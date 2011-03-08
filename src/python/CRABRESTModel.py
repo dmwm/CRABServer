@@ -21,7 +21,7 @@ import json
 import cherrypy
 
 class CRABRESTModel(RESTModel):
-    
+    """ CRAB Interface to the WMAgent """
     def __init__(self, config={}):
         '''
         Initialise the RESTModel and add some methods to it.
@@ -146,22 +146,25 @@ class CRABRESTModel(RESTModel):
 
         CheckIn.checkIn(request)
         # Auto Assign the requests     
-        ChangeState.changeRequestStatus(requestName, 'assignment-approved')
+        ChangeState.changeRequestStatus(requestSchema['RequestName'], 'assignment-approved')
         # Auto Assign the requests     
         ### what is the meaning of the Team in the Analysis use case? 
-        ChangeState.assignRequest(requestName, requestSchema["Team"])
-     
+        ChangeState.assignRequest(requestSchema['RequestName'], requestSchema["Team"])
         #return  ID & status
         return json.dumps(result)
 
     
     def addNewUser(self):
         """
+        The client must pass the user DN. 
+        The server get the username from sitedb (using userDN)
+        The user DN must be propagated to WMBS wmbs_user.name
         """
 
         body = cherrypy.request.body.read()
         requestorInfos = unidecode(JsonWrapper.loads(body))
 
+        userDN = requestorInfos["UserDN"]
         user = requestorInfos["Username"]
         group = requestorInfos["Group"]
         team = requestorInfos["Team"]
