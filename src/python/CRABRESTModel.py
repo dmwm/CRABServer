@@ -15,6 +15,7 @@ from WMCore.RequestManager.RequestDB.Interface.User import Registration
 from WMCore.RequestManager.RequestDB.Interface.Group import Information
 from WMCore.RequestManager.RequestDB.Interface.Admin import GroupManagement, ProdManagement
 from WMCore.Cache.WMConfigCache import ConfigCache
+from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 import hashlib
 import cherrypy
 import threading
@@ -28,11 +29,16 @@ class CRABRESTModel(RESTModel):
         Initialise the RESTModel and add some methods to it.
         '''
         RESTModel.__init__(self, config)
-        #self.hostAddress = config.model.reqMgrHost
+
         self.couchUrl = config.model.couchUrl
         self.workloadCouchDB = config.model.workloadCouchDB
-        self.configCacheCouchURL =  config.configCacheCouchURL
+        self.configCacheCouchURL = config.configCacheCouchURL
         self.configCacheCouchDB = config.configCacheCouchDB
+        self.agentDN = config.agentDN
+        self.SandBoxCache_endpoint = config.SandBoxCache_endpoint
+        self.SandBoxCache_port = config.SandBoxCache_port
+        self.SandBoxCache_basepath = config.SandBoxCache_basepath
+
         #/user
         self._addMethod('POST', 'user', self.addNewUser,
                         args=[],
@@ -52,85 +58,118 @@ class CRABRESTModel(RESTModel):
                         validation=[self.isalnum])
         #/config
         self._addMethod('POST', 'config', self.postUserConfig,
-                        args=[''],
+                        args=[],
                         validation=[self.checkConfig])
 
-        # Server status
-        self._addMethod('GET', 'status', self.getServerStatus)
+        # Server
+        self._addMethod('GET', 'info', self.getServerInfo,
+                        args=[],
+                        validation=[self.isalnum])
 
         cherrypy.engine.subscribe('start_thread', self.initThread)
 
 
     def initThread(self, thread_index):
-        """ The ReqMgr expects the DBI to be contained in the Thread  """
+        """
+        The ReqMgr expects the DBI to be contained in the Thread
+        """
         myThread = threading.currentThread()
         #myThread = cherrypy.thread_data
         # Get it from the DBFormatter superclass
         myThread.dbi = self.dbi
 
     def checkConfig(self, pset):
-        """ check user configuration """
+        """
+        Check user configuration
+        """
         return pset
 
     def postUserConfig(self):
-        """ this must act as proxy for CouchDB. Upload user config and return DocID """
+        """
+        Act as a proxy for CouchDB. Upload user config and return DocID.
+        """
 
         body = cherrypy.request.body.read()
         params = unidecode(JsonWrapper.loads(body))
 
-        configCache = ConfigCache(self.confiCacheCouchURL, self.configCacheCouchDB)
-        configCache.createUserGroup(params['groupName'], params['userName'])
+        configCache = ConfigCache(self.configCacheCouchURL, self.configCacheCouchDB)
+        try:
+            user = SiteDBJSON().dnUserName(params['UserDN'])
+        except Exception, ex:
+            raise cherrypy.HTTPError(500, ex.message)
 
-        configMD5 = hashlib.md5(params['confFile']).hexdigest()
+        configCache.createUserGroup(params['Group'], user)
+
+        configMD5 = hashlib.md5(params['ConfFile']).hexdigest()
         configCache.document['md5_hash'] = configMD5
-        configCache.document['pset_hash'] = params['psetHash']     #edmConfigHash
-        configCache.attachments['configFile'] = params['confFile']
+        configCache.document['pset_hash'] = params['PsetHash']
+        configCache.attachments['configFile'] = params['ConfFile']
 
-        configCache.setPSetTweaks(json.loads(params['psetTweaks']))
-        configCache.setLabel(params['label'])
-        configCache.setDescription(params['description'])
+        configCache.setPSetTweaks(json.loads(params['PsetTweaks']))
+
+        logging.error(params['PsetTweaks'])
+
+        configCache.setLabel(params['Label'])
+        configCache.setDescription(params['Description'])
         configCache.save()
 
         result = {}
-        result['DocID'] = configCache.id
+        result['DocID']  = configCache.document["_id"]
+        result['DocRev'] = configCache.document["_rev"]
 
         return result
 
-    def getServerStatus(self):
-        result = {
-                'number_of_tasks':0,
-                'my_proxy':'myproxy.cern.ch',
-                'server_dn': '',
-                'server_se_path': '/path/',
-                'couch_url': "CONFIG_CACHE",
-                'in_drain': False,
-                'admin': "spiga"
-                }
+    def getServerInfo(self):
+        """
+        Return informatiion to allow client operations
+        """
+
+        result = {}
+        ## could be a list of all supported DN
+        result['server_dn']  = self.agentDN
+        result['my_proxy'] = 'myproxy.cern.ch'
+        result['sandbox'] = {}
+        result['sandbox']['type'] = 'gridFtp'
+        # the following will change as soon as we follow up on #1305
+        # at the moment is gridFTP specific.
+        result['sandbox']['endpoint'] = self.SandBoxCache_endpoint
+        result['sandbox']['port'] = self.SandBoxCache_port
+        result['sandbox']['basepath'] = self.SandBoxCache_basepath
+
         return result
 
-    def isalnum(self, index):
-        """ Validates that all input is alphanumeric,
-            with spaces and underscores tolerated"""
-        for v in index.values():
+    def isalnum(self, call_input):
+        """
+        Validates that all input is alphanumeric, with spaces and underscores
+        tolerated.
+        """
+        for v in call_input.values():
             WMCore.Lexicon.identifier(v)
-        return index
+        return call_input
 
     def getTaskStatus(self, requestID):
-        """ Return the whole task status  """
+        """
+        Return the whole task status
+        """
         requestDetails = GetRequest.getRequestDetails(requestID)
         return requestDetails
 
-
     def putTaskModifies(self, requestID):
-        """ Modify the task in any possible field : B/W lists, stop/start automation... """
+        """
+        Modify the task in any possible field : B/W lists, stop/start automation...
+        """
         return requestID
 
     def deleteRequest(self, requestID):
-        """    """
+        """
+        Delete a request identified by requestID
+        """
         return requestID
 
     def postRequest(self, requestName):
-        """ Checks the request n the body with one arg, and changes the status with kwargs """
+        """
+        Checks the request n the body with one arg, and changes the status with kwargs
+        """
         result = {}
         body = cherrypy.request.body.read()
         requestSchema = unidecode(JsonWrapper.loads(body))
@@ -157,7 +196,7 @@ class CRABRESTModel(RESTModel):
         try:
             specificSchema.validate()
         except Exception, ex:
-            raise cherrypy.HTTPError(400,ex.message)
+            raise cherrypy.HTTPError(400, ex.message)
 
         request = maker(specificSchema)
         helper = WMWorkloadHelper(request['WorkflowSpec'])
@@ -172,12 +211,12 @@ class CRABRESTModel(RESTModel):
         try:
             CheckIn.checkIn(request)
         except Exception, ex:
-            raise cherrypy.HTTPError(500,ex.message)
+            raise cherrypy.HTTPError(500, ex.message)
         # Auto Assign the requests
         try:
             ChangeState.changeRequestStatus(requestSchema['RequestName'], 'assignment-approved')
         except Exception, ex:
-            raise cherrypy.HTTPError(500,ex.message)
+            raise cherrypy.HTTPError(500, ex.message)
         # Auto Assign the requests
         ### what is the meaning of the Team in the Analysis use case?
         ChangeState.assignRequest(requestSchema['RequestName'], requestSchema["Team"])
@@ -198,31 +237,32 @@ class CRABRESTModel(RESTModel):
         logging.info(requestorInfos)
 
         userDN = requestorInfos.get("UserDN", None)
-        user = requestorInfos.get("Username", None)
         group = requestorInfos.get("Group", None)
         team = requestorInfos.get("Team", "Analysis")
         email = requestorInfos.get("Email", None)
 
         result = {}
         if userDN != None :
-            logging.info("userDN: To DO")
-            # get hnName from it.
-            # for the moment uses what the client pass..
+            mySiteDB = SiteDBJSON()
+            try:
+                user = mySiteDB.dnUserName(userDN)
+            except Exception, ex:
+                raise cherrypy.HTTPError(500, ex.message)
         else:
             raise cherrypy.HTTPError(400, "Bad input userDN not defined")
         if user != None:
             if email == None: raise cherrypy.HTTPError(400, "Bad input user email not defined")
             if not Registration.isRegistered(user):
-                Registration.registerUser(user, email,userDN)
-                result['user'] = '%s registered'%user
+                Registration.registerUser(user, email, userDN)
+                result['user'] = '%s registered' % user
             else:
-                result['user'] = '%s already registered'%user
+                result['user'] = '%s already registered' % user
         if group != None:
             if not Information.groupExists(group):
                 GroupManagement.addGroup(group)
-                result['group'] = '% registered' %group
+                result['group'] = '% registered' % group
             else:
-                result['group'] = '%s already registered'%group
+                result['group'] = '%s already registered' % group
         if group != None and user != None:
             factory = DBConnect.getConnection()
             idDAO = factory(classname = "Requestor.ID")
@@ -232,11 +272,11 @@ class CRABRESTModel(RESTModel):
             if len(assoc) == 0:
                 GroupManagement.addUserToGroup(user, group)
         if team != None:
-            if not ProdManagement.teamExist(team):
+            if not ProdManagement.getTeamID(team):
                 ProdManagement.addTeam(team)
-                result['team'] = '%s registered' %team
+                result['team'] = '%s registered' % team
             else:
-                result['team'] = '%s already registered' %team
+                result['team'] = '%s already registered' % team
         else:
             raise cherrypy.HTTPError(400, "Bad input Team not defined")
 
