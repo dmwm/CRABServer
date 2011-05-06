@@ -5,6 +5,7 @@ from WMCore.WebTools.RESTModel import RESTModel
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import unidecode, removePasswordFromUrl
 from WMCore.RequestManager.RequestMaker.Registry import retrieveRequestMaker
+from WMCore.Database.CMSCouch import CouchServer
 import WMCore.RequestManager.RequestDB.Connection as DBConnect
 import WMCore.Wrappers.JsonWrapper as JsonWrapper
 import WMCore.Lexicon
@@ -22,6 +23,22 @@ import threading
 import json
 import cherrypy
 
+def getJobsFromRange(myrange):
+    """
+    Take a string and return a list of jobId
+    """
+    myrange = myrange.replace(' ','').split(',')
+    result = []
+    for element in myrange:
+        if element.count('-') > 0:
+            mySubRange = element.split('-')
+            jobInterval = range( int(mySubRange[0]), int(mySubRange[1])+1)
+            result.extend(jobInterval)
+        else:
+            result.append(int(element))
+
+    return result
+
 class CRABRESTModel(RESTModel):
     """ CRAB Interface to the WMAgent """
     def __init__(self, config={}):
@@ -34,6 +51,8 @@ class CRABRESTModel(RESTModel):
         self.workloadCouchDB = config.model.workloadCouchDB
         self.configCacheCouchURL = config.configCacheCouchURL
         self.configCacheCouchDB = config.configCacheCouchDB
+        self.jsmCacheCouchURL = config.jsmCacheCouchURL
+        self.jsmCacheCouchDB = config.jsmCacheCouchDB
         self.agentDN = config.agentDN
         self.SandBoxCache_endpoint = config.SandBoxCache_endpoint
         self.SandBoxCache_port = config.SandBoxCache_port
@@ -60,6 +79,9 @@ class CRABRESTModel(RESTModel):
         self._addMethod('POST', 'config', self.postUserConfig,
                         args=[],
                         validation=[self.checkConfig])
+        #/data
+        self._addMethod('GET', 'data', self.getDataLocation,
+                       args=['requestID','jobRange'], validation=[self.checkConfig])
 
         # Server
         self._addMethod('GET', 'info', self.getServerInfo,
@@ -211,7 +233,7 @@ class CRABRESTModel(RESTModel):
         try:
             CheckIn.checkIn(request)
         except Exception, ex:
-            raise cherrypy.HTTPError(500, ex.message)
+            raise cherrypy.HTTPError(500, str(ex))
         # Auto Assign the requests
         try:
             ChangeState.changeRequestStatus(requestSchema['RequestName'], 'assignment-approved')
@@ -254,9 +276,7 @@ class CRABRESTModel(RESTModel):
             if email == None: raise cherrypy.HTTPError(400, "Bad input user email not defined")
             if not Registration.isRegistered(user):
                 Registration.registerUser(user, email, userDN)
-                result['user'] = '%s registered' % user
-            else:
-                result['user'] = '%s already registered' % user
+            result['hn_name'] = '%s' % user
         if group != None:
             if not Information.groupExists(group):
                 GroupManagement.addGroup(group)
@@ -281,3 +301,54 @@ class CRABRESTModel(RESTModel):
             raise cherrypy.HTTPError(400, "Bad input Team not defined")
 
         return result
+
+    def getDataLocation(self, requestID, jobRange):
+
+        """
+        Load PFN by Workflow and return {JobID:PFN}
+        """
+        logging.info("Getting Data Locations for request %s and jobs range %s" % (requestID, str(jobRange)))
+
+        try:
+            WMCore.Lexicon.jobrange(jobRange)
+        except AssertionError, ex:
+	    raise cherrypy.HTTPError(400, "Bad range of jobs specified")
+        jobRange = getJobsFromRange(jobRange)
+
+        try:
+            logging.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
+            self.couchdb = CouchServer(self.jsmCacheCouchURL)
+            self.fwjrdatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
+        except Exception, ex:
+            raise cherrypy.HTTPError(400, "Error connecting to couch: %s" % str(ex))
+
+        options = {"startkey": [requestID], "endkey": [requestID] }
+
+        result = {}
+
+        fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "outputPFNByWorkflowName", options)
+        logging.debug("Found %d rows in the fwjr database." % len(fwjrResults["rows"]))
+
+        for f in fwjrResults["rows"]:
+            currID = f['value']['jobid']
+            if currID in jobRange and f['value'].has_key('pfn'):
+                #check the retry count
+                if result.has_key(currID):
+                    oldJobId_RetryCount = result[currID][0]
+                    oldRetryCount = int(oldJobId_RetryCount.split('-')[1])
+                    currRetryCount = int(f['id'].split('-')[1])
+                    #insert in the result dict only if it is a new retry
+                    if currRetryCount > oldRetryCount:
+                        result[currID] = [ f['id'] , f['value']['pfn'] ]
+                else:
+                    result[currID] = [ f['id'] , f['value']['pfn'] ]
+
+        #Compact result deleting jobid-retrycount keys
+        logging.debug("Preparing results")
+        lightresult = {}
+        for jobid, id_pfn in result.items():
+            lightresult[ str(jobid) ] = id_pfn[1]
+
+        return lightresult
+
+
