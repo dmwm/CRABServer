@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """
+Example configuration for CRABServer
 """
 
 import os
@@ -14,6 +15,7 @@ workDirectory = "/CRABInterface/worgkin/dir"
 
 couchURL = "http://user:passwd@host:5984"
 workloadCouchDB = "workloadCouchDB"
+jsmCacheDBName = "jsmCacheDBName"
 
 databaseUrl = "mysql://root@localhost/ReqMgrDB"
 databaseSocket = "/path/mysql.sock"
@@ -68,4 +70,5 @@ config.CRABInterface.views.active.crab.model.workloadCouchDB = workloadCouchDB
 config.CRABInterface.views.active.crab.model.object = 'CRABRESTModel'
 config.CRABInterface.views.active.crab.formatter.object = 'WMCore.WebTools.RESTFormatter'
 
-
+config.CRABInterface.views.active.crab.jsmCacheCouchURL = couchURL
+config.CRABInterface.views.active.crab.jsmCacheCouchDB = jsmCacheDBName
