@@ -20,8 +20,6 @@ jsmCacheDBName = "jsmCacheDBName"
 databaseUrl = "mysql://root@localhost/ReqMgrDB"
 databaseSocket = "/path/mysql.sock"
 
-yuiRoot = "http://yui.yahooapis.com/2.8.0r4"
-
 config = Configuration()
 
 config.section_("General")
@@ -31,7 +29,6 @@ config.CoreDatabase.connectUrl = databaseUrl
 config.CoreDatabase.socket = databaseSocket
 
 config.webapp_("CRABInterface")
-CRABInterfaceUrl = "http://%s:%s" % (serverHostName, CRABInterfacePort)
 
 config.CRABInterface.componentDir = config.General.workDir + "/CRABInterface"
 config.CRABInterface.Webtools.host = serverHostName
@@ -52,7 +49,6 @@ config.CRABInterface.admin = "admin@mail.address"
 config.CRABInterface.title = "CRAB REST Interface"
 config.CRABInterface.description = "rest interface for crab"
 config.CRABInterface.instance = "Analysis WMAGENT"
-config.CRABInterface.yuiroot = yuiRoot
 
 config.CRABInterface.section_("security")
 config.CRABInterface.security.dangerously_insecure = True
