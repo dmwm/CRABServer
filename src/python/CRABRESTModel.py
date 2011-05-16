@@ -83,6 +83,10 @@ class CRABRESTModel(RESTModel):
         self._addMethod('GET', 'data', self.getDataLocation,
                        args=['requestID','jobRange'], validation=[self.checkConfig])
 
+        #/log
+        self._addMethod('GET', 'log', self.getLogLocation,
+                       args=['requestID','jobRange'], validation=[self.checkConfig])
+
         # Server
         self._addMethod('GET', 'info', self.getServerInfo,
                         args=[],
@@ -118,7 +122,7 @@ class CRABRESTModel(RESTModel):
         try:
             user = SiteDBJSON().dnUserName(params['UserDN'])
         except Exception, ex:
-            raise cherrypy.HTTPError(500, ex.message)
+            raise cherrypy.HTTPError(500, "Problem extracting user from SiteDB %s" % str(ex))
 
         configCache.createUserGroup(params['Group'], user)
 
@@ -238,7 +242,7 @@ class CRABRESTModel(RESTModel):
         try:
             ChangeState.changeRequestStatus(requestSchema['RequestName'], 'assignment-approved')
         except Exception, ex:
-            raise cherrypy.HTTPError(500, ex.message)
+            raise cherrypy.HTTPError(500, str(ex))
         # Auto Assign the requests
         ### what is the meaning of the Team in the Analysis use case?
         ChangeState.assignRequest(requestSchema['RequestName'], requestSchema["Team"])
@@ -269,7 +273,7 @@ class CRABRESTModel(RESTModel):
             try:
                 user = mySiteDB.dnUserName(userDN)
             except Exception, ex:
-                raise cherrypy.HTTPError(500, ex.message)
+                raise cherrypy.HTTPError(500, "Problem extracting user from SiteDB %s" % str(ex))
         else:
             raise cherrypy.HTTPError(400, "Bad input userDN not defined")
         if user != None:
@@ -303,9 +307,8 @@ class CRABRESTModel(RESTModel):
         return result
 
     def getDataLocation(self, requestID, jobRange):
-
         """
-        Load PFN by Workflow and return {JobID:PFN}
+        Load output PFNs by Workflow and return {JobID:PFN}
         """
         logging.info("Getting Data Locations for request %s and jobs range %s" % (requestID, str(jobRange)))
 
@@ -324,11 +327,42 @@ class CRABRESTModel(RESTModel):
 
         options = {"startkey": [requestID], "endkey": [requestID] }
 
-        result = {}
-
         fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "outputPFNByWorkflowName", options)
         logging.debug("Found %d rows in the fwjr database." % len(fwjrResults["rows"]))
 
+        return self.extractPFNs(fwjrResults, jobRange)
+
+    def getLogLocation(self, requestID, jobRange):
+        """
+        Load log PFNs by Workflow and return {JobID:PFN}
+        """
+        self.logger.info("Getting Logs Locations for request %s and jobs range %s" % (requestID, str(jobRange)))
+
+        try:
+            WMCore.Lexicon.jobrange(jobRange)
+        except AssertionError, ex:
+            raise cherrypy.HTTPError(400, "Please specify a valid range of jobs")
+
+        jobRange = getJobsFromRange(jobRange)
+
+        try:
+            self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
+            self.couchdb = CouchServer(self.jsmCacheCouchURL)
+            self.fwjrdatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
+        except Exception, ex:
+            raise cherrypy.HTTPError(400, "Error connecting to couch: %s" % str(ex))
+
+        options = {"startkey": [requestID], "endkey": [requestID] }
+
+        fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "logArchivesPFNByWorkflowName", options)
+
+        return self.extractPFNs(fwjrResults, jobRange)
+
+
+    def extractPFNs(self, fwjrResults, jobRange):
+        """
+        """
+        result = {}
         for f in fwjrResults["rows"]:
             currID = f['value']['jobid']
             if currID in jobRange and f['value'].has_key('pfn'):
@@ -350,5 +384,4 @@ class CRABRESTModel(RESTModel):
             lightresult[ str(jobid) ] = id_pfn[1]
 
         return lightresult
-
 
