@@ -1,4 +1,5 @@
 #!/usr/bin/env/ python
+#pylint: disable=E1101
 """
 _CRABRESTModel_t_
 
@@ -97,8 +98,15 @@ process.out_step = cms.EndPath(process.output)'''
         "jobRange" : '125-126,127,128-129'
     }
 
+    logLocParams = {
+        "requestID" : "mmascher_crab_MyAnalysis___110506_123756",
+        "jobRange" : '347,348'
+    }
 
     def initialize(self):
+        """
+            Initialize the class.
+        """
         self.config = DefaultConfig('CRABRESTModel')
         self.config.Webtools.environment = 'development'
         self.config.Webtools.error_log_level = logging.ERROR
@@ -145,6 +153,9 @@ process.out_step = cms.EndPath(process.output)'''
 
 
     def tearDown(self):
+        """
+        _tearDown_
+        """
         self.testInit.tearDownCouch()
         self.testInit.clearDatabase()
 
@@ -247,15 +258,22 @@ process.out_step = cms.EndPath(process.output)'''
 
     outpfn = 'srm://srmcms.pic.es:8443/srm/managerv2?SFN=/pnfs/pic.es/data/cms/store/user/mmascher/RelValProdTTbar/\
 1304039730//0000/4C86B480-0D72-E011-978B-002481CFE25E.root'
+    logpfn = 'srm://storm-se-01.ba.infn.it:8444/srm/managerv2?SFN=/cms//store/unmerged/logs/prod/2011/5/6/\
+mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e-0026b958c394-99-0-logArchive.tar.gz'
 
     def injectFWJR(self, reportXML, jobID, retryCount, taskName):
+        """
+        Inject a fake fwjr with a cmsRun1 section into couchDB
+        """
         couchServer = CouchServer(os.environ["COUCHURL"])
         changeStateDB = couchServer.connectDatabase(jsmCacheDB + "/fwjrs")
+
         myReport = Report("cmsRun1")
         myReport.parse(reportXML)
         myReport.setTaskName(taskName)
         myReport.data.cmsRun1.status = 0
         myReport.data.cmsRun1.output.output.files.file0.OutputPFN = self.outpfn
+
         fwjrDocument = {"_id": "%s-%s" % (jobID, retryCount),
                         "jobid": jobID,
                         "retrycount": retryCount,
@@ -265,7 +283,34 @@ process.out_step = cms.EndPath(process.output)'''
         changeStateDB.commit()
 
 
+    def injectLogFWJR(self, jobID, retryCount, taskName):
+        """
+        Inject a fake fwjr with a logArch1 section into couchDB
+        """
+        couchServer = CouchServer(os.environ["COUCHURL"])
+        changeStateDB = couchServer.connectDatabase(jsmCacheDB + "/fwjrs")
+
+        myReportLog = Report("logArch1")
+        myReportLog.setTaskName(taskName)
+        myReportLog.addOutputModule(moduleName = "logArchive")
+        reportFile = {"lfn": "", "pfn": self.logpfn,
+                      "location": "SEName", "module_label": "logArchive",
+                      "events": 0, "size": 0, "merged": False}
+        myReportLog.addOutputFile(outputModule = "logArchive", file = reportFile)
+
+        fwjrDocumentLog = {"_id": "%s-%s" % (jobID, retryCount),
+                        "jobid": jobID,
+                        "retrycount": retryCount,
+                        "fwjr": myReportLog.__to_json__(None),
+                        "type": "fwjr"}
+        changeStateDB.queue(fwjrDocumentLog, timestamp = True)
+        changeStateDB.commit()
+
+
     def testGetJobsFromRange(self):
+        """
+        Test getJobsFromRange function
+        """
         result = getJobsFromRange("1")
         self.assertEqual(result, [1])
 
@@ -277,6 +322,9 @@ process.out_step = cms.EndPath(process.output)'''
 
 
     def testGetDataLocation(self):
+        """
+        Test /data API
+        """
         host = "http://%s:%s " % (self.config.Webtools.host, self.config.Webtools.port)
         api = "/%s/rest/data/" % (self.config.Webtools.application.lower())
 
@@ -308,6 +356,43 @@ process.out_step = cms.EndPath(process.output)'''
                         'application/json', 'application/json', {'code' : 400})
         self.assertTrue(exp is not None)
 
+
+    def testGetLogLocation(self):
+        """
+        Test /log API
+        """
+        host = "http://%s:%s " % (self.config.Webtools.host, self.config.Webtools.port)
+        api = "/%s/rest/log/" % (self.config.Webtools.application.lower())
+
+        self.injectLogFWJR(347, 0, "/%s/Analysis" % self.logLocParams["requestID"])
+        self.injectLogFWJR(348, 0, "/%s/Analysis" % self.logLocParams["requestID"])
+        #import time
+        #time.sleep(20)
+
+        result, exp = methodTest('GET', host + api, self.logLocParams, \
+                        'application/json', 'application/json', {'code' : 200})
+        result = json.loads(result)
+
+        self.assertEqual(result['347'], self.logpfn)
+
+        #Check job with multiple fwjr
+        self.injectLogFWJR(347, 1, "/%s/Analysis" % self.logLocParams["requestID"])
+        result, exp = methodTest('GET', host + api, self.logLocParams, \
+                        'application/json', 'application/json', {'code' : 200})
+        self.assertTrue(exp is not None)
+        result = json.loads(result)
+
+        self.assertEqual(result['347'], self.logpfn)
+        self.assertEqual(result['348'], self.logpfn)
+
+        #Test invalid ranges
+        self.logLocParams['jobRange'] = 'I'
+        result, exp = methodTest('GET', host + api, self.logLocParams, \
+                        'application/json', 'application/json', {'code' : 400})
+        self.assertTrue(exp is not None)
+
+
+        print str(result)
 
 
 if __name__ == "__main__":
