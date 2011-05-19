@@ -10,9 +10,7 @@ from WMCore.Configuration import Configuration
 
 serverHostName = "HOST_NAME"
 CRABInterfacePort = 8888
-
 workDirectory = "/CRABInterface/worgkin/dir"
-
 couchURL = "http://user:passwd@host:5984"
 workloadCouchDB = "workloadCouchDB"
 jsmCacheDBName = "jsmCacheDBName"
@@ -47,11 +45,16 @@ config.CRABInterface.templates =os.path.join(getWMBASE(),
 config.CRABInterface.configCacheCouchURL = "YourConfigCacheUrl"
 config.CRABInterface.configCacheCouchDB = "configCacheCouchDB-Name"
 
+## TODO once the deploy model has been defined.. we will clarify how 
+##      to deal with these params
 config.CRABInterface.agentDN = "/Your/Agent/DN.here/"
 config.CRABInterface.SandBoxCache_endpoint = "USB-cache-endpoint"
 config.CRABInterface.SandBoxCache_port  = "PORT"
 config.CRABInterface.SandBoxCache_basepath ="/Path/if/Needed"
 
+config.CRABInterface.views.active.crab.jsmCacheCouchURL = couchURL
+config.CRABInterface.views.active.crab.jsmCacheCouchDB = jsmCacheDBName
+##
 
 config.CRABInterface.admin = "admin@mail.address"
 config.CRABInterface.title = "CRAB REST Interface"
@@ -67,12 +70,10 @@ config.CRABInterface.views.active.section_('crab')
 config.CRABInterface.views.active.crab.section_('model')
 config.CRABInterface.views.active.crab.section_('formatter')
 config.CRABInterface.views.active.crab.object = 'WMCore.WebTools.RESTApi'
-config.CRABInterface.views.active.crab.templates =  os.path.join(getWMBASE(),
+config.CRABInterface.views.active.crab.templates = os.path.join(getWMBASE(),
                                        "src/templates/WMCore/WebTools/")
 config.CRABInterface.views.active.crab.model.couchUrl = couchURL
 config.CRABInterface.views.active.crab.model.workloadCouchDB = workloadCouchDB
 config.CRABInterface.views.active.crab.model.object = 'CRABRESTModel'
 config.CRABInterface.views.active.crab.formatter.object = 'WMCore.WebTools.RESTFormatter'
 
-config.CRABInterface.views.active.crab.jsmCacheCouchURL = couchURL
-config.CRABInterface.views.active.crab.jsmCacheCouchDB = jsmCacheDBName
