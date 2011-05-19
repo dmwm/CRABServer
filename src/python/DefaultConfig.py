@@ -33,6 +33,14 @@ config.section_("CoreDatabase")
 config.CoreDatabase.connectUrl = databaseUrl
 config.CoreDatabase.socket = databaseSocket
 
+config.section_("Agent")
+config.Agent.hostName = serverHostName
+#config.Agent.contact = userEmail
+#config.Agent.teamName = teamName
+#config.Agent.agentName = agentName
+#config.Agent.useMsgService = False
+#config.Agent.useTrigger = False
+#config.Agent.useHeartbeat = False
 config.webapp_("CRABInterface")
 CRABInterfaceUrl = "http://%s:%s" % (serverHostName, CRABInterfacePort)
 
