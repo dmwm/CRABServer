@@ -1,6 +1,10 @@
 import time
+import commands
 import logging
+import shutil
+import tempfile
 
+from WMCore.WebTools.RESTModel import restexpose
 from WMCore.WebTools.RESTModel import RESTModel
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import unidecode, removePasswordFromUrl
@@ -16,6 +20,7 @@ from WMCore.RequestManager.RequestDB.Interface.User import Registration
 from WMCore.RequestManager.RequestDB.Interface.Group import Information
 from WMCore.RequestManager.RequestDB.Interface.Admin import GroupManagement, ProdManagement
 from WMCore.Cache.WMConfigCache import ConfigCache
+from WMCore.Services.Requests import JSONRequests
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 import hashlib
 import cherrypy
@@ -91,6 +96,13 @@ class CRABRESTModel(RESTModel):
         self._addMethod('GET', 'info', self.getServerInfo,
                         args=[],
                         validation=[self.isalnum])
+
+        # uploadConfig. Add directly since the file cannot be parsed through validation
+        self.methods['POST']['uploadUserSandbox'] = {'args':       ['userfile', 'doUpload'],
+                                          'call':       self.uploadUserSandbox,
+                                          'validation': [],
+                                          'version':    1,
+                                          'expires':    self.defaultExpires}
 
         cherrypy.engine.subscribe('start_thread', self.initThread)
 
@@ -385,3 +397,53 @@ class CRABRESTModel(RESTModel):
 
         return lightresult
 
+    @restexpose
+    def uploadUserSandbox(self, userfile, doUpload=1):
+        """
+        Receive the upload of the user sandbox and forward on to UserFileCache
+        if needed
+        """
+        ufcHost = 'http://%s:%s/' % (self.SandBoxCache_endpoint, self.SandBoxCache_port)
+
+        # Calculate the hash of the file
+        hasher = hashlib.sha256()
+
+        size = 0
+        while True:
+            data = userfile.file.read(8192)
+            if not data:
+                break
+            hasher.update(data)
+            size += len(data)
+        digest = hasher.hexdigest()
+
+        # See if the server already has this file
+        if doUpload:
+            userFileCache = JSONRequests(url=ufcHost)
+            existsResult = userFileCache.get(uri=self.SandBoxCache_basepath+'/exists', data={'hashkey':digest})
+            if existsResult[0]['exists']:
+                logging.debug("Sandbox %s already exists" % digest)
+                return existsResult[0]
+
+        # Not on server, make a local copy for curl
+        downloadUrl = 'Upload not attempted'
+        with tempfile.NamedTemporaryFile() as uploadHandle:
+            userfile.file.seek(0)
+            shutil.copyfileobj(userfile.file, uploadHandle)
+            uploadHandle.flush()
+
+            url = '%s%s/upload' % (ufcHost, self.SandBoxCache_basepath)
+            if doUpload:
+                logging.debug("Uploading user sandbox %s to %s" % (digest, url))
+                # Upload the file to UserFileCache
+                with tempfile.NamedTemporaryFile() as curlOutput:
+                    curlCommand = 'curl -H "Accept: application/json" -F userfile=@%s %s -o %s' % \
+                                (uploadHandle.name, url, curlOutput.name)
+                    (status, output) = commands.getstatusoutput(curlCommand)
+                    returnDict = json.loads(curlOutput.read())
+                    size = returnDict['size']
+                    downloadUrl= returnDict['url']
+                    digest = returnDict['hashkey']
+
+        results = {'size':size, 'hashkey':digest, 'url':downloadUrl}
+        return results

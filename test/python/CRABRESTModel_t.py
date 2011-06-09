@@ -5,10 +5,14 @@ _CRABRESTModel_t_
 
 """
 
+import commands
 import json
 import unittest
 import logging
 import os
+import tempfile
+import time
+
 from WMQuality.WebTools.RESTClientAPI import methodTest
 from WMQuality.WebTools.RESTBaseUnitTest import RESTBaseUnitTest
 from WMQuality.WebTools.RESTServerSetup import DefaultConfig
@@ -27,6 +31,7 @@ workloadDB = 'workload_db_test'
 configCacheDB = 'config_cache_test'
 jsmCacheDB = 'jsmcache_test'
 
+doUpload = 0 # Change to 1 if you have a UserFileCache server running and configured
 
 class CRABRESTModelTest(RESTBaseUnitTest):
     """
@@ -128,9 +133,9 @@ process.out_step = cms.EndPath(process.output)'''
         self.config.UnitTests.views.active.rest.jsmCacheCouchURL = couchURL
         self.config.UnitTests.views.active.rest.jsmCacheCouchDB = jsmCacheDB
         self.config.UnitTests.views.active.rest.agentDN = ''
-        self.config.UnitTests.views.active.rest.SandBoxCache_endpoint = ''
-        self.config.UnitTests.views.active.rest.SandBoxCache_port = ''
-        self.config.UnitTests.views.active.rest.SandBoxCache_basepath = ''
+        self.config.UnitTests.views.active.rest.SandBoxCache_endpoint = 'cms-xen39.fnal.gov'
+        self.config.UnitTests.views.active.rest.SandBoxCache_port = 7739
+        self.config.UnitTests.views.active.rest.SandBoxCache_basepath = 'userfilecache/userfilecache'
         self.config.UnitTests.views.active.rest.logLevel = 'DEBUG'
 
         self.schemaModules = ['WMCore.RequestManager.RequestDB']
@@ -393,6 +398,38 @@ mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e
 
 
         print str(result)
+
+    def testUpload(self):
+        """
+        Test uploading with curl
+        Make sure size returned by server is what we expect
+        """
+
+        testInputName  = '/tmp/UnitTestInputFile'
+        try:
+            os.unlink(testInputName)
+        except OSError:
+            pass
+
+        with open(testInputName, 'w') as testFile:
+            testFile.write(str(time.time()))
+            testFile.write('\nFirst line\n')
+            [testFile.write(str(x)) for x in xrange(0,1000)]
+            testFile.write('\nLast line\n')
+
+        with tempfile.NamedTemporaryFile() as tmpFile:
+            url = self.urlbase + 'uploadUserSandbox'
+            curlCommand = 'curl -H "Accept: application/json" -F "doUpload=%s" -F"userfile=@%s" %s -o %s' % \
+                          (doUpload, testInputName, url, tmpFile.name)
+            (status, output) = commands.getstatusoutput(curlCommand)
+            self.assertEqual(status, 0, 'Upload failed with output %s' % output)
+            returnDict = json.loads(tmpFile.read())
+
+            self.assertEqual(returnDict['size'], os.path.getsize(testInputName))
+
+        import pdb
+        pdb.set_trace()
+        return returnDict
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ import unittest
 import urllib
 
 from WMQuality.WebTools.RESTBaseUnitTest import RESTBaseUnitTest
+from WMQuality.WebTools.RESTClientAPI import makeRequest
 from WMQuality.WebTools.RESTClientAPI import methodTest
 from WMQuality.WebTools.RESTServerSetup import DefaultConfig
 
@@ -80,7 +81,7 @@ class TestUserFileCache(RESTBaseUnitTest):
         # Make a test file
         with open(testInputName, 'w') as testFile:
             testFile.write('First line\n')
-            [testFile.write(str(x)) for x in xrange(0,1000)]
+            [testFile.write(str(x)) for x in xrange(0, 1000)]
             testFile.write('\nLast line\n')
 
         self.host = 'http://%s:%s' % (self.config.Webtools.host, self.config.Webtools.port)
@@ -117,7 +118,7 @@ class TestUserFileCache(RESTBaseUnitTest):
         returnDict = self.testUpload()
 
         opener = urllib.FancyURLopener()
-        url = '%s/unittests/download?hashkey=%s' % (self.host, returnDict['id'])
+        url = '%s/unittests/download?hashkey=%s' % (self.host, returnDict['hashkey'])
         opener.retrieve(url, testOutputName)
 
         self.assertEqual(os.path.getsize(testOutputName), os.path.getsize(testInputName))
@@ -140,7 +141,6 @@ class TestUserFileCache(RESTBaseUnitTest):
 
             self.assertEqual(status, 0, 'Upload failed with output %s' % output)
             returnDict = json.loads(tmpFile.read())
-
             self.assertEqual(returnDict['size'], os.path.getsize(testInputName))
         return returnDict
 
@@ -158,7 +158,38 @@ class TestUserFileCache(RESTBaseUnitTest):
 
         methodTest(verb, url, output=output, expireTime=expireTime)
 
+    def testExists(self):
+        """
+        Test the exists function
+        """
+        verb = 'GET'
+        existsUrl = self.urlbase + 'exists'
+        uploadUrl = self.urlbase + 'upload'
+        expireTime = 0
 
+        # This one can't exist, too short
+        requestInput = {'hashkey':'fffffffffffffffffffff'}
+        expected = json.dumps({"exists":False})
+        output = {'code':200, 'type':'text/json', 'data':expected}
+        methodTest(verb, existsUrl, output=output, expireTime=expireTime, request_input=requestInput)
+
+        # Upload the file
+        with tempfile.NamedTemporaryFile() as curlOutput:
+            curlCommand = 'curl -H "Accept: application/json" -F userfile=@%s %s -o %s' % \
+                          (testInputName, uploadUrl, curlOutput.name)
+            (status, output) = commands.getstatusoutput(curlCommand)
+            self.assertEqual(status, 0, 'Problem uploading with curl')
+            returnDict = json.loads(curlOutput.read())
+
+        # Now re-test exists
+        requestInput = {'hashkey':returnDict['hashkey']}
+        data, code, contentType, response = makeRequest(existsUrl, values=requestInput,
+                                  verb=verb, accept='application/json', contentType='application/json')
+        jsonData = json.loads(data)
+        self.assertEqual(code, 200)
+        self.assertTrue(jsonData['exists'])
+
+        return
 
 if __name__ == '__main__':
     unittest.main()
