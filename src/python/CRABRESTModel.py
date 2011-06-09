@@ -245,6 +245,7 @@ class CRABRESTModel(RESTModel):
         del metadata['WorkflowSpec']
         workloadUrl = helper.saveCouch(self.couchUrl, self.workloadCouchDB, metadata=metadata)
         request['RequestWorkflow'] = removePasswordFromUrl(workloadUrl)
+        request['PrepID'] = None
 
         try:
             CheckIn.checkIn(request)
@@ -385,17 +386,15 @@ class CRABRESTModel(RESTModel):
                     currRetryCount = int(f['id'].split('-')[1])
                     #insert in the result dict only if it is a new retry
                     if currRetryCount > oldRetryCount:
-                        result[currID] = [ f['id'] , f['value']['pfn'] ]
+                        result[str(currID)] = { 'pfn':f['value']['pfn'] }
+                        if hasattr(f['value'], 'checksums'):
+                            result[str(currID)].update( {'checksums':f['value']['checksums']})
                 else:
-                    result[currID] = [ f['id'] , f['value']['pfn'] ]
+                    result[str(currID)] = {'pfn':f['value']['pfn']}
+                    if hasattr(f['value'], 'checksums'):
+                        result[str(currID)].update( {'checksums':f['value']['checksums']})
 
-        #Compact result deleting jobid-retrycount keys
-        logging.debug("Preparing results")
-        lightresult = {}
-        for jobid, id_pfn in result.items():
-            lightresult[ str(jobid) ] = id_pfn[1]
-
-        return lightresult
+        return result
 
     @restexpose
     def uploadUserSandbox(self, userfile, doUpload=1):
