@@ -261,6 +261,25 @@ process.out_step = cms.EndPath(process.output)'''
         self.assertTrue(result['ID'].startswith("%s_%s" % (self.postReqParams["Username"], \
                                           self.postReqParams["RequestName"])))
 
+        # Test various problems with asyncDest
+        self.postReqParams['asyncDest'] = 'T2_US_Bari'
+        jsonString = json.dumps(self.postReqParams, sort_keys=False)
+        result, exp = methodTest('POST', host + api, jsonString, \
+                        'application/json', 'application/json', {'code' : 500})
+        self.assertTrue(result.find('not a valid CMS site') > 1)
+
+        self.postReqParams['asyncDest'] = 'Bari'
+        jsonString = json.dumps(self.postReqParams, sort_keys=False)
+        result, exp = methodTest('POST', host + api, jsonString, \
+                        'application/json', 'application/json', {'code' : 500})
+        self.assertTrue(result.find('not a valid CMS site name') > 1)
+
+        del self.postReqParams['asyncDest']
+        jsonString = json.dumps(self.postReqParams, sort_keys=False)
+        result, exp = methodTest('POST', host + api, jsonString, \
+                        'application/json', 'application/json', {'code' : 500})
+        self.assertTrue(result.find('asyncDest parameter is missing') > 1)
+
     outpfn = 'srm://srmcms.pic.es:8443/srm/managerv2?SFN=/pnfs/pic.es/data/cms/store/user/mmascher/RelValProdTTbar/\
 1304039730//0000/4C86B480-0D72-E011-978B-002481CFE25E.root'
     logpfn = 'srm://storm-se-01.ba.infn.it:8444/srm/managerv2?SFN=/cms//store/unmerged/logs/prod/2011/5/6/\
@@ -427,8 +446,6 @@ mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e
 
             self.assertEqual(returnDict['size'], os.path.getsize(testInputName))
 
-        import pdb
-        pdb.set_trace()
         return returnDict
 
 

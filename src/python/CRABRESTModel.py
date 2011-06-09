@@ -213,6 +213,8 @@ class CRABRESTModel(RESTModel):
         requestSchema = unidecode(JsonWrapper.loads(body))
         logging.error(requestSchema)
 
+        self.validateAsyncDest(requestSchema)
+
         requestSchema["CouchUrl"] =  self.configCacheCouchURL
         requestSchema["CouchDBName"] =  self.configCacheCouchDB
 
@@ -446,3 +448,24 @@ class CRABRESTModel(RESTModel):
 
         results = {'size':size, 'hashkey':digest, 'url':downloadUrl}
         return results
+
+    def validateAsyncDest(self, request):
+        """
+        Make sure asyncDest is there, has the right format, and is a valid site
+        """
+        if not request.get('asyncDest', None):
+            raise cherrypy.HTTPError(500, 'asyncDest parameter is missing from request')
+
+        asyncDest = request['asyncDest']
+        try:
+            if not WMCore.Lexicon.cmsname(asyncDest):
+                raise cherrypy.HTTPError(500, 'asyncDest parameter (%s) is not a valid CMS site name' % asyncDest)
+        except AssertionError:
+            raise cherrypy.HTTPError(500, 'asyncDest parameter (%s) is not a valid CMS site name' % asyncDest)
+
+        se = SiteDBJSON().cmsNametoSE(asyncDest)
+        if len(se) < 1:
+            raise cherrypy.HTTPError(500, 'asyncDest parameter (%s) is not a valid CMS site name' % asyncDest)
+
+        return True
+
