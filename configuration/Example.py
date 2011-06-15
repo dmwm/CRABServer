@@ -18,6 +18,10 @@ jsmCacheDBName = "jsmCacheDBName"
 databaseUrl = "mysql://root@localhost/ReqMgrDB"
 databaseSocket = "/path/mysql.sock"
 
+ufcHostName = 'cms-xen39.fnal.gov'
+ufcPort = 7725
+ufcBasepath = 'userfilecache/userfilecache'
+
 config = Configuration()
 
 config.section_("General")
@@ -49,9 +53,9 @@ config.CRABInterface.configCacheCouchDB = "configCacheCouchDB-Name"
 ## TODO once the deploy model has been defined.. we will clarify how
 ##      to deal with these params
 config.CRABInterface.agentDN = "/Your/Agent/DN.here/"
-config.CRABInterface.SandBoxCache_endpoint = "USB-cache-endpoint"
-config.CRABInterface.SandBoxCache_port  = "PORT"
-config.CRABInterface.SandBoxCache_basepath ="/Path/if/Needed"
+config.CRABInterface.SandBoxCache_endpoint = ufcHostName
+config.CRABInterface.SandBoxCache_port  = ufcPort
+config.CRABInterface.SandBoxCache_basepath = ufcBasepath
 ##
 
 config.CRABInterface.admin = "admin@mail.address"
@@ -78,4 +82,46 @@ config.CRABInterface.views.active.crab.formatter.object = 'WMCore.WebTools.RESTF
 ##      to deal with these params
 config.CRABInterface.views.active.crab.jsmCacheCouchURL = couchURL
 config.CRABInterface.views.active.crab.jsmCacheCouchDB = jsmCacheDBName
-##
+
+## Configuration to setup UserFileCache for sandbox uploads
+
+config.webapp_("UserFileCache")
+userFileCacheUrl = "http://%s:%s" % (ufcHostName, ufcPort)
+
+config.UserFileCache.componentDir = config.General.workDir + "/UserFileCache"
+
+config.UserFileCache.userCacheDir = '/tmp/ufCache'
+config.UserFileCache.Webtools.host = ufcHostName
+config.UserFileCache.Webtools.port = ufcPort
+config.UserFileCache.Webtools.environment = 'devel'
+config.UserFileCache.templates = os.path.join(os.environ["WMCORE_ROOT"], 'templates/WMCore/WebTools')
+
+config.UserFileCache.admin = 'admin@mail.address'
+config.UserFileCache.title = "User File Cache"
+config.UserFileCache.description = "Upload and download of user files"
+
+config.UserFileCache.section_("security")
+config.UserFileCache.security.dangerously_insecure = True
+
+views = config.UserFileCache.section_('views')
+
+# These are all the active pages that Root.py should instantiate
+active = views.section_('active')
+
+# Main part of userfilecache uses REST model
+
+userfilecache = active.section_('userfilecache')
+userfilecache.serviceURL = "%s/userfilecache/userfilecache" % userFileCacheUrl
+userfilecache.object = 'WMCore.WebTools.RESTApi'
+
+userfilecache.section_('model')
+userfilecache.model.object = 'CRABServer.UserFileCache.UserFileCacheRESTModel'
+userfilecache.section_('formatter')
+userfilecache.formatter.object = 'WMCore.WebTools.RESTFormatter'
+userfilecache.default_expires = 0 # no caching
+
+# Download uses Page model
+
+download = active.section_('download')
+download.object = 'CRABServer.UserFileCache.UserFileCachePage'
+download.templates = os.path.join(os.environ["WMCORE_ROOT"], 'templates/WMCore/WebTools')
