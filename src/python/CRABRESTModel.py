@@ -68,7 +68,7 @@ class CRABRESTModel(RESTModel):
                         args=[],
                         validation=[self.isalnum])
         #/task
-        self._addMethod('GET', 'task', self.getTaskStatus,
+        self._addMethod('GET', 'task', self.getDetailedStatus,
                         args=['requestID'],
                         validation=[self.isalnum])
         self._addMethod('PUT', 'task', self.putTaskModifies,
@@ -184,13 +184,6 @@ class CRABRESTModel(RESTModel):
         for v in call_input.values():
             WMCore.Lexicon.identifier(v)
         return call_input
-
-    def getTaskStatus(self, requestID):
-        """
-        Return the whole task status
-        """
-        requestDetails = GetRequest.getRequestDetails(requestID)
-        return requestDetails
 
     def putTaskModifies(self, requestID):
         """
@@ -320,6 +313,38 @@ class CRABRESTModel(RESTModel):
             raise cherrypy.HTTPError(400, "Bad input Team not defined")
 
         return result
+
+    def getDetailedStatus(self, requestID):
+        """
+        Get the status with job counts, etc
+        """
+        logging.info("Getting detailed status info for request %s" % (requestID))
+
+        try:
+            logging.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
+            self.couchdb = CouchServer(self.jsmCacheCouchURL)
+            self.jobDatabase = self.couchdb.connectDatabase("%s/jobs" % self.jsmCacheCouchDB)
+        except Exception, ex:
+            raise cherrypy.HTTPError(400, "Error connecting to couch: %s" % str(ex))
+        options = {"reduce": False, "startkey": [requestID], "endkey": [requestID, {}] }
+        jobResults = self.jobDatabase.loadView("JobDump", "statusByWorkflowName", options)
+        logging.debug("Found %d rows in the jobs database." % len(jobResults["rows"]))
+
+        requestDetails = GetRequest.getRequestDetails(requestID)
+
+        stateDict = {}
+
+        for row in jobResults['rows']:
+            jobId = row['value']['jobid']
+            state = row['value']['state']
+
+            if stateDict.has_key(state):
+                stateDict[state]['count'] += 1
+                stateDict[state]['jobs'].append(jobId)
+            else:
+                stateDict[state] = {'count':1, 'jobs':[jobId]}
+
+        return {'states':stateDict, 'requestDetails':requestDetails}
 
     def getDataLocation(self, requestID, jobRange):
         """
@@ -465,7 +490,7 @@ class CRABRESTModel(RESTModel):
 
         se = SiteDBJSON().cmsNametoSE(asyncDest)
         if len(se) < 1:
-            raise cherrypy.HTTPError(500, 'asyncDest parameter (%s) is not a valid CMS site name' % asyncDest)
+            raise cherrypy.HTTPError(500, 'asyncDest parameter (%s) is not a valid CMS site name or has no associated SE' % asyncDest)
 
         return True
 
