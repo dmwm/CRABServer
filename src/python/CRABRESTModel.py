@@ -414,11 +414,11 @@ class CRABRESTModel(RESTModel):
                     #insert in the result dict only if it is a new retry
                     if currRetryCount > oldRetryCount:
                         result[str(currID)] = { 'pfn':f['value']['pfn'] }
-                        if hasattr(f['value'], 'checksums'):
+                        if f['value'].has_key('checksums'):
                             result[str(currID)].update( {'checksums':f['value']['checksums']})
                 else:
                     result[str(currID)] = {'pfn':f['value']['pfn']}
-                    if hasattr(f['value'], 'checksums'):
+                    if f['value'].has_key('checksums'):
                         result[str(currID)].update( {'checksums':f['value']['checksums']})
 
         return result
