@@ -1,8 +1,16 @@
-import time
+"""
+CRAB Interface to the WMAgent
+"""
+
+import cherrypy
 import commands
+import hashlib
 import logging
 import shutil
 import tempfile
+import threading
+import time
+import json
 
 from WMCore.WebTools.RESTModel import restexpose
 from WMCore.WebTools.RESTModel import RESTModel
@@ -22,11 +30,6 @@ from WMCore.RequestManager.RequestDB.Interface.Admin import GroupManagement, Pro
 from WMCore.Cache.WMConfigCache import ConfigCache
 from WMCore.Services.Requests import JSONRequests
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
-import hashlib
-import cherrypy
-import threading
-import json
-import cherrypy
 
 def getJobsFromRange(myrange):
     """
@@ -59,9 +62,9 @@ class CRABRESTModel(RESTModel):
         self.jsmCacheCouchURL = config.jsmCacheCouchURL
         self.jsmCacheCouchDB = config.jsmCacheCouchDB
         self.agentDN = config.agentDN
-        self.SandBoxCache_endpoint = config.SandBoxCache_endpoint
-        self.SandBoxCache_port = config.SandBoxCache_port
-        self.SandBoxCache_basepath = config.SandBoxCache_basepath
+        self.sandBoxCacheEndpoint = config.SandBoxCache_endpoint
+        self.sandBoxCachePort = config.SandBoxCache_port
+        self.sandBoxCacheBasepath = config.SandBoxCache_basepath
 
         #/user
         self._addMethod('POST', 'user', self.addNewUser,
@@ -170,9 +173,9 @@ class CRABRESTModel(RESTModel):
         result['sandbox']['type'] = 'gridFtp'
         # the following will change as soon as we follow up on #1305
         # at the moment is gridFTP specific.
-        result['sandbox']['endpoint'] = self.SandBoxCache_endpoint
-        result['sandbox']['port'] = self.SandBoxCache_port
-        result['sandbox']['basepath'] = self.SandBoxCache_basepath
+        result['sandbox']['endpoint'] = self.sandBoxCacheEndpoint
+        result['sandbox']['port'] = self.sandBoxCachePort
+        result['sandbox']['basepath'] = self.sandBoxCacheBasepath
 
         return result
 
@@ -285,7 +288,8 @@ class CRABRESTModel(RESTModel):
         else:
             raise cherrypy.HTTPError(400, "Bad input userDN not defined")
         if user != None:
-            if email == None: raise cherrypy.HTTPError(400, "Bad input user email not defined")
+            if email == None:
+                raise cherrypy.HTTPError(400, "Bad input user email not defined")
             if not Registration.isRegistered(user):
                 Registration.registerUser(user, email, userDN)
             result['hn_name'] = '%s' % user
@@ -355,8 +359,9 @@ class CRABRESTModel(RESTModel):
         try:
             WMCore.Lexicon.jobrange(jobRange)
         except AssertionError, ex:
-	    raise cherrypy.HTTPError(400, "Bad range of jobs specified")
+            raise cherrypy.HTTPError(400, "Bad range of jobs specified")
         jobRange = getJobsFromRange(jobRange)
+        jobList = self.jobList(requestID)
 
         try:
             logging.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
@@ -370,7 +375,7 @@ class CRABRESTModel(RESTModel):
         fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "outputPFNByWorkflowName", options)
         logging.debug("Found %d rows in the fwjr database." % len(fwjrResults["rows"]))
 
-        return self.extractPFNs(fwjrResults, jobRange)
+        return self.extractPFNs(fwjrResults, jobRange, jobList)
 
     def getLogLocation(self, requestID, jobRange):
         """
@@ -384,6 +389,7 @@ class CRABRESTModel(RESTModel):
             raise cherrypy.HTTPError(400, "Please specify a valid range of jobs")
 
         jobRange = getJobsFromRange(jobRange)
+        jobList = self.jobList(requestID)
 
         try:
             self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
@@ -396,31 +402,38 @@ class CRABRESTModel(RESTModel):
 
         fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "logArchivesPFNByWorkflowName", options)
 
-        return self.extractPFNs(fwjrResults, jobRange)
+        return self.extractPFNs(fwjrResults, jobRange, jobList)
 
 
-    def extractPFNs(self, fwjrResults, jobRange):
+    def extractPFNs(self, fwjrResults, jobRange, jobList):
         """
+        Pull the list of PFNs out of a couch view
         """
         result = {}
         for f in fwjrResults["rows"]:
             currID = f['value']['jobid']
-            if currID in jobRange and f['value'].has_key('pfn'):
-                #check the retry count
-                if result.has_key(currID):
-                    oldJobId_RetryCount = result[currID][0]
-                    oldRetryCount = int(oldJobId_RetryCount.split('-')[1])
-                    currRetryCount = int(f['id'].split('-')[1])
-                    #insert in the result dict only if it is a new retry
-                    if currRetryCount > oldRetryCount:
-                        result[str(currID)] = { 'pfn':f['value']['pfn'] }
+            jobID = int(currID)
+            if jobID in jobList and f['value'].has_key('pfn'):
+                jobNum = jobList.index(jobID) + 1
+                if jobNum in jobRange:
+                    jobKey = str(jobNum)
+                    logging.debug("Found file for jobID %s at index %s" % (jobID, jobNum))
+                    #check the retry count
+                    if result.has_key(jobKey):
+                        oldJobId_RetryCount = result[jobKey][0]
+                        oldRetryCount = int(oldJobId_RetryCount.split('-')[1])
+                        currRetryCount = int(f['id'].split('-')[1])
+                        #insert in the result dict only if it is a new retry
+                        if currRetryCount > oldRetryCount:
+                            result[jobKey] = { 'pfn':f['value']['pfn'] }
+                            if f['value'].has_key('checksums'):
+                                result[jobKey].update( {'checksums':f['value']['checksums']})
+                    else:
+                        result[jobKey] = {'pfn':f['value']['pfn']}
                         if f['value'].has_key('checksums'):
-                            result[str(currID)].update( {'checksums':f['value']['checksums']})
-                else:
-                    result[str(currID)] = {'pfn':f['value']['pfn']}
-                    if f['value'].has_key('checksums'):
-                        result[str(currID)].update( {'checksums':f['value']['checksums']})
+                            result[jobKey].update( {'checksums':f['value']['checksums']})
 
+        logging.debug("PFN dict %s" % result)
         return result
 
     @restexpose
@@ -429,7 +442,7 @@ class CRABRESTModel(RESTModel):
         Receive the upload of the user sandbox and forward on to UserFileCache
         if needed
         """
-        ufcHost = 'http://%s:%s/' % (self.SandBoxCache_endpoint, self.SandBoxCache_port)
+        ufcHost = 'http://%s:%s/' % (self.sandBoxCacheEndpoint, self.sandBoxCachePort)
 
         # Calculate the hash of the file
         hasher = hashlib.sha256()
@@ -446,7 +459,7 @@ class CRABRESTModel(RESTModel):
         # See if the server already has this file
         if doUpload:
             userFileCache = JSONRequests(url=ufcHost)
-            existsResult = userFileCache.get(uri=self.SandBoxCache_basepath+'/exists', data={'hashkey':digest})
+            existsResult = userFileCache.get(uri=self.sandBoxCacheBasepath+'/exists', data={'hashkey':digest})
             if existsResult[0]['exists']:
                 logging.debug("Sandbox %s already exists" % digest)
                 return existsResult[0]
@@ -458,7 +471,7 @@ class CRABRESTModel(RESTModel):
             shutil.copyfileobj(userfile.file, uploadHandle)
             uploadHandle.flush()
 
-            url = '%s%s/upload' % (ufcHost, self.SandBoxCache_basepath)
+            url = '%s%s/upload' % (ufcHost, self.sandBoxCacheBasepath)
             if doUpload:
                 logging.debug("Uploading user sandbox %s to %s" % (digest, url))
                 # Upload the file to UserFileCache
@@ -494,3 +507,23 @@ class CRABRESTModel(RESTModel):
 
         return True
 
+    def jobList(self, requestID):
+        """
+        Return a list of job IDs in order to aid in correlating user job # with JobID
+        """
+
+        try:
+            self.couchdb = CouchServer(self.jsmCacheCouchURL)
+            self.jobDatabase = self.couchdb.connectDatabase("%s/jobs" % self.jsmCacheCouchDB)
+        except Exception, ex:
+            raise cherrypy.HTTPError(400, "Error connecting to couch: %s" % str(ex))
+
+        options = {"reduce": False, "startkey": [requestID], "endkey": [requestID, {}] }
+        jobResults = self.jobDatabase.loadView("JobDump", "statusByWorkflowName", options)
+        logging.debug("Found %d rows in the jobs database." % len(jobResults["rows"]))
+
+        # Sort the jobs numerically
+        jobList = [int(row['value']['jobid']) for row in jobResults['rows']]
+        jobList.sort()
+
+        return jobList
