@@ -12,6 +12,7 @@ import logging
 import os
 import tempfile
 import time
+import hashlib
 
 from WMQuality.WebTools.RESTClientAPI import methodTest
 from WMQuality.WebTools.RESTBaseUnitTest import RESTBaseUnitTest
@@ -415,9 +416,6 @@ mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e
                         'application/json', 'application/json', {'code' : 400})
         self.assertTrue(exp is not None)
 
-
-        print str(result)
-
     def testUpload(self):
         """
         Test uploading with curl
@@ -436,10 +434,18 @@ mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e
             [testFile.write(str(x)) for x in xrange(0,1000)]
             testFile.write('\nLast line\n')
 
+        sha256sum = hashlib.sha256()
+        with open(testInputName,'rb') as f:
+            while True:
+                chunkdata = f.read(8192)
+                if not chunkdata:
+                    break
+                sha256sum.update(chunkdata)
+
         with tempfile.NamedTemporaryFile() as tmpFile:
             url = self.urlbase + 'uploadUserSandbox'
-            curlCommand = 'curl -H "Accept: application/json" -F "doUpload=%s" -F"userfile=@%s" %s -o %s' % \
-                          (doUpload, testInputName, url, tmpFile.name)
+            curlCommand = 'curl -H "Accept: application/json" -F "checksum=%s" -F "doUpload=%s" -F"userfile=@%s" %s -o %s' % \
+                          (sha256sum.hexdigest(), doUpload, testInputName, url, tmpFile.name)
             (status, output) = commands.getstatusoutput(curlCommand)
             self.assertEqual(status, 0, 'Upload failed with output %s' % output)
             returnDict = json.loads(tmpFile.read())

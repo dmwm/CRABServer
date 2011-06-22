@@ -101,7 +101,7 @@ class CRABRESTModel(RESTModel):
                         validation=[self.isalnum])
 
         # uploadConfig. Add directly since the file cannot be parsed through validation
-        self.methods['POST']['uploadUserSandbox'] = {'args':       ['userfile', 'doUpload'],
+        self.methods['POST']['uploadUserSandbox'] = {'args':       ['userfile', 'checksum', 'doUpload'],
                                           'call':       self.uploadUserSandbox,
                                           'validation': [],
                                           'version':    1,
@@ -437,7 +437,7 @@ class CRABRESTModel(RESTModel):
         return result
 
     @restexpose
-    def uploadUserSandbox(self, userfile, doUpload=1):
+    def uploadUserSandbox(self, userfile, checksum, doUpload=1):
         """
         Receive the upload of the user sandbox and forward on to UserFileCache
         if needed
@@ -455,6 +455,10 @@ class CRABRESTModel(RESTModel):
             hasher.update(data)
             size += len(data)
         digest = hasher.hexdigest()
+
+        # Basic preservation of the file integrity
+        if not (digest == checksum):
+            raise cherrypy.HTTPError(400, 'File transfer error: digest check failed.')
 
         # See if the server already has this file
         if doUpload:

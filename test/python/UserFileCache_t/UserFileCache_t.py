@@ -13,6 +13,7 @@ import shutil
 import tempfile
 import unittest
 import urllib
+import hashlib
 
 from WMQuality.WebTools.RESTBaseUnitTest import RESTBaseUnitTest
 from WMQuality.WebTools.RESTClientAPI import makeRequest
@@ -133,15 +134,25 @@ class TestUserFileCache(RESTBaseUnitTest):
         Make sure size returned by server is what we expect
         """
 
+        sha256sum = hashlib.sha256()
+        with open(testInputName,'rb') as f:
+            while True:
+                chunkdata = f.read(8192)
+                if not chunkdata:
+                    break
+                sha256sum.update(chunkdata)
+
         with tempfile.NamedTemporaryFile() as tmpFile:
             url = self.urlbase + 'upload'
-            curlCommand = 'curl -H "Accept: application/json" -F userfile=@%s %s -o %s' % \
-                          (testInputName, url, tmpFile.name)
+            curlCommand = 'curl -H "Accept: application/json" -F checksum=%s -F userfile=@%s %s -o %s' % \
+                          (sha256sum.hexdigest(), testInputName, url, tmpFile.name)
             (status, output) = commands.getstatusoutput(curlCommand)
 
             self.assertEqual(status, 0, 'Upload failed with output %s' % output)
             returnDict = json.loads(tmpFile.read())
             self.assertEqual(returnDict['size'], os.path.getsize(testInputName))
+            self.assertEqual(returnDict['hashkey'], sha256sum.hexdigest())
+
         return returnDict
 
 
@@ -158,6 +169,7 @@ class TestUserFileCache(RESTBaseUnitTest):
 
         methodTest(verb, url, output=output, expireTime=expireTime)
 
+
     def testExists(self):
         """
         Test the exists function
@@ -173,10 +185,18 @@ class TestUserFileCache(RESTBaseUnitTest):
         output = {'code':200, 'type':'text/json', 'data':expected}
         methodTest(verb, existsUrl, output=output, expireTime=expireTime, request_input=requestInput)
 
+        sha256sum = hashlib.sha256()
+        with open(testInputName,'rb') as f:
+            while True:
+                chunkdata = f.read(8192)
+                if not chunkdata:
+                    break
+                sha256sum.update(chunkdata)
+
         # Upload the file
         with tempfile.NamedTemporaryFile() as curlOutput:
-            curlCommand = 'curl -H "Accept: application/json" -F userfile=@%s %s -o %s' % \
-                          (testInputName, uploadUrl, curlOutput.name)
+            curlCommand = 'curl -H "Accept: application/json" -F checksum=%s -F userfile=@%s %s -o %s' % \
+                          ( sha256sum.hexdigest(), testInputName, uploadUrl, curlOutput.name)
             (status, output) = commands.getstatusoutput(curlCommand)
             self.assertEqual(status, 0, 'Problem uploading with curl')
             returnDict = json.loads(curlOutput.read())
@@ -188,8 +208,10 @@ class TestUserFileCache(RESTBaseUnitTest):
         jsonData = json.loads(data)
         self.assertEqual(code, 200)
         self.assertTrue(jsonData['exists'])
+        self.assertEqual(sha256sum.hexdigest(), returnDict['hashkey'])
 
         return
+
 
 if __name__ == '__main__':
     unittest.main()

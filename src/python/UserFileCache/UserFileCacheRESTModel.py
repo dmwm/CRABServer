@@ -31,7 +31,7 @@ class UserFileCacheRESTModel(RESTModel):
 
         if not self.methods.has_key('POST'):
             self.methods['POST'] = {}
-        self.methods['POST']['upload'] = {'args':       ['userfile'],
+        self.methods['POST']['upload'] = {'args':       ['userfile', 'checksum'],
                                           'call':       self.upload,
                                           'validation': [],
                                           'version':    1,
@@ -75,7 +75,7 @@ class UserFileCacheRESTModel(RESTModel):
 
 
     @restexpose
-    def upload(self, userfile):
+    def upload(self, userfile, checksum):
         """
         Upload the file, calculating the hash renaming it to the
         hash value. If the file already exists, just touch it
@@ -93,6 +93,10 @@ class UserFileCacheRESTModel(RESTModel):
         digest = hasher.hexdigest()
         fileDir = os.path.join(self.cacheDir, digest[0:2])
         fileName = os.path.join(fileDir, digest)
+
+        # Basic preservation of the file integrity
+        if not (digest == checksum):
+            raise cherrypy.HTTPError(400, 'File transfer error: digest check failed.')
 
         if os.path.isfile(fileName):
             self.touch(digest)
@@ -116,4 +120,5 @@ class UserFileCacheRESTModel(RESTModel):
         #fileName = os.path.join(fileDir, digest)
         if os.path.isfile(fileName):
             os.utime(fileName, None)
+
         return
