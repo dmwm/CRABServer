@@ -480,8 +480,8 @@ class CRABRESTModel(RESTModel):
                 logging.debug("Uploading user sandbox %s to %s" % (digest, url))
                 # Upload the file to UserFileCache
                 with tempfile.NamedTemporaryFile() as curlOutput:
-                    curlCommand = 'curl -H "Accept: application/json" -F userfile=@%s %s -o %s' % \
-                                (uploadHandle.name, url, curlOutput.name)
+                    curlCommand = 'curl -H "Accept: application/json" -F"checksum=%s" -F userfile=@%s %s -o %s' % \
+                                (digest, uploadHandle.name, url, curlOutput.name)
                     (status, output) = commands.getstatusoutput(curlCommand)
                     returnDict = json.loads(curlOutput.read())
                     size = returnDict['size']

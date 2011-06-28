@@ -45,7 +45,6 @@ config.CRABInterface.Webtools.host = serverHostName
 config.CRABInterface.Webtools.port = CRABInterfacePort
 config.CRABInterface.Webtools.environment = "devel"
 config.CRABInterface.templates = os.path.join(os.environ["WMCORE_ROOT"], 'templates/WMCore/WebTools')
-                                       "src/templates/WMCore/WebTools")
 
 config.CRABInterface.configCacheCouchURL = "YourConfigCacheUrl"
 config.CRABInterface.configCacheCouchDB = "configCacheCouchDB-Name"
