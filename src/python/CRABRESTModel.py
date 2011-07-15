@@ -11,6 +11,7 @@ import tempfile
 import threading
 import time
 import json
+import imp
 
 from WMCore.WebTools.RESTModel import restexpose
 from WMCore.WebTools.RESTModel import RESTModel
