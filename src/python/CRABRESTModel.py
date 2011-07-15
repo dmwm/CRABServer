@@ -66,6 +66,11 @@ class CRABRESTModel(RESTModel):
         self.sandBoxCachePort = config.SandBoxCache_port
         self.sandBoxCacheBasepath = config.SandBoxCache_basepath
 
+        self.clientMapping = {}
+        if hasattr(config, 'clientMapping'):
+            clientmapper = imp.load_source('', config.clientMapping)
+            self.clientMapping = clientmapper.defaulturi
+
         #/user
         self._addMethod('POST', 'user', self.addNewUser,
                         args=[],
@@ -101,6 +106,10 @@ class CRABRESTModel(RESTModel):
 
         # Server
         self._addMethod('GET', 'info', self.getServerInfo,
+                        args=[],
+                        validation=[self.isalnum])
+
+        self._addMethod('GET', 'requestmapping', self.getClientMapping,
                         args=[],
                         validation=[self.isalnum])
 
@@ -555,3 +564,12 @@ class CRABRESTModel(RESTModel):
         jobList.sort()
 
         return jobList
+
+    @restexpose
+    def getClientMapping(self):
+        """
+        Return the dictionary that allows the client to map the client configuration to the server request
+        It also returns the URI for each API
+        """
+
+        return self.clientMapping

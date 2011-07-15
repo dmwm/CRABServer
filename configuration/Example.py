@@ -52,6 +52,7 @@ config.CRABInterface.configCacheCouchDB = "configCacheCouchDB-Name"
 ## TODO once the deploy model has been defined.. we will clarify how
 ##      to deal with these params
 config.CRABInterface.agentDN = "/Your/Agent/DN.here/"
+config.CRABInterface.clientMapping = '/PATH/configuration/ClientMapping.py'
 config.CRABInterface.SandBoxCache_endpoint = ufcHostName
 config.CRABInterface.SandBoxCache_port  = ufcPort
 config.CRABInterface.SandBoxCache_basepath = ufcBasepath
