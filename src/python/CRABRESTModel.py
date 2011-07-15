@@ -91,6 +91,10 @@ class CRABRESTModel(RESTModel):
         self._addMethod('GET', 'data', self.getDataLocation,
                        args=['requestID','jobRange'], validation=[self.checkConfig])
 
+        #/goodLumis, equivalent of "report" from CRAB2
+        self._addMethod('GET', 'goodLumis', self.getGoodLumis,
+                       args=['requestID'], validation=[self.checkConfig])
+
         #/log
         self._addMethod('GET', 'log', self.getLogLocation,
                        args=['requestID','jobRange'], validation=[self.checkConfig])
@@ -403,6 +407,26 @@ class CRABRESTModel(RESTModel):
         fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "logArchivesPFNByWorkflowName", options)
 
         return self.extractPFNs(fwjrResults, jobRange, jobList)
+
+
+    def getGoodLumis(self, requestID):
+        """
+        Return the list of good lumis processed as generated
+        by CouchDB
+        """
+        self.logger.info("Getting list of processed lumis for request %s" % (requestID))
+
+        try:
+            self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
+            self.couchdb = CouchServer(self.jsmCacheCouchURL)
+            self.fwjrdatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
+        except Exception, ex:
+            raise cherrypy.HTTPError(400, "Error connecting to couch: %s" % str(ex))
+
+        keys = [requestID]
+
+        goodLumis = self.fwjrdatabase.loadList("FWJRDump", "lumiList", "goodLumisByWorkflowName", keys=keys)
+        return json.loads(goodLumis)
 
 
     def extractPFNs(self, fwjrResults, jobRange, jobList):
