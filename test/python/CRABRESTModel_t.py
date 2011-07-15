@@ -20,6 +20,7 @@ from WMQuality.WebTools.RESTServerSetup import DefaultConfig
 from WMCore.Cache.WMConfigCache import ConfigCache
 from WMCore.Database.CMSCouch import CouchServer
 from WMCore.FwkJobReport.Report import Report
+from CRABServer.CRABRESTModel import getJobsFromRange
 from CRABRESTModel import getJobsFromRange
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import allSoftwareVersions
 import WMCore.RequestManager.RequestDB.Interface.Admin.SoftwareManagement as SoftwareAdmin
@@ -101,12 +102,12 @@ process.out_step = cms.EndPath(process.output)'''
 
     dataLocParams = {
         "requestID" : "mmascher_crab_MyAnalysis___110429_030846",
-        "jobRange" : '125-126,127,128-129'
+        "jobRange" : '1,2'
     }
 
     logLocParams = {
         "requestID" : "mmascher_crab_MyAnalysis___110506_123756",
-        "jobRange" : '347,348'
+        "jobRange" : '1,2'
     }
 
     def initialize(self):
@@ -115,8 +116,8 @@ process.out_step = cms.EndPath(process.output)'''
         """
         self.config = DefaultConfig('CRABRESTModel')
         self.config.Webtools.environment = 'development'
-        self.config.Webtools.error_log_level = logging.ERROR
-        self.config.Webtools.access_log_level = logging.ERROR
+        self.config.Webtools.error_log_level = logging.DEBUG
+        self.config.Webtools.access_log_level = logging.DEBUG
         self.config.Webtools.port = 8588
 
         #DB Parameters used by RESTServerSetup
@@ -149,10 +150,11 @@ process.out_step = cms.EndPath(process.output)'''
         _setUp_
         """
         RESTBaseUnitTest.setUp(self)
-        self.testInit.setupCouch("workload_db_test")
-        self.testInit.setupCouch("config_cache_test", "ConfigCache")
+        self.testInit.setupCouch(workloadDB)
+        self.testInit.setupCouch(configCacheDB, "ConfigCache")
 
         self.testInit.setupCouch(jsmCacheDB + "/fwjrs", "FWJRDump")
+        self.testInit.setupCouch(jsmCacheDB + "/jobs", "JobDump")
 
         for v in allSoftwareVersions():
             SoftwareAdmin.addSoftware(v)
@@ -170,11 +172,10 @@ process.out_step = cms.EndPath(process.output)'''
         """
         _insertConfig_
         """
-        host = "http://%s:%s " % (self.config.Webtools.host, self.config.Webtools.port)
-        api = "/%s/rest/config/" % (self.config.Webtools.application.lower())
+        api = "config"
 
         jsonString = json.dumps(self.insConfParams, sort_keys=False)
-        result, exp = methodTest('POST', host + api, jsonString, 'application/json', \
+        result, exp = methodTest('POST', self.urlbase + api, jsonString, 'application/json', \
                                  'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
 
@@ -204,11 +205,10 @@ process.out_step = cms.EndPath(process.output)'''
         """
         _insertUser_
         """
-        host = "http://%s:%s " % (self.config.Webtools.host, self.config.Webtools.port)
-        api = "/%s/rest/user/" % (self.config.Webtools.application.lower())
+        api = "user"
 
         jsonString = json.dumps(self.insUserParams, sort_keys=False)
-        result, exp = methodTest('POST', host + api, jsonString, 'application/json', \
+        result, exp = methodTest('POST', self.urlbase + api, jsonString, 'application/json', \
                                  'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
         return json.loads(result)
@@ -234,9 +234,7 @@ process.out_step = cms.EndPath(process.output)'''
         """
         _testPostRequest_
         """
-        host = "http://%s:%s " % (self.config.Webtools.host, self.config.Webtools.port)
-        api = "/%s/rest/task/%s" % (self.config.Webtools.application.lower(), \
-                                    self.postReqParams['RequestName'])
+        api = "task/%s" % self.postReqParams['RequestName']
 
         #_insertConfig has been already tested in the previous test method
         result = self.insertConfig()
@@ -244,14 +242,14 @@ process.out_step = cms.EndPath(process.output)'''
 
         #Posting a request without registering the user first
         jsonString = json.dumps(self.postReqParams, sort_keys=False)
-        result, exp = methodTest('POST', host + api, jsonString, \
+        result, exp = methodTest('POST', self.urlbase + api, jsonString, \
                         'application/json', 'application/json', {'code' : 500})
         self.assertTrue(exp is not None)
 
         #Again, insertUser tested before. It should work
         self.insertUser()
 
-        result, exp = methodTest('POST', host + api, jsonString, \
+        result, exp = methodTest('POST', self.urlbase + api, jsonString, \
                         'application/json', 'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
         result = json.loads(result)
@@ -265,19 +263,19 @@ process.out_step = cms.EndPath(process.output)'''
         # Test various problems with asyncDest
         self.postReqParams['asyncDest'] = 'T2_US_Bari'
         jsonString = json.dumps(self.postReqParams, sort_keys=False)
-        result, exp = methodTest('POST', host + api, jsonString, \
+        result, exp = methodTest('POST', self.urlbase + api, jsonString, \
                         'application/json', 'application/json', {'code' : 500})
         self.assertTrue(result.find('not a valid CMS site') > 1)
 
         self.postReqParams['asyncDest'] = 'Bari'
         jsonString = json.dumps(self.postReqParams, sort_keys=False)
-        result, exp = methodTest('POST', host + api, jsonString, \
+        result, exp = methodTest('POST', self.urlbase + api, jsonString, \
                         'application/json', 'application/json', {'code' : 500})
         self.assertTrue(result.find('not a valid CMS site name') > 1)
 
         del self.postReqParams['asyncDest']
         jsonString = json.dumps(self.postReqParams, sort_keys=False)
-        result, exp = methodTest('POST', host + api, jsonString, \
+        result, exp = methodTest('POST', self.urlbase + api, jsonString, \
                         'application/json', 'application/json', {'code' : 500})
         self.assertTrue(result.find('asyncDest parameter is missing') > 1)
 
@@ -291,7 +289,10 @@ mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e
         Inject a fake fwjr with a cmsRun1 section into couchDB
         """
         couchServer = CouchServer(os.environ["COUCHURL"])
-        changeStateDB = couchServer.connectDatabase(jsmCacheDB + "/fwjrs")
+
+        self._injectJobReport(couchServer, taskName, jobID)
+
+        fwjrdb = couchServer.connectDatabase(jsmCacheDB + "/fwjrs")
 
         myReport = Report("cmsRun1")
         myReport.parse(reportXML)
@@ -304,8 +305,32 @@ mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e
                         "retrycount": retryCount,
                         "fwjr": myReport.__to_json__(None),
                         "type": "fwjr"}
-        changeStateDB.queue(fwjrDocument, timestamp = True)
-        changeStateDB.commit()
+        fwjrdb.queue(fwjrDocument, timestamp = True)
+        fwjrdb.commit()
+
+
+    def _injectJobReport(selfi, couchServer, taskName, jobID):
+        jobdb = couchServer.connectDatabase(jsmCacheDB + "/jobs")
+
+        jobDocument = {
+            'task': taskName,
+            'group': 'Analysis',
+            #'name': '13ed3478-abce-11e0-94e6-0026b958c394-4',
+            'workflow': taskName.split("/")[1],
+            'mask': {'LastRun': None, 'FirstRun': None, 'LastEvent': None, 'FirstEvent': None, 'LastLumi': None, 'FirstLumi': None},
+            #'inputfiles': [],
+            'jobid': jobID,
+            'states': {'0': {'newstate': 'created', 'oldstate': 'new', 'location': 'Agent', 'timestamp': 1310396241}},
+            'user': 'mmascher',
+            #'jobgroup': 12L,
+            'taskType': 'Analysis',
+            'owner': 'mmascher',
+            '_id': str(jobID),
+            'type': 'job'
+        }
+
+        jobdb.queue(jobDocument, timestamp = True)
+        jobdb.commit()
 
 
     def injectLogFWJR(self, jobID, retryCount, taskName):
@@ -313,7 +338,9 @@ mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e
         Inject a fake fwjr with a logArch1 section into couchDB
         """
         couchServer = CouchServer(os.environ["COUCHURL"])
-        changeStateDB = couchServer.connectDatabase(jsmCacheDB + "/fwjrs")
+        fwjrdb = couchServer.connectDatabase(jsmCacheDB + "/fwjrs")
+
+        self._injectJobReport(couchServer, taskName, jobID)
 
         myReportLog = Report("logArch1")
         myReportLog.setTaskName(taskName)
@@ -328,8 +355,8 @@ mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e
                         "retrycount": retryCount,
                         "fwjr": myReportLog.__to_json__(None),
                         "type": "fwjr"}
-        changeStateDB.queue(fwjrDocumentLog, timestamp = True)
-        changeStateDB.commit()
+        fwjrdb.queue(fwjrDocumentLog, timestamp = True)
+        fwjrdb.commit()
 
 
     def testGetJobsFromRange(self):
@@ -350,34 +377,34 @@ mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e
         """
         Test /data API
         """
-        host = "http://%s:%s " % (self.config.Webtools.host, self.config.Webtools.port)
-        api = "/%s/rest/data/" % (self.config.Webtools.application.lower())
+        api = "data"
+        EXP_RES = { 'pfn' : self.outpfn }
 
         fwjrPath = os.path.join(os.path.dirname(__file__), 'Report.xml')
         self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.dataLocParams["requestID"])
         self.injectFWJR(fwjrPath, 128, 0, "/%s/Analysis" % self.dataLocParams["requestID"])
 
-        result, exp = methodTest('GET', host + api, self.dataLocParams, \
+        result, exp = methodTest('GET', self.urlbase + api, self.dataLocParams, \
                         'application/json', 'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
         result = json.loads(result)
 
-        self.assertEqual(result['127'], self.outpfn)
-        self.assertEqual(result['128'], self.outpfn)
+        self.assertEqual(result['1'], EXP_RES)
+        self.assertEqual(result['2'], EXP_RES)
 
         #Check job with multiple fwjr
         self.injectFWJR(fwjrPath, 127, 1, "/%s/Analysis" % self.dataLocParams["requestID"])
-        result, exp = methodTest('GET', host + api, self.dataLocParams, \
+        result, exp = methodTest('GET', self.urlbase + api, self.dataLocParams, \
                         'application/json', 'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
         result = json.loads(result)
 
-        self.assertEqual(result['127'], self.outpfn)
-        self.assertEqual(result['128'], self.outpfn)
+        self.assertEqual(result['1'], EXP_RES)
+        self.assertEqual(result['2'], EXP_RES)
 
         #Test invalid ranges
         self.dataLocParams['jobRange'] = 'I'
-        result, exp = methodTest('GET', host + api, self.dataLocParams, \
+        result, exp = methodTest('GET', self.urlbase + api, self.dataLocParams, \
                         'application/json', 'application/json', {'code' : 400})
         self.assertTrue(exp is not None)
 
@@ -386,33 +413,30 @@ mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e
         """
         Test /log API
         """
-        host = "http://%s:%s " % (self.config.Webtools.host, self.config.Webtools.port)
-        api = "/%s/rest/log/" % (self.config.Webtools.application.lower())
+        api = "log"
+        EXP_RES = { 'pfn' : self.logpfn }
 
         self.injectLogFWJR(347, 0, "/%s/Analysis" % self.logLocParams["requestID"])
         self.injectLogFWJR(348, 0, "/%s/Analysis" % self.logLocParams["requestID"])
-        #import time
-        #time.sleep(20)
 
-        result, exp = methodTest('GET', host + api, self.logLocParams, \
+        result, exp = methodTest('GET', self.urlbase + api, self.logLocParams, \
                         'application/json', 'application/json', {'code' : 200})
         result = json.loads(result)
-
-        self.assertEqual(result['347'], self.logpfn)
+        self.assertEqual(result['1'], EXP_RES)
 
         #Check job with multiple fwjr
         self.injectLogFWJR(347, 1, "/%s/Analysis" % self.logLocParams["requestID"])
-        result, exp = methodTest('GET', host + api, self.logLocParams, \
+        result, exp = methodTest('GET', self.urlbase + api, self.logLocParams, \
                         'application/json', 'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
         result = json.loads(result)
 
-        self.assertEqual(result['347'], self.logpfn)
-        self.assertEqual(result['348'], self.logpfn)
+        self.assertEqual(result['1'], EXP_RES)
+        self.assertEqual(result['2'], EXP_RES)
 
         #Test invalid ranges
         self.logLocParams['jobRange'] = 'I'
-        result, exp = methodTest('GET', host + api, self.logLocParams, \
+        result, exp = methodTest('GET', self.urlbase + api, self.logLocParams, \
                         'application/json', 'application/json', {'code' : 400})
         self.assertTrue(exp is not None)
 
