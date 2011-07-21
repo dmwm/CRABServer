@@ -20,8 +20,10 @@ from WMQuality.WebTools.RESTServerSetup import DefaultConfig
 from WMCore.Cache.WMConfigCache import ConfigCache
 from WMCore.Database.CMSCouch import CouchServer
 from WMCore.FwkJobReport.Report import Report
-from CRABServer.CRABRESTModel import getJobsFromRange
-from CRABRESTModel import getJobsFromRange
+try:
+    from CRABServer.CRABRESTModel import getJobsFromRange
+except ImportError:
+    from CRABRESTModel import getJobsFromRange
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import allSoftwareVersions
 import WMCore.RequestManager.RequestDB.Interface.Admin.SoftwareManagement as SoftwareAdmin
 
@@ -110,6 +112,16 @@ process.out_step = cms.EndPath(process.output)'''
         "jobRange" : '1,2'
     }
 
+    reportParams = {
+        "requestID" : "mmascher_crab_MyAnalysis___110506_123756",
+    }
+
+    outpfn = 'srm://srmcms.pic.es:8443/srm/managerv2?SFN=/pnfs/pic.es/data/cms/store/user/mmascher/RelValProdTTbar/' + \
+             '1304039730//0000/4C86B480-0D72-E011-978B-002481CFE25E.root'
+    logpfn = 'srm://storm-se-01.ba.infn.it:8444/srm/managerv2?SFN=/cms//store/unmerged/logs/prod/2011/5/6/' + \
+             'mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e-0026b958c394-99-0-logArchive.tar.gz'
+
+
     def initialize(self):
         """
             Initialize the class.
@@ -149,12 +161,17 @@ process.out_step = cms.EndPath(process.output)'''
         """
         _setUp_
         """
+        data_path = os.path.join(os.path.dirname(__file__), '../data')
+        self.test_data_dir = os.path.normpath(data_path)
+
         RESTBaseUnitTest.setUp(self)
         self.testInit.setupCouch(workloadDB)
         self.testInit.setupCouch(configCacheDB, "ConfigCache")
 
         self.testInit.setupCouch(jsmCacheDB + "/fwjrs", "FWJRDump")
         self.testInit.setupCouch(jsmCacheDB + "/jobs", "JobDump")
+
+
 
         for v in allSoftwareVersions():
             SoftwareAdmin.addSoftware(v)
@@ -279,12 +296,8 @@ process.out_step = cms.EndPath(process.output)'''
                         'application/json', 'application/json', {'code' : 500})
         self.assertTrue(result.find('asyncDest parameter is missing') > 1)
 
-    outpfn = 'srm://srmcms.pic.es:8443/srm/managerv2?SFN=/pnfs/pic.es/data/cms/store/user/mmascher/RelValProdTTbar/\
-1304039730//0000/4C86B480-0D72-E011-978B-002481CFE25E.root'
-    logpfn = 'srm://storm-se-01.ba.infn.it:8444/srm/managerv2?SFN=/cms//store/unmerged/logs/prod/2011/5/6/\
-mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e-0026b958c394-99-0-logArchive.tar.gz'
 
-    def injectFWJR(self, reportXML, jobID, retryCount, taskName):
+    def injectFWJR(self, reportXML, jobID, retryCount, taskName, skipoutput = False):
         """
         Inject a fake fwjr with a cmsRun1 section into couchDB
         """
@@ -298,7 +311,8 @@ mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e
         myReport.parse(reportXML)
         myReport.setTaskName(taskName)
         myReport.data.cmsRun1.status = 0
-        myReport.data.cmsRun1.output.output.files.file0.OutputPFN = self.outpfn
+        if not skipoutput:
+            myReport.data.cmsRun1.output.output.files.file0.OutputPFN = self.outpfn
 
         fwjrDocument = {"_id": "%s-%s" % (jobID, retryCount),
                         "jobid": jobID,
@@ -380,7 +394,7 @@ mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e
         api = "data"
         EXP_RES = { 'pfn' : self.outpfn }
 
-        fwjrPath = os.path.join(os.path.dirname(__file__), 'Report.xml')
+        fwjrPath = os.path.join(self.test_data_dir, 'Report.xml')
         self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.dataLocParams["requestID"])
         self.injectFWJR(fwjrPath, 128, 0, "/%s/Analysis" % self.dataLocParams["requestID"])
 
@@ -439,6 +453,51 @@ mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e
         result, exp = methodTest('GET', self.urlbase + api, self.logLocParams, \
                         'application/json', 'application/json', {'code' : 400})
         self.assertTrue(exp is not None)
+
+
+    def testReport(self):
+        """
+        Test /report API. Make sure Report.xml generates the same list of processed lumis as what is in JSON fil
+        """
+        api = "goodLumis"
+
+        print self.test_data_dir
+        fwjrPath = os.path.join(self.test_data_dir, 'Report.xml')
+        jsonPath = os.path.join(self.test_data_dir, 'reportLumis.json')
+        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.reportParams["requestID"])
+
+        result, exp = methodTest('GET', self.urlbase + api, self.reportParams, \
+                        'application/json', 'application/json', {'code' : 200})
+        self.assertTrue(exp is not None)
+        result = json.loads(result)
+
+        with open(jsonPath) as f:
+            correctResult = json.load(f)
+
+        self.assertEqual(result, correctResult)
+
+
+    def testJobErrors(self):
+        """
+        Test /jobErrors API. Make sure it get back the expected result
+        """
+        api = 'jobErrors'
+
+        fwjrPath = os.path.join(self.test_data_dir, 'CMSSWFailReport.xml')
+        jsonPath = os.path.join(self.test_data_dir, 'reportLumis.json')
+        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.reportParams["requestID"], True)
+
+        result, exp = methodTest('GET', self.urlbase + api, self.reportParams, \
+                        'application/json', 'application/json', {'code' : 200})
+
+        self.assertTrue(exp is not None)
+        result = json.loads(result)
+
+        self.assertEqual(len(result.keys()), 1)
+        self.assertEqual(result.keys(), [u'1'])
+        self.assertEqual(result[u'1'][u'0'][u'cmsRun1'][0][u'type'], u'CMSException')
+        self.assertEqual(result[u'1'][u'0'][u'cmsRun1'][0][u'exitCode'], u'8001')
+
 
     def testUpload(self):
         """
