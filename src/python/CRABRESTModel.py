@@ -114,6 +114,11 @@ class CRABRESTModel(RESTModel):
                         args=[],
                         validation=[self.isalnum])
 
+        # this allows to retrieve failure reason for each job
+        self._addMethod('GET', 'jobErrors', self.getJobErrors,
+                        args=['requestID'],
+                        validation=[self.isalnum])
+ 
         # uploadConfig. Add directly since the file cannot be parsed through validation
         self.methods['POST']['uploadUserSandbox'] = {'args':       ['userfile', 'checksum', 'doUpload'],
                                           'call':       self.uploadUserSandbox,
@@ -566,7 +571,6 @@ class CRABRESTModel(RESTModel):
 
         return jobList
 
-    @restexpose
     def getClientMapping(self):
         """
         Return the dictionary that allows the client to map the client configuration to the server request
@@ -574,3 +578,37 @@ class CRABRESTModel(RESTModel):
         """
 
         return self.clientMapping
+
+    def getJobErrors(self, requestID):
+        """
+        Return all the error reasons for each job in the workflow
+        """
+        logging.debug("Getting failed reasons for jobs in request %s" % requestID)
+
+        try:
+            logging.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
+            self.couchdb = CouchServer(self.jsmCacheCouchURL)
+            self.jobDatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
+        except Exception, ex:
+            raise cherrypy.HTTPError(400, "Error connecting to couch: %s" % str(ex))
+        options = {"startkey": [requestID], "endkey": [requestID, {}] }
+        jobResults = self.jobDatabase.loadView("FWJRDump", "errorsByWorkflowName", options)
+        logging.debug("Found %d rows in the jobs database." % jobResults["total_rows"])
+
+        ## retrieving relative's job id in the request
+        jobList = self.jobList(requestID)
+
+        ## formatting the result
+        dictresult = {}
+        for failure in jobResults['rows']:
+            primkeyjob = str( jobList.index(failure['value']['jobid']) + 1 )
+            secokeyretry = str(failure['value']['retry'])
+            ## we may have already added the job due to another failure in another submission
+            if not primkeyjob in dictresult:
+                dictresult[primkeyjob] = {secokeyretry: {}}
+            ## we may have already added a failure for the same retry (eg: in a different step)
+            if not secokeyretry in dictresult[primkeyjob]:
+                dictresult[primkeyjob][secokeyretry] = {}
+            dictresult[primkeyjob][secokeyretry][str(failure['value']['step'])] = failure['value']['error']
+
+        return dictresult
