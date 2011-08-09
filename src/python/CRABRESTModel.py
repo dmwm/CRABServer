@@ -353,19 +353,28 @@ class CRABRESTModel(RESTModel):
         jobResults = self.jobDatabase.loadView("JobDump", "statusByWorkflowName", options)
         logging.debug("Found %d rows in the jobs database." % len(jobResults["rows"]))
 
-        requestDetails = GetRequest.getRequestDetails(requestID)
+        try:
+            requestDetails = GetRequest.getRequestDetails(requestID)
+        except RuntimeError:
+            # TODO: Drop percent_success on ticket #2035
+            requestDetails = {'RequestStatus':'Unknown, ReqMgr unreachable', 'percent_success':0}
+
+        jobList = [int(row['value']['jobid']) for row in jobResults['rows']]
+        jobList.sort()
 
         stateDict = {}
 
         for row in jobResults['rows']:
-            jobId = row['value']['jobid']
+            jobID = row['value']['jobid']
             state = row['value']['state']
+            jobNum = jobList.index(jobID) + 1
 
             if stateDict.has_key(state):
                 stateDict[state]['count'] += 1
-                stateDict[state]['jobs'].append(jobId)
+                stateDict[state]['jobs'].append(jobNum)
+                stateDict[state]['jobIDs'].append(jobID)
             else:
-                stateDict[state] = {'count':1, 'jobs':[jobId]}
+                stateDict[state] = {'count':1, 'jobs':[jobNum], 'jobIDs':[jobID]}
 
         return {'states':stateDict, 'requestDetails':requestDetails}
 
@@ -482,6 +491,7 @@ class CRABRESTModel(RESTModel):
         if needed
         """
         ufcHost = 'http://%s:%s/' % (self.sandBoxCacheEndpoint, self.sandBoxCachePort)
+        doUpload = (doUpload != '0')
 
         # Calculate the hash of the file
         hasher = hashlib.sha256()
