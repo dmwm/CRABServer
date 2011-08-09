@@ -116,6 +116,10 @@ process.out_step = cms.EndPath(process.output)'''
         "requestID" : "mmascher_crab_MyAnalysis___110506_123756",
     }
 
+    statusParams = {
+        "requestID" : "mmascher_crab_MyAnalysis___110506_123756",
+    }
+
     outpfn = 'srm://srmcms.pic.es:8443/srm/managerv2?SFN=/pnfs/pic.es/data/cms/store/user/mmascher/RelValProdTTbar/' + \
              '1304039730//0000/4C86B480-0D72-E011-978B-002481CFE25E.root'
     logpfn = 'srm://storm-se-01.ba.infn.it:8444/srm/managerv2?SFN=/cms//store/unmerged/logs/prod/2011/5/6/' + \
@@ -497,6 +501,26 @@ process.out_step = cms.EndPath(process.output)'''
         self.assertEqual(result.keys(), [u'1'])
         self.assertEqual(result[u'1'][u'0'][u'cmsRun1'][0][u'type'], u'CMSException')
         self.assertEqual(result[u'1'][u'0'][u'cmsRun1'][0][u'exitCode'], u'8001')
+
+
+    def testStatus(self):
+        """
+        Test detailed status
+        """
+        api = "task"
+
+        fwjrPath = os.path.join(self.test_data_dir, 'Report.xml')
+        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.statusParams["requestID"], skipoutput=True)
+        fwjrPath = os.path.join(self.test_data_dir, 'CMSSWFailReport.xml')
+        self.injectFWJR(fwjrPath, 128, 0, "/%s/Analysis" % self.statusParams["requestID"], skipoutput=True)
+
+        result, exp = methodTest('GET', self.urlbase + api, self.statusParams, \
+                        'application/json', 'application/json', {'code' : 200})
+        self.assertTrue(exp is not None)
+        result = json.loads(result)
+        self.assertEqual(result['states']['pending']['count'], 2)
+        self.assertEqual(sorted(result['states']['pending']['jobs']), [1, 2])
+        self.assertEqual(sorted(result['states']['pending']['jobIDs']), [127, 128])
 
 
     def testUpload(self):
