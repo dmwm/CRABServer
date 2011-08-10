@@ -450,7 +450,7 @@ class CRABRESTModel(RESTModel):
         keys = [requestID]
 
         goodLumis = self.fwjrdatabase.loadList("FWJRDump", "lumiList", "goodLumisByWorkflowName", keys=keys)
-        return json.loads(goodLumis)
+        return goodLumis
 
 
     def extractPFNs(self, fwjrResults, jobRange, jobList):
