@@ -118,7 +118,7 @@ class CRABRESTModel(RESTModel):
         self._addMethod('GET', 'jobErrors', self.getJobErrors,
                         args=['requestID'],
                         validation=[self.isalnum])
- 
+
         # uploadConfig. Add directly since the file cannot be parsed through validation
         self.methods['POST']['uploadUserSandbox'] = {'args':       ['userfile', 'checksum', 'doUpload'],
                                           'call':       self.uploadUserSandbox,
@@ -458,6 +458,8 @@ class CRABRESTModel(RESTModel):
         Pull the list of PFNs out of a couch view
         """
         result = {}
+        # This map will keep track of the highest job retry-count. Elements are like { jobid : retrycount }
+        retryCountMap = {}
         for f in fwjrResults["rows"]:
             currID = f['value']['jobid']
             jobID = int(currID)
@@ -465,23 +467,27 @@ class CRABRESTModel(RESTModel):
                 jobNum = jobList.index(jobID) + 1
                 if jobNum in jobRange:
                     jobKey = str(jobNum)
-                    logging.debug("Found file for jobID %s at index %s" % (jobID, jobNum))
+                    self.logger.debug("Found file for jobID %s at index %s" % (jobID, jobNum))
                     #check the retry count
                     if result.has_key(jobKey):
-                        oldJobId_RetryCount = result[jobKey][0]
-                        oldRetryCount = int(oldJobId_RetryCount.split('-')[1])
+                        oldRetryCount = int(retryCountMap[jobKey])
                         currRetryCount = int(f['id'].split('-')[1])
                         #insert in the result dict only if it is a new retry
                         if currRetryCount > oldRetryCount:
+                            #id are like 127-1 (id-retrycount). Taking the retrycount
+                            retryCountMap[jobKey] = f['id'].split('-')[1]
                             result[jobKey] = { 'pfn':f['value']['pfn'] }
                             if f['value'].has_key('checksums'):
                                 result[jobKey].update( {'checksums':f['value']['checksums']})
                     else:
+                        #id are like 127-1 (id-retrycount). Taking the retrycount
+                        retryCountMap[jobKey] = f['id'].split('-')[1]
+
                         result[jobKey] = {'pfn':f['value']['pfn']}
                         if f['value'].has_key('checksums'):
                             result[jobKey].update( {'checksums':f['value']['checksums']})
 
-        logging.debug("PFN dict %s" % result)
+        self.logger.debug("PFN dict %s" % result)
         return result
 
     @restexpose
