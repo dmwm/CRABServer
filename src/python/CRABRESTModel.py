@@ -18,7 +18,7 @@ from WMCore.WebTools.RESTModel import RESTModel
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import unidecode, removePasswordFromUrl
 from WMCore.RequestManager.RequestMaker.Registry import retrieveRequestMaker
-from WMCore.Database.CMSCouch import CouchServer
+from WMCore.Database.CMSCouch import CouchServer, CouchError
 import WMCore.RequestManager.RequestDB.Connection as DBConnect
 import WMCore.Wrappers.JsonWrapper as JsonWrapper
 import WMCore.Lexicon
@@ -28,7 +28,7 @@ from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState, GetRe
 from WMCore.RequestManager.RequestDB.Interface.User import Registration
 from WMCore.RequestManager.RequestDB.Interface.Group import Information
 from WMCore.RequestManager.RequestDB.Interface.Admin import GroupManagement, ProdManagement
-from WMCore.Cache.WMConfigCache import ConfigCache
+from WMCore.Cache.WMConfigCache import ConfigCache, ConfigCacheException
 from WMCore.Services.Requests import JSONRequests
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 
@@ -138,6 +138,11 @@ class CRABRESTModel(RESTModel):
         # Get it from the DBFormatter superclass
         myThread.dbi = self.dbi
 
+    def postError(self, errmsg, dbgmsg, code):
+        logging.error(errmsg)
+        logging.debug(dbgmsg)
+        raise cherrypy.HTTPError(code, errmsg)
+
     def checkConfig(self, pset):
         """
         Check user configuration
@@ -150,32 +155,43 @@ class CRABRESTModel(RESTModel):
         """
 
         body = cherrypy.request.body.read()
-        params = unidecode(JsonWrapper.loads(body))
+        params = {}
+        ## is this try except really needed? the proper checks should be already performed when this method has been called
+        ## we'll need to have specific exception handling
+        try:
+            params = unidecode(JsonWrapper.loads(body))
+        except Exception, ex:
+            msg = "Error: problem decoding the body of the request"
+            self.postError(msg, str(body), 400)
 
-        configCache = ConfigCache(self.configCacheCouchURL, self.configCacheCouchDB)
+        ## we'll need to have specific exception handling
         try:
             user = SiteDBJSON().dnUserName(params['UserDN'])
         except Exception, ex:
-            raise cherrypy.HTTPError(500, "Problem extracting user from SiteDB %s" % str(ex))
-
-        configCache.createUserGroup(params['Group'], user)
-
-        configMD5 = hashlib.md5(params['ConfFile']).hexdigest()
-        configCache.document['md5_hash'] = configMD5
-        configCache.document['pset_hash'] = params['PsetHash']
-        configCache.attachments['configFile'] = params['ConfFile']
-
-        configCache.setPSetTweaks(json.loads(params['PsetTweaks']))
-
-        logging.error(params['PsetTweaks'])
-
-        configCache.setLabel(params['Label'])
-        configCache.setDescription(params['Description'])
-        configCache.save()
+            self.postError("Problem extracting user from SiteDB", str(ex) + " " + str(params), 500)
 
         result = {}
-        result['DocID']  = configCache.document["_id"]
-        result['DocRev'] = configCache.document["_rev"]
+        try:
+            configCache = ConfigCache(self.configCacheCouchURL, self.configCacheCouchDB)
+
+            configCache.createUserGroup(params['Group'], user)
+
+            configMD5 = hashlib.md5(params['ConfFile']).hexdigest()
+            configCache.document['md5_hash'] = configMD5
+            configCache.document['pset_hash'] = params['PsetHash']
+            configCache.attachments['configFile'] = params['ConfFile']
+
+            configCache.setPSetTweaks(json.loads(params['PsetTweaks']))
+
+            configCache.setLabel(params['Label'])
+            configCache.setDescription(params['Description'])
+            configCache.save()
+            result['DocID']  = configCache.document["_id"]
+            result['DocRev'] = configCache.document["_rev"]
+        except ConfigCacheException, ex:
+            msg = "Error: problem uploading the configuration"
+            self.postError(msg + "\n" + str(ex), str(params), 500)
+
 
         return result
 
@@ -211,12 +227,14 @@ class CRABRESTModel(RESTModel):
         """
         Modify the task in any possible field : B/W lists, stop/start automation...
         """
+        self.postError("Not implemented", '', 501)
         return requestID
 
     def deleteRequest(self, requestID):
         """
         Delete a request identified by requestID
         """
+        self.postError("Not implemented", '', 501)
         return requestID
 
     def postRequest(self, requestName):
@@ -225,8 +243,14 @@ class CRABRESTModel(RESTModel):
         """
         result = {}
         body = cherrypy.request.body.read()
-        requestSchema = unidecode(JsonWrapper.loads(body))
-        logging.error(requestSchema)
+        requestSchema = {}
+
+        ## we'll need to have specific exception handling
+        try:
+            requestSchema = unidecode(JsonWrapper.loads(body))
+        except Exception, ex:
+            msg = "Error: problem decoding the body of the request"
+            self.postError(msg, str(body), 400)
 
         self.validateAsyncDest(requestSchema)
 
@@ -248,10 +272,12 @@ class CRABRESTModel(RESTModel):
         # we only want the first part, before /task/
         url = url[0:url.find('/task')]
         specificSchema.reqMgrURL = url
+
+        ## we'll need to have specific exception handling
         try:
             specificSchema.validate()
         except Exception, ex:
-            raise cherrypy.HTTPError(400, ex.message)
+            self.postError(ex.message, str(ex), 400)
 
         request = maker(specificSchema)
         helper = WMWorkloadHelper(request['WorkflowSpec'])
@@ -264,18 +290,26 @@ class CRABRESTModel(RESTModel):
         request['RequestWorkflow'] = removePasswordFromUrl(workloadUrl)
         request['PrepID'] = None
 
+        ## we'll need to have specific exception handling
         try:
             CheckIn.checkIn(request)
         except Exception, ex:
-            raise cherrypy.HTTPError(500, str(ex))
+            self.postError("Problem checking in the request", str(ex), 500)
+
         # Auto Assign the requests
+        ## we'll need to have specific exception handling
         try:
             ChangeState.changeRequestStatus(requestSchema['RequestName'], 'assignment-approved')
         except Exception, ex:
-            raise cherrypy.HTTPError(500, str(ex))
+            self.postError("Problem changing the request status", str(ex), 500)
+
         # Auto Assign the requests
         ### what is the meaning of the Team in the Analysis use case?
-        ChangeState.assignRequest(requestSchema['RequestName'], requestSchema["Team"])
+        ## we'll need to have specific exception handling
+        try:
+            ChangeState.assignRequest(requestSchema['RequestName'], requestSchema["Team"])
+        except Exception, ex:
+            self.postError("Problem changing the request assignment", str(ex), 500)
         #return  ID & status
         return result
 
@@ -288,9 +322,16 @@ class CRABRESTModel(RESTModel):
         """
 
         body = cherrypy.request.body.read()
-        requestorInfos = unidecode(JsonWrapper.loads(body))
+        requestorInfos = {}
 
-        logging.info(requestorInfos)
+        ## we'll need to have specific exception handling
+        try:
+            requestorInfos = unidecode(JsonWrapper.loads(body))
+        except Exception, ex:
+            msg = "Error: problem decoding the body of the request"
+            self.postError(msg, str(body), 400)
+
+        logging.info("Requestor information: %s" %str(requestorInfos))
 
         userDN = requestorInfos.get("UserDN", None)
         group = requestorInfos.get("Group", None)
@@ -300,15 +341,16 @@ class CRABRESTModel(RESTModel):
         result = {}
         if userDN != None :
             mySiteDB = SiteDBJSON()
+            ## we'll need to have specific exception handling
             try:
                 user = mySiteDB.dnUserName(userDN)
             except Exception, ex:
-                raise cherrypy.HTTPError(500, "Problem extracting user from SiteDB %s" % str(ex))
+                self.postError("Problem extracting user " + userDN + " from SiteDB", str(ex), 500)
         else:
-            raise cherrypy.HTTPError(400, "Bad input userDN not defined")
+            self.postError("Bad input userDN not defined", '', 400)
         if user != None:
             if email == None:
-                raise cherrypy.HTTPError(400, "Bad input user email not defined")
+                self.postError("Bad input user email not defined", '', 400)
             if not Registration.isRegistered(user):
                 Registration.registerUser(user, email, userDN)
             result['hn_name'] = '%s' % user
@@ -333,7 +375,7 @@ class CRABRESTModel(RESTModel):
             else:
                 result['team'] = '%s already registered' % team
         else:
-            raise cherrypy.HTTPError(400, "Bad input Team not defined")
+            self.postError("Bad input Team not defined", '', 400)
 
         return result
 
@@ -347,8 +389,9 @@ class CRABRESTModel(RESTModel):
             logging.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
             self.couchdb = CouchServer(self.jsmCacheCouchURL)
             self.jobDatabase = self.couchdb.connectDatabase("%s/jobs" % self.jsmCacheCouchDB)
-        except Exception, ex:
-            raise cherrypy.HTTPError(400, "Error connecting to couch: %s" % str(ex))
+        except CouchError, ex:
+            self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
+
         options = {"reduce": False, "startkey": [requestID], "endkey": [requestID, {}] }
         jobResults = self.jobDatabase.loadView("JobDump", "statusByWorkflowName", options)
         logging.debug("Found %d rows in the jobs database." % len(jobResults["rows"]))
@@ -387,7 +430,7 @@ class CRABRESTModel(RESTModel):
         try:
             WMCore.Lexicon.jobrange(jobRange)
         except AssertionError, ex:
-            raise cherrypy.HTTPError(400, "Bad range of jobs specified")
+            self.postError("Bad range of jobs specified", '', 400)
         jobRange = getJobsFromRange(jobRange)
         jobList = self.jobList(requestID)
 
@@ -395,8 +438,8 @@ class CRABRESTModel(RESTModel):
             logging.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
             self.couchdb = CouchServer(self.jsmCacheCouchURL)
             self.fwjrdatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
-        except Exception, ex:
-            raise cherrypy.HTTPError(400, "Error connecting to couch: %s" % str(ex))
+        except CouchError, ex:
+            self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
 
         options = {"startkey": [requestID], "endkey": [requestID] }
 
@@ -414,7 +457,7 @@ class CRABRESTModel(RESTModel):
         try:
             WMCore.Lexicon.jobrange(jobRange)
         except AssertionError, ex:
-            raise cherrypy.HTTPError(400, "Please specify a valid range of jobs")
+            self.postError("Please specify a valid range of jobs", str(ex), 400)
 
         jobRange = getJobsFromRange(jobRange)
         jobList = self.jobList(requestID)
@@ -423,8 +466,8 @@ class CRABRESTModel(RESTModel):
             self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
             self.couchdb = CouchServer(self.jsmCacheCouchURL)
             self.fwjrdatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
-        except Exception, ex:
-            raise cherrypy.HTTPError(400, "Error connecting to couch: %s" % str(ex))
+        except CouchError, ex:
+            self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
 
         options = {"startkey": [requestID], "endkey": [requestID] }
 
@@ -444,14 +487,13 @@ class CRABRESTModel(RESTModel):
             self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
             self.couchdb = CouchServer(self.jsmCacheCouchURL)
             self.fwjrdatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
-        except Exception, ex:
-            raise cherrypy.HTTPError(400, "Error connecting to couch: %s" % str(ex))
+        except CouchError, ex:
+            self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
 
         keys = [requestID]
 
         goodLumis = self.fwjrdatabase.loadList("FWJRDump", "lumiList", "goodLumisByWorkflowName", keys=keys)
         return goodLumis
-
 
     def extractPFNs(self, fwjrResults, jobRange, jobList):
         """
@@ -513,7 +555,8 @@ class CRABRESTModel(RESTModel):
 
         # Basic preservation of the file integrity
         if not (digest == checksum):
-            raise cherrypy.HTTPError(400, 'File transfer error: digest check failed.')
+            msg = "File transfer error: digest check failed between %s and %s"
+            self.postError(msg, "", 400)
 
         # See if the server already has this file
         if doUpload:
@@ -551,18 +594,21 @@ class CRABRESTModel(RESTModel):
         Make sure asyncDest is there, has the right format, and is a valid site
         """
         if not request.get('asyncDest', None):
-            raise cherrypy.HTTPError(500, 'asyncDest parameter is missing from request')
+            self.postError("asyncDest parameter is missing from request", '', 400)
 
         asyncDest = request['asyncDest']
         try:
             if not WMCore.Lexicon.cmsname(asyncDest):
-                raise cherrypy.HTTPError(500, 'asyncDest parameter (%s) is not a valid CMS site name' % asyncDest)
+                msg = 'asyncDest parameter (%s) is not a valid CMS site name' % asyncDest
+                self.postError(msg, '', 400)
         except AssertionError:
-            raise cherrypy.HTTPError(500, 'asyncDest parameter (%s) is not a valid CMS site name' % asyncDest)
+            msg = 'asyncDest parameter (%s) is not a valid CMS site name' % asyncDest
+            self.postError(msg, '', 400)
 
         se = SiteDBJSON().cmsNametoSE(asyncDest)
         if len(se) < 1:
-            raise cherrypy.HTTPError(500, 'asyncDest parameter (%s) is not a valid CMS site name or has no associated SE' % asyncDest)
+            msg = 'asyncDest parameter (%s) is not a valid CMS site name or has no associated SE' % asyncDest
+            self.postError(msg, '', 400)
 
         return True
 
@@ -574,8 +620,8 @@ class CRABRESTModel(RESTModel):
         try:
             self.couchdb = CouchServer(self.jsmCacheCouchURL)
             self.jobDatabase = self.couchdb.connectDatabase("%s/jobs" % self.jsmCacheCouchDB)
-        except Exception, ex:
-            raise cherrypy.HTTPError(400, "Error connecting to couch: %s" % str(ex))
+        except CouchError, ex:
+            self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
 
         options = {"reduce": False, "startkey": [requestID], "endkey": [requestID, {}] }
         jobResults = self.jobDatabase.loadView("JobDump", "statusByWorkflowName", options)
@@ -605,8 +651,9 @@ class CRABRESTModel(RESTModel):
             logging.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
             self.couchdb = CouchServer(self.jsmCacheCouchURL)
             self.jobDatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
-        except Exception, ex:
-            raise cherrypy.HTTPError(400, "Error connecting to couch: %s" % str(ex))
+        except CouchError, ex:
+            self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
+
         options = {"startkey": [requestID], "endkey": [requestID, {}] }
         jobResults = self.jobDatabase.loadView("FWJRDump", "errorsByWorkflowName", options)
         logging.debug("Found %d rows in the jobs database." % jobResults["total_rows"])
