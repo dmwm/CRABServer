@@ -285,19 +285,19 @@ process.out_step = cms.EndPath(process.output)'''
         self.postReqParams['asyncDest'] = 'T2_US_Bari'
         jsonString = json.dumps(self.postReqParams, sort_keys=False)
         result, exp = methodTest('POST', self.urlbase + api, jsonString, \
-                        'application/json', 'application/json', {'code' : 500})
+                        'application/json', 'application/json', {'code' : 400})
         self.assertTrue(result.find('not a valid CMS site') > 1)
 
         self.postReqParams['asyncDest'] = 'Bari'
         jsonString = json.dumps(self.postReqParams, sort_keys=False)
         result, exp = methodTest('POST', self.urlbase + api, jsonString, \
-                        'application/json', 'application/json', {'code' : 500})
+                        'application/json', 'application/json', {'code' : 400})
         self.assertTrue(result.find('not a valid CMS site name') > 1)
 
         del self.postReqParams['asyncDest']
         jsonString = json.dumps(self.postReqParams, sort_keys=False)
         result, exp = methodTest('POST', self.urlbase + api, jsonString, \
-                        'application/json', 'application/json', {'code' : 500})
+                        'application/json', 'application/json', {'code' : 400})
         self.assertTrue(result.find('asyncDest parameter is missing') > 1)
 
 
