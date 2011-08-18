@@ -5,7 +5,6 @@ CRAB Interface to the WMAgent
 import cherrypy
 import commands
 import hashlib
-import logging
 import shutil
 import tempfile
 import threading
@@ -139,8 +138,8 @@ class CRABRESTModel(RESTModel):
         myThread.dbi = self.dbi
 
     def postError(self, errmsg, dbgmsg, code):
-        logging.error(errmsg)
-        logging.debug(dbgmsg)
+        self.logger.error(errmsg)
+        self.logger.debug(dbgmsg)
         raise cherrypy.HTTPError(code, errmsg)
 
     def checkConfig(self, pset):
@@ -331,7 +330,7 @@ class CRABRESTModel(RESTModel):
             msg = "Error: problem decoding the body of the request"
             self.postError(msg, str(body), 400)
 
-        logging.info("Requestor information: %s" %str(requestorInfos))
+        self.logger.info("Requestor information: %s" %str(requestorInfos))
 
         userDN = requestorInfos.get("UserDN", None)
         group = requestorInfos.get("Group", None)
@@ -383,10 +382,10 @@ class CRABRESTModel(RESTModel):
         """
         Get the status with job counts, etc
         """
-        logging.info("Getting detailed status info for request %s" % (requestID))
+        self.logger.info("Getting detailed status info for request %s" % (requestID))
 
         try:
-            logging.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
+            self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
             self.couchdb = CouchServer(self.jsmCacheCouchURL)
             self.jobDatabase = self.couchdb.connectDatabase("%s/jobs" % self.jsmCacheCouchDB)
         except CouchError, ex:
@@ -394,7 +393,7 @@ class CRABRESTModel(RESTModel):
 
         options = {"reduce": False, "startkey": [requestID], "endkey": [requestID, {}] }
         jobResults = self.jobDatabase.loadView("JobDump", "statusByWorkflowName", options)
-        logging.debug("Found %d rows in the jobs database." % len(jobResults["rows"]))
+        self.logger.debug("Found %d rows in the jobs database." % len(jobResults["rows"]))
 
         try:
             requestDetails = GetRequest.getRequestDetails(requestID)
@@ -425,7 +424,7 @@ class CRABRESTModel(RESTModel):
         """
         Load output PFNs by Workflow and return {JobID:PFN}
         """
-        logging.info("Getting Data Locations for request %s and jobs range %s" % (requestID, str(jobRange)))
+        self.logger.info("Getting Data Locations for request %s and jobs range %s" % (requestID, str(jobRange)))
 
         try:
             WMCore.Lexicon.jobrange(jobRange)
@@ -435,7 +434,7 @@ class CRABRESTModel(RESTModel):
         jobList = self.jobList(requestID)
 
         try:
-            logging.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
+            self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
             self.couchdb = CouchServer(self.jsmCacheCouchURL)
             self.fwjrdatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
         except CouchError, ex:
@@ -444,7 +443,7 @@ class CRABRESTModel(RESTModel):
         options = {"startkey": [requestID], "endkey": [requestID] }
 
         fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "outputPFNByWorkflowName", options)
-        logging.debug("Found %d rows in the fwjr database." % len(fwjrResults["rows"]))
+        self.logger.debug("Found %d rows in the fwjr database." % len(fwjrResults["rows"]))
 
         return self.extractPFNs(fwjrResults, jobRange, jobList)
 
@@ -563,7 +562,7 @@ class CRABRESTModel(RESTModel):
             userFileCache = JSONRequests(url=ufcHost)
             existsResult = userFileCache.get(uri=self.sandBoxCacheBasepath+'/exists', data={'hashkey':digest})
             if existsResult[0]['exists']:
-                logging.debug("Sandbox %s already exists" % digest)
+                self.logger.debug("Sandbox %s already exists" % digest)
                 return existsResult[0]
 
         # Not on server, make a local copy for curl
@@ -575,7 +574,7 @@ class CRABRESTModel(RESTModel):
 
             url = '%s%s/upload' % (ufcHost, self.sandBoxCacheBasepath)
             if doUpload:
-                logging.debug("Uploading user sandbox %s to %s" % (digest, url))
+                self.logger.debug("Uploading user sandbox %s to %s" % (digest, url))
                 # Upload the file to UserFileCache
                 with tempfile.NamedTemporaryFile() as curlOutput:
                     curlCommand = 'curl -H "Accept: application/json" -F"checksum=%s" -F userfile=@%s %s -o %s' % \
@@ -625,7 +624,7 @@ class CRABRESTModel(RESTModel):
 
         options = {"reduce": False, "startkey": [requestID], "endkey": [requestID, {}] }
         jobResults = self.jobDatabase.loadView("JobDump", "statusByWorkflowName", options)
-        logging.debug("Found %d rows in the jobs database." % len(jobResults["rows"]))
+        self.logger.debug("Found %d rows in the jobs database." % len(jobResults["rows"]))
 
         # Sort the jobs numerically
         jobList = [int(row['value']['jobid']) for row in jobResults['rows']]
@@ -645,10 +644,10 @@ class CRABRESTModel(RESTModel):
         """
         Return all the error reasons for each job in the workflow
         """
-        logging.debug("Getting failed reasons for jobs in request %s" % requestID)
+        self.logger.debug("Getting failed reasons for jobs in request %s" % requestID)
 
         try:
-            logging.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
+            self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
             self.couchdb = CouchServer(self.jsmCacheCouchURL)
             self.jobDatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
         except CouchError, ex:
@@ -656,7 +655,7 @@ class CRABRESTModel(RESTModel):
 
         options = {"startkey": [requestID], "endkey": [requestID, {}] }
         jobResults = self.jobDatabase.loadView("FWJRDump", "errorsByWorkflowName", options)
-        logging.debug("Found %d rows in the jobs database." % jobResults["total_rows"])
+        self.logger.debug("Found %d rows in the jobs database." % jobResults["total_rows"])
 
         ## retrieving relative's job id in the request
         jobList = self.jobList(requestID)
