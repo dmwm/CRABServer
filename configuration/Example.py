@@ -48,6 +48,9 @@ config.CRABInterface.templates = os.path.join(os.environ["WMCORE_ROOT"], 'templa
 
 config.CRABInterface.configCacheCouchURL = "YourConfigCacheUrl"
 config.CRABInterface.configCacheCouchDB = "configCacheCouchDB-Name"
+config.CRABInterface.ACDCCouchURL = 'http://user:passwd@host:5984'
+config.CRABInterface.ACDCCouchDB = 'wmagent_acdc'
+config.CRABInterface.DBSUrl = 'https://cmsdbsprod.cern.ch:8443/cms_dbs_prod_global_writer/servlet/DBSServlet'
 
 ## TODO once the deploy model has been defined.. we will clarify how
 ##      to deal with these params
