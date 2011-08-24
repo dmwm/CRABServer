@@ -12,12 +12,14 @@ import time
 import json
 import imp
 
+from WMCore.ACDC.AnalysisCollectionService import AnalysisCollectionService
 from WMCore.WebTools.RESTModel import restexpose
 from WMCore.WebTools.RESTModel import RESTModel
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import unidecode, removePasswordFromUrl
 from WMCore.RequestManager.RequestMaker.Registry import retrieveRequestMaker
 from WMCore.Database.CMSCouch import CouchServer, CouchError
+from WMCore.DataStructs.Mask import Mask
 import WMCore.RequestManager.RequestDB.Connection as DBConnect
 import WMCore.Wrappers.JsonWrapper as JsonWrapper
 import WMCore.Lexicon
@@ -57,6 +59,10 @@ class CRABRESTModel(RESTModel):
 
         self.couchUrl = config.model.couchUrl
         self.workloadCouchDB = config.model.workloadCouchDB
+        self.ACDCCouchURL = config.ACDCCouchURL
+        self.ACDCCouchDB = config.ACDCCouchDB
+        self.DBSURL = config.DBSUrl
+
         self.configCacheCouchURL = config.configCacheCouchURL
         self.configCacheCouchDB = config.configCacheCouchDB
         self.jsmCacheCouchURL = config.jsmCacheCouchURL
@@ -99,6 +105,10 @@ class CRABRESTModel(RESTModel):
         #/goodLumis, equivalent of "report" from CRAB2
         self._addMethod('GET', 'goodLumis', self.getGoodLumis,
                        args=['requestID'], validation=[self.checkConfig])
+
+        #/lumiMask
+        self._addMethod('POST', 'lumiMask', self.postLumiMask,
+                       args=[], validation=[self.checkConfig])
 
         #/log
         self._addMethod('GET', 'log', self.getLogLocation,
@@ -191,6 +201,41 @@ class CRABRESTModel(RESTModel):
             msg = "Error: problem uploading the configuration"
             self.postError(msg + "\n" + str(ex), str(params), 500)
 
+        return result
+
+    def postLumiMask(self):
+        """
+        Act as a proxy for CouchDB. Upload ACDC collection and return DocID.
+        """
+
+        logging.info('User is uploading lumi mask')
+        body = cherrypy.request.body.read()
+        params = unidecode(JsonWrapper.loads(body))
+
+        lumiMask = Mask()
+
+        for run, lumis in params['LumiMask'].items():
+            lumiMask.addRunWithLumiRanges(run=int(run), lumiList=lumis)
+
+        try:
+            user = SiteDBJSON().dnUserName(params['UserDN'])
+        except Exception, ex:
+            raise cherrypy.HTTPError(500, "Problem extracting user from SiteDB %s" % str(ex))
+
+        acService = AnalysisCollectionService(url=self.ACDCCouchURL, database=self.ACDCCouchDB)
+        collection = acService.createCollection(params['RequestName'], user, params['Group'])
+        fileSetName = "%s-cmsRun1" % params['RequestName']
+        dbsURL = params.get('DbsUrl', self.DBSURL)
+
+        fileSet, fileList = acService.createFilesetFromDBS(
+                                collection, filesetName=fileSetName, dbsURL=dbsURL,
+                                dataset=params['DatasetName'], mask=lumiMask
+                            )
+        logging.error("FileList created with %s files" % len(fileList['fileset']['files']))
+
+        result = {}
+        result['DocID']  = fileList["_id"]
+        result['DocRev'] = fileList["_rev"]
 
         return result
 
