@@ -298,7 +298,7 @@ class CRABRESTModel(RESTModel):
 
         self.validateAsyncDest(requestSchema)
 
-        requestSchema["CouchUrl"] =  self.configCacheCouchURL
+        requestSchema["CouchUrl"] =  removePasswordFromUrl(self.configCacheCouchURL)
         requestSchema["CouchDBName"] =  self.configCacheCouchDB
 
         #requestName must be unique. Unique name is the ID
