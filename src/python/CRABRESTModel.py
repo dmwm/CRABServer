@@ -67,7 +67,7 @@ class CRABRESTModel(RESTModel):
         self.configCacheCouchDB = config.configCacheCouchDB
         self.jsmCacheCouchURL = config.jsmCacheCouchURL
         self.jsmCacheCouchDB = config.jsmCacheCouchDB
-        self.agentDN = config.agentDN
+        self.serverDN = config.serverDN
         self.sandBoxCacheEndpoint = config.SandBoxCache_endpoint
         self.sandBoxCachePort = config.SandBoxCache_port
         self.sandBoxCacheBasepath = config.SandBoxCache_basepath
@@ -246,7 +246,7 @@ class CRABRESTModel(RESTModel):
 
         result = {}
         ## could be a list of all supported DN
-        result['server_dn']  = self.agentDN
+        result['server_dn']  = self.serverDN
         result['my_proxy'] = 'myproxy.cern.ch'
         result['sandbox'] = {}
         result['sandbox']['type'] = 'gridFtp'

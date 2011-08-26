@@ -12,8 +12,9 @@ serverHostName = "HOST_NAME"
 CRABInterfacePort = 8888
 workDirectory = "/CRABInterface/worgkin/dir"
 couchURL = "http://user:passwd@host:5984"
-workloadCouchDB = "workloadCouchDB"
-jsmCacheDBName = "jsmCacheDBName"
+workloadCouchDB = "reqmgrdb"
+jsmCacheDBName = "wmagent_jobdump"
+configCacheCouchDB = "wmagent_configcache"
 
 databaseUrl = "mysql://root@localhost/ReqMgrDB"
 databaseSocket = "/path/mysql.sock"
@@ -47,14 +48,14 @@ config.CRABInterface.Webtools.environment = "devel"
 config.CRABInterface.templates = os.path.join(os.environ["WMCORE_ROOT"], 'templates/WMCore/WebTools')
 
 config.CRABInterface.configCacheCouchURL = "YourConfigCacheUrl"
-config.CRABInterface.configCacheCouchDB = "configCacheCouchDB-Name"
+config.CRABInterface.configCacheCouchDB = configCacheCouchDB
 config.CRABInterface.ACDCCouchURL = 'http://user:passwd@host:5984'
 config.CRABInterface.ACDCCouchDB = 'wmagent_acdc'
 config.CRABInterface.DBSUrl = 'https://cmsdbsprod.cern.ch:8443/cms_dbs_prod_global_writer/servlet/DBSServlet'
 
 ## TODO once the deploy model has been defined.. we will clarify how
 ##      to deal with these params
-config.CRABInterface.agentDN = "/Your/Agent/DN.here/"
+config.CRABInterface.serverDN = "/Your/Agent/DN.here/"
 config.CRABInterface.clientMapping = '/PATH/configuration/ClientMapping.py'
 config.CRABInterface.SandBoxCache_endpoint = ufcHostName
 config.CRABInterface.SandBoxCache_port  = ufcPort
