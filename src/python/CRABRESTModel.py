@@ -208,7 +208,7 @@ class CRABRESTModel(RESTModel):
         Act as a proxy for CouchDB. Upload ACDC collection and return DocID.
         """
 
-        logging.info('User is uploading lumi mask')
+        self.logger.info('User is uploading lumi mask')
         body = cherrypy.request.body.read()
         params = unidecode(JsonWrapper.loads(body))
 
@@ -231,11 +231,11 @@ class CRABRESTModel(RESTModel):
                                 collection, filesetName=fileSetName, dbsURL=dbsURL,
                                 dataset=params['DatasetName'], mask=lumiMask
                             )
-        logging.error("FileList created with %s files" % len(fileList['fileset']['files']))
 
         result = {}
         result['DocID']  = fileList["_id"]
         result['DocRev'] = fileList["_rev"]
+        result['Name']   = fileSetName
 
         return result
 
@@ -300,11 +300,14 @@ class CRABRESTModel(RESTModel):
 
         requestSchema["CouchUrl"] =  removePasswordFromUrl(self.configCacheCouchURL)
         requestSchema["CouchDBName"] =  self.configCacheCouchDB
+        requestSchema["ACDCUrl"] =  self.ACDCCouchURL
+        requestSchema["ACDCDBName"] =  self.ACDCCouchDB
 
         #requestName must be unique. Unique name is the ID
         currentTime = time.strftime('%y%m%d_%H%M%S',
                                  time.localtime(time.time()))
 
+        requestSchema['OriginalRequestName'] = requestSchema['RequestName']
         requestSchema['RequestName'] = "%s_%s_%s" % (requestSchema["Requestor"], requestSchema['RequestName'],
                                                   currentTime)
         result['ID'] = requestSchema['RequestName']
