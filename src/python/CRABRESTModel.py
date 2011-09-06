@@ -199,7 +199,7 @@ class CRABRESTModel(RESTModel):
             result['DocRev'] = configCache.document["_rev"]
         except ConfigCacheException, ex:
             msg = "Error: problem uploading the configuration"
-            self.postError(msg + "\n" + str(ex), str(params), 500)
+            self.postError(msg, 'Exception: ' + str(ex) + '\nParams: ' + str(params), 500)
 
         return result
 
