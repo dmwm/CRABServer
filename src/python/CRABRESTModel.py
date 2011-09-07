@@ -248,13 +248,6 @@ class CRABRESTModel(RESTModel):
         ## could be a list of all supported DN
         result['server_dn']  = self.serverDN
         result['my_proxy'] = 'myproxy.cern.ch'
-        result['sandbox'] = {}
-        result['sandbox']['type'] = 'gridFtp'
-        # the following will change as soon as we follow up on #1305
-        # at the moment is gridFTP specific.
-        result['sandbox']['endpoint'] = self.sandBoxCacheEndpoint
-        result['sandbox']['port'] = self.sandBoxCachePort
-        result['sandbox']['basepath'] = self.sandBoxCacheBasepath
 
         return result
 
