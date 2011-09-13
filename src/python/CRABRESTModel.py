@@ -293,7 +293,7 @@ class CRABRESTModel(RESTModel):
 
         requestSchema["CouchUrl"] =  removePasswordFromUrl(self.configCacheCouchURL)
         requestSchema["CouchDBName"] =  self.configCacheCouchDB
-        requestSchema["ACDCUrl"] =  self.ACDCCouchURL
+        requestSchema["ACDCUrl"] =  removePasswordFromUrl(self.ACDCCouchURL)
         requestSchema["ACDCDBName"] =  self.ACDCCouchDB
 
         #requestName must be unique. Unique name is the ID
