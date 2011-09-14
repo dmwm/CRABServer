@@ -45,13 +45,13 @@ config.CRABInterface.templates =os.path.join(getWMBASE(),
 config.CRABInterface.configCacheCouchURL = "YourConfigCacheUrl"
 config.CRABInterface.configCacheCouchDB = "configCacheCouchDB-Name"
 
-## TODO once the deploy model has been defined.. we will clarify how 
+## TODO once the deploy model has been defined.. we will clarify how
 ##      to deal with these params
 config.CRABInterface.agentDN = "/Your/Agent/DN.here/"
 config.CRABInterface.clientMapping = '/PATH/configuration/ClientMapping.py'
-config.CRABInterface.SandBoxCache_endpoint = "USB-cache-endpoint"
-config.CRABInterface.SandBoxCache_port  = "PORT"
-config.CRABInterface.SandBoxCache_basepath ="/Path/if/Needed"
+config.CRABInterface.sandBoxCacheHost = "USB-cache-endpoint"
+config.CRABInterface.sandBoxCachePort  = "PORT"
+config.CRABInterface.sandBoxCacheBasepath ="/Path/if/Needed"
 
 config.CRABInterface.views.active.crab.jsmCacheCouchURL = couchURL
 config.CRABInterface.views.active.crab.jsmCacheCouchDB = jsmCacheDBName

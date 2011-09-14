@@ -68,9 +68,9 @@ class CRABRESTModel(RESTModel):
         self.jsmCacheCouchURL = config.jsmCacheCouchURL
         self.jsmCacheCouchDB = config.jsmCacheCouchDB
         self.serverDN = config.serverDN
-        self.sandBoxCacheEndpoint = config.SandBoxCache_endpoint
-        self.sandBoxCachePort = config.SandBoxCache_port
-        self.sandBoxCacheBasepath = config.SandBoxCache_basepath
+        self.sandBoxCacheHost = config.sandBoxCacheHost
+        self.sandBoxCachePort = config.sandBoxCachePort
+        self.sandBoxCacheBasepath = config.sandBoxCacheBasepath
 
         self.clientMapping = {}
         if hasattr(config, 'clientMapping'):
@@ -578,7 +578,7 @@ class CRABRESTModel(RESTModel):
         Receive the upload of the user sandbox and forward on to UserFileCache
         if needed
         """
-        ufcHost = 'http://%s:%s/' % (self.sandBoxCacheEndpoint, self.sandBoxCachePort)
+        ufcHost = 'http://%s:%s/' % (self.sandBoxCacheHost, self.sandBoxCachePort)
         doUpload = (doUpload != '0')
 
         # Calculate the hash of the file

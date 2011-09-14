@@ -57,9 +57,9 @@ config.CRABInterface.DBSUrl = 'https://cmsdbsprod.cern.ch:8443/cms_dbs_prod_glob
 ##      to deal with these params
 config.CRABInterface.serverDN = "/Your/Agent/DN.here/"
 config.CRABInterface.clientMapping = '/PATH/configuration/ClientMapping.py'
-config.CRABInterface.SandBoxCache_endpoint = ufcHostName
-config.CRABInterface.SandBoxCache_port  = ufcPort
-config.CRABInterface.SandBoxCache_basepath = ufcBasepath
+config.CRABInterface.sandBoxCacheHost = ufcHostName
+config.CRABInterface.sandBoxCachePort  = ufcPort
+config.CRABInterface.sandBoxCacheBasepath = ufcBasepath
 ##
 
 config.CRABInterface.admin = "admin@mail.address"
