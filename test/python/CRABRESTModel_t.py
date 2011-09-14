@@ -151,9 +151,9 @@ process.out_step = cms.EndPath(process.output)'''
         self.config.UnitTests.views.active.rest.jsmCacheCouchURL = couchURL
         self.config.UnitTests.views.active.rest.jsmCacheCouchDB = jsmCacheDB
         self.config.UnitTests.views.active.rest.serverDN = ''
-        self.config.UnitTests.views.active.rest.SandBoxCache_endpoint = 'cms-xen39.fnal.gov'
-        self.config.UnitTests.views.active.rest.SandBoxCache_port = 7739
-        self.config.UnitTests.views.active.rest.SandBoxCache_basepath = 'userfilecache/userfilecache'
+        self.config.UnitTests.views.active.rest.sandBoxCacheHost = 'cms-xen39.fnal.gov'
+        self.config.UnitTests.views.active.rest.sandBoxCachePort = 7739
+        self.config.UnitTests.views.active.rest.sandBoxCacheBasepath = 'userfilecache/userfilecache'
         self.config.UnitTests.views.active.rest.logLevel = 'DEBUG'
 
         self.schemaModules = ['WMCore.RequestManager.RequestDB']
