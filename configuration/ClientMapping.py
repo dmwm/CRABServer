@@ -47,5 +47,6 @@ defaulturi = {
     'server_info' : {'uri': '/crabinterface/crab/info/'},
     'status' : {'uri': '/crabinterface/crab/task/'},
     'upload' : {'uri': '/crabinterface/crab/uploadUserSandbox'},
-    'get-errors': {'uri': '/crabinterface/crab/jobErrors/'}
+    'get-errors': {'uri': '/crabinterface/crab/jobErrors/'},
+    'report': {'uri': '/crabinterface/crab/goodLumis/'}
 }
