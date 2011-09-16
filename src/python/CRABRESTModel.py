@@ -313,7 +313,14 @@ class CRABRESTModel(RESTModel):
         url = url[0:url.find('/task')]
         specificSchema.reqMgrURL = url
 
-        ## we'll need to have specific exception handling
+        # Can pile up error messages here for various checks\
+        errorMessage = ''
+        if requestSchema.get("ACDCDoc", None) and requestSchema['JobSplitAlgo'] != 'LumiBased':
+            errorMessage += 'You must use LumiBased splitting if specifying a lumiMask. '
+
+        if errorMessage:
+            self.postError(errorMessage, str(body), 400)
+
         try:
             specificSchema.validate()
         except Exception, ex:
