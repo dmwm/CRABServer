@@ -44,7 +44,6 @@ defaulturi = {
     'get-log' :  {'uri': '/crabinterface/crab/log/'},
     'get-output'   : {'uri': '/crabinterface/crab/data/'},
     'reg_user'    : {'uri': '/crabinterface/crab/user/'},
-    'report' : {'uri': '/crabinterface/crab/goodLumis/'},
     'server_info' : {'uri': '/crabinterface/crab/info/'},
     'status' : {'uri': '/crabinterface/crab/task/'},
     'upload' : {'uri': '/crabinterface/crab/uploadUserSandbox'},

@@ -6,13 +6,14 @@ _CRABRESTModel_t_
 """
 
 import commands
+import hashlib
 import json
 import unittest
 import logging
 import os
 import tempfile
 import time
-import hashlib
+import urllib2
 
 from WMQuality.WebTools.RESTClientAPI import methodTest
 from WMQuality.WebTools.RESTBaseUnitTest import RESTBaseUnitTest
@@ -33,6 +34,7 @@ databaseSocket = os.getenv("DBSOCK")
 couchURL = os.getenv("COUCHURL")
 workloadDB = 'workload_db_test'
 configCacheDB = 'config_cache_test'
+ACDCDB = 'acdc_test'
 jsmCacheDB = 'jsmcache_test'
 
 doUpload = 0 # Change to 1 if you have a UserFileCache server running and configured
@@ -102,6 +104,14 @@ process.out_step = cms.EndPath(process.output)'''
         "CMSSWVersion": "CMSSW_3_9_7"
     }
 
+    lumiMaskParams = {'DatasetName' : "/RelValProdTTbar/JobRobot-MC_3XY_V24_JobRobot-v1/GEN-SIM-DIGI-RECO",
+                      'Description' : '',
+                      'RequestName' : "crab_MyAnalysis__",
+                      "Group"       : "Analysis",
+                      "UserDN"      : "/DC=ch/DC=cern/OU=Organic Units/OU=Users/CN=mmascher/CN=720897/CN=Marco Mascheroni",
+                      'Label'       : '',
+                     }
+
     dataLocParams = {
         "requestID" : "mmascher_crab_MyAnalysis___110429_030846",
         "jobRange" : '1,2'
@@ -148,8 +158,11 @@ process.out_step = cms.EndPath(process.output)'''
         self.config.UnitTests.views.active.rest.model.workloadCouchDB = workloadDB
         self.config.UnitTests.views.active.rest.configCacheCouchURL = couchURL
         self.config.UnitTests.views.active.rest.configCacheCouchDB = configCacheDB
+        self.config.UnitTests.views.active.rest.ACDCCouchURL = couchURL
+        self.config.UnitTests.views.active.rest.ACDCCouchDB = ACDCDB
         self.config.UnitTests.views.active.rest.jsmCacheCouchURL = couchURL
         self.config.UnitTests.views.active.rest.jsmCacheCouchDB = jsmCacheDB
+        self.config.UnitTests.views.active.rest.DBSUrl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
         self.config.UnitTests.views.active.rest.serverDN = ''
         self.config.UnitTests.views.active.rest.sandBoxCacheHost = 'cms-xen39.fnal.gov'
         self.config.UnitTests.views.active.rest.sandBoxCachePort = 7739
@@ -465,19 +478,17 @@ process.out_step = cms.EndPath(process.output)'''
         """
         api = "goodLumis"
 
-        print self.test_data_dir
         fwjrPath = os.path.join(self.test_data_dir, 'Report.xml')
         jsonPath = os.path.join(self.test_data_dir, 'reportLumis.json')
         self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.reportParams["requestID"])
 
         result, exp = methodTest('GET', self.urlbase + api, self.reportParams, \
-                        'application/json', 'application/json', {'code' : 200})
+                        '*/*', 'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
         result = json.loads(result)
 
         with open(jsonPath) as f:
             correctResult = json.load(f)
-
         self.assertEqual(result, correctResult)
 
 
@@ -560,6 +571,30 @@ process.out_step = cms.EndPath(process.output)'''
             self.assertEqual(returnDict['size'], os.path.getsize(testInputName))
 
         return returnDict
+
+
+    def testACDCUpload(self):
+        """
+        Test upload the lumi mask to the server
+        """
+        api = 'lumiMask'
+        lumiFile = urllib2.urlopen('https://cms-service-dqm.web.cern.ch/cms-service-dqm/CAF/certification/Collisions10/7TeV/DCSOnly/DCSTRONLY_132440-139459')
+        lumiMask = json.load(lumiFile)
+
+        self.lumiMaskParams.update({'LumiMask' : lumiMask})
+
+        jsonString = json.dumps(self.lumiMaskParams, sort_keys=False)
+        result, exp = methodTest('POST', self.urlbase + api, jsonString, 'application/json', \
+                                 'application/json', {'code' : 200})
+
+        self.assertTrue(result.has_key("DocID"))
+        self.assertTrue(result.has_key("DocRev"))
+        self.assertTrue(result.has_key("Name"))
+        self.assertTrue(len(result["DocID"]) > 0)
+        self.assertTrue(len(result["DocRev"]) > 0)
+        self.assertTrue(len(result["Name"]) > 0)
+
+        return
 
 
 if __name__ == "__main__":
