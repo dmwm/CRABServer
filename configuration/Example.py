@@ -51,7 +51,7 @@ config.CRABInterface.configCacheCouchURL = "YourConfigCacheUrl"
 config.CRABInterface.configCacheCouchDB = configCacheCouchDB
 config.CRABInterface.ACDCCouchURL = 'http://user:passwd@host:5984'
 config.CRABInterface.ACDCCouchDB = 'wmagent_acdc'
-config.CRABInterface.DBSUrl = 'https://cmsdbsprod.cern.ch:8443/cms_dbs_prod_global_writer/servlet/DBSServlet'
+config.CRABInterface.DBSUrl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
 
 ## TODO once the deploy model has been defined.. we will clarify how
 ##      to deal with these params
@@ -94,7 +94,7 @@ userFileCacheUrl = "http://%s:%s" % (ufcHostName, ufcPort)
 
 config.UserFileCache.componentDir = config.General.workDir + "/UserFileCache"
 
-config.UserFileCache.userCacheDir = '/tmp/ufCache'
+config.UserFileCache.userCacheDir = config.UserFileCache.componentDir + '/UserTarballCache'
 config.UserFileCache.Webtools.host = ufcHostName
 config.UserFileCache.Webtools.port = ufcPort
 config.UserFileCache.Webtools.environment = 'devel'
