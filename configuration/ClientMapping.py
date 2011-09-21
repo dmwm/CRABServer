@@ -35,8 +35,8 @@ defaulturi = {
                             "BlockWhitelist"    : {"default": None,             "config": 'Data.blockWhitelist',    "type": "ListType",    "required": False},
                             "BlockBlacklist"    : {"default": None,             "config": 'Data.blockBlacklist',    "type": "ListType",    "required": False},
                             "JobSplitAlgo"      : {"default": None,             "config": 'Data.splitting',         "type": "StringType",  "required": False},
-                            "VoRole"            : {"default": None,             "config": 'User.vorole',            "type": "StringType",  "required": False},
-                            "VoGroup"           : {"default": None,             "config": 'User.vogroup',           "type": "StringType",  "required": False}
+                            "VoRole"            : {"default": None,             "config": 'User.voRole',            "type": "StringType",  "required": False},
+                            "VoGroup"           : {"default": None,             "config": 'User.voGroup',           "type": "StringType",  "required": False}
                             #"JobSplitArgs"      : {"default": None,             "config": 'Data.filesPerJob',       "type": IntType,    "required": False},
                             #"JobSplitArgs"      : {"default": None,             "config": 'Data.eventPerJob',       "type": IntType,    "required": False},
                           }
