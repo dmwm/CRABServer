@@ -27,6 +27,8 @@ except ImportError:
     from CRABRESTModel import getJobsFromRange
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import allSoftwareVersions
 import WMCore.RequestManager.RequestDB.Interface.Admin.SoftwareManagement as SoftwareAdmin
+from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState
+
 
 databaseURL = os.getenv("DATABASE")
 databaseSocket = os.getenv("DBSOCK")
@@ -264,54 +266,126 @@ process.out_step = cms.EndPath(process.output)'''
         self.assertEqual(result["group"] , "'Analysis'egistered")
 
 
+    def postRequest(self, request, inputparams, code):
+        """
+        _postRequest_
+        """
+        api = "task/%s" % request
+
+        jsonString = json.dumps(inputparams, sort_keys=False)
+        result, exp = methodTest('POST', self.urlbase + api, jsonString, 'application/json', \
+                                 'application/json', {'code' : code})
+        self.assertTrue(exp is not None)
+        return json.loads(result)
+
+
     def testPostRequest(self):
         """
         _testPostRequest_
         """
-        api = "task/%s" % self.postReqParams['RequestName']
 
         #_insertConfig has been already tested in the previous test method
         result = self.insertConfig()
-        self.postReqParams['AnalysisConfigCacheDoc'] = result['DocID']
+        localPostReqParams = self.postReqParams.copy()
+        localPostReqParams['AnalysisConfigCacheDoc'] = result['DocID']
 
         #Posting a request without registering the user first
-        jsonString = json.dumps(self.postReqParams, sort_keys=False)
-        result, exp = methodTest('POST', self.urlbase + api, jsonString, \
-                        'application/json', 'application/json', {'code' : 500})
-        self.assertTrue(exp is not None)
+        result = self.postRequest( localPostReqParams['RequestName'], localPostReqParams, 500)
 
         #Again, insertUser tested before. It should work
         self.insertUser()
-
-        result, exp = methodTest('POST', self.urlbase + api, jsonString, \
-                        'application/json', 'application/json', {'code' : 200})
-        self.assertTrue(exp is not None)
-        result = json.loads(result)
+        result = self.postRequest( localPostReqParams['RequestName'], localPostReqParams, 200)
         self.assertTrue(result.has_key("ID"))
         #SINCE python 2.7 :(
         #self.assertRegexpMatches(result['ID'], \
         #           "mmascher_crab_MyAnalysis__\d\d\d\d\d\d_\d\d\d\d\d\d")
-        self.assertTrue(result['ID'].startswith("%s_%s" % (self.postReqParams["Username"], \
-                                          self.postReqParams["RequestName"])))
+        self.assertTrue(result['ID'].startswith("%s_%s" % (localPostReqParams["Username"], \
+                                          localPostReqParams["RequestName"])))
 
         # Test various problems with asyncDest
-        self.postReqParams['asyncDest'] = 'T2_US_Bari'
-        jsonString = json.dumps(self.postReqParams, sort_keys=False)
-        result, exp = methodTest('POST', self.urlbase + api, jsonString, \
-                        'application/json', 'application/json', {'code' : 400})
-        self.assertTrue(result.find('not a valid CMS site') > 1)
+        localPostReqParams['asyncDest'] = 'T2_US_Bari'
+        result = self.postRequest( localPostReqParams['RequestName'], localPostReqParams, 400)
+        self.assertTrue(result['message'].find('not a valid CMS site') > 1)
 
-        self.postReqParams['asyncDest'] = 'Bari'
-        jsonString = json.dumps(self.postReqParams, sort_keys=False)
-        result, exp = methodTest('POST', self.urlbase + api, jsonString, \
-                        'application/json', 'application/json', {'code' : 400})
-        self.assertTrue(result.find('not a valid CMS site name') > 1)
+        localPostReqParams['asyncDest'] = 'Bari'
+        result = self.postRequest( localPostReqParams['RequestName'], localPostReqParams, 400)
+        self.assertTrue(result['message'].find('not a valid CMS site name') > 1)
 
-        del self.postReqParams['asyncDest']
-        jsonString = json.dumps(self.postReqParams, sort_keys=False)
-        result, exp = methodTest('POST', self.urlbase + api, jsonString, \
-                        'application/json', 'application/json', {'code' : 400})
-        self.assertTrue(result.find('asyncDest parameter is missing') > 1)
+        del localPostReqParams['asyncDest']
+        result = self.postRequest( localPostReqParams['RequestName'], localPostReqParams, 400)
+        self.assertTrue(result['message'] == 'asyncDest parameter is missing from request')
+
+
+    def resubmit(self, request, inputparams, code):
+        """
+        _resubmit_
+        """
+        api = "reprocessTask/%s" % request
+
+        jsonString = json.dumps(inputparams, sort_keys=False)
+        result, exp = methodTest('POST', self.urlbase + api, jsonString, 'application/json', \
+                                 'application/json', {'code' : code})
+        self.assertTrue(exp is not None)
+        return json.loads(result)
+
+
+    def testResubmit(self):
+        """
+        _testRequest_
+        """
+
+        ## testing without the original request
+        result = self.resubmit( 'daffy_duck', {}, 400 )
+        self.assertTrue(result['message'] == 'Request daffy_duck not found. Impossible to resubmit.')
+
+        ## creating a valid workflow to be resubmitted
+        resultConfig = self.insertConfig()
+        self.postReqParams['AnalysisConfigCacheDoc'] = resultConfig['DocID']
+        self.insertUser()
+        resultSub = self.postRequest( self.postReqParams['RequestName'], self.postReqParams, 200)
+
+        ## testing with the original request in place, but not completed
+        resultResub = self.resubmit( resultSub['ID'], {}, 400 )
+        self.assertTrue(resultResub['message'].find('not yet completed; impossible to resubmit') > 1)
+
+        ##### disabling this till we have a easy way to have a real spec, or emulate one #####
+        ## testing with the original request in place, but not completed, this time we force it
+        #resultResub = self.resubmit( resultSub['ID'], {"ForceResubmit": 1}, 200 )
+        #assert type(result.get('ID', '')) is type('string')
+        #assert len(result.get('ID', '')) > 0
+
+        ## creating a new valid request to be resubmitted
+        newsub = self.postReqParams.copy()
+        newsub['RequestName'] = 'mickey_mouse'
+        resultSub = self.postRequest( newsub['RequestName'], newsub, 200)
+        ## testing with the original request in place, completed
+        ChangeState.changeRequestStatus(resultSub['ID'], 'completed')
+        ##### disabling this till we have a easy way to have a real spec, or emulate one #####
+        #resultResub = self.resubmit( resultSub['ID'], {}, 200 )
+        #assert type(result.get('ID', '')) is type('string')
+        #assert len(result.get('ID', '')) > 0
+
+        ## creating a new valid request to be resubmitted
+        newsub = self.postReqParams.copy()
+        newsub['RequestName'] = 'donald_duck'
+        resultSub = self.postRequest( newsub['RequestName'], newsub, 200)
+        ## testing with the original request in place, completed
+        ChangeState.changeRequestStatus(resultSub['ID'], 'completed')
+        ##### disabling this till we have a easy way to have a real spec, or emulate one #####
+        #resultResub = self.resubmit( resultSub['ID'], {}, 200 )
+        #assert type(result.get('ID', '')) is type('string')
+        #assert len(result.get('ID', '')) > 0
+
+        ## creating a new valid request to be resubmitted
+        newsub = self.postReqParams.copy()
+        newsub['RequestName'] = 'plut'
+        resultSub = self.postRequest( newsub['RequestName'], newsub, 200)
+        ## testing with the original request in place, completed and with a white-blackList
+        ChangeState.changeRequestStatus(resultSub['ID'], 'completed')
+        ##### disabling this till we have a easy way to have a real spec, or emulate one #####
+        #resultResub = self.resubmit( resultSub['ID'], {'SiteWhitelist': 'T2_IT_Legnaro', 'SiteBlacklist': 'T2_US_UCSD'}, 200 )
+        #assert type(result.get('ID', '')) is type('string')
+        #assert len(result.get('ID', '')) > 0
 
 
     def injectFWJR(self, reportXML, jobID, retryCount, taskName, skipoutput = False):
