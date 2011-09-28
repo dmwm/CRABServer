@@ -549,14 +549,19 @@ class CRABRESTModel(RESTModel):
         for row in jobResults['rows']:
             jobID = row['value']['jobid']
             state = row['value']['state']
+            task  = row['value']['task']
             jobNum = jobList.index(jobID) + 1
 
-            if stateDict.has_key(state):
-                stateDict[state]['count'] += 1
-                stateDict[state]['jobs'].append(jobNum)
-                stateDict[state]['jobIDs'].append(jobID)
+            if stateDict.has_key(task):
+                if stateDict[task].has_key(state):
+                    stateDict[task][state]['count'] += 1
+                    stateDict[task][state]['jobs'].append(jobNum)
+                    stateDict[task][state]['jobIDs'].append(jobID)
+                else:
+                    stateDict[task] = {state : {'count':1, 'jobs':[jobNum], 'jobIDs':[jobID]} }
             else:
-                stateDict[state] = {'count':1, 'jobs':[jobNum], 'jobIDs':[jobID]}
+                stateDict[task] = {state : {'count':1, 'jobs':[jobNum], 'jobIDs':[jobID]} }
+
 
         return {'states':stateDict, 'requestDetails':requestDetails}
 
