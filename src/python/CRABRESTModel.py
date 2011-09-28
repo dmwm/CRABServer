@@ -32,6 +32,7 @@ from WMCore.RequestManager.RequestDB.Interface.Admin import GroupManagement, Pro
 from WMCore.Cache.WMConfigCache import ConfigCache, ConfigCacheException
 from WMCore.Services.Requests import JSONRequests
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
+from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import loadWorkload
 
 def getJobsFromRange(myrange):
     """
@@ -51,6 +52,7 @@ def getJobsFromRange(myrange):
 
 class CRABRESTModel(RESTModel):
     """ CRAB Interface to the WMAgent """
+
     def __init__(self, config={}):
         '''
         Initialise the RESTModel and add some methods to it.
@@ -92,6 +94,10 @@ class CRABRESTModel(RESTModel):
                         args=['requestID'],
                         validation=[self.isalnum])
         self._addMethod('POST', 'task', self.postRequest,
+                        args=['requestName'],
+                        validation=[self.isalnum])
+        #/reprocessTask
+        self._addMethod('POST', 'reprocessTask', self.reprocessRequest,
                         args=['requestName'],
                         validation=[self.isalnum])
         #/config
@@ -207,7 +213,6 @@ class CRABRESTModel(RESTModel):
         """
         Act as a proxy for CouchDB. Upload ACDC collection and return DocID.
         """
-
         self.logger.info('User is uploading lumi mask')
         body = cherrypy.request.body.read()
         params = unidecode(JsonWrapper.loads(body))
@@ -303,6 +308,7 @@ class CRABRESTModel(RESTModel):
         requestSchema['OriginalRequestName'] = requestSchema['RequestName']
         requestSchema['RequestName'] = "%s_%s_%s" % (requestSchema["Requestor"], requestSchema['RequestName'],
                                                   currentTime)
+        requestSchema['Campaign'] = requestSchema['RequestName']
         result['ID'] = requestSchema['RequestName']
 
         maker = retrieveRequestMaker(requestSchema['RequestType'])
@@ -337,29 +343,115 @@ class CRABRESTModel(RESTModel):
         request['RequestWorkflow'] = removePasswordFromUrl(workloadUrl)
         request['PrepID'] = None
 
-        ## we'll need to have specific exception handling
-        try:
-            CheckIn.checkIn(request)
-        except Exception, ex:
-            self.postError("Problem checking in the request", str(ex), 500)
-
-        # Auto Assign the requests
-        ## we'll need to have specific exception handling
-        try:
-            ChangeState.changeRequestStatus(requestSchema['RequestName'], 'assignment-approved')
-        except Exception, ex:
-            self.postError("Problem changing the request status", str(ex), 500)
-
         # Auto Assign the requests
         ### what is the meaning of the Team in the Analysis use case?
-        ## we'll need to have specific exception handling
         try:
+            CheckIn.checkIn(request)
+            ChangeState.changeRequestStatus(requestSchema['RequestName'], 'assignment-approved')
             ChangeState.assignRequest(requestSchema['RequestName'], requestSchema["Team"])
-        except Exception, ex:
-            self.postError("Problem changing the request assignment", str(ex), 500)
+        except RuntimeError, re:
+            self.postError(str(re), '', 500)
+
         #return  ID & status
         return result
 
+    def reprocessRequest(self, requestName ):
+        """
+        This takes a request and submit a new one starting from the original one
+        Using a json body to pass resubmission variables
+        """
+
+        ## retrieving the original request status
+        requestStatus = self.getDetailedStatus(requestName)
+        if 'Unknown' in requestStatus['requestDetails'].get('RequestStatus', 'Unknown'):
+            self.postError('Request %s not found. Impossible to resubmit.' % requestName, str(requestStatus), 400)
+
+        body = cherrypy.request.body.read()
+        requestSchema = {}
+
+        ## we'll need to have specific exception handling
+        try:
+            requestSchema = unidecode(JsonWrapper.loads(body))
+        except Exception, ex:
+            msg = "Error: problem decoding the body of the request"
+            self.postError(msg, str(body), 400)
+
+        ## not forced resubmission, just check workflow status
+        if not requestSchema.get('ForceResubmit', False):
+            ## resubmitting just if the previous request was failed
+            if not requestStatus['requestDetails']['RequestStatus'] in ['completed']:
+                self.postError("Request '%s' not yet completed; impossible to resubmit." % requestName, '', 400)
+            ## resubmitting just if there are failed jobs
+            elif requestStatus['states'].get('failure', None) is None:
+                self.postError("Request '%s' doesn't have failed jobs." % requestName, '', 400)
+        ## forced, kill and resubmit in any case (to verify what *any* means)
+        else:
+            ## before resumitting kill the previous request
+            ## TODO: check if this is also killing the jobs
+            try:
+                ChangeState.changeRequestStatus(requestName, 'aborted')
+            except RuntimeError, re:
+                self.postError(str(re), '', 500)
+            #self.postError("Forced resubmission not yet available.", '', 501)
+
+        ## retrieving the original request schema
+        originalRequest = GetRequest.getRequestByName( requestName )
+        helper = loadWorkload(originalRequest)
+        originalSchema = helper.data.request.schema.dictionary_()
+
+        ## retrieving the task path to be resubmitted - default is Analysis
+        taskResubmit = requestSchema.get('TaskResubmit', 'Analysis')
+        wmtask = helper.getTask(taskResubmit)
+        if not wmtask:
+            self.postError('%s task not found in the workflow %s.' %(requestSchema['TaskResubmit'], requestName), '', 404)
+        taskPath = wmtask.getPathName()
+
+        newPars = { 'OriginalRequestName': originalSchema['RequestName'],
+                    'InitialTaskPath':     taskPath,
+                    'SiteWhitelist':       requestSchema.get('SiteWhitelist', originalSchema.get('SiteWhitelist', [])),
+                    'SiteBlacklist':       requestSchema.get('SiteBlacklist', originalSchema.get('SiteBlacklist', [])),
+                  }
+
+        ## at some point we'll have some other kind of request (MonteCarlo?)
+        ## and we might need to have different parameters then analysis has
+        if originalSchema['RequestType'] in ['Analysis']:
+            ## this below is taking parameter from the original request
+            ##   this is should work even if we have more then one agent with different acdc dbs
+            ##   note: site-b/w-lists are replaced while we could probably decide to simply append them
+            newPars['ACDCServer'] = originalSchema['ACDCUrl']
+            newPars['ACDCDatabase'] = originalSchema['ACDCDBName']
+
+        ## creating the new schema obj for the resubmission
+        resubmitSchema = originalSchema.copy()
+        resubmitSchema.update( newPars )
+
+        ## retrieving the resubmission maker - the generic one allows to update analayis specific parameters
+        maker = retrieveRequestMaker("Resubmission")
+        schema = maker.newSchema()
+        ## updating it with resubmission parameters
+        schema.update( resubmitSchema )
+        ## generating a new name: I am choosing the original name plus resubmit and date
+        currentTime = time.strftime('%y%m%d_%H%M%S', time.localtime(time.time()))
+        schema['RequestName'] = "%s_%s_%s_%s" % (originalSchema['Requestor'], originalSchema['OriginalRequestName'], 'resubmit', currentTime)
+        request = maker(schema)
+        newHelper = WMWorkloadHelper(request['WorkflowSpec'])
+        # can't save Request object directly, because it makes it hard to retrieve the _rev
+        metadata = {}
+        metadata.update(request)
+        # don't want to JSONify the whole workflow
+        del metadata['WorkflowSpec']
+        workloadUrl = newHelper.saveCouch(self.couchUrl, self.workloadCouchDB, metadata=metadata)
+        request['RequestWorkflow'] = removePasswordFromUrl(workloadUrl)
+        self.logger.debug("Injecting the request")
+        try:
+            CheckIn.checkIn(request)
+            ChangeState.changeRequestStatus(schema['RequestName'], 'assignment-approved')
+            ChangeState.assignRequest(schema['RequestName'], schema["Team"])
+        except RuntimeError, re:
+            self.postError(str(re), '', 500)
+
+        ## returning this analogue to the normal submission
+        return {'ID': schema['RequestName']}
 
     def addNewUser(self):
         """
@@ -522,7 +614,6 @@ class CRABRESTModel(RESTModel):
 
         return self.extractPFNs(fwjrResults, jobRange, jobList)
 
-
     def getGoodLumis(self, requestID):
         """
         Return the list of good lumis processed as generated
@@ -652,7 +743,12 @@ class CRABRESTModel(RESTModel):
             msg = 'asyncDest parameter (%s) is not a valid CMS site name' % asyncDest
             self.postError(msg, '', 400)
 
-        se = SiteDBJSON().cmsNametoSE(asyncDest)
+        se = None
+        try:
+            se = SiteDBJSON().cmsNametoSE(asyncDest)
+        except (RuntimeError, SyntaxError), er:
+            self.postError( str(er), '', 500)
+
         if len(se) < 1:
             msg = 'asyncDest parameter (%s) is not a valid CMS site name or has no associated SE' % asyncDest
             self.postError(msg, '', 400)
