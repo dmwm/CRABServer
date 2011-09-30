@@ -276,8 +276,39 @@ class CRABRESTModel(RESTModel):
         """
         Delete a request identified by requestID
         """
-        self.postError("Not implemented", '', 501)
-        return requestID
+        ## We need to check the status of the request and determine the aborted/failed status based on the current status
+
+        ## this is derived from this module
+        ## import WMCore.RequestManager.RequestDB.Settings.RequestStatus
+        deleteMapper = { "new" : "failed",
+                         "assigned" : "failed",
+                         "negotiating" : "failed",
+                         "acquired" : "failed",
+                         "running" : "aborted",
+                       }
+        skipDelete = ["aborted", "failed", "completed"]
+
+        requestDetails = {'RequestStatus': 'unknown'}
+        try:
+            requestDetails = GetRequest.getRequestDetails(requestID)
+        except RuntimeError, re:
+            import traceback
+            self.postError(str(re), str(traceback.format_exc()), 500)
+
+        ## cannot delete status unknown
+        if requestDetails['RequestStatus'] == 'unknown':
+            self.postError('Request unknown, impossible to kill' % str(requestDetails['RequestStatus']), 'Known status are %s.' % str(deleteMapper.keys()), 500)
+        ## cannot delete when in some terminal status
+        elif requestDetails['RequestStatus'] in skipDelete or not requestDetails['RequestStatus'] in deleteMapper.keys():
+            self.postError('Status of the request is %s: impossible to kill.' % str(requestDetails['RequestStatus']), '', 500)
+
+        try:
+            Utilities.changeStatus(requestID, deleteMapper[requestDetails['RequestStatus']] )
+        except RuntimeError, re:
+            import traceback
+            self.postError(str(re), str(traceback.format_exc()), 500)
+
+        return {"result": "ok"}
 
     def postRequest(self, requestName):
         """
