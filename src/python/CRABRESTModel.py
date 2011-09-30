@@ -589,7 +589,7 @@ class CRABRESTModel(RESTModel):
                     stateDict[task][state]['jobs'].append(jobNum)
                     stateDict[task][state]['jobIDs'].append(jobID)
                 else:
-                    stateDict[task] = {state : {'count':1, 'jobs':[jobNum], 'jobIDs':[jobID]} }
+                    stateDict[task][state] = {'count':1, 'jobs':[jobNum], 'jobIDs':[jobID]}
             else:
                 stateDict[task] = {state : {'count':1, 'jobs':[jobNum], 'jobIDs':[jobID]} }
 
