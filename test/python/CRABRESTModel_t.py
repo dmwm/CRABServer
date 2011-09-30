@@ -671,5 +671,41 @@ process.out_step = cms.EndPath(process.output)'''
         return
 
 
+    def testDeleteRequest(self):
+        """
+        Test the deletion of a request
+        """
+
+        def kill(request, code):
+            """
+            _resubmit_
+            """
+            api = "task/%s" % request
+
+            jsonString = json.dumps({}, sort_keys=False)
+            result, exp = methodTest('DELETE', self.urlbase + api, jsonString, 'application/json', \
+                                     'application/json', {'code' : code})
+            self.assertTrue(exp is not None)
+            return json.loads(result)
+
+        ## killing a not existing wf
+        result = kill('donald_duck', 500)
+        self.assertTrue(result["message"] == "Cannot find request donald_duck")
+
+        ## creating a valid workflow to be killed
+        resultConfig = self.insertConfig()
+        self.postReqParams['AnalysisConfigCacheDoc'] = resultConfig['DocID']
+        self.insertUser()
+        resultSub = self.postRequest( self.postReqParams['RequestName'], self.postReqParams, 200)
+
+        ## killing the wf, this should kill it without any issue
+        result = kill(resultSub['ID'], 200)
+        assertTrue(result["result"] == "ok")
+
+        ## killing again the wf, this should fail
+        result = kill(resultSub['ID'], 500)
+        assertTrue(result["message"].find("impossible to kill") > -1)
+
+
 if __name__ == "__main__":
     unittest.main()
