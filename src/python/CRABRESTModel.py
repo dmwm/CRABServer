@@ -4,6 +4,7 @@ CRAB Interface to the WMAgent
 
 import cherrypy
 import commands
+import copy
 import hashlib
 import shutil
 import tempfile
@@ -341,6 +342,9 @@ class CRABRESTModel(RESTModel):
                                                   currentTime)
         requestSchema['Campaign'] = requestSchema['RequestName']
         result['ID'] = requestSchema['RequestName']
+
+        # Figure out ProcessingVersion
+        self.setProcessingVersion(requestSchema)
 
         maker = retrieveRequestMaker(requestSchema['RequestType'])
         specificSchema = maker.schemaClass()
@@ -854,3 +858,43 @@ class CRABRESTModel(RESTModel):
             dictresult[primkeyjob][secokeyretry][str(failure['value']['step'])] = failure['value']['error']
 
         return dictresult
+
+
+    def setProcessingVersion(self, request):
+        """
+        If no ProcessingVersion is specified, go to couch to figure out next one.
+        """
+
+        if request.get('ProcessingVersion', None):
+            return
+
+        try:
+            self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.workloadCouchDB, self.couchUrl))
+            self.couchdb = CouchServer(self.couchUrl)
+            self.database = self.couchdb.connectDatabase(self.workloadCouchDB)
+        except CouchError, ex:
+            self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
+
+        startkey = [request['Requestor'], request['PublishDataName'], request['InputDataset']]
+        endkey = copy.copy(startkey)
+        endkey.append({})
+        options = {"startkey" : startkey, "endkey" : endkey}
+
+        requests = self.database.loadView("ReqMgr", "requestsByUser", options)
+        self.logger.debug("Found %d rows in the requests database." % requests["total_rows"])
+
+        versions = []
+        for row in requests['rows']:
+            oldVersion = row['value']['version']
+            try:
+                versions.append(int(oldVersion.replace('v', '')))
+            except ValueError: # Not an int, so we ignore it
+                pass
+
+        self.logger.debug("Existing versions for workflow are: %s" % versions)
+        newVersion = 1
+        if versions:
+            newVersion = max(versions) + 1
+
+        self.logger.debug("New version is: %s" % newVersion)
+        request['ProcessingVersion'] = 'v%d' % newVersion
