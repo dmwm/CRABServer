@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 """
 _ClientMapping_
 
@@ -48,5 +48,6 @@ defaulturi = {
     'status' : {'uri': '/crabinterface/crab/task/'},
     'upload' : {'uri': '/crabinterface/crab/uploadUserSandbox'},
     'get-errors': {'uri': '/crabinterface/crab/jobErrors/'},
-    'report': {'uri': '/crabinterface/crab/goodLumis/'}
+    'report': {'uri': '/crabinterface/crab/goodLumis/'},
+    'kill':   {'uri': '/crabinterface/crab/task/'},
 }
