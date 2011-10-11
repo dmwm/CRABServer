@@ -93,6 +93,7 @@ process.out_step = cms.EndPath(process.output)'''
         "InputDataset": "/RelValProdTTbar/JobRobot-MC_3XY_V24_JobRobot-v1/GEN-SIM-DIGI-RECO",
         "JobSplitAlgo": "FileBased",
         "ProcessingVersion": "",
+        "PublishDataName": "MyTest",
         "AnalysisConfigCacheDoc": "_",
         "Requestor": "mmascher",
         "DbsUrl": "http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet",
@@ -184,7 +185,7 @@ process.out_step = cms.EndPath(process.output)'''
         self.test_data_dir = os.path.normpath(data_path)
 
         RESTBaseUnitTest.setUp(self)
-        self.testInit.setupCouch(workloadDB)
+        self.testInit.setupCouch(workloadDB, 'ReqMgr')
         self.testInit.setupCouch(configCacheDB, "ConfigCache")
 
         self.testInit.setupCouch(jsmCacheDB + "/fwjrs", "FWJRDump")
@@ -301,6 +302,13 @@ process.out_step = cms.EndPath(process.output)'''
         #           "mmascher_crab_MyAnalysis__\d\d\d\d\d\d_\d\d\d\d\d\d")
         self.assertTrue(result['ID'].startswith("%s_%s" % (localPostReqParams["Username"], \
                                           localPostReqParams["RequestName"])))
+        self.assertEqual(result['ProcessingVersion'], 'v2')
+
+        # Test inserting a workflow with a new processing version
+        localPostReqParams['ProcessingVersion'] = 'v10'
+        result = self.postRequest( localPostReqParams['RequestName'], localPostReqParams, 200)
+        self.assertEqual(result['ProcessingVersion'], 'v10')
+        localPostReqParams['ProcessingVersion'] = ''
 
         # Test various problems with asyncDest
         localPostReqParams['asyncDest'] = 'T2_US_Bari'

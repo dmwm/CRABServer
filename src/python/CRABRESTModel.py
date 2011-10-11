@@ -345,6 +345,7 @@ class CRABRESTModel(RESTModel):
 
         # Figure out ProcessingVersion
         self.setProcessingVersion(requestSchema)
+        result['ProcessingVersion'] = requestSchema['ProcessingVersion']
 
         maker = retrieveRequestMaker(requestSchema['RequestType'])
         specificSchema = maker.schemaClass()
