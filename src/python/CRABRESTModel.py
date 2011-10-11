@@ -34,6 +34,7 @@ from WMCore.Cache.WMConfigCache import ConfigCache, ConfigCacheException
 from WMCore.Services.Requests import JSONRequests
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import loadWorkload
+import WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools as Utilities
 
 def getJobsFromRange(myrange):
     """
