@@ -7,6 +7,7 @@ import commands
 import copy
 import hashlib
 import shutil
+import tarfile
 import tempfile
 import threading
 import time
@@ -722,20 +723,17 @@ class CRABRESTModel(RESTModel):
         doUpload = (doUpload != '0')
 
         # Calculate the hash of the file
-        hasher = hashlib.sha256()
-
-        size = 0
-        while True:
-            data = userfile.file.read(8192)
-            if not data:
-                break
-            hasher.update(data)
-            size += len(data)
-        digest = hasher.hexdigest()
+        try:
+            tar = tarfile.open(fileobj=userfile.file, mode='r')
+            lsl = [(x.name, int(x.size), int(x.mtime), x.uname) for x in tar.getmembers()]
+            hasher = hashlib.sha256(str(lsl))
+            digest = hasher.hexdigest()
+        except tarfile.ReadError:
+            raise cherrypy.HTTPError(400, 'File is not a .tgz file.')
 
         # Basic preservation of the file integrity
         if not (digest == checksum):
-            msg = "File transfer error: digest check failed between %s and %s"
+            msg = "File transfer error: digest check failed between %s and %s" % (digest, checksum)
             self.postError(msg, "", 400)
 
         # See if the server already has this file
