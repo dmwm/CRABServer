@@ -13,6 +13,7 @@ import threading
 import time
 import json
 import imp
+from operator import itemgetter
 
 from WMCore.ACDC.AnalysisCollectionService import AnalysisCollectionService
 from WMCore.WebTools.RESTModel import restexpose
@@ -88,13 +89,13 @@ class CRABRESTModel(RESTModel):
                         validation=[self.isalnum])
         #/task
         self._addMethod('GET', 'task', self.getDetailedStatus,
-                        args=['requestID'],
+                        args=['requestName'],
                         validation=[self.isalnum])
         self._addMethod('PUT', 'task', self.putTaskModifies,
-                        args=['requestID'],
+                        args=['requestName'],
                         validation=[self.isalnum])
         self._addMethod('DELETE', 'task', self.deleteRequest,
-                        args=['requestID'],
+                        args=['requestName'],
                         validation=[self.isalnum])
         self._addMethod('POST', 'task', self.postRequest,
                         args=['requestName'],
@@ -109,11 +110,11 @@ class CRABRESTModel(RESTModel):
                         validation=[self.checkConfig])
         #/data
         self._addMethod('GET', 'data', self.getDataLocation,
-                       args=['requestID','jobRange'], validation=[self.checkConfig])
+                       args=['requestName','jobRange'], validation=[self.checkConfig])
 
         #/goodLumis, equivalent of "report" from CRAB2
         self._addMethod('GET', 'goodLumis', self.getGoodLumis,
-                       args=['requestID'], validation=[self.checkConfig])
+                       args=['requestName'], validation=[self.checkConfig])
 
         #/lumiMask
         self._addMethod('POST', 'lumiMask', self.postLumiMask,
@@ -121,7 +122,7 @@ class CRABRESTModel(RESTModel):
 
         #/log
         self._addMethod('GET', 'log', self.getLogLocation,
-                       args=['requestID','jobRange'], validation=[self.checkConfig])
+                       args=['requestName','jobRange'], validation=[self.checkConfig])
 
         # Server
         self._addMethod('GET', 'info', self.getServerInfo,
@@ -134,7 +135,7 @@ class CRABRESTModel(RESTModel):
 
         # this allows to retrieve failure reason for each job
         self._addMethod('GET', 'jobErrors', self.getJobErrors,
-                        args=['requestID'],
+                        args=['requestName'],
                         validation=[self.isalnum])
 
         # uploadConfig. Add directly since the file cannot be parsed through validation
@@ -157,9 +158,35 @@ class CRABRESTModel(RESTModel):
         myThread.dbi = self.dbi
 
     def postError(self, errmsg, dbgmsg, code):
+        """
+        Common method to return and log errors
+        """
         self.logger.error(errmsg)
         self.logger.debug(dbgmsg)
         raise cherrypy.HTTPError(code, errmsg)
+
+    def __getFromCampaign(self, requestName):
+        """
+        Receive a string correspondi to a request name 
+        Return all the worfklow grouped by the campaign of the input workflow
+        """
+        factory = DBConnect.getConnection()
+        idDAO = factory(classname = "Request.ID")
+        requestId = idDAO.execute(requestName)
+        campaignDAO = factory(classname = "Campaign.GetByRequest")
+        campaign = campaignDAO.execute(requestId)
+
+        self.database = None
+        try:
+            self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.workloadCouchDB, self.couchUrl))
+            self.couchdb = CouchServer(self.couchUrl)
+            self.database = self.couchdb.connectDatabase(self.workloadCouchDB)
+        except CouchError, ex:
+            self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
+        options = {"startkey": [campaign], "endkey": [campaign], 'reduce' : False }
+        campaignWfs = self.database.loadView("ReqMgr", "requestsByCampaign", options)
+        self.logger.debug("Found %d rows in the reqmgr database." % len(campaignWfs["rows"]))
+        return campaignWfs["rows"]
 
     def checkConfig(self, pset):
         """
@@ -268,17 +295,24 @@ class CRABRESTModel(RESTModel):
             WMCore.Lexicon.identifier(v)
         return call_input
 
-    def putTaskModifies(self, requestID):
+    def putTaskModifies(self, requestName):
         """
         Modify the task in any possible field : B/W lists, stop/start automation...
         """
         self.postError("Not implemented", '', 501)
-        return requestID
+        return requestName
 
-    def deleteRequest(self, requestID):
+    def deleteRequest(self, requestName):
         """
-        Delete a request identified by requestID
+        Delete a request identified by requestName
         """
+        try:
+            WMCore.Lexicon.requestName(requestName)
+        except AssertionError, ex:
+            self.postError("Invalid request name specified", '', 400)
+
+        lastSubmission = max([(singleWf['value']['Submission'], singleWf['value']['RequestName']) for singleWf in self.__getFromCampaign(requestName)])[1]
+
         ## We need to check the status of the request and determine the aborted/failed status based on the current status
 
         ## this is derived from this module
@@ -293,7 +327,7 @@ class CRABRESTModel(RESTModel):
 
         requestDetails = {'RequestStatus': 'unknown'}
         try:
-            requestDetails = GetRequest.getRequestDetails(requestID)
+            requestDetails = GetRequest.getRequestDetails(lastSubmission)
         except RuntimeError, re:
             import traceback
             self.postError(str(re), str(traceback.format_exc()), 500)
@@ -306,7 +340,7 @@ class CRABRESTModel(RESTModel):
             self.postError('Status of the request is %s: impossible to kill.' % str(requestDetails['RequestStatus']), '', 500)
 
         try:
-            Utilities.changeStatus(requestID, deleteMapper[requestDetails['RequestStatus']] )
+            Utilities.changeStatus(lastSubmission, deleteMapper[requestDetails['RequestStatus']] )
         except RuntimeError, re:
             import traceback
             self.postError(str(re), str(traceback.format_exc()), 500)
@@ -394,7 +428,7 @@ class CRABRESTModel(RESTModel):
         #return  ID & status
         return result
 
-    def reprocessRequest(self, requestName ):
+    def reprocessRequest(self, requestName):
         """
         This takes a request and submit a new one starting from the original one
         Using a json body to pass resubmission variables
@@ -405,31 +439,18 @@ class CRABRESTModel(RESTModel):
         except AssertionError, ex:
             self.postError("Invalid request name specified", '', 400)
 
-        factory = DBConnect.getConnection()
-        idDAO = factory(classname = "Request.ID")
-        requestId = idDAO.execute(requestName)
-        campaignDAO = factory(classname = "Campaign.GetByRequest")
-        campaign = campaignDAO.execute(requestId)
+        self.logger.info("Reprocessing request %s" % requestName)
 
-        self.database = None
-        try:
-            self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.workloadCouchDB, self.couchUrl))
-            self.couchdb = CouchServer(self.couchUrl)
-            self.database = self.couchdb.connectDatabase(self.workloadCouchDB)
-        except CouchError, ex:
-            self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
-
-        options = {"startkey": [campaign], "endkey": [campaign], 'reduce' : False }
-
-        campaignWfs = self.database.loadView("ReqMgr", "requestsByCampaign", options)
-        self.logger.debug("Found %d rows in the reqmgr database." % len(campaignWfs["rows"]))
-
-        lastResubmission = max( [(singleWf['value']['Submission'], singleWf['value']['RequestName']) for singleWf in campaignWfs['rows']] )[1]
+        campaignWfs = sorted([(req['value']['Submission'], req['value']['RequestName'], req['value']['OriginalRequestName']) for req in self.__getFromCampaign(requestName)])
+        lastSubmission = campaignWfs[-1][1]
+        firstSubmission = campaignWfs[0][1:]
 
         ## retrieving the original request status
-        requestStatus = self.getDetailedStatus(lastResubmission)
+        campaignStatus = self.getDetailedStatus(lastSubmission)['worfklows']
+        requestStatus = campaignStatus[map(itemgetter('request'), campaignStatus).index(lastSubmission)]
+
         if 'Unknown' in requestStatus['requestDetails'].get('RequestStatus', 'Unknown'):
-            self.postError('Request %s not found. Impossible to resubmit.' % lastResubmission, str(requestStatus), 400)
+            self.postError('Request %s not found. Impossible to resubmit.' % lastSubmission, str(requestStatus), 400)
 
         body = cherrypy.request.body.read()
         requestSchema = {}
@@ -443,33 +464,32 @@ class CRABRESTModel(RESTModel):
 
         taskResubmit = requestSchema.get('TaskResubmit', 'Analysis')
 
-        self.logger.error( str(requestStatus['states']))
         ## not forced resubmission, just check workflow/job status
         if not requestSchema.get('ForceResubmit', False):
             ## resubmitting just if the previous request was failed
             if not requestStatus['requestDetails']['RequestStatus'] in ['completed']:
-                self.postError("Request '%s' not yet completed; impossible to resubmit." % lastResubmission, '', 400)
+                self.postError("Request '%s' not yet completed; impossible to resubmit." % lastSubmission, '', 400)
             ## resubmitting just if there are failed jobs
-            elif requestStatus['states']['/' + lastResubmission + '/' + taskResubmit].get('failure', {'count': 0}) < 1 :
-                self.postError("Request '%s' doesn't have failed jobs." % lastResubmission, '', 400)
+            elif requestStatus['states']['/' + lastSubmission + '/' + taskResubmit].get('failure', {'count': 0}) < 1 :
+                self.postError("Request '%s' doesn't have failed jobs." % lastSubmission, '', 400)
         ## forced, kill and resubmit in any case (to verify what *any* means)
         else:
             ## before resumitting kill the previous request
             ## TODO: check if this is also killing the jobs
             try:
-                ChangeState.changeRequestStatus(lastResubmission, 'aborted')
+                ChangeState.changeRequestStatus(lastSubmission, 'aborted')
             except RuntimeError, re:
                 self.postError(str(re), '', 500)
             #self.postError("Forced resubmission not yet available.", '', 501)
 
         ## retrieving the original request schema
-        originalRequest = GetRequest.getRequestByName( lastResubmission )
+        originalRequest = GetRequest.getRequestByName( lastSubmission )
         helper = loadWorkload(originalRequest)
         originalSchema = helper.data.request.schema.dictionary_()
 
         wmtask = helper.getTask(taskResubmit)
         if not wmtask:
-            self.postError('%s task not found in the workflow %s.' %(taskResubmit, lastResubmission), '', 404)
+            self.postError('%s task not found in the workflow %s.' %(taskResubmit, lastSubmission), '', 404)
         taskPath = wmtask.getPathName()
 
         # this below is taking parameter from the original request
@@ -498,7 +518,7 @@ class CRABRESTModel(RESTModel):
         schema.update( resubmitSchema )
         ## generating a new name: I am choosing the original name plus resubmit and date
         currentTime = time.strftime('%y%m%d_%H%M%S', time.localtime(time.time()))
-        schema['RequestName'] = "%s_%s_%s_%s" % (originalSchema['Requestor'], originalSchema['OriginalRequestName'], 'resubmit', currentTime)
+        schema['RequestName'] = "%s_%s_%s_%s" % (originalSchema['Requestor'], firstSubmission[1], 'resubmit', currentTime)
         request = maker(schema)
         newHelper = WMWorkloadHelper(request['WorkflowSpec'])
         # can't save Request object directly, because it makes it hard to retrieve the _rev
@@ -584,11 +604,19 @@ class CRABRESTModel(RESTModel):
 
         return result
 
-    def getDetailedStatus(self, requestID):
+    def getDetailedStatus(self, requestName):
         """
         Get the status with job counts, etc
         """
-        self.logger.info("Getting detailed status info for request %s" % (requestID))
+        self.logger.info("Getting detailed status info for request %s" % requestName)
+
+        try:
+            WMCore.Lexicon.requestName(requestName)
+        except AssertionError, ex:
+            self.postError("Invalid request name specified", '', 400)
+
+        campaignWfs = sorted([(work['value']['Submission'], work['value']['RequestName']) for work in self.__getFromCampaign(requestName)], key=lambda wf: wf[0])
+        campaignStatus = []
 
         try:
             self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
@@ -597,80 +625,94 @@ class CRABRESTModel(RESTModel):
         except CouchError, ex:
             self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
 
-        options = {"reduce": False, "startkey": [requestID], "endkey": [requestID, {}] }
-        jobResults = self.jobDatabase.loadView("JobDump", "statusByWorkflowName", options)
-        self.logger.debug("Found %d rows in the jobs database." % len(jobResults["rows"]))
+        totJobs = 0
+        for wfCounter, singleWf in campaignWfs:
+            options = {"reduce": False, "startkey": [singleWf], "endkey": [singleWf, {}] }
+            jobResults = self.jobDatabase.loadView("JobDump", "statusByWorkflowName", options)
+            self.logger.debug("Found %d rows in the jobs database." % len(jobResults["rows"]))
 
-        try:
-            requestDetails = GetRequest.getRequestDetails(requestID)
-        except RuntimeError:
-            # TODO: Drop percent_success on ticket #2035
-            requestDetails = {'RequestStatus':'Unknown, ReqMgr unreachable', 'percent_success':0}
+            try:
+                requestDetails = GetRequest.getRequestDetails(singleWf)
+            except RuntimeError:
+                requestDetails = {'RequestStatus':'Unknown, ReqMgr unreachable'}
 
-        jobList = [int(row['value']['jobid']) for row in jobResults['rows']]
-        jobList.sort()
+            jobList = [int(row['value']['jobid']) for row in jobResults['rows']]
+            jobList.sort()
 
-        stateDict = {}
+            stateDict = {}
 
-        for row in jobResults['rows']:
-            jobID = row['value']['jobid']
-            state = row['value']['state']
-            task  = row['value']['task']
-            jobNum = jobList.index(jobID) + 1
+            for row in jobResults['rows']:
+                jobID = row['value']['jobid']
+                state = row['value']['state']
+                task  = row['value']['task']
+                jobNum = jobList.index(jobID) + 1 + totJobs
 
-            if stateDict.has_key(task):
-                if stateDict[task].has_key(state):
-                    stateDict[task][state]['count'] += 1
-                    stateDict[task][state]['jobs'].append(jobNum)
-                    stateDict[task][state]['jobIDs'].append(jobID)
+                if stateDict.has_key(task):
+                    if stateDict[task].has_key(state):
+                        stateDict[task][state]['count'] += 1
+                        stateDict[task][state]['jobs'].append(jobNum)
+                        stateDict[task][state]['jobIDs'].append(jobID)
+                    else:
+                        stateDict[task][state] = {'count': 1, 'jobs': [jobNum], 'jobIDs': [jobID]}
                 else:
-                    stateDict[task][state] = {'count':1, 'jobs':[jobNum], 'jobIDs':[jobID]}
-            else:
-                stateDict[task] = {state : {'count':1, 'jobs':[jobNum], 'jobIDs':[jobID]} }
+                    stateDict[task] = {state : {'count': 1, 'jobs': [jobNum], 'jobIDs': [jobID]} }
+            campaignStatus.append( {'request': singleWf, 'states': stateDict, 'requestDetails': requestDetails} )
+            totJobs += len( jobResults['rows'] )
 
+        return {'worfklows': campaignStatus}
 
-        return {'states':stateDict, 'requestDetails':requestDetails}
-
-    def getDataLocation(self, requestID, jobRange):
+    def getDataLocation(self, requestName, jobRange):
         """
         Load output PFNs by Workflow and return {JobID:PFN}
         """
-        self.logger.info("Getting Data Locations for request %s and jobs range %s" % (requestID, str(jobRange)))
+        try:
+            WMCore.Lexicon.requestName(requestName)
+        except AssertionError, ex:
+            self.postError("Invalid request name specified", '', 400)
+
+        campaignWfs = sorted([(work['value']['Submission'], work['value']['RequestName']) for work in self.__getFromCampaign(requestName)], key=lambda wf: wf[0])
+
+        self.logger.info("Getting Data Locations for request %s and jobs range %s" % (requestName, str(jobRange)))
 
         try:
             WMCore.Lexicon.jobrange(jobRange)
         except AssertionError, ex:
             self.postError("Bad range of jobs specified", '', 400)
         jobRange = getJobsFromRange(jobRange)
-        jobList = self.jobList(requestID)
 
         try:
-            self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
+            self.logger.debug("Connecting to database %s/fwjrs using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
             self.couchdb = CouchServer(self.jsmCacheCouchURL)
             self.fwjrdatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
         except CouchError, ex:
             self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
 
-        options = {"startkey": [requestID], "endkey": [requestID] }
+        result = {'data': []}
+        for wfCounter, singleWf in campaignWfs:
+            jobList = self.jobList(singleWf)
+            options = {"startkey": [singleWf], "endkey": [singleWf] }
+            fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "outputPFNByWorkflowName", options)
+            self.logger.debug("Found %d rows in the fwjrs database." % len(fwjrResults["rows"]))
+            result['data'].append({singleWf: self.extractPFNs(fwjrResults, jobRange, jobList)})
 
-        fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "outputPFNByWorkflowName", options)
-        self.logger.debug("Found %d rows in the fwjr database." % len(fwjrResults["rows"]))
+        return result
 
-        return self.extractPFNs(fwjrResults, jobRange, jobList)
-
-    def getLogLocation(self, requestID, jobRange):
+    def getLogLocation(self, requestName, jobRange):
         """
         Load log PFNs by Workflow and return {JobID:PFN}
         """
-        self.logger.info("Getting Logs Locations for request %s and jobs range %s" % (requestID, str(jobRange)))
-
+        try:
+            WMCore.Lexicon.requestName(requestName)
+        except AssertionError, ex:
+            self.postError("Invalid request name specified", '', 400)
         try:
             WMCore.Lexicon.jobrange(jobRange)
         except AssertionError, ex:
             self.postError("Please specify a valid range of jobs", str(ex), 400)
 
+        self.logger.info("Getting Logs Locations for request %s and jobs range %s" % (requestName, str(jobRange)))
+        campaignWfs = sorted([(work['value']['Submission'], work['value']['RequestName']) for work in self.__getFromCampaign(requestName)], key=lambda wf: wf[0])
         jobRange = getJobsFromRange(jobRange)
-        jobList = self.jobList(requestID)
 
         try:
             self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
@@ -679,18 +721,29 @@ class CRABRESTModel(RESTModel):
         except CouchError, ex:
             self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
 
-        options = {"startkey": [requestID], "endkey": [requestID] }
+        result = {'log': []}
+        for wfCounter, singleWf in campaignWfs:
+            jobList = self.jobList(singleWf)
+            options = {"startkey": [singleWf], "endkey": [singleWf] }
+            fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "logArchivesPFNByWorkflowName", options)
+            self.logger.debug("Found %d rows in the fwjrs database." % len(fwjrResults["rows"]))
+            result['log'].append({singleWf: self.extractPFNs(fwjrResults, jobRange, jobList)})
 
-        fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "logArchivesPFNByWorkflowName", options)
+        return result
 
-        return self.extractPFNs(fwjrResults, jobRange, jobList)
-
-    def getGoodLumis(self, requestID):
+    def getGoodLumis(self, requestName):
         """
         Return the list of good lumis processed as generated
         by CouchDB
         """
-        self.logger.info("Getting list of processed lumis for request %s" % (requestID))
+        try:
+            WMCore.Lexicon.requestName(requestName)
+        except AssertionError, ex:
+            self.postError("Invalid request name specified", '', 400)
+
+        self.logger.info("Getting list of processed lumis for request %s" % requestName)
+
+        campaignWfs = sorted([(work['value']['Submission'], work['value']['RequestName']) for work in self.__getFromCampaign(requestName)], key=lambda wf: wf[0])
 
         try:
             self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
@@ -699,10 +752,12 @@ class CRABRESTModel(RESTModel):
         except CouchError, ex:
             self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
 
-        keys = [requestID]
+        result = {'lumis': []}
+        for wfCounter, singleWf in campaignWfs:
+            keys = [singleWf]
+            result['lumis'].append({singleWf: self.fwjrdatabase.loadList("FWJRDump", "lumiList", "goodLumisByWorkflowName", keys=keys)})
 
-        goodLumis = self.fwjrdatabase.loadList("FWJRDump", "lumiList", "goodLumisByWorkflowName", keys=keys)
-        return goodLumis
+        return result
 
     def extractPFNs(self, fwjrResults, jobRange, jobList):
         """
@@ -712,8 +767,7 @@ class CRABRESTModel(RESTModel):
         # This map will keep track of the highest job retry-count. Elements are like { jobid : retrycount }
         retryCountMap = {}
         for f in fwjrResults["rows"]:
-            currID = f['value']['jobid']
-            jobID = int(currID)
+            jobID = int(f['value']['jobid'])
             if jobID in jobList and f['value'].has_key('pfn'):
                 jobNum = jobList.index(jobID) + 1
                 if jobNum in jobRange:
@@ -823,7 +877,7 @@ class CRABRESTModel(RESTModel):
 
         return True
 
-    def jobList(self, requestID):
+    def jobList(self, requestName):
         """
         Return a list of job IDs in order to aid in correlating user job # with JobID
         """
@@ -834,7 +888,7 @@ class CRABRESTModel(RESTModel):
         except CouchError, ex:
             self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
 
-        options = {"reduce": False, "startkey": [requestID], "endkey": [requestID, {}] }
+        options = {"reduce": False, "startkey": [requestName], "endkey": [requestName, {}] }
         jobResults = self.jobDatabase.loadView("JobDump", "statusByWorkflowName", options)
         self.logger.debug("Found %d rows in the jobs database." % len(jobResults["rows"]))
 
@@ -852,41 +906,48 @@ class CRABRESTModel(RESTModel):
 
         return self.clientMapping
 
-    def getJobErrors(self, requestID):
+    def getJobErrors(self, requestName):
         """
         Return all the error reasons for each job in the workflow
         """
-        self.logger.debug("Getting failed reasons for jobs in request %s" % requestID)
+        try:
+            WMCore.Lexicon.requestName(requestName)
+        except AssertionError, ex:
+            self.postError("Invalid request name specified", '', 400)
+
+        self.logger.debug("Getting failed reasons for jobs in request %s" % requestName)
+
+        campaignWfs = sorted([(work['value']['Submission'], work['value']['RequestName']) for work in self.__getFromCampaign(requestName)], key=lambda wf: wf[0])
 
         try:
-            self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
+            self.logger.debug("Connecting to database %s/fwjrs using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
             self.couchdb = CouchServer(self.jsmCacheCouchURL)
-            self.jobDatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
+            self.fwjrdatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
         except CouchError, ex:
             self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
 
-        options = {"startkey": [requestID], "endkey": [requestID, {}] }
-        jobResults = self.jobDatabase.loadView("FWJRDump", "errorsByWorkflowName", options)
-        self.logger.debug("Found %d rows in the jobs database." % jobResults["total_rows"])
+        result = {'errors': []}
+        for wfCounter, singleWf in campaignWfs:
+            options = {"startkey": [singleWf], "endkey": [singleWf, {}] }
+            jobResults = self.fwjrdatabase.loadView("FWJRDump", "errorsByWorkflowName", options)
+            self.logger.debug("Found %d rows in the fwjrs database." % jobResults["total_rows"])
+            ## retrieving relative's job id in the request
+            jobList = self.jobList(singleWf)
+            ## formatting the result
+            dictresult = {}
+            for failure in jobResults['rows']:
+                primkeyjob = str( jobList.index(failure['value']['jobid']) + 1 )
+                secokeyretry = str(failure['value']['retry'])
+                ## we may have already added the job due to another failure in another submission
+                if not primkeyjob in dictresult:
+                    dictresult[primkeyjob] = {secokeyretry: {}}
+                ## we may have already added a failure for the same retry (eg: in a different step)
+                if not secokeyretry in dictresult[primkeyjob]:
+                    dictresult[primkeyjob][secokeyretry] = {}
+                dictresult[primkeyjob][secokeyretry][str(failure['value']['step'])] = failure['value']['error']
+            result['errors'].append({singleWf: dictresult})
 
-        ## retrieving relative's job id in the request
-        jobList = self.jobList(requestID)
-
-        ## formatting the result
-        dictresult = {}
-        for failure in jobResults['rows']:
-            primkeyjob = str( jobList.index(failure['value']['jobid']) + 1 )
-            secokeyretry = str(failure['value']['retry'])
-            ## we may have already added the job due to another failure in another submission
-            if not primkeyjob in dictresult:
-                dictresult[primkeyjob] = {secokeyretry: {}}
-            ## we may have already added a failure for the same retry (eg: in a different step)
-            if not secokeyretry in dictresult[primkeyjob]:
-                dictresult[primkeyjob][secokeyretry] = {}
-            dictresult[primkeyjob][secokeyretry][str(failure['value']['step'])] = failure['value']['error']
-
-        return dictresult
-
+        return result
 
     def setProcessingVersion(self, request):
         """
