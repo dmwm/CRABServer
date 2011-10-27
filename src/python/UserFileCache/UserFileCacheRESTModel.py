@@ -8,6 +8,7 @@ import cherrypy
 import hashlib
 import os
 import shutil
+import tarfile
 
 from WMCore.WebTools.RESTModel import restexpose
 from WMCore.WebTools.RESTModel import RESTModel
@@ -80,17 +81,14 @@ class UserFileCacheRESTModel(RESTModel):
         Upload the file, calculating the hash renaming it to the
         hash value. If the file already exists, just touch it
         """
-        hasher = hashlib.sha256()
+        try:
+            tar = tarfile.open(fileobj=userfile.file, mode='r')
+            lsl = [(x.name, int(x.size), int(x.mtime), x.uname) for x in tar.getmembers()]
+            hasher = hashlib.sha256(str(lsl))
+            digest = hasher.hexdigest()
+        except tarfile.ReadError:
+            raise cherrypy.HTTPError(400, 'File is not a .tgz file.')
 
-
-        size = 0
-        while True:
-            data = userfile.file.read(8192)
-            if not data:
-                break
-            hasher.update(data)
-            size += len(data)
-        digest = hasher.hexdigest()
         fileDir = os.path.join(self.cacheDir, digest[0:2])
         fileName = os.path.join(fileDir, digest)
 
@@ -106,6 +104,8 @@ class UserFileCacheRESTModel(RESTModel):
             handle = open(fileName,'wb')
             userfile.file.seek(0)
             shutil.copyfileobj(userfile.file, handle)
+            handle.close()
+            size = os.path.getsize(fileName)
 
         url = 'http://%s:%s/userfilecache/download?hashkey=%s' % (self.host, self.port, digest)
 
