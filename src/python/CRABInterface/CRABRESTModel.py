@@ -316,7 +316,10 @@ class CRABRESTModel(RESTModel):
         except AssertionError, ex:
             self.postError("Invalid request name specified", '', 400)
 
-        lastSubmission = max([(singleWf['value']['Submission'], singleWf['value']['RequestName']) for singleWf in self.__getFromCampaign(requestName)])[1]
+        campaignWfs = [(singleWf['value']['Submission'], singleWf['value']['RequestName']) for singleWf in self.__getFromCampaign(requestName)]
+        if not campaignWfs:
+            self.postError("Cannot find request %s" % requestName, '', 400)
+        lastSubmission = max(campaignWfs)[1]
 
         ## We need to check the status of the request and determine the aborted/failed status based on the current status
         skipDelete = ["aborted", "failed", "completed"]
@@ -440,6 +443,8 @@ class CRABRESTModel(RESTModel):
 
         ## TODO mcinquil remove this and get it from the status
         campaignWfs = sorted([(req['value']['Submission'], req['value']['RequestName'], req['value']['OriginalRequestName']) for req in self.__getFromCampaign(requestName)])
+        if not campaignWfs:
+            self.postError('Request %s not found. Impossible to resubmit.' % requestName, '', 400)
         lastSubmission = campaignWfs[-1][1]
         firstSubmission = campaignWfs[0][1:]
 
