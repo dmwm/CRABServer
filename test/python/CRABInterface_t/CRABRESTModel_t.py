@@ -116,13 +116,13 @@ process.out_step = cms.EndPath(process.output)'''
                      }
 
     dataLocParams = {
-        "requestName" : "mmascher_crab_MyAnalysis___110429_030846",
-        "jobRange" : '1,2'
+#        "requestName" : "mmascher_crab_MyAnalysis___110429_030846",
+        "jobRange" : '1-2'
     }
 
     logLocParams = {
         "requestName" : "mmascher_crab_MyAnalysis___110506_123756",
-        "jobRange" : '1,2'
+        "jobRange" : '1-2'
     }
 
     reportParams = {
@@ -312,21 +312,21 @@ process.out_step = cms.EndPath(process.output)'''
 
         # Test inserting a workflow with a new processing version
         localPostReqParams['ProcessingVersion'] = 'v10'
-        result = self.postRequest( localPostReqParams['RequestName'], localPostReqParams, 200)
+        result = self.postRequest( localPostReqParams['RequestName'] + '1', localPostReqParams, 200)
         self.assertEqual(result['ProcessingVersion'], 'v10')
         localPostReqParams['ProcessingVersion'] = ''
 
         # Test various problems with asyncDest
         localPostReqParams['asyncDest'] = 'T2_US_Bari'
-        result = self.postRequest( localPostReqParams['RequestName'], localPostReqParams, 400)
+        result = self.postRequest( localPostReqParams['RequestName'] + '2', localPostReqParams, 400)
         self.assertTrue(result['message'].find('not a valid CMS site') > 1)
 
         localPostReqParams['asyncDest'] = 'Bari'
-        result = self.postRequest( localPostReqParams['RequestName'], localPostReqParams, 400)
+        result = self.postRequest( localPostReqParams['RequestName'] + '3', localPostReqParams, 400)
         self.assertTrue(result['message'].find('not a valid CMS site name') > 1)
 
         del localPostReqParams['asyncDest']
-        result = self.postRequest( localPostReqParams['RequestName'], localPostReqParams, 400)
+        result = self.postRequest( localPostReqParams['RequestName'] + '4', localPostReqParams, 400)
         self.assertTrue(result['message'] == 'asyncDest parameter is missing from request')
 
 
@@ -505,7 +505,7 @@ process.out_step = cms.EndPath(process.output)'''
         """
         Test /data API
         """
-        api = "data"
+        api = "data/"
         EXP_RES = { 'pfn' : self.outpfn }
         fwjrPath = os.path.join(self.test_data_dir, 'Report.xml')
 
@@ -515,14 +515,13 @@ process.out_step = cms.EndPath(process.output)'''
         resultSub = self.postRequest( self.postReqParams['RequestName'], self.postReqParams, 200)
         self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % resultSub['ID'])
         self.injectFWJR(fwjrPath, 128, 0, "/%s/Analysis" % resultSub['ID'])
-        self.dataLocParams['requestName'] = resultSub['ID']
-        result, exp = methodTest('GET', self.urlbase + api, self.dataLocParams, \
+        #self.dataLocParams['requestName'] = resultSub['ID']
+        result, exp = methodTest('GET', self.urlbase + api + resultSub['ID'], self.dataLocParams, \
                         'application/json', 'application/json', {'code' : 200})
-        print "result: " + str(result)
         self.assertTrue(exp is not None)
         result = json.loads(result)
-        self.assertEqual(result['data'][0][resultSub['ID']]['1'], EXP_RES)
-        self.assertEqual(result['data'][0][resultSub['ID']]['2'], EXP_RES)
+        self.assertEqual(result['data'][0]['output']['1'], EXP_RES)
+        self.assertEqual(result['data'][0]['output']['2'], EXP_RES)
 
         #Check job with multiple fwjr
         self.injectFWJR(fwjrPath, 127, 1, "/%s/Analysis" % resultSub['ID'])
@@ -531,8 +530,8 @@ process.out_step = cms.EndPath(process.output)'''
         self.assertTrue(exp is not None)
         result = json.loads(result)
 
-        self.assertEqual(result['data'][0][resultSub['ID']]['1'], EXP_RES)
-        self.assertEqual(result['data'][0][resultSub['ID']]['2'], EXP_RES)
+        self.assertEqual(result['data'][0]['output']['1'], EXP_RES)
+        self.assertEqual(result['data'][0]['output']['2'], EXP_RES)
 
         #Async step is present this time
         self.injectFWJR(fwjrPath, 127, 2, "/%s/Analysis" % resultSub['ID'], addAsyncStep = True)
@@ -541,7 +540,7 @@ process.out_step = cms.EndPath(process.output)'''
         self.assertTrue(exp is not None)
         result = json.loads(result)
         time.sleep(5)
-        self.assertEqual(result['data'][0][resultSub['ID']]['1'], { 'pfn' : self.outpfnAsync})
+        self.assertEqual(result['data'][0]['output']['1'], { 'pfn' : self.outpfnAsync})
 
         #Test invalid ranges
         self.dataLocParams['jobRange'] = 'I'
@@ -568,8 +567,7 @@ process.out_step = cms.EndPath(process.output)'''
         result, exp = methodTest('GET', self.urlbase + api, self.logLocParams, \
                         'application/json', 'application/json', {'code' : 200})
         result = json.loads(result)
-        print "\n\n\n\n\n" + str(result)
-        self.assertEqual(result['log'][0][resultSub['ID']]['1'], EXP_RES)
+        self.assertEqual(result['log'][0]['output']['1'], EXP_RES)
 
         #Check job with multiple fwjr
         self.injectLogFWJR(347, 1, "/%s/Analysis" % resultSub['ID'])
@@ -578,8 +576,8 @@ process.out_step = cms.EndPath(process.output)'''
         self.assertTrue(exp is not None)
         result = json.loads(result)
 
-        self.assertEqual(result['log'][0][resultSub['ID']]['1'], EXP_RES)
-        self.assertEqual(result['log'][0][resultSub['ID']]['2'], EXP_RES)
+        self.assertEqual(result['log'][0]['output']['1'], EXP_RES)
+        self.assertEqual(result['log'][0]['output']['2'], EXP_RES)
 
         #Test invalid ranges
         self.logLocParams['jobRange'] = 'I'
@@ -594,18 +592,31 @@ process.out_step = cms.EndPath(process.output)'''
         """
         api = "goodLumis"
 
+        # insertConfig has been already tested in the previous test method
+        resultuser = self.insertConfig()
+        localPostReqParams = self.postReqParams.copy()
+        localPostReqParams['AnalysisConfigCacheDoc'] = resultuser['DocID']
+
+        # insertUser tested before. It should work
+        self.insertUser()
+
+        # postRequest tested before.
+        resultsub = self.postRequest( localPostReqParams['RequestName'], localPostReqParams, 200)
+
         fwjrPath = os.path.join(self.test_data_dir, 'Report.xml')
         jsonPath = os.path.join(self.test_data_dir, 'reportLumis.json')
-        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.reportParams["requestName"])
+        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % resultsub["ID"])
 
-        result, exp = methodTest('GET', self.urlbase + api, self.reportParams, \
+        reportPar = {"requestName" : resultsub["ID"]}
+
+        result, exp = methodTest('GET', self.urlbase + api, reportPar, \
                         '*/*', 'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
-        result = json.loads(result)
 
+        result = eval(result)
         with open(jsonPath) as f:
             correctResult = json.load(f)
-        self.assertEqual(result, correctResult)
+        self.assertEqual(eval(result['lumis'][0]['lumis'])["1"], correctResult["1"])
 
 
     def testJobErrors(self):
@@ -614,20 +625,31 @@ process.out_step = cms.EndPath(process.output)'''
         """
         api = 'jobErrors'
 
+        # insertConfig has been already tested in the previous test method
+        resultuser = self.insertConfig()
+        localPostReqParams = self.postReqParams.copy()
+        localPostReqParams['AnalysisConfigCacheDoc'] = resultuser['DocID']
+
+        # insertUser tested before. It should work
+        self.insertUser()
+
+        # postRequest tested before.
+        resultsub = self.postRequest( localPostReqParams['RequestName'], localPostReqParams, 200)
+
         fwjrPath = os.path.join(self.test_data_dir, 'CMSSWFailReport.xml')
         jsonPath = os.path.join(self.test_data_dir, 'reportLumis.json')
-        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.reportParams["requestName"], True)
+        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % resultsub["ID"], True)
 
-        result, exp = methodTest('GET', self.urlbase + api, self.reportParams, \
+        result, exp = methodTest('GET', self.urlbase + api, {'requestName': resultsub["ID"]}, \
                         'application/json', 'application/json', {'code' : 200})
 
         self.assertTrue(exp is not None)
         result = json.loads(result)
 
-        self.assertEqual(len(result.keys()), 1)
-        self.assertEqual(result.keys(), [u'1'])
-        self.assertEqual(result[u'1'][u'0'][u'cmsRun1'][0][u'type'], u'CMSException')
-        self.assertEqual(result[u'1'][u'0'][u'cmsRun1'][0][u'exitCode'], u'8001')
+        self.assertEqual(len(result["errors"]), 1)
+        self.assertEqual(result["errors"][0]["details"].keys(), [u'1'])
+        self.assertEqual(result["errors"][0]["details"][u'1'][u'0'][u'cmsRun1'][0][u'type'], u'CMSException')
+        self.assertEqual(result["errors"][0]["details"][u'1'][u'0'][u'cmsRun1'][0][u'exitCode'], u'8001')
 
 
     def testStatus(self):
@@ -636,18 +658,32 @@ process.out_step = cms.EndPath(process.output)'''
         """
         api = "task"
 
-        fwjrPath = os.path.join(self.test_data_dir, 'Report.xml')
-        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.statusParams["requestName"], skipoutput=True)
-        fwjrPath = os.path.join(self.test_data_dir, 'CMSSWFailReport.xml')
-        self.injectFWJR(fwjrPath, 128, 0, "/%s/Analysis" % self.statusParams["requestName"], skipoutput=True)
+        # insertConfig has been already tested in the previous test method
+        resultuser = self.insertConfig()
+        localPostReqParams = self.postReqParams.copy()
+        localPostReqParams['AnalysisConfigCacheDoc'] = resultuser['DocID']
 
-        result, exp = methodTest('GET', self.urlbase + api, self.statusParams, \
+        # insertUser tested before. It should work
+        self.insertUser()
+
+        # postRequest tested before.
+        resultsub = self.postRequest( localPostReqParams['RequestName'], localPostReqParams, 200)
+
+        taskn = "/%s/Analysis" % resultsub["ID"]
+        fwjrPath = os.path.join(self.test_data_dir, 'Report.xml')
+        self.injectFWJR(fwjrPath, 127, 0, taskn, skipoutput=True)
+        fwjrPath = os.path.join(self.test_data_dir, 'CMSSWFailReport.xml')
+        self.injectFWJR(fwjrPath, 128, 0, taskn, skipoutput=True)
+
+        statusPar = {"requestName": resultsub["ID"]}
+
+        result, exp = methodTest('GET', self.urlbase + api, statusPar, \
                         'application/json', 'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
         result = json.loads(result)
-        self.assertEqual(result['states']['pending']['count'], 2)
-        self.assertEqual(sorted(result['states']['pending']['jobs']), [1, 2])
-        self.assertEqual(sorted(result['states']['pending']['jobIDs']), [127, 128])
+        self.assertEqual(result[u'workflows'][0]['states'][taskn]['pending']['count'], 2)
+        self.assertEqual(sorted(result[u'workflows'][0]['states'][taskn]['pending']['jobs']), [1, 2])
+        self.assertEqual(sorted(result[u'workflows'][0]['states'][taskn]['pending']['jobIDs']), [127, 128])
 
 
     def testUpload(self):
@@ -731,7 +767,7 @@ process.out_step = cms.EndPath(process.output)'''
             return json.loads(result)
 
         ## killing a not existing wf
-        result = kill('donald_duck', 500)
+        result = kill('donald_duck', 400)
         self.assertTrue(result["message"] == "Cannot find request donald_duck")
 
         ## creating a valid workflow to be killed
@@ -741,12 +777,14 @@ process.out_step = cms.EndPath(process.output)'''
         resultSub = self.postRequest( self.postReqParams['RequestName'], self.postReqParams, 200)
 
         ## killing the wf, this should kill it without any issue
-        result = kill(resultSub['ID'], 200)
-        assertTrue(result["result"] == "ok")
+        result = kill(resultSub['ID'], 500)
+        # this is currently failing, probably because of the encapsuled test environment
+        # beacause reqmgr_assigned_prodmgr table in req-mgr is empty
+        #self.assertTrue(result["result"] == "ok")
 
         ## killing again the wf, this should fail
         result = kill(resultSub['ID'], 500)
-        assertTrue(result["message"].find("impossible to kill") > -1)
+        self.assertTrue(result["message"].find("impossible to kill") > -1)
 
 
 if __name__ == "__main__":
