@@ -115,7 +115,7 @@ class CRABRESTModel(RESTModel):
                         validation=[self.checkConfig])
         #/data
         self._addMethod('GET', 'data', self.getDataLocation,
-                       args=['requestName','jobRange'], validation=[self.checkConfig])
+                       args=['requestName','jobRange'], validation=[self.isalnum])
 
         #/goodLumis, equivalent of "report" from CRAB2
         self._addMethod('GET', 'goodLumis', self.getGoodLumis,
@@ -172,8 +172,8 @@ class CRABRESTModel(RESTModel):
 
     def __getFromCampaign(self, requestName):
         """
-        Receive a string corresponding to a request name
-        Return all the worfklow grouped by the campaign of the input workflow
+        Receive a string correspondi to a request name
+        Return all the workflow grouped by the campaign of the input workflow
         """
         factory = DBConnect.getConnection()
         idDAO = factory(classname = "Request.ID")
@@ -319,19 +319,11 @@ class CRABRESTModel(RESTModel):
         lastSubmission = max([(singleWf['value']['Submission'], singleWf['value']['RequestName']) for singleWf in self.__getFromCampaign(requestName)])[1]
 
         ## We need to check the status of the request and determine the aborted/failed status based on the current status
-
-        ## this is derived from this module
-        ## import WMCore.RequestManager.RequestDB.Settings.RequestStatus
-        deleteMapper = { "new" : "failed",
-                         "assigned" : "failed",
-                         "negotiating" : "failed",
-                         "acquired" : "failed",
-                         "running" : "aborted",
-                       }
         skipDelete = ["aborted", "failed", "completed"]
 
         requestDetails = {'RequestStatus': 'unknown'}
         try:
+            self.logger.info("Going to kill now")
             requestDetails = GetRequest.getRequestDetails(lastSubmission)
         except RuntimeError, re:
             import traceback
@@ -339,13 +331,13 @@ class CRABRESTModel(RESTModel):
 
         ## cannot delete status unknown
         if requestDetails['RequestStatus'] == 'unknown':
-            self.postError('Request unknown, impossible to kill' % str(requestDetails['RequestStatus']), 'Known status are %s.' % str(deleteMapper.keys()), 500)
+            self.postError('Request unknown, impossible to kill' % str(requestDetails['RequestStatus']), '', 500)
         ## cannot delete when in some terminal status
-        elif requestDetails['RequestStatus'] in skipDelete or not requestDetails['RequestStatus'] in deleteMapper.keys():
+        elif requestDetails['RequestStatus'] in skipDelete:
             self.postError('Status of the request is %s: impossible to kill.' % str(requestDetails['RequestStatus']), '', 500)
 
         try:
-            Utilities.changeStatus(lastSubmission, deleteMapper[requestDetails['RequestStatus']] )
+            Utilities.changeStatus(lastSubmission, 'aborted')
         except RuntimeError, re:
             import traceback
             self.postError(str(re), str(traceback.format_exc()), 500)
@@ -446,12 +438,13 @@ class CRABRESTModel(RESTModel):
 
         self.logger.info("Reprocessing request %s" % requestName)
 
+        ## TODO mcinquil remove this and get it from the status
         campaignWfs = sorted([(req['value']['Submission'], req['value']['RequestName'], req['value']['OriginalRequestName']) for req in self.__getFromCampaign(requestName)])
         lastSubmission = campaignWfs[-1][1]
         firstSubmission = campaignWfs[0][1:]
 
         ## retrieving the original request status
-        campaignStatus = self.getDetailedStatus(lastSubmission)['worfklows']
+        campaignStatus = self.getDetailedStatus(lastSubmission)['workflows']
         requestStatus = campaignStatus[map(itemgetter('request'), campaignStatus).index(lastSubmission)]
 
         if 'Unknown' in requestStatus['requestDetails'].get('RequestStatus', 'Unknown'):
@@ -465,7 +458,7 @@ class CRABRESTModel(RESTModel):
             requestSchema = unidecode(JsonWrapper.loads(body))
         except Exception, ex:
             msg = "Error: problem decoding the body of the request"
-            self.postError(msg, str(body), 400)
+            self.postError(msg, str(body) + '\n' + str(ex), 400)
 
         taskResubmit = requestSchema.get('TaskResubmit', 'Analysis')
 
@@ -480,12 +473,10 @@ class CRABRESTModel(RESTModel):
         ## forced, kill and resubmit in any case (to verify what *any* means)
         else:
             ## before resumitting kill the previous request
-            ## TODO: check if this is also killing the jobs
             try:
                 ChangeState.changeRequestStatus(lastSubmission, 'aborted')
             except RuntimeError, re:
                 self.postError(str(re), '', 500)
-            #self.postError("Forced resubmission not yet available.", '', 501)
 
         ## retrieving the original request schema
         originalRequest = GetRequest.getRequestByName( lastSubmission )
@@ -641,6 +632,8 @@ class CRABRESTModel(RESTModel):
             except RuntimeError:
                 requestDetails = {'RequestStatus':'Unknown, ReqMgr unreachable'}
 
+            requestDetails = {'RequestMessages': requestDetails['RequestMessages'], 'RequestStatus': requestDetails['RequestStatus']}
+
             jobList = [int(row['value']['jobid']) for row in jobResults['rows']]
             jobList.sort()
 
@@ -661,10 +654,10 @@ class CRABRESTModel(RESTModel):
                         stateDict[task][state] = {'count': 1, 'jobs': [jobNum], 'jobIDs': [jobID]}
                 else:
                     stateDict[task] = {state : {'count': 1, 'jobs': [jobNum], 'jobIDs': [jobID]} }
-            campaignStatus.append( {'request': singleWf, 'states': stateDict, 'requestDetails': requestDetails} )
+            campaignStatus.append( {'request': singleWf, 'subOrder': wfCounter, 'states': stateDict, 'requestDetails': requestDetails} )
             totJobs += len( jobResults['rows'] )
 
-        return {'worfklows': campaignStatus}
+        return {'workflows': campaignStatus}
 
     def getDataLocation(self, requestName, jobRange):
         """
@@ -698,7 +691,7 @@ class CRABRESTModel(RESTModel):
             options = {"startkey": [singleWf], "endkey": [singleWf] }
             fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "outputLFNByWorkflowName", options)
             self.logger.debug("Found %d rows in the fwjrs database." % len(fwjrResults["rows"]))
-            result['data'].append({singleWf: self.extractLFNs(fwjrResults, jobRange, jobList)})
+            result['data'].append({'request': singleWf, 'subOrder': wfCounter, 'output': self.extractLFNs(fwjrResults, jobRange, jobList)})
 
         return result
 
@@ -732,7 +725,7 @@ class CRABRESTModel(RESTModel):
             options = {"startkey": [singleWf], "endkey": [singleWf] }
             fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "logArchivesLFNByWorkflowName", options)
             self.logger.debug("Found %d rows in the fwjrs database." % len(fwjrResults["rows"]))
-            result['log'].append({singleWf: self.extractLFNs(fwjrResults, jobRange, jobList)})
+            result['log'].append({'request': singleWf, 'subOrder': wfCounter, 'output': self.extractLFNs(fwjrResults, jobRange, jobList)})
 
         return result
 
@@ -760,7 +753,7 @@ class CRABRESTModel(RESTModel):
         result = {'lumis': []}
         for wfCounter, singleWf in campaignWfs:
             keys = [singleWf]
-            result['lumis'].append({singleWf: self.fwjrdatabase.loadList("FWJRDump", "lumiList", "goodLumisByWorkflowName", keys=keys)})
+            result['lumis'].append({'request': singleWf, 'subOrder': wfCounter, 'lumis': self.fwjrdatabase.loadList("FWJRDump", "lumiList", "goodLumisByWorkflowName", keys=keys)})
 
         return result
 
@@ -824,7 +817,7 @@ class CRABRESTModel(RESTModel):
 
         # Basic preservation of the file integrity
         if not (digest == checksum):
-            msg = "File transfer error: digest check failed between %s and %s" % (digest, checksum)
+            msg = "File transfer error: digest check failed between %s and %s"  % (digest, checksum)
             self.postError(msg, "", 400)
 
         # See if the server already has this file
@@ -924,7 +917,7 @@ class CRABRESTModel(RESTModel):
         except AssertionError, ex:
             self.postError("Invalid request name specified", '', 400)
 
-        self.logger.debug("Getting failed reasons for jobs in request %s" % requestName)
+        self.logger.info("Getting failed reasons for jobs in request %s" % requestName)
 
         campaignWfs = sorted([(work['value']['Submission'], work['value']['RequestName']) for work in self.__getFromCampaign(requestName)], key=lambda wf: wf[0])
 
@@ -954,7 +947,7 @@ class CRABRESTModel(RESTModel):
                 if not secokeyretry in dictresult[primkeyjob]:
                     dictresult[primkeyjob][secokeyretry] = {}
                 dictresult[primkeyjob][secokeyretry][str(failure['value']['step'])] = failure['value']['error']
-            result['errors'].append({singleWf: dictresult})
+            result['errors'].append({'request': singleWf, 'subOrder': wfCounter, 'details': dictresult})
 
         return result
 
