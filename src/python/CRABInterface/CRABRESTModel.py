@@ -115,7 +115,7 @@ class CRABRESTModel(RESTModel):
                         validation=[self.checkConfig])
         #/data
         self._addMethod('GET', 'data', self.getDataLocation,
-                       args=['requestName','jobRange'], validation=[self.isalnum])
+                       args=['requestName','jobRange'])
 
         #/goodLumis, equivalent of "report" from CRAB2
         self._addMethod('GET', 'goodLumis', self.getGoodLumis,
@@ -686,8 +686,9 @@ class CRABRESTModel(RESTModel):
             self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
 
         result = {'data': []}
+        jobList = []
         for wfCounter, singleWf in campaignWfs:
-            jobList = self.jobList(singleWf)
+            jobList.extend( self.jobList(singleWf) )
             options = {"startkey": [singleWf], "endkey": [singleWf] }
             fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "outputLFNByWorkflowName", options)
             self.logger.debug("Found %d rows in the fwjrs database." % len(fwjrResults["rows"]))
@@ -720,8 +721,9 @@ class CRABRESTModel(RESTModel):
             self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
 
         result = {'log': []}
+        jobList = []
         for wfCounter, singleWf in campaignWfs:
-            jobList = self.jobList(singleWf)
+            jobList.extend( self.jobList(singleWf) )
             options = {"startkey": [singleWf], "endkey": [singleWf] }
             fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "logArchivesLFNByWorkflowName", options)
             self.logger.debug("Found %d rows in the fwjrs database." % len(fwjrResults["rows"]))
