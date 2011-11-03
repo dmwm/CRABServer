@@ -343,6 +343,7 @@ class CRABRESTModel(RESTModel):
         requestSchema['RequestName'] = "%s_%s_%s" % (requestSchema["Requestor"], requestSchema['RequestName'],
                                                   currentTime)
         requestSchema['Campaign'] = requestSchema['RequestName']
+        requestSchema['Submission'] = 1
         result['ID'] = requestSchema['RequestName']
 
         # Figure out ProcessingVersion
@@ -399,10 +400,36 @@ class CRABRESTModel(RESTModel):
         Using a json body to pass resubmission variables
         """
 
+        try:
+            WMCore.Lexicon.requestName(requestName)
+        except AssertionError, ex:
+            self.postError("Invalid request name specified", '', 400)
+
+        factory = DBConnect.getConnection()
+        idDAO = factory(classname = "Request.ID")
+        requestId = idDAO.execute(requestName)
+        campaignDAO = factory(classname = "Campaign.GetByRequest")
+        campaign = campaignDAO.execute(requestId)
+
+        self.database = None
+        try:
+            self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.workloadCouchDB, self.couchUrl))
+            self.couchdb = CouchServer(self.couchUrl)
+            self.database = self.couchdb.connectDatabase(self.workloadCouchDB)
+        except CouchError, ex:
+            self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
+
+        options = {"startkey": [campaign], "endkey": [campaign], 'reduce' : False }
+
+        campaignWfs = self.database.loadView("ReqMgr", "requestsByCampaign", options)
+        self.logger.debug("Found %d rows in the reqmgr database." % len(campaignWfs["rows"]))
+
+        lastResubmission = max( [(singleWf['value']['Submission'], singleWf['value']['RequestName']) for singleWf in campaignWfs['rows']] )[1]
+
         ## retrieving the original request status
-        requestStatus = self.getDetailedStatus(requestName)
+        requestStatus = self.getDetailedStatus(lastResubmission)
         if 'Unknown' in requestStatus['requestDetails'].get('RequestStatus', 'Unknown'):
-            self.postError('Request %s not found. Impossible to resubmit.' % requestName, str(requestStatus), 400)
+            self.postError('Request %s not found. Impossible to resubmit.' % lastResubmission, str(requestStatus), 400)
 
         body = cherrypy.request.body.read()
         requestSchema = {}
@@ -414,48 +441,49 @@ class CRABRESTModel(RESTModel):
             msg = "Error: problem decoding the body of the request"
             self.postError(msg, str(body), 400)
 
-        ## not forced resubmission, just check workflow status
+        taskResubmit = requestSchema.get('TaskResubmit', 'Analysis')
+
+        self.logger.error( str(requestStatus['states']))
+        ## not forced resubmission, just check workflow/job status
         if not requestSchema.get('ForceResubmit', False):
             ## resubmitting just if the previous request was failed
             if not requestStatus['requestDetails']['RequestStatus'] in ['completed']:
-                self.postError("Request '%s' not yet completed; impossible to resubmit." % requestName, '', 400)
+                self.postError("Request '%s' not yet completed; impossible to resubmit." % lastResubmission, '', 400)
             ## resubmitting just if there are failed jobs
-            elif requestStatus['states'].get('failure', None) is None:
-                self.postError("Request '%s' doesn't have failed jobs." % requestName, '', 400)
+            elif requestStatus['states']['/' + lastResubmission + '/' + taskResubmit].get('failure', {'count': 0}) < 1 :
+                self.postError("Request '%s' doesn't have failed jobs." % lastResubmission, '', 400)
         ## forced, kill and resubmit in any case (to verify what *any* means)
         else:
             ## before resumitting kill the previous request
             ## TODO: check if this is also killing the jobs
             try:
-                ChangeState.changeRequestStatus(requestName, 'aborted')
+                ChangeState.changeRequestStatus(lastResubmission, 'aborted')
             except RuntimeError, re:
                 self.postError(str(re), '', 500)
             #self.postError("Forced resubmission not yet available.", '', 501)
 
         ## retrieving the original request schema
-        originalRequest = GetRequest.getRequestByName( requestName )
+        originalRequest = GetRequest.getRequestByName( lastResubmission )
         helper = loadWorkload(originalRequest)
         originalSchema = helper.data.request.schema.dictionary_()
 
-        ## retrieving the task path to be resubmitted - default is Analysis
-        taskResubmit = requestSchema.get('TaskResubmit', 'Analysis')
         wmtask = helper.getTask(taskResubmit)
         if not wmtask:
-            self.postError('%s task not found in the workflow %s.' %(requestSchema['TaskResubmit'], requestName), '', 404)
+            self.postError('%s task not found in the workflow %s.' %(taskResubmit, lastResubmission), '', 404)
         taskPath = wmtask.getPathName()
 
+        # this below is taking parameter from the original request
+        #   note: site-b/w-lists are replaced while we could probably decide to simply append them
         newPars = { 'OriginalRequestName': originalSchema['RequestName'],
                     'InitialTaskPath':     taskPath,
                     'SiteWhitelist':       requestSchema.get('SiteWhitelist', originalSchema.get('SiteWhitelist', [])),
                     'SiteBlacklist':       requestSchema.get('SiteBlacklist', originalSchema.get('SiteBlacklist', [])),
+                    'Submission':          originalSchema['Submission'] + 1,
                   }
 
         ## at some point we'll have some other kind of request (MonteCarlo?)
         ## and we might need to have different parameters then analysis has
         if originalSchema['RequestType'] in ['Analysis']:
-            ## this below is taking parameter from the original request
-            ##   this is should work even if we have more then one agent with different acdc dbs
-            ##   note: site-b/w-lists are replaced while we could probably decide to simply append them
             newPars['ACDCServer'] = originalSchema['ACDCUrl']
             newPars['ACDCDatabase'] = originalSchema['ACDCDBName']
 
