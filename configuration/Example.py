@@ -79,7 +79,7 @@ config.CRABInterface.views.active.crab.object = 'WMCore.WebTools.RESTApi'
 config.CRABInterface.views.active.crab.templates = os.path.join(os.environ["WMCORE_ROOT"], 'templates/WMCore/WebTools')
 config.CRABInterface.views.active.crab.model.couchUrl = couchURL
 config.CRABInterface.views.active.crab.model.workloadCouchDB = workloadCouchDB
-config.CRABInterface.views.active.crab.model.object = 'CRABServer.CRABRESTModel'
+config.CRABInterface.views.active.crab.model.object = 'CRABServer.CRABInterface.CRABRESTModel'
 config.CRABInterface.views.active.crab.formatter.object = 'WMCore.WebTools.RESTFormatter'
 
 ## TODO once the deploy model has been defined.. we will clarify how

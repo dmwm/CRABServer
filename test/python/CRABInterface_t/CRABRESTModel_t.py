@@ -22,9 +22,9 @@ from WMCore.Cache.WMConfigCache import ConfigCache
 from WMCore.Database.CMSCouch import CouchServer
 from WMCore.FwkJobReport.Report import Report
 try:
-    from CRABServer.CRABRESTModel import getJobsFromRange
+    from CRABServer.CRABInterface.CRABRESTModel import getJobsFromRange
 except ImportError:
-    from CRABRESTModel import getJobsFromRange
+    from CRABInterface.CRABRESTModel import getJobsFromRange
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import allSoftwareVersions
 import WMCore.RequestManager.RequestDB.Interface.Admin.SoftwareManagement as SoftwareAdmin
 from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState
@@ -156,7 +156,7 @@ process.out_step = cms.EndPath(process.output)'''
         self.config.UnitTests.section_('database')
         self.config.UnitTests.database.connectUrl = databaseURL
         self.config.UnitTests.database.socket = databaseSocket
-        self.config.UnitTests.object = 'CRABRESTModel'
+        self.config.UnitTests.object = 'CRABInterface.CRABRESTModel'
         self.config.UnitTests.views.active.rest.model.couchUrl = couchURL
         self.config.UnitTests.views.active.rest.model.workloadCouchDB = workloadDB
         self.config.UnitTests.views.active.rest.configCacheCouchURL = couchURL
@@ -181,7 +181,7 @@ process.out_step = cms.EndPath(process.output)'''
         """
         _setUp_
         """
-        data_path = os.path.join(os.path.dirname(__file__), '../data')
+        data_path = os.path.join(os.path.dirname(__file__), '../../data')
         self.test_data_dir = os.path.normpath(data_path)
 
         RESTBaseUnitTest.setUp(self)

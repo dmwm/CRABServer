@@ -75,6 +75,6 @@ config.CRABInterface.views.active.crab.templates = os.path.join(getWMBASE(),
                                        "src/templates/WMCore/WebTools/")
 config.CRABInterface.views.active.crab.model.couchUrl = couchURL
 config.CRABInterface.views.active.crab.model.workloadCouchDB = workloadCouchDB
-config.CRABInterface.views.active.crab.model.object = 'CRABRESTModel'
+config.CRABInterface.views.active.crab.model.object = 'CRABInterface.CRABRESTModel'
 config.CRABInterface.views.active.crab.formatter.object = 'WMCore.WebTools.RESTFormatter'
 
