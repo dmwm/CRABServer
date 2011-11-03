@@ -116,26 +116,32 @@ process.out_step = cms.EndPath(process.output)'''
                      }
 
     dataLocParams = {
-        "requestID" : "mmascher_crab_MyAnalysis___110429_030846",
+        "requestName" : "mmascher_crab_MyAnalysis___110429_030846",
         "jobRange" : '1,2'
     }
 
     logLocParams = {
-        "requestID" : "mmascher_crab_MyAnalysis___110506_123756",
+        "requestName" : "mmascher_crab_MyAnalysis___110506_123756",
         "jobRange" : '1,2'
     }
 
     reportParams = {
-        "requestID" : "mmascher_crab_MyAnalysis___110506_123756",
+        "requestName" : "mmascher_crab_MyAnalysis___110506_123756",
     }
 
     statusParams = {
-        "requestID" : "mmascher_crab_MyAnalysis___110506_123756",
+        "requestName" : "mmascher_crab_MyAnalysis___110506_123756",
     }
 
-    outpfn = 'srm://srmcms.pic.es:8443/srm/managerv2?SFN=/pnfs/pic.es/data/cms/store/user/mmascher/RelValProdTTbar/' + \
-             '1304039730//0000/4C86B480-0D72-E011-978B-002481CFE25E.root'
-    logpfn = 'srm://storm-se-01.ba.infn.it:8444/srm/managerv2?SFN=/cms//store/unmerged/logs/prod/2011/5/6/' + \
+    location = 'ingrid-se02.cism.ucl.ac.be'
+    lfnAsync = '/store/user/mmascher/RelValProdTTbar/1304039730//0000/outputAsync.root'
+    outpfn = 'srm://ingrid-se02.cism.ucl.ac.be:8444/srm/managerv2?SFN=/storage/data/cms/store/user/mmascher/RelValProdTTbar/1304039730/' + \
+             '/0000/output.root'
+    outpfnAsync = 'srm://ingrid-se02.cism.ucl.ac.be:8444/srm/managerv2?SFN=/storage/data/cms/store/user/mmascher/RelValProdTTbar/1304039730/' + \
+             '/0000/outputAsync.root'
+    logLocation = 'storm-se-01.ba.infn.it'
+    loglfn = '/store/unmerged/logs/prod/2011/5/6/mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e-0026b958c394-99-0-logArchive.tar.gz'
+    logpfn = 'srm://storm-se-01.ba.infn.it:8444/srm/managerv2?SFN=//cms/store/unmerged/logs/prod/2011/5/6/' + \
              'mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e-0026b958c394-99-0-logArchive.tar.gz'
 
 
@@ -156,7 +162,7 @@ process.out_step = cms.EndPath(process.output)'''
         self.config.UnitTests.section_('database')
         self.config.UnitTests.database.connectUrl = databaseURL
         self.config.UnitTests.database.socket = databaseSocket
-        self.config.UnitTests.object = 'CRABInterface.CRABRESTModel'
+        self.config.UnitTests.views.active.rest.model.object = 'CRABInterface.CRABRESTModel'
         self.config.UnitTests.views.active.rest.model.couchUrl = couchURL
         self.config.UnitTests.views.active.rest.model.workloadCouchDB = workloadDB
         self.config.UnitTests.views.active.rest.configCacheCouchURL = couchURL
@@ -396,7 +402,7 @@ process.out_step = cms.EndPath(process.output)'''
         #assert len(result.get('ID', '')) > 0
 
 
-    def injectFWJR(self, reportXML, jobID, retryCount, taskName, skipoutput = False):
+    def injectFWJR(self, reportXML, jobID, retryCount, taskName, skipoutput = False, addAsyncStep = False):
         """
         Inject a fake fwjr with a cmsRun1 section into couchDB
         """
@@ -409,9 +415,18 @@ process.out_step = cms.EndPath(process.output)'''
         myReport = Report("cmsRun1")
         myReport.parse(reportXML)
         myReport.setTaskName(taskName)
+
+        #adding async step
+        if addAsyncStep:
+            myReport.addOutputModule(moduleName = "asynStageOut")
+            myReport.addStep("asyncStageOut1", 0)
+            reportFile = {"OutputPFN": self.outpfnAsync, "lfn" : self.lfnAsync, "location" : self.location}
+            myReport.addOutputFile(outputModule = "output", file = reportFile)
+
         myReport.data.cmsRun1.status = 0
         if not skipoutput:
             myReport.data.cmsRun1.output.output.files.file0.OutputPFN = self.outpfn
+            myReport.data.cmsRun1.output.output.files.file0.location = self.location
 
         fwjrDocument = {"_id": "%s-%s" % (jobID, retryCount),
                         "jobid": jobID,
@@ -458,8 +473,8 @@ process.out_step = cms.EndPath(process.output)'''
         myReportLog = Report("logArch1")
         myReportLog.setTaskName(taskName)
         myReportLog.addOutputModule(moduleName = "logArchive")
-        reportFile = {"lfn": "", "pfn": self.logpfn,
-                      "location": "SEName", "module_label": "logArchive",
+        reportFile = {"lfn": self.loglfn, "pfn": self.logpfn,
+                      "location": self.logLocation, "module_label": "logArchive",
                       "events": 0, "size": 0, "merged": False}
         myReportLog.addOutputFile(outputModule = "logArchive", file = reportFile)
 
@@ -492,28 +507,41 @@ process.out_step = cms.EndPath(process.output)'''
         """
         api = "data"
         EXP_RES = { 'pfn' : self.outpfn }
-
         fwjrPath = os.path.join(self.test_data_dir, 'Report.xml')
-        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.dataLocParams["requestID"])
-        self.injectFWJR(fwjrPath, 128, 0, "/%s/Analysis" % self.dataLocParams["requestID"])
 
+        resultConfig = self.insertConfig()
+        self.postReqParams['AnalysisConfigCacheDoc'] = resultConfig['DocID']
+        self.insertUser()
+        resultSub = self.postRequest( self.postReqParams['RequestName'], self.postReqParams, 200)
+        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % resultSub['ID'])
+        self.injectFWJR(fwjrPath, 128, 0, "/%s/Analysis" % resultSub['ID'])
+        self.dataLocParams['requestName'] = resultSub['ID']
         result, exp = methodTest('GET', self.urlbase + api, self.dataLocParams, \
                         'application/json', 'application/json', {'code' : 200})
+        print "result: " + str(result)
         self.assertTrue(exp is not None)
         result = json.loads(result)
-
-        self.assertEqual(result['1'], EXP_RES)
-        self.assertEqual(result['2'], EXP_RES)
+        self.assertEqual(result['data'][0][resultSub['ID']]['1'], EXP_RES)
+        self.assertEqual(result['data'][0][resultSub['ID']]['2'], EXP_RES)
 
         #Check job with multiple fwjr
-        self.injectFWJR(fwjrPath, 127, 1, "/%s/Analysis" % self.dataLocParams["requestID"])
+        self.injectFWJR(fwjrPath, 127, 1, "/%s/Analysis" % resultSub['ID'])
         result, exp = methodTest('GET', self.urlbase + api, self.dataLocParams, \
                         'application/json', 'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
         result = json.loads(result)
 
-        self.assertEqual(result['1'], EXP_RES)
-        self.assertEqual(result['2'], EXP_RES)
+        self.assertEqual(result['data'][0][resultSub['ID']]['1'], EXP_RES)
+        self.assertEqual(result['data'][0][resultSub['ID']]['2'], EXP_RES)
+
+        #Async step is present this time
+        self.injectFWJR(fwjrPath, 127, 2, "/%s/Analysis" % resultSub['ID'], addAsyncStep = True)
+        result, exp = methodTest('GET', self.urlbase + api, self.dataLocParams, \
+                        'application/json', 'application/json', {'code' : 200})
+        self.assertTrue(exp is not None)
+        result = json.loads(result)
+        time.sleep(5)
+        self.assertEqual(result['data'][0][resultSub['ID']]['1'], { 'pfn' : self.outpfnAsync})
 
         #Test invalid ranges
         self.dataLocParams['jobRange'] = 'I'
@@ -529,23 +557,29 @@ process.out_step = cms.EndPath(process.output)'''
         api = "log"
         EXP_RES = { 'pfn' : self.logpfn }
 
-        self.injectLogFWJR(347, 0, "/%s/Analysis" % self.logLocParams["requestID"])
-        self.injectLogFWJR(348, 0, "/%s/Analysis" % self.logLocParams["requestID"])
+        resultConfig = self.insertConfig()
+        self.postReqParams['AnalysisConfigCacheDoc'] = resultConfig['DocID']
+        self.insertUser()
+        resultSub = self.postRequest( self.postReqParams['RequestName'], self.postReqParams, 200)
+        self.injectLogFWJR(347, 0, "/%s/Analysis" % resultSub['ID'])
+        self.injectLogFWJR(348, 0, "/%s/Analysis" % resultSub['ID'])
+        self.logLocParams['requestName'] = resultSub['ID']
 
         result, exp = methodTest('GET', self.urlbase + api, self.logLocParams, \
                         'application/json', 'application/json', {'code' : 200})
         result = json.loads(result)
-        self.assertEqual(result['1'], EXP_RES)
+        print "\n\n\n\n\n" + str(result)
+        self.assertEqual(result['log'][0][resultSub['ID']]['1'], EXP_RES)
 
         #Check job with multiple fwjr
-        self.injectLogFWJR(347, 1, "/%s/Analysis" % self.logLocParams["requestID"])
+        self.injectLogFWJR(347, 1, "/%s/Analysis" % resultSub['ID'])
         result, exp = methodTest('GET', self.urlbase + api, self.logLocParams, \
                         'application/json', 'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
         result = json.loads(result)
 
-        self.assertEqual(result['1'], EXP_RES)
-        self.assertEqual(result['2'], EXP_RES)
+        self.assertEqual(result['log'][0][resultSub['ID']]['1'], EXP_RES)
+        self.assertEqual(result['log'][0][resultSub['ID']]['2'], EXP_RES)
 
         #Test invalid ranges
         self.logLocParams['jobRange'] = 'I'
@@ -562,7 +596,7 @@ process.out_step = cms.EndPath(process.output)'''
 
         fwjrPath = os.path.join(self.test_data_dir, 'Report.xml')
         jsonPath = os.path.join(self.test_data_dir, 'reportLumis.json')
-        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.reportParams["requestID"])
+        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.reportParams["requestName"])
 
         result, exp = methodTest('GET', self.urlbase + api, self.reportParams, \
                         '*/*', 'application/json', {'code' : 200})
@@ -582,7 +616,7 @@ process.out_step = cms.EndPath(process.output)'''
 
         fwjrPath = os.path.join(self.test_data_dir, 'CMSSWFailReport.xml')
         jsonPath = os.path.join(self.test_data_dir, 'reportLumis.json')
-        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.reportParams["requestID"], True)
+        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.reportParams["requestName"], True)
 
         result, exp = methodTest('GET', self.urlbase + api, self.reportParams, \
                         'application/json', 'application/json', {'code' : 200})
@@ -603,9 +637,9 @@ process.out_step = cms.EndPath(process.output)'''
         api = "task"
 
         fwjrPath = os.path.join(self.test_data_dir, 'Report.xml')
-        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.statusParams["requestID"], skipoutput=True)
+        self.injectFWJR(fwjrPath, 127, 0, "/%s/Analysis" % self.statusParams["requestName"], skipoutput=True)
         fwjrPath = os.path.join(self.test_data_dir, 'CMSSWFailReport.xml')
-        self.injectFWJR(fwjrPath, 128, 0, "/%s/Analysis" % self.statusParams["requestID"], skipoutput=True)
+        self.injectFWJR(fwjrPath, 128, 0, "/%s/Analysis" % self.statusParams["requestName"], skipoutput=True)
 
         result, exp = methodTest('GET', self.urlbase + api, self.statusParams, \
                         'application/json', 'application/json', {'code' : 200})

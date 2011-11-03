@@ -38,6 +38,9 @@ from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import loadWorkload
 import WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools as Utilities
 
+from LFN2PFNConverter import LFN2PFNConverter
+
+
 def getJobsFromRange(myrange):
     """
     Take a string and return a list of jobId
@@ -77,6 +80,8 @@ class CRABRESTModel(RESTModel):
         self.sandBoxCacheHost = config.sandBoxCacheHost
         self.sandBoxCachePort = config.sandBoxCachePort
         self.sandBoxCacheBasepath = config.sandBoxCacheBasepath
+
+        self.converter = LFN2PFNConverter()
 
         self.clientMapping = {}
         if hasattr(config, 'clientMapping'):
@@ -167,7 +172,7 @@ class CRABRESTModel(RESTModel):
 
     def __getFromCampaign(self, requestName):
         """
-        Receive a string correspondi to a request name 
+        Receive a string corresponding to a request name
         Return all the worfklow grouped by the campaign of the input workflow
         """
         factory = DBConnect.getConnection()
@@ -691,15 +696,15 @@ class CRABRESTModel(RESTModel):
         for wfCounter, singleWf in campaignWfs:
             jobList = self.jobList(singleWf)
             options = {"startkey": [singleWf], "endkey": [singleWf] }
-            fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "outputPFNByWorkflowName", options)
+            fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "outputLFNByWorkflowName", options)
             self.logger.debug("Found %d rows in the fwjrs database." % len(fwjrResults["rows"]))
-            result['data'].append({singleWf: self.extractPFNs(fwjrResults, jobRange, jobList)})
+            result['data'].append({singleWf: self.extractLFNs(fwjrResults, jobRange, jobList)})
 
         return result
 
     def getLogLocation(self, requestName, jobRange):
         """
-        Load log PFNs by Workflow and return {JobID:PFN}
+        Load log LFNs by Workflow and return {JobID:PFN}
         """
         try:
             WMCore.Lexicon.requestName(requestName)
@@ -725,9 +730,9 @@ class CRABRESTModel(RESTModel):
         for wfCounter, singleWf in campaignWfs:
             jobList = self.jobList(singleWf)
             options = {"startkey": [singleWf], "endkey": [singleWf] }
-            fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "logArchivesPFNByWorkflowName", options)
+            fwjrResults = self.fwjrdatabase.loadView("FWJRDump", "logArchivesLFNByWorkflowName", options)
             self.logger.debug("Found %d rows in the fwjrs database." % len(fwjrResults["rows"]))
-            result['log'].append({singleWf: self.extractPFNs(fwjrResults, jobRange, jobList)})
+            result['log'].append({singleWf: self.extractLFNs(fwjrResults, jobRange, jobList)})
 
         return result
 
@@ -759,16 +764,29 @@ class CRABRESTModel(RESTModel):
 
         return result
 
-    def extractPFNs(self, fwjrResults, jobRange, jobList):
+    def extractLFNs(self, fwjrResults, jobRange, jobList):
         """
-        Pull the list of PFNs out of a couch view
+        Pull the list of LFNs,locations out of a couch view, convert them into the pfn, return it!
         """
+        def foundIt():
+            #id are like 127-1 (id-retrycount). Taking the retrycount
+            retryCountMap[jobKey] = f['id'].split('-')[1]
+            try:
+                pfn = self.converter.lfn2pfn(f['value']['location'], f['value']['lfn'])
+            except Exception,ex:
+                self.logger.exception()
+                msg = "Error converting lfn to pfn. LFN: %s, location: %s" % (f['value']['lfn'], f['value']['location'])
+                self.postError("Error converting lfn to pfn.", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
+            result[jobKey] = { 'pfn': pfn }
+            if f['value'].has_key('checksums'):
+                result[jobKey].update( {'checksums':f['value']['checksums']})
+
         result = {}
         # This map will keep track of the highest job retry-count. Elements are like { jobid : retrycount }
         retryCountMap = {}
         for f in fwjrResults["rows"]:
             jobID = int(f['value']['jobid'])
-            if jobID in jobList and f['value'].has_key('pfn'):
+            if jobID in jobList and f['value'].has_key('lfn'):
                 jobNum = jobList.index(jobID) + 1
                 if jobNum in jobRange:
                     jobKey = str(jobNum)
@@ -779,18 +797,9 @@ class CRABRESTModel(RESTModel):
                         currRetryCount = int(f['id'].split('-')[1])
                         #insert in the result dict only if it is a new retry
                         if currRetryCount > oldRetryCount:
-                            #id are like 127-1 (id-retrycount). Taking the retrycount
-                            retryCountMap[jobKey] = f['id'].split('-')[1]
-                            result[jobKey] = { 'pfn':f['value']['pfn'] }
-                            if f['value'].has_key('checksums'):
-                                result[jobKey].update( {'checksums':f['value']['checksums']})
+                            foundIt()
                     else:
-                        #id are like 127-1 (id-retrycount). Taking the retrycount
-                        retryCountMap[jobKey] = f['id'].split('-')[1]
-
-                        result[jobKey] = {'pfn':f['value']['pfn']}
-                        if f['value'].has_key('checksums'):
-                            result[jobKey].update( {'checksums':f['value']['checksums']})
+                        foundIt()
 
         self.logger.debug("PFN dict %s" % result)
         return result
