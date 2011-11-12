@@ -4,11 +4,11 @@ Created on Oct 20, 2011
 import unittest
 import socket
 from xml.parsers.expat import ExpatError
-from LFN2PFNConverter import LFN2PFNConverter
+from CRABInterface.LFN2PFNConverter import LFN2PFNConverter
 
 
 class LFN2PFNConverterTest(unittest.TestCase):
-    siteName = 'ingrid-se02.cism.ucl.ac.be'
+    siteName = 'T2_BE_UCL'
     lfn = '/store/temp/user/jmmaes/RelValProdTTbar/crab303test-jmmaes-004/v1/0000/861F86B0-1EF0-E011-A7A4-00226406A18A.root'
     expPFN = 'srm://ingrid-se02.cism.ucl.ac.be:8444/srm/managerv2?SFN=/storage/data/cms/store/temp/user/jmmaes/RelValProdTTbar/crab303test-jmmaes-004/v1/0000/861F86B0-1EF0-E011-A7A4-00226406A18A.root'
 
@@ -29,7 +29,8 @@ class LFN2PFNConverterTest(unittest.TestCase):
 
     def testNotExistingSite(self):
         converter = LFN2PFNConverter()
-        self.assertRaises(KeyError , converter.lfn2pfn, *('XXX', self.lfn))
+        res = converter.lfn2pfn('XXX', self.lfn)
+        self.assertEqual(None, res)
 
 
 if __name__ == "__main__":
