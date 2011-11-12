@@ -18,7 +18,7 @@ defaulturi = {
                   'map':  {
                             "RequestType"       : {"default": "Analysis",       "config": None,                     "type": "StringType",  "required": True },
                             "Group"             : {"default": "Analysis",       "config": 'User.group',             "type": "StringType",  "required": True },
-                            "Team"              : {"default": "Analysis",       "config": 'User.group',             "type": "StringType",  "required": True },
+                            "Team"              : {"default": "Analysis",       "config": 'User.team',              "type": "StringType",  "required": True },
                             "Requestor"         : {"default": None,             "config": None,                     "type": "StringType",  "required": True },
                             "Username"          : {"default": None,             "config": None,                     "type": "StringType",  "required": True },
                             "RequestName"       : {"default": None,             "config": None,                     "type": "StringType",  "required": True },

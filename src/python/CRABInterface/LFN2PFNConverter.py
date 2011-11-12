@@ -5,7 +5,6 @@ Created on Oct 19, 2011
 '''
 from WMCore.Storage.TrivialFileCatalog import readTFC
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
-from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 
 class LFN2PFNConverter:
     '''
@@ -18,11 +17,9 @@ class LFN2PFNConverter:
         Constructor: create
         '''
         self.phedex = PhEDEx(responseType='xml', dict=dict)
-        self.sitedb = SiteDBJSON()
 
-    def lfn2pfn(self, se, lfn):
-        #Default: cache expires in 0.5 hours in Servicei
-        siteName = self.sitedb.seToCMSName(se)
+    def lfn2pfn(self, siteName, lfn):
+        #Default: cache expires in 0.5 hours in Service
         self.phedex.getNodeTFC(siteName)
 
         tfcCacheFile = self.phedex.cacheFileName('tfc', inputdata={'node': siteName})
