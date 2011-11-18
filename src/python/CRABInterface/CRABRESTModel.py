@@ -467,17 +467,17 @@ class CRABRESTModel(RESTModel):
 
         taskResubmit = requestSchema.get('TaskResubmit', 'Analysis')
 
+        ## resubmitting just if there are failed jobs, valid for forced resubmissions too
+        if requestStatus['states']['/' + lastSubmission + '/' + taskResubmit].get('failure', {'count': 0})['count'] < 1 :
+            self.postError("Request '%s' doesn't have failed jobs." % lastSubmission, '', 400)
+
         ## not forced resubmission, just check workflow/job status
         if not requestSchema.get('ForceResubmit', False):
             ## resubmitting just if the previous request was failed
             if not requestStatus['requestDetails']['RequestStatus'] in ['completed']:
                 self.postError("Request '%s' not yet completed; impossible to resubmit." % lastSubmission, '', 400)
-            ## resubmitting just if there are failed jobs
-            elif requestStatus['states']['/' + lastSubmission + '/' + taskResubmit].get('failure', {'count': 0}) < 1 :
-                self.postError("Request '%s' doesn't have failed jobs." % lastSubmission, '', 400)
-        ## forced, kill and resubmit in any case (to verify what *any* means)
         else:
-            ## before resumitting kill the previous request
+            ## killing for any job status before resumitting kill the previous request
             try:
                 ChangeState.changeRequestStatus(lastSubmission, 'aborted')
             except RuntimeError, re:
