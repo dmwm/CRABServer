@@ -951,8 +951,12 @@ class CRABRESTModel(RESTModel):
                 if not primkeyjob in dictresult:
                     dictresult[primkeyjob] = {secokeyretry: {}}
                 ## we may have already added a failure for the same retry (eg: in a different step)
+                ## we want the latest one
                 if not secokeyretry in dictresult[primkeyjob]:
-                    dictresult[primkeyjob][secokeyretry] = {}
+                    ## there is just one key, with the latest retry
+                    if int(dictresult[primkeyjob].keys()[0]) < int(secokeyretry):
+                        del dictresult[primkeyjob]
+                        dictresult[primkeyjob] = {secokeyretry: {}}
                 dictresult[primkeyjob][secokeyretry][str(failure['value']['step'])] = failure['value']['error']
             result['errors'].append({'request': singleWf, 'subOrder': wfCounter, 'details': dictresult})
 
