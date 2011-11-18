@@ -39,7 +39,10 @@ defaulturi = {
                             "VoGroup"           : {"default": None,             "config": 'User.voGroup',           "type": "StringType",  "required": False}
                             #"JobSplitArgs"      : {"default": None,             "config": 'Data.filesPerJob',       "type": IntType,    "required": False},
                             #"JobSplitArgs"      : {"default": None,             "config": 'Data.eventPerJob',       "type": IntType,    "required": False},
-                          }
+                          },
+
+                  'other-config-params' : ["General.serverUrl", "General.requestName", "JobType.pluginName", "JobType.externalPluginFile", "Data.unitsPerJob", "Data.splitting", \
+                                               "JobType.psetName", "JobType.inputFiles", "Data.inputDataset", "User.email", "Data.lumiMask", "General.workArea"]
                 },
     'get-log' :  {'uri': '/crabinterface/crab/log/'},
     'get-output'   : {'uri': '/crabinterface/crab/data/'},
