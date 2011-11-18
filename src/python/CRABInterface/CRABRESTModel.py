@@ -41,17 +41,23 @@ import WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools as Utilities
 from LFN2PFNConverter import LFN2PFNConverter
 
 
-def getJobsFromRange(myrange):
+def expandRange(myrange, restInstance=None):
     """
     Take a string and return a list of jobId
     """
-    myrange = myrange.replace(' ','').split(',')
+    myrange = myrange.replace(' ','')
+    try:
+        WMCore.Lexicon.jobrange(myrange)
+    except AssertionError, ex:
+        restInstance.postError("Irregular range " + myrange, str(ex), 400)
+
+    myrange = myrange.split(',')
     result = []
     for element in myrange:
         if element.count('-') > 0:
             mySubRange = element.split('-')
-            jobInterval = range( int(mySubRange[0]), int(mySubRange[1])+1)
-            result.extend(jobInterval)
+            subInterval = range( int(mySubRange[0]), int(mySubRange[1])+1)
+            result.extend(subInterval)
         else:
             result.append(int(element))
 
@@ -374,6 +380,12 @@ class CRABRESTModel(RESTModel):
                                  time.localtime(time.time()))
 
         requestSchema['OriginalRequestName'] = requestSchema['RequestName']
+
+        if requestSchema.has_key('RunWhitelist'):
+            requestSchema['RunWhitelist' ] = expandRange( requestSchema['RunWhitelist' ], self)
+        if requestSchema.has_key('RunBlacklist'):
+            requestSchema['RunBlacklist' ] = expandRange( requestSchema['RunBlacklist' ], self)
+
         requestSchema['RequestName'] = "%s_%s_%s" % (requestSchema["Requestor"], requestSchema['RequestName'],
                                                   currentTime)
         requestSchema['Campaign'] = requestSchema['RequestName']
@@ -678,12 +690,6 @@ class CRABRESTModel(RESTModel):
         self.logger.info("Getting Data Locations for request %s and jobs range %s" % (requestName, str(jobRange)))
 
         try:
-            WMCore.Lexicon.jobrange(jobRange)
-        except AssertionError, ex:
-            self.postError("Bad range of jobs specified", '', 400)
-        jobRange = getJobsFromRange(jobRange)
-
-        try:
             self.logger.debug("Connecting to database %s/fwjrs using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))
             self.couchdb = CouchServer(self.jsmCacheCouchURL)
             self.fwjrdatabase = self.couchdb.connectDatabase("%s/fwjrs" % self.jsmCacheCouchDB)
@@ -709,14 +715,10 @@ class CRABRESTModel(RESTModel):
             WMCore.Lexicon.requestName(requestName)
         except AssertionError, ex:
             self.postError("Invalid request name specified", '', 400)
-        try:
-            WMCore.Lexicon.jobrange(jobRange)
-        except AssertionError, ex:
-            self.postError("Please specify a valid range of jobs", str(ex), 400)
 
         self.logger.info("Getting Logs Locations for request %s and jobs range %s" % (requestName, str(jobRange)))
         campaignWfs = sorted([(work['value']['Submission'], work['value']['RequestName']) for work in self.__getFromCampaign(requestName)], key=lambda wf: wf[0])
-        jobRange = getJobsFromRange(jobRange)
+        jobRange = expandRange(jobRange, self)
 
         try:
             self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.jsmCacheCouchDB, self.jsmCacheCouchURL))

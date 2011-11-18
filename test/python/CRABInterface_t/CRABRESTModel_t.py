@@ -22,9 +22,9 @@ from WMCore.Cache.WMConfigCache import ConfigCache
 from WMCore.Database.CMSCouch import CouchServer
 from WMCore.FwkJobReport.Report import Report
 try:
-    from CRABServer.CRABInterface.CRABRESTModel import getJobsFromRange
+    from CRABServer.CRABInterface.CRABRESTModel import expandRange
 except ImportError:
-    from CRABInterface.CRABRESTModel import getJobsFromRange
+    from CRABInterface.CRABRESTModel import expandRange
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import allSoftwareVersions
 import WMCore.RequestManager.RequestDB.Interface.Admin.SoftwareManagement as SoftwareAdmin
 from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState
@@ -310,23 +310,31 @@ process.out_step = cms.EndPath(process.output)'''
                                           localPostReqParams["RequestName"])))
         self.assertEqual(result['ProcessingVersion'], 'v2')
 
+        localPostReqParams['RunWhitelist'] = '1,2.4'
+        result = self.postRequest( localPostReqParams['RequestName'] + '1', localPostReqParams, 400)
+        self.assertEqual(result['message'], 'Irregular range 1,2.4')
+
+        localPostReqParams['RunWhitelist'] = '1,2-4'
+        result = self.postRequest( localPostReqParams['RequestName'] + '1', localPostReqParams, 200)
+        self.assertTrue(result.has_key("ID"))
+
         # Test inserting a workflow with a new processing version
         localPostReqParams['ProcessingVersion'] = 'v10'
-        result = self.postRequest( localPostReqParams['RequestName'] + '1', localPostReqParams, 200)
+        result = self.postRequest( localPostReqParams['RequestName'] + '2', localPostReqParams, 200)
         self.assertEqual(result['ProcessingVersion'], 'v10')
         localPostReqParams['ProcessingVersion'] = ''
 
         # Test various problems with asyncDest
         localPostReqParams['asyncDest'] = 'T2_US_Bari'
-        result = self.postRequest( localPostReqParams['RequestName'] + '2', localPostReqParams, 400)
+        result = self.postRequest( localPostReqParams['RequestName'] + '3', localPostReqParams, 400)
         self.assertTrue(result['message'].find('not a valid CMS site') > 1)
 
         localPostReqParams['asyncDest'] = 'Bari'
-        result = self.postRequest( localPostReqParams['RequestName'] + '3', localPostReqParams, 400)
+        result = self.postRequest( localPostReqParams['RequestName'] + '4', localPostReqParams, 400)
         self.assertTrue(result['message'].find('not a valid CMS site name') > 1)
 
         del localPostReqParams['asyncDest']
-        result = self.postRequest( localPostReqParams['RequestName'] + '4', localPostReqParams, 400)
+        result = self.postRequest( localPostReqParams['RequestName'] + '5', localPostReqParams, 400)
         self.assertTrue(result['message'] == 'asyncDest parameter is missing from request')
 
 
@@ -437,7 +445,7 @@ process.out_step = cms.EndPath(process.output)'''
         fwjrdb.commit()
 
 
-    def _injectJobReport(selfi, couchServer, taskName, jobID):
+    def _injectJobReport(self, couchServer, taskName, jobID):
         jobdb = couchServer.connectDatabase(jsmCacheDB + "/jobs")
 
         jobDocument = {
@@ -489,15 +497,15 @@ process.out_step = cms.EndPath(process.output)'''
 
     def testGetJobsFromRange(self):
         """
-        Test getJobsFromRange function
+        Test expandRange function
         """
-        result = getJobsFromRange("1")
+        result = expandRange("1")
         self.assertEqual(result, [1])
 
-        result = getJobsFromRange("1 , 2, 5")
+        result = expandRange("1 , 2, 5")
         self.assertEqual(result, [1, 2, 5])
 
-        result = getJobsFromRange("1 , 2-6 , 5 , 7-9")
+        result = expandRange("1 , 2-6 , 5 , 7-9")
         self.assertEqual(result, [1, 2, 3, 4, 5, 6, 5, 7, 8, 9])
 
 
@@ -539,7 +547,6 @@ process.out_step = cms.EndPath(process.output)'''
                         'application/json', 'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
         result = json.loads(result)
-        time.sleep(5)
         self.assertEqual(result['data'][0]['output']['1'], { 'pfn' : self.outpfnAsync})
 
         #Test invalid ranges
