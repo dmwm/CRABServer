@@ -11,6 +11,7 @@ import json
 import unittest
 import logging
 import os
+import tarfile
 import tempfile
 import time
 import urllib2
@@ -700,6 +701,7 @@ process.out_step = cms.EndPath(process.output)'''
         """
 
         testInputName  = '/tmp/UnitTestInputFile'
+        testTarName    = '/tmp/test.tgz'
         try:
             os.unlink(testInputName)
         except OSError:
@@ -711,23 +713,21 @@ process.out_step = cms.EndPath(process.output)'''
             [testFile.write(str(x)) for x in xrange(0,1000)]
             testFile.write('\nLast line\n')
 
-        sha256sum = hashlib.sha256()
-        with open(testInputName,'rb') as f:
-            while True:
-                chunkdata = f.read(8192)
-                if not chunkdata:
-                    break
-                sha256sum.update(chunkdata)
+        (status, output) = commands.getstatusoutput('tar cfz %s %s' % (testTarName, testInputName))
+
+        tar = tarfile.open(name=testTarName, mode='r:gz')
+        lsl = [(x.name, int(x.size), int(x.mtime), x.uname) for x in tar.getmembers()]
+        hasher = hashlib.sha256(str(lsl))
 
         with tempfile.NamedTemporaryFile() as tmpFile:
             url = self.urlbase + 'uploadUserSandbox'
             curlCommand = 'curl -H "Accept: application/json" -F "checksum=%s" -F "doUpload=%s" -F"userfile=@%s" %s -o %s' % \
-                          (sha256sum.hexdigest(), doUpload, testInputName, url, tmpFile.name)
+                          (hasher.hexdigest(), doUpload, testTarName, url, tmpFile.name)
             (status, output) = commands.getstatusoutput(curlCommand)
             self.assertEqual(status, 0, 'Upload failed with output %s' % output)
             returnDict = json.loads(tmpFile.read())
 
-            self.assertEqual(returnDict['size'], os.path.getsize(testInputName))
+            self.assertEqual(returnDict['size'], os.path.getsize(testTarName))
 
         return returnDict
 
@@ -743,8 +743,9 @@ process.out_step = cms.EndPath(process.output)'''
         self.lumiMaskParams.update({'LumiMask' : lumiMask})
 
         jsonString = json.dumps(self.lumiMaskParams, sort_keys=False)
-        result, exp = methodTest('POST', self.urlbase + api, jsonString, 'application/json', \
-                                 'application/json', {'code' : 200})
+        resultString, exp = methodTest('POST', self.urlbase + api, jsonString, 'application/json', \
+                                       'application/json', {'code' : 200})
+        result = json.loads(resultString)
 
         self.assertTrue(result.has_key("DocID"))
         self.assertTrue(result.has_key("DocRev"))

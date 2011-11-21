@@ -6,6 +6,7 @@ import cherrypy
 import commands
 import copy
 import hashlib
+import os
 import shutil
 import tarfile
 import tempfile
@@ -843,6 +844,7 @@ class CRABRESTModel(RESTModel):
             userfile.file.seek(0)
             shutil.copyfileobj(userfile.file, uploadHandle)
             uploadHandle.flush()
+            size = os.path.getsize(uploadHandle.name)
 
             url = '%s%s/upload' % (ufcHost, self.sandBoxCacheBasepath)
             if doUpload:
