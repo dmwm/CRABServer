@@ -36,13 +36,17 @@ defaulturi = {
                             "BlockBlacklist"    : {"default": None,             "config": 'Data.blockBlacklist',    "type": "ListType",    "required": False},
                             "JobSplitAlgo"      : {"default": None,             "config": 'Data.splitting',         "type": "StringType",  "required": False},
                             "VoRole"            : {"default": None,             "config": 'User.voRole',            "type": "StringType",  "required": False},
-                            "VoGroup"           : {"default": None,             "config": 'User.voGroup',           "type": "StringType",  "required": False}
-                            #"JobSplitArgs"      : {"default": None,             "config": 'Data.filesPerJob',       "type": IntType,    "required": False},
-                            #"JobSplitArgs"      : {"default": None,             "config": 'Data.eventPerJob',       "type": IntType,    "required": False},
+                            "VoGroup"           : {"default": None,             "config": 'User.voGroup',           "type": "StringType",  "required": False},
+                            "OutputFiles"       : {"default": [],               "config": 'JobType.outputFiles',    "type": "ListType",    "required": False},
                           },
 
-                  'other-config-params' : ["General.serverUrl", "General.requestName", "JobType.pluginName", "JobType.externalPluginFile", "Data.unitsPerJob", "Data.splitting", \
-                                               "JobType.psetName", "JobType.inputFiles", "Data.inputDataset", "User.email", "Data.lumiMask", "General.workArea"]
+                  'other-config-params' : [
+                                           "General.serverUrl", "General.requestName", "General.workArea",
+                                           "JobType.pluginName", "JobType.externalPluginFile", "JobType.psetName",
+                                           "JobType.inputFiles", "JobType.pyCfgParams",
+                                           "Data.unitsPerJob", "Data.splitting", "Data.inputDataset", "Data.lumiMask",
+                                           "User.email",
+                                          ]
                 },
     'get-log' :  {'uri': '/crabinterface/crab/log/'},
     'get-output'   : {'uri': '/crabinterface/crab/data/'},
