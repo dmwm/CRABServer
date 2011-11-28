@@ -89,6 +89,7 @@ class CRABRESTModel(RESTModel):
         self.sandBoxCacheBasepath = config.sandBoxCacheBasepath
 
         self.converter = LFN2PFNConverter()
+        self.allCMSNames = SiteDBJSON().getAllCMSNames()
 
         self.clientMapping = {}
         if hasattr(config, 'clientMapping'):
@@ -414,6 +415,7 @@ class CRABRESTModel(RESTModel):
             self.postError(errorMessage, str(body), 400)
 
         try:
+            specificSchema.allCMSNames = self.allCMSNames
             specificSchema.validate()
         except Exception, ex:
             self.postError(ex.message, str(ex), 400)
@@ -687,6 +689,7 @@ class CRABRESTModel(RESTModel):
             self.postError("Invalid request name specified", '', 400)
 
         campaignWfs = sorted([(work['value']['Submission'], work['value']['RequestName']) for work in self.__getFromCampaign(requestName)], key=lambda wf: wf[0])
+        jobRange = expandRange(jobRange, self)
 
         self.logger.info("Getting Data Locations for request %s and jobs range %s" % (requestName, str(jobRange)))
 
