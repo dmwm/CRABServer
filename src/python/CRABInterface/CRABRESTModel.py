@@ -772,6 +772,9 @@ class CRABRESTModel(RESTModel):
         Pull the list of LFNs,locations out of a couch view, convert them into the pfn, return it!
         """
         def foundIt():
+            if not f['value'].has_key('location'):
+                msg = "Cannot find the location of the output file of job %s. Check that it had successfully staged out"
+                self.postError(msg , msg , 400)
             #id are like 127-1 (id-retrycount). Taking the retrycount
             retryCountMap[jobKey] = f['id'].split('-')[1]
             try:
