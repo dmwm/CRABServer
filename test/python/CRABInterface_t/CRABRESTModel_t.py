@@ -311,31 +311,36 @@ process.out_step = cms.EndPath(process.output)'''
                                           localPostReqParams["RequestName"])))
         self.assertEqual(result['ProcessingVersion'], 'v2')
 
-        localPostReqParams['RunWhitelist'] = '1,2.4'
+        localPostReqParams['SiteWhitelist'] = ['XXX']
         result = self.postRequest( localPostReqParams['RequestName'] + '1', localPostReqParams, 400)
+        self.assertTrue(result['message'].find('provided in the SiteWhitelist param has not been found.') > 1)
+        del localPostReqParams['SiteWhitelist']
+
+        localPostReqParams['RunWhitelist'] = '1,2.4'
+        result = self.postRequest( localPostReqParams['RequestName'] + '2', localPostReqParams, 400)
         self.assertEqual(result['message'], 'Irregular range 1,2.4')
 
         localPostReqParams['RunWhitelist'] = '1,2-4'
-        result = self.postRequest( localPostReqParams['RequestName'] + '1', localPostReqParams, 200)
+        result = self.postRequest( localPostReqParams['RequestName'] + '3', localPostReqParams, 200)
         self.assertTrue(result.has_key("ID"))
 
         # Test inserting a workflow with a new processing version
         localPostReqParams['ProcessingVersion'] = 'v10'
-        result = self.postRequest( localPostReqParams['RequestName'] + '2', localPostReqParams, 200)
+        result = self.postRequest( localPostReqParams['RequestName'] + '4', localPostReqParams, 200)
         self.assertEqual(result['ProcessingVersion'], 'v10')
         localPostReqParams['ProcessingVersion'] = ''
 
         # Test various problems with asyncDest
         localPostReqParams['asyncDest'] = 'T2_US_Bari'
-        result = self.postRequest( localPostReqParams['RequestName'] + '3', localPostReqParams, 400)
+        result = self.postRequest( localPostReqParams['RequestName'] + '5', localPostReqParams, 400)
         self.assertTrue(result['message'].find('not a valid CMS site') > 1)
 
         localPostReqParams['asyncDest'] = 'Bari'
-        result = self.postRequest( localPostReqParams['RequestName'] + '4', localPostReqParams, 400)
+        result = self.postRequest( localPostReqParams['RequestName'] + '6', localPostReqParams, 400)
         self.assertTrue(result['message'].find('not a valid CMS site name') > 1)
 
         del localPostReqParams['asyncDest']
-        result = self.postRequest( localPostReqParams['RequestName'] + '5', localPostReqParams, 400)
+        result = self.postRequest( localPostReqParams['RequestName'] + '7', localPostReqParams, 400)
         self.assertTrue(result['message'] == 'asyncDest parameter is missing from request')
 
 
