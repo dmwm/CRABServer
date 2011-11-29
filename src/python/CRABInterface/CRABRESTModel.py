@@ -489,7 +489,7 @@ class CRABRESTModel(RESTModel):
         ## not forced resubmission, just check workflow/job status
         if not requestSchema.get('ForceResubmit', False):
             ## resubmitting just if the previous request was failed
-            if not requestStatus['requestDetails']['RequestStatus'] in ['completed']:
+            if not requestStatus['requestDetails']['RequestStatus'] in ['completed', 'aborted']:
                 self.postError("Request '%s' not yet completed; impossible to resubmit." % lastSubmission, '', 400)
         else:
             ## killing for any job status before resumitting kill the previous request
