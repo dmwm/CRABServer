@@ -6,14 +6,16 @@ Testing of the UserFileCache
 
 import commands
 import filecmp
+import hashlib
 import json
 import logging
 import os
 import shutil
+import tarfile
 import tempfile
+import time
 import unittest
 import urllib
-import hashlib
 
 from WMQuality.WebTools.RESTBaseUnitTest import RESTBaseUnitTest
 from WMQuality.WebTools.RESTClientAPI import makeRequest
@@ -23,6 +25,10 @@ from WMQuality.WebTools.RESTServerSetup import DefaultConfig
 testCacheDir   = '/tmp/UnitTestCacheDir'
 testInputName  = '/tmp/UnitTestInputFile'
 testOutputName = '/tmp/UnitTestOutputFile'
+testTarName    = '/tmp/test.tgz'
+
+uploadDir = 'ewv'
+uploadName = 'test_topublish.tgz'
 
 class UserFileCacheConfig(DefaultConfig):
     """
@@ -79,11 +85,27 @@ class TestUserFileCache(RESTBaseUnitTest):
         """
 
         RESTBaseUnitTest.setUp(self)
-        # Make a test file
+        # Make the test files
+
+        try:
+            os.unlink(testInputName)
+        except OSError:
+            pass
+
         with open(testInputName, 'w') as testFile:
-            testFile.write('First line\n')
-            [testFile.write(str(x)) for x in xrange(0, 1000)]
+            testFile.write(str(time.time()))
+            testFile.write('\nFirst line\n')
+            [testFile.write(str(x)) for x in xrange(0,1000)]
             testFile.write('\nLast line\n')
+
+        (status, output) = commands.getstatusoutput('tar cfz %s %s' % (testTarName, testInputName))
+
+        # Figure hash of file
+        tar = tarfile.open(name=testTarName, mode='r:gz')
+        lsl = [(x.name, int(x.size), int(x.mtime), x.uname) for x in tar.getmembers()]
+        hasher = hashlib.sha256(str(lsl))
+
+        self.hexDigest = hasher.hexdigest()
 
         self.host = 'http://%s:%s' % (self.config.Webtools.host, self.config.Webtools.port)
         return
@@ -107,6 +129,10 @@ class TestUserFileCache(RESTBaseUnitTest):
             os.unlink(testOutputName)
         except OSError:
             pass
+        try:
+            os.unlink(testTarName)
+        except OSError:
+            pass
         #pylint: enable-msg=W0704
 
 
@@ -122,8 +148,8 @@ class TestUserFileCache(RESTBaseUnitTest):
         url = '%s/unittests/download?hashkey=%s' % (self.host, returnDict['hashkey'])
         opener.retrieve(url, testOutputName)
 
-        self.assertEqual(os.path.getsize(testOutputName), os.path.getsize(testInputName))
-        self.assertTrue(filecmp.cmp(testOutputName, testInputName))
+        self.assertEqual(os.path.getsize(testOutputName), os.path.getsize(testTarName))
+        self.assertTrue(filecmp.cmp(testOutputName, testTarName))
 
         return
 
@@ -134,24 +160,15 @@ class TestUserFileCache(RESTBaseUnitTest):
         Make sure size returned by server is what we expect
         """
 
-        sha256sum = hashlib.sha256()
-        with open(testInputName,'rb') as f:
-            while True:
-                chunkdata = f.read(8192)
-                if not chunkdata:
-                    break
-                sha256sum.update(chunkdata)
-
         with tempfile.NamedTemporaryFile() as tmpFile:
             url = self.urlbase + 'upload'
             curlCommand = 'curl -H "Accept: application/json" -F checksum=%s -F userfile=@%s %s -o %s' % \
-                          (sha256sum.hexdigest(), testInputName, url, tmpFile.name)
+                          (self.hexDigest, testTarName, url, tmpFile.name)
             (status, output) = commands.getstatusoutput(curlCommand)
 
             self.assertEqual(status, 0, 'Upload failed with output %s' % output)
             returnDict = json.loads(tmpFile.read())
-            self.assertEqual(returnDict['size'], os.path.getsize(testInputName))
-            self.assertEqual(returnDict['hashkey'], sha256sum.hexdigest())
+            self.assertEqual(returnDict['size'], os.path.getsize(testTarName))
 
         return returnDict
 
@@ -185,18 +202,10 @@ class TestUserFileCache(RESTBaseUnitTest):
         output = {'code':200, 'type':'text/json', 'data':expected}
         methodTest(verb, existsUrl, output=output, expireTime=expireTime, request_input=requestInput)
 
-        sha256sum = hashlib.sha256()
-        with open(testInputName,'rb') as f:
-            while True:
-                chunkdata = f.read(8192)
-                if not chunkdata:
-                    break
-                sha256sum.update(chunkdata)
-
         # Upload the file
         with tempfile.NamedTemporaryFile() as curlOutput:
             curlCommand = 'curl -H "Accept: application/json" -F checksum=%s -F userfile=@%s %s -o %s' % \
-                          ( sha256sum.hexdigest(), testInputName, uploadUrl, curlOutput.name)
+                          (self.hexDigest, testTarName, uploadUrl, curlOutput.name)
             (status, output) = commands.getstatusoutput(curlCommand)
             self.assertEqual(status, 0, 'Problem uploading with curl')
             returnDict = json.loads(curlOutput.read())
@@ -208,9 +217,52 @@ class TestUserFileCache(RESTBaseUnitTest):
         jsonData = json.loads(data)
         self.assertEqual(code, 200)
         self.assertTrue(jsonData['exists'])
-        self.assertEqual(sha256sum.hexdigest(), returnDict['hashkey'])
+        self.assertEqual(self.hexDigest, returnDict['hashkey'])
 
         return
+
+
+    def testWithName(self):
+        """
+        Test uploading and retrieving file with a name rather than hashkey
+        """
+
+        verb = 'GET'
+        existsUrl = self.urlbase + 'exists'
+        uploadUrl = self.urlbase + 'upload'
+        expireTime = 0
+
+        # Test uploading file
+        with tempfile.NamedTemporaryFile() as tmpFile:
+            url = self.urlbase + 'upload'
+            curlCommand = 'curl -H "Accept: application/json" -F subDir=%s -F name=%s -F checksum=%s -F userfile=@%s %s -o %s' % \
+                          (uploadDir, uploadName, self.hexDigest, testTarName, url, tmpFile.name)
+
+            (status, output) = commands.getstatusoutput(curlCommand)
+
+            self.assertEqual(status, 0, 'Upload failed with output %s' % output)
+            returnDict = json.loads(tmpFile.read())
+            self.assertEqual(returnDict['size'], os.path.getsize(testTarName))
+
+        # Test exists
+        requestInput = {'name' : uploadName, 'subDir' : uploadDir}
+        data, code, contentType, response = makeRequest(existsUrl, values=requestInput,
+                                  verb=verb, accept='application/json', contentType='application/json')
+        jsonData = json.loads(data)
+        self.assertEqual(code, 200, 'Failed with output %s' % data)
+        self.assertTrue(jsonData['exists'])
+        self.assertEqual(self.hexDigest, returnDict['hashkey'])
+
+        # Test download
+        opener = urllib.FancyURLopener()
+        url = '%s/unittests/download?subDir=%s;name=%s' % (self.host, uploadDir, uploadName)
+        opener.retrieve(url, testOutputName)
+
+        self.assertEqual(os.path.getsize(testOutputName), os.path.getsize(testTarName))
+        self.assertTrue(filecmp.cmp(testOutputName, testTarName))
+
+        return
+
 
 
 if __name__ == '__main__':
