@@ -394,7 +394,6 @@ class CRABRESTModel(RESTModel):
             requestSchema['RunWhitelist' ] = expandRange( requestSchema['RunWhitelist' ], self)
         if requestSchema.has_key('RunBlacklist'):
             requestSchema['RunBlacklist' ] = expandRange( requestSchema['RunBlacklist' ], self)
-
         requestSchema['RequestName'] = "%s_%s_%s" % (requestSchema["Requestor"], requestSchema['RequestName'],
                                                   currentTime)
         requestSchema['Campaign'] = requestSchema['RequestName']
@@ -426,6 +425,12 @@ class CRABRESTModel(RESTModel):
             specificSchema.validate()
         except Exception, ex:
             self.postError(ex.message, str(ex), 400)
+
+        if not specificSchema.has_key('VoRole') or specificSchema['VoRole'] != 't1access':
+            if specificSchema.has_key('SiteBlacklist'):
+                specificSchema['SiteBlacklist'].append("T1*")
+            else:
+                specificSchema['SiteBlacklist'] = ["T1*"]
 
         request = maker(specificSchema)
         helper = WMWorkloadHelper(request['WorkflowSpec'])
