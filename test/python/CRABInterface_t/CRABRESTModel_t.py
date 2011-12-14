@@ -122,7 +122,7 @@ process.out_step = cms.EndPath(process.output)'''
     }
 
     logLocParams = {
-        "requestName" : "mmascher_crab_MyAnalysis___110506_123756",
+#        "requestName" : "mmascher_crab_MyAnalysis___110506_123756",
         "jobRange" : '1-2'
     }
 
@@ -134,13 +134,13 @@ process.out_step = cms.EndPath(process.output)'''
         "requestName" : "mmascher_crab_MyAnalysis___110506_123756",
     }
 
-    location = 'ingrid-se02.cism.ucl.ac.be'
+    location = 'T2_BE_UCL'
     lfnAsync = '/store/user/mmascher/RelValProdTTbar/1304039730//0000/outputAsync.root'
     outpfn = 'srm://ingrid-se02.cism.ucl.ac.be:8444/srm/managerv2?SFN=/storage/data/cms/store/user/mmascher/RelValProdTTbar/1304039730/' + \
              '/0000/output.root'
     outpfnAsync = 'srm://ingrid-se02.cism.ucl.ac.be:8444/srm/managerv2?SFN=/storage/data/cms/store/user/mmascher/RelValProdTTbar/1304039730/' + \
              '/0000/outputAsync.root'
-    logLocation = 'storm-se-01.ba.infn.it'
+    logLocation = 'T2_IT_Bari'
     loglfn = '/store/unmerged/logs/prod/2011/5/6/mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e-0026b958c394-99-0-logArchive.tar.gz'
     logpfn = 'srm://storm-se-01.ba.infn.it:8444/srm/managerv2?SFN=//cms/store/unmerged/logs/prod/2011/5/6/' + \
              'mmascher_crab_MyAnalysis___110506_123756/Analysis/0000/0/f56e599e-77cc-11e0-b51e-0026b958c394-99-0-logArchive.tar.gz'
@@ -314,6 +314,11 @@ process.out_step = cms.EndPath(process.output)'''
         localPostReqParams['SiteWhitelist'] = ['XXX']
         result = self.postRequest( localPostReqParams['RequestName'] + '1', localPostReqParams, 400)
         self.assertTrue(result['message'].find('provided in the SiteWhitelist param has not been found.') > 1)
+
+        localPostReqParams['SiteWhitelist'] = ['T2*']
+        result = self.postRequest( localPostReqParams['RequestName'] + '1', localPostReqParams, 200)
+        couchDoc = self.testInit.couch.couchServer.connectDatabase(workloadDB).document(result['ID'])
+        self.assertTrue(len(couchDoc['SiteWhitelist']) > 10) #I assume there are more than 10 T2
         del localPostReqParams['SiteWhitelist']
 
         localPostReqParams['RunWhitelist'] = '1,2.4'
@@ -539,7 +544,7 @@ process.out_step = cms.EndPath(process.output)'''
 
         #Check job with multiple fwjr
         self.injectFWJR(fwjrPath, 127, 1, "/%s/Analysis" % resultSub['ID'])
-        result, exp = methodTest('GET', self.urlbase + api, self.dataLocParams, \
+        result, exp = methodTest('GET', self.urlbase + api + resultSub['ID'], self.dataLocParams, \
                         'application/json', 'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
         result = json.loads(result)
@@ -549,7 +554,7 @@ process.out_step = cms.EndPath(process.output)'''
 
         #Async step is present this time
         self.injectFWJR(fwjrPath, 127, 2, "/%s/Analysis" % resultSub['ID'], addAsyncStep = True)
-        result, exp = methodTest('GET', self.urlbase + api, self.dataLocParams, \
+        result, exp = methodTest('GET', self.urlbase + api + resultSub['ID'], self.dataLocParams, \
                         'application/json', 'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
         result = json.loads(result)
@@ -557,7 +562,7 @@ process.out_step = cms.EndPath(process.output)'''
 
         #Test invalid ranges
         self.dataLocParams['jobRange'] = 'I'
-        result, exp = methodTest('GET', self.urlbase + api, self.dataLocParams, \
+        result, exp = methodTest('GET', self.urlbase + api + resultSub['ID'], self.dataLocParams, \
                         'application/json', 'application/json', {'code' : 400})
         self.assertTrue(exp is not None)
 
@@ -566,7 +571,7 @@ process.out_step = cms.EndPath(process.output)'''
         """
         Test /log API
         """
-        api = "log"
+        api = "log/"
         EXP_RES = { 'pfn' : self.logpfn }
 
         resultConfig = self.insertConfig()
@@ -575,16 +580,15 @@ process.out_step = cms.EndPath(process.output)'''
         resultSub = self.postRequest( self.postReqParams['RequestName'], self.postReqParams, 200)
         self.injectLogFWJR(347, 0, "/%s/Analysis" % resultSub['ID'])
         self.injectLogFWJR(348, 0, "/%s/Analysis" % resultSub['ID'])
-        self.logLocParams['requestName'] = resultSub['ID']
 
-        result, exp = methodTest('GET', self.urlbase + api, self.logLocParams, \
+        result, exp = methodTest('GET', self.urlbase + api + resultSub['ID'], self.logLocParams, \
                         'application/json', 'application/json', {'code' : 200})
         result = json.loads(result)
         self.assertEqual(result['log'][0]['output']['1'], EXP_RES)
 
         #Check job with multiple fwjr
         self.injectLogFWJR(347, 1, "/%s/Analysis" % resultSub['ID'])
-        result, exp = methodTest('GET', self.urlbase + api, self.logLocParams, \
+        result, exp = methodTest('GET', self.urlbase + api + resultSub['ID'], self.logLocParams, \
                         'application/json', 'application/json', {'code' : 200})
         self.assertTrue(exp is not None)
         result = json.loads(result)
