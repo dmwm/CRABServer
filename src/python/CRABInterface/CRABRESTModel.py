@@ -90,6 +90,13 @@ class CRABRESTModel(RESTModel):
 
         self.converter = LFN2PFNConverter()
         self.allCMSNames = SiteDBJSON().getAllCMSNames()
+        #get wildcards
+        self.wildcardKeys = getattr(config, 'wildcardKeys', {'T1*': 'T1_*',
+                                                             'T2*': 'T2_*',
+                                                             'T3*': 'T3_*'})
+        self.wildcardSites = {}
+        Utilities.addSiteWildcards(self.wildcardKeys, self.allCMSNames, self.wildcardSites)
+        self.logger.debug("Available wildcards: %s" % (self.wildcardSites))
 
         self.clientMapping = {}
         if hasattr(config, 'clientMapping'):
@@ -427,6 +434,8 @@ class CRABRESTModel(RESTModel):
         metadata.update(request)
         # don't want to JSONify the whole workflow
         del metadata['WorkflowSpec']
+        helper.setSiteWildcardsLists(siteWhitelist = specificSchema.get("SiteWhitelist",[]), siteBlacklist = specificSchema.get("SiteBlacklist",[]),
+                                     wildcardDict = self.wildcardSites)
         workloadUrl = helper.saveCouch(self.couchUrl, self.workloadCouchDB, metadata=metadata)
         request['RequestWorkflow'] = removePasswordFromUrl(workloadUrl)
         request['PrepID'] = None
