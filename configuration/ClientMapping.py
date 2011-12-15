@@ -41,7 +41,7 @@ defaulturi = {
                           },
 
                   'other-config-params' : [
-                                           "General.serverUrl", "General.requestName", "General.workArea",
+                                           "General.serverUrl", "General.ufccacheUrl", "General.requestName", "General.workArea",
                                            "JobType.pluginName", "JobType.externalPluginFile", "JobType.psetName",
                                            "JobType.inputFiles", "JobType.pyCfgParams",
                                            "Data.unitsPerJob", "Data.splitting", "Data.inputDataset", "Data.lumiMask",

@@ -117,10 +117,12 @@ class UserFileCacheRESTModel(RESTModel):
 
         # Basic preservation of the file integrity
         if digest != checksum:
-            raise cherrypy.HTTPError(400, 'File transfer error: digest check failed.')
+            msg = "File transfer error: digest check failed between %s and %s"  % (digest, checksum)
+            raise cherrypy.HTTPError(400, msg)
 
         if os.path.isfile(fileName):
             self.touch(fileName)
+            size = os.path.getsize(fileName)
         else:
             if not os.path.isdir(fileDir):
                 os.makedirs(fileDir)
@@ -130,7 +132,7 @@ class UserFileCacheRESTModel(RESTModel):
             handle.close()
             size = os.path.getsize(fileName)
 
-        return {'size':size, 'name':userfile.filename, 'hashkey':digest, 'url':url}
+        return {'size':size, 'hashkey':digest, 'url':url}
 
     def touch(self, fileName):
         """

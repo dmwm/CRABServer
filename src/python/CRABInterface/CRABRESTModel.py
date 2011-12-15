@@ -158,13 +158,6 @@ class CRABRESTModel(RESTModel):
                         args=['requestName'],
                         validation=[self.isalnum])
 
-        # uploadConfig. Add directly since the file cannot be parsed through validation
-        self.methods['POST']['uploadUserSandbox'] = {'args':       ['userfile', 'checksum', 'doUpload'],
-                                          'call':       self.uploadUserSandbox,
-                                          'validation': [],
-                                          'version':    1,
-                                          'expires':    self.defaultExpires}
-
         cherrypy.engine.subscribe('start_thread', self.initThread)
 
 
@@ -826,61 +819,6 @@ class CRABRESTModel(RESTModel):
 
         self.logger.debug("PFN dict %s" % result)
         return result
-
-    @restexpose
-    def uploadUserSandbox(self, userfile, checksum, doUpload=1):
-        """
-        Receive the upload of the user sandbox and forward on to UserFileCache
-        if needed
-        """
-        ufcHost = 'http://%s:%s/' % (self.sandBoxCacheHost, self.sandBoxCachePort)
-        doUpload = (doUpload != '0')
-
-        # Calculate the hash of the file
-        try:
-            tar = tarfile.open(fileobj=userfile.file, mode='r')
-            lsl = [(x.name, int(x.size), int(x.mtime), x.uname) for x in tar.getmembers()]
-            hasher = hashlib.sha256(str(lsl))
-            digest = hasher.hexdigest()
-        except tarfile.ReadError:
-            raise cherrypy.HTTPError(400, 'File is not a .tgz file.')
-
-        # Basic preservation of the file integrity
-        if not (digest == checksum):
-            msg = "File transfer error: digest check failed between %s and %s"  % (digest, checksum)
-            self.postError(msg, "", 400)
-
-        # See if the server already has this file
-        if doUpload:
-            userFileCache = JSONRequests(url=ufcHost)
-            existsResult = userFileCache.get(uri=self.sandBoxCacheBasepath+'/exists', data={'hashkey':digest})
-            if existsResult[0]['exists']:
-                self.logger.debug("Sandbox %s already exists" % digest)
-                return existsResult[0]
-
-        # Not on server, make a local copy for curl
-        downloadUrl = 'Upload not attempted'
-        with tempfile.NamedTemporaryFile() as uploadHandle:
-            userfile.file.seek(0)
-            shutil.copyfileobj(userfile.file, uploadHandle)
-            uploadHandle.flush()
-            size = os.path.getsize(uploadHandle.name)
-
-            url = '%s%s/upload' % (ufcHost, self.sandBoxCacheBasepath)
-            if doUpload:
-                self.logger.debug("Uploading user sandbox %s to %s" % (digest, url))
-                # Upload the file to UserFileCache
-                with tempfile.NamedTemporaryFile() as curlOutput:
-                    curlCommand = 'curl -H "Accept: application/json" -F"checksum=%s" -F userfile=@%s %s -o %s' % \
-                                (digest, uploadHandle.name, url, curlOutput.name)
-                    (status, output) = commands.getstatusoutput(curlCommand)
-                    returnDict = json.loads(curlOutput.read())
-                    size = returnDict['size']
-                    downloadUrl= returnDict['url']
-                    digest = returnDict['hashkey']
-
-        results = {'size':size, 'hashkey':digest, 'url':downloadUrl}
-        return results
 
     def validateAsyncDest(self, request):
         """
