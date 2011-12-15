@@ -49,10 +49,10 @@ config.CRABInterface.configCacheCouchDB = "configCacheCouchDB-Name"
 ##      to deal with these params
 config.CRABInterface.agentDN = "/Your/Agent/DN.here/"
 config.CRABInterface.clientMapping = '/PATH/configuration/ClientMapping.py'
-config.CRABInterface.sandBoxCacheHost = "USB-cache-endpoint"
-config.CRABInterface.sandBoxCachePort  = "PORT"
-config.CRABInterface.sandBoxCacheBasepath ="/Path/if/Needed"
 
+config.CRABInterface.sandBoxCacheHost = ufcHostName
+config.CRABInterface.sandBoxCachePort  = ufcPort
+config.CRABInterface.sandBoxCacheBasepath = ufcBasepath
 config.CRABInterface.views.active.crab.jsmCacheCouchURL = couchURL
 config.CRABInterface.views.active.crab.jsmCacheCouchDB = jsmCacheDBName
 ##
