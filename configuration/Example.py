@@ -60,7 +60,11 @@ config.CRABInterface.clientMapping = '/PATH/configuration/ClientMapping.py'
 config.CRABInterface.sandBoxCacheHost = ufcHostName
 config.CRABInterface.sandBoxCachePort  = ufcPort
 config.CRABInterface.sandBoxCacheBasepath = ufcBasepath
-##
+config.CRABInterface.userFileCacheEndpoint = "http://%s:%s/userfilecache/" % (ufcHostName, ufcPort)
+config.CRABInterface.proxyDir = '/tmp/credentials/'
+config.CRABInterface.delegatedServerCert = '/data/ewv/cms-xen39crab3devcert.pem'
+config.CRABInterface.delegatedServerKey = '/data/ewv/cms-xen39crab3devkey.pem'
+config.CRABInterface.myproxyServer = 'myproxy.cern.ch'
 
 config.CRABInterface.admin = "admin@mail.address"
 config.CRABInterface.title = "CRAB REST Interface"

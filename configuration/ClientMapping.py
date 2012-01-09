@@ -58,4 +58,5 @@ defaulturi = {
     'report': {'uri': '/crabinterface/crab/goodLumis/'},
     'kill':   {'uri': '/crabinterface/crab/task/'},
     'resubmit': {'uri': '/crabinterface/crab/reprocessTask/'},
+    'publish': {'uri': '/crabinterface/crab/publish/'},
 }
