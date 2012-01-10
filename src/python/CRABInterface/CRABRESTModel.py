@@ -12,11 +12,22 @@ import tarfile
 import tempfile
 import threading
 import time
+import types
 import json
 import imp
+
+from contextlib import contextmanager
 from operator import itemgetter
 
+from DBSAPI.dbsApi import DbsApi
+from DBSAPI.dbsException import DbsException
+from DBSAPI.dbsMigrateApi import DbsMigrateApi
+
+from WMComponent.DBSUpload.DBSInterface import createProcessedDataset, createAlgorithm, insertFiles
+from WMComponent.DBSUpload.DBSInterface import createPrimaryDataset,   createFileBlock, closeBlock
+from WMComponent.DBSUpload.DBSInterface import createDBSFileFromBufferFile
 from WMCore.ACDC.AnalysisCollectionService import AnalysisCollectionService
+from WMCore.Credential.Proxy    import myProxyEnvironment
 from WMCore.WebTools.RESTModel import restexpose
 from WMCore.WebTools.RESTModel import RESTModel
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
@@ -24,6 +35,7 @@ from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import unidecode, removeP
 from WMCore.RequestManager.RequestMaker.Registry import retrieveRequestMaker
 from WMCore.Database.CMSCouch import CouchServer, CouchError
 from WMCore.DataStructs.Mask import Mask
+from WMCore.DataStructs.Run import Run
 import WMCore.RequestManager.RequestDB.Connection as DBConnect
 import WMCore.Wrappers.JsonWrapper as JsonWrapper
 import WMCore.Lexicon
@@ -36,6 +48,7 @@ from WMCore.RequestManager.RequestDB.Interface.Admin import GroupManagement, Pro
 from WMCore.Cache.WMConfigCache import ConfigCache, ConfigCacheException
 from WMCore.Services.Requests import JSONRequests
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
+from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import loadWorkload
 import WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools as Utilities
 
@@ -64,6 +77,34 @@ def expandRange(myrange, restInstance=None):
 
     return result
 
+
+
+@contextmanager
+def working_directory(directory):
+    """
+    This function is intended to be used as a ``with`` statement context
+    manager. It allows you to replace code like this: 1
+        original_directory = os.getcwd()
+        try:
+            os.chdir(some_dir)
+            ... bunch of code ...
+        finally:
+            os.chdir(original_directory)
+
+        with something simpler:
+
+        with working_directory(some_dir):
+            ... bunch of code ...
+    """
+    original_directory = os.getcwd()
+    try:
+        os.chdir(directory)
+        yield directory
+    finally:
+        os.chdir(original_directory)
+
+
+
 class CRABRESTModel(RESTModel):
     """ CRAB Interface to the WMAgent """
 
@@ -87,6 +128,11 @@ class CRABRESTModel(RESTModel):
         self.sandBoxCacheHost = config.sandBoxCacheHost
         self.sandBoxCachePort = config.sandBoxCachePort
         self.sandBoxCacheBasepath = config.sandBoxCacheBasepath
+        self.userFileCacheEndpoint = config.userFileCacheEndpoint
+        self.proxyDir = config.proxyDir
+        self.delegatedServerCert = config.delegatedServerCert
+        self.delegatedServerKey = config.delegatedServerKey
+        self.myproxyServer = config.myproxyServer
 
         self.converter = LFN2PFNConverter()
         self.allCMSNames = SiteDBJSON().getAllCMSNames()
@@ -122,6 +168,10 @@ class CRABRESTModel(RESTModel):
                         validation=[self.isalnum])
         #/reprocessTask
         self._addMethod('POST', 'reprocessTask', self.reprocessRequest,
+                        args=['requestName'],
+                        validation=[self.isalnum])
+        #/publish
+        self._addMethod('POST', 'publish', self.publish,
                         args=['requestName'],
                         validation=[self.isalnum])
         #/config
@@ -962,3 +1012,229 @@ class CRABRESTModel(RESTModel):
 
         self.logger.debug("New version is: %s" % newVersion)
         request['ProcessingVersion'] = 'v%d' % newVersion
+
+    def publish(self, requestName):
+        """
+        Publish all the files for all the datasets in a campaign
+        """
+
+        try:
+            WMCore.Lexicon.requestName(requestName)
+        except AssertionError, ex:
+            self.postError("Invalid request name specified", '', 400)
+
+        # Get parameters sent in request
+        body = cherrypy.request.body.read()
+        try:
+            requestSchema = unidecode(JsonWrapper.loads(body))
+        except Exception, ex:
+            msg = "Error: problem decoding the body of the request"
+            self.postError(msg, str(body) + '\n' + str(ex), 400)
+
+        destURL = requestSchema.get('PublishDbsUrl', None)
+        if not destURL:
+            self.postError("No DBS URL specified for publication", '', 400)
+
+        self.logger.info("Publishing files in campaign %s to %s" % (requestName, destURL))
+
+        try:
+            self.logger.debug("Connecting to database %s using the couch instance at %s: " % (self.workloadCouchDB, self.couchUrl))
+            self.couchdb = CouchServer(self.couchUrl)
+            self.database = self.couchdb.connectDatabase(self.workloadCouchDB)
+        except CouchError, ex:
+            self.postError("Error connecting to couch database", str(ex) + '\n' + str(getattr(ex, 'reason', '')), 500)
+
+        startkey = [requestName]
+        endkey = copy.copy(startkey)
+        endkey.append({})
+        options = {"startkey" : startkey, "endkey" : endkey}
+
+        requests = self.database.loadView("ReqMgr", "publishInfoByCampaign", options)
+        self.logger.debug("Found %d workflow(s) in the campaign." % len(requests["rows"]))
+        if len(requests["rows"]) < 1:
+            return {'status': False,
+                    'message': 'No Workflows found in campaign %s' % requestName, }
+
+        requestNames = [row['value']['requestname'] for row in requests['rows']]
+        commonSettings = requests['rows'][0]['value']
+        inputDataset = commonSettings['inputDataset']
+        sourceURL    = commonSettings['inputDBS']
+        requestorDN  = commonSettings['requestorDN']
+
+        try:
+            requestor = SiteDBJSON().dnUserName(requestorDN)
+        except Exception, ex:
+            self.postError("Problem extracting user from SiteDB", str(ex) + " " + str(requestorDN), 500)
+
+        try:
+            toPublish = self.readToPublishFiles(requestNames, requestor)
+        except tarfile.ReadError:
+            return {'status': False,
+                    'message': "Unable to read publication description files. " +
+                               "You may need to wait for some time after all jobs have finished.",
+                    'summary': {}, }
+
+        dbsResults = self.publishInDBS(requestorDN=requestorDN, sourceURL=sourceURL,
+                                    inputDataset=inputDataset, toPublish=toPublish, destURL=destURL)
+        self.logger.debug("DBS publication results %s" % dbsResults)
+        return {'status': True,
+                'message': 'Publication completed for campaign %s' % requestName,
+                'summary': dbsResults,
+               }
+
+    def readToPublishFiles(self, requestNames, requestor):
+        """
+        Download and read the files describing
+        what needs to be published
+        """
+        def decodeAsString(a):
+            """
+            DBS is stupid and doesn't understand that unicode is a string: (if type(obj) == type(''))
+            So best to convert as much of the decoded JSON to str as possible. Some is left over and handled by
+            PoorMansBufferFile
+            """
+            newDict = {}
+            for key, value in a.iteritems():
+                if type(key) == types.UnicodeType:
+                    key = str(key)
+                if type(value) == types.UnicodeType:
+                    value = str(value)
+                newDict.update({key : value})
+            return newDict
+
+
+        ufc = UserFileCache({'endpoint': self.userFileCacheEndpoint})
+        tmpDir = tempfile.mkdtemp()
+        toPublish = {}
+        with working_directory(tmpDir):
+            for requestName in requestNames:
+                tgzName = '%s_publish.tgz' % requestName
+                self.logger.info('Reading toPublish from %s' % tgzName)
+                tgzPath = ufc.download(subDir=requestor, name=tgzName, output=tgzName)
+                tgz = tarfile.open(tgzName, 'r')
+                for member in tgz.getmembers():
+                    jsonFile = tgz.extractfile(member)
+                    requestPublish = json.load(jsonFile, object_hook=decodeAsString)
+                    for datasetName in requestPublish:
+                        if toPublish.get(datasetName, None):
+                            for lfn in requestPublish[datasetName]:
+                                toPublish[datasetName].append(lfn)
+                        else:
+                            toPublish[datasetName] = copy.deepcopy(requestPublish[datasetName])
+                tgz.close()
+        shutil.rmtree(tmpDir, ignore_errors=True)
+
+        return toPublish
+
+    def publishInDBS(self, requestorDN, sourceURL, inputDataset, toPublish, destURL):
+        """
+        Actually do the publishing
+        """
+        class PoorMansBufferFile(dict):
+            """
+            The JSON we recover is almost a BufferFile, just needs a couple of methods
+            to match the signature we need
+            """
+
+            def getRuns(self):
+                """
+                _getRuns_
+
+                Retrieve a list of WMCore.DataStructs.Run objects that represent which
+                run/lumi sections this file contains.
+                """
+                runs = []
+                for run, lumis in self.get("runInfo", {}).iteritems():
+                    runs.append(Run(run, *lumis))
+                return runs
+
+            def getParentLFNs(self):
+                """
+                _getParentLFNs_
+
+                Retrieve a list of parent LFNs in dictionary form
+                """
+
+                parents = []
+
+                for lfn in self.get("parentLFNs", []):
+                    parents.append({'LogicalFileName': str(lfn)})
+                return parents
+
+
+        # Start of publishInDBS
+        blockSize = 100
+
+        with myProxyEnvironment(userDN=requestorDN, serverCert=self.delegatedServerCert, serverKey=self.delegatedServerKey,
+                                myproxySrv=self.myproxyServer, proxyDir=self.proxyDir, logger=self.logger) as filename:
+
+            migrateAPI = DbsMigrateApi(sourceURL, destURL)
+            sourceApi = DbsApi({'url' : sourceURL, 'version' : 'DBS_2_0_9', 'mode' : 'POST'})
+            destApi   = DbsApi({'url' : destURL,   'version' : 'DBS_2_0_9', 'mode' : 'POST'})
+
+            migrateAPI.migrateDataset(inputDataset)
+            results = {}
+            for datasetPath, files in toPublish.iteritems():
+                self.logger.info("Inserting dataset %s" % datasetPath)
+                results[datasetPath] = {'files': 0, 'blocks': 0, 'existingFiles': 0,}
+                if not files:
+                    continue
+
+                # Pull some info out of files[0]
+                appName = files[0]["appName"]
+                appVer  = files[0]["appVer"]
+                appFam  = files[0]["appFam"]
+                seName  = {'Name': files[0]["locations"][0]}
+                seName  = str(files[0]["locations"][0])
+
+                empty, primName, procName, tier =  datasetPath.split('/')
+
+                # Find any files already in the dataset so we can skip them
+                try:
+                    existingDBSFiles = destApi.listFiles(path=datasetPath)
+                    existingFiles = [x['LogicalFileName'] for x in existingDBSFiles]
+                    results[datasetPath]['existingFiles'] = len(existingFiles)
+                except DbsException:
+                    existingDBSFiles = []
+                    existingFiles = []
+
+                # Is there anything to do?
+                workToDo = False
+                for file in files:
+                    if not file['lfn'] in existingFiles:
+                        workToDo = True
+                        break
+
+                if not workToDo:
+                    self.logger.info("Nothing uploaded, %s has these files already" % datasetPath)
+                    continue
+
+                # This must exist because we just migrated it
+                primary = destApi.listPrimaryDatasets(primName)[0]
+
+                algo = createAlgorithm(apiRef=destApi, appName=appName, appVer=appVer, appFam=appFam)
+                processed = createProcessedDataset(algorithm=algo, apiRef=destApi, primary=primary, processedName=procName,
+                                                   dataTier=tier, group='Analysis', parent=inputDataset)
+
+                # Convert JSON Buffer-like files into DBSFiles
+                dbsFiles = []
+                for file in files:
+                    if not file['lfn'] in existingFiles:
+                        pmbFile = PoorMansBufferFile(file)
+                        dbsFile = createDBSFileFromBufferFile(pmbFile, processed)
+                        dbsFiles.append(dbsFile)
+
+                # Loop and split into blocks with blockSize files
+                count = 0
+                blockCount = 0
+                while count < len(dbsFiles):
+                    self.logger.debug("Creating new block")
+                    block = createFileBlock(apiRef=destApi, datasetPath=processed, seName=seName)
+                    status = insertFiles(apiRef=destApi, datasetPath=str(datasetPath), files=dbsFiles[count:count+blockSize], block=block, maxFiles=100)
+                    count += blockSize
+                    blockCount += 1
+                    status = closeBlock(apiRef=destApi, block=block)
+                results[datasetPath]['files'] = len(dbsFiles)
+                results[datasetPath]['blocks'] = blockCount
+
+        return results
