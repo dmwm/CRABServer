@@ -493,6 +493,10 @@ class CRABRESTModel(RESTModel):
             CheckIn.checkIn(request)
             ChangeState.changeRequestStatus(requestSchema['RequestName'], 'assignment-approved')
             ChangeState.assignRequest(requestSchema['RequestName'], requestSchema["Team"])
+        #Raised during the check in
+        except CheckIn.RequestCheckInError, re:
+            self.postError(re._message, str(re), 500)
+        #Raised by the change state
         except RuntimeError, re:
             self.postError(str(re), '', 500)
 
