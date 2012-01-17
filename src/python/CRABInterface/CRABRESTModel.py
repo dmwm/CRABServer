@@ -46,7 +46,6 @@ from WMCore.RequestManager.RequestDB.Interface.User import Registration
 from WMCore.RequestManager.RequestDB.Interface.Group import Information
 from WMCore.RequestManager.RequestDB.Interface.Admin import GroupManagement, ProdManagement
 from WMCore.Cache.WMConfigCache import ConfigCache, ConfigCacheException
-from WMCore.Services.Requests import JSONRequests
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import loadWorkload
@@ -133,7 +132,6 @@ class CRABRESTModel(RESTModel):
         self.delegatedServerCert = config.delegatedServerCert
         self.delegatedServerKey = config.delegatedServerKey
         self.myproxyServer = config.myproxyServer
-
         self.converter = LFN2PFNConverter()
         self.allCMSNames = SiteDBJSON().getAllCMSNames()
         #get wildcards
@@ -469,7 +467,8 @@ class CRABRESTModel(RESTModel):
         except Exception, ex:
             self.postError(ex.message, str(ex), 400)
 
-        if not specificSchema.has_key('VoRole') or specificSchema['VoRole'] != 't1access':
+
+        if requestSchema['BlacklistT1']:
             if specificSchema.has_key('SiteBlacklist'):
                 specificSchema['SiteBlacklist'].append("T1*")
             else:

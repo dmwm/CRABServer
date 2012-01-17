@@ -38,6 +38,7 @@ defaulturi = {
                             "VoRole"            : {"default": None,             "config": 'User.voRole',            "type": "StringType",  "required": False},
                             "VoGroup"           : {"default": None,             "config": 'User.voGroup',           "type": "StringType",  "required": False},
                             "OutputFiles"       : {"default": [],               "config": 'JobType.outputFiles',    "type": "ListType",    "required": False},
+                            "BlacklistT1"       : {"default": True,             "config": None,                     "type": "BooleanType", "required": False},
                           },
 
                   'other-config-params' : [
@@ -45,7 +46,7 @@ defaulturi = {
                                            "JobType.pluginName", "JobType.externalPluginFile", "JobType.psetName",
                                            "JobType.inputFiles", "JobType.pyCfgParams",
                                            "Data.unitsPerJob", "Data.splitting", "Data.inputDataset", "Data.lumiMask",
-                                           "User.email",
+                                           "User.email", 'Site.removeT1Blacklisting'
                                           ]
                 },
     'get-log' :  {'uri': '/crabinterface/crab/log/'},
