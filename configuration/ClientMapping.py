@@ -46,7 +46,7 @@ defaulturi = {
                                            "JobType.pluginName", "JobType.externalPluginFile", "JobType.psetName",
                                            "JobType.inputFiles", "JobType.pyCfgParams",
                                            "Data.unitsPerJob", "Data.splitting", "Data.inputDataset", "Data.lumiMask",
-                                           "User.email", 'Site.removeT1Blacklisting'
+                                           "User.email", "Data.publishDbsUrl", "Site.removeT1Blacklisting"
                                           ]
                 },
     'get-log' :  {'uri': '/crabinterface/crab/log/'},
