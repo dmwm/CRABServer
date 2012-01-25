@@ -1071,7 +1071,7 @@ class CRABRESTModel(RESTModel):
 
         try:
             toPublish = self.readToPublishFiles(requestNames, requestor)
-        except tarfile.ReadError:
+        except (tarfile.ReadError, RuntimeError):
             return {'status': False,
                     'message': "Unable to read publication description files. " +
                                "You may need to wait for some time after all jobs have finished.",
