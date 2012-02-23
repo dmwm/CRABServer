@@ -310,8 +310,19 @@ class CRABRESTModel(RESTModel):
 
         lumiMask = Mask()
 
+        # RunRange can be either a list or a string
+        runRange = params.get('RunRange', [])
+        if isinstance(runRange, basestring):
+            runRange = expandRange(params['RunRange'], self)
+
+        # Add lumis that are in run range, abort if we find nothing.
+        haveLumis = False
         for run, lumis in params['LumiMask'].items():
-            lumiMask.addRunWithLumiRanges(run=int(run), lumiList=lumis)
+            if not runRange or (runRange and int(run) in runRange):
+                lumiMask.addRunWithLumiRanges(run=int(run), lumiList=lumis)
+                haveLumis = True
+        if not haveLumis:
+            raise cherrypy.HTTPError(500, 'No lumis to run over. lumiMask and runRange may not intersect.')
 
         try:
             user = SiteDBJSON().dnUserName(params['UserDN'])

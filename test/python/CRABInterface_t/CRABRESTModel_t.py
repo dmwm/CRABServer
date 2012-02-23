@@ -177,7 +177,12 @@ process.out_step = cms.EndPath(process.output)'''
         self.config.UnitTests.views.active.rest.sandBoxCacheHost = 'cms-xen39.fnal.gov'
         self.config.UnitTests.views.active.rest.sandBoxCachePort = 7739
         self.config.UnitTests.views.active.rest.sandBoxCacheBasepath = 'userfilecache/userfilecache'
+        self.config.UnitTests.views.active.rest.userFileCacheEndpoint = 'http://cms-xen39.fnal.gov:7739/userfilecache/'
         self.config.UnitTests.views.active.rest.logLevel = 'DEBUG'
+        self.config.UnitTests.views.active.rest.proxyDir = '/tmp/credentials/'
+        self.config.UnitTests.views.active.rest.myproxyServer = 'myproxy.cern.ch'
+        self.config.UnitTests.views.active.rest.delegatedServerKey = '/data/ewv/cms-xen39crab3devkey.pem'
+        self.config.UnitTests.views.active.rest.delegatedServerCert = '/data/ewv/cms-xen39crab3devcert.pem'
 
         self.schemaModules = ['WMCore.RequestManager.RequestDB']
         self.urlbase = self.config.getServerUrl()
@@ -796,6 +801,26 @@ process.out_step = cms.EndPath(process.output)'''
         self.assertTrue(len(result["DocID"]) > 0)
         self.assertTrue(len(result["DocRev"]) > 0)
         self.assertTrue(len(result["Name"]) > 0)
+
+        self.lumiMaskParams.update({'RunRange' : '132400-132600'})
+
+        jsonString = json.dumps(self.lumiMaskParams, sort_keys=False)
+        resultString, exp = methodTest('POST', self.urlbase + api, jsonString, 'application/json', \
+                                       'application/json', {'code' : 200})
+        result = json.loads(resultString)
+
+        self.assertTrue(result.has_key("DocID"))
+        self.assertTrue(result.has_key("DocRev"))
+        self.assertTrue(result.has_key("Name"))
+        self.assertTrue(len(result["DocID"]) > 0)
+        self.assertTrue(len(result["DocRev"]) > 0)
+        self.assertTrue(len(result["Name"]) > 0)
+
+        self.lumiMaskParams.update({'RunRange' : '1-100'})
+
+        jsonString = json.dumps(self.lumiMaskParams, sort_keys=False)
+        resultString, exp = methodTest('POST', self.urlbase + api, jsonString, 'application/json', \
+                                       'application/json', {'code' : 500})
 
         return
 
