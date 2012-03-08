@@ -1,6 +1,6 @@
 import sys, os
 
-from CRABServer.CRABInterface import __version__ as cs_version
+from CRABInterface import __version__ as cs_version
 
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest',
               'sphinx.ext.intersphinx', 'sphinx.ext.todo',
