@@ -45,7 +45,7 @@ defaulturi = {
                                            "General.serverUrl", "General.ufccacheUrl", "General.requestName", "General.workArea",
                                            "JobType.pluginName", "JobType.externalPluginFile", "JobType.psetName",
                                            "JobType.inputFiles", "JobType.pyCfgParams",
-                                           "Data.unitsPerJob", "Data.splitting", "Data.inputDataset", "Data.lumiMask",
+                                           "Data.unitsPerJob", "Data.splitting", "Data.inputDataset", "Data.lumiMask", "Data.runRange",
                                            "User.email", "Data.publishDbsUrl", "Site.removeT1Blacklisting"
                                           ]
                 },
