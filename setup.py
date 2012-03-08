@@ -18,7 +18,7 @@ from distutils.cmd import Command
 from distutils.command.install import INSTALL_SCHEMES
 
 sys.path.append(os.path.join(os.getcwd(), 'src/python'))
-from CRABServer.CRABInterface import __version__ as cs_version
+from CRABInterface import __version__ as cs_version
 
 required_python_version = '2.6'
 
