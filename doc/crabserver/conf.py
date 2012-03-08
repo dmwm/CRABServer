@@ -1,6 +1,5 @@
 import sys, os
 
-from CRABInterface import __version__ as cs_version
 
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest',
               'sphinx.ext.intersphinx', 'sphinx.ext.todo',
@@ -12,8 +11,8 @@ source_encoding = 'utf-8'
 master_doc = 'index'
 project = 'CMS CRAB Server'
 copyright = 'CERN, INFN and Fermilab'
-version = cs_version
-release = cs_version
+version = '<VERSION>'
+release = '<VERSION>'
 today_fmt = '%B %d, %Y'
 #unused_docs = []
 #exclude_trees = []

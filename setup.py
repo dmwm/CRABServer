@@ -1,185 +1,147 @@
-#!/usr/bin/env python
-
-"""
-Standard python setup.py file for CrabServer.
-To build    : python setup.py build
-To install  : python setup.py install --prefix=<some dir>
-To clean    : python setup.py clean
-To run tests: python setup.py test
-"""
-
-import sys
-import os
-from unittest import TextTestRunner, TestLoader
+import sys, os, os.path, re, shutil, string
+from distutils.core import setup, Command
+from distutils.command.build import build
+from distutils.command.install import install
+from distutils.spawn import spawn
 from glob import glob
-from os.path import splitext, basename, join as pjoin
-from distutils.core import setup
-from distutils.cmd import Command
-from distutils.command.install import INSTALL_SCHEMES
 
-sys.path.append(os.path.join(os.getcwd(), 'src/python'))
-from CRABInterface import __version__ as cs_version
 
-required_python_version = '2.6'
+systems = \
+{
+  'CRABInterface':
+  {
+    'python': ['CRABInterface']
+  },
+  'UserFileCache':
+  {
+    'python': ['UserFileCache']
+  },
+  'All':
+  {
+    'python': ['CRABInterface','UserFileCache']
+  }
+}
 
-class TestCommand(Command):
-    """
-    Class to handle unit tests
-    """
-    user_options = [ ]
+def get_relative_path():
+  return os.path.dirname(os.path.abspath(os.path.join(os.getcwd(), sys.argv[0])))
 
-    def initialize_options(self):
-        """Init method"""
-        self._dir = os.getcwd()
+def define_the_build(self, dist, system_name, patch_x = ''):
+  # Expand various sources.
+  docroot = "doc/build/html"
+  system = systems[system_name]
+  #binsrc = sum((glob("bin/%s" % x) for x in system['bin']), [])
 
-    def finalize_options(self):
-        """Finalize method"""
-        pass
+  py_version = (string.split(sys.version))[0]
+  pylibdir = '%slib/python%s/site-packages' % (patch_x, py_version[0:3])
+ # dist.py_modules = ['CRABServer.__init__']
+  dist.packages = system['python']
+  #dist.data_files = [('%sbin' % patch_x, binsrc)]
+  dist.data_files = []
+  if os.path.exists(docroot):
+    for dirpath, dirs, files in os.walk(docroot):
+      dist.data_files.append(("%sdoc%s" % (patch_x, dirpath[len(docroot):]),
+                              ["%s/%s" % (dirpath, fname) for fname in files
+                               if fname != '.buildinfo']))
 
-    def run(self):
-        """
-        Finds all the tests modules in test/, and runs them.
-        """
-        # list of files to exclude,
-        # e.g. [pjoin(self._dir, 'test', 'exclude_t.py')]
-        exclude = []
-        # list of test files
-        testfiles = []
-        for tname in glob(pjoin(self._dir, 'test', '*_t.py')):
-            if  not tname.endswith('__init__.py') and \
-                tname not in exclude:
-                testfiles.append('.'.join(
-                    ['test', splitext(basename(tname))[0]])
-                )
-        testfiles.sort()
-        try:
-            tests = TestLoader().loadTestsFromNames(testfiles)
-        except:
-            print "\nFail to load unit tests", testfiles
-            raise
-        test = TextTestRunner(verbosity = 2)
-        test.run(tests)
+class BuildCommand(Command):
+  """Build python modules for a specific system."""
+  description = \
+    "Build python modules for the specified system. The two supported systems\n" + \
+    "\t\t   at the moment are 'CRABInterface' and 'UserFileCache'. Use with --force \n" + \
+    "\t\t   to ensure a clean build of only the requested parts.\n"
+  user_options = build.user_options
+  user_options.append(('system=', 's', 'build the specified system (default: CRABInterface)'))
+  user_options.append(('skip-docs=', 'd' , 'skip documentation'))
 
-class CleanCommand(Command):
-    """
-    Class which clean-up all pyc files
-    """
-    user_options = [ ]
+  def initialize_options(self):
+    self.system = "CRABInterface"
+    self.skip_docs = False
 
-    def initialize_options(self):
-        """Init method"""
-        self._clean_me = [ ]
-        for root, dirs, files in os.walk('.'):
-            for fname in files:
-                if fname.endswith('.pyc'):
-                    self._clean_me.append(pjoin(root, fname))
+  def finalize_options(self):
+    if self.system not in systems:
+      print "System %s unrecognised, please use '-s CRABInterface'" % self.system
+      sys.exit(1)
 
-    def finalize_options(self):
-        """Finalize method"""
-        pass
+    # Expand various sources and maybe do the c++ build.
+    define_the_build(self, self.distribution, self.system, '')
 
-    def run(self):
-        """Run method"""
-        for clean_me in self._clean_me:
-            try:
-                os.unlink(clean_me)
-            except:
-                pass
+    # Force rebuild.
+    shutil.rmtree("%s/build" % get_relative_path(), True)
+    shutil.rmtree("doc/build", True)
 
-def dirwalk(relativedir):
-    """
-    Walk a directory tree and look-up for __init__.py files.
-    If found yield those dirs. Code based on
-    http://code.activestate.com/recipes/105873-walk-a-directory-tree-using-a-generator/
-    """
-    idir = os.path.join(os.getcwd(), relativedir)
-    for fname in os.listdir(idir):
-        fullpath = os.path.join(idir, fname)
-        if  os.path.isdir(fullpath) and not os.path.islink(fullpath):
-            for subdir in dirwalk(fullpath):  # recurse into subdir
-                yield subdir
-        else:
-            initdir, initfile = os.path.split(fullpath)
-            if  initfile == '__init__.py':
-                yield initdir
+  def generate_docs(self):
+    if not self.skip_docs:
+      os.environ["PYTHONPATH"] = "%s/../WMCore/src/python/:%s" % (os.getcwd(), os.environ["PYTHONPATH"])
+      os.environ["PYTHONPATH"] = "%s/build/lib:%s" % (os.getcwd(), os.environ["PYTHONPATH"])
+      spawn(['make', '-C', 'doc', 'html', 'PROJECT=%s' % 'crabserver' ])
 
-def find_packages(relativedir):
-    "Find list of packages in a given dir"
-    packages = []
-    for idir in dirwalk(relativedir):
-        package = idir.replace(os.getcwd() + '/', '')
-        package = package.replace(relativedir + '/', '')
-        package = package.replace('/', '.')
-        packages.append(package)
-    return packages
+  def run(self):
+    command = 'build'
+    if self.distribution.have_run.get(command): return
+    cmd = self.distribution.get_command_obj(command)
+    cmd.force = self.force
+    cmd.ensure_finalized()
+    cmd.run()
+    self.generate_docs()
+    self.distribution.have_run[command] = 1
 
-def datafiles(idir):
-    """Return list of data files in provided relative dir"""
-    files = []
-    for dirname, dirnames, filenames in os.walk(idir):
-        for subdirname in dirnames:
-            files.append(os.path.join(dirname, subdirname))
-        for filename in filenames:
-            if  filename[-1] == '~':
-                continue
-            files.append(os.path.join(dirname, filename))
-    return files
+class InstallCommand(install):
+  """Install a specific system."""
+  description = \
+    "Install a specific system. You can patch an existing\n" + \
+    "\t\t   installation instead of normal full installation using the '-p' option.\n"
+  user_options = install.user_options
+  user_options.append(('system=', 's', 'install the specified system (default: CRABInterface)'))
+  user_options.append(('patch', None, 'patch an existing installation (default: no patch)'))
+  user_options.append(('skip-docs=', 'd' , 'skip documentation'))
 
-def main():
-    "Main function"
-    version      = cs_version
-    name         = "CRABServer"
-    description  = "CMS CRAB Server"
-    url          = \
-        "https://svnweb.cern.ch/trac/CMSDMWM/wiki/CRABServerManagement"
-    readme       = "CRAB Server %s" % url
-    author       = "",
-    author_email = "",
-    keywords     = ["CRABServer"]
-    package_dir  = \
-        {"CRABInterface": "src/python/CRABInterface", "UserFileCache": "src/python/UserFileCache"}
-    packages     = find_packages('src/python')
-    data_files   = [] # list of tuples whose entries are (dir, [data_files])
-    cms_license  = "CMS experiment software"
-    classifiers  = [
-        "Development Status :: 3 - Production/Beta",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: CMS/CERN Software License",
-        "Operating System :: MacOS :: MacOS X",
-        "Operating System :: Microsoft :: Windows",
-        "Operating System :: POSIX",
-        "Programming Language :: Python",
-        "Topic :: Scientific/Engineering"
-    ]
+  def initialize_options(self):
+    install.initialize_options(self)
+    self.system = "CRABInterface"
+    self.patch = None
+    self.skip_docs = False
 
-    if  sys.version < required_python_version:
-        msg = "I'm sorry, but %s %s requires Python %s or later."
-        print msg % (name, version, required_python_version)
-        sys.exit(1)
+  def finalize_options(self):
+    # Check options.
+    if self.system not in systems:
+      print "System %s unrecognised, please use '-s CRABInterface'" % self.system
+      sys.exit(1)
+    if self.patch and not os.path.isdir("%s/xbin" % self.prefix):
+      print "Patch destination %s does not look like a valid location." % self.prefix
+      sys.exit(1)
 
-    # set default location for "data_files" to
-    # platform specific "site-packages" location
-    for scheme in INSTALL_SCHEMES.values():
-        scheme['data'] = scheme['purelib']
+    # Expand various sources, but don't build anything from c++ now.
+    define_the_build(self, self.distribution, self.system, (self.patch and 'x') or '')
 
-    setup(
-        name                 = name,
-        version              = version,
-        description          = description,
-        long_description     = readme,
-        keywords             = keywords,
-        packages             = packages,
-        package_dir          = package_dir,
-        data_files           = data_files,
-        scripts              = datafiles('bin'),
-        requires             = ['python (>=2.6)'],
-        classifiers          = classifiers,
-        cmdclass             = {'test': TestCommand, 'clean': CleanCommand},
-        author               = author,
-        author_email         = author_email,
-        url                  = url,
-        license              = cms_license,
-    )
+    # Whack the metadata name.
+    self.distribution.metadata.name = self.system
+    assert self.distribution.get_name() == self.system
 
-if __name__ == "__main__":
-    main()
+    # Pass to base class.
+    install.finalize_options(self)
+
+    # Mangle paths if we are patching. Most of the mangling occurs
+    # already in define_the_build(), but we need to fix up others.
+    if self.patch:
+      self.install_lib = re.sub(r'(.*)/lib/python(.*)', r'\1/xlib/python\2', self.install_lib)
+      self.install_scripts = re.sub(r'(.*)/bin$', r'\1/xbin', self.install_scripts)
+
+  def run(self):
+    for cmd_name in self.get_sub_commands():
+      cmd = self.distribution.get_command_obj(cmd_name)
+      cmd.distribution = self.distribution
+      if cmd_name == 'install_data':
+        cmd.install_dir = self.prefix
+      else:
+        cmd.install_dir = self.install_lib
+      cmd.ensure_finalized()
+      self.run_command(cmd_name)
+      self.distribution.have_run[cmd_name] = 1
+
+setup(name = 'crabserver',
+      version = '1.0',
+      maintainer_email = 'hn-cms-crabdevelopment@cern.ch',
+      cmdclass = { 'build_system': BuildCommand,
+                   'install_system': InstallCommand },
+      # base directory for all the packages
+      package_dir = { '' : 'src/python' })
