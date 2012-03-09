@@ -34,8 +34,6 @@ class RESTWorkflow(RESTEntity):
                re.compile("^/(\*|[a-zA-Z\*][a-zA-Z0-9_\*]{0,100})(/(\*|[a-zA-Z0-9_\.\-\*]{1,100})){0,1}(/(\*|[A-Z\-\*]{1,50})){0,1}$"), optional=False)
             validate_strlist("siteblacklist", param, safe, re.compile("^T[0-3%]((_[A-Z]{2}(_[A-Za-z0-9]+)*)?)$"))
             validate_strlist("sitewhitelist", param, safe, re.compile("^T[0-3%]((_[A-Z]{2}(_[A-Za-z0-9]+)*)?)$"))
-            validate_str("runwhitelist", param, safe, re.compile("^\d+(-\d+)?(,\d+(-\d+)?)*$"), optional=True) #TODO has it been renamed to RunRange (?);
-            validate_str("runblacklist", param, safe, re.compile("^\d+(-\d+)?(,\d+(-\d+)?)*$"), optional=True)
             validate_strlist("blockwhitelist", param, safe, re.compile("^(/[a-zA-Z0-9\.\-_]{1,100}){3}#[a-zA-Z0-9\.\-_]{1,100}$"))
             validate_strlist("blockblacklist", param, safe, re.compile("^(/[a-zA-Z0-9\.\-_]{1,100}){3}#[a-zA-Z0-9\.\-_]{1,100}$"))
             validate_str("splitalgo", param, safe, re.compile("^EventBased|FileBased|LumiBased|RunBased|SizeBased$"), optional=False)
@@ -72,7 +70,7 @@ class RESTWorkflow(RESTEntity):
 
 
     @restcall
-    def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, runwhitelist, runblacklist, blockwhitelist, blockblacklist,
+    def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist, blockblacklist,
             splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag, publishname, asyncdest, campaign, blacklistT1):
         """Insert a new workflow. The caller needs to be a CMS user with a valid CMS x509 cert/proxy.
 
@@ -84,8 +82,6 @@ class RESTWorkflow(RESTEntity):
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name;
            :arg str asyncdest: CMS site name for storage destination of the output files;
-           :arg int list runwhitelist: selective list of input run from the specified input dataset;
-           :arg int list runblacklist:  input run to be excluded from the specified input dataset;
            :arg str list blockwhitelist: selective list of input iblock from the specified input dataset;
            :arg str list blockblacklist:  input blocks to be excluded from the specified input dataset;
            :arg str splitalgo: algorithm to be used for the workflow splitting;
@@ -108,12 +104,11 @@ class RESTWorkflow(RESTEntity):
            :returns: a dict which contaians details of the request"""
 
         return self.workflowmgr.submit(workflow=workflow, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata,
-                                      siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, runwhitelist=runwhitelist,
-                                      runblacklist=runblacklist, blockwhitelist=blockwhitelist, blockblacklist=blockblacklist,
-                                      splitalgo=splitalgo, algoargs=algoargs, configdoc=configdoc, userisburl=userisburl,
-                                      adduserfiles=adduserfiles, addoutputfiles=addoutputfiles, savelogsflag=savelogsflag,
-                                      userdn=cherrypy.request.user['dn'], userhn=cherrypy.request.user['login'],
-                                      publishname=publishname, asyncdest=asyncdest, campaign=campaign, blacklistT1=blacklistT1)
+                                       siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, blockwhitelist=blockwhitelist,
+                                       blockblacklist=blockblacklist, splitalgo=splitalgo, algoargs=algoargs, configdoc=configdoc,
+                                       userisburl=userisburl, adduserfiles=adduserfiles, addoutputfiles=addoutputfiles,
+                                       savelogsflag=savelogsflag, userdn=cherrypy.request.user['dn'], userhn=cherrypy.request.user['login'],
+                                       publishname=publishname, asyncdest=asyncdest, campaign=campaign, blacklistT1=blacklistT1)
 
     @restcall
     def post(self, workflow, resubmit, dbsurl):

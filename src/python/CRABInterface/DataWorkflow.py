@@ -213,8 +213,8 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             self.logger.exception(re)
             raise ExecutionError(str(re))
 
-    def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, runwhitelist, runblacklist,
-               blockwhitelist, blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
+    def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
+               blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
                userdn, userhn, publishname, asyncdest, campaign, blacklistT1):
         """Perform the workflow injection into the reqmgr + couch
 
@@ -226,8 +226,6 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name;
            :arg str asyncdest: CMS site name for storage destination of the output files;
-           :arg int list runwhitelist: selective list of input run from the specified input dataset;
-           :arg int list runblacklist:  input run to be excluded from the specified input dataset;
            :arg str list blockwhitelist: selective list of input iblock from the specified input dataset;
            :arg str list blockblacklist:  input blocks to be excluded from the specified input dataset;
            :arg str splitalgo: algorithm to be used for the workflow splitting;
@@ -251,8 +249,6 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
                      "AnalysisConfigCacheDoc": configdoc,
                      "RequestName": requestname,
                      "OriginalRequestName": workflow, # do we really need this?
-                     "RunWhitelist": runwhitelist,
-                     "RunBlacklist": runblacklist,
                      "SiteWhitelist": sitewhitelist,
                      "SiteBlacklist": siteblacklist,
                      "CMSSWVersion": jobsw,
@@ -284,11 +280,6 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         #requestSchema["ACDCDBName"] =  self.ACDCCouchDB
         #TODO is it needed?
         #requestSchema['OriginalRequestName'] = requestSchema['RequestName']
-
-        if schemaWf['RunWhitelist']:
-            schemaWf['RunWhitelist'] = expandRange( schemaWf['RunWhitelist' ], self)
-        if schemaWf['RunBlacklist']:
-            schemaWf['RunBlacklist'] = expandRange( schemaWf['RunBlacklist' ], self)
 
         schemaWf["ProcessingVersion"] = setProcessingVersion(schemaWf, self.reqmgrurl, self.reqmgrname)
 

@@ -1,7 +1,8 @@
 import logging
 
 # WMCore dependecies here
-from WMCore.Database.CMSCouch import CouchServer, CouchError, Database
+from WMCore.Database.CMSCouch import CouchServer, CouchError, Database, CouchNotFoundError
+from WMCore.REST.Error import ExecutionError, NoSuchInstance
 
 # CRABServer dependencies here
 from CRABInterface.DataWorkflow import DataWorkflow
@@ -112,9 +113,12 @@ class DataCampaign(object):
 
         #Get all the 'reqmgr' documents related to the campaign (one for each wf)
         options = { "startkey": [campaign,0], "endkey": [campaign,{}] }
-        campaignDocs = self.database.loadView( "WMStats", "campaign-request", options)
+        try:
+            campaignDocs = self.database.loadView( "WMStats", "campaign-request", options)
+        except CouchNotFoundError, ce:
+            raise ExecutionError("Impossible to load campaign-request view from WMStats")
         if not campaignDocs['rows']:
-            return ["Cannot find campaign" + campaign]
+            raise NoSuchInstance("Cannot find requested campaign")
 
         #Get the 'agent' document for each workflow of the campaign
         wfDocs = [ self.workflow._getWorkflow(doc['value']['id']) for doc in campaignDocs['rows'] ]
