@@ -62,7 +62,7 @@ class RESTFile(RESTEntity):
             outfilepath = os.path.join(self.cachedir, hashkey[0:2])
             outfilename = os.path.join(outfilepath, hashkey)
 
-        if os.path.isfile(outfilepath):
+        if os.path.isfile(outfilename) and not inputfilename:
             # we do not want to upload again a file that already exists
             self.__touch(outfilename)
             result['size'] = os.path.getsize(outfilename)
@@ -81,10 +81,10 @@ class RESTFile(RESTEntity):
                           ('application/x-download', RawFormat())
                         ])
     def get(self, hashkey, inputfilename, nodownload):
-        """Allow to to retrieve a file previously uploaded to the local filesystem.
-           Base path of the local filesystem is configurable.
-           In case `nodownload` argument is true or different from zero instead to
-           return the raw file, summary information are returned.
+        """Retrieve a file previously uploaded to the local filesystem.
+           The base path on the local filesystem is configurable.
+           If the `nodownload` argument is true or different from zero instead of
+           returning the raw file, summary information is returned.
 
            The caller needs to be a CMS user with a valid CMS x509 cert/proxy.
 
