@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python
 
 """
 REST Model portion for User File Cache.
@@ -120,7 +120,7 @@ class UserFileCacheRESTModel(RESTModel):
             msg = "File transfer error: digest check failed between %s and %s"  % (digest, checksum)
             raise cherrypy.HTTPError(400, msg)
 
-        if os.path.isfile(fileName):
+        if os.path.isfile(fileName) and not (subDir and name):
             self.touch(fileName)
             size = os.path.getsize(fileName)
         else:
