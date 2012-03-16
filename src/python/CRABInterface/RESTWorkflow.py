@@ -5,11 +5,11 @@ from WMCore.REST.Validation import validate_str, validate_strlist, validate_num,
 
 # CRABServer dependecies here
 from CRABInterface.DataWorkflow import DataWorkflow
-from CRABInterface.RESTExtensions import authz_owner_match
+from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
+from CRABInterface.Regexps import *
 
 # external dependecies here
 import cherrypy
-import re
 
 
 class RESTWorkflow(RESTEntity):
@@ -22,41 +22,39 @@ class RESTWorkflow(RESTEntity):
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
+        authz_login_valid()
 
-        # TODO: we should start replacing most of the regex here with what we have in WMCore.Lexicon
-        #       (this probably requires to adapt something on Lexicon)
         if method in ['PUT']:
-            validate_str("workflow", param, safe, re.compile("^[a-zA-Z0-9\.\-_]{1,80}$"), optional=False)
-            validate_str("jobtype", param, safe, re.compile("^[A-Za-z]*$"), optional=False)
-            validate_str("jobsw", param, safe, re.compile("^CMSSW(_\d+){3}(_[a-zA-Z0-9_]+)?$"), optional=False)
-            validate_str("jobarch", param, safe, re.compile("^slc[0-9]{1}_[a-z0-9]+_gcc[a-z0-9]+(_[a-z0-9]+)?$"), optional=False)
-            validate_str("inputdata", param, safe,
-               re.compile("^/(\*|[a-zA-Z\*][a-zA-Z0-9_\*]{0,100})(/(\*|[a-zA-Z0-9_\.\-\*]{1,100})){0,1}(/(\*|[A-Z\-\*]{1,50})){0,1}$"), optional=False)
-            validate_strlist("siteblacklist", param, safe, re.compile("^T[0-3%]((_[A-Z]{2}(_[A-Za-z0-9]+)*)?)$"))
-            validate_strlist("sitewhitelist", param, safe, re.compile("^T[0-3%]((_[A-Z]{2}(_[A-Za-z0-9]+)*)?)$"))
-            validate_strlist("blockwhitelist", param, safe, re.compile("^(/[a-zA-Z0-9\.\-_]{1,100}){3}#[a-zA-Z0-9\.\-_]{1,100}$"))
-            validate_strlist("blockblacklist", param, safe, re.compile("^(/[a-zA-Z0-9\.\-_]{1,100}){3}#[a-zA-Z0-9\.\-_]{1,100}$"))
-            validate_str("splitalgo", param, safe, re.compile("^EventBased|FileBased|LumiBased|RunBased|SizeBased$"), optional=False)
+            validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
+            validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
+            validate_str("jobsw", param, safe, RX_CMSSW, optional=False)
+            validate_str("jobarch", param, safe, RX_ARCH, optional=False)
+            validate_str("inputdata", param, safe, RX_DATASET, optional=False)
+            validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
+            validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
+            validate_strlist("blockwhitelist", param, safe, RX_BLOCK)
+            validate_strlist("blockblacklist", param, safe, RX_BLOCK)
+            validate_str("splitalgo", param, safe, RX_SPLIT, optional=False)
             validate_num("algoargs", param, safe, optional=False)
-            validate_str("configdoc", param, safe, re.compile("^[A-Za-z0-9]*$"), optional=False)
-            validate_str("userisburl", param, safe, re.compile("^https?://([-\w\.]+)+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$"), optional=False)
-            validate_strlist("adduserfiles", param, safe, re.compile("^([a-zA-Z0-9\-\._]+)$"))
-            validate_strlist("addoutputfiles", param, safe, re.compile("^([a-zA-Z0-9\-\._]+)$"))
+            validate_str("configdoc", param, safe, RX_CFGDOC, optional=False)
+            validate_str("userisburl", param, safe, RX_CACHEURL, optional=False)
+            validate_strlist("adduserfiles", param, safe, RX_ADDFILE)
+            validate_strlist("addoutputfiles", param, safe, RX_ADDFILE)
             validate_num("savelogsflag", param, safe, optional=False)
-            validate_str("publishname", param, safe, re.compile("[a-zA-Z0-9\-_]+"), optional=False)
-            validate_str("asyncdest", param, safe, re.compile("^T[0-3%]((_[A-Z]{2}(_[A-Za-z0-9]+)*)?)$"), optional=False)
-            validate_str("campaign", param, safe, re.compile("^[a-zA-Z0-9\.\-_]{1,80}$"), optional=True)
+            validate_str("publishname", param, safe, RX_PUBLISH, optional=False)
+            validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
+            validate_str("campaign", param, safe, RX_CAMPAIGN, optional=True)
             validate_num("blacklistT1", param, safe, optional=False)
 
         elif method in ['POST']:
-            validate_str("workflow", param, safe, re.compile("^[a-zA-Z0-9\.\-_]{1,100}$"), optional=False)
+            validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
             validate_num("resubmit", param, safe, optional=True)
-            validate_str("dbsurl", param, safe, re.compile("^https?://([-\w\.]+)+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$"), optional=True)
+            validate_str("dbsurl", param, safe, RX_DBSURL, optional=True)
 
         elif method in ['GET']:
-            validate_strlist("workflow", param, safe, re.compile("^[a-zA-Z0-9\.\-_]{1,100}$"))
-            validate_str('subresource', param, safe, re.compile("^errors|report|logs|data|schema|configcache$"), optional=True)
-            #XXX: parameters of subresources calls has to be put here
+            validate_strlist("workflow", param, safe, RX_WORKFLOW)
+            validate_str('subresource', param, safe, RX_SUBRESTAT, optional=True)
+            #parameters of subresources calls has to be put here
             #used by get latest
             validate_num('age', param, safe, optional=True)
             #used by get log, gt data
@@ -65,7 +63,7 @@ class RESTWorkflow(RESTEntity):
             validate_num('shortformat', param, safe, optional=True)
 
         elif method in ['DELETE']:
-            validate_strlist("workflow", param, safe, re.compile("^[a-zA-Z0-9\.\-_]{1,100}$"))
+            validate_strlist("workflow", param, safe, RX_WORKFLOW)
             validate_num("force", param, safe, optional=True)
 
 

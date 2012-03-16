@@ -5,11 +5,12 @@ from WMCore.REST.Validation import validate_str, validate_strlist, validate_num,
 
 # CRABServer dependecies here
 from CRABInterface.DataCampaign import DataCampaign
-from CRABInterface.RESTExtensions import authz_owner_match
+from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
+from CRABInterface.Regexps import RX_CAMPAIGN, RX_WORKFLOW
 
 # external dependecies here
 import cherrypy
-import re
+
 
 class RESTCampaign(RESTEntity):
     """REST entity for campaigns allows to handle a set of workflows all together"""
@@ -20,24 +21,25 @@ class RESTCampaign(RESTEntity):
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
+        authz_login_valid()
 
-        # TODO: we should start replacing most of the regex here with what we have in WMCore.Lexicon
-        #       (this probably requires to adapt something on Lexicon)
         if method in ['PUT']:
-            validate_str("campaign", param, safe, re.compile("^[a-zA-Z0-9\.\-_]{1,80}$"), optional=False)
-            validate_strlist("workflow", param, safe, re.compile("^[a-zA-Z0-9\.\-_]{1,80}$"))
+            validate_str("campaign", param, safe, RX_CAMPAIGN, optional=False)
+            validate_strlist("workflow", param, safe, RX_WORKFLOW)
 
         elif method in ['POST']:
-            validate_str("campaign", param, safe, re.compile("^[a-zA-Z0-9\.\-_]{1,80}$"), optional=False)
+            validate_str("campaign", param, safe, RX_CAMPAIGN, optional=False)
             validate_num("resubmit", param, safe, optional=True)
 
         elif method in ['GET']:
-            validate_str("campaign", param, safe, re.compile("^[a-zA-Z0-9\.\-_]{1,80}$"), optional=False)
-            #validate_str('subresource', param, safe, re.compile("^errors|report|logs|data|schema|configcache$"), optional=True)
+            validate_str("campaign", param, safe, RX_CAMPAIGN, optional=True)
             validate_num('age', param, safe, optional=True)
+            cherrypy.log("ERRORE? : " + str(param))
+            if not "campaign" in param.kwargs and not "age" in param.kwargs:
+                raise InvalidParameter("Invalid input parameters")
 
         elif method in ['DELETE']:
-            validate_str("campaign", param, safe, re.compile("^[a-zA-Z0-9\.\-_]{1,80}$"), optional=False)
+            validate_str("campaign", param, safe, RX_CAMPAIGN, optional=False)
             validate_num("force", param, safe, optional=True)
 
     @restcall
@@ -64,7 +66,10 @@ class RESTCampaign(RESTEntity):
            :returns: the list of modified field"""
 
         if resubmit:
-            return self.campaignmgr.resubmit(campaign)
+            # strict check on authz: only the campaign owner can modify it
+            workflows = self.campaignmgr.getCampaignWorkflows(campaign)
+            alldocs = authz_owner_match(self.campaignmgr.database, workflows)
+            return self.campaignmgr.resubmit(campaign, workflows)
         else:
             raise NotImplementedError
 
@@ -85,8 +90,6 @@ class RESTCampaign(RESTEntity):
             # retrieve the information about latest campaigns for that user
             # age can have a default: 1 week ?
             result = self.campaignmgr.retrieveRecent(user, age)
-        else:
-            raise InvalidParameter("Invalid input parameters")
 
         return result
 
@@ -100,5 +103,8 @@ class RESTCampaign(RESTEntity):
 
         raise NotImplementedError
 
-        result = rows([{}])
+        # strict check on authz: only the campaign owner can modify it
+        workflows = self.campaignmgr.getCampaignWorkflows(campaign)
+        alldocs = authz_owner_match(self.campaignmgr.database, workflows)
+        result = self.campaignmgr.kill(campaign, force, workflows)
         return result

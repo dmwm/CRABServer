@@ -25,15 +25,15 @@ class DataUser(object):
         logger = logging.getLogger("CRABLogger.DataUser")
 
         if not userDN:
-            raise InvalidParameter("Bad input userDN not defined: " + userDN)
+            raise InvalidParameter("Bad input userDN not defined")
         if not userHN:
-            raise InvalidParameter("Bad input userHN not defined: " + userHN)
+            raise InvalidParameter("Bad input userHN not defined")
         if not email:
-            raise InvalidParmeter("Bad input user email not defined: " + email)
+            raise InvalidParmeter("Bad input user email not defined")
         if not team:
-            raise InvalidParameter("Bad input Team not defined: " + team)
+            raise InvalidParameter("Bad input Team not defined")
         if not group:
-            raise InvalidParameter("Bad input Group not defined: " + group)
+            raise InvalidParameter("Bad input Group not defined")
 
         if not Registration.isRegistered(userHN):
             logger.info("Registering user %s with email %s and userDN %s)" % (userHN, email, userDN))
@@ -47,7 +47,7 @@ class DataUser(object):
         userId = idDAO.execute(userHN)
         assocDAO = factory(classname = "Requestor.GetAssociation")
         assoc = assocDAO.execute(userId)
-        if len(assoc) == 0:
+        if assoc:
             logger.debug("Adding user %s to group %s" % group)
             GroupManagement.addUserToGroup(userHN, group)
 

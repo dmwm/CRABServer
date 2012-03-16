@@ -32,6 +32,7 @@ data.reqmgrname = 'reqmgrdb'
 
 data.connectUrl = connectUrl
 #data.loggingLevel = 10
+#data.loggingFile = '/tmp/CRAB.log'
 
 conf.section_("CoreDatabase")
 conf.CoreDatabase.connectUrl = connectUrl

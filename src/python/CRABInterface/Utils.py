@@ -24,7 +24,7 @@ def setProcessingVersion(request, reqmgrurl, reqmgrname):
         database = couchdb.connectDatabase(reqmgrname)
     except CouchError, ex:
         logger.exception(ex)
-        raise ExecutionError("Error connecting to couch database.\n\tException message: %s\n\tException reason:%s" % (str(ex), str(getattr(ex, 'reason', ''))))
+        raise ExecutionError("Error connecting to couch database", errobj = ex)
 
     startkey = [request['Requestor'], request['PublishDataName'], request['InputDataset']]
     endkey = copy.copy(startkey)
@@ -49,27 +49,3 @@ def setProcessingVersion(request, reqmgrurl, reqmgrname):
 
     logger.debug("New version is: %s" % newVersion)
     return 'v%d' % newVersion
-
-
-def expandRange(myrange, restInstance=None):
-    """
-    Take a string of ranges (like '1,2,4-7,5,3-9') and return a list of integers
-    """
-    myrange = myrange.replace(' ','')
-    try:
-        WMCore.Lexicon.jobrange(myrange)
-    except AssertionError, ex:
-        logging.getLogger("CRABLogger.Utils").exception(ex)
-        raise InvalidParameter("Irregular range " + myrange)
-
-    myrange = myrange.split(',')
-    result = []
-    for element in myrange:
-        if element.count('-') > 0:
-            mySubRange = element.split('-')
-            subInterval = range( int(mySubRange[0]), int(mySubRange[1])+1)
-            result.extend(subInterval)
-        else:
-            result.append(int(element))
-
-    return result

@@ -30,9 +30,9 @@ class RESTBaseAPI(RESTApi):
                     'campaign': RESTCampaign(app, self, config, mount),
                    } )
 
-        self._initLogger( getattr(config, 'loggingLevel', None) ) #None can be cahnged to logging.INFO if we realize we can log to a file in the cmsWeb env
+        self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None) ) #None can be cahnged to logging.INFO if we realize we can log to a file in the cmsWeb env
 
-    def _initLogger(self, loggingLevel = None):
+    def _initLogger(self, logfile, logginglevel):
         """
         Setup the logger for all the CRAB API's. If loggingLevel is not specified (==None) we use the NullHandler which just 'pass' and does not log
 
@@ -42,8 +42,8 @@ class RESTBaseAPI(RESTApi):
         """
 
         logger = logging.getLogger('CRABLogger')
-        if loggingLevel:
-            hdlr = logging.FileHandler('/tmp/CRAB.log') #TODO temporary path until we figure out where we can put the logfile (if we can have one)
+        if logginglevel:
+            hdlr = logging.FileHandler(logfile)
             formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
             hdlr.setFormatter(formatter)
             logger.addHandler(hdlr)

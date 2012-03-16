@@ -18,14 +18,15 @@ from WMCore.Database.DBFactory import DBFactory
 
 #CRAB dependencies
 from CRABInterface.DataUser import DataUser
-from CRABInterface.Utils import setProcessingVersion, expandRange
+from CRABInterface.Utils import setProcessingVersion
 
 class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Uses cplog
     """Entity that allows to operate on workflow resources"""
     splitMap = {'LumiBased' : 'lumis_per_job', 'EventBased' : 'events_per_job', 'FileBased' : 'files_per_job'}
 
     @staticmethod
-    def globalinit(monurl, monname, reqmgrurl, reqmgrname, configcacheurl, configcachename, connectUrl, sitewildcards = {'T1*': 'T1_*', 'T2*': 'T2_*', 'T3*': 'T3_*'} ):
+    def globalinit(monurl, monname, reqmgrurl, reqmgrname, configcacheurl, configcachename, connectUrl,
+                   sitewildcards={'T1*': 'T1_*', 'T2*': 'T2_*', 'T3*': 'T3_*'}):
         DataWorkflow.couchdb = CouchServer(monurl)
         DataWorkflow.database = DataWorkflow.couchdb.connectDatabase(monname)
 
@@ -54,15 +55,15 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         myThread = threading.currentThread()
         myThread.dbi = self.dbi
 
-    def _getWorkflow(self, wf):
-        options = { "startkey": wf, "endkey": wf, 'reduce' : True, 'descending' : True }
+    def getWorkflow(self, wf):
+        options = {"startkey": wf, "endkey": wf, 'reduce': True, 'descending': True}
         try:
-            doc = self.database.document( id = wf )
+            doc = self.database.document(id=wf)
         except CouchNotFoundError:
             return {}
-        agentDoc = self.database.loadView( "WMStats", "latest-request", options)
+        agentDoc = self.database.loadView("WMStats", "latest-request", options)
         if agentDoc['rows']:
-            agentDoc = self.database.document( id=agentDoc['rows'][0]['value']['id'] )
+            agentDoc = self.database.document(id=agentDoc['rows'][0]['value']['id'])
             doc['status'] = agentDoc['status']
             doc['sites'] = agentDoc['sites']
             return doc
@@ -70,7 +71,8 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             return doc
 
     def _initCache(self, sitewildcards):
-        """Building the cache for frequently used information. This shouldn't be abused and should be refreshed sometimes.
+        """Building the cache for frequently used information.
+           This shouldn't be abused and should be refreshed sometimes.
 
            :arg dict sitewildcards: a dictionary containing site wildcards"""
         # caching site db sites with wildcards
@@ -87,13 +89,14 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
            :return: a json corresponding to the workflow in couch"""
 
         for wf in wfs:
-            yield self._getWorkflow(wf)
+            yield self.getWorkflow(wf)
 
     def getLatests(self, user, limit, timestamp):
         """Retrives the latest workflows for the user
 
            :arg str user: a valid user hn login name
-           :arg int limit: the maximum number of workflows to return (this should probably have a default!)
+           :arg int limit: the maximum number of workflows to return
+                          (this should probably have a default!)
            :arg int limit: limit on the workflow age
            :return: a list of workflows"""
         # convert the workflow age in something eatable by a couch view
@@ -113,15 +116,16 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         """Retrieves the sets of errors for a specific workflow
 
            :arg str workflow: a workflow name
-           :arg int shortformat: a flag indicating if the user is asking for detailed information about sites and list of errors
+           :arg int shortformat: a flag indicating if the user is asking for detailed
+                                 information about sites and list of errors
            :return: a list of errors grouped by exit code, error reason, site"""
 
         for wf in workflow:
             group_level = 3 if shortformat else 5
-            options = { "startkey": [wf, "jobfailed"], "endkey": [wf, "jobfailed", {}, {}, {}], "reduce" : True,  "group_level" : group_level}#&group=true (default)
-            yield self.database.loadView( "WMStats", "jobsByStatusWorkflow", options)['rows']
+            options = {"startkey": [wf, "jobfailed"], "endkey": [wf, "jobfailed", {}, {}, {}], "reduce": True,  "group_level": group_level}
+            yield self.database.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
 
-        #yield [{}]
+        yield [{}]
 
     def report(self, workflow):
         """Retrieves the quality of the workflow in term of what has been processed
@@ -207,11 +211,11 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         #Raised during the check in
         except CheckIn.RequestCheckInError, re:
             self.logger.exception(re)
-            raise ExecutionError(str(re))
+            raise ExecutionError("Problem checking in the request", errobj = re)
         #Raised by the change state
         except RuntimeError, re:
             self.logger.exception(re)
-            raise ExecutionError(str(re))
+            raise ExecutionError("Problem checking in the request", errobj = re)
 
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
@@ -273,7 +277,8 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
                    }
 
         if not asyncdest in self.allCMSNames:
-            raise InvalidParameter("The parameter asyncdest %s is not in the list of known CMS sites %s" % (asyncdest, self.allCMSNames))
+            excasync = ValueError("The parameter asyncdest %s is not in the list of known CMS sites %s" % (asyncdest, self.allCMSNames))
+            raise InvalidParameter("Remote output data site not valid", errobj = excasync)
 
         #TODO where's the ACDC?
         #requestSchema["ACDCUrl"] =  removePasswordFromUrl(self.ACDCCouchURL)
@@ -299,7 +304,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             specificSchema.allCMSNames = self.allCMSNames
             specificSchema.validate()
         except Exception, ex:
-            raise InvalidParameter(ex.message)
+            raise InvalidParameter("Not valid scehma provided", errobj = ex)
 
         #The client set BlacklistT1 as true if the user has not t1access role.
         if blacklistT1:
