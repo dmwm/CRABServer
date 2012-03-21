@@ -76,7 +76,7 @@ class Tester(helper.CPWebCase):
         # TODO this is not working given how we pass the input file now
         #self.assertStatus("200 OK")
 
-    def test_download_tgz(self, fmt='application/x-download', page="/test/file", inbody = None):
+    def test_download_tgz(self, fmt='application/octet-stream', page="/test/file", inbody = None):
         h = fake_authz_headers(RT.test_authz_key.data) + [("Accept", fmt)]
         # empty request failing
         self.getPage(page, headers=h, method="GET", body=None)
@@ -127,7 +127,7 @@ class Tester(helper.CPWebCase):
         #self.getPage(page, headers=h, method="PUT", body=body2)
         #self.assertStatus("200 OK")
 
-    def test_download_json(self, fmt='application/x-download', page="/test/file", inbody = None):
+    def test_download_json(self, fmt='application/octet-stream', page="/test/file", inbody = None):
         h = fake_authz_headers(RT.test_authz_key.data) + [("Accept", fmt)]
         username = [head[1] for head in h if head[0] == 'cms-authn-login'][-1]
         # empty request failing

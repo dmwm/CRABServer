@@ -11,6 +11,14 @@ from WMCore.REST.Error import RESTError, InvalidParameter
 import tarfile
 import hashlib
 
+import cherrypy
+
+###### authz_login_valid is currently duplicatint CRABInterface.RESTExtension . A better solution
+###### should be found for authz_*
+def authz_login_valid():
+    if not cherrypy.request.user['login']:
+        raise cherrypy.HTTPError(403, "You are not allowed to access this resource.")
+
 
 def _check_file(argname, val, hashkey):
     """Check that `argname` `val` is a tar file and that provided 'hashkey`
@@ -22,7 +30,7 @@ def _check_file(argname, val, hashkey):
                          (name, size, mtime, uname) of all the tarball members
        :return: the val if the validation passes."""
     if not hasattr(val, 'file') or not isinstance(val.file, file):
-        raise InvalidParameter("Incorrect '%s' parameter" % argname)
+        raise InvalidParameter("Incorrect inputfile parameter")
     digest = None
     try:
         tar = tarfile.open(fileobj=val.file, mode='r')
@@ -31,8 +39,8 @@ def _check_file(argname, val, hashkey):
         digest = hasher.hexdigest()
     except tarfile.ReadError:
         raise InvalidParameter('File is not a .tgz file.')
-    if not digest or not hashkey == digest:
-        raise ChecksumFailed("Checksum '%s' - '%s' do not match" % (digest, hashkey))
+    if not digest or hashkey != digest:
+        raise ChecksumFailed("Checksums do not match")
     return val
 
 class ChecksumFailed(RESTError):

@@ -5,7 +5,7 @@ from WMCore.REST.Error import RESTError, InvalidParameter, NoSuchInstance
 from WMCore.REST.Format import RawFormat, JSONFormat, XMLFormat
 
 # CRABServer dependecies here
-from UserFileCache.RESTExtension import _check_file, ChecksumFailed, validate_file
+from UserFileCache.RESTExtensions import _check_file, ChecksumFailed, validate_file, authz_login_valid
 
 # external dependecies here
 import cherrypy
@@ -16,6 +16,10 @@ import hashlib
 import os
 import shutil
 
+# here go the all regex to be used for validation
+RX_HASH = re.compile(r'^[a-f0-9]{64}$')
+# input file name may correspond to workflowname + _publish.tgz
+RX_FILENAME = re.compile(r'^[a-zA-Z0-9\.\-_]{1,80}_publish\.tgz$')
 
 class RESTFile(RESTEntity):
     """The RESTEntity for uploaded and downloaded files"""
@@ -26,16 +30,18 @@ class RESTFile(RESTEntity):
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
+        authz_login_valid()
+
         if method in ['PUT']:
-            validate_str("hashkey", param, safe, re.compile('^[a-f0-9]{64}$'), optional=False)
+            validate_str("hashkey", param, safe, RX_HASH, optional=False)
             validate_file("inputfile", param, safe, 'hashkey',  optional=False)
-            # input file name may correspond to workflowname + _publish.tgz
-            validate_str("inputfilename", param, safe, re.compile('^[a-zA-Z0-9\.\-_]{1,80}_publish\.tgz$'), optional=True)
+            validate_str("inputfilename", param, safe, RX_FILENAME, optional=True)
         if method in ['GET']:
-            validate_str("hashkey", param, safe, re.compile('^[a-f0-9]{64}$'), optional=True)
-            # input file name may correspond to workflowname + _publish.tgz
-            validate_str("inputfilename", param, safe, re.compile('^[a-zA-Z0-9\.\-_]{1,80}_publish\.tgz$'), optional=True)
+            validate_str("hashkey", param, safe, RX_HASH, optional=True)
+            validate_str("inputfilename", param, safe, RX_FILENAME, optional=True)
             validate_num("nodownload", param, safe, optional=True)
+            if not safe.kwargs['hashkey'] and not safe.kwargs['inputfilename']:
+                raise InvalidParameter("Missing input parameter")
 
     @restcall
     def put(self, inputfile, hashkey, inputfilename):
@@ -74,11 +80,11 @@ class RESTFile(RESTEntity):
             shutil.copyfileobj(inputfile.file, handlefile)
             handlefile.close()
             result['size'] = os.path.getsize(outfilename)
-        yield result
+        return [result]
 
     @restcall(formats = [ ('application/json', JSONFormat()),
                           ('application/xml', XMLFormat('UFCAPIs')),
-                          ('application/x-download', RawFormat())
+                          ('application/octet-stream', RawFormat())
                         ])
     def get(self, hashkey, inputfilename, nodownload):
         """Retrieve a file previously uploaded to the local filesystem.
@@ -95,8 +101,6 @@ class RESTFile(RESTEntity):
            :arg int nodownload: flag used to get just summary informtion
            :return: hashkey, name, size of the requested file or the raw file if
                     `nodownload` is False."""
-        if not hashkey and not inputfilename:
-            raise InvalidParameter("Missing input parameter")
         result = {}
         filename = None
         if hashkey:
@@ -115,7 +119,7 @@ class RESTFile(RESTEntity):
             raise NoSuchInstance("Not found")
         self.__touch(filename)
         if not nodownload:
-            return serve_file(filename, "application/x-download", "attachment")
+            return serve_file(filename, "application/octet-stream", "attachment")
         result['exists'] = True
         result['size'] = os.path.getsize(filename)
         return [result]
