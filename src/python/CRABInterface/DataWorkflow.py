@@ -9,7 +9,6 @@ import WMCore.RequestManager.RequestMaker.Processing.AnalysisRequest #for regist
 from WMCore.Database.CMSCouch import CouchServer, CouchError, Database, CouchNotFoundError
 from WMCore.RequestManager.RequestMaker.Registry import retrieveRequestMaker
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
-from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import removePasswordFromUrl
 from WMCore.RequestManager.RequestMaker import CheckIn
 from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
@@ -248,7 +247,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         self.user.addNewUser(userdn, userhn)
         requestname = '%s_%s_%s' % (userhn, workflow, time.strftime('%y%m%d_%H%M%S', time.gmtime()))
 
-        schemaWf = { "CouchUrl": removePasswordFromUrl(self.configcacheurl),
+        schemaWf = { "CouchUrl": self.configcacheurl,
                      "CouchDBName": self.configcachename,
                      "AnalysisConfigCacheDoc": configdoc,
                      "RequestName": requestname,
@@ -281,7 +280,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             raise InvalidParameter("Remote output data site not valid", errobj = excasync)
 
         #TODO where's the ACDC?
-        #requestSchema["ACDCUrl"] =  removePasswordFromUrl(self.ACDCCouchURL)
+        #requestSchema["ACDCUrl"] =  self.ACDCCouchURL
         #requestSchema["ACDCDBName"] =  self.ACDCCouchDB
         #TODO is it needed?
         #requestSchema['OriginalRequestName'] = requestSchema['RequestName']

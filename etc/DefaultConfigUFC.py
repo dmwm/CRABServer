@@ -12,7 +12,7 @@ main.authz_defaults = { 'role': None, 'group': None, 'site': None }
 main.section_('tools').section_('cms_auth').key_file = '/data/auth/wmcore/header-auth-key'
 
 app = conf.section_('crabcache')
-app.admin = 'opsmail@cern.ch'
+app.admin = 'cms.analysis.ops@cern.ch'
 app.description = 'CRABCache RESTFull API'
 app.title = 'CRABCacheAPIs'
 
