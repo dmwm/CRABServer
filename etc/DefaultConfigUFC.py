@@ -18,6 +18,6 @@ app.title = 'CRABCacheAPIs'
 
 views = conf.section_('views')
 
-data = views.section_('data')
+data = views.section_('ui')
 data.object = 'UserFileCache.RESTBaseAPI.RESTBaseAPI'
 data.cachedir = '/tmp'
