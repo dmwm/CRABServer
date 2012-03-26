@@ -47,10 +47,10 @@ class DataUser(object):
         userId = idDAO.execute(userHN)
         assocDAO = factory(classname = "Requestor.GetAssociation")
         assoc = assocDAO.execute(userId)
-        if assoc:
-            logger.debug("Adding user %s to group %s" % group)
+        if not assoc:
+            logger.debug("Adding user %s to group %s" % (userHN, group))
             GroupManagement.addUserToGroup(userHN, group)
 
         if not ProdManagement.getTeamID(team):
-            logger.info("Registering team %s" % (userHN,team))
+            logger.info("Registering team %s" % team)
             ProdManagement.addTeam(team)

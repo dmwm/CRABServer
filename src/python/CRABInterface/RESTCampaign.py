@@ -34,8 +34,7 @@ class RESTCampaign(RESTEntity):
         elif method in ['GET']:
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=True)
             validate_num('age', param, safe, optional=True)
-            cherrypy.log("ERRORE? : " + str(param))
-            if not "campaign" in param.kwargs and not "age" in param.kwargs:
+            if not safe.kwargs['campaign'] and not safe.kwargs['age']:
                 raise InvalidParameter("Invalid input parameters")
 
         elif method in ['DELETE']:
