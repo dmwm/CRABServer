@@ -1,15 +1,16 @@
 from cherrypy.test import test, webtest, helper
 from cherrypy import expose, response, config as cpconfig
 import os, tempfile, tarfile, hashlib, shutil
+import mimetypes
 
 from WMCore.REST.Test import setup_test_server, fake_authz_headers
 import WMCore.REST.Test as RT
-from WMCore.Services.Requests import uploadFile, downloadFile
 
 from UserFileCache import RESTBaseAPI
 
 UFC_CACHE=os.path.join(os.getcwd(), 'test_cache')
 #UFC_CACHE=tempfile.mkdtemp(prefix='testufc', dir=os.getcwd())
+
 
 class RESTBaseAPI_t(RESTBaseAPI.RESTBaseAPI):
     """The UserFileCache REST API unit test modules"""
@@ -40,7 +41,8 @@ class Tester(helper.CPWebCase):
         os.remove(self.json.name)
 
     def _fake_upload_isb(self, name = 'test.tgz'):
-        os.mkdir( os.path.join(UFC_CACHE, self.checksum[0:2]) )
+        if not os.path.isdir( os.path.join(UFC_CACHE, self.checksum[0:2]) ):
+            os.mkdir( os.path.join(UFC_CACHE, self.checksum[0:2]) )
         shutil.copyfile(name, os.path.join(UFC_CACHE, self.checksum[0:2], self.checksum))
         return self.tgz, self.checksum
 
@@ -70,10 +72,21 @@ class Tester(helper.CPWebCase):
         self.assertHeader("X-Error-Http", "400")
         self.assertHeader("X-Error-Detail", "Invalid input parameter")
         # real upload request
-        body2 = 'hashkey='+self.checksum+'&inputfile='+open(self.tgz.name,'rb').read() #TODO change how we pass the input file
-        h2 = h + [('Content-Length', len(body2))]
-        self.getPage(page, headers=h, method="PUT", body=body2)
-        # TODO this is not working given how we pass the input file now
+        # TODO this is not working because it gets 'File is not a .tgz file.'
+        b2 = """--x
+Content-Disposition: form-data; name="inputfile"; filename="%s"
+Content-Type: application/x-tar
+
+%s
+--x
+Content-Disposition: form-data; name="hashkey"
+
+%s
+--x--
+""" % (self.tgz.name, open(self.tgz.name,'rb').read(), self.checksum)
+        h2 = [("Content-type", "multipart/form-data; boundary=x"),
+             ("Content-Length", len(b2))]
+        self.getPage(page, headers=h+h2, method="PUT", body=b2)
         #self.assertStatus("200 OK")
 
     def test_download_tgz(self, fmt='application/octet-stream', page="/test/file", inbody = None):
@@ -121,10 +134,25 @@ class Tester(helper.CPWebCase):
         self.assertHeader("X-Error-Http", "400")
         self.assertHeader("X-Error-Detail", "Invalid input parameter")
         # real upload request
-        # TODO this is not working given how we pass the input file now
-        #body2 = 'hashkey='+self.jsonchecksum+'&inputfilename='+self.json.name+'&inputfile='+open(self.json.name,'rb').read()
-        #h2 = h + [('Content-Length', len(body2))]
-        #self.getPage(page, headers=h, method="PUT", body=body2)
+        # TODO this is not working because it gets 'File is not a .tgz file.'
+        b2 = """--x
+Content-Disposition: form-data; name="inputfile"; filename="%s"
+Content-Type: application/x-tar
+
+%s
+--x
+Content-Disposition: form-data; name="hashkey"
+
+%s
+--x
+Content-Disposition: form-data; name="inputfilename"
+
+%s
+--x--
+""" % (self.json.name, open(self.json.name,'rb').read(), self.jsonchecksum, self.json.name)
+        h2 = [("Content-type", "multipart/form-data; boundary=x"),
+             ("Content-Length", len(b2))]
+        self.getPage(page, headers=h+h2, method="PUT", body=b2)
         #self.assertStatus("200 OK")
 
     def test_download_json(self, fmt='application/octet-stream', page="/test/file", inbody = None):
@@ -164,8 +192,7 @@ class Tester(helper.CPWebCase):
         self.getPage(page + body1, headers=h, method="GET", body=inbody)
         self.assertStatus("200 OK")
         self.assertHeader("Content-Type", fmt)
-        # Following asertion fails
-        #self.assertInBody(checksum)
+        self.assertInBody(checksum)
 
 
 def setup_server():
@@ -174,6 +201,8 @@ def setup_server():
 
 if __name__ == '__main__':
     setup_server()
-    helper.testmain()
-    # cleaning cache when tests are over
-    shutil.rmtree(UFC_CACHE)
+    try:
+        helper.testmain()
+    finally:
+        # cleaning cache when tests are over
+        shutil.rmtree(UFC_CACHE)
