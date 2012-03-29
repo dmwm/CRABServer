@@ -10,7 +10,7 @@ from WMCore.REST.Error import RESTError, InvalidParameter
 # external dependecies here
 import tarfile
 import hashlib
-
+import cStringIO
 import cherrypy
 
 ###### authz_login_valid is currently duplicatint CRABInterface.RESTExtension . A better solution
@@ -29,7 +29,9 @@ def _check_file(argname, val, hashkey):
        :arg str hashkey: the sha256 hexdigest of the file, calculated over the tuple
                          (name, size, mtime, uname) of all the tarball members
        :return: the val if the validation passes."""
-    if not hasattr(val, 'file') or not isinstance(val.file, file):
+    # checking that is a valid file or an input string
+    # note: the input string is generated on client side just when the input file is empty
+    if not hasattr(val, 'file') or not (isinstance(val.file, file) or type(cStringIO.StringIO())):
         raise InvalidParameter("Incorrect inputfile parameter")
     digest = None
     try:
