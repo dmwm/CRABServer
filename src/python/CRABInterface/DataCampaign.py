@@ -114,7 +114,7 @@ class DataCampaign(object):
         #Get all the 'reqmgr_request' documents related to the campaign (one for each wf)
         options = {"startkey": [campaign,0], "endkey": [campaign,{}]}
         try:
-            campaignDocs = self.database.loadView("WMStats", "campaign-request", options)
+            campaignDocs = self.database.loadView("WMStats", "requestByCampaignAndDate", options)
         except CouchNotFoundError, ce:
             raise ExecutionError("Impossible to load campaign-request view from WMStats")
         if not campaignDocs['rows']:
@@ -143,11 +143,6 @@ class DataCampaign(object):
             raise MissingObject("Cannot find any workflow in the campaign")
 
         jobsPerState, detailsPerState = self._aggregateCampaign([doc['status'] for doc in wfDocs if doc.get('status', None)])
-        #From the first 'agent' document retrieve the total number of jobs
-        if 'status' in wfDocs[0] and 'inWMBS' in wfDocs[0]['status']:
-            jobsPerState['total'] = wfDocs[0]['status']['inWMBS']
-        else:
-            jobsPerState['total'] = 0
 
         detailsPerSite = {}
         #iterate on all the workflows and from them get a list with all the sites

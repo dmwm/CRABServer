@@ -60,7 +60,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             doc = self.database.document(id=wf)
         except CouchNotFoundError:
             return {}
-        agentDoc = self.database.loadView("WMStats", "latest-request", options)
+        agentDoc = self.database.loadView("WMStats", "latestRequest", options)
         if agentDoc['rows']:
             agentDoc = self.database.document(id=agentDoc['rows'][0]['value']['id'])
             doc['status'] = agentDoc['status']
