@@ -14,6 +14,7 @@ from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 import WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools as ReqMgrUtilities
 from WMCore.Database.DBFactory import DBFactory
+from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 
 #CRAB dependencies
 from CRABInterface.DataUser import DataUser
@@ -24,7 +25,8 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
     splitMap = {'LumiBased' : 'lumis_per_job', 'EventBased' : 'events_per_job', 'FileBased' : 'files_per_job'}
 
     @staticmethod
-    def globalinit(monurl, monname, reqmgrurl, reqmgrname, configcacheurl, configcachename, connectUrl,
+    def globalinit(monurl, monname, asomonurl, asomonname, reqmgrurl, reqmgrname,
+                   configcacheurl, configcachename, connectUrl, phedexargs=None,
                    sitewildcards={'T1*': 'T1_*', 'T2*': 'T2_*', 'T3*': 'T3_*'}):
         DataWorkflow.couchdb = CouchServer(monurl)
         DataWorkflow.database = DataWorkflow.couchdb.connectDatabase(monname)
@@ -35,8 +37,13 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         DataWorkflow.configcacheurl = configcacheurl
         DataWorkflow.configcachename = configcachename
 
+        DataWorkflow.asocouchdb = CouchServer(asomonurl)
+        DataWorkflow.asodatabase = DataWorkflow.couchdb.connectDatabase(asomonname)
+
         DataWorkflow.connectUrl = connectUrl
         DataWorkflow.sitewildcards = sitewildcards
+
+        DataWorkflow.phedex = PhEDEx(responseType='xml', dict=phedexargs)
 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
@@ -155,20 +162,74 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         raise NotImplementedError
         return [{}]
 
-    def output(self, workflow, howmany):
+    def output(self, workflows, howmany):
         """Returns the workflow output PFN. It takes care of the LFN - PFN conversion too.
 
-           :arg str workflow: a workflow name
+           :arg str list workflow: a workflow name
            :arg int howmany: the limit on the number of PFN to return
-           :return: (a generator of?) a list of output pfns"""
+           :return: a generator of list of output pfns"""
 
-        # example:
-        # return self.database.loadView('WMStats', 'getoutput',
-        #                              options = { "startkey": workflow,
-        #                                          "endkey": workflow,
-        #                                          "limit": howmany,})
-        raise NotImplementedError
-        return [{}]
+        options = {"reduce": False}
+        # default 1
+        # no limits if -1
+        howmany = howmany if howmany else 1
+        if howmany > 0:
+            options["limit"] = howmany
+
+        # retrieving from async stage out
+        result = []
+        for wf in workflows:
+            # retrieves from async stage out
+            options["startkey"] = [wf]
+            options["endkey"] = [wf, {}]
+            result += self.asodatabase.loadView("UserMonitoring", "FilesByWorkflow", options)['rows']
+            # check if we have got enough and how many missing
+            if 'limit' in options:
+                if len(result) >= howmany:
+                    break
+                elif len(result) + options['limit'] > howmany:
+                    options['limit'] = howmany - len(result)
+
+        jobids = [singlefile['value']['jobid'] for singlefile in result]
+
+        # retrieve from request monitoring couchdb?
+        if 'limit' in options and len(result) < howmany:
+            # retrieve from jobsummary
+            options = {"reduce": False}
+            for wf in workflows:
+                options["startkey"] = [wf, 'output']
+                options["endkey"] = [wf, 'output', {}]
+                tempresult = self.database.loadView("WMStats", "filesByWorkflow", options)['rows']
+                # merge the aso mon result and req mon result avoiding duplicated outputs
+                tempresult = [t for t in tempresult if not t['value']['jobid'] in jobids]
+                if len(tempresult) + len(result) > howmany:
+                    result += tempresult[: howmany-len(result)]
+                else:
+                    result += tempresult
+            """
+            # this version doesn't work as expected, but is an example on avoiding full view load in rest memory
+            if howmany:
+                options["limit"] = howmany - len(result)
+            for wf in workflows:
+                options["startkey"] = [wf, 'output']
+                options["endkey"] = [wf, 'output', {}]
+                result += self.database.loadView("WMStats", "filesByWorkflow", options)['rows']
+                # check if we have got enough and how many missing
+                if 'limit' in options:
+                    if len(result) >= howmany:
+                        break
+                    elif len(result) + options['limit'] > howmany:
+                        options['limit'] = howmany - len(result)
+            """
+        for singlefile in result:
+            singlefile['value']['workflow'] = singlefile['key'][0]
+            singlefile['value']['pfn'] = self.phedex.getPFN(singlefile['value']['location'],
+                                                            singlefile['value']['lfn'])[(singlefile['value']['location'],
+                                                                                         singlefile['value']['lfn'])]
+            del singlefile['value']['jobid']
+            del singlefile['value']['location']
+            del singlefile['value']['lfn']
+            yield singlefile['value']
 
     def schema(self, workflow):
         """Returns the workflow schema parameters.

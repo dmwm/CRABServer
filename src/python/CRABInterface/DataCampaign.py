@@ -166,3 +166,23 @@ class DataCampaign(object):
 
         raise NotImplementedError
         return []
+
+    def output(self, campaign, limit):
+        """Returns the campaign output PFN. It takes care of the LFN - PFN conversion too.
+
+           :arg str campaign: a campaign name
+           :arg int limit: the limit on the number of PFN to return
+           :return: an object with the list of output pfns"""
+        workflows = self.getCampaignWorkflows(campaign)
+        result = self.workflow.output(workflows, limit)
+        return result
+
+    def log(self, campaign, limit):
+        """Returns the campaign log archive PFN. It takes care of the LFN - PFN conversion too.
+
+           :arg str campaign: a campaign name
+           :arg int limit: the limit on the number of PFN to return
+           :return: an object with the list of log pfns"""
+        workflows = self.getCampaignWorkflows(campaign)
+        result = self.workflow.log(workflows, limit)
+        return result

@@ -22,8 +22,9 @@ class RESTBaseAPI(RESTApi):
         RESTApi.__init__(self, app, config, mount)
 
         #Global initialization of Data objects. Parameters coming from the config should go here
-        DataWorkflow.globalinit(config.monurl, config.monname, config.reqmgrurl, config.reqmgrname,
-                                config.configcacheurl, config.configcachename, config.connectUrl)
+        DataWorkflow.globalinit(config.monurl, config.monname, config.asomonurl, config.asomonname,
+                                config.reqmgrurl, config.reqmgrname, config.configcacheurl,
+                                config.configcachename, config.connectUrl, {'endpoint': config.phedexurl})
         DataCampaign.globalinit(config.monurl, config.monname)
 
         self._add( {'workflow': RESTWorkflow(app, self, config, mount),

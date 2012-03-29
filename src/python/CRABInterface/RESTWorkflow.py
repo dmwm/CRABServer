@@ -1,5 +1,5 @@
 # WMCore dependecies here
-from WMCore.REST.Error import ExecutionError
+from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.REST.Server import RESTEntity, restcall, rows
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
 
@@ -61,6 +61,8 @@ class RESTWorkflow(RESTEntity):
             validate_num('limit', param, safe, optional=True)
             #used by errors
             validate_num('shortformat', param, safe, optional=True)
+            if not safe.kwargs['workflow'] and safe.kwargs['subresource']:
+                raise InvalidParameter("Invalid input parameters")
 
         elif method in ['DELETE']:
             validate_strlist("workflow", param, safe, RX_WORKFLOW)

@@ -6,7 +6,7 @@ from WMCore.REST.Validation import validate_str, validate_strlist, validate_num,
 # CRABServer dependecies here
 from CRABInterface.DataCampaign import DataCampaign
 from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
-from CRABInterface.Regexps import RX_CAMPAIGN, RX_WORKFLOW
+from CRABInterface.Regexps import RX_CAMPAIGN, RX_WORKFLOW, RX_SUBRESTAT
 
 # external dependecies here
 import cherrypy
@@ -34,7 +34,11 @@ class RESTCampaign(RESTEntity):
         elif method in ['GET']:
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=True)
             validate_num('age', param, safe, optional=True)
+            validate_str('subresource', param, safe, RX_SUBRESTAT, optional=True)
+            validate_num('limit', param, safe, optional=True)
             if not safe.kwargs['campaign'] and not safe.kwargs['age']:
+                raise InvalidParameter("Invalid input parameters")
+            if not safe.kwargs['campaign'] and safe.kwargs['subresource']:
                 raise InvalidParameter("Invalid input parameters")
 
         elif method in ['DELETE']:
@@ -73,18 +77,27 @@ class RESTCampaign(RESTEntity):
             raise NotImplementedError
 
     @restcall
-    def get(self, campaign, age):
+    def get(self, campaign, age, subresource, limit):
         """Retrieves the campaigns information, like a status summary, in case the campaign unique name is specified.
            Otherwise returns all campaigns since (now - age) for which the user is the owner.
            The caller needs to be a CMS user owner of the campaign.
 
-           :arg str list campaign: list of unique name identifiers of campaigns;
+           :arg str campaign: list of unique name identifiers of campaigns;
            :arg int age: max campaigns age in days;
-           :retrun: the list of campaigns with the relative status summary"""
+           :arg str subresource: the campaign sub-resource to retrieve
+           :arg int limit: limit of sub-resource elements to retrieve
+           :retrun: the list of campaigns with the relative status summary or (the list of) sub-resource(s)"""
 
         result = []
         if campaign:
-            result = self.campaignmgr.campaignSummary(campaign)
+            if not subresource:
+                result = self.campaignmgr.campaignSummary(campaign)
+            elif subresource == 'logs':
+                result = self.campaignmgr.logs(campaign, limit)
+            elif subresource == 'data':
+                result = self.campaignmgr.output(campaign, limit)
+            else:
+                raise NotImplementedError
         elif age:
             # retrieve the information about latest campaigns for that user
             # age can have a default: 1 week ?

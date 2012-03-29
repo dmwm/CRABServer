@@ -12,6 +12,7 @@ COUCH_URL = os.getenv("COUCHURL")
 REQMGR_DB = 'test_reqmgrdb'
 MON_DB = 'test_wmstat'
 CC_DB = 'test_configcache'
+MONASO_DB = 'test_asomon'
 
 SUBMIT_BODY = "workflow=pippo&jobtype=Cmssw&jobsw=CMSSW_4_2_5&jobarch=slc5_amd64_gcc434&splitalgo=FileBased&algoargs=args&userisburl=https://cfg&savelogsflag=0&publishname=ciao&asyncdest=T2_IT_Bari&inputdata=/RelValProdTTbar/JobRobot-MC_3XY_V24_JobRobot-v1/GEN-SIM-DIGI-RECO&configfile=itslocatedhere"
 
@@ -22,10 +23,13 @@ class RESTBaseAPI_t(RESTBaseAPI.RESTBaseAPI):
         #print config
         config.monurl = COUCH_URL
         config.monname = MON_DB
+        config.asomonurl = COUCH_URL
+        config.asomonname = MONASO_DB
         config.configcacheurl = COUCH_URL
         config.configcachename = CC_DB
         config.reqmgrurl = COUCH_URL
         config.reqmgrname = REQMGR_DB
+        config.phedexurl = 'https://some.url.notvalid.cern.ch/phedex/'
         connectUrl='oracle://u:p@oradb'
         #config.CoreDatabase.connectUrl = connectUrl
         config.connectUrl = connectUrl
@@ -65,8 +69,48 @@ class Tester(helper.CPWebCase):
         self.assertHeader("X-Error-Detail", "Invalid input parameter")
         # failing with 400 given the missing input args
         self.getPage(page + "?campaign=pippo", headers=h, method="GET", body=inbody)
-        self.assertStatus("500 Internal Server Error")
-        self.assertHeader("X-Error-Http", "500")
+        self.assertStatus("400 Bad Request")
+        self.assertHeader("X-Error-Http", "400")
+
+
+    def test_workflow_output(self, fmt = 'application/json', page = "/test/workflow", inbody=None):
+        h = fake_authz_headers(RT.test_authz_key.data) + [("Accept", fmt)]
+        # no workflow specified
+        self.getPage(page + '?subresource=data', headers=h, method="GET", body=inbody)
+        self.assertStatus("400 Bad Request")
+        self.assertHeader("X-Error-Http", "400")
+        self.assertHeader("X-Error-Detail", "Invalid input parameter")
+        # server will try to return if something is in couch, nothing in this case
+        self.getPage(page + '?workflow=pippo&subresource=data', headers=h, method="GET", body=inbody)
+        self.assertStatus("200 OK")
+        self.assertInBody("result")
+        # as before, but not using default limit
+        self.getPage(page + '?workflow=pippo&subresource=data&limit=10', headers=h, method="GET", body=inbody)
+        self.assertStatus("200 OK")
+        self.assertInBody("result")
+        # as before, but limit is unlimited with -1
+        self.getPage(page + '?workflow=pippo&subresource=data&limit=-1', headers=h, method="GET", body=inbody)
+        self.assertStatus("200 OK")
+        self.assertInBody("result")
+
+
+    def test_campaign_output(self, fmt = 'application/json', page = "/test/campaign", inbody=None):
+        h = fake_authz_headers(RT.test_authz_key.data) + [("Accept", fmt)]
+        # no workflow specified
+        self.getPage(page + '?subresource=data', headers=h, method="GET", body=inbody)
+        self.assertStatus("400 Bad Request")
+        self.assertHeader("X-Error-Http", "400")
+        self.assertHeader("X-Error-Detail", "Invalid input parameter")
+        # server will try to return if something is in couch, nothing in this case
+        self.getPage(page + '?campaign=pippo&subresource=data', headers=h, method="GET", body=inbody)
+        self.assertStatus("400 Bad Request")
+        self.assertHeader("X-Error-Http", "400")
+        self.assertHeader("X-Error-Detail", "Required object is missing")
+        # as before but limit specified
+        self.getPage(page + '?campaign=pippo&subresource=data&limit=-1', headers=h, method="GET", body=inbody)
+        self.assertStatus("400 Bad Request")
+        self.assertHeader("X-Error-Http", "400")
+        self.assertHeader("X-Error-Detail", "Required object is missing")
 
 def setup_server():
     srcfile = RESTBaseAPI_t.__name__

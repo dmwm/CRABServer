@@ -24,10 +24,13 @@ data.object = 'CRABInterface.RESTBaseAPI.RESTBaseAPI'
 
 data.monurl = 'http://localhost:5984'
 data.monname = 'wmstats'
+data.asomonurl = 'http://localhost:5984'
+data.asomonname = 'user_monitoring_asynctransfer'
 data.configcacheurl = 'http://localhost:5984'
 data.configcachename = 'wmagent_configcache'
 data.reqmgrurl = 'http://localhost:5984'
 data.reqmgrname = 'reqmgrdb'
+data.phedexurl = 'https://cmsweb.cern.ch/phedex/datasvc/xml/prod/'
 
 data.connectUrl = connectUrl
 #data.loggingLevel = 10
