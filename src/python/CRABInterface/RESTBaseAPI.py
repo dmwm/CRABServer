@@ -32,9 +32,9 @@ class RESTBaseAPI(RESTApi):
 
         self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None) ) #None can be cahnged to logging.INFO if we realize we can log to a file in the cmsWeb env
 
-    def _initLogger(self, logfile, logginglevel):
+    def _initLogger(self, logfile, loglevel):
         """
-        Setup the logger for all the CRAB API's. If loggingLevel is not specified (==None) we use the NullHandler which just 'pass' and does not log
+        Setup the logger for all the CRAB API's. If loglevel is not specified (==None) we use the NullHandler which just 'pass' and does not log
 
         RESTEntities and other parts of the code can retrieve it by calling: logging.getLogger('CRABLogger.ChildName')
         ChildName is the specific name of the logger (child of CRABLogger). Using childs in that way we can configure
@@ -42,11 +42,11 @@ class RESTBaseAPI(RESTApi):
         """
 
         logger = logging.getLogger('CRABLogger')
-        if logginglevel:
+        if loglevel:
             hdlr = logging.FileHandler(logfile)
             formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
             hdlr.setFormatter(formatter)
             logger.addHandler(hdlr)
-            logger.setLevel(loggingLevel)
+            logger.setLevel(loglevel)
         else:
             logger.addHandler( NullHandler() )
