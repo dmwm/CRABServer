@@ -338,7 +338,9 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
 
         if not asyncdest in self.allCMSNames:
             excasync = ValueError("The parameter asyncdest %s is not in the list of known CMS sites %s" % (asyncdest, self.allCMSNames))
-            raise InvalidParameter("Remote output data site not valid", errobj = excasync)
+            invalidp = InvalidParameter("Remote output data site not valid", errobj = excasync)
+            setattr(invalidp, 'trace', '')
+            raise invalidp
 
         #TODO where's the ACDC?
         #requestSchema["ACDCUrl"] =  self.ACDCCouchURL
