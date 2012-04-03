@@ -15,6 +15,7 @@ from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 import WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools as ReqMgrUtilities
 from WMCore.Database.DBFactory import DBFactory
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
+from WMCore.Services.WMStats.WMStatsWriter import WMStatsWriter
 
 #CRAB dependencies
 from CRABInterface.DataUser import DataUser
@@ -30,6 +31,8 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
                    sitewildcards={'T1*': 'T1_*', 'T2*': 'T2_*', 'T3*': 'T3_*'}):
         DataWorkflow.couchdb = CouchServer(monurl)
         DataWorkflow.database = DataWorkflow.couchdb.connectDatabase(monname)
+        DataWorkflow.wmstatsurl = monurl + '/' + monname
+        DataWorkflow.wmstats = WMStatsWriter(DataWorkflow.wmstatsurl)
 
         #WMBSHelper need the reqmgr couchurl and database name
         DataWorkflow.reqmgrurl = reqmgrurl
@@ -265,9 +268,9 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         # Auto Assign the requests
         ### what is the meaning of the Team in the Analysis use case?
         try:
-            CheckIn.checkIn(request)
-            ChangeState.changeRequestStatus(request['RequestName'], 'assignment-approved')
-            ChangeState.assignRequest(request['RequestName'], request["Team"])
+            CheckIn.checkIn(request, self.wmstats)
+            ChangeState.changeRequestStatus(request['RequestName'], 'assignment-approved', wmstatUrl=self.wmstatsurl)
+            ChangeState.assignRequest(request['RequestName'], request["Team"], wmstatUrl=self.wmstatsurl)
         #Raised during the check in
         except CheckIn.RequestCheckInError, re:
             self.logger.exception(re)
