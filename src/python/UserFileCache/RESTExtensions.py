@@ -12,6 +12,12 @@ import tarfile
 import hashlib
 import cStringIO
 import cherrypy
+from os import fstat
+
+# 100MB is the maximum allowed size of a single file
+FILE_SIZE_LIMIT = 104857600
+# 0.5MB is the maximum limit for file completely loaded into memory
+FILE_MEMORY_LIMIT = 512*1024
 
 ###### authz_login_valid is currently duplicatint CRABInterface.RESTExtension . A better solution
 ###### should be found for authz_*
@@ -31,8 +37,19 @@ def _check_file(argname, val, hashkey):
        :return: the val if the validation passes."""
     # checking that is a valid file or an input string
     # note: the input string is generated on client side just when the input file is empty
-    if not hasattr(val, 'file') or not (isinstance(val.file, file) or type(cStringIO.StringIO())):
+    if not hasattr(val, 'file') or not (isinstance(val.file, file) or type(val.file) == type(cStringIO.StringIO())):
         raise InvalidParameter("Incorrect inputfile parameter")
+    elif isinstance(val.file, file):
+        if fstat(val.file.fileno()).st_size > FILE_SIZE_LIMIT:
+            raise InvalidParameter('File is bigger then allowed limit of %d' % FILE_SIZE_LIMIT)
+    elif type(val.file) == type(cStringIO.StringIO()):
+        # in this case file content is in memory instead of a file object handle
+        val.file.seek(0,2)
+        insize = val.file.tell()
+        val.file.seek(0)
+        if insize > FILE_MEMORY_LIMIT:
+            raise InvalidParameter('File too large to be completely loaded into memory.')
+
     digest = None
     try:
         tar = tarfile.open(fileobj=val.file, mode='r')
