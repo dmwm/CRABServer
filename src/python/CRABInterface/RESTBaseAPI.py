@@ -2,6 +2,7 @@ import logging
 
 # WMCore dependecies here
 from WMCore.REST.Server import RESTApi
+from WMCore.REST.Format import JSONFormat
 
 # CRABServer dependecies here
 from CRABInterface.RESTWorkflow import RESTWorkflow
@@ -20,6 +21,8 @@ class RESTBaseAPI(RESTApi):
 
     def __init__(self, app, config, mount):
         RESTApi.__init__(self, app, config, mount)
+
+        self.formats = [ ('application/json', JSONFormat()) ]
 
         #Global initialization of Data objects. Parameters coming from the config should go here
         DataWorkflow.globalinit(config.monurl, config.monname, config.asomonurl, config.asomonname,

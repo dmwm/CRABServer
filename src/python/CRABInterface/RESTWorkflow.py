@@ -146,7 +146,7 @@ class RESTWorkflow(RESTEntity):
         if workflow:
             # if have the wf then retrieve the wf status summary
             if not subresource:
-                return self.workflowmgr.status(workflow)
+                result = self.workflowmgr.status(workflow)
             # if have a subresource then it should be one of these
             elif subresource == 'logs':
                 result = self.workflowmgr.logs(workflow, limit)

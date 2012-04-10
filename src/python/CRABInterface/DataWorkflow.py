@@ -403,6 +403,14 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         raise NotImplementedError
         return [{}]
 
+    def status(self, workflows):
+        """Retrieve the states of the workflows
+
+           :arg str list workflows: a list of valid workflow name
+           :return: a generator of workflow states"""
+        for wf in workflows:
+            yield self.getWorkflow(wf)
+
     def kill(self, workflow, force):
         """Request to Abort a workflow.
 

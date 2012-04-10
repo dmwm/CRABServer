@@ -101,7 +101,7 @@ class RESTCampaign(RESTEntity):
         elif age:
             # retrieve the information about latest campaigns for that user
             # age can have a default: 1 week ?
-            result = self.campaignmgr.retrieveRecent(user, age)
+            result = self.campaignmgr.retrieveRecent(cherrypy.request.user['login'], age)
 
         return result
 

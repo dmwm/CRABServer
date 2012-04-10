@@ -6,6 +6,7 @@ and it shouldn't have any other dependencies a part of that and cherrypy.
 Currently authz_owner_match uses a WMCore.Database.CMSCouch method
 but in next versions it should be dropped, as from the CRABInterface.
 """
+from WMCore.REST.Error import MissingObject
 
 import cherrypy
 
@@ -27,14 +28,17 @@ def authz_owner_match(database, workflows, retrieve_docs=True):
         wfdoc = None
         try:
             wfdoc = database.document( id = wf )
-        except:
-            log("ERROR: could not retrieve the requested document %s" % wf)
-            raise cherrypy.HTTPError(404, "The resource requested does not exist")
+        except Exception, ex:
+            excauthz = RuntimeError("The document '%s' is not retrievable '%s'" % (wf, str(ex)))
+            missobj = MissingObject("The resource requested does not exist", errobj = excauthz)
+            setattr(missobj, 'trace', '')
+            raise missobj
+
         if wfdoc and 'Requestor' in wfdoc:
             if wfdoc['Requestor'] == cherrypy.request.user['login']:
                 alldocs.append(wfdoc)
                 continue
-        log("ERROR: authz denied for user %s to resources %s" % (user, str(workflows)))
+        log("ERROR: authz denied for user '%s' to the resource '%s'" % (user, wf))
         raise cherrypy.HTTPError(403, "You are not allowed to access this resource.")
 
     if len(workflows) == len(alldocs):
@@ -43,7 +47,7 @@ def authz_owner_match(database, workflows, retrieve_docs=True):
             return alldocs
         return
 
-    log("ERROR: authz denied for user %s to resources %s" % (user, str(workflows)))
+    log("ERROR: authz denied for user '%s' to resource '%s'" % (user, wf))
     raise cherrypy.HTTPError(403, "You are not allowed to access this resource.")
 
 def authz_login_valid():
