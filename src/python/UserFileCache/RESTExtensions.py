@@ -37,12 +37,12 @@ def _check_file(argname, val, hashkey):
        :return: the val if the validation passes."""
     # checking that is a valid file or an input string
     # note: the input string is generated on client side just when the input file is empty
-    if not hasattr(val, 'file') or not (isinstance(val.file, file) or type(val.file) == type(cStringIO.StringIO())):
+    if not hasattr(val, 'file') or not (isinstance(val.file, file) or isinstance(val.file, cStringIO.StringIO)):
         raise InvalidParameter("Incorrect inputfile parameter")
     elif isinstance(val.file, file):
         if fstat(val.file.fileno()).st_size > FILE_SIZE_LIMIT:
             raise InvalidParameter('File is bigger then allowed limit of %d' % FILE_SIZE_LIMIT)
-    elif type(val.file) == type(cStringIO.StringIO()):
+    elif isinstance(val.file, cStringIO.StringIO):
         # in this case file content is in memory instead of a file object handle
         val.file.seek(0,2)
         insize = val.file.tell()

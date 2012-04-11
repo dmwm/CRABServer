@@ -105,21 +105,14 @@ class RESTFile(RESTEntity):
            :arg str inputfilename: in case its needed to retrieve a file with a specific
                                    name
            :return: the raw file"""
-        result = {}
         filename = None
         infilepath = filepath(self.cachedir)
         if hashkey:
             # defining the path/name from the hash of the file
             filename = os.path.join(infilepath, hashkey[0:2], hashkey)
-            result['hashkey'] = hashkey
         elif inputfilename:
             # composing the path/name from the user name and the input file
             filename = os.path.join(infilepath, inputfilename)
-            tar = tarfile.open(filename, mode='r')
-            lsl = [(x.name, int(x.size), int(x.mtime), x.uname) for x in tar.getmembers()]
-            realhashkey = hashlib.sha256(str(lsl)).hexdigest()
-            result['hashkey'] = realhashkey
-            result['name'] = inputfilename
         if not os.path.isfile(filename):
             raise MissingObject("Not such file")
         touch(filename)
