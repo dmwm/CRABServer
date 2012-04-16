@@ -33,8 +33,8 @@ def authz_owner_match(database, workflows, retrieve_docs=True):
             excauthz = RuntimeError("The document '%s' is not retrievable '%s'" % (wf, str(ex)))
             raise MissingObject("The resource requested does not exist", trace=traceback.format_exc(), errobj = excauthz)
 
-        if wfdoc and 'Requestor' in wfdoc:
-            if wfdoc['Requestor'] == cherrypy.request.user['login']:
+        if wfdoc and 'requestor' in wfdoc:
+            if wfdoc['requestor'] == cherrypy.request.user['login']:
                 alldocs.append(wfdoc)
                 continue
         log("ERROR: authz denied for user '%s' to the resource '%s'" % (user, wf))
