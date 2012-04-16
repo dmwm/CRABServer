@@ -1,5 +1,6 @@
 import logging
 import copy
+import traceback
 
 import WMCore
 from WMCore.REST.Error import *
@@ -23,8 +24,7 @@ def setProcessingVersion(request, reqmgrurl, reqmgrname):
         couchdb = CouchServer(reqmgrurl)
         database = couchdb.connectDatabase(reqmgrname)
     except CouchError, ex:
-        logger.exception(ex)
-        raise ExecutionError("Error connecting to couch database", errobj = ex)
+        raise ExecutionError("Error connecting to couch database", errobj = ex, trace=traceback.format_exc())
 
     startkey = [request['Requestor'], request['PublishDataName'], request['InputDataset']]
     endkey = copy.copy(startkey)

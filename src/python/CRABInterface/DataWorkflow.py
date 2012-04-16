@@ -2,6 +2,7 @@ import time
 import threading
 import logging
 import cherrypy #cherrypy import is needed here because we need the 'start_thread' subscription
+import traceback
 
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
@@ -273,12 +274,10 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             ChangeState.assignRequest(request['RequestName'], request["Team"], wmstatUrl=self.wmstatsurl)
         #Raised during the check in
         except CheckIn.RequestCheckInError, re:
-            self.logger.exception(re)
-            raise ExecutionError("Problem checking in the request", errobj = re)
+            raise ExecutionError("Problem checking in the request", trace=traceback.format_exc(), errobj=re)
         #Raised by the change state
         except RuntimeError, re:
-            self.logger.exception(re)
-            raise ExecutionError("Problem checking in the request", errobj = re)
+            raise ExecutionError("Problem checking in the request", trace=traceback.format_exc(), errobj=re)
 
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
@@ -369,7 +368,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             specificSchema.allCMSNames = self.allCMSNames
             specificSchema.validate()
         except Exception, ex:
-            raise InvalidParameter("Not valid scehma provided", errobj = ex)
+            raise InvalidParameter("Not valid scehma provided", trace=traceback.format_exc(), errobj = ex)
 
         #The client set BlacklistT1 as true if the user has not t1access role.
         if blacklistT1:

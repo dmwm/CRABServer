@@ -9,6 +9,7 @@ but in next versions it should be dropped, as from the CRABInterface.
 from WMCore.REST.Error import MissingObject
 
 import cherrypy
+import traceback
 
 def authz_owner_match(database, workflows, retrieve_docs=True):
     """Match user against authorisation requirements to modify an existing resource.
@@ -30,9 +31,7 @@ def authz_owner_match(database, workflows, retrieve_docs=True):
             wfdoc = database.document( id = wf )
         except Exception, ex:
             excauthz = RuntimeError("The document '%s' is not retrievable '%s'" % (wf, str(ex)))
-            missobj = MissingObject("The resource requested does not exist", errobj = excauthz)
-            setattr(missobj, 'trace', '')
-            raise missobj
+            raise MissingObject("The resource requested does not exist", trace=traceback.format_exc(), errobj = excauthz)
 
         if wfdoc and 'Requestor' in wfdoc:
             if wfdoc['Requestor'] == cherrypy.request.user['login']:
