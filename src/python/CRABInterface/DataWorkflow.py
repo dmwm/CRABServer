@@ -310,7 +310,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         self.user.addNewUser(userdn, userhn)
         requestname = '%s_%s_%s' % (userhn, workflow, time.strftime('%y%m%d_%H%M%S', time.gmtime()))
 
-        schemaWf = { "CouchUrl": self.configcacheurl,
+        schemaWf = { "CouchURL": self.configcacheurl,
                      "CouchDBName": self.configcachename,
                      "AnalysisConfigCacheDoc": configdoc,
                      "RequestName": requestname,
