@@ -177,7 +177,7 @@ class DataCampaign(object):
         result = self.workflow.output(workflows, limit)
         return result
 
-    def log(self, campaign, limit):
+    def logs(self, campaign, limit):
         """Returns the campaign log archive PFN. It takes care of the LFN - PFN conversion too.
 
            :arg str campaign: a campaign name
