@@ -268,7 +268,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         # Auto Assign the requests
         ### what is the meaning of the Team in the Analysis use case?
         try:
-            CheckIn.checkIn(request, self.wmstats)
+            CheckIn.checkIn(request, wmstatSvc=self.wmstats)
             ChangeState.changeRequestStatus(request['RequestName'], 'assignment-approved', wmstatUrl=self.wmstatsurl)
             ChangeState.assignRequest(request['RequestName'], request["Team"], wmstatUrl=self.wmstatsurl)
         #Raised during the check in
