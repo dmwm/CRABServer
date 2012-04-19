@@ -141,6 +141,7 @@ class DataCampaign(object):
         #checking that we have some workflow documents
         if not wfDocs:
             raise MissingObject("Cannot find any workflow in the campaign")
+        self.logger.debug("Workflow documents retrieved: %s" % wfDocs)
 
         jobsPerState, detailsPerState = self._aggregateCampaign([doc['status'] for doc in wfDocs if doc.get('status', None)])
 
@@ -153,6 +154,11 @@ class DataCampaign(object):
 
         #get the status of the campaign: sort by update_time the request_stauts list of the most recent workflow
         campaignStatus = sorted([x for x in wfDocs[-1]["request_status"]], key=lambda y: y['update_time'] )[-1]['status']
+
+        #successful jobs can be in several states. Taking information from async
+        transfers = self.workflow.getWorkflowTransfers(wfDocs[-1]['_id'])
+        if transfers:
+            detailsPerState['success'] = transfers
 
         return [wfDocs[-1]["campaign"], campaignStatus, jobsPerState, detailsPerState, detailsPerSite]
 

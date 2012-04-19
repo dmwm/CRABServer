@@ -70,6 +70,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         try:
             doc = self.database.document(id=wf)
         except CouchNotFoundError:
+            self.logger.error("Cannot find document with id " + str(id))
             return {}
         agentDoc = self.database.loadView("WMStats", "latestRequest", options)
         if agentDoc['rows']:
@@ -79,6 +80,17 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             return doc
         else:
             return doc
+
+    def getWorkflowTransfers(self, wf):
+        """Return the async transfers concerning the workflow"""
+        try:
+            doc = self.asodatabase.document(wf)
+            self.logger.debug("Workflow trasfer: %s" % doc)
+            if doc and 'state' in doc:
+                 return doc['state']
+        except CouchNotFoundError:
+            self.logger.error("Cannot find view StatesByWorkflow")
+        return {"transfer started" : 0}
 
     def _initCache(self, sitewildcards):
         """Building the cache for frequently used information.
@@ -172,6 +184,8 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
            :arg str list workflow: a workflow name
            :arg int howmany: the limit on the number of PFN to return
            :return: a generator of list of output pfns"""
+
+        self.logger.info("Getting the output (%s%%) for workflows %s" % (workflows, howmany))
 
         options = {"reduce": False}
         # default 1
