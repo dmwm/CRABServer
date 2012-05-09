@@ -20,7 +20,8 @@ from WMCore.Services.WMStats.WMStatsWriter import WMStatsWriter
 
 #CRAB dependencies
 from CRABInterface.DataUser import DataUser
-from CRABInterface.Utils import setProcessingVersion
+from CRABInterface.Utils import setProcessingVersion, CouchDBConn, conn_couch
+
 
 class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Uses cplog
     """Entity that allows to operate on workflow resources"""
@@ -30,8 +31,10 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
     def globalinit(monurl, monname, asomonurl, asomonname, reqmgrurl, reqmgrname,
                    configcacheurl, configcachename, connectUrl, phedexargs=None,
                    sitewildcards={'T1*': 'T1_*', 'T2*': 'T2_*', 'T3*': 'T3_*'}):
-        DataWorkflow.couchdb = CouchServer(monurl)
-        DataWorkflow.database = DataWorkflow.couchdb.connectDatabase(monname)
+
+        DataWorkflow.monitordb = CouchDBConn(db=CouchServer(monurl), name=monname, conn=None)
+        DataWorkflow.asodb = CouchDBConn(db=CouchServer(asomonurl), name=asomonname, conn=None)
+
         DataWorkflow.wmstatsurl = monurl + '/' + monname
         DataWorkflow.wmstats = WMStatsWriter(DataWorkflow.wmstatsurl)
 
@@ -40,9 +43,6 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         DataWorkflow.reqmgrname = reqmgrname
         DataWorkflow.configcacheurl = configcacheurl
         DataWorkflow.configcachename = configcachename
-
-        DataWorkflow.asocouchdb = CouchServer(asomonurl)
-        DataWorkflow.asodatabase = DataWorkflow.couchdb.connectDatabase(asomonname)
 
         DataWorkflow.connectUrl = connectUrl
         DataWorkflow.sitewildcards = sitewildcards
@@ -65,26 +65,28 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         myThread = threading.currentThread()
         myThread.dbi = self.dbi
 
+    @conn_couch(databases=['monitor'])
     def getWorkflow(self, wf):
         options = {"startkey": wf, "endkey": wf, 'reduce': True, 'descending': True}
         try:
-            doc = self.database.document(id=wf)
+            doc = self.monitordb.conn.document(id=wf)
         except CouchNotFoundError:
             self.logger.error("Cannot find document with id " + str(id))
             return {}
-        agentDoc = self.database.loadView("WMStats", "latestRequest", options)
+        agentDoc = self.monitordb.conn.loadView("WMStats", "latestRequest", options)
         if agentDoc['rows']:
-            agentDoc = self.database.document(id=agentDoc['rows'][0]['value']['id'])
+            agentDoc = self.monitordb.conn.document(id=agentDoc['rows'][0]['value']['id'])
             doc['status'] = agentDoc['status']
             doc['sites'] = agentDoc['sites']
             return doc
         else:
             return doc
 
+    @conn_couch(databases=['asomonitor'])
     def getWorkflowTransfers(self, wf):
         """Return the async transfers concerning the workflow"""
         try:
-            doc = self.asodatabase.document(wf)
+            doc = self.asodb.conn.document(wf)
             self.logger.debug("Workflow trasfer: %s" % doc)
             if doc and 'state' in doc:
                  return doc['state']
@@ -113,6 +115,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         for wf in wfs:
             yield self.getWorkflow(wf)
 
+    @conn_couch(databases=['monitor'])
     def getLatests(self, user, limit, timestamp):
         """Retrives the latest workflows for the user
 
@@ -127,13 +130,14 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         # this will allow to query as it's described here: http://guide.couchdb.org/draft/views.html#many
 
         # example:
-        # return self.database.loadView('WMStats', 'byUser',
+        # return self.monitordb.conn.loadView('WMStats', 'byUser',
         #                              options = { "startkey": user,
         #                                          "endkey": user,
         #                                          "limit": limit, })
         #raise NotImplementedError
         return [{}]
 
+    @conn_couch(databases=['monitor'])
     def errors(self, workflow, shortformat):
         """Retrieves the sets of errors for a specific workflow
 
@@ -145,10 +149,11 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         for wf in workflow:
             group_level = 3 if shortformat else 5
             options = {"startkey": [wf, "jobfailed"], "endkey": [wf, "jobfailed", {}, {}, {}], "reduce": True,  "group_level": group_level}
-            yield self.database.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
+            yield self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
 
         yield [{}]
 
+    @conn_couch(databases=['monitor'])
     def report(self, workflow):
         """Retrieves the quality of the workflow in term of what has been processed
            (eg: good lumis)
@@ -157,12 +162,13 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
            :return: what?"""
 
         # example:
-        # return self.database.loadView('WMStats', 'getlumis',
+        # return self.monitordb.conn.loadView('WMStats', 'getlumis',
         #                              options = { "startkey": workflow,
         #                                          "endkey": workflow,})
         raise NotImplementedError
         return [{}]
 
+    @conn_couch(databases=['monitor'])
     def logs(self, workflow, howmany):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
 
@@ -171,13 +177,14 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
            :return: (a generator of?) a list of logs pfns"""
 
         # example:
-        # return self.database.loadView('WMStats', 'getlogs',
+        # return self.monitordb.conn.loadView('WMStats', 'getlogs',
         #                              options = { "startkey": workflow,
         #                                          "endkey": workflow,
         #                                          "limit": howmany,})
         raise NotImplementedError
         return [{}]
 
+    @conn_couch(databases=['monitor', 'asomonitor'])
     def output(self, workflows, howmany):
         """Returns the workflow output PFN. It takes care of the LFN - PFN conversion too.
 
@@ -200,7 +207,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             # retrieves from async stage out
             options["startkey"] = [wf]
             options["endkey"] = [wf, {}]
-            result += self.asodatabase.loadView("UserMonitoring", "FilesByWorkflow", options)['rows']
+            result += self.asodb.conn.loadView("UserMonitoring", "FilesByWorkflow", options)['rows']
             # check if we have got enough and how many missing
             if 'limit' in options:
                 if len(result) >= howmany:
@@ -217,7 +224,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             for wf in workflows:
                 options["startkey"] = [wf, 'output']
                 options["endkey"] = [wf, 'output', {}]
-                tempresult = self.database.loadView("WMStats", "filesByWorkflow", options)['rows']
+                tempresult = self.monitordb.conn.loadView("WMStats", "filesByWorkflow", options)['rows']
                 # merge the aso mon result and req mon result avoiding duplicated outputs
                 tempresult = [t for t in tempresult if not t['value']['jobid'] in jobids]
                 if len(tempresult) + len(result) > howmany:
@@ -231,7 +238,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             for wf in workflows:
                 options["startkey"] = [wf, 'output']
                 options["endkey"] = [wf, 'output', {}]
-                result += self.database.loadView("WMStats", "filesByWorkflow", options)['rows']
+                result += self.monitordb.conn.loadView("WMStats", "filesByWorkflow", options)['rows']
                 # check if we have got enough and how many missing
                 if 'limit' in options:
                     if len(result) >= howmany:

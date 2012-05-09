@@ -1,6 +1,7 @@
 import logging
 import copy
 import traceback
+from collections import namedtuple
 
 import WMCore
 from WMCore.REST.Error import *
@@ -9,6 +10,26 @@ from WMCore.Database.CMSCouch import CouchServer, CouchError
 """
 The module contains some utility functions used by the various modules of the CRAB REST interface
 """
+
+CouchDBConn = namedtuple("CouchDBConn", ["db", "name", "conn"])
+
+def conn_couch(databases):
+    """
+    Decorator to be used among REST resources to optimize connections to CouchDB
+
+    arg str list databases: list of string telling which database connections
+                            should be started; currently availables are 
+                            'monitor' and 'asomonitor'.
+    """
+    def wrap(func):
+        def wrapped_func(*args):
+            if 'monitor' in databases and not args[0].monitordb.conn:
+                args[0].monitordb = args[0].monitordb._replace(conn=args[0].monitordb.db.connectDatabase(args[0].monitordb.name, create=False))
+            if 'asomonitor' in databases and not args[0].asodb.conn:
+                args[0].asodb = args[0].asodb._replace(conn=args[0].asodb.db.connectDatabase(args[0].asodb.name, create=False))
+            return func(*args)
+        return wrapped_func
+    return wrap
 
 def setProcessingVersion(request, reqmgrurl, reqmgrname):
     """
@@ -22,7 +43,7 @@ def setProcessingVersion(request, reqmgrurl, reqmgrname):
     try:
         logger.debug("Connecting to database %s using the couch instance at %s: " % (reqmgrname, reqmgrurl))
         couchdb = CouchServer(reqmgrurl)
-        database = couchdb.connectDatabase(reqmgrname)
+        database = couchdb.connectDatabase(reqmgrname, create=False)
     except CouchError, ex:
         raise ExecutionError("Error connecting to couch database", errobj = ex, trace=traceback.format_exc())
 

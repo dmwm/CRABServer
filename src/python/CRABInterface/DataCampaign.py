@@ -6,7 +6,7 @@ from WMCore.REST.Error import ExecutionError, MissingObject
 
 # CRABServer dependencies here
 from CRABInterface.DataWorkflow import DataWorkflow
-
+from CRABInterface.Utils import CouchDBConn, conn_couch
 
 class DataCampaign(object):
     """Entity that allows to operate on campaign resources.
@@ -16,8 +16,7 @@ class DataCampaign(object):
 
     @staticmethod
     def globalinit(monurl, monname):
-        DataCampaign.couchdb = CouchServer(monurl)
-        DataCampaign.database = DataCampaign.couchdb.connectDatabase(monname)
+        DataCampaign.monitordb = CouchDBConn(db=CouchServer(monurl), name=monname, conn=None)
 
     def __init__(self, config):
         self.logger = logging.getLogger('CRABLogger.DataCampaign')
@@ -106,6 +105,7 @@ class DataCampaign(object):
 
         return jobsPerState, detailsPerState
 
+    @conn_couch(databases=['monitor'])
     def getCampaignWorkflows(self, campaign):
         """Retrieve the list of workflow names part of the campaign
 
@@ -114,7 +114,7 @@ class DataCampaign(object):
         #Get all the 'reqmgr_request' documents related to the campaign (one for each wf)
         options = {"startkey": [campaign,0], "endkey": [campaign,{}]}
         try:
-            campaignDocs = self.database.loadView("WMStats", "requestByCampaignAndDate", options)
+            campaignDocs = self.monitordb.conn.loadView("WMStats", "requestByCampaignAndDate", options)
         except CouchNotFoundError, ce:
             raise ExecutionError("Impossible to load campaign-request view from WMStats")
         if not campaignDocs['rows']:
