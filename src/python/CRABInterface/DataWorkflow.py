@@ -91,7 +91,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             if doc and 'state' in doc:
                  return doc['state']
         except CouchNotFoundError:
-            self.logger.error("Cannot find view StatesByWorkflow")
+            self.logger.error("Cannot find ASO documents in couch")
         return {"transfer started" : 0}
 
     def _initCache(self, sitewildcards):
@@ -181,8 +181,32 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         #                              options = { "startkey": workflow,
         #                                          "endkey": workflow,
         #                                          "limit": howmany,})
-        raise NotImplementedError
-        return [{}]
+        howmany = howmany if howmany else 1
+        numJobs = {}
+        res = []
+        self.logger.debug("Retrieving log for %s" % workflow)
+        for wf in workflow:
+            options = {"startkey": [wf, "jobfailed"], "endkey": [wf, "jobfailed", {}, {}, {}], "reduce": False, "include_docs" : True}
+            outview = self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
+            for row in outview:
+                if 'output' in row['doc']:
+                    elem = {}
+                    for output in row['doc']['output']:
+                        if output['type'] == 'logArchive':
+                            self.logger.debug("Found logarchive output: %s" % output)
+                            elem["size"] = output['size']
+                            elem["checksums"] = output['checksums']
+                            elem["pfn"] = self.phedex.getPFN(row['doc']['site'],
+                                                             output['lfn'])[(row['doc']['site'], output['lfn'])]
+                            elem["workflow"] = wf
+                            elem["exitcode"] = row['doc']['exitcode']
+                #update the numjobs
+                numJobs[row['doc']['exitcode']] = 1 if not row['doc']['exitcode'] in numJobs else numJobs[row['doc']['exitcode']] + 1
+                if numJobs[row['doc']['exitcode']] <= howmany:
+                    if elem:
+                        yield elem
+                    else:
+                        yield {'exitcode' : row['doc']['exitcode'], 'error' : "The job does not have outputs"}
 
     @conn_couch(databases=['monitor', 'asomonitor'])
     def output(self, workflows, howmany):
@@ -216,6 +240,8 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
                     options['limit'] = howmany - len(result)
 
         jobids = [singlefile['value']['jobid'] for singlefile in result]
+
+        self.logger.info("Getting the following from ASO database: " + str(jobids))
 
         # retrieve from request monitoring couchdb?
         if 'limit' in options and len(result) < howmany:
