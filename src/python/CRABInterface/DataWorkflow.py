@@ -92,7 +92,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
                  return doc['state']
         except CouchNotFoundError:
             self.logger.error("Cannot find ASO documents in couch")
-        return {"transfer started" : 0}
+        return {}
 
     def _initCache(self, sitewildcards):
         """Building the cache for frequently used information.
