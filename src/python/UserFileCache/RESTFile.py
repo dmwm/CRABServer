@@ -5,7 +5,7 @@ from WMCore.REST.Error import RESTError, InvalidParameter, MissingObject
 from WMCore.REST.Format import RawFormat
 
 # CRABServer dependecies here
-from UserFileCache.RESTExtensions import _check_file, ChecksumFailed, validate_file, authz_login_valid
+from UserFileCache.RESTExtensions import _check_file, ChecksumFailed, validate_file, authz_login_valid, quota_user_free
 
 # external dependecies here
 import cherrypy
@@ -47,7 +47,7 @@ class RESTFile(RESTEntity):
 
         if method in ['PUT']:
             validate_str("hashkey", param, safe, RX_HASH, optional=False)
-            validate_file("inputfile", param, safe, 'hashkey',  optional=False)
+            validate_file("inputfile", param, safe, 'hashkey', optional=False)
             validate_str("inputfilename", param, safe, RX_FILENAME, optional=True)
         if method in ['GET']:
             validate_str("hashkey", param, safe, RX_HASH, optional=True)
@@ -84,6 +84,9 @@ class RESTFile(RESTEntity):
            touch(outfilename)
            result['size'] = os.path.getsize(outfilename)
         else:
+            # check that the user quota is still below limit
+            quota_user_free(filepath(self.cachedir), inputfile)
+
             if not os.path.isdir(outfilepath):
                 os.makedirs(outfilepath)
             handlefile = open(outfilename,'wb')

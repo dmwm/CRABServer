@@ -12,12 +12,14 @@ import tarfile
 import hashlib
 import cStringIO
 import cherrypy
-from os import fstat
+from os import fstat, walk, path
 
 # 100MB is the maximum allowed size of a single file
 FILE_SIZE_LIMIT = 104857600
 # 0.5MB is the maximum limit for file completely loaded into memory
 FILE_MEMORY_LIMIT = 512*1024
+# 600MB is the user quota limit - this includes files needed for publication
+QUOTA_USER_LIMIT = 1024*1024*600
 
 ###### authz_login_valid is currently duplicatint CRABInterface.RESTExtension . A better solution
 ###### should be found for authz_*
@@ -25,6 +27,43 @@ def authz_login_valid():
     if not cherrypy.request.user['login']:
         raise cherrypy.HTTPError(403, "You are not allowed to access this resource.")
 
+def file_size(argfile):
+    """Return the file or cStringIO.StringIO size
+
+       :arg file|cStringIO.StringIO argfile: file object handler or cStringIO.StringIO
+       :return: size in bytes"""
+    if isinstance(argfile, file):
+        return fstat(argfile.fileno()).st_size, True
+    elif isinstance(argfile, cStringIO.OutputType):
+        argfile.seek(0,2)
+        filesize = argfile.tell()
+        argfile.seek(0)
+        return filesize, False
+
+def get_size(quotapath):
+    """Check the quotapath directory size; it doesn't include the 4096 bytes taken by each directory
+
+    :arg str quotapath: the directory for which is needed to calculate the quota
+    :return: bytes taken by the directory"""
+    totalsize = 0
+    for dirpath, dirnames, filenames in walk(quotapath):
+        for f in filenames:
+            fp = path.join(dirpath, f)
+            totalsize += path.getsize(fp)
+    return totalsize
+
+def quota_user_free(quotadir, infile):
+    """Raise an exception if the input file overflow the user quota
+
+    :arg str quotadir: the user path where the file will be written
+    :arg file|cStringIO.StringIO infile: file object handler or cStringIO.StringIO
+    :return: Nothing"""
+    filesize, realfile = file_size(infile.file)
+    quota = get_size(quotadir)
+    if filesize + quota > QUOTA_USER_LIMIT:
+         excquota = ValueError("User %s has reached quota of %dB: additional file of %dB cannot be uploaded." \
+                               % (cherrypy.request.user['login'], quota, filesize))
+         raise InvalidParameter("User quota limit reached; cannot upload the file", errobj=excquota, trace='')
 
 def _check_file(argname, val, hashkey):
     """Check that `argname` `val` is a tar file and that provided 'hashkey`
@@ -37,17 +76,15 @@ def _check_file(argname, val, hashkey):
        :return: the val if the validation passes."""
     # checking that is a valid file or an input string
     # note: the input string is generated on client side just when the input file is empty
+    filesize = 0
     if not hasattr(val, 'file') or not (isinstance(val.file, file) or isinstance(val.file, cStringIO.OutputType)):
         raise InvalidParameter("Incorrect inputfile parameter")
-    elif isinstance(val.file, file):
-        if fstat(val.file.fileno()).st_size > FILE_SIZE_LIMIT:
-            raise InvalidParameter('File is bigger then allowed limit of %d' % FILE_SIZE_LIMIT)
-    elif isinstance(val.file, cStringIO.OutputType):
-        # in this case file content is in memory instead of a file object handle
-        val.file.seek(0,2)
-        insize = val.file.tell()
-        val.file.seek(0)
-        if insize > FILE_MEMORY_LIMIT:
+    else:
+        filesize, realfile = file_size(val.file)
+        if realfile:
+            if filesize > FILE_SIZE_LIMIT:
+                raise InvalidParameter('File is bigger then allowed limit of %dB' % FILE_SIZE_LIMIT)
+        elif filesize > FILE_MEMORY_LIMIT:
             raise InvalidParameter('File too large to be completely loaded into memory.')
 
     digest = None
