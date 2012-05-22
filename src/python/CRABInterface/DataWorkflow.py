@@ -20,7 +20,7 @@ from WMCore.Services.WMStats.WMStatsWriter import WMStatsWriter
 
 #CRAB dependencies
 from CRABInterface.DataUser import DataUser
-from CRABInterface.Utils import setProcessingVersion, CouchDBConn, conn_couch
+from CRABInterface.Utils import setProcessingVersion, CouchDBConn, CMSSitesCache, conn_handler
 
 
 class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Uses cplog
@@ -53,7 +53,9 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
         self.user = DataUser()
 
-        self._initCache(self.sitewildcards)
+        self.wildcardKeys = self.sitewildcards
+        self.wildcardSites = {}
+        self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
 
         self.dbi = DBFactory(self.logger, self.connectUrl).connect()
         cherrypy.engine.subscribe('start_thread', self.initThread)
@@ -65,7 +67,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         myThread = threading.currentThread()
         myThread.dbi = self.dbi
 
-    @conn_couch(databases=['monitor'])
+    @conn_handler(services=['monitor'])
     def getWorkflow(self, wf):
         options = {"startkey": wf, "endkey": wf, 'reduce': True, 'descending': True}
         try:
@@ -82,7 +84,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         else:
             return doc
 
-    @conn_couch(databases=['asomonitor'])
+    @conn_handler(services=['asomonitor'])
     def getWorkflowTransfers(self, wf):
         """Return the async transfers concerning the workflow"""
         try:
@@ -94,18 +96,6 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             self.logger.error("Cannot find ASO documents in couch")
         return {}
 
-    def _initCache(self, sitewildcards):
-        """Building the cache for frequently used information.
-           This shouldn't be abused and should be refreshed sometimes.
-
-           :arg dict sitewildcards: a dictionary containing site wildcards"""
-        # caching site db sites with wildcards
-        self.wildcardKeys = sitewildcards
-        self.wildcardSites = {}
-        self.allCMSNames = SiteDBJSON().getAllCMSNames()
-        ReqMgrUtilities.addSiteWildcards(self.wildcardKeys, self.allCMSNames, self.wildcardSites)
-        #anything else to be cached?
-
     def getAll(self, wfs):
         """Retrieves the workflow document from the couch database
 
@@ -115,7 +105,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         for wf in wfs:
             yield self.getWorkflow(wf)
 
-    @conn_couch(databases=['monitor'])
+    @conn_handler(services=['monitor'])
     def getLatests(self, user, limit, timestamp):
         """Retrives the latest workflows for the user
 
@@ -137,7 +127,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         #raise NotImplementedError
         return [{}]
 
-    @conn_couch(databases=['monitor'])
+    @conn_handler(services=['monitor'])
     def errors(self, workflow, shortformat):
         """Retrieves the sets of errors for a specific workflow
 
@@ -153,7 +143,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
 
         yield [{}]
 
-    @conn_couch(databases=['monitor'])
+    @conn_handler(services=['monitor'])
     def report(self, workflow):
         """Retrieves the quality of the workflow in term of what has been processed
            (eg: good lumis)
@@ -168,7 +158,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         raise NotImplementedError
         return [{}]
 
-    @conn_couch(databases=['monitor'])
+    @conn_handler(services=['monitor'])
     def logs(self, workflow, howmany):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
 
@@ -208,7 +198,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
                     else:
                         yield {'exitcode' : row['doc']['exitcode'], 'error' : "The job does not have outputs"}
 
-    @conn_couch(databases=['monitor', 'asomonitor'])
+    @conn_handler(services=['monitor', 'asomonitor'])
     def output(self, workflows, howmany):
         """Returns the workflow output PFN. It takes care of the LFN - PFN conversion too.
 
@@ -326,6 +316,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         except RuntimeError, re:
             raise ExecutionError("Problem checking in the request", trace=traceback.format_exc(), errobj=re)
 
+    @conn_handler(services=['sitedb'])
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
                userdn, userhn, publishname, asyncdest, campaign, blacklistT1):
@@ -385,8 +376,8 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
                      "Username"  : userhn,
                    }
 
-        if not asyncdest in self.allCMSNames:
-            excasync = ValueError("The parameter asyncdest %s is not in the list of known CMS sites %s" % (asyncdest, self.allCMSNames))
+        if not asyncdest in self.allCMSNames.sites:
+            excasync = ValueError("The parameter asyncdest %s is not in the list of known CMS sites %s" % (asyncdest, self.allCMSNames.sites))
             invalidp = InvalidParameter("Remote output data site not valid", errobj = excasync)
             setattr(invalidp, 'trace', '')
             raise invalidp
@@ -412,7 +403,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             raise InvalidParameter('You must use LumiBased splitting if specifying a lumiMask.')
 
         try:
-            specificSchema.allCMSNames = self.allCMSNames
+            specificSchema.allCMSNames = self.allCMSNames.sites
             specificSchema.validate()
         except Exception, ex:
             raise InvalidParameter("Not valid scehma provided", trace=traceback.format_exc(), errobj = ex)

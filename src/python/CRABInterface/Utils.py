@@ -2,32 +2,40 @@ import logging
 import copy
 import traceback
 from collections import namedtuple
+from time import mktime, gmtime
 
 import WMCore
 from WMCore.REST.Error import *
 from WMCore.Database.CMSCouch import CouchServer, CouchError
+from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
+from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import addSiteWildcards
 
 """
 The module contains some utility functions used by the various modules of the CRAB REST interface
 """
 
 CouchDBConn = namedtuple("CouchDBConn", ["db", "name", "conn"])
+CMSSitesCache = namedtuple("CMSSitesCache", ["cachetime", "sites"])
 
-def conn_couch(databases):
+def conn_handler(services):
     """
-    Decorator to be used among REST resources to optimize connections to CouchDB
+    Decorator to be used among REST resources to optimize connections to other services
+    as CouchDB and SiteDB
 
-    arg str list databases: list of string telling which database connections
-                            should be started; currently availables are 
-                            'monitor' and 'asomonitor'.
+    arg str list services: list of string telling which service connections
+                           should be started; currently availables are
+                           'monitor' and 'asomonitor'.
     """
     def wrap(func):
-        def wrapped_func(*args):
-            if 'monitor' in databases and not args[0].monitordb.conn:
+        def wrapped_func(*args, **kwargs):
+            if 'monitor' in services and not args[0].monitordb.conn:
                 args[0].monitordb = args[0].monitordb._replace(conn=args[0].monitordb.db.connectDatabase(args[0].monitordb.name, create=False))
-            if 'asomonitor' in databases and not args[0].asodb.conn:
+            if 'asomonitor' in services and not args[0].asodb.conn:
                 args[0].asodb = args[0].asodb._replace(conn=args[0].asodb.db.connectDatabase(args[0].asodb.name, create=False))
-            return func(*args)
+            if 'sitedb' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
+                args[0].allCMSNames = CMSSitesCache(sites=SiteDBJSON().getAllCMSNames(), cachetime=mktime(gmtime()))
+                addSiteWildcards(args[0].wildcardKeys, args[0].allCMSNames.sites, args[0].wildcardSites)
+            return func(*args, **kwargs)
         return wrapped_func
     return wrap
 

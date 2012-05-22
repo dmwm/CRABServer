@@ -6,7 +6,7 @@ from WMCore.REST.Error import ExecutionError, MissingObject
 
 # CRABServer dependencies here
 from CRABInterface.DataWorkflow import DataWorkflow
-from CRABInterface.Utils import CouchDBConn, conn_couch
+from CRABInterface.Utils import CouchDBConn, conn_handler
 
 class DataCampaign(object):
     """Entity that allows to operate on campaign resources.
@@ -105,7 +105,7 @@ class DataCampaign(object):
 
         return jobsPerState, detailsPerState
 
-    @conn_couch(databases=['monitor'])
+    @conn_handler(services=['monitor'])
     def getCampaignWorkflows(self, campaign):
         """Retrieve the list of workflow names part of the campaign
 
