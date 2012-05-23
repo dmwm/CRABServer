@@ -13,10 +13,7 @@ from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 from WMCore.RequestManager.RequestMaker import CheckIn
 from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
-import WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools as ReqMgrUtilities
 from WMCore.Database.DBFactory import DBFactory
-from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
-from WMCore.Services.WMStats.WMStatsWriter import WMStatsWriter
 
 #CRAB dependencies
 from CRABInterface.DataUser import DataUser
@@ -36,7 +33,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         DataWorkflow.asodb = CouchDBConn(db=CouchServer(asomonurl), name=asomonname, conn=None)
 
         DataWorkflow.wmstatsurl = monurl + '/' + monname
-        DataWorkflow.wmstats = WMStatsWriter(DataWorkflow.wmstatsurl)
+        DataWorkflow.wmstats = None
 
         #WMBSHelper need the reqmgr couchurl and database name
         DataWorkflow.reqmgrurl = reqmgrurl
@@ -47,7 +44,8 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         DataWorkflow.connectUrl = connectUrl
         DataWorkflow.sitewildcards = sitewildcards
 
-        DataWorkflow.phedex = PhEDEx(responseType='xml', dict=phedexargs)
+        DataWorkflow.phedexargs = phedexargs
+        DataWorkflow.phedex = None
 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
@@ -158,7 +156,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         raise NotImplementedError
         return [{}]
 
-    @conn_handler(services=['monitor'])
+    @conn_handler(services=['monitor', 'phedex'])
     def logs(self, workflow, howmany):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
 
@@ -198,7 +196,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
                     else:
                         yield {'exitcode' : row['doc']['exitcode'], 'error' : "The job does not have outputs"}
 
-    @conn_handler(services=['monitor', 'asomonitor'])
+    @conn_handler(services=['monitor', 'asomonitor', 'phedex'])
     def output(self, workflows, howmany):
         """Returns the workflow output PFN. It takes care of the LFN - PFN conversion too.
 
@@ -302,6 +300,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         raise NotImplementedError
         return [{}]
 
+    @conn_handler(services=['wmstats'])
     def _inject(self, request):
         # Auto Assign the requests
         ### what is the meaning of the Team in the Analysis use case?

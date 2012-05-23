@@ -9,6 +9,8 @@ from WMCore.REST.Error import *
 from WMCore.Database.CMSCouch import CouchServer, CouchError
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import addSiteWildcards
+from WMCore.Services.WMStats.WMStatsWriter import WMStatsWriter
+from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 
 """
 The module contains some utility functions used by the various modules of the CRAB REST interface
@@ -20,7 +22,7 @@ CMSSitesCache = namedtuple("CMSSitesCache", ["cachetime", "sites"])
 def conn_handler(services):
     """
     Decorator to be used among REST resources to optimize connections to other services
-    as CouchDB and SiteDB
+    as CouchDB and SiteDB, PhEDEx, WMStats monitoring
 
     arg str list services: list of string telling which service connections
                            should be started; currently availables are
@@ -35,6 +37,10 @@ def conn_handler(services):
             if 'sitedb' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
                 args[0].allCMSNames = CMSSitesCache(sites=SiteDBJSON().getAllCMSNames(), cachetime=mktime(gmtime()))
                 addSiteWildcards(args[0].wildcardKeys, args[0].allCMSNames.sites, args[0].wildcardSites)
+            if 'wmstats' in services and not args[0].wmstats:
+                args[0].wmstats = WMStatsWriter(args[0].wmstatsurl)
+            if 'phedex' in services and not args[0].phedex:
+                args[0].phedex = PhEDEx(responseType='xml', dict=args[0].phedexargs)
             return func(*args, **kwargs)
         return wrapped_func
     return wrap
