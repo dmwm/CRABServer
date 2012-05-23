@@ -61,7 +61,8 @@ def setProcessingVersion(request, reqmgrurl, reqmgrname):
     except CouchError, ex:
         raise ExecutionError("Error connecting to couch database", errobj = ex, trace=traceback.format_exc())
 
-    startkey = [request['Requestor'], request['PublishDataName'], request['InputDataset']]
+    inputDataset = request.get("InputDataset", None)
+    startkey = [request['Requestor'], request['PublishDataName'], inputDataset]
     endkey = copy.copy(startkey)
     endkey.append({})
     options = {"startkey" : startkey, "endkey" : endkey}
