@@ -29,7 +29,7 @@ class RESTWorkflow(RESTEntity):
             validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
             validate_str("jobsw", param, safe, RX_CMSSW, optional=False)
             validate_str("jobarch", param, safe, RX_ARCH, optional=False)
-            jobtype = param.kwargs.get('jobtype', None)
+            jobtype = safe.kwargs.get('jobtype', None)
             if jobtype == 'Analysis':
                 validate_str("inputdata", param, safe, RX_DATASET, optional=False)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)

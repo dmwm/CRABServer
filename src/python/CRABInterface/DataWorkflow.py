@@ -160,42 +160,65 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
     @conn_handler(services=['monitor', 'phedex'])
     def logs(self, workflow, howmany):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
+           If any LocCollect job with valid output step is found return it (SaveLogs==True)
+           If not, return the logs from the logarchive step of real jobs. Return howmany jobs
+           for each exit code
 
            :arg str workflow: a workflow name
            :arg int howmany: the limit on the number of PFN to return
            :return: (a generator of?) a list of logs pfns"""
 
-        # example:
-        # return self.monitordb.conn.loadView('WMStats', 'getlogs',
-        #                              options = { "startkey": workflow,
-        #                                          "endkey": workflow,
-        #                                          "limit": howmany,})
+        #default is 1 logfile per exitcode
         howmany = howmany if howmany else 1
+        #number of jobs for each exit code
         numJobs = {}
-        res = []
-        self.logger.debug("Retrieving log for %s" % workflow)
+        self.logger.info("Retrieving %s log(s) for %s" % (howmany, workflow))
         for wf in workflow:
-            options = {"startkey": [wf, "jobfailed"], "endkey": [wf, "jobfailed", {}, {}, {}], "reduce": False, "include_docs" : True}
+            options = {"startkey": [wf], "endkey": [wf, {}, {}, {}, {}], "reduce": False, "include_docs" : True}
             outview = self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
             for row in outview:
-                if 'output' in row['doc']:
-                    elem = {}
-                    for output in row['doc']['output']:
-                        if output['type'] == 'logArchive':
-                            self.logger.debug("Found logarchive output: %s" % output)
-                            elem["size"] = output['size']
-                            elem["checksums"] = output['checksums']
-                            elem["pfn"] = self.phedex.getPFN(row['doc']['site'],
-                                                             output['lfn'])[(row['doc']['site'], output['lfn'])]
-                            elem["workflow"] = wf
-                            elem["exitcode"] = row['doc']['exitcode']
-                #update the numjobs
-                numJobs[row['doc']['exitcode']] = 1 if not row['doc']['exitcode'] in numJobs else numJobs[row['doc']['exitcode']] + 1
-                if numJobs[row['doc']['exitcode']] <= howmany:
-                    if elem:
-                        yield elem
-                    else:
-                        yield {'exitcode' : row['doc']['exitcode'], 'error' : "The job does not have outputs"}
+                elem = {}
+                #if the fwjr does not have outputs
+                if not 'output' in row['doc'] or not row['doc']['output']:
+                    #add an error entry if it is not a LogCollect and if we have not already done that
+                    if not row['doc']['task'].endswith("/Analysis/LogCollect") and not row['doc']['exitcode'] in numJobs:
+                        self.logger.debug("Found a job without output module. Exitcode is %s" % row['doc']['exitcode'])
+                        numJobs[row['doc']['exitcode']] = 1
+                        elem = {'exitcode' : row['doc']['exitcode'], 'error' : "The job fwjr does not have outputs modules"}
+                else: #if we have an output module in the fwjr
+                    #check if this is a LogCollect job
+                    if row['doc']['task'].endswith("/Analysis/LogCollect"):
+                        #Fill elem if we find an lfn
+                        for output in row['doc']['output']:
+                            if 'lfn' in output:
+                                self.logger.debug("Found logCollect output: %s" % row['doc']['output'])
+                                elem["type"] = "logCollect"
+                                elem["size"] = output['size']
+                                elem["checksums"] = output['checksums']
+                                #XXX in this report we have the pfn and not the lfn
+                                elem["pfn"] = output['lfn']
+                                elem["workflow"] = wf
+                    else: #Not a LogCollect fwjr, but a real job
+                        #initialize/set the number of logs retrieved for this fwjr document
+                        numJobs[row['doc']['exitcode']] = 0 if not row['doc']['exitcode'] in numJobs else numJobs[row['doc']['exitcode']] + 1
+                        #if they are enough next loop!
+                        if numJobs[row['doc']['exitcode']] >= howmany:
+                            continue
+                        for output in row['doc']['output']:
+                            #when we find the logarchive output we fill elem
+                            if output['type'] == 'logArchive':
+                                self.logger.debug("Found logArchive output: %s" % output)
+                                elem["type"] = "logArchive"
+                                elem["size"] = output['size']
+                                elem["checksums"] = output['checksums']
+                                elem["pfn"] = self.phedex.getPFN(row['doc']['site'],
+                                                                 output['lfn'])[(row['doc']['site'], output['lfn'])]
+                                elem["workflow"] = wf
+                                elem["exitcode"] = row['doc']['exitcode']
+                #before the next for loop check if we found something to give back
+                if elem:
+                    yield elem
+
 
     @conn_handler(services=['monitor', 'asomonitor', 'phedex'])
     def output(self, workflows, howmany):
@@ -230,7 +253,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
 
         jobids = [singlefile['value']['jobid'] for singlefile in result]
 
-        self.logger.info("Getting the following from ASO database: " + str(jobids))
+        self.logger.debug("Got the following from ASO database: " + str(jobids))
 
         # retrieve from request monitoring couchdb?
         if 'limit' in options and len(result) < howmany:
@@ -262,6 +285,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
                         options['limit'] = howmany - len(result)
             """
         for singlefile in result:
+            singlefile['value']['type'] = "output"
             singlefile['value']['workflow'] = singlefile['key'][0]
             singlefile['value']['pfn'] = self.phedex.getPFN(singlefile['value']['location'],
                                                             singlefile['value']['lfn'])[(singlefile['value']['location'],
@@ -376,6 +400,7 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
                      "Username"  : userhn,
                    }
 
+        self.logger.debug("Inserting workflow with schema: %s" % schemaWf)
         if not asyncdest in self.allCMSNames.sites:
             excasync = ValueError("The parameter asyncdest %s is not in the list of known CMS sites %s" % (asyncdest, self.allCMSNames.sites))
             invalidp = InvalidParameter("Remote output data site not valid", errobj = excasync)
