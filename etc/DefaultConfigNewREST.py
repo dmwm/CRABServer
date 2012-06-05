@@ -31,7 +31,7 @@ data.configcachename = 'wmagent_configcache'
 data.reqmgrurl = 'http://localhost:5984'
 data.reqmgrname = 'reqmgrdb'
 data.phedexurl = 'https://cmsweb.cern.ch/phedex/datasvc/xml/prod/'
-
+data.dbsurl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
 data.connectUrl = connectUrl
 #data.loggingLevel = 10
 #data.loggingFile = '/tmp/CRAB.log'

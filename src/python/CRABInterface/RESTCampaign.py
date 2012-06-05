@@ -1,7 +1,7 @@
 # WMCore dependecies here
 from WMCore.REST.Error import InvalidParameter
-from WMCore.REST.Server import RESTEntity, restcall, rows
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
+from WMCore.REST.Server import RESTEntity, restcall
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 
 # CRABServer dependecies here
 from CRABInterface.DataCampaign import DataCampaign
@@ -54,11 +54,12 @@ class RESTCampaign(RESTEntity):
            :arg str list workflow: workflow names requested by the user;
            :return: the campaign name with the relative workflow names."""
 
+        raise NotImplementedError
         result = []
         uniquecampaign = self.campaignmgr.create(campaign)
         if workflow:
             result = self.campaignmgr.injectWorkflow(campaign, workflow)
-        return result
+        return [{'campaign': uniquecampaign, 'workflows': result}]
 
     @restcall
     def post(self, campaign, resubmit):
@@ -68,10 +69,11 @@ class RESTCampaign(RESTEntity):
            :arg int resubmit: resubmit the campaign? 0 no, everything else yes;
            :returns: the list of modified field"""
 
+        raise NotImplementedError
         if resubmit:
             # strict check on authz: only the campaign owner can modify it
             workflows = self.campaignmgr.getCampaignWorkflows(campaign)
-            alldocs = authz_owner_match(self.campaignmgr.database, workflows)
+            alldocs = authz_owner_match(self.campaignmgr.monitordb, workflows)
             return self.campaignmgr.resubmit(campaign, workflows)
         else:
             raise NotImplementedError
@@ -88,6 +90,7 @@ class RESTCampaign(RESTEntity):
            :arg int limit: limit of sub-resource elements to retrieve
            :retrun: the list of campaigns with the relative status summary or (the list of) sub-resource(s)"""
 
+        raise NotImplementedError
         result = []
         if campaign:
             if not subresource:
@@ -117,6 +120,6 @@ class RESTCampaign(RESTEntity):
 
         # strict check on authz: only the campaign owner can modify it
         workflows = self.campaignmgr.getCampaignWorkflows(campaign)
-        alldocs = authz_owner_match(self.campaignmgr.database, workflows)
+        alldocs = authz_owner_match(self.campaignmgr.monitordb, workflows)
         result = self.campaignmgr.kill(campaign, force, workflows)
         return result

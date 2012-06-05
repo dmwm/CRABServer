@@ -46,7 +46,7 @@ def authz_owner_match(database, workflows, retrieve_docs=True):
             return alldocs
         return
 
-    log("ERROR: authz denied for user '%s' to resource '%s'" % (user, wf))
+    log("ERROR: authz denied for user '%s' to resource '%s'" % (user, str(workflows)))
     raise cherrypy.HTTPError(403, "You are not allowed to access this resource.")
 
 def authz_login_valid():

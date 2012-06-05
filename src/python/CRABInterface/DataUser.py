@@ -29,7 +29,7 @@ class DataUser(object):
         if not userHN:
             raise InvalidParameter("Bad input userHN not defined")
         if not email:
-            raise InvalidParmeter("Bad input user email not defined")
+            raise InvalidParameter("Bad input user email not defined")
         if not team:
             raise InvalidParameter("Bad input Team not defined")
         if not group:

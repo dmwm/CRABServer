@@ -5,9 +5,10 @@ from WMCore.REST.Server import RESTApi
 from WMCore.REST.Format import JSONFormat
 
 # CRABServer dependecies here
-from CRABInterface.RESTWorkflow import RESTWorkflow
+from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTCampaign import RESTCampaign
 from CRABInterface.DataWorkflow import DataWorkflow
+from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.DataCampaign import DataCampaign
 
 #In case the log level is not specified in the configuration we use the NullHandler and we do not print messages
@@ -27,10 +28,12 @@ class RESTBaseAPI(RESTApi):
         #Global initialization of Data objects. Parameters coming from the config should go here
         DataWorkflow.globalinit(config.monurl, config.monname, config.asomonurl, config.asomonname,
                                 config.reqmgrurl, config.reqmgrname, config.configcacheurl,
-                                config.configcachename, config.connectUrl, {'endpoint': config.phedexurl})
+                                config.configcachename, config.connectUrl, {'endpoint': config.phedexurl},
+                                config.dbsurl)
+        DataUserWorkflow.globalinit(config.monurl, config.monname, config.asomonurl, config.asomonname)
         DataCampaign.globalinit(config.monurl, config.monname)
 
-        self._add( {'workflow': RESTWorkflow(app, self, config, mount),
+        self._add( {'workflow': RESTUserWorkflow(app, self, config, mount),
                     'campaign': RESTCampaign(app, self, config, mount),
                    } )
 

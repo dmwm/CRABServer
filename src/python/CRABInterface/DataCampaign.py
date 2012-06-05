@@ -1,18 +1,33 @@
 import logging
 
 # WMCore dependecies here
-from WMCore.Database.CMSCouch import CouchServer, CouchError, Database, CouchNotFoundError
-from WMCore.REST.Error import ExecutionError, MissingObject
+from WMCore.Database.CMSCouch import CouchServer
+from WMCore.REST.Error import MissingObject
 
 # CRABServer dependencies here
-from CRABInterface.DataWorkflow import DataWorkflow
+from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.Utils import CouchDBConn, conn_handler
 
 class DataCampaign(object):
     """Entity that allows to operate on campaign resources.
-       DataCampaign is a container on a set of workflows.
+       DataCampaign is a container on a set of workflows which have not strict relation
+       a part of being part of the same campaign container.
        An operations on a campaign implies to act in all the workflows
-       it contains"""
+       it contains.
+
+       CAMPAIGN-UNIQUE-NAME
+         |
+         |_workflow-1.0__workflow-1.1__....
+         |
+         |_workflow-2.0__workflow-2.1__workflow-2.2__....
+         |
+         |_workflow-3.0__....
+
+       This class does not provide any aggregation of the workflows in the campaign,
+       and it returns a list of workflows. Aggregation of workflows which have a hierarchical
+       relationship (e.g. resubmission) is left to the DataUserWorkflow class.
+       This means that it shows information of the first column of the schema above,
+       where the first column aggregates the row information (thanks to DataUserWorkflow)."""
 
     @staticmethod
     def globalinit(monurl, monname):
@@ -20,7 +35,7 @@ class DataCampaign(object):
 
     def __init__(self, config):
         self.logger = logging.getLogger('CRABLogger.DataCampaign')
-        self.workflow = DataWorkflow()
+        self.userworkflow = DataUserWorkflow()
 
     def create(self, campaign):
         """Create a campaign object with an unique name.
@@ -33,7 +48,7 @@ class DataCampaign(object):
         return {}
 
     def injectWorkflow(self, campaign, wfs):
-        """Insert a workflow into the ReqMgr. It uses the `DataWorkflow` object.
+        """Insert a workflow into the ReqMgr. It uses the `DataUserWorkflow` object.
            To create the campaign and to get the unique campaign name refer to
            `create` method.
 
@@ -41,8 +56,8 @@ class DataCampaign(object):
            :arg str list wfs: the list of workflows to create
            :return: the workflows unique names."""
 
-        for worfkflow in wfs:
-            yield self.workflow.inject(workflow)
+        for workflow in wfs:
+            yield self.userworkflow.inject(workflow)
 
     def resubmit(self, campaign, workflows=None):
         """Resubmit all the unfinished workflows in the campaign.
@@ -51,10 +66,12 @@ class DataCampaign(object):
            :arg list str workflows: the list of workflows part of the campaign
            :return: the workflows unique names."""
 
+        workflows = self.getCampaignWorkflows(campaign)
         if not workflows:
-            workflows = self.getCampaignWorkflows(campaign)
+            raise MissingObject("Cannot find workflows in campaign")
+
         for workflow in workflows:
-            yield self.workflow.resubmit(workflow)
+            yield self.userworkflow.resubmit(workflow)
 
     def kill(self, campaign, force, workflows=None):
         """Cancel all the unfinished workflows in the campaign.
@@ -64,63 +81,23 @@ class DataCampaign(object):
            :arg list str workflows: the list of workflows part of the campaign
            :return: potentially nothing"""
 
+        workflows = self.getCampaignWorkflows(campaign)
         if not workflows:
-            workflows = self.getCampaignWorkflows(campaign)
+            raise MissingObject("Cannot find workflows in campaign")
+
         for workflow in workflows:
-            yield self.workflow.kill(workflow)
-
-    def _aggregateCampaign(self, wfDocs):
-        """A resubmission keeps succeded jobs, and, after a kill,
-           sends a new workflow on the not/analyzed part of the
-           dataset (parts where jobs are running/scheduled/failed/etc).
-           In the aggregation we iterates on 'old' workflows and sum
-           the number of succeded jobs. The last resubmission is kept
-           as it is.
-
-           :arg dict list: a list with the workflow document summary
-           :return: two dicts, one with the high-level aggregation per
-                    state and another one with the details for each
-                    state."""
-
-        jobsPerState = {}
-        detailsPerState = {}
-        if not wfDocs:
-            return jobsPerState, detailsPerState
-
-        #jobs in success state are taken from all the workflows
-        jobsPerState['success'] = sum( [ doc['success'] for doc in wfDocs if doc.get('success', None) ] )
-
-        lastDoc = wfDocs[-1]
-        for state in lastDoc:
-            if state != 'inWMBS':
-                if type(lastDoc[state])==int:
-                    jobsPerState[state] = lastDoc[state]
-                else:
-                    jobsPerState[state] = sum( lastDoc[state].values() )
-                    detailsPerState[state] = lastDoc[state]
-                    #count back retry and first from the total
-                    if state == 'submitted' and 'submitted' in lastDoc:
-                        jobsPerState['submitted'] -= lastDoc['submitted'].get('first', 0)
-                        jobsPerState['submitted'] -= lastDoc['submitted'].get('retry', 0)
-
-        return jobsPerState, detailsPerState
+            yield self.userworkflow.kill(workflow)
 
     @conn_handler(services=['monitor'])
     def getCampaignWorkflows(self, campaign):
-        """Retrieve the list of workflow names part of the campaign
+        """Retrieve the list of workflow names part of the campaign.
+           This considers only top level workflows and not their resubmissions.
 
            :arg str campaign: the unique campaign name
            :return: list of workflows"""
-        #Get all the 'reqmgr_request' documents related to the campaign (one for each wf)
-        options = {"startkey": [campaign,0], "endkey": [campaign,{}]}
-        try:
-            campaignDocs = self.monitordb.conn.loadView("WMStats", "requestByCampaignAndDate", options)
-        except CouchNotFoundError, ce:
-            raise ExecutionError("Impossible to load campaign-request view from WMStats")
-        if not campaignDocs['rows']:
-            raise MissingObject("Cannot find requested campaign")
 
-        return [doc['value']['id'] for doc in campaignDocs['rows']]
+        ## TODO: this needs to be changed, avoiding to pick resubmitted workflows.
+        raise NotImplementedError
 
     def campaignSummary(self, campaign, workflows=None):
         """Provide the campaign status summary. This method iterates on all the workflows
@@ -135,32 +112,12 @@ class DataCampaign(object):
            :arg list str workflows: the list of workflows part of the campaign
            :return: the campaign status summary"""
 
+        workflows = self.getCampaignWorkflows(campaign)
         if not workflows:
-            workflows = self.getCampaignWorkflows(campaign)
-        wfDocs = [self.workflow.getWorkflow(wf) for wf in workflows]
-        #checking that we have some workflow documents
-        if not wfDocs:
-            raise MissingObject("Cannot find any workflow in the campaign")
-        self.logger.debug("Workflow documents retrieved: %s" % wfDocs)
+            raise MissingObject("Cannot find workflows in campaign")
 
-        jobsPerState, detailsPerState = self._aggregateCampaign([doc['status'] for doc in wfDocs if doc.get('status', None)])
-
-        detailsPerSite = {}
-        #iterate on all the workflows and from them get a list with all the sites
-        siteList = reduce(lambda x,y: x+y, [doc['sites'].keys() for doc in wfDocs if doc.get('sites', None)], [])
-        #for each site get the aggregation
-        for site in siteList:
-            detailsPerSite[site] = self._aggregateCampaign([doc['sites'][site] for doc in wfDocs if doc.get('sites', None) and doc['sites'].get(site, None)])
-
-        #get the status of the campaign: sort by update_time the request_stauts list of the most recent workflow
-        campaignStatus = sorted([x for x in wfDocs[-1]["request_status"]], key=lambda y: y['update_time'] )[-1]['status']
-
-        #successful jobs can be in several states. Taking information from async
-        transfers = self.workflow.getWorkflowTransfers(wfDocs[-1]['_id'])
-        if transfers:
-            detailsPerState['success'] = transfers
-
-        return [wfDocs[-1]["campaign"], campaignStatus, jobsPerState, detailsPerState, detailsPerSite]
+        for workflow in workflows:
+            yield self.userworkflow.status(workflow)
 
     def retrieveRecent(self, user, since):
         """Query the monitoring db to retrieve the latest user campaigns.
@@ -180,8 +137,11 @@ class DataCampaign(object):
            :arg int limit: the limit on the number of PFN to return
            :return: an object with the list of output pfns"""
         workflows = self.getCampaignWorkflows(campaign)
-        result = self.workflow.output(workflows, limit)
-        return result
+        if not workflows:
+            raise MissingObject("Cannot find workflows in campaign")
+
+        for workflow in workflows:
+            yield self.userworkflow.output(workflow)
 
     def logs(self, campaign, limit):
         """Returns the campaign log archive PFN. It takes care of the LFN - PFN conversion too.
@@ -190,5 +150,7 @@ class DataCampaign(object):
            :arg int limit: the limit on the number of PFN to return
            :return: an object with the list of log pfns"""
         workflows = self.getCampaignWorkflows(campaign)
-        result = self.workflow.log(workflows, limit)
-        return result
+        if not workflows:
+            raise MissingObject("Cannot find workflows in campaign")
+
+        yield self.userworkflow.log(workflows, limit)

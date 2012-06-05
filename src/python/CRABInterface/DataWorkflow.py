@@ -21,14 +21,15 @@ from CRABInterface.DataUser import DataUser
 from CRABInterface.Utils import setProcessingVersion, CouchDBConn, CMSSitesCache, conn_handler
 
 
-class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Uses cplog
-    """Entity that allows to operate on workflow resources"""
+class DataWorkflow(object):
+    """Entity that allows to operate on workflow resources.
+       No aggregation of workflows provided here."""
     splitMap = {'LumiBased' : 'lumis_per_job', 'EventBased' : 'events_per_job', 'FileBased' : 'files_per_job'}
 
     @staticmethod
     def globalinit(monurl, monname, asomonurl, asomonname, reqmgrurl, reqmgrname,
                    configcacheurl, configcachename, connectUrl, phedexargs=None,
-                   sitewildcards={'T1*': 'T1_*', 'T2*': 'T2_*', 'T3*': 'T3_*'}):
+                   dbsurl=None, sitewildcards={'T1*': 'T1_*', 'T2*': 'T2_*', 'T3*': 'T3_*'}):
 
         DataWorkflow.monitordb = CouchDBConn(db=CouchServer(monurl), name=monname, conn=None)
         DataWorkflow.asodb = CouchDBConn(db=CouchServer(asomonurl), name=asomonname, conn=None)
@@ -47,6 +48,8 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
 
         DataWorkflow.phedexargs = phedexargs
         DataWorkflow.phedex = None
+
+        DataWorkflow.dbsurl = dbsurl
 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
@@ -68,6 +71,12 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
 
     @conn_handler(services=['monitor'])
     def getWorkflow(self, wf):
+        """
+        Get the workflow summary documents frmo the Central Monitoring.
+
+        :arg str wf: the workflow name
+        :return: the summary documents in a dictionary.
+        """
         options = {"startkey": wf, "endkey": wf, 'reduce': True, 'descending': True}
         try:
             doc = self.monitordb.conn.document(id=wf)
@@ -85,7 +94,12 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
 
     @conn_handler(services=['asomonitor'])
     def getWorkflowTransfers(self, wf):
-        """Return the async transfers concerning the workflow"""
+        """
+        Return the async transfers concerning the workflow
+
+        :arg str wf: the workflow name
+        :return: the summary document in a dictionary.
+        """
         try:
             doc = self.asodb.conn.document(wf)
             self.logger.debug("Workflow trasfer: %s" % doc)
@@ -100,7 +114,6 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
 
            :arg str list workflow: a list of workflow names
            :return: a json corresponding to the workflow in couch"""
-
         for wf in wfs:
             yield self.getWorkflow(wf)
 
@@ -135,12 +148,9 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
                                  information about sites and list of errors
            :return: a list of errors grouped by exit code, error reason, site"""
 
-        for wf in workflow:
-            group_level = 3 if shortformat else 5
-            options = {"startkey": [wf, "jobfailed"], "endkey": [wf, "jobfailed", {}, {}, {}], "reduce": True,  "group_level": group_level}
-            yield self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
-
-        yield [{}]
+        group_level = 3 if shortformat else 5
+        options = {"startkey": [workflow, "jobfailed"], "endkey": [workflow, "jobfailed", {}, {}, {}], "reduce": True,  "group_level": group_level}
+        return self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
 
     @conn_handler(services=['monitor'])
     def report(self, workflow):
@@ -158,134 +168,113 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         return [{}]
 
     @conn_handler(services=['monitor', 'phedex'])
-    def logs(self, workflow, howmany):
+    def logs(self, workflow, howmany, exitcode):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
-           If any LocCollect job with valid output step is found return it (SaveLogs==True)
-           If not, return the logs from the logarchive step of real jobs. Return howmany jobs
-           for each exit code
 
            :arg str workflow: a workflow name
            :arg int howmany: the limit on the number of PFN to return
+           :arg int exitcode: the log has to be of a job ended with this exit_code
            :return: (a generator of?) a list of logs pfns"""
-
         #default is 1 logfile per exitcode
         howmany = howmany if howmany else 1
+        self.logger.info("Retrieving %s log(s) for %s" % (howmany, workflow))
+
         #number of jobs for each exit code
         numJobs = {}
-        self.logger.info("Retrieving %s log(s) for %s" % (howmany, workflow))
-        for wf in workflow:
-            options = {"startkey": [wf], "endkey": [wf, {}, {}, {}, {}], "reduce": False, "include_docs" : True}
-            outview = self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
-            for row in outview:
-                elem = {}
-                #if the fwjr does not have outputs
-                if not 'output' in row['doc'] or not row['doc']['output']:
-                    #add an error entry if it is not a LogCollect and if we have not already done that
-                    if not row['doc']['task'].endswith("/Analysis/LogCollect") and not row['doc']['exitcode'] in numJobs:
-                        self.logger.debug("Found a job without output module. Exitcode is %s" % row['doc']['exitcode'])
-                        numJobs[row['doc']['exitcode']] = 1
-                        elem = {'exitcode' : row['doc']['exitcode'], 'error' : "The job fwjr does not have outputs modules"}
-                else: #if we have an output module in the fwjr
-                    #check if this is a LogCollect job
-                    if row['doc']['task'].endswith("/Analysis/LogCollect"):
-                        #Fill elem if we find an lfn
-                        for output in row['doc']['output']:
-                            if 'lfn' in output:
-                                self.logger.debug("Found logCollect output: %s" % row['doc']['output'])
-                                elem["type"] = "logCollect"
-                                elem["size"] = output['size']
-                                elem["checksums"] = output['checksums']
-                                #XXX in this report we have the pfn and not the lfn
-                                elem["pfn"] = output['lfn']
-                                elem["workflow"] = wf
-                    else: #Not a LogCollect fwjr, but a real job
-                        #initialize/set the number of logs retrieved for this fwjr document
-                        numJobs[row['doc']['exitcode']] = 0 if not row['doc']['exitcode'] in numJobs else numJobs[row['doc']['exitcode']] + 1
-                        #if they are enough next loop!
-                        if numJobs[row['doc']['exitcode']] >= howmany:
-                            continue
-                        for output in row['doc']['output']:
-                            #when we find the logarchive output we fill elem
-                            if output['type'] == 'logArchive':
-                                self.logger.debug("Found logArchive output: %s" % output)
-                                elem["type"] = "logArchive"
-                                elem["size"] = output['size']
-                                elem["checksums"] = output['checksums']
-                                elem["pfn"] = self.phedex.getPFN(row['doc']['site'],
-                                                                 output['lfn'])[(row['doc']['site'], output['lfn'])]
-                                elem["workflow"] = wf
-                                elem["exitcode"] = row['doc']['exitcode']
-                #before the next for loop check if we found something to give back
-                if elem:
-                    yield elem
+        #number of jobs with no logs for each exit code
+        missLogs = {}
 
+        ## TODO optimize this by avoiding loading full view in memory
+        options = {"reduce": False, "include_docs" : True}
+        if exitcode == None:
+            options["startkey"] = [workflow]
+            options["endkey"] = [workflow, {}, {}, {}, {}]
+        elif exitcode != 0:
+            options["startkey"] = [workflow, "jobfailed", exitcode]
+            options["endkey"] = [workflow, "jobfailed", exitcode, {}, {}]
+        else:
+            options["startkey"] = [workflow, "success", exitcode]
+            options["endkey"] = [workflow, "success", exitcode, {}, {}]
+        outview = self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
 
-    @conn_handler(services=['monitor', 'asomonitor', 'phedex'])
-    def output(self, workflows, howmany):
-        """Returns the workflow output PFN. It takes care of the LFN - PFN conversion too.
-
-           :arg str list workflow: a workflow name
-           :arg int howmany: the limit on the number of PFN to return
-           :return: a generator of list of output pfns"""
-
-        self.logger.info("Getting the output (%s%%) for workflows %s" % (workflows, howmany))
-
-        options = {"reduce": False}
-        # default 1
-        # no limits if -1
-        howmany = howmany if howmany else 1
-        if howmany > 0:
-            options["limit"] = howmany
-
-        # retrieving from async stage out
-        result = []
-        for wf in workflows:
-            # retrieves from async stage out
-            options["startkey"] = [wf]
-            options["endkey"] = [wf, {}]
-            result += self.asodb.conn.loadView("UserMonitoring", "FilesByWorkflow", options)['rows']
-            # check if we have got enough and how many missing
-            if 'limit' in options:
-                if len(result) >= howmany:
+        for row in outview:
+            elem = {}
+            #if the fwjr does not have outputs
+            if not 'output' in row['doc'] or not row['doc']['output']:
+                if not row['doc']['task'].endswith("/LogCollect"):
+                    missLogs[str(row['doc']['exitcode'])] = 1 if not str(row['doc']['exitcode']) in missLogs else missLogs[str(row['doc']['exitcode'])] + 1
+            elif row['doc']['task'].endswith("/LogCollect"):
+                for output in row['doc']['output']:
+                    if 'lfn' in output:
+                        elem["type"] = "logCollect"
+                        elem["size"] = output['size']
+                        elem["checksums"] = output['checksums']
+                        #Note: in this report we have the pfn and not the lfn
+                        elem["pfn"] = output['lfn']
+                        elem["workflow"] = workflow
+            elif row['doc']['exitcode'] in numJobs and numJobs[row['doc']['exitcode']] >= howmany:
+                if exitcode is not None:
                     break
-                elif len(result) + options['limit'] > howmany:
-                    options['limit'] = howmany - len(result)
-
-        jobids = [singlefile['value']['jobid'] for singlefile in result]
-
-        self.logger.debug("Got the following from ASO database: " + str(jobids))
-
-        # retrieve from request monitoring couchdb?
-        if 'limit' in options and len(result) < howmany:
-            # retrieve from jobsummary
-            options = {"reduce": False}
-            for wf in workflows:
-                options["startkey"] = [wf, 'output']
-                options["endkey"] = [wf, 'output', {}]
-                tempresult = self.monitordb.conn.loadView("WMStats", "filesByWorkflow", options)['rows']
-                # merge the aso mon result and req mon result avoiding duplicated outputs
-                tempresult = [t for t in tempresult if not t['value']['jobid'] in jobids]
-                if len(tempresult) + len(result) > howmany:
-                    result += tempresult[: howmany-len(result)]
                 else:
-                    result += tempresult
-            """
-            # this version doesn't work as expected, but is an example on avoiding full view load in rest memory
-            if howmany:
-                options["limit"] = howmany - len(result)
-            for wf in workflows:
-                options["startkey"] = [wf, 'output']
-                options["endkey"] = [wf, 'output', {}]
-                result += self.monitordb.conn.loadView("WMStats", "filesByWorkflow", options)['rows']
-                # check if we have got enough and how many missing
-                if 'limit' in options:
-                    if len(result) >= howmany:
-                        break
-                    elif len(result) + options['limit'] > howmany:
-                        options['limit'] = howmany - len(result)
-            """
+                    continue
+            else: #a real job
+                found = False
+                for output in row['doc']['output']:
+                    #when we find the logarchive output we fill elem
+                    if output['type'] == 'logArchive':
+                        elem["type"] = "logArchive"
+                        elem["size"] = output['size']
+                        elem["checksums"] = output['checksums']
+                        elem["pfn"] = self.phedex.getPFN(row['doc']['site'],
+                                                         output['lfn'])[(row['doc']['site'], output['lfn'])]
+                        elem["workflow"] = workflow
+                        elem["exitcode"] = row['doc']['exitcode']
+                        numJobs[row['doc']['exitcode']] = 1 if not row['doc']['exitcode'] in numJobs else numJobs[row['doc']['exitcode']] + 1
+                        found = True
+                if not found:
+                    missLogs[str(row['doc']['exitcode'])] = 1 if not str(row['doc']['exitcode']) in missLogs else missLogs[str(row['doc']['exitcode'])] + 1
+
+            if elem:
+                yield elem
+        # how many job report did not have an exit code are reported in missing
+        yield {"missing": missLogs}
+
+    @conn_handler(services=['asomonitor'])
+    def outputLocation(self, workflow, max):
+        """
+        Retrieves the output LFN from async stage out
+
+        :arg str workflow: the unique workflow name
+        :arg int max: the maximum number of output files to retrieve
+        :return: the result of the view as it is."""
+        options = {"reduce": False, "startkey": [workflow], "endkey": [workflow, {}]}
+        if max:
+            options["limit"] = max
+        return self.asodb.conn.loadView("UserMonitoring", "FilesByWorkflow", options)['rows']
+
+    @conn_handler(services=['monitor'])
+    def outputTempLocation(self, workflow, howmany, jobtoskip):
+        """Returns the workflow output LFN from the temporary location after the
+           local stage out at the site where the job was running.
+
+           :arg str workflow: a workflow name
+           :arg int howmany: the limit on the number of PFN to return
+           :arg list int: the list of jobid to ignore
+           :return: a generator of list of output pfns"""
+        options = {"reduce": False, "limit": howmany}
+        options["startkey"] = [workflow, 'output']
+        options["endkey"] = [workflow, 'output', {}]
+        tempresult = self.monitordb.conn.loadView("WMStats", "filesByWorkflow", options)['rows']
+        return [t for t in tempresult if not t['value']['jobid'] in jobtoskip]
+
+    @conn_handler(services=['phedex'])
+    def getPhyisicalLocation(self, result):
+        """
+        Translates LFN to PFN
+
+        :arg dict list result: the list of dictionaties containing the file information
+        :return: a generator of dictionaries reporting the file information in PFN."""
         for singlefile in result:
-            singlefile['value']['type'] = "output"
             singlefile['value']['workflow'] = singlefile['key'][0]
             singlefile['value']['pfn'] = self.phedex.getPFN(singlefile['value']['location'],
                                                             singlefile['value']['lfn'])[(singlefile['value']['location'],
@@ -294,6 +283,25 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
             del singlefile['value']['location']
             del singlefile['value']['lfn']
             yield singlefile['value']
+
+    def output(self, workflow, howmany):
+        """
+        Retrieves the output PFN aggregating output in final and temporary locations.
+
+        :arg str workflow: the unique workflow name
+           :arg int howmany: the limit on the number of PFN to return
+           :return: a generator of list of outputs"""
+        howmany = howmany if howmany else 1
+        max = howmany if howmany > 0 else None
+        result = self.workflow.outputLocation(wf, max)
+
+        if not max or len(result) < howmany:
+            jobids = [singlefile['value']['jobid'] for singlefile in result]
+            tempresult = self.workflow.outputTempLocation(wf, howmany-len(result), jobids)
+            if len(tempresult) + len(result) >= howmany:
+                result += tempresult[: howmany-len(result)]
+
+        return self.getPhyisicalLocation(result)
 
     def schema(self, workflow):
         """Returns the workflow schema parameters.
@@ -327,33 +335,33 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
 
     @conn_handler(services=['wmstats'])
     def _inject(self, request):
-        # Auto Assign the requests
-        ### what is the meaning of the Team in the Analysis use case?
+        """
+        Injecting and auto assigning the requests inside ReqMgr.
+
+        :arg dict request: the request schema to inject"""
         try:
             CheckIn.checkIn(request, wmstatSvc=self.wmstats)
-            ChangeState.changeRequestStatus(request['RequestName'], 'assignment-approved', wmstatUrl=self.wmstatsurl)
-            ChangeState.assignRequest(request['RequestName'], request["Team"], wmstatUrl=self.wmstatsurl)
-        #Raised during the check in
         except CheckIn.RequestCheckInError, re:
             raise ExecutionError("Problem checking in the request", trace=traceback.format_exc(), errobj=re)
-        #Raised by the change state
+        try:
+            ChangeState.changeRequestStatus(request['RequestName'], 'assignment-approved', wmstatUrl=self.wmstatsurl)
+            ChangeState.assignRequest(request['RequestName'], request["Team"], wmstatUrl=self.wmstatsurl)
         except RuntimeError, re:
             raise ExecutionError("Problem checking in the request", trace=traceback.format_exc(), errobj=re)
 
     @conn_handler(services=['sitedb'])
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
-               userdn, userhn, publishname, asyncdest, campaign, blacklistT1):
+               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl):
         """Perform the workflow injection into the reqmgr + couch
 
            :arg str workflow: workflow name requested by the user;
            :arg str jobtype: job type of the workflow, usually Analysis;
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
-           :arg str list inputdata: input datasets;
+           :arg str inputdata: input dataset;
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name;
-           :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg str list blockwhitelist: selective list of input iblock from the specified input dataset;
            :arg str list blockblacklist:  input blocks to be excluded from the specified input dataset;
            :arg str splitalgo: algorithm to be used for the workflow splitting;
@@ -363,9 +371,13 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
            :arg str list adduserfiles: list of additional input files;
            :arg str list addoutputfiles: list of additional output files;
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
+           :arg str userdn: DN of user doing the request;
+           :arg str userhn: hyper new name of the user doing the request;
            :arg str publishname: name to use for data publication;
-           :arg str asyncdest: final destination of workflow output files;
+           :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg str campaign: needed just in case the workflow has to be appended to an existing campaign;
+           :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
+           :arg str dbsurl: dbs url where the input dataset is published;
            :returns: a dict which contaians details of the request"""
 
         #add the user in the reqmgr database
@@ -396,11 +408,11 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
                      "JobSplitArgs": { self.splitMap[splitalgo] : algoargs },
                      "Campaign": campaign or requestname, # for first submissions this should be = to the wf name
                      "Submission": 1, # easy to track the relation between resubmissions,
-                     "Requestor" : userhn,
-                     "Username"  : userhn,
+                     "Requestor": userhn,
+                     "Username": userhn,
+                     "DbsUrl": dbsurl if dbsurl is not None else self.dbsurl,
                    }
 
-        self.logger.debug("Inserting workflow with schema: %s" % schemaWf)
         if not asyncdest in self.allCMSNames.sites:
             excasync = ValueError("The parameter asyncdest %s is not in the list of known CMS sites %s" % (asyncdest, self.allCMSNames.sites))
             invalidp = InvalidParameter("Remote output data site not valid", errobj = excasync)
@@ -465,13 +477,12 @@ class DataWorkflow(object): #Page needed for debug methods used by DBFactory. Us
         raise NotImplementedError
         return [{}]
 
-    def status(self, workflows):
-        """Retrieve the states of the workflows
+    def status(self, workflow):
+        """Retrieve the status of the workflow
 
-           :arg str list workflows: a list of valid workflow name
-           :return: a generator of workflow states"""
-        for wf in workflows:
-            yield self.getWorkflow(wf)
+           :arg str workflow: a valid workflow name
+           :return: a workflow status summary document"""
+        yield self.getWorkflow(wf)
 
     def kill(self, workflow, force):
         """Request to Abort a workflow.

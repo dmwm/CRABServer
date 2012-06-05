@@ -4,8 +4,7 @@ import traceback
 from collections import namedtuple
 from time import mktime, gmtime
 
-import WMCore
-from WMCore.REST.Error import *
+from WMCore.REST.Error import ExecutionError
 from WMCore.Database.CMSCouch import CouchServer, CouchError
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import addSiteWildcards
@@ -84,4 +83,4 @@ def setProcessingVersion(request, reqmgrurl, reqmgrname):
         newVersion = max(versions) + 1
 
     logger.debug("New version is: %s" % newVersion)
-    return 'v%d' % newVersion
+    return newVersion

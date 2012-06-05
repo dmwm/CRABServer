@@ -1,10 +1,10 @@
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.REST.Server import RESTEntity, restcall, rows
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 
 # CRABServer dependecies here
-from CRABInterface.DataWorkflow import DataWorkflow
+from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
 from CRABInterface.Regexps import *
 
@@ -12,13 +12,13 @@ from CRABInterface.Regexps import *
 import cherrypy
 
 
-class RESTWorkflow(RESTEntity):
-    """REST entity for workflows and relative subresources"""
+class RESTUserWorkflow(RESTEntity):
+    """REST entity for workflows from the user point of view and relative subresources"""
 
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
 
-        self.workflowmgr = DataWorkflow()
+        self.userworkflowmgr = DataUserWorkflow()
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
@@ -47,6 +47,7 @@ class RESTWorkflow(RESTEntity):
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=True)
             validate_num("blacklistT1", param, safe, optional=False)
+            validate_str("dbsurl", param, safe, RX_DBSURL, optional=True)
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
@@ -54,15 +55,20 @@ class RESTWorkflow(RESTEntity):
             validate_str("dbsurl", param, safe, RX_DBSURL, optional=True)
 
         elif method in ['GET']:
-            validate_strlist("workflow", param, safe, RX_WORKFLOW)
+            validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
             validate_str('subresource', param, safe, RX_SUBRESTAT, optional=True)
             #parameters of subresources calls has to be put here
             #used by get latest
             validate_num('age', param, safe, optional=True)
-            #used by get log, gt data
+            #used by get log, get data
             validate_num('limit', param, safe, optional=True)
+            validate_num('exitcode', param, safe, optional=True)
+            if safe.kwargs['subresource'] not in ['data', 'logs'] and (safe.kwargs['limit'] is not None or safe.kwargs['exitcode'] is not None):
+                raise InvalidParameter("Invalid input parameters")
             #used by errors
             validate_num('shortformat', param, safe, optional=True)
+            if safe.kwargs['subresource'] not in ['errors'] and safe.kwargs['shortformat'] is not None:
+                raise InvalidParameter("Invalid input parameters")
             if not safe.kwargs['workflow'] and safe.kwargs['subresource']:
                 raise InvalidParameter("Invalid input parameters")
 
@@ -73,14 +79,15 @@ class RESTWorkflow(RESTEntity):
 
     @restcall
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist, blockblacklist,
-            splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag, publishname, asyncdest, campaign, blacklistT1):
+            splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag, publishname,
+            asyncdest, campaign, blacklistT1, dbsurl):
         """Insert a new workflow. The caller needs to be a CMS user with a valid CMS x509 cert/proxy.
 
            :arg str workflow: workflow name requested by the user;
            :arg str jobtype: job type of the workflow, usally CMSSW;
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
-           :arg str list inputdata: input datasets;
+           :arg str inputdata: input dataset;
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name;
            :arg str asyncdest: CMS site name for storage destination of the output files;
@@ -88,7 +95,7 @@ class RESTWorkflow(RESTEntity):
            :arg str list blockblacklist:  input blocks to be excluded from the specified input dataset;
            :arg str splitalgo: algorithm to be used for the workflow splitting;
            :arg str algoargs: argument to be used by the splitting algorithm;
-           :arg str configdoc: the document id of the config cache document:
+           :arg str configdoc: the document id of the config cache document;
            :arg str userisburl: URL of the input sandbox file;
            :arg str list adduserfiles: list of additional input files;
            :arg str list addoutputfiles: list of additional output files;
@@ -96,21 +103,17 @@ class RESTWorkflow(RESTEntity):
            :arg str publishname: name to use for data publication;
            :arg str asyncdest: final destination of workflow output files;
            :arg str campaign: needed just in case the workflow has to be appended to an existing campaign;
-           :arg str userdn: the user DN
-           :arg str configfile: configuration file provided by the user as string
-           :arg str psettweaks: a json representing the psettweak provided by the user
-           :arg str psethash: the hash od the psetfile
-           :arg str label:
-           :arg str  description:
+           :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
+           :arg str dbsurl: dbs url where the input dataset is published;
+           :returns: a dict which contaians details of the submitted request"""
 
-           :returns: a dict which contaians details of the request"""
-
-        return self.workflowmgr.submit(workflow=workflow, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata,
+        return self.userworkflowmgr.submit(workflow=workflow, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata,
                                        siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, blockwhitelist=blockwhitelist,
                                        blockblacklist=blockblacklist, splitalgo=splitalgo, algoargs=algoargs, configdoc=configdoc,
                                        userisburl=userisburl, adduserfiles=adduserfiles, addoutputfiles=addoutputfiles,
                                        savelogsflag=savelogsflag, userdn=cherrypy.request.user['dn'], userhn=cherrypy.request.user['login'],
-                                       publishname=publishname, asyncdest=asyncdest, campaign=campaign, blacklistT1=blacklistT1)
+                                       publishname=publishname, asyncdest=asyncdest, campaign=campaign, blacklistT1=blacklistT1,
+                                       dbsurl=dbsurl)
 
     @restcall
     def post(self, workflow, resubmit, dbsurl):
@@ -124,44 +127,48 @@ class RESTWorkflow(RESTEntity):
         result = []
         if resubmit:
             # strict check on authz: only the workflow owner can modify it
-            alldocs = authz_owner_match(self.workflowmgr.database, [workflow])
-            result = rows([self.workflowmgr.resubmit(workflow)])
+            alldocs = authz_owner_match(self.userworkflowmgr.database, [workflow])
+            result = rows([self.userworkflowmgr.resubmit(workflow)])
         elif dbsurl:
-            result = rows([self.workflowmgr.publish(workflow, dbsurl)])
-
+            # strict check on authz: only the workflow owner can modify it
+            alldocs = authz_owner_match(self.workflowmgr.database, [workflow])
+            result = rows([self.userworkflowmgr.publish(workflow=workflow, dbsurl=dbsurl, doc=alldocs[-1],
+                                                        userdn=cherrypy.request.user['dn'],
+                                                        userhn=cherrypy.request.user['login'])])
         return result
 
     @restcall
-    def get(self, workflow, subresource, age, limit, shortformat):
-        """Retrieves the workflows information, like a status summary, in case the workflow unique name is specified.
+    def get(self, workflow, subresource, age, limit, shortformat, exitcode):
+        """Retrieves the workflow information, like a status summary, in case the workflow unique name is specified.
            Otherwise returns all workflows since (now - age) for which the user is the owner.
-           The caller needs to be a CMS user owner of the workflow.
+           The caller needs to be a valid CMS user.
 
-           :arg str list workflow: list of unique name identifiers of workflows;
-           :arg int age: max workflows age in days;
+           :arg str workflow: unique name identifier of workflow;
+           :arg int age: max workflow age in days;
            :arg str subresource: the specific workflow information to be accessed;
            :arg int limit: limit of return entries for some specific subresource;
-           :retrun: the list of workflows with the relative status summary in case of per user request; or
+           :arg int exitcode: exitcode for which the specific subresource is needed (eg log file of a job with that exitcode)
+           :retrun: workflow with the relative status summary in case of per user request; or
                     the requested subresource."""
 
         result = []
         if workflow:
             # if have the wf then retrieve the wf status summary
             if not subresource:
-                result = self.workflowmgr.status(workflow)
+                result = self.userworkflowmgr.status(workflow)
             # if have a subresource then it should be one of these
             elif subresource == 'logs':
-                result = self.workflowmgr.logs(workflow, limit)
+                result = self.userworkflowmgr.logs(workflow, limit, exitcode)
             elif subresource == 'data':
-                result = self.workflowmgr.output(workflow, limit)
+                result = self.userworkflowmgr.output(workflow, limit)
             elif subresource == 'errors':
-                result = self.workflowmgr.errors(workflow, shortformat)
+                result = self.userworkflowmgr.errors(workflow, shortformat)
             elif subresource == 'report':
-                result = rows([self.workflowmgr.report(workflow)])
+                result = rows([self.userworkflowmgr.report(workflow)])
             elif subresource == 'schema':
-                result = rows([self.workflowmgr.schema(workflow)])
+                result = rows([self.userworkflowmgr.schema(workflow)])
             elif subresource == 'configcache':
-                result = rows([self.workflowmgr.configcache(workflow)])
+                result = rows([self.userworkflowmgr.configcache(workflow)])
             # if here means that no valid subresource has been requested
             # flow should never pass through here since validation restrict this
             else:
@@ -170,7 +177,7 @@ class RESTWorkflow(RESTEntity):
             # retrieve the information about latest worfklows for that user
             # age can have a default: 1 week ?
             cherrypy.log("Found user '%s'" % cherrypy.request.user['login'])
-            result = self.workflowmgr.getLatests(cherrypy.request.user['login'], limit, age)
+            result = self.userworkflowmgr.getLatests(cherrypy.request.user['login'], limit, age)
 
         return result
 
@@ -183,6 +190,6 @@ class RESTWorkflow(RESTEntity):
            :return: nothing?"""
 
         # strict check on authz: only the workflow owner can modify it
-        alldocs = authz_owner_match(self.workflowmgr.database, workflow)
-        result = rows([self.workflowmgr.kill(workflow, force)])
+        alldocs = authz_owner_match(self.userworkflowmgr.database, workflow)
+        result = rows([self.userworkflowmgr.kill(workflow, force)])
         return result
