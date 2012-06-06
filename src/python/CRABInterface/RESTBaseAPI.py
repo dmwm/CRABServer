@@ -7,6 +7,7 @@ from WMCore.REST.Format import JSONFormat
 # CRABServer dependecies here
 from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTCampaign import RESTCampaign
+from CRABInterface.RESTServerInfo import RESTServerInfo
 from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.DataCampaign import DataCampaign
@@ -35,9 +36,10 @@ class RESTBaseAPI(RESTApi):
 
         self._add( {'workflow': RESTUserWorkflow(app, self, config, mount),
                     'campaign': RESTCampaign(app, self, config, mount),
+                    'info': RESTServerInfo(app, self, config, mount),
                    } )
 
-        self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None) ) #None can be cahnged to logging.INFO if we realize we can log to a file in the cmsWeb env
+        self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None) )
 
     def _initLogger(self, logfile, loglevel):
         """
