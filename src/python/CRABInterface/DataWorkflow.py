@@ -13,7 +13,7 @@ from WMCore.RequestManager.RequestMaker.Registry import retrieveRequestMaker
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 from WMCore.RequestManager.RequestMaker import CheckIn
 from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState, GetRequest
-from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import loadWorkload, changeStatus
+from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import loadWorkload, abortRequest
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.Database.DBFactory import DBFactory
 
@@ -526,6 +526,7 @@ class DataWorkflow(object):
 
            :arg str workflow: a workflow name"""
         try:
-            changeStatus(workflow, 'aborted', wmstatUrl=self.wmstatsurl)
+            ChangeState.changeRequestStatus(workflow, 'aborted', wmstatUrl=self.wmstatsurl)
+            abortRequest(workflow)
         except RuntimeError, re:
             raise ExecutionError("Problem killing the request", trace=traceback.format_exc(), errobj=re)
