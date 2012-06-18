@@ -1,7 +1,7 @@
 import logging
 
 # WMCore dependecies here
-from WMCore.REST.Error import ExecutionError, MissingObject
+from WMCore.REST.Error import InvalidParameter, ExecutionError, MissingObject
 from WMCore.Database.CMSCouch import CouchServer, CouchError, CouchNotFoundError
 
 #CRAB dependencies
@@ -208,7 +208,7 @@ class DataUserWorkflow(object):
 
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
-               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl):
+               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc):
         """Perform the workflow injection into the reqmgr + couch
 
            :arg str workflow: workflow name requested by the user;
@@ -233,20 +233,28 @@ class DataUserWorkflow(object):
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
+           :arg str acdcdoc: input acdc document which contains the input information for data selction (eg: lumi mask)
            :returns: a dict which contaians details of the request"""
 
         return self.workflow.submit(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist,
                                         blockwhitelist, blockblacklist, splitalgo, algoargs, configdoc, userisburl,
                                         adduserfiles, addoutputfiles, savelogsflag, userdn, userhn, publishname,
-                                        asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl)
+                                        asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc)
 
-    def resubmit(self, workflow):
-        """Request to reprocess what the workflow hasn't finished to reprocess.
-           This needs to create a new workflow in the same campaign"""
-        # TODO: part of the code here needs to be shared with inject
-        wfchain = self._getWorkflowChain(workflow)
-
-        raise NotImplementedError
+    def resubmit(self, workflow, siteblacklist, sitewhitelist):
+        """Request to reprocess what the latest workflow in the chain hasn't finished to reprocess.
+           This needs to create a new workflow in the same campaign, using previously missed input.
+           :arg str workflow: a valid workflow name
+           :arg str list siteblacklist: black list of sites, with CMS name;
+           :arg str list sitewhitelist: white list of sites, with CMS name."""
+        latestwf = self._getWorkflowChain(workflow)[-1]
+        wfdoc = self.workflow.getWorkflow(latestwf)
+        if wfdoc['request_status'][-1]['status'] not in ["aborted", "completed"]:
+            raise InvalidParameter("Impossible to resubmit a not completed workflow.")
+        for status in wfdoc['status']:
+            if status not in ["failure", "success"]:
+                raise InvalidParameter("Impossible to resubmit a workflow with pending jobs.")
+        self.workflow.resubmit(workflow=wfdoc["workflow"], siteblacklist=siteblacklist, sitewhitelist=sitewhitelist)
 
     def status(self, workflow):
         """Retrieve the status of the workflow
@@ -288,8 +296,11 @@ class DataUserWorkflow(object):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name
-           :arg int force: force to delete the workflows in any case; 0 no, everything else yes
-           :return: the operation result"""
-        wfchain = self._getWorkflowChain(workflow)
-
-        raise NotImplementedError
+           :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
+        skipkill = ["aborted", "failed", "completed"]
+        latestwf = self._getWorkflowChain(workflow)[-1]
+        wfdoc = self.workflow.getWorkflow(latestwf)
+        if not force:
+            if wfdoc['request_status'][-1]['status'] in skipkill:
+                raise InvalidParameter("Workflow cannot be killed because already finished.")
+        self.workflow.kill(workflow)

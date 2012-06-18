@@ -7,11 +7,13 @@ Currently authz_owner_match uses a WMCore.Database.CMSCouch method
 but in next versions it should be dropped, as from the CRABInterface.
 """
 from WMCore.REST.Error import MissingObject
+from CRABInterface.Utils import CouchDBConn, conn_handler
 
 import cherrypy
 import traceback
 
-def authz_owner_match(database, workflows, retrieve_docs=True):
+@conn_handler(services=['monitor'])
+def authz_owner_match(accessobj, workflows, retrieve_docs=True):
     """Match user against authorisation requirements to modify an existing resource.
        Allows to cache couchdb fetched documents if the caller needs them.
 
@@ -28,7 +30,7 @@ def authz_owner_match(database, workflows, retrieve_docs=True):
     for wf in workflows:
         wfdoc = None
         try:
-            wfdoc = database.document( id = wf )
+            wfdoc = accessobj.monitordb.conn.document( id = wf )
         except Exception, ex:
             excauthz = RuntimeError("The document '%s' is not retrievable '%s'" % (wf, str(ex)))
             raise MissingObject("The resource requested does not exist", trace=traceback.format_exc(), errobj = excauthz)

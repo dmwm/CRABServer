@@ -33,6 +33,8 @@ data.reqmgrname = 'reqmgrdb'
 data.phedexurl = 'https://cmsweb.cern.ch/phedex/datasvc/xml/prod/'
 data.dbsurl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
 data.delegateto = ['/dn/of/the/agent/for.myproxy.delegation']
+data.acdcurl = 'http://localhost:5984'
+data.acdcdb = 'wmagent_acdc'
 
 data.connectUrl = connectUrl
 #data.loggingLevel = 10

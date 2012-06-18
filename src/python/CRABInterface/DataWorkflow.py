@@ -12,14 +12,15 @@ from WMCore.Database.CMSCouch import CouchServer, CouchError, Database, CouchNot
 from WMCore.RequestManager.RequestMaker.Registry import retrieveRequestMaker
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 from WMCore.RequestManager.RequestMaker import CheckIn
-from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState
+from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState, GetRequest
+from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import loadWorkload, changeStatus
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.Database.DBFactory import DBFactory
 
 #CRAB dependencies
 from CRABInterface.DataUser import DataUser
 from CRABInterface.Utils import setProcessingVersion, CouchDBConn, CMSSitesCache, conn_handler
-
+from CRABInterface.Regexps import RX_WFRESUB
 
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
@@ -29,7 +30,8 @@ class DataWorkflow(object):
     @staticmethod
     def globalinit(monurl, monname, asomonurl, asomonname, reqmgrurl, reqmgrname,
                    configcacheurl, configcachename, connectUrl, phedexargs=None,
-                   dbsurl=None, sitewildcards={'T1*': 'T1_*', 'T2*': 'T2_*', 'T3*': 'T3_*'}):
+                   dbsurl=None, acdcurl=None, acdcdb=None,
+                   sitewildcards={'T1*': 'T1_*', 'T2*': 'T2_*', 'T3*': 'T3_*'}):
 
         DataWorkflow.monitordb = CouchDBConn(db=CouchServer(monurl), name=monname, conn=None)
         DataWorkflow.asodb = CouchDBConn(db=CouchServer(asomonurl), name=asomonname, conn=None)
@@ -50,6 +52,9 @@ class DataWorkflow(object):
         DataWorkflow.phedex = None
 
         DataWorkflow.dbsurl = dbsurl
+
+        DataWorkflow.acdcurl = acdcurl
+        DataWorkflow.acdcdb = acdcdb
 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
@@ -343,7 +348,7 @@ class DataWorkflow(object):
     @conn_handler(services=['sitedb'])
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
-               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl):
+               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc):
         """Perform the workflow injection into the reqmgr + couch
 
            :arg str workflow: workflow name requested by the user;
@@ -404,6 +409,9 @@ class DataWorkflow(object):
                      "Username": userhn,
                      "DbsUrl": dbsurl if dbsurl is not None else self.dbsurl,
                      "PublishDbsUrl": publishdbsurl,
+                     "ACDCUrl": self.acdcurl,
+                     "ACDCDBName": self.acdcdb,
+                     "ACDCDoc": acdcdoc,
                    }
 
         if not asyncdest in self.allCMSNames.sites:
@@ -411,26 +419,17 @@ class DataWorkflow(object):
             invalidp = InvalidParameter("Remote output data site not valid", errobj = excasync)
             setattr(invalidp, 'trace', '')
             raise invalidp
-
-        #TODO where's the ACDC?
-        #requestSchema["ACDCUrl"] =  self.ACDCCouchURL
-        #requestSchema["ACDCDBName"] =  self.ACDCCouchDB
-        #TODO is it needed?
-        #requestSchema['OriginalRequestName'] = requestSchema['RequestName']
+        if schemaWf.get("ACDCDoc", None) and schemaWf['JobSplitAlgo'] != 'LumiBased':
+            excsplit = ValueError("You must use LumiBased splitting if specifying a lumiMask.")
+            invalidp = InvalidParameter("You must use LumiBased splitting if specifying a lumiMask.", errobj = excsplit)
+            setattr(invalidp, 'trace', '')
+            raise invalidp
 
         schemaWf["ProcessingVersion"] = setProcessingVersion(schemaWf, self.reqmgrurl, self.reqmgrname)
 
         maker = retrieveRequestMaker("Analysis")
         specificSchema = maker.schemaClass()
         specificSchema.update(schemaWf)
-#       TODO do we really need these three instructions? At the end url is (from the old reqmgr) http://crabas.lnl.infn.it:8188/crabinterface/crab
-#        url = cherrypy.url()
-        # we only want the first part, before /task/
-#        url = url[0:url.find('/task')]
-#        specificSchema.reqMgrURL = url
-
-        if schemaWf.get("ACDCDoc", None) and schemaWf['JobSplitAlgo'] != 'LumiBased':
-            raise InvalidParameter('You must use LumiBased splitting if specifying a lumiMask.')
 
         try:
             specificSchema.allCMSNames = self.allCMSNames.sites
@@ -463,12 +462,57 @@ class DataWorkflow(object):
 
         return [{'RequestName': request['RequestName']}]
 
-    def resubmit(self, workflow):
+    def resubmit(self, workflow, siteblacklist, sitewhitelist):
         """Request to reprocess what the workflow hasn't finished to reprocess.
-           This needs to create a new workflow in the same campaign"""
+           This needs to create a new workflow in the same campaign
+
+           :arg str workflow: a valid workflow name
+           :arg str list siteblacklist: black list of sites, with CMS name;
+           :arg str list sitewhitelist: white list of sites, with CMS name."""
+        # TODO: change this
+        taskresubmit = "Analysis"
         # TODO: part of the code here needs to be shared with inject
-        raise NotImplementedError
-        return [{}]
+        originalwf = GetRequest.getRequestByName( workflow )
+        helper = loadWorkload(originalwf)
+        originalschema = helper.data.request.schema.dictionary_()
+        wmtask = helper.getTask(taskresubmit)
+        if not wmtask:
+            exctask = ValueError('%s task not found in the workflow %s.' %(taskResubmit, lastSubmission))
+            invalidp = InvalidParameter("Problem resubmitting workflow because task to resubmit was not found.", errobj = exctask)
+            setattr(invalidp, 'trace', '')
+            raise invalidp
+        taskpath = wmtask.getPathName()
+        resubmitschema = originalschema.copy()
+        newpars = { 'OriginalRequestName': workflow,
+                    'InitialTaskPath':     taskpath,
+                    'SiteWhitelist':       sitewhitelist if sitewhitelist else originalschema.get('SiteWhitelist', []),
+                    'SiteBlacklist':       siteblacklist if siteblacklist else originalschema.get('SiteBlacklist', []),
+                    'Submission':          originalschema['Submission'] + 1,
+                    'ACDCServer':          originalschema['ACDCUrl'],
+                    'ACDCDatabase':        originalschema['ACDCDBName'],
+                  }
+        resubmitschema.update(newpars)
+        maker = retrieveRequestMaker("Resubmission")
+        schema = maker.newSchema()
+        ## updating it with resubmission parameters
+        schema.update( resubmitschema )
+        ## generating a new name: I am choosing the original name plus resubmit and date
+
+        if RX_WFRESUB.match(workflow):
+            times = int(workflow.rsplit('_resubmit')[-1].split('_')[-1])+1
+            basenewname = workflow.rsplit('_resubmit')[0]
+            schema['RequestName'] = basenewname + '_resubmit_' + str(times)
+        else:
+            schema['RequestName'] = workflow + '_resubmit_1'
+        request = maker(schema)
+        newhelper = WMWorkloadHelper(request['WorkflowSpec'])
+        # can't save Request object directly, because it makes it hard to retrieve the _rev
+        metadata = {}
+        metadata.update(request)
+        # don't want to JSONify the whole workflow
+        del metadata['WorkflowSpec']
+        request['RequestWorkflow'] = newhelper.saveCouch(self.reqmgrurl, self.reqmgrname, metadata=metadata)
+        self._inject(request)
 
     def status(self, workflow):
         """Retrieve the status of the workflow
@@ -477,11 +521,11 @@ class DataWorkflow(object):
            :return: a workflow status summary document"""
         yield self.getWorkflow(wf)
 
-    def kill(self, workflow, force):
+    def kill(self, workflow):
         """Request to Abort a workflow.
 
-           :arg str workflow: a workflow name
-           :arg int force: force to delete the workflows in any case; 0 no, everything else yes
-           :return: the operation result"""
-        raise NotImplementedError
-        return [{}]
+           :arg str workflow: a workflow name"""
+        try:
+            changeStatus(workflow, 'aborted', wmstatUrl=self.wmstatsurl)
+        except RuntimeError, re:
+            raise ExecutionError("Problem killing the request", trace=traceback.format_exc(), errobj=re)
