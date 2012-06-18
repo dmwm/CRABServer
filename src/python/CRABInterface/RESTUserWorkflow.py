@@ -158,7 +158,7 @@ class RESTUserWorkflow(RESTEntity):
             elif subresource == 'errors':
                 result = self.userworkflowmgr.errors(workflow, shortformat)
             elif subresource == 'report':
-                result = rows([self.userworkflowmgr.report(workflow)])
+                result = self.userworkflowmgr.report(workflow)
             elif subresource == 'schema':
                 result = rows([self.userworkflowmgr.schema(workflow)])
             elif subresource == 'configcache':

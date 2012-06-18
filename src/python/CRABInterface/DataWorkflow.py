@@ -67,6 +67,15 @@ class DataWorkflow(object):
         self.dbi = DBFactory(self.logger, self.connectUrl).connect()
         cherrypy.engine.subscribe('start_thread', self.initThread)
 
+        # Supporting different types of workflows means providing
+        # different functionalities depending on the type.
+        # This dictionary contains pointer to workflow type methods
+        # (when many more methods are needed it can be evaluated to have
+        #  a common base class and implemantation of types with common
+        #  naming convention).
+        self.typemapping = {'Analysis': {'report': self._reportAnalysis},
+                            'PrivateMC': {'report': self._reportPrivateMC},}
+
     def initThread(self, thread_index):
         """
         The ReqMgr expects the DBI to be contained in the Thread
@@ -157,7 +166,6 @@ class DataWorkflow(object):
         options = {"startkey": [workflow, "jobfailed"], "endkey": [workflow, "jobfailed", {}, {}, {}], "reduce": True,  "group_level": group_level}
         return self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
 
-    @conn_handler(services=['monitor'])
     def report(self, workflow):
         """Retrieves the quality of the workflow in term of what has been processed
            (eg: good lumis)
@@ -165,12 +173,10 @@ class DataWorkflow(object):
            :arg str workflow: a workflow name
            :return: what?"""
 
-        # example:
-        # return self.monitordb.conn.loadView('WMStats', 'getlumis',
-        #                              options = { "startkey": workflow,
-        #                                          "endkey": workflow,})
-        raise NotImplementedError
-        return [{}]
+        try:
+            return self.typemapping[self.getType(workflow)]['report'](workflow)
+        except KeyError, ex:
+            raise InvalidParameter("Not valid scehma provided", trace=traceback.format_exc(), errobj = ex)
 
     @conn_handler(services=['monitor', 'phedex'])
     def logs(self, workflow, howmany, exitcode):
@@ -530,3 +536,36 @@ class DataWorkflow(object):
             abortRequest(workflow)
         except RuntimeError, re:
             raise ExecutionError("Problem killing the request", trace=traceback.format_exc(), errobj=re)
+
+    @conn_handler(services=['monitor'])
+    def getType(self, workflow):
+        """Retrieves the workflow type from the monitoring
+
+           :arg str workflow: a workflow name
+           :return: a string of the job type supported by the workflow."""
+
+        return self.monitordb.conn.document(id=workflow).get('request_type', None)
+
+    @conn_handler(services=['monitor'])
+    def _reportAnalysis(self, workflow):
+        """Retrieves the quality of the workflow in term of what has been processed
+           from an analysis point of view, looking at good lumis.
+
+           :arg str workflow: a workflow name
+           :return: dictionary with run-lumis information"""
+
+        options = {"reduce": False, "include_docs" : True, "startkey": [workflow, "success", 0], "endkey": [workflow, "success", 0, {}, {}]}
+        output = {}
+        for singlelumi in self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']:
+            if 'lumis' in singlelumi['doc'] and singlelumi['doc']['lumis']:
+                for run in singlelumi['doc']['lumis']:
+                    output.update((k, run[k]+output.get(k,[])) for k in run)
+        return [output]
+
+    def _reportPrivateMC(self, workflow):
+        """Retrieves the quality of the workflow in term of what has been processed.
+
+           :arg str workflow: a workflow name
+           :return: what?"""
+
+        raise NotImplementedError

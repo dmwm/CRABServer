@@ -133,8 +133,8 @@ class DataUserWorkflow(object):
            :arg str workflow: a workflow name
            :return: what?"""
         wfchain = self._getWorkflowChain(workflow)
-
-        raise NotImplementedError
+        for wf in wfchain:
+            yield self.workflow.report(wf)
 
     @conn_handler(services=['monitor'])
     def logs(self, workflow, howmany, exitcode):
