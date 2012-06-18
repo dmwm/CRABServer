@@ -44,6 +44,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE)
             validate_num("savelogsflag", param, safe, optional=False)
             validate_str("publishname", param, safe, RX_PUBLISH, optional=False)
+            validate_str("publishdbsurl", param, safe, RX_PUBDBSURL, optional=True)
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=True)
             validate_num("blacklistT1", param, safe, optional=False)
@@ -51,8 +52,6 @@ class RESTUserWorkflow(RESTEntity):
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
-            validate_num("resubmit", param, safe, optional=True)
-            validate_str("dbsurl", param, safe, RX_DBSURL, optional=True)
 
         elif method in ['GET']:
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
@@ -80,7 +79,7 @@ class RESTUserWorkflow(RESTEntity):
     @restcall
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist, blockblacklist,
             splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag, publishname,
-            asyncdest, campaign, blacklistT1, dbsurl):
+            asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl):
         """Insert a new workflow. The caller needs to be a CMS user with a valid CMS x509 cert/proxy.
 
            :arg str workflow: workflow name requested by the user;
@@ -105,6 +104,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str campaign: needed just in case the workflow has to be appended to an existing campaign;
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
+           :arg str publishdbsurl: dbs url where the output data has to be published;
            :returns: a dict which contaians details of the submitted request"""
 
         return self.userworkflowmgr.submit(workflow=workflow, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata,
@@ -113,29 +113,19 @@ class RESTUserWorkflow(RESTEntity):
                                        userisburl=userisburl, adduserfiles=adduserfiles, addoutputfiles=addoutputfiles,
                                        savelogsflag=savelogsflag, userdn=cherrypy.request.user['dn'], userhn=cherrypy.request.user['login'],
                                        publishname=publishname, asyncdest=asyncdest, campaign=campaign, blacklistT1=blacklistT1,
-                                       dbsurl=dbsurl)
+                                       dbsurl=dbsurl, publishdbsurl=publishdbsurl)
 
     @restcall
-    def post(self, workflow, resubmit, dbsurl):
-        """Modifies an existing workflow. The caller needs to be a CMS user owner of the workflow.
+    def post(self, workflow):
+        """Resubmit an existing workflow. The caller needs to be a CMS user owner of the workflow.
 
            :arg str workflow: unique name identifier of the workflow;
-           :arg int resubmit: reubmit the workflow? 0 no, everything else yes;
-           :arg str dbsurl: publish the workflow results
-           :returns: return the modified fields or the publication details"""
+           :returns: return the operation result"""
 
         result = []
-        if resubmit:
-            # strict check on authz: only the workflow owner can modify it
-            alldocs = authz_owner_match(self.userworkflowmgr.database, [workflow])
-            result = rows([self.userworkflowmgr.resubmit(workflow)])
-        elif dbsurl:
-            # strict check on authz: only the workflow owner can modify it
-            alldocs = authz_owner_match(self.workflowmgr.database, [workflow])
-            result = rows([self.userworkflowmgr.publish(workflow=workflow, dbsurl=dbsurl, doc=alldocs[-1],
-                                                        userdn=cherrypy.request.user['dn'],
-                                                        userhn=cherrypy.request.user['login'])])
-        return result
+        # strict check on authz: only the workflow owner can modify it
+        alldocs = authz_owner_match(self.userworkflowmgr.database, [workflow])
+        return rows([self.userworkflowmgr.resubmit(workflow)])
 
     @restcall
     def get(self, workflow, subresource, age, limit, shortformat, exitcode):

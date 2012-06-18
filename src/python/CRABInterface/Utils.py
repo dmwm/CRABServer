@@ -73,7 +73,7 @@ def setProcessingVersion(request, reqmgrurl, reqmgrname):
     for row in requests['rows']:
         oldVersion = row['value']['version']
         try:
-            versions.append(int(oldVersion.replace('v', '')))
+            versions.append(int(oldVersion))
         except ValueError: # Not an int, so we ignore it
             pass
 

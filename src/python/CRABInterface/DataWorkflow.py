@@ -324,15 +324,6 @@ class DataWorkflow(object):
         raise NotImplementedError
         return [{}]
 
-    def publish(self, workflow, dbsurl):
-        """Perform the data publication of the workflow result.
-
-           :arg str workflow: a workflow name
-           :arg str dbsurl: the DBS URL endpoint where to publish
-           :return: the publication status or result"""
-        raise NotImplementedError
-        return [{}]
-
     @conn_handler(services=['wmstats'])
     def _inject(self, request):
         """
@@ -352,7 +343,7 @@ class DataWorkflow(object):
     @conn_handler(services=['sitedb'])
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
-               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl):
+               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl):
         """Perform the workflow injection into the reqmgr + couch
 
            :arg str workflow: workflow name requested by the user;
@@ -378,6 +369,7 @@ class DataWorkflow(object):
            :arg str campaign: needed just in case the workflow has to be appended to an existing campaign;
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
+           :arg str publishdbsurl: dbs url where the output data has to be published;
            :returns: a dict which contaians details of the request"""
 
         #add the user in the reqmgr database
@@ -411,6 +403,7 @@ class DataWorkflow(object):
                      "Requestor": userhn,
                      "Username": userhn,
                      "DbsUrl": dbsurl if dbsurl is not None else self.dbsurl,
+                     "PublishDbsUrl": publishdbsurl,
                    }
 
         if not asyncdest in self.allCMSNames.sites:

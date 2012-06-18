@@ -29,7 +29,6 @@ class RESTCampaign(RESTEntity):
 
         elif method in ['POST']:
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=False)
-            validate_num("resubmit", param, safe, optional=True)
 
         elif method in ['GET']:
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=True)
@@ -62,21 +61,17 @@ class RESTCampaign(RESTEntity):
         return [{'campaign': uniquecampaign, 'workflows': result}]
 
     @restcall
-    def post(self, campaign, resubmit):
-        """Modifies an existing campaign. The caller needs to be a CMS user owner of the campaign.
+    def post(self, campaign):
+        """Resubmit an existing campaign. The caller needs to be a CMS user owner of the campaign.
 
            :arg str campaign: unique name identifier of the campaign;
-           :arg int resubmit: resubmit the campaign? 0 no, everything else yes;
            :returns: the list of modified field"""
 
         raise NotImplementedError
-        if resubmit:
-            # strict check on authz: only the campaign owner can modify it
-            workflows = self.campaignmgr.getCampaignWorkflows(campaign)
-            alldocs = authz_owner_match(self.campaignmgr.monitordb, workflows)
-            return self.campaignmgr.resubmit(campaign, workflows)
-        else:
-            raise NotImplementedError
+        # strict check on authz: only the campaign owner can modify it
+        workflows = self.campaignmgr.getCampaignWorkflows(campaign)
+        alldocs = authz_owner_match(self.campaignmgr.monitordb, workflows)
+        return self.campaignmgr.resubmit(campaign, workflows)
 
     @restcall
     def get(self, campaign, age, subresource, limit):

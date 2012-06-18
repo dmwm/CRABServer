@@ -206,18 +206,9 @@ class DataUserWorkflow(object):
         wfchain = self._getWorkflowChain(workflow)
         raise NotImplementedError
 
-    def publish(self, workflow, dbsurl, doc, userdn, userhn):
-        """Perform the data publication of the workflow result.
-
-           :arg str workflow: a workflow name
-           :arg str dbsurl: the DBS URL endpoint where to publish
-           :return: the publication status or result"""
-        wfchain = self._getWorkflowChain(workflow)
-        raise NotImplementedError
-
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
-               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl):
+               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl):
         """Perform the workflow injection into the reqmgr + couch
 
            :arg str workflow: workflow name requested by the user;
@@ -241,12 +232,13 @@ class DataUserWorkflow(object):
            :arg str campaign: needed just in case the workflow has to be appended to an existing campaign;
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
+           :arg str publishdbsurl: dbs url where the output data has to be published;
            :returns: a dict which contaians details of the request"""
 
         return self.workflow.submit(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist,
                                         blockwhitelist, blockblacklist, splitalgo, algoargs, configdoc, userisburl,
                                         adduserfiles, addoutputfiles, savelogsflag, userdn, userhn, publishname,
-                                        asyncdest, campaign, blacklistT1, dbsurl)
+                                        asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl)
 
     def resubmit(self, workflow):
         """Request to reprocess what the workflow hasn't finished to reprocess.
