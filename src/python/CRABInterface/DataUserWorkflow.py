@@ -304,3 +304,12 @@ class DataUserWorkflow(object):
             if wfdoc['request_status'][-1]['status'] in skipkill:
                 raise InvalidParameter("Workflow cannot be killed because already finished.")
         self.workflow.kill(workflow)
+
+    def getType(self, workflow):
+        """Retrieves the workflow type from the monitoring
+
+           :arg str workflow: a workflow name
+           :return: a string of the job type supported by the workflow."""
+        ## will we have workflows with different job types in the same chain?
+        ## current answer is NO
+        return self.workflow.getType(self._getWorkflowChain(workflow)[-1])

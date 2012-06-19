@@ -163,6 +163,8 @@ class RESTUserWorkflow(RESTEntity):
                 result = rows([self.userworkflowmgr.schema(workflow)])
             elif subresource == 'configcache':
                 result = rows([self.userworkflowmgr.configcache(workflow)])
+            elif subresource == 'type':
+                result = self.userworkflowmgr.getType(workflow)
             # if here means that no valid subresource has been requested
             # flow should never pass through here since validation restrict this
             else:

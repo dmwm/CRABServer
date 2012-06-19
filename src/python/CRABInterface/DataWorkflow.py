@@ -543,7 +543,6 @@ class DataWorkflow(object):
 
            :arg str workflow: a workflow name
            :return: a string of the job type supported by the workflow."""
-
         return self.monitordb.conn.document(id=workflow).get('request_type', None)
 
     @conn_handler(services=['monitor'])
