@@ -344,7 +344,7 @@ class DataWorkflow(object):
         try:
             CheckIn.checkIn(request, wmstatSvc=self.wmstats)
         except CheckIn.RequestCheckInError, re:
-            raise ExecutionError("Problem checking in the request", trace=traceback.format_exc(), errobj=re)
+            raise ExecutionError("Problem checking in the request: %s" % getattr(re, '_message', 'unknown'), trace=traceback.format_exc(), errobj=re)
         try:
             ChangeState.changeRequestStatus(request['RequestName'], 'assignment-approved', wmstatUrl=self.wmstatsurl)
             ChangeState.assignRequest(request['RequestName'], request["Team"], wmstatUrl=self.wmstatsurl)
