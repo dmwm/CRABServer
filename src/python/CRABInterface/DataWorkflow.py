@@ -91,7 +91,7 @@ class DataWorkflow(object):
         :arg str wf: the workflow name
         :return: the summary documents in a dictionary.
         """
-        options = {"startkey": wf, "endkey": wf, 'reduce': True, 'descending': True}
+        options = {"startkey": [wf, {}], "endkey": [wf], 'reduce': True, 'descending': True}
         try:
             doc = self.monitordb.conn.document(id=wf)
         except CouchNotFoundError:
