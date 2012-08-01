@@ -14,7 +14,6 @@ from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 from WMCore.RequestManager.RequestMaker import CheckIn
 from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState, GetRequest
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import loadWorkload, abortRequest
-from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.Database.DBFactory import DBFactory
 
 #CRAB dependencies
@@ -388,6 +387,38 @@ class DataWorkflow(object):
         except RuntimeError, re:
             raise ExecutionError("Problem checking in the request", trace=traceback.format_exc(), errobj=re)
 
+
+    def _injectCouch(self, schemaWf, makerType):
+        maker = retrieveRequestMaker(makerType)
+        specificSchema = maker.newSchema()
+        specificSchema.update(schemaWf)
+        try:
+            specificSchema.allCMSNames = self.allCMSNames.sites
+            specificSchema.validate()
+        except Exception as ex:
+            raise InvalidParameter("Not valid scehma provided", trace=traceback.format_exc(), errobj=ex)
+        #The client set BlacklistT1 as true if the user has not t1access role.
+        if specificSchema["BlacklistT1"]:
+            if specificSchema['SiteBlacklist']:
+                specificSchema['SiteBlacklist'].append("T1*")
+            else:
+                specificSchema['SiteBlacklist'] = ["T1*"]
+        request = maker(specificSchema)
+        helper = WMWorkloadHelper(request['WorkflowSpec'])
+        # can't save Request object directly, because it makes it hard to retrieve the _rev
+        metadata = {}
+        metadata.update(request) # don't want to JSONify the whole workflow
+        del metadata['WorkflowSpec']
+        siteBlacklist = specificSchema.get("SiteBlacklist", [])
+        siteWhitelist = specificSchema.get("SiteWhitelist", [])
+        helper.setSiteWildcardsLists(siteWhitelist=siteWhitelist, siteBlacklist=siteBlacklist, wildcardDict=self.wildcardSites)
+        if not set(siteBlacklist).isdisjoint( set(siteWhitelist) ):
+            raise InvalidParameter("SiteBlacklist and SiteWhitelist are not disjoint: %s in both lists" % \
+                                   (','.join( set(siteBlacklist) & set(siteWhitelist) )))
+        request['RequestWorkflow'] = helper.saveCouch(self.reqmgrurl, self.reqmgrname, metadata=metadata)
+        return request
+
+
     @conn_handler(services=['sitedb'])
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
@@ -450,6 +481,7 @@ class DataWorkflow(object):
                      "Submission": 1, # easy to track the relation between resubmissions,
                      "Requestor": userhn,
                      "Username": userhn,
+                     "BlacklistT1": blacklistT1,
                      "DbsUrl": dbsurl if dbsurl is not None else self.dbsurl,
                      "PublishDbsUrl": publishdbsurl,
                      "ACDCUrl": self.acdcurl,
@@ -470,41 +502,16 @@ class DataWorkflow(object):
 
         schemaWf["ProcessingVersion"] = setProcessingVersion(schemaWf, self.reqmgrurl, self.reqmgrname)
 
-        maker = retrieveRequestMaker("Analysis")
-        specificSchema = maker.schemaClass()
-        specificSchema.update(schemaWf)
-
-        try:
-            specificSchema.allCMSNames = self.allCMSNames.sites
-            specificSchema.validate()
-        except Exception, ex:
-            raise InvalidParameter("Not valid scehma provided", trace=traceback.format_exc(), errobj = ex)
-
-        #The client set BlacklistT1 as true if the user has not t1access role.
-        if blacklistT1:
-            if schemaWf['SiteBlacklist']:
-                schemaWf['SiteBlacklist'].append("T1*")
-            else:
-                specificSchema['SiteBlacklist'] = ["T1*"]
-
-        request = maker(specificSchema)
-
-        helper = WMWorkloadHelper(request['WorkflowSpec'])
-
-        # can't save Request object directly, because it makes it hard to retrieve the _rev
-        metadata = {}
-        metadata.update(request)
-        # don't want to JSONify the whole workflow
-        del metadata['WorkflowSpec']
-        helper.setSiteWildcardsLists(siteWhitelist = specificSchema.get("SiteWhitelist",[]), siteBlacklist = specificSchema.get("SiteBlacklist",[]),
-                                     wildcardDict = self.wildcardSites)
-        request['RequestWorkflow'] = helper.saveCouch(self.reqmgrurl, self.reqmgrname, metadata=metadata)
+        makerType = "Analysis"
+        request = self._injectCouch(schemaWf, makerType)
         request['PrepID'] = None
 
         self._inject(request)
 
         return [{'RequestName': request['RequestName']}]
 
+
+    @conn_handler(services=['sitedb'])
     def resubmit(self, workflow, siteblacklist, sitewhitelist):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
@@ -514,7 +521,6 @@ class DataWorkflow(object):
            :arg str list sitewhitelist: white list of sites, with CMS name."""
         # TODO: change this
         taskresubmit = "Analysis"
-        # TODO: part of the code here needs to be shared with inject
         originalwf = GetRequest.getRequestByName( workflow )
         helper = loadWorkload(originalwf)
         originalschema = helper.data.request.schema.dictionary_()
@@ -534,27 +540,17 @@ class DataWorkflow(object):
                     'ACDCServer':          originalschema['ACDCUrl'],
                     'ACDCDatabase':        originalschema['ACDCDBName'],
                   }
-        resubmitschema.update(newpars)
-        maker = retrieveRequestMaker("Resubmission")
-        schema = maker.newSchema()
-        ## updating it with resubmission parameters
-        schema.update( resubmitschema )
-        ## generating a new name: I am choosing the original name plus resubmit and date
 
+        ## generating a new name: I am choosing the original name plus resubmit and date
         if RX_WFRESUB.match(workflow):
             times = int(workflow.rsplit('_resubmit')[-1].split('_')[-1])+1
             basenewname = workflow.rsplit('_resubmit')[0]
-            schema['RequestName'] = basenewname + '_resubmit_' + str(times)
+            newpars['RequestName'] = basenewname + '_resubmit_' + str(times)
         else:
-            schema['RequestName'] = workflow + '_resubmit_1'
-        request = maker(schema)
-        newhelper = WMWorkloadHelper(request['WorkflowSpec'])
-        # can't save Request object directly, because it makes it hard to retrieve the _rev
-        metadata = {}
-        metadata.update(request)
-        # don't want to JSONify the whole workflow
-        del metadata['WorkflowSpec']
-        request['RequestWorkflow'] = newhelper.saveCouch(self.reqmgrurl, self.reqmgrname, metadata=metadata)
+            newpars['RequestName'] = workflow + '_resubmit_1'
+
+        resubmitschema.update(newpars)
+        request = self._injectCouch(resubmitschema, "Resubmission")
         self._inject(request)
 
     def status(self, workflow):
