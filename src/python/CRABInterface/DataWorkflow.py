@@ -304,11 +304,11 @@ class DataWorkflow(object):
            :return: a generator of list of outputs"""
         howmany = howmany if howmany else 1
         max = howmany if howmany > 0 else None
-        result = self.workflow.outputLocation(wf, max)
+        result = self.workflow.outputLocation(workflow, max)
 
         if not max or len(result) < howmany:
             jobids = [singlefile['value']['jobid'] for singlefile in result]
-            tempresult = self.workflow.outputTempLocation(wf, howmany-len(result), jobids)
+            tempresult = self.workflow.outputTempLocation(workflow, howmany-len(result), jobids)
             if len(tempresult) + len(result) >= howmany:
                 result += tempresult[: howmany-len(result)]
 
@@ -483,7 +483,7 @@ class DataWorkflow(object):
         originalschema = helper.data.request.schema.dictionary_()
         wmtask = helper.getTask(taskresubmit)
         if not wmtask:
-            exctask = ValueError('%s task not found in the workflow %s.' %(taskResubmit, lastSubmission))
+            exctask = ValueError('%s task not found in the workflow %s.' %(taskresubmit, workflow))
             invalidp = InvalidParameter("Problem resubmitting workflow because task to resubmit was not found.", errobj = exctask)
             setattr(invalidp, 'trace', '')
             raise invalidp
@@ -525,7 +525,7 @@ class DataWorkflow(object):
 
            :arg str workflow: a valid workflow name
            :return: a workflow status summary document"""
-        yield self.getWorkflow(wf)
+        yield self.getWorkflow(workflow)
 
     def kill(self, workflow):
         """Request to Abort a workflow.
