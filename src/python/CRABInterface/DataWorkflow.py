@@ -412,6 +412,7 @@ class DataWorkflow(object):
         siteBlacklist = specificSchema.get("SiteBlacklist", [])
         siteWhitelist = specificSchema.get("SiteWhitelist", [])
         helper.setSiteWildcardsLists(siteWhitelist=siteWhitelist, siteBlacklist=siteBlacklist, wildcardDict=self.wildcardSites)
+        helper.setDashboardActivity(dashboardActivity = 'Analysis')
         if not set(siteBlacklist).isdisjoint( set(siteWhitelist) ):
             raise InvalidParameter("SiteBlacklist and SiteWhitelist are not disjoint: %s in both lists" % \
                                    (','.join( set(siteBlacklist) & set(siteWhitelist) )))
