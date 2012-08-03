@@ -151,6 +151,19 @@ class DataUserWorkflow(object):
             for el in self.workflow.logs(wf, howmany, exitcode):
                 yield el
 
+    @conn_handler(services=['monitor'])
+    def fwjr(self, workflow, howmany, exitcode):
+        """Returns the the error messages of the fwjr reported by the monitoring.
+
+           :arg str workflow: a workflow name
+           :arg int howmany: the limit on the number of fwjr to return
+           :arg int exitcode: the fwjr has to be of a job ended with this exit_code
+           :return: a generator of list of fwjr"""
+        wfchain = self._getWorkflowChain(workflow)
+        #return the errors of just the last workflow. Failed jobs of older wf have been resubmitted
+        if wfchain:
+            return self.workflow.fwjr(wfchain[-1], howmany, exitcode)
+
     @conn_handler(services=['monitor', 'asomonitor'])
     def output(self, workflow, howmany):
         """Returns the workflow output PFN. It takes care of the LFN - PFN conversion too.

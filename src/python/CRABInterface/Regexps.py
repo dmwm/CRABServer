@@ -19,7 +19,7 @@ RX_DBSURL    = re.compile(r"^https?://cmsweb([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_
 RX_PUBDBSURL = re.compile(r"^https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
 RX_ACDCDOC   = re.compile(r"^[A-Za-z0-9]*$")
 
-RX_SUBRESTAT = re.compile(r"^errors|report|logs|data|schema|configcache|type$")
+RX_SUBRESTAT = re.compile(r"^errors|report|logs|data|schema|configcache|type|fwjr$")
 #subresources of the ServerInfo (/info) resource
 RX_SUBRES_SI = re.compile(r"^delegatedn$")
 
