@@ -159,7 +159,9 @@ class DataWorkflow(object):
 
            :arg str workflow: a workflow name
            :arg int shortformat: a flag indicating if the user is asking for detailed
-                                 information about sites and list of errors
+                                 information about sites and list of errors. If
+                                 the user does a crab status -f -i where failures need
+                                 to be grouped by site we need the long formats
            :return: a list of errors grouped by exit code, error reason, site"""
 
         group_level = 3 if shortformat else 5
@@ -178,6 +180,52 @@ class DataWorkflow(object):
         except KeyError, ex:
             raise InvalidParameter("Not valid scehma provided", trace=traceback.format_exc(), errobj = ex)
 
+    def _getJobDocuments(self, workflow, exitcode):
+        ## TODO optimize this by avoiding loading full view in memory
+        options = {"reduce": False, "include_docs" : True}
+        if exitcode == None:
+            options["startkey"] = [workflow]
+            options["endkey"] = [workflow, {}, {}, {}, {}]
+        elif exitcode != 0:
+            options["startkey"] = [workflow, "jobfailed", exitcode]
+            options["endkey"] = [workflow, "jobfailed", exitcode, {}, {}]
+        else:
+            options["startkey"] = [workflow, "success", exitcode]
+            options["endkey"] = [workflow, "success", exitcode, {}, {}]
+
+        return self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
+
+    @conn_handler(services=['monitor'])
+    def fwjr(self, workflow, howmany, exitcode):
+        """Returns the workflow fwjr.
+
+           :arg str workflow: a workflow name
+           :arg int howmany: the limit on the number of fwjr to return
+           :arg int exitcode: the fwjr has to be of a job ended with this exit_code
+           :return: a generator of a list of fwjrs"""
+        #default is 1 logfile per exitcode
+        howmany = howmany if howmany else 1
+        self.logger.info("Retrieving %s log(s) for %s" % (howmany, workflow))
+
+        outview = self._getJobDocuments(workflow, exitcode)
+
+        #number of errors for each exit code
+        numJobs = {}
+
+        for row in outview:
+            #exclude log collect and jobs with exitcode 0
+            if row['doc']['task'].endswith("/LogCollect") or not row['doc']['exitcode']:
+                continue
+            #do what you have to do when you find enough errors
+            if row['doc']['exitcode'] in numJobs and numJobs[row['doc']['exitcode']] >= howmany:
+                if exitcode is not None:
+                    break #exit if the user required just one exit code
+                else:
+                    continue #continue the for otherwise
+            numJobs[row['doc']['exitcode']] = 1 if row['doc']['exitcode'] not in numJobs else numJobs[row['doc']['exitcode']] + 1
+            row['doc']['errors'].update({'exitcode' : row['doc']['exitcode']})
+            yield row['doc']['errors']
+
     @conn_handler(services=['monitor', 'phedex'])
     def logs(self, workflow, howmany, exitcode):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
@@ -190,23 +238,12 @@ class DataWorkflow(object):
         howmany = howmany if howmany else 1
         self.logger.info("Retrieving %s log(s) for %s" % (howmany, workflow))
 
+        outview = self._getJobDocuments(workflow, exitcode)
+
         #number of jobs for each exit code
         numJobs = {}
         #number of jobs with no logs for each exit code
         missLogs = {}
-
-        ## TODO optimize this by avoiding loading full view in memory
-        options = {"reduce": False, "include_docs" : True}
-        if exitcode == None:
-            options["startkey"] = [workflow]
-            options["endkey"] = [workflow, {}, {}, {}, {}]
-        elif exitcode != 0:
-            options["startkey"] = [workflow, "jobfailed", exitcode]
-            options["endkey"] = [workflow, "jobfailed", exitcode, {}, {}]
-        else:
-            options["startkey"] = [workflow, "success", exitcode]
-            options["endkey"] = [workflow, "success", exitcode, {}, {}]
-        outview = self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
 
         for row in outview:
             elem = {}
