@@ -392,11 +392,7 @@ class DataWorkflow(object):
         maker = retrieveRequestMaker(makerType)
         specificSchema = maker.newSchema()
         specificSchema.update(schemaWf)
-        try:
-            specificSchema.allCMSNames = self.allCMSNames.sites
-            specificSchema.validate()
-        except Exception as ex:
-            raise InvalidParameter("Not valid scehma provided", trace=traceback.format_exc(), errobj=ex)
+
         #The client set BlacklistT1 as true if the user has not t1access role.
         if specificSchema["BlacklistT1"]:
             if specificSchema['SiteBlacklist']:
@@ -490,11 +486,6 @@ class DataWorkflow(object):
                      "ACDCDoc": acdcdoc,
                    }
 
-        if not asyncdest in self.allCMSNames.sites:
-            excasync = ValueError("The parameter asyncdest %s is not in the list of known CMS sites %s" % (asyncdest, self.allCMSNames.sites))
-            invalidp = InvalidParameter("Remote output data site not valid", errobj = excasync)
-            setattr(invalidp, 'trace', '')
-            raise invalidp
         if schemaWf.get("ACDCDoc", None) and schemaWf['JobSplitAlgo'] != 'LumiBased':
             excsplit = ValueError("You must use LumiBased splitting if specifying a lumiMask.")
             invalidp = InvalidParameter("You must use LumiBased splitting if specifying a lumiMask.", errobj = excsplit)

@@ -5,8 +5,10 @@ from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 
 # CRABServer dependecies here
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
+from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
 from CRABInterface.Regexps import *
+from CRABInterface.Utils import CMSSitesCache, conn_handler
 
 # external dependecies here
 import cherrypy
@@ -19,7 +21,16 @@ class RESTUserWorkflow(RESTEntity):
         RESTEntity.__init__(self, app, api, config, mount)
 
         self.userworkflowmgr = DataUserWorkflow()
+        self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
 
+    def _checkSite(self, site):
+        if site not in self.allCMSNames.sites and site not in DataWorkflow.sitewildcards:
+            excasync = ValueError("Remote output data site not valid")
+            invalidp = InvalidParameter("The parameter %s is not in the list of known CMS sites %s" % (site, self.allCMSNames.sites), errobj = excasync)
+            setattr(invalidp, 'trace', '')
+            raise invalidp
+
+    @conn_handler(services=['sitedb'])
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid()
@@ -33,7 +44,9 @@ class RESTUserWorkflow(RESTEntity):
             if jobtype == 'Analysis':
                 validate_str("inputdata", param, safe, RX_DATASET, optional=False)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
+            [self._checkSite(site) for site in safe.kwargs['siteblacklist']]
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
+            [self._checkSite(site) for site in safe.kwargs['sitewhitelist']]
             validate_strlist("blockwhitelist", param, safe, RX_BLOCK)
             validate_strlist("blockblacklist", param, safe, RX_BLOCK)
             validate_str("splitalgo", param, safe, RX_SPLIT, optional=False)
@@ -46,6 +59,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("publishname", param, safe, RX_PUBLISH, optional=False)
             validate_str("publishdbsurl", param, safe, RX_PUBDBSURL, optional=True)
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
+            self._checkSite(safe.kwargs['asyncdest'])
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=True)
             validate_num("blacklistT1", param, safe, optional=False)
             validate_str("dbsurl", param, safe, RX_DBSURL, optional=True)
