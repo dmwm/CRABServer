@@ -153,6 +153,8 @@ class RESTUserWorkflow(RESTEntity):
             # if have a subresource then it should be one of these
             elif subresource == 'logs':
                 result = self.userworkflowmgr.logs(workflow, limit, exitcode)
+            elif subresource == 'fwjr':
+                result = self.userworkflowmgr.fwjr(workflow, limit, exitcode)
             elif subresource == 'data':
                 result = self.userworkflowmgr.output(workflow, limit)
             elif subresource == 'errors':
