@@ -92,6 +92,10 @@ class DataWorkflow(object):
         :arg str wf: the workflow name
         :return: the summary documents in a dictionary.
         """
+        def _antsk(doc):
+            """Return just the analysis task so that we avoid to include LogCollect jobs"""
+            return doc['tasks']['/%s/Analysis' % doc['workflow']] if 'tasks' in doc else doc
+
         options = {"startkey": [wf, {}], "endkey": [wf], 'reduce': True, 'descending': True}
         try:
             doc = self.monitordb.conn.document(id=wf)
@@ -101,8 +105,8 @@ class DataWorkflow(object):
         agentDoc = self.monitordb.conn.loadView("WMStats", "latestRequest", options)
         if agentDoc['rows']:
             agentDoc = self.monitordb.conn.document(id=agentDoc['rows'][0]['value']['id'])
-            doc['status'] = agentDoc['status']
-            doc['sites'] = agentDoc['sites']
+            doc['status'] = _antsk(agentDoc)['status']
+            doc['sites'] = _antsk(agentDoc)['sites']
             return doc
         else:
             return doc
