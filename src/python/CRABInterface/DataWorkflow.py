@@ -29,7 +29,7 @@ class DataWorkflow(object):
     @staticmethod
     def globalinit(monurl, monname, asomonurl, asomonname, reqmgrurl, reqmgrname,
                    configcacheurl, configcachename, connectUrl, phedexargs=None,
-                   dbsurl=None, acdcurl=None, acdcdb=None, defaultBlacklist=[],
+                   dbsurl=None, acdcurl=None, acdcdb=None, defaultBlacklist=None,
                    sitewildcards={'T1*': 'T1_*', 'T2*': 'T2_*', 'T3*': 'T3_*'}):
 
         DataWorkflow.monitordb = CouchDBConn(db=CouchServer(monurl), name=monname, conn=None)
@@ -55,7 +55,7 @@ class DataWorkflow(object):
         DataWorkflow.acdcurl = acdcurl
         DataWorkflow.acdcdb = acdcdb
 
-        DataWorkflow.defaultBlacklist = defaultBlacklist
+        DataWorkflow.defaultBlacklist = defaultBlacklist or []
 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
