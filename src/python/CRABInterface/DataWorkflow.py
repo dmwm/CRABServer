@@ -426,7 +426,7 @@ class DataWorkflow(object):
     @conn_handler(services=['sitedb'])
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
-               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc):
+               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag):
         """Perform the workflow injection into the reqmgr + couch
 
            :arg str workflow: workflow name requested by the user;
@@ -453,6 +453,8 @@ class DataWorkflow(object):
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
+           :arg str acdcdoc: input acdc document which contains the input information for data selction (eg: lumi mask)
+           :arg str globaltag: the globaltag to use when running the job;
            :returns: a dict which contaians details of the request"""
 
         #add the user in the reqmgr database
@@ -486,11 +488,12 @@ class DataWorkflow(object):
                      "Requestor": userhn,
                      "Username": userhn,
                      "BlacklistT1": blacklistT1,
-                     "DbsUrl": dbsurl if dbsurl is not None else self.dbsurl,
+                     "DbsUrl": dbsurl or self.dbsurl,
                      "PublishDbsUrl": publishdbsurl,
                      "ACDCUrl": self.acdcurl,
                      "ACDCDBName": self.acdcdb,
                      "ACDCDoc": acdcdoc,
+                     "GlobalTag": globaltag or None,
                    }
 
         if schemaWf.get("ACDCDoc", None) and schemaWf['JobSplitAlgo'] != 'LumiBased':

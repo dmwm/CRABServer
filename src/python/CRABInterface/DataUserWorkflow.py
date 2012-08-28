@@ -236,7 +236,7 @@ class DataUserWorkflow(object):
 
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
-               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc):
+               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag):
         """Perform the workflow injection into the reqmgr + couch
 
            :arg str workflow: workflow name requested by the user;
@@ -262,12 +262,13 @@ class DataUserWorkflow(object):
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
            :arg str acdcdoc: input acdc document which contains the input information for data selction (eg: lumi mask)
+           :arg str globaltag: the globaltag to use when running the job;
            :returns: a dict which contaians details of the request"""
 
         return self.workflow.submit(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist,
                                         blockwhitelist, blockblacklist, splitalgo, algoargs, configdoc, userisburl,
                                         adduserfiles, addoutputfiles, savelogsflag, userdn, userhn, publishname,
-                                        asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc)
+                                        asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag)
 
     def resubmit(self, workflow, siteblacklist, sitewhitelist):
         """Request to reprocess what the latest workflow in the chain hasn't finished to reprocess.

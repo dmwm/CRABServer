@@ -18,6 +18,7 @@ RX_CMSSITE   = re.compile(r"^T[0-3%](\*?|(_[A-Z]{2}(_[A-Za-z0-9]+)*)?)$")
 RX_DBSURL    = re.compile(r"^https?://cmsweb([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
 RX_PUBDBSURL = re.compile(r"^https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
 RX_ACDCDOC   = re.compile(r"^[A-Za-z0-9]*$")
+RX_GLOBALTAG   = re.compile(r"[a-zA-Z0-9\s\.\-_:]{1,100}$")
 
 RX_SUBRESTAT = re.compile(r"^errors|report|logs|data|schema|configcache|type|fwjr$")
 #subresources of the ServerInfo (/info) resource
