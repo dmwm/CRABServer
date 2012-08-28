@@ -5,8 +5,10 @@ from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 
 # CRABServer dependecies here
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
+from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
 from CRABInterface.Regexps import *
+from CRABInterface.Utils import CMSSitesCache, conn_handler
 
 # external dependecies here
 import cherrypy
@@ -19,7 +21,16 @@ class RESTUserWorkflow(RESTEntity):
         RESTEntity.__init__(self, app, api, config, mount)
 
         self.userworkflowmgr = DataUserWorkflow()
+        self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
 
+    def _checkSite(self, site):
+        if site not in self.allCMSNames.sites and site not in DataWorkflow.sitewildcards:
+            excasync = ValueError("Remote output data site not valid")
+            invalidp = InvalidParameter("The parameter %s is not in the list of known CMS sites %s" % (site, self.allCMSNames.sites), errobj = excasync)
+            setattr(invalidp, 'trace', '')
+            raise invalidp
+
+    @conn_handler(services=['sitedb'])
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid()
@@ -33,7 +44,9 @@ class RESTUserWorkflow(RESTEntity):
             if jobtype == 'Analysis':
                 validate_str("inputdata", param, safe, RX_DATASET, optional=False)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
+            [self._checkSite(site) for site in safe.kwargs['siteblacklist']]
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
+            [self._checkSite(site) for site in safe.kwargs['sitewhitelist']]
             validate_strlist("blockwhitelist", param, safe, RX_BLOCK)
             validate_strlist("blockblacklist", param, safe, RX_BLOCK)
             validate_str("splitalgo", param, safe, RX_SPLIT, optional=False)
@@ -46,10 +59,12 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("publishname", param, safe, RX_PUBLISH, optional=False)
             validate_str("publishdbsurl", param, safe, RX_PUBDBSURL, optional=True)
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
+            self._checkSite(safe.kwargs['asyncdest'])
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=True)
             validate_num("blacklistT1", param, safe, optional=False)
             validate_str("dbsurl", param, safe, RX_DBSURL, optional=True)
             validate_str("acdcdoc", param, safe, RX_ACDCDOC, optional=True)
+            validate_str("globaltag", param, safe, RX_GLOBALTAG, optional=True)
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
@@ -82,7 +97,7 @@ class RESTUserWorkflow(RESTEntity):
     @restcall
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist, blockblacklist,
             splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag, publishname,
-            asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc):
+            asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag):
         """Insert a new workflow. The caller needs to be a CMS user with a valid CMS x509 cert/proxy.
 
            :arg str workflow: workflow name requested by the user;
@@ -108,7 +123,8 @@ class RESTUserWorkflow(RESTEntity):
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
-           :arg str acdcdoc: input acdc document which contains the input information for data selction (eg: lumi mask)
+           :arg str acdcdoc: input acdc document which contains the input information for data selction (eg: lumi mask);
+           :arg str globaltag: the globaltag to use when running the job;
            :returns: a dict which contaians details of the submitted request"""
 
         return self.userworkflowmgr.submit(workflow=workflow, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata,
@@ -117,7 +133,7 @@ class RESTUserWorkflow(RESTEntity):
                                        userisburl=userisburl, adduserfiles=adduserfiles, addoutputfiles=addoutputfiles,
                                        savelogsflag=savelogsflag, userdn=cherrypy.request.user['dn'], userhn=cherrypy.request.user['login'],
                                        publishname=publishname, asyncdest=asyncdest, campaign=campaign, blacklistT1=blacklistT1,
-                                       dbsurl=dbsurl, publishdbsurl=publishdbsurl, acdcdoc=acdcdoc)
+                                       dbsurl=dbsurl, publishdbsurl=publishdbsurl, acdcdoc=acdcdoc, globaltag=globaltag)
 
     @restcall
     def post(self, workflow, siteblacklist, sitewhitelist):

@@ -1,4 +1,5 @@
 import logging
+import time
 
 # WMCore dependecies here
 from WMCore.REST.Error import InvalidParameter, ExecutionError, MissingObject
@@ -55,7 +56,7 @@ class DataUserWorkflow(object):
         try:
             workflowdocs = self.monitordb.conn.loadView("WMStats", "requestByCampaignAndDate", options)
         except CouchNotFoundError, ce:
-            raise ExecutionError("Impossible to load campaign-request view from WMStats")
+            raise ExecutionError("Impossible to load requestByCampaignAndDate view from WMStats")
         if not workflowdocs['rows']:
             raise MissingObject("Cannot find requested workflow")
 
@@ -103,13 +104,27 @@ class DataUserWorkflow(object):
            :arg str user: a valid user hn login name
            :arg int limit: the maximum number of workflows to return
                           (this should probably have a default!)
-           :arg int limit: limit on the workflow age
+           :arg int timestamp: limit on the workflow age. This is an integer ad returnet by time.gmtime
            :return: a list of workflows"""
-        # convert the workflow age in something eatable by a couch view
-        # in practice it's convenient that the timestamp is on a fixed format: latest 1 or 3 days, latest 1 week, latest 1 month
-        # and that it's a list (probably it can be converted into it): [year, month-num, day, hh, mm, ss]
-        # this will allow to query as it's described here: http://guide.couchdb.org/draft/views.html#many
-        raise NotImplementedError
+
+        starttime = list(time.gmtime(timestamp))[0:6]
+        endtime   = list(time.gmtime())[0:6]
+
+        #not using limit because of resubmissions :(
+        options = {"startkey": [starttime, user], "endkey": [endtime, user]}
+        try:
+            docs = self.monitordb.conn.loadView("WMStats", "requestByDate", options)
+        except CouchNotFoundError, ce:
+            raise ExecutionError("Impossible to load requestByDate view from WMStats")
+
+        #take only the last workflow in the campaign (last resubmission)
+        result = {}
+        for row in docs['rows']:
+            result[row['value']['campaign']] = row
+
+        #return the list ordered by date (we lost the order in the previous for)
+        return sorted( result.values(), key=lambda x: x['key'][0])
+
 
     @conn_handler(services=['monitor'])
     def errors(self, workflow, shortformat):
@@ -221,7 +236,7 @@ class DataUserWorkflow(object):
 
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
-               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc):
+               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag):
         """Perform the workflow injection into the reqmgr + couch
 
            :arg str workflow: workflow name requested by the user;
@@ -247,12 +262,13 @@ class DataUserWorkflow(object):
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
            :arg str acdcdoc: input acdc document which contains the input information for data selction (eg: lumi mask)
+           :arg str globaltag: the globaltag to use when running the job;
            :returns: a dict which contaians details of the request"""
 
         return self.workflow.submit(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist,
                                         blockwhitelist, blockblacklist, splitalgo, algoargs, configdoc, userisburl,
                                         adduserfiles, addoutputfiles, savelogsflag, userdn, userhn, publishname,
-                                        asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc)
+                                        asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag)
 
     def resubmit(self, workflow, siteblacklist, sitewhitelist):
         """Request to reprocess what the latest workflow in the chain hasn't finished to reprocess.

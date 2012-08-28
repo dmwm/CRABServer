@@ -30,7 +30,8 @@ class RESTBaseAPI(RESTApi):
         DataWorkflow.globalinit(config.monurl, config.monname, config.asomonurl, config.asomonname,
                                 config.reqmgrurl, config.reqmgrname, config.configcacheurl,
                                 config.configcachename, config.connectUrl, {'endpoint': config.phedexurl},
-                                config.dbsurl, acdcurl=config.acdcurl, acdcdb=config.acdcdb)
+                                config.dbsurl, acdcurl=config.acdcurl, acdcdb=config.acdcdb,
+                                defaultBlacklist=config.defaultBlacklist)
         DataUserWorkflow.globalinit(config.monurl, config.monname, config.asomonurl, config.asomonname)
         DataCampaign.globalinit(config.monurl, config.monname)
 
