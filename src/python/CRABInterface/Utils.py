@@ -35,7 +35,8 @@ def conn_handler(services):
                 args[0].asodb = args[0].asodb._replace(conn=args[0].asodb.db.connectDatabase(args[0].asodb.name, create=False))
             if 'sitedb' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
                 args[0].allCMSNames = CMSSitesCache(sites=SiteDBJSON().getAllCMSNames(), cachetime=mktime(gmtime()))
-                addSiteWildcards(args[0].wildcardKeys, args[0].allCMSNames.sites, args[0].wildcardSites)
+                if hasattr(args[0], 'wildcardKeys') and hasattr(args[0], 'wildcardSites'):
+                    addSiteWildcards(args[0].wildcardKeys, args[0].allCMSNames.sites, args[0].wildcardSites)
             if 'wmstats' in services and not args[0].wmstats:
                 args[0].wmstats = WMStatsWriter(args[0].wmstatsurl)
             if 'phedex' in services and not args[0].phedex:
