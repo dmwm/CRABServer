@@ -119,14 +119,17 @@ class DataWorkflow(object):
         :arg str wf: the workflow name
         :return: the summary document in a dictionary.
         """
+        result = {}
         try:
             doc = self.asodb.conn.document(wf)
             self.logger.debug("Workflow trasfer: %s" % doc)
             if doc and 'state' in doc:
-                 return doc['state']
+                 result['state'] = doc['state']
+            if doc and 'failures_reasons' in doc:
+                 result['failures_reasons'] = doc['failures_reasons']
         except CouchNotFoundError:
             self.logger.error("Cannot find ASO documents in couch")
-        return {}
+        return result
 
     def getAll(self, wfs):
         """Retrieves the workflow document from the couch database
@@ -169,9 +172,12 @@ class DataWorkflow(object):
                                  to be grouped by site we need the long formats
            :return: a list of errors grouped by exit code, error reason, site"""
 
+        result = {}
         group_level = 3 if shortformat else 5
         options = {"startkey": [workflow, "jobfailed"], "endkey": [workflow, "jobfailed", {}, {}, {}], "reduce": True,  "group_level": group_level}
-        return self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
+        result['jobs'] = self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
+        result['transfers'] = self.getWorkflowTransfers(workflow)
+        return result
 
     def report(self, workflow):
         """Retrieves the quality of the workflow in term of what has been processed
