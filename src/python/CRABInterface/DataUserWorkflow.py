@@ -234,41 +234,12 @@ class DataUserWorkflow(object):
         wfchain = self._getWorkflowChain(workflow)
         raise NotImplementedError
 
-    def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
-               blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
-               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag):
-        """Perform the workflow injection into the reqmgr + couch
+   def submit(self, *args, **kwargs):
+        """Perform the workflow injection into the reqmgr + couch.
+          :args: submit parameters (see RESTUserWorkflow.put)
+          :returns: a dict which contaians details of the request"""
 
-           :arg str workflow: workflow name requested by the user;
-           :arg str jobtype: job type of the workflow, usually Analysis;
-           :arg str jobsw: software requirement;
-           :arg str jobarch: software architecture (=SCRAM_ARCH);
-           :arg str list inputdata: input datasets;
-           :arg str list siteblacklist: black list of sites, with CMS name;
-           :arg str list sitewhitelist: white list of sites, with CMS name;
-           :arg str list blockwhitelist: selective list of input iblock from the specified input dataset;
-           :arg str list blockblacklist:  input blocks to be excluded from the specified input dataset;
-           :arg str splitalgo: algorithm to be used for the workflow splitting;
-           :arg str algoargs: argument to be used by the splitting algorithm;
-           :arg str configdoc: URL of the configuration object ot be used;
-           :arg str userisburl: URL of the input sandbox file;
-           :arg str list adduserfiles: list of additional input files;
-           :arg str list addoutputfiles: list of additional output files;
-           :arg int savelogsflag: archive the log files? 0 no, everything else yes;
-           :arg str publishname: name to use for data publication;
-           :arg str asyncdest: CMS site name for storage destination of the output files;
-           :arg str campaign: needed just in case the workflow has to be appended to an existing campaign;
-           :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
-           :arg str dbsurl: dbs url where the input dataset is published;
-           :arg str publishdbsurl: dbs url where the output data has to be published;
-           :arg str acdcdoc: input acdc document which contains the input information for data selction (eg: lumi mask)
-           :arg str globaltag: the globaltag to use when running the job;
-           :returns: a dict which contaians details of the request"""
-
-        return self.workflow.submit(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist,
-                                        blockwhitelist, blockblacklist, splitalgo, algoargs, configdoc, userisburl,
-                                        adduserfiles, addoutputfiles, savelogsflag, userdn, userhn, publishname,
-                                        asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag)
+        return self.workflow.submit(*args, **kwargs)
 
     def resubmit(self, workflow, siteblacklist, sitewhitelist):
         """Request to reprocess what the latest workflow in the chain hasn't finished to reprocess.

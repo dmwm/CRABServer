@@ -426,7 +426,7 @@ class DataWorkflow(object):
     @conn_handler(services=['sitedb'])
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
-               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag):
+               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag, runs, lumis):
         """Perform the workflow injection into the reqmgr + couch
 
            :arg str workflow: workflow name requested by the user;
@@ -492,11 +492,13 @@ class DataWorkflow(object):
                      "PublishDbsUrl": publishdbsurl,
                      "ACDCUrl": self.acdcurl,
                      "ACDCDBName": self.acdcdb,
-                     "ACDCDoc": acdcdoc,
                      "GlobalTag": globaltag or None,
+                     "Lumis" : lumis,
+                     "Runs" : runs,
+                     "ACDCDoc": acdcdoc, ##TODO Can we delete this one?
                    }
 
-        if schemaWf.get("ACDCDoc", None) and schemaWf['JobSplitAlgo'] != 'LumiBased':
+        if schemaWf.get("Lumis", None) and schemaWf['JobSplitAlgo'] != 'LumiBased':
             excsplit = ValueError("You must use LumiBased splitting if specifying a lumiMask.")
             invalidp = InvalidParameter("You must use LumiBased splitting if specifying a lumiMask.", errobj = excsplit)
             setattr(invalidp, 'trace', '')
