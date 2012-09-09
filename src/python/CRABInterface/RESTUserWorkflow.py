@@ -65,6 +65,10 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("dbsurl", param, safe, RX_DBSURL, optional=True)
             validate_str("acdcdoc", param, safe, RX_ACDCDOC, optional=True)
             validate_str("globaltag", param, safe, RX_GLOBALTAG, optional=True)
+            validate_strlist("runs", param, safe, RX_RUNS)
+            validate_strlist("lumis", param, safe, RX_LUMILIST)
+            if len(safe.kwargs["runs"]) != len(safe.kwargs["lumis"]):
+               raise InvalidParameter("The number of runs and the number of limi lists are different")
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
@@ -97,7 +101,7 @@ class RESTUserWorkflow(RESTEntity):
     @restcall
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist, blockblacklist,
             splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag, publishname,
-            asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag):
+            asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag, runs, lumis):
         """Insert a new workflow. The caller needs to be a CMS user with a valid CMS x509 cert/proxy.
 
            :arg str workflow: workflow name requested by the user;
@@ -125,6 +129,8 @@ class RESTUserWorkflow(RESTEntity):
            :arg str publishdbsurl: dbs url where the output data has to be published;
            :arg str acdcdoc: input acdc document which contains the input information for data selction (eg: lumi mask);
            :arg str globaltag: the globaltag to use when running the job;
+           :arg str runs: runs;
+           :arg str lumis: lumis;
            :returns: a dict which contaians details of the submitted request"""
 
         return self.userworkflowmgr.submit(workflow=workflow, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata,
@@ -133,7 +139,7 @@ class RESTUserWorkflow(RESTEntity):
                                        userisburl=userisburl, adduserfiles=adduserfiles, addoutputfiles=addoutputfiles,
                                        savelogsflag=savelogsflag, userdn=cherrypy.request.user['dn'], userhn=cherrypy.request.user['login'],
                                        publishname=publishname, asyncdest=asyncdest, campaign=campaign, blacklistT1=blacklistT1,
-                                       dbsurl=dbsurl, publishdbsurl=publishdbsurl, acdcdoc=acdcdoc, globaltag=globaltag)
+                                       dbsurl=dbsurl, publishdbsurl=publishdbsurl, acdcdoc=acdcdoc, globaltag=globaltag, runs=runs, lumis=lumis)
 
     @restcall
     def post(self, workflow, siteblacklist, sitewhitelist):
