@@ -287,6 +287,7 @@ class DataUserWorkflow(object):
 
         #successful jobs can be in several states. Taking information from async
         transfers = self.workflow.getWorkflowTransfers(wfdocs[-1]['_id'])
+        transfers = {} if 'state' not in transfers else transfers['state']
         if transfers:
             detailsperstate['success'] = transfers
 
