@@ -80,7 +80,9 @@ class DataUserWorkflow(object):
             return jobsperstate, detailsperstate
 
         #jobs in success state are taken from all the workflows
-        jobsperstate['success'] = sum( [ doc['success'] for doc in wfdocs if doc.get('success', None) ] )
+        success = sum( [ doc['success'] for doc in wfdocs if doc.get('success', None) ] )
+        if success:
+            jobsperstate['success'] = success
 
         lastdoc = wfdocs[-1]
         for state in lastdoc:
@@ -234,7 +236,7 @@ class DataUserWorkflow(object):
         wfchain = self._getWorkflowChain(workflow)
         raise NotImplementedError
 
-   def submit(self, *args, **kwargs):
+    def submit(self, *args, **kwargs):
         """Perform the workflow injection into the reqmgr + couch.
           :args: submit parameters (see RESTUserWorkflow.put)
           :returns: a dict which contaians details of the request"""
