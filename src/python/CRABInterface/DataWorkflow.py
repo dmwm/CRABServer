@@ -602,7 +602,7 @@ class DataWorkflow(object):
             if 'lumis' in singlelumi['doc'] and singlelumi['doc']['lumis']:
                 for run in singlelumi['doc']['lumis']:
                     output.update((k, run[k]+output.get(k,[])) for k in run)
-        return [output]
+        return output
 
     def _reportPrivateMC(self, workflow):
         """Retrieves the quality of the workflow in term of what has been processed.
