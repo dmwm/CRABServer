@@ -84,7 +84,7 @@ class RESTUserWorkflow(RESTEntity):
             #used by get log, get data
             validate_num('limit', param, safe, optional=True)
             validate_num('exitcode', param, safe, optional=True)
-            if safe.kwargs['subresource'] not in ['data', 'logs'] and (safe.kwargs['limit'] is not None or safe.kwargs['exitcode'] is not None):
+            if safe.kwargs['subresource'] not in ['data', 'logs', 'fwjr'] and (safe.kwargs['limit'] is not None or safe.kwargs['exitcode'] is not None):
                 raise InvalidParameter("Invalid input parameters")
             #used by errors
             validate_num('shortformat', param, safe, optional=True)

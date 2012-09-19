@@ -265,6 +265,7 @@ class DataUserWorkflow(object):
            :return: a generator of workflow states"""
 
         wfchain = self._getWorkflowChain(workflow)
+        self.logger.debug("Chain: %s" % wfchain)
         wfdocs = [self.workflow.getWorkflow(wf) for wf in wfchain]
 
         #checking that we have some workflow documents
@@ -273,7 +274,7 @@ class DataUserWorkflow(object):
         self.logger.debug("Workflow documents retrieved: %s" % wfdocs)
 
         # TODO: review this, in order to share the code among this and DataWorkflow.status
-        jobperstate, detailsperstate = self._aggregateChainStatus([doc['status'] for doc in wfdocs if doc.get('status', None)])
+        jobperstate, detailsperstate = self._aggregateChainStatus([doc['status'] if 'status' in doc else {} for doc in wfdocs])
 
         detailspersite = {}
         #iterate on all the workflows and from them get a list with all the sites
@@ -281,7 +282,11 @@ class DataUserWorkflow(object):
         siteList = reduce(lambda x,y: x+y, [doc['sites'].keys() for doc in wfdocs if doc.get('sites', None)], [])
         #for each site get the aggregation
         for site in siteList:
-            detailspersite[site] = self._aggregateChainStatus([doc['sites'][site] for doc in wfdocs if doc.get('sites', None) and doc['sites'].get(site, None)])
+            details = self._aggregateChainStatus([doc['sites'][site] if doc.get('sites', None) and doc['sites'].get(site, None) else {} for doc in wfdocs])
+            #drop sites with no relevant details (e.g.: sites with failed jobs for wf1 and not used by wf2)
+            if details!=({},{}):
+                detailspersite[site] = details
+
 
         #get the status of the workflow: sort by update_time the request_stauts list of the most recent workflow
         # TODO: move to DataWorkflow.status

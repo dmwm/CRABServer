@@ -104,6 +104,7 @@ class DataWorkflow(object):
             return {}
         agentDoc = self.monitordb.conn.loadView("WMStats", "latestRequest", options)
         if agentDoc['rows']:
+            self.logger.debug("Latest document id: %s" % agentDoc['rows'][0]['value']['id'])
             agentDoc = self.monitordb.conn.document(id=agentDoc['rows'][0]['value']['id'])
             doc['status'] = _antsk(agentDoc)['status']
             doc['sites'] = _antsk(agentDoc)['sites']
