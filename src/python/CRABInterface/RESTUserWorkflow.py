@@ -12,7 +12,7 @@ from CRABInterface.Utils import CMSSitesCache, conn_handler
 
 # external dependecies here
 import cherrypy
-
+import time
 
 class RESTUserWorkflow(RESTEntity):
     """REST entity for workflows from the user point of view and relative subresources"""
@@ -56,8 +56,14 @@ class RESTUserWorkflow(RESTEntity):
             validate_strlist("adduserfiles", param, safe, RX_ADDFILE)
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE)
             validate_num("savelogsflag", param, safe, optional=False)
-            validate_str("publishname", param, safe, RX_PUBLISH, optional=False)
+            validate_str("publishname", param, safe, RX_PUBLISH, optional=True)
             validate_str("publishdbsurl", param, safe, RX_PUBDBSURL, optional=True)
+            #if one and only one between publishDataName and publishDbsUrl is set raise an error (we need both or none of them)
+            if bool(safe.kwargs["publishname"]) != bool(safe.kwargs["publishdbsurl"]):
+                raise InvalidParameter("You need to set both publishDataName and publishDbsUrl parameters if you need the automatic publication")
+            #set the default value of the publishname parameter
+            if not safe.kwargs["publishname"]:
+                safe.kwargs["publishname"] = str(int(time.time()))
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkSite(safe.kwargs['asyncdest'])
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=True)
