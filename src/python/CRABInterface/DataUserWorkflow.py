@@ -294,11 +294,14 @@ class DataUserWorkflow(object):
 
         #successful jobs can be in several states. Taking information from async
         transfers = self.workflow.getWorkflowTransfers(wfdocs[-1]['_id'])
-        transfers = {} if 'state' not in transfers else transfers['state']
-        if transfers:
-            detailsperstate['success'] = transfers
+        self.logger.debug("Workflow transfers retrieved: %s" % transfers)
+        transferDetails = {}
+        if transfers and 'state' in transfers:
+            transferDetails['state'] = transfers['state']
+            if 'publication_state' in transfers:
+                transferDetails['publication_state'] = transfers['publication_state']
 
-        return [wfdocs[-1]["workflow"], workflowstatus, jobperstate, detailsperstate, detailspersite]
+        return [wfdocs[-1]["workflow"], workflowstatus, jobperstate, detailsperstate, detailspersite, transferDetails]
 
     def kill(self, workflow, force):
         """Request to Abort a workflow.

@@ -139,7 +139,7 @@ class InstallCommand(install):
       self.distribution.have_run[cmd_name] = 1
 
 setup(name = 'crabserver',
-      version = '1.0',
+      version = '3.1.2',
       maintainer_email = 'hn-cms-crabdevelopment@cern.ch',
       cmdclass = { 'build_system': BuildCommand,
                    'install_system': InstallCommand },
