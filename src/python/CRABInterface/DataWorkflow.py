@@ -125,7 +125,9 @@ class DataWorkflow(object):
             doc = self.asodb.conn.document(wf)
             self.logger.debug("Workflow trasfer: %s" % doc)
             if doc and 'state' in doc:
-                 result['state'] = doc['state']
+                result['state'] = doc['state']
+                if 'publication_state' in doc:
+                    result['publication_state'] = doc['publication_state']
             if doc and 'failures_reasons' in doc:
                  result['failures_reasons'] = doc['failures_reasons']
         except CouchNotFoundError:
