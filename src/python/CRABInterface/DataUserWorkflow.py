@@ -60,7 +60,7 @@ class DataUserWorkflow(object):
         if not workflowdocs['rows']:
             raise MissingObject("Cannot find requested workflow")
 
-        return [doc['value']['id'] for doc in workflowdocs['rows']]
+        return [doc['id'] for doc in workflowdocs['rows']]
 
     def _aggregateChainStatus(self, wfdocs):
         """A resubmission keeps succeded jobs, and, after a kill,
