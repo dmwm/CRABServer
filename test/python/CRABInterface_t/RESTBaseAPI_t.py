@@ -1,6 +1,7 @@
 from cherrypy.test import test, webtest, helper
 from cherrypy import expose, response, config as cpconfig
 import os
+import string, random
 
 from WMCore.REST.Test import setup_test_server, fake_authz_headers
 import WMCore.REST.Test as RT
@@ -13,6 +14,8 @@ REQMGR_DB = 'test_reqmgrdb'
 MON_DB = 'test_wmstat'
 CC_DB = 'test_configcache'
 MONASO_DB = 'test_asomon'
+DBSURL = 'http://localhost/fake_dbs_url/servlet/DBSServlet'
+ACDCDB = 'test_wmagent_acdc'
 
 SUBMIT_BODY = "workflow=pippo&jobtype=Cmssw&jobsw=CMSSW_4_2_5&jobarch=slc5_amd64_gcc434&splitalgo=FileBased&algoargs=args&userisburl=https://cfg&savelogsflag=0&publishname=ciao&asyncdest=T2_IT_Bari&inputdata=/RelValProdTTbar/JobRobot-MC_3XY_V24_JobRobot-v1/GEN-SIM-DIGI-RECO&configfile=itslocatedhere"
 
@@ -33,6 +36,13 @@ class RESTBaseAPI_t(RESTBaseAPI.RESTBaseAPI):
         connectUrl='oracle://u:p@oradb'
         #config.CoreDatabase.connectUrl = connectUrl
         config.connectUrl = connectUrl
+        config.dbsurl = DBSURL
+        config.acdcurl = COUCH_URL
+        config.acdcdb = ACDCDB
+        config.delegatedn =  []
+        config.defaultBlacklist=  []
+        config.loggingLevel = 10
+        config.loggingFile = 'CRAB.log'
         RESTBaseAPI.RESTBaseAPI.__init__(self, app, config, mount)
 
 class Tester(helper.CPWebCase):
@@ -52,65 +62,26 @@ class Tester(helper.CPWebCase):
         # self.assertInBody("RequestName")
 
 
-    def test_workflow_status(self, fmt = 'application/json', page = "/test/workflow", inbody=None):
-        h = fake_authz_headers(RT.test_authz_key.data) + [("Accept", fmt)]
-        # empty of input, server will try to return latest requests, nothing in this case
-        self.getPage(page, headers=h, method="GET", body=inbody)
-        self.assertStatus("200 OK")
-        self.assertInBody("result")
-
-
-    def test_campaign_status(self, fmt = 'application/json', page = "/test/campaign", inbody=None):
-        h = fake_authz_headers(RT.test_authz_key.data) + [("Accept", fmt)]
-        # failing with 400 given the missing input args
-        self.getPage(page, headers=h, method="GET", body=inbody)
-        self.assertStatus("400 Bad Request")
-        self.assertHeader("X-Error-Http", "400")
-        self.assertHeader("X-Error-Detail", "Invalid input parameter")
-        # failing with 400 given the missing input args
-        self.getPage(page + "?campaign=pippo", headers=h, method="GET", body=inbody)
-        self.assertStatus("400 Bad Request")
-        self.assertHeader("X-Error-Http", "400")
-
-
-    def test_workflow_output(self, fmt = 'application/json', page = "/test/workflow", inbody=None):
+    def test_workflow_get(self, fmt = 'application/json', page = "/test/workflow", inbody=None):
         h = fake_authz_headers(RT.test_authz_key.data) + [("Accept", fmt)]
         # no workflow specified
         self.getPage(page + '?subresource=data', headers=h, method="GET", body=inbody)
         self.assertStatus("400 Bad Request")
         self.assertHeader("X-Error-Http", "400")
         self.assertHeader("X-Error-Detail", "Invalid input parameter")
-        # server will try to return if something is in couch, nothing in this case
-        self.getPage(page + '?workflow=pippo&subresource=data', headers=h, method="GET", body=inbody)
-        self.assertStatus("200 OK")
-        self.assertInBody("result")
-        # as before, but not using default limit
-        self.getPage(page + '?workflow=pippo&subresource=data&limit=10', headers=h, method="GET", body=inbody)
-        self.assertStatus("200 OK")
-        self.assertInBody("result")
-        # as before, but limit is unlimited with -1
-        self.getPage(page + '?workflow=pippo&subresource=data&limit=-1', headers=h, method="GET", body=inbody)
-        self.assertStatus("200 OK")
-        self.assertInBody("result")
-
-
-    def test_campaign_output(self, fmt = 'application/json', page = "/test/campaign", inbody=None):
-        h = fake_authz_headers(RT.test_authz_key.data) + [("Accept", fmt)]
-        # no workflow specified
-        self.getPage(page + '?subresource=data', headers=h, method="GET", body=inbody)
+        # invalid input parameter specified
+        self.getPage(page + '?workflow=pippo&invalid_param=xxx', headers=h, method="GET", body=inbody)
         self.assertStatus("400 Bad Request")
         self.assertHeader("X-Error-Http", "400")
         self.assertHeader("X-Error-Detail", "Invalid input parameter")
-        # server will try to return if something is in couch, nothing in this case
-        self.getPage(page + '?campaign=pippo&subresource=data', headers=h, method="GET", body=inbody)
+        # too long workflow name
+        randomlongname=''.join(random.choice(string.ascii_uppercase + string.digits) for x in range(200))
+        self.getPage(page + '?workflow='+randomlongname, headers=h, method="GET", body=inbody)
         self.assertStatus("400 Bad Request")
         self.assertHeader("X-Error-Http", "400")
-        self.assertHeader("X-Error-Detail", "Required object is missing")
-        # as before but limit specified
-        self.getPage(page + '?campaign=pippo&subresource=data&limit=-1', headers=h, method="GET", body=inbody)
-        self.assertStatus("400 Bad Request")
-        self.assertHeader("X-Error-Http", "400")
-        self.assertHeader("X-Error-Detail", "Required object is missing")
+        self.assertHeader("X-Error-Detail", "Invalid input parameter")
+
+
 
 def setup_server():
     srcfile = RESTBaseAPI_t.__name__
