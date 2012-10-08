@@ -2,8 +2,12 @@ import re
 
 # TODO: we should start replacing most of the regex here with what we have in WMCore.Lexicon
 #       (this probably requires to adapt something on Lexicon)
-RX_WORKFLOW  = re.compile(r"^[a-zA-Z0-9\.\-_]{1,80}$")
-RX_CAMPAIGN  = RX_WORKFLOW
+wfBase = r"^[a-zA-Z0-9\.\-_]{1,%s}$"
+RX_WORKFLOW  = re.compile( wfBase % 80 )
+#  8  +  1        +    80     +         1 +6 + 1 + 6
+#username_OriginalWorkflowNameMax80Chars_121004_100926 => username is max 8 chars, timestamp is twelve chars, 3 underscores
+RX_UNIQUEWF  = re.compile( wfBase % (8 + 1 + 80 + 1 + 6 + 1 + 6))
+RX_CAMPAIGN  = RX_UNIQUEWF
 RX_JOBTYPE   = re.compile(r"^[A-Za-z]*$")
 RX_CMSSW     = re.compile(r"^CMSSW(_\d+){3}(_[a-zA-Z0-9_]+)?$")
 RX_ARCH      = re.compile(r"^slc[0-9]{1}_[a-z0-9]+_gcc[a-z0-9]+(_[a-z0-9]+)?$")

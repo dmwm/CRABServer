@@ -19,7 +19,8 @@ import shutil
 # here go the all regex to be used for validation
 RX_HASH = re.compile(r'^[a-f0-9]{64}$')
 # input file name may correspond to workflowname + _publish.tgz
-RX_FILENAME = re.compile(r'^[a-zA-Z0-9\.\-_]{1,80}_publish\.tgz$')
+#8+1+80+1+6+1+6=103
+RX_FILENAME = re.compile(r'^[a-zA-Z0-9\.\-_]{1,103}_publish\.tgz$')
 
 def touch(filename):
     """Touch the file to keep automated cleanup away
