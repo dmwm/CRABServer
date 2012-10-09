@@ -25,7 +25,7 @@ class RESTCampaign(RESTEntity):
 
         if method in ['PUT']:
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=False)
-            validate_strlist("workflow", param, safe, RX_WORKFLOW)
+            validate_strlist("workflow", param, safe, RX_WORKFLOW) #Verb not implemented. Should it be RX_UNIQUEWF?
 
         elif method in ['POST']:
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=False)

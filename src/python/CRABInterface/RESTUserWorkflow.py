@@ -77,12 +77,12 @@ class RESTUserWorkflow(RESTEntity):
                raise InvalidParameter("The number of runs and the number of limi lists are different")
 
         elif method in ['POST']:
-            validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
+            validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
 
         elif method in ['GET']:
-            validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
+            validate_str("workflow", param, safe, RX_UNIQUEWF, optional=True)
             validate_str('subresource', param, safe, RX_SUBRESTAT, optional=True)
             #parameters of subresources calls has to be put here
             #used by get latest
@@ -100,7 +100,7 @@ class RESTUserWorkflow(RESTEntity):
                 raise InvalidParameter("Invalid input parameters")
 
         elif method in ['DELETE']:
-            validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
+            validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
             validate_num("force", param, safe, optional=True)
 
 
