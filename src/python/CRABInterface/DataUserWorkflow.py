@@ -150,8 +150,21 @@ class DataUserWorkflow(object):
            :arg str workflow: a workflow name
            :return: what?"""
         wfchain = self._getWorkflowChain(workflow)
+        outprogress = {}
         for wf in wfchain:
+            wftempout = self.workflow.getWorkflow(wf)
+            if wftempout and 'output' in wftempout:
+                for dataset in wftempout['output']:
+                    if dataset['dataset'] in outprogress:
+                        outprogress[dataset['dataset']]['count'] += dataset['count']
+                        outprogress[dataset['dataset']]['events'] += dataset['events']
+                        outprogress[dataset['dataset']]['size'] += dataset['size']
+                    else:
+                        outprogress[dataset['dataset']] = {'count': dataset['count'],
+                                                              'events': dataset['events'],
+                                                              'size': dataset['size']}
             yield self.workflow.report(wf)
+        yield {'out': outprogress}
 
     @conn_handler(services=['monitor'])
     def logs(self, workflow, howmany, exitcode):

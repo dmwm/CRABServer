@@ -108,6 +108,7 @@ class DataWorkflow(object):
             agentDoc = self.monitordb.conn.document(id=agentDoc['rows'][0]['value']['id'])
             doc['status'] = _antsk(agentDoc)['status']
             doc['sites'] = _antsk(agentDoc)['sites']
+            doc['output'] = agentDoc.get('output_progress')                                                                                                                                                                        
             return doc
         else:
             return doc
