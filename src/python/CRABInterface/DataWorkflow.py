@@ -436,7 +436,8 @@ class DataWorkflow(object):
     @conn_handler(services=['sitedb'])
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
-               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag, runs, lumis):
+               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag,
+               runs, lumis, vorole, vogroup):
         """Perform the workflow injection into the reqmgr + couch
 
            :arg str workflow: workflow name requested by the user;
@@ -505,8 +506,14 @@ class DataWorkflow(object):
                      "GlobalTag": globaltag or None,
                      "Lumis" : lumis,
                      "Runs" : runs,
-                     "ACDCDoc": acdcdoc, ##TODO Can we delete this one?
                    }
+
+        #the keys VoRole and VoGroup should be in the spec only if they have a value,
+        #otherwise WorkQueueManagerWMBSFileFeeder explodes!
+        if vorole:
+            schemaWf['VoRole'] = vorole
+        if vogroup:
+            schemaWf['VoGroup'] = vogroup
 
         if schemaWf.get("Lumis", None) and schemaWf['JobSplitAlgo'] != 'LumiBased':
             excsplit = ValueError("You must use LumiBased splitting if specifying a lumiMask.")
