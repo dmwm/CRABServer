@@ -108,6 +108,7 @@ class DataWorkflow(object):
             agentDoc = self.monitordb.conn.document(id=agentDoc['rows'][0]['value']['id'])
             doc['status'] = _antsk(agentDoc)['status']
             doc['sites'] = _antsk(agentDoc)['sites']
+            doc['output'] = agentDoc.get('output_progress')                                                                                                                                                                        
             return doc
         else:
             return doc
@@ -287,8 +288,8 @@ class DataWorkflow(object):
                         elem["type"] = "logArchive"
                         elem["size"] = output['size']
                         elem["checksums"] = output['checksums']
-                        elem["pfn"] = self.phedex.getPFN(row['doc']['site'],
-                                                         output['lfn'])[(row['doc']['site'], output['lfn'])]
+                        elem["pfn"] = self.phedex.getPFN(output['location'],
+                                                         output['lfn'])[(output['location'], output['lfn'])]
                         elem["workflow"] = workflow
                         elem["exitcode"] = row['doc']['exitcode']
                         numJobs[row['doc']['exitcode']] = 1 if not row['doc']['exitcode'] in numJobs else numJobs[row['doc']['exitcode']] + 1
