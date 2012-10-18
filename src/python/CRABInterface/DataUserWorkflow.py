@@ -264,11 +264,16 @@ class DataUserWorkflow(object):
            :arg str list sitewhitelist: white list of sites, with CMS name."""
         latestwf = self._getWorkflowChain(workflow)[-1]
         wfdoc = self.workflow.getWorkflow(latestwf)
-        if wfdoc['request_status'][-1]['status'] not in ["aborted", "completed"]:
+        taskStatus = wfdoc['request_status'][-1]['status']
+        if taskStatus not in ["aborted", "completed"]:
             raise InvalidParameter("Impossible to resubmit a not completed workflow.")
+        hasFailure = False #at least one job has to be failed
         for status in wfdoc['status']:
             if status not in ["failure", "success"]:
                 raise InvalidParameter("Impossible to resubmit a workflow with pending jobs.")
+            hasFailure |= status == 'failure'
+        if not hasFailure and taskStatus == 'completed':
+            raise InvalidParameter("Impossible to resubmit a workflow if all jobs succeded.")
         self.workflow.resubmit(workflow=wfdoc["workflow"], siteblacklist=siteblacklist, sitewhitelist=sitewhitelist)
 
     def status(self, workflow):
