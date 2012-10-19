@@ -178,7 +178,9 @@ class DataWorkflow(object):
 
         result = {}
         group_level = 3 if shortformat else 5
-        options = {"startkey": [workflow, "jobfailed"], "endkey": [workflow, "jobfailed", {}, {}, {}], "reduce": True,  "group_level": group_level}
+        options = {"startkey": [workflow, workflow+"/Analysis", "jobfailed"],
+                   "endkey": [workflow, workflow+"/Analysis", "jobfailed", {}, {}, {}],
+                   "reduce": True,  "group_level": group_level}
         result['jobs'] = self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
         result['transfers'] = self.getWorkflowTransfers(workflow)
         return result
@@ -199,14 +201,14 @@ class DataWorkflow(object):
         ## TODO optimize this by avoiding loading full view in memory
         options = {"reduce": False, "include_docs" : True}
         if exitcode == None:
-            options["startkey"] = [workflow]
-            options["endkey"] = [workflow, {}, {}, {}, {}]
+            options["startkey"] = [workflow, workflow+"/Analysis"]
+            options["endkey"] = [workflow, workflow+"/Analysis", {}, {}, {}, {}]
         elif exitcode != 0:
-            options["startkey"] = [workflow, "jobfailed", exitcode]
-            options["endkey"] = [workflow, "jobfailed", exitcode, {}, {}]
+            options["startkey"] = [workflow, workflow+"/Analysis", "jobfailed", exitcode]
+            options["endkey"] = [workflow, workflow+"/Analysis", "jobfailed", exitcode, {}, {}]
         else:
-            options["startkey"] = [workflow, "success", exitcode]
-            options["endkey"] = [workflow, "success", exitcode, {}, {}]
+            options["startkey"] = [workflow, workflow+"/Analysis", "success", exitcode]
+            options["endkey"] = [workflow, workflow+"/Analysis", "success", exitcode, {}, {}]
 
         return self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
 
@@ -600,7 +602,9 @@ class DataWorkflow(object):
            :arg str workflow: a workflow name
            :return: dictionary with run-lumis information"""
 
-        options = {"reduce": False, "include_docs" : True, "startkey": [workflow, "success", 0], "endkey": [workflow, "success", 0, {}, {}]}
+        options = {"reduce": False, "include_docs" : True,
+                   "startkey": [workflow, workflow+"/Analysis", "success", 0],
+                   "endkey": [workflow, workflow+"/Analysis", "success", 0, {}, {}]}
         output = {}
         for singlelumi in self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']:
             if 'lumis' in singlelumi['doc'] and singlelumi['doc']['lumis']:
