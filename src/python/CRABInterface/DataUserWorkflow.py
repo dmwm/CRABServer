@@ -79,11 +79,6 @@ class DataUserWorkflow(object):
         if not wfdocs:
             return jobsperstate, detailsperstate
 
-        #jobs in success state are taken from all the workflows
-        success = sum( [ doc['success'] for doc in wfdocs if doc.get('success', None) ] )
-        if success:
-            jobsperstate['success'] = success
-
         lastdoc = wfdocs[-1]
         for state in lastdoc:
             if state != 'inWMBS':
@@ -96,6 +91,11 @@ class DataUserWorkflow(object):
                     if state == 'submitted' and 'submitted' in lastdoc:
                         jobsperstate['submitted'] -= lastdoc['submitted'].get('first', 0)
                         jobsperstate['submitted'] -= lastdoc['submitted'].get('retry', 0)
+
+        #jobs in success state are taken from all the workflows
+        success = sum( [ doc['success'] for doc in wfdocs if doc.get('success', None) ] )
+        if success:
+            jobsperstate['success'] = success
 
         return jobsperstate, detailsperstate
 
