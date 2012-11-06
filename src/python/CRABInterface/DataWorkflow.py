@@ -177,7 +177,7 @@ class DataWorkflow(object):
            :return: a list of errors grouped by exit code, error reason, site"""
 
         result = {}
-        group_level = 3 if shortformat else 5
+        group_level = 4 if shortformat else 6
         options = {"startkey": [workflow, "/"+workflow+"/Analysis", "jobfailed"],
                    "endkey": [workflow, "/"+workflow+"/Analysis", "jobfailed", {}, {}, {}],
                    "reduce": True,  "group_level": group_level}
