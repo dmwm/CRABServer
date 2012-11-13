@@ -290,8 +290,13 @@ class DataWorkflow(object):
                         elem["type"] = "logArchive"
                         elem["size"] = output['size']
                         elem["checksums"] = output['checksums']
-                        elem["pfn"] = self.phedex.getPFN(output['location'],
+                        try:
+                            elem["pfn"] = self.phedex.getPFN(output['location'],
                                                          output['lfn'])[(output['location'], output['lfn'])]
+                        except Exception, e:
+                            self.logger.exception(e)
+                            raise ExecutionError("Problem in the lfn/pfn conversion. Location: %s, Lfn: %s" % (output['location'], output['lfn']),\
+                                        trace=traceback.format_exc(), errobj=e)
                         elem["workflow"] = workflow
                         elem["exitcode"] = row['doc']['exitcode']
                         numJobs[row['doc']['exitcode']] = 1 if not row['doc']['exitcode'] in numJobs else numJobs[row['doc']['exitcode']] + 1
@@ -341,9 +346,14 @@ class DataWorkflow(object):
         :return: a generator of dictionaries reporting the file information in PFN."""
         for singlefile in result:
             singlefile['value']['workflow'] = singlefile['key'][0]
-            singlefile['value']['pfn'] = self.phedex.getPFN(singlefile['value']['location'],
+            try:
+                singlefile['value']['pfn'] = self.phedex.getPFN(singlefile['value']['location'],
                                                             singlefile['value']['lfn'])[(singlefile['value']['location'],
                                                                                          singlefile['value']['lfn'])]
+            except Exception, e:
+                self.logger.exception(e)
+                raise ExecutionError("Problem in the lfn/pfn conversion. Location: %s, Lfn: %s" % (output['location'], output['lfn']),\
+                            trace=traceback.format_exc(), errobj=e)
             del singlefile['value']['jobid']
             del singlefile['value']['location']
             del singlefile['value']['lfn']
