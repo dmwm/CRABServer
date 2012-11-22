@@ -15,6 +15,8 @@ from WMCore.RequestManager.RequestMaker import CheckIn
 from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState, GetRequest
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import loadWorkload, abortRequest
 from WMCore.Database.DBFactory import DBFactory
+from WMCore.Services.WMStats.WMStatsWriter import WMStatsWriter
+
 
 #CRAB dependencies
 from CRABInterface.DataUser import DataUser
@@ -108,7 +110,8 @@ class DataWorkflow(object):
             agentDoc = self.monitordb.conn.document(id=agentDoc['rows'][0]['value']['id'])
             doc['status'] = _antsk(agentDoc)['status']
             doc['sites'] = _antsk(agentDoc)['sites']
-            doc['output'] = agentDoc.get('output_progress')                                                                                                                                                                        
+            doc['output'] = agentDoc.get('output_progress')
+
             return doc
         else:
             return doc
@@ -396,14 +399,18 @@ class DataWorkflow(object):
 
         :arg dict request: the request schema to inject"""
         try:
-            CheckIn.checkIn(request, wmstatSvc=self.wmstats)
+            CheckIn.checkIn(request)
         except CheckIn.RequestCheckInError, re:
             raise ExecutionError("Problem checking in the request: %s" % getattr(re, '_message', 'unknown'), trace=traceback.format_exc(), errobj=re)
         try:
             ChangeState.changeRequestStatus(request['RequestName'], 'assignment-approved', wmstatUrl=self.wmstatsurl)
             ChangeState.assignRequest(request['RequestName'], request["Team"], wmstatUrl=self.wmstatsurl)
         except RuntimeError, re:
-            raise ExecutionError("Problem checking in the request", trace=traceback.format_exc(), errobj=re)
+            raise ExecutionError("Problem assigning in the request", trace=traceback.format_exc(), errobj=re)
+        try:
+            self.wmstats.insertRequest(request)
+        except Exception as ex:
+            raise ExecutionError("Could not update WMStats", trace=traceback.format_exc(), errobj=ex)
 
 
     def _injectCouch(self, schemaWf, makerType):
