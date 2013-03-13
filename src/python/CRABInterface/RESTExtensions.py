@@ -7,7 +7,7 @@ Currently authz_owner_match uses a WMCore.Database.CMSCouch method
 but in next versions it should be dropped, as from the CRABInterface.
 """
 from WMCore.REST.Error import MissingObject
-from CRABInterface.Utils import CouchDBConn, conn_handler
+from CRABInterface.Utils import conn_handler
 
 import cherrypy
 import traceback
@@ -20,7 +20,6 @@ def authz_owner_match(accessobj, workflows, retrieve_docs=True):
        :arg WMCore.CMSCouch.Database database: database connection to retrieve the docs
        :arg str list workflows: a list of workflows unique name as positive check
        :return: in case retrieve_docs is not false the list of couchdb documents."""
-
     user = cherrypy.request.user
     log = cherrypy.log
 
@@ -35,8 +34,8 @@ def authz_owner_match(accessobj, workflows, retrieve_docs=True):
             excauthz = RuntimeError("The document '%s' is not retrievable '%s'" % (wf, str(ex)))
             raise MissingObject("The resource requested does not exist", trace=traceback.format_exc(), errobj = excauthz)
 
-        if wfdoc and 'requestor' in wfdoc:
-            if wfdoc['requestor'] == cherrypy.request.user['login']:
+        if wfdoc and 'Requestor' in wfdoc:
+            if wfdoc['Requestor'] == cherrypy.request.user['login']:
                 alldocs.append(wfdoc)
                 continue
         log("ERROR: authz denied for user '%s' to the resource '%s'" % (user, wf))

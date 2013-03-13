@@ -25,7 +25,7 @@ class RESTCampaign(RESTEntity):
 
         if method in ['PUT']:
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=False)
-            validate_strlist("workflow", param, safe, RX_WORKFLOW) #Verb not implemented. Should it be RX_UNIQUEWF?
+            validate_strlist("workflow", param, safe, RX_WORKFLOW)
 
         elif method in ['POST']:
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=False)
@@ -68,10 +68,6 @@ class RESTCampaign(RESTEntity):
            :returns: the list of modified field"""
 
         raise NotImplementedError
-        # strict check on authz: only the campaign owner can modify it
-        workflows = self.campaignmgr.getCampaignWorkflows(campaign)
-        alldocs = authz_owner_match(self.campaignmgr.monitordb, workflows)
-        return self.campaignmgr.resubmit(campaign, workflows)
 
     @restcall
     def get(self, campaign, age, subresource, limit):
@@ -112,9 +108,3 @@ class RESTCampaign(RESTEntity):
            :return: nothing?"""
 
         raise NotImplementedError
-
-        # strict check on authz: only the campaign owner can modify it
-        workflows = self.campaignmgr.getCampaignWorkflows(campaign)
-        alldocs = authz_owner_match(self.campaignmgr.monitordb, workflows)
-        result = self.campaignmgr.kill(campaign, force, workflows)
-        return result

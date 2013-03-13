@@ -1,8 +1,10 @@
 import time
+import datetime
 import threading
 import logging
 import cherrypy #cherrypy import is needed here because we need the 'start_thread' subscription
 import traceback
+import json
 
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
@@ -14,12 +16,18 @@ from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 from WMCore.RequestManager.RequestMaker import CheckIn
 from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState, GetRequest
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import loadWorkload, abortRequest
+from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.Database.DBFactory import DBFactory
+from WMCore.WMSpec.WMTask import buildLumiMask
 
 #CRAB dependencies
-from CRABInterface.DataUser import DataUser
-from CRABInterface.Utils import setProcessingVersion, CouchDBConn, CMSSitesCache, conn_handler
+from CRABInterface.Utils import CMSSitesCache, conn_handler
+from CRABInterface.Utils import retriveUserCert
 from CRABInterface.Regexps import RX_WFRESUB
+
+#SQL queries
+from TaskDB.Oracle.Task.New import New
+from TaskDB.Oracle.Task.ID import ID
 
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
@@ -27,46 +35,15 @@ class DataWorkflow(object):
     splitMap = {'LumiBased' : 'lumis_per_job', 'EventBased' : 'events_per_job', 'FileBased' : 'files_per_job'}
 
     @staticmethod
-    def globalinit(monurl, monname, asomonurl, asomonname, reqmgrurl, reqmgrname,
-                   configcacheurl, configcachename, connectUrl, phedexargs=None,
-                   dbsurl=None, acdcurl=None, acdcdb=None, defaultBlacklist=None,
-                   sitewildcards={'T1*': 'T1_*', 'T2*': 'T2_*', 'T3*': 'T3_*'}):
-
-        DataWorkflow.monitordb = CouchDBConn(db=CouchServer(monurl), name=monname, conn=None)
-        DataWorkflow.asodb = CouchDBConn(db=CouchServer(asomonurl), name=asomonname, conn=None)
-
-        DataWorkflow.wmstatsurl = monurl + '/' + monname
-        DataWorkflow.wmstats = None
-
-        #WMBSHelper need the reqmgr couchurl and database name
-        DataWorkflow.reqmgrurl = reqmgrurl
-        DataWorkflow.reqmgrname = reqmgrname
-        DataWorkflow.configcacheurl = configcacheurl
-        DataWorkflow.configcachename = configcachename
-
-        DataWorkflow.connectUrl = connectUrl
-        DataWorkflow.sitewildcards = sitewildcards
-
+    def globalinit(dbapi, phedexargs=None, dbsurl=None):
+        DataWorkflow.api = dbapi
         DataWorkflow.phedexargs = phedexargs
         DataWorkflow.phedex = None
-
         DataWorkflow.dbsurl = dbsurl
-
-        DataWorkflow.acdcurl = acdcurl
-        DataWorkflow.acdcdb = acdcdb
-
-        DataWorkflow.defaultBlacklist = defaultBlacklist or []
 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
-        self.user = DataUser()
-
-        self.wildcardKeys = self.sitewildcards
-        self.wildcardSites = {}
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
-
-        self.dbi = DBFactory(self.logger, self.connectUrl).connect()
-        cherrypy.engine.subscribe('start_thread', self.initThread)
 
         # Supporting different types of workflows means providing
         # different functionalities depending on the type.
@@ -77,73 +54,6 @@ class DataWorkflow(object):
         self.typemapping = {'Analysis': {'report': self._reportAnalysis},
                             'PrivateMC': {'report': self._reportPrivateMC},}
 
-    def initThread(self, thread_index):
-        """
-        The ReqMgr expects the DBI to be contained in the Thread
-        """
-        myThread = threading.currentThread()
-        myThread.dbi = self.dbi
-
-    @conn_handler(services=['monitor'])
-    def getWorkflow(self, wf):
-        """
-        Get the workflow summary documents frmo the Central Monitoring.
-
-        :arg str wf: the workflow name
-        :return: the summary documents in a dictionary.
-        """
-        def _antsk(doc):
-            """Return just the analysis task so that we avoid to include LogCollect jobs"""
-            return doc['tasks']['/%s/Analysis' % doc['workflow']] if 'tasks' in doc else doc
-
-        options = {"startkey": [wf, {}], "endkey": [wf], 'reduce': True, 'descending': True}
-        try:
-            doc = self.monitordb.conn.document(id=wf)
-        except CouchNotFoundError:
-            self.logger.error("Cannot find document with id " + str(id))
-            return {}
-        agentDoc = self.monitordb.conn.loadView("WMStats", "latestRequest", options)
-        if agentDoc['rows']:
-            self.logger.debug("Latest document id: %s" % agentDoc['rows'][0]['value']['id'])
-            agentDoc = self.monitordb.conn.document(id=agentDoc['rows'][0]['value']['id'])
-            doc['status'] = _antsk(agentDoc)['status']
-            doc['sites'] = _antsk(agentDoc)['sites']
-            doc['output'] = agentDoc.get('output_progress')                                                                                                                                                                        
-            return doc
-        else:
-            return doc
-
-    @conn_handler(services=['asomonitor'])
-    def getWorkflowTransfers(self, wf):
-        """
-        Return the async transfers concerning the workflow
-
-        :arg str wf: the workflow name
-        :return: the summary document in a dictionary.
-        """
-        result = {}
-        try:
-            doc = self.asodb.conn.document(wf)
-            self.logger.debug("Workflow trasfer: %s" % doc)
-            if doc and 'state' in doc:
-                result['state'] = doc['state']
-                if 'publication_state' in doc:
-                    result['publication_state'] = doc['publication_state']
-            if doc and 'failures_reasons' in doc:
-                 result['failures_reasons'] = doc['failures_reasons']
-        except CouchNotFoundError:
-            self.logger.error("Cannot find ASO documents in couch")
-        return result
-
-    def getAll(self, wfs):
-        """Retrieves the workflow document from the couch database
-
-           :arg str list workflow: a list of workflow names
-           :return: a json corresponding to the workflow in couch"""
-        for wf in wfs:
-            yield self.getWorkflow(wf)
-
-    @conn_handler(services=['monitor'])
     def getLatests(self, user, limit, timestamp):
         """Retrives the latest workflows for the user
 
@@ -165,25 +75,15 @@ class DataWorkflow(object):
         #raise NotImplementedError
         return [{}]
 
-    @conn_handler(services=['monitor'])
     def errors(self, workflow, shortformat):
         """Retrieves the sets of errors for a specific workflow
 
            :arg str workflow: a workflow name
            :arg int shortformat: a flag indicating if the user is asking for detailed
-                                 information about sites and list of errors. If
-                                 the user does a crab status -f -i where failures need
-                                 to be grouped by site we need the long formats
+                                 information about sites and list of errors
            :return: a list of errors grouped by exit code, error reason, site"""
 
-        result = {}
-        group_level = 4 if shortformat else 6
-        options = {"startkey": [workflow, "/"+workflow+"/Analysis", "jobfailed"],
-                   "endkey": [workflow, "/"+workflow+"/Analysis", "jobfailed", {}, {}, {}],
-                   "reduce": True,  "group_level": group_level}
-        result['jobs'] = self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
-        result['transfers'] = self.getWorkflowTransfers(workflow)
-        return result
+        raise NotImplementedError
 
     def report(self, workflow):
         """Retrieves the quality of the workflow in term of what has been processed
@@ -192,59 +92,13 @@ class DataWorkflow(object):
            :arg str workflow: a workflow name
            :return: what?"""
 
+        raise NotImplementedError
         try:
             return self.typemapping[self.getType(workflow)]['report'](workflow)
         except KeyError, ex:
             raise InvalidParameter("Not valid scehma provided", trace=traceback.format_exc(), errobj = ex)
 
-    def _getJobDocuments(self, workflow, exitcode):
-        ## TODO optimize this by avoiding loading full view in memory
-        options = {"reduce": False, "include_docs" : True}
-        if exitcode == None:
-            options["startkey"] = [workflow, "/"+workflow+"/Analysis"]
-            options["endkey"] = [workflow, "/"+workflow+"/Analysis", {}, {}, {}, {}]
-        elif exitcode != 0:
-            options["startkey"] = [workflow, "/"+workflow+"/Analysis", "jobfailed", exitcode]
-            options["endkey"] = [workflow, "/"+workflow+"/Analysis", "jobfailed", exitcode, {}, {}]
-        else:
-            options["startkey"] = [workflow, "/"+workflow+"/Analysis", "success", exitcode]
-            options["endkey"] = [workflow, "/"+workflow+"/Analysis", "success", exitcode, {}, {}]
-
-        return self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']
-
-    @conn_handler(services=['monitor'])
-    def fwjr(self, workflow, howmany, exitcode):
-        """Returns the workflow fwjr.
-
-           :arg str workflow: a workflow name
-           :arg int howmany: the limit on the number of fwjr to return
-           :arg int exitcode: the fwjr has to be of a job ended with this exit_code
-           :return: a generator of a list of fwjrs"""
-        #default is 1 logfile per exitcode
-        howmany = howmany if howmany else 1
-        self.logger.info("Retrieving %s log(s) for %s" % (howmany, workflow))
-
-        outview = self._getJobDocuments(workflow, exitcode)
-
-        #number of errors for each exit code
-        numJobs = {}
-
-        for row in outview:
-            #exclude log collect and jobs with exitcode 0
-            if row['doc']['task'].endswith("/LogCollect") or not row['doc']['exitcode']:
-                continue
-            #do what you have to do when you find enough errors
-            if row['doc']['exitcode'] in numJobs and numJobs[row['doc']['exitcode']] >= howmany:
-                if exitcode is not None:
-                    break #exit if the user required just one exit code
-                else:
-                    continue #continue the for otherwise
-            numJobs[row['doc']['exitcode']] = 1 if row['doc']['exitcode'] not in numJobs else numJobs[row['doc']['exitcode']] + 1
-            row['doc']['errors'].update({'exitcode' : row['doc']['exitcode']})
-            yield row['doc']['errors']
-
-    @conn_handler(services=['monitor', 'phedex'])
-    def logs(self, workflow, howmany, exitcode):
+    def logs(self, workflow, howmany, exitcode, pandaids):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
 
            :arg str workflow: a workflow name
@@ -252,70 +106,22 @@ class DataWorkflow(object):
            :arg int exitcode: the log has to be of a job ended with this exit_code
            :return: (a generator of?) a list of logs pfns"""
         #default is 1 logfile per exitcode
-        howmany = howmany if howmany else 1
         self.logger.info("Retrieving %s log(s) for %s" % (howmany, workflow))
+        raise NotImplementedError
 
-        outview = self._getJobDocuments(workflow, exitcode)
-
-        #number of jobs for each exit code
-        numJobs = {}
-        #number of jobs with no logs for each exit code
-        missLogs = {}
-
-        for row in outview:
-            elem = {}
-            #if the fwjr does not have outputs
-            if not 'output' in row['doc'] or not row['doc']['output']:
-                if not row['doc']['task'].endswith("/LogCollect"):
-                    missLogs[str(row['doc']['exitcode'])] = 1 if not str(row['doc']['exitcode']) in missLogs else missLogs[str(row['doc']['exitcode'])] + 1
-            elif row['doc']['task'].endswith("/LogCollect"):
-                for output in row['doc']['output']:
-                    if 'lfn' in output:
-                        elem["type"] = "logCollect"
-                        elem["size"] = output['size']
-                        elem["checksums"] = output['checksums']
-                        #Note: in this report we have the pfn and not the lfn
-                        elem["pfn"] = output['lfn']
-                        elem["workflow"] = workflow
-            elif row['doc']['exitcode'] in numJobs and numJobs[row['doc']['exitcode']] >= howmany:
-                if exitcode is not None:
-                    break
-                else:
-                    continue
-            else: #a real job
-                found = False
-                for output in row['doc']['output']:
-                    #when we find the logarchive output we fill elem
-                    if output['type'] == 'logArchive':
-                        elem["type"] = "logArchive"
-                        elem["size"] = output['size']
-                        elem["checksums"] = output['checksums']
-                        elem["pfn"] = self.phedex.getPFN(output['location'],
-                                                         output['lfn'])[(output['location'], output['lfn'])]
-                        elem["workflow"] = workflow
-                        elem["exitcode"] = row['doc']['exitcode']
-                        numJobs[row['doc']['exitcode']] = 1 if not row['doc']['exitcode'] in numJobs else numJobs[row['doc']['exitcode']] + 1
-                        found = True
-                if not found:
-                    missLogs[str(row['doc']['exitcode'])] = 1 if not str(row['doc']['exitcode']) in missLogs else missLogs[str(row['doc']['exitcode'])] + 1
-
-            if elem:
-                yield elem
-        # how many job report did not have an exit code are reported in missing
-        yield {"missing": missLogs}
 
     @conn_handler(services=['asomonitor'])
-    def outputLocation(self, workflow, max):
+    def outputLocation(self, workflow, max, pandaids):
         """
         Retrieves the output LFN from async stage out
 
         :arg str workflow: the unique workflow name
         :arg int max: the maximum number of output files to retrieve
         :return: the result of the view as it is."""
-        options = {"reduce": False, "startkey": [workflow], "endkey": [workflow, {}]}
-        if max:
+        options = {"reduce": False, "startkey": [workflow, "output"], "endkey": [workflow, 'output', {}]}
+        if max and not pandaids: #do not use limits if there are pandaids
             options["limit"] = max
-        return self.asodb.conn.loadView("UserMonitoring", "FilesByWorkflow", options)['rows']
+        return self._filterids(self.asodb.conn.loadView("UserMonitoring", "FilesByWorkflow", options)['rows'], pandaids)
 
     @conn_handler(services=['monitor'])
     def outputTempLocation(self, workflow, howmany, jobtoskip):
@@ -332,23 +138,6 @@ class DataWorkflow(object):
         tempresult = self.monitordb.conn.loadView("WMStats", "filesByWorkflow", options)['rows']
         return [t for t in tempresult if not t['value']['jobid'] in jobtoskip]
 
-    @conn_handler(services=['phedex'])
-    def getPhyisicalLocation(self, result):
-        """
-        Translates LFN to PFN
-
-        :arg dict list result: the list of dictionaties containing the file information
-        :return: a generator of dictionaries reporting the file information in PFN."""
-        for singlefile in result:
-            singlefile['value']['workflow'] = singlefile['key'][0]
-            singlefile['value']['pfn'] = self.phedex.getPFN(singlefile['value']['location'],
-                                                            singlefile['value']['lfn'])[(singlefile['value']['location'],
-                                                                                         singlefile['value']['lfn'])]
-            del singlefile['value']['jobid']
-            del singlefile['value']['location']
-            del singlefile['value']['lfn']
-            yield singlefile['value']
-
     def output(self, workflow, howmany):
         """
         Retrieves the output PFN aggregating output in final and temporary locations.
@@ -356,15 +145,8 @@ class DataWorkflow(object):
         :arg str workflow: the unique workflow name
            :arg int howmany: the limit on the number of PFN to return
            :return: a generator of list of outputs"""
-        howmany = howmany if howmany else 1
-        max = howmany if howmany > 0 else None
-        result = self.workflow.outputLocation(workflow, max)
-
-        if not max or len(result) < howmany:
-            jobids = [singlefile['value']['jobid'] for singlefile in result]
-            tempresult = self.workflow.outputTempLocation(workflow, howmany-len(result), jobids)
-            if len(tempresult) + len(result) >= howmany:
-                result += tempresult[: howmany-len(result)]
+        raise NotImplementedError
+        self.phedex.getPFN(location, pfn)
 
         return self.getPhyisicalLocation(result)
 
@@ -389,57 +171,11 @@ class DataWorkflow(object):
         raise NotImplementedError
         return [{}]
 
-    @conn_handler(services=['wmstats'])
-    def _inject(self, request):
-        """
-        Injecting and auto assigning the requests inside ReqMgr.
-
-        :arg dict request: the request schema to inject"""
-        try:
-            CheckIn.checkIn(request, wmstatSvc=self.wmstats)
-        except CheckIn.RequestCheckInError, re:
-            raise ExecutionError("Problem checking in the request: %s" % getattr(re, '_message', 'unknown'), trace=traceback.format_exc(), errobj=re)
-        try:
-            ChangeState.changeRequestStatus(request['RequestName'], 'assignment-approved', wmstatUrl=self.wmstatsurl)
-            ChangeState.assignRequest(request['RequestName'], request["Team"], wmstatUrl=self.wmstatsurl)
-        except RuntimeError, re:
-            raise ExecutionError("Problem checking in the request", trace=traceback.format_exc(), errobj=re)
-
-
-    def _injectCouch(self, schemaWf, makerType):
-        maker = retrieveRequestMaker(makerType)
-        specificSchema = maker.newSchema()
-        specificSchema.update(schemaWf)
-
-        #The client set BlacklistT1 as true if the user has not t1access role.
-        if specificSchema["BlacklistT1"]:
-            if specificSchema['SiteBlacklist']:
-                specificSchema['SiteBlacklist'].append("T1*")
-            else:
-                specificSchema['SiteBlacklist'] = ["T1*"]
-        specificSchema['SiteBlacklist'] += DataWorkflow.defaultBlacklist
-        request = maker(specificSchema)
-        helper = WMWorkloadHelper(request['WorkflowSpec'])
-        # can't save Request object directly, because it makes it hard to retrieve the _rev
-        metadata = {}
-        metadata.update(request) # don't want to JSONify the whole workflow
-        del metadata['WorkflowSpec']
-        siteBlacklist = specificSchema.get("SiteBlacklist", [])
-        siteWhitelist = specificSchema.get("SiteWhitelist", [])
-        helper.setSiteWildcardsLists(siteWhitelist=siteWhitelist, siteBlacklist=siteBlacklist, wildcardDict=self.wildcardSites)
-        helper.setDashboardActivity(dashboardActivity = 'Analysis')
-        if not set(siteBlacklist).isdisjoint( set(siteWhitelist) ):
-            raise InvalidParameter("SiteBlacklist and SiteWhitelist are not disjoint: %s in both lists" % \
-                                   (','.join( set(siteBlacklist) & set(siteWhitelist) )))
-        request['RequestWorkflow'] = helper.saveCouch(self.reqmgrurl, self.reqmgrname, metadata=metadata)
-        return request
-
-
-    @conn_handler(services=['sitedb'])
+    @retriveUserCert(clean=False)
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
-               blockblacklist, splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag,
-               userdn, userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag,
-               runs, lumis, vorole, vogroup):
+               blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,
+               userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
+               runs, lumis): #TODO delete unused parameters
         """Perform the workflow injection into the reqmgr + couch
 
            :arg str workflow: workflow name requested by the user;
@@ -466,75 +202,78 @@ class DataWorkflow(object):
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
-           :arg str acdcdoc: input acdc document which contains the input information for data selction (eg: lumi mask)
-           :arg str globaltag: the globaltag to use when running the job;
+           :arg str list runs: list of run numbers
+           :arg str list lumis: list of lumi section numbers
            :returns: a dict which contaians details of the request"""
 
+        self.logger.debug("""workflow %s, jobtype %s, jobsw %s, jobarch %s, inputdata %s, siteblacklist %s, sitewhitelist %s, blockwhitelist %s,
+               blockblacklist %s, splitalgo %s, algoargs %s, configdoc %s, userisburl %s, cachefilename %s, cacheurl %s, adduserfiles %s, addoutputfiles %s, savelogsflag %s,
+               userhn %s, publishname %s, asyncdest %s, campaign %s, blacklistT1 %s, dbsurl %s, publishdbsurl %s, tfileoutfiles %s, edmoutfiles %s, userdn %s,
+               runs %s, lumis %s"""%(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,\
+               blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,\
+               userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,\
+               runs, lumis))
         #add the user in the reqmgr database
-        self.user.addNewUser(userdn, userhn)
-        requestname = '%s_%s_%s' % (userhn, workflow, time.strftime('%y%m%d_%H%M%S', time.gmtime()))
+        timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
+        requestname = '%s_%s_%s' % (timestamp, userhn, workflow)
 
-        schemaWf = { "CouchURL": self.configcacheurl,
-                     "CouchDBName": self.configcachename,
-                     "AnalysisConfigCacheDoc": configdoc,
-                     "RequestName": requestname,
-                     "OriginalRequestName": workflow, # do we really need this?
-                     "SiteWhitelist": sitewhitelist,
-                     "SiteBlacklist": siteblacklist,
-                     "CMSSWVersion": jobsw,
-                     "RequestorDN": userdn,
-                     "SaveLogs": bool(savelogsflag),
-                     "InputDataset": inputdata,
-                     "OutputFiles": addoutputfiles,
-                     "Group": "Analysis",
-                     "Team": "Analysis",
-                     "RequestType": jobtype,
-                     "userFiles": adduserfiles,
-                     "ScramArch": jobarch,
-                     "JobSplitAlgo": splitalgo,
-                     "userSandbox": userisburl,
-                     "PublishDataName": publishname,
-                     "asyncDest": asyncdest,
-                     "JobSplitArgs": { self.splitMap[splitalgo] : algoargs },
-                     "Campaign": campaign or requestname, # for first submissions this should be = to the wf name
-                     "Submission": 1, # easy to track the relation between resubmissions,
-                     "Requestor": userhn,
-                     "Username": userhn,
-                     "BlacklistT1": blacklistT1,
-                     "DbsUrl": dbsurl or self.dbsurl,
-                     "PublishDbsUrl": publishdbsurl,
-                     "ACDCUrl": self.acdcurl,
-                     "ACDCDBName": self.acdcdb,
-                     "GlobalTag": globaltag or None,
-                     "Lumis" : lumis,
-                     "Runs" : runs,
-                   }
+        self.api.modify(New.sql,
+                            task_name       = [requestname],\
+                            jobset_id       = [None],
+                            task_status     = ['NEW'],\
+                            start_time      = [datetime.datetime.now()],\
+                            task_failure    = [''],\
+                            job_sw          = [jobsw],\
+                            job_arch        = [jobarch],\
+                            input_dataset   = [inputdata],\
+                            site_whitelist   = [json.dumps(sitewhitelist)],\
+                            site_blacklist  = [json.dumps(siteblacklist)],\
+                            split_algo      = [splitalgo],\
+                            split_args      = [algoargs],\
+                            #parameter userisburl is the same as cacheurl since we use panda
+                            #and the pset is put in the pandacache with the usersandbox (and not in the configcache)
+                            user_sandbox    = [cacheurl],\
+                            cache_url       = [cacheurl],\
+                            username        = [userhn],\
+                            user_dn         = [userdn],\
+                            user_vo         = ['cms'],\
+                            user_role       = [''],\
+                            user_group      = [''],\
+                            publish_name    = [publishname],\
+                            asyncdest       = [asyncdest],\
+                            dbs_url         = [dbsurl],\
+                            publish_dbs_url = [publishdbsurl],\
+                            outfiles        = [json.dumps(addoutputfiles)],\
+                            tfile_outfiles  = [json.dumps(tfileoutfiles)],\
+                            edm_outfiles    = [json.dumps(edmoutfiles)],\
+                            data_runs       = [json.dumps(buildLumiMask(runs, lumis))],\
+                            transformation  = ['http://common-analysis-framework.cern.ch/CMSRunAnaly.sh'],\
+                            arguments       = [''],\
+        )
 
-        #the keys VoRole and VoGroup should be in the spec only if they have a value,
-        #otherwise WorkQueueManagerWMBSFileFeeder explodes!
-        if vorole:
-            schemaWf['VoRole'] = vorole
-        if vogroup:
-            schemaWf['VoGroup'] = vogroup
-
-        if schemaWf.get("Lumis", None) and schemaWf['JobSplitAlgo'] != 'LumiBased':
+        """
+        if schemaWf.get("ACDCDoc", None) and schemaWf['JobSplitAlgo'] != 'LumiBased':
             excsplit = ValueError("You must use LumiBased splitting if specifying a lumiMask.")
             invalidp = InvalidParameter("You must use LumiBased splitting if specifying a lumiMask.", errobj = excsplit)
             setattr(invalidp, 'trace', '')
             raise invalidp
 
-        schemaWf["ProcessingVersion"] = setProcessingVersion(schemaWf, self.reqmgrurl, self.reqmgrname)
+        try:
+            specificSchema.allCMSNames = self.allCMSNames.sites
+            specificSchema.validate()
+        except Exception, ex:
+            raise InvalidParameter("Not valid scehma provided", trace=traceback.format_exc(), errobj = ex)
 
-        makerType = "Analysis"
-        request = self._injectCouch(schemaWf, makerType)
-        request['PrepID'] = None
+        #The client set BlacklistT1 as true if the user has not t1access role.
+        if blacklistT1:
+            if schemaWf['SiteBlacklist']:
+                schemaWf['SiteBlacklist'].append("T1*")
+            else:
+                specificSchema['SiteBlacklist'] = ["T1*"]
+        """
 
-        self._inject(request)
+        return [{'RequestName': requestname}]
 
-        return [{'RequestName': request['RequestName']}]
-
-
-    @conn_handler(services=['sitedb'])
     def resubmit(self, workflow, siteblacklist, sitewhitelist):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
@@ -544,12 +283,13 @@ class DataWorkflow(object):
            :arg str list sitewhitelist: white list of sites, with CMS name."""
         # TODO: change this
         taskresubmit = "Analysis"
+        # TODO: part of the code here needs to be shared with inject
         originalwf = GetRequest.getRequestByName( workflow )
         helper = loadWorkload(originalwf)
         originalschema = helper.data.request.schema.dictionary_()
         wmtask = helper.getTask(taskresubmit)
         if not wmtask:
-            exctask = ValueError('%s task not found in the workflow %s.' %(taskresubmit, workflow))
+            exctask = ValueError('%s task not found in the workflow %s.' %(taskResubmit, lastSubmission))
             invalidp = InvalidParameter("Problem resubmitting workflow because task to resubmit was not found.", errobj = exctask)
             setattr(invalidp, 'trace', '')
             raise invalidp
@@ -563,25 +303,46 @@ class DataWorkflow(object):
                     'ACDCServer':          originalschema['ACDCUrl'],
                     'ACDCDatabase':        originalschema['ACDCDBName'],
                   }
-
+        resubmitschema.update(newpars)
+        maker = retrieveRequestMaker("Resubmission")
+        schema = maker.newSchema()
+        ## updating it with resubmission parameters
+        schema.update( resubmitschema )
         ## generating a new name: I am choosing the original name plus resubmit and date
+
         if RX_WFRESUB.match(workflow):
             times = int(workflow.rsplit('_resubmit')[-1].split('_')[-1])+1
             basenewname = workflow.rsplit('_resubmit')[0]
-            newpars['RequestName'] = basenewname + '_resubmit_' + str(times)
+            schema['RequestName'] = basenewname + '_resubmit_' + str(times)
         else:
-            newpars['RequestName'] = workflow + '_resubmit_1'
-
-        resubmitschema.update(newpars)
-        request = self._injectCouch(resubmitschema, "Resubmission")
+            schema['RequestName'] = workflow + '_resubmit_1'
+        request = maker(schema)
+        newhelper = WMWorkloadHelper(request['WorkflowSpec'])
+        # can't save Request object directly, because it makes it hard to retrieve the _rev
+        metadata = {}
+        metadata.update(request)
+        # don't want to JSONify the whole workflow
+        del metadata['WorkflowSpec']
+        request['RequestWorkflow'] = newhelper.saveCouch(self.reqmgrurl, self.reqmgrname, metadata=metadata)
         self._inject(request)
 
-    def status(self, workflow):
+    def status(self, workflow, userdn):
         """Retrieve the status of the workflow
 
            :arg str workflow: a valid workflow name
            :return: a workflow status summary document"""
-        yield self.getWorkflow(workflow)
+
+        self.logger.info("Getting status for workflow %s" % workflow)
+
+        row = self.api.query(None, None, "SELECT tm_task_status FROM tasks WHERE tm_taskname = :taskname", taskname = workflow)
+        status = row.next()[0] #just one row is picked up by the previous query
+        self.logger.debug("Status result for workflow %s: %s" % (workflow, status))
+
+        rows = self.api.query(None, None, "SELECT panda_jobdef_id FROM jobgroups WHERE tm_taskname = :taskname", taskname = workflow)
+        for jobdef in row:
+            status, pandaIDstatus = PandaBooking(userdn,'cms','','').getPandIDsWithJobID(jobdef[0], True)
+
+        return pandaIDstatus
 
     def kill(self, workflow):
         """Request to Abort a workflow.
@@ -593,7 +354,6 @@ class DataWorkflow(object):
         except RuntimeError, re:
             raise ExecutionError("Problem killing the request", trace=traceback.format_exc(), errobj=re)
 
-    @conn_handler(services=['monitor'])
     def getType(self, workflow):
         """Retrieves the workflow type from the monitoring
 
@@ -601,7 +361,6 @@ class DataWorkflow(object):
            :return: a string of the job type supported by the workflow."""
         return self.monitordb.conn.document(id=workflow).get('request_type', None)
 
-    @conn_handler(services=['monitor'])
     def _reportAnalysis(self, workflow):
         """Retrieves the quality of the workflow in term of what has been processed
            from an analysis point of view, looking at good lumis.
@@ -609,15 +368,13 @@ class DataWorkflow(object):
            :arg str workflow: a workflow name
            :return: dictionary with run-lumis information"""
 
-        options = {"reduce": False, "include_docs" : True,
-                   "startkey": [workflow, "/"+workflow+"/Analysis", "success", 0],
-                   "endkey": [workflow, "/"+workflow+"/Analysis", "success", 0, {}, {}]}
+        options = {"reduce": False, "include_docs" : True, "startkey": [workflow, "success", 0], "endkey": [workflow, "success", 0, {}, {}]}
         output = {}
         for singlelumi in self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']:
             if 'lumis' in singlelumi['doc'] and singlelumi['doc']['lumis']:
                 for run in singlelumi['doc']['lumis']:
                     output.update((k, run[k]+output.get(k,[])) for k in run)
-        return output
+        return [output]
 
     def _reportPrivateMC(self, workflow):
         """Retrieves the quality of the workflow in term of what has been processed.

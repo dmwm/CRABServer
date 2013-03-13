@@ -1,11 +1,11 @@
-# WMCore dependecies here
+# WMCore dep#endecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.REST.Server import RESTEntity, restcall, rows
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
 
 # CRABServer dependecies here
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
-from CRABInterface.DataWorkflow import DataWorkflow
+from CRABInterface.DataUserWorkflow import DataWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
 from CRABInterface.Regexps import *
 from CRABInterface.Utils import CMSSitesCache, conn_handler
@@ -13,6 +13,7 @@ from CRABInterface.Utils import CMSSitesCache, conn_handler
 # external dependecies here
 import cherrypy
 import time
+
 
 class RESTUserWorkflow(RESTEntity):
     """REST entity for workflows from the user point of view and relative subresources"""
@@ -52,39 +53,39 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("splitalgo", param, safe, RX_SPLIT, optional=False)
             validate_num("algoargs", param, safe, optional=False)
             validate_str("configdoc", param, safe, RX_CFGDOC, optional=False)
-            validate_str("userisburl", param, safe, RX_CACHEURL, optional=False)
+            validate_str("userisburl", param, safe, RX_CACHEURL, optional=True)
+            validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
+            validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
+            #validate_str("userisburl", param, safe, re.compile(r"^[A-Za-z]*$"), optional=False)
             validate_strlist("adduserfiles", param, safe, RX_ADDFILE)
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE)
             validate_num("savelogsflag", param, safe, optional=False)
+            validate_str("vorole", param, safe, RX_VOPARAMS, optional=True)
+            validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
             validate_str("publishname", param, safe, RX_PUBLISH, optional=True)
             validate_str("publishdbsurl", param, safe, RX_PUBDBSURL, optional=True)
             #if one and only one between publishDataName and publishDbsUrl is set raise an error (we need both or none of them)
             if bool(safe.kwargs["publishname"]) != bool(safe.kwargs["publishdbsurl"]):
                 raise InvalidParameter("You need to set both publishDataName and publishDbsUrl parameters if you need the automatic publication")
-            #set the default value of the publishname parameter
-            if not safe.kwargs["publishname"]:
-                safe.kwargs["publishname"] = str(int(time.time()))
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkSite(safe.kwargs['asyncdest'])
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=True)
             validate_num("blacklistT1", param, safe, optional=False)
             validate_str("dbsurl", param, safe, RX_DBSURL, optional=True)
-            validate_str("acdcdoc", param, safe, RX_ACDCDOC, optional=True)
-            validate_str("globaltag", param, safe, RX_GLOBALTAG, optional=True)
+            validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES)
+            validate_strlist("edmoutfiles", param, safe, RX_OUTFILES)
             validate_strlist("runs", param, safe, RX_RUNS)
             validate_strlist("lumis", param, safe, RX_LUMILIST)
             if len(safe.kwargs["runs"]) != len(safe.kwargs["lumis"]):
-               raise InvalidParameter("The number of runs and the number of lumi lists are different")
-            validate_str("vorole", param, safe, RX_VOROLES, optional=True)
-            validate_str("vogroup", param, safe, RX_VOROLES, optional=True)
+                raise InvalidParameter("The number of runs and the number of limi lists are different")
 
         elif method in ['POST']:
-            validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
+            validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
 
         elif method in ['GET']:
-            validate_str("workflow", param, safe, RX_UNIQUEWF, optional=True)
+            validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
             validate_str('subresource', param, safe, RX_SUBRESTAT, optional=True)
             #parameters of subresources calls has to be put here
             #used by get latest
@@ -92,7 +93,9 @@ class RESTUserWorkflow(RESTEntity):
             #used by get log, get data
             validate_num('limit', param, safe, optional=True)
             validate_num('exitcode', param, safe, optional=True)
-            if safe.kwargs['subresource'] not in ['data', 'logs', 'fwjr'] and (safe.kwargs['limit'] is not None or safe.kwargs['exitcode'] is not None):
+            validate_numlist('pandaids', param, safe)
+            if safe.kwargs['subresource'] not in ['data', 'logs'] and (safe.kwargs['limit'] is not None or \
+                                                safe.kwargs['exitcode'] is not None or safe.kwargs['pandaids']):
                 raise InvalidParameter("Invalid input parameters")
             #used by errors
             validate_num('shortformat', param, safe, optional=True)
@@ -102,14 +105,15 @@ class RESTUserWorkflow(RESTEntity):
                 raise InvalidParameter("Invalid input parameters")
 
         elif method in ['DELETE']:
-            validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
+            validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
             validate_num("force", param, safe, optional=True)
 
 
     @restcall
+    #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist, blockblacklist,
-            splitalgo, algoargs, configdoc, userisburl, adduserfiles, addoutputfiles, savelogsflag, publishname,
-            asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, acdcdoc, globaltag, runs, lumis, vorole, vogroup):
+            splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl,  adduserfiles, addoutputfiles, savelogsflag, vorole, vogroup,
+            publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, tfileoutfiles, edmoutfiles, runs, lumis):
         """Insert a new workflow. The caller needs to be a CMS user with a valid CMS x509 cert/proxy.
 
            :arg str workflow: workflow name requested by the user;
@@ -135,22 +139,20 @@ class RESTUserWorkflow(RESTEntity):
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
-           :arg str acdcdoc: input acdc document which contains the input information for data selction (eg: lumi mask);
-           :arg str globaltag: the globaltag to use when running the job;
-           :arg str runs: runs;
-           :arg str lumis: lumis;
-           :arg str vorole: vorole used to retrieve the user proxy from myproxy;
-           :arg str vorole: vogroup used to retrieve the user proxy from myproxy;
+           :arg str list outfiles: list of the name of the output files
+           :arg str list runs: list of run numbers
+           :arg str list lumis: list of lumi section numbers
            :returns: a dict which contaians details of the submitted request"""
-
+        #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
         return self.userworkflowmgr.submit(workflow=workflow, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata,
                                        siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, blockwhitelist=blockwhitelist,
                                        blockblacklist=blockblacklist, splitalgo=splitalgo, algoargs=algoargs, configdoc=configdoc,
-                                       userisburl=userisburl, adduserfiles=adduserfiles, addoutputfiles=addoutputfiles,
-                                       savelogsflag=savelogsflag, userdn=cherrypy.request.user['dn'], userhn=cherrypy.request.user['login'],
+                                       userisburl=userisburl, cachefilename=cachefilename, cacheurl=cacheurl, adduserfiles=adduserfiles,
+                                       addoutputfiles=addoutputfiles, savelogsflag=savelogsflag, userdn=cherrypy.request.user['dn'],
+                                       userhn=cherrypy.request.user['login'], vorole=vorole, vogroup=vogroup,
                                        publishname=publishname, asyncdest=asyncdest, campaign=campaign, blacklistT1=blacklistT1,
-                                       dbsurl=dbsurl, publishdbsurl=publishdbsurl, acdcdoc=acdcdoc, globaltag=globaltag, runs=runs, lumis=lumis,
-                                       vorole=vorole, vogroup=vogroup)
+                                       dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,\
+                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis)
 
     @restcall
     def post(self, workflow, siteblacklist, sitewhitelist):
@@ -161,11 +163,11 @@ class RESTUserWorkflow(RESTEntity):
            :arg str list sitewhitelist: white list of sites, with CMS name."""
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.userworkflowmgr, [workflow], retrieve_docs=False)
-        self.userworkflowmgr.resubmit(workflow=workflow, siteblacklist=siteblacklist, sitewhitelist=sitewhitelist)
+        self.userworkflowmgr.resubmit(workflow=workflow, siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
         return [{"result":"ok"}]
 
     @restcall
-    def get(self, workflow, subresource, age, limit, shortformat, exitcode):
+    def get(self, workflow, subresource, age, limit, shortformat, exitcode, pandaids):
         """Retrieves the workflow information, like a status summary, in case the workflow unique name is specified.
            Otherwise returns all workflows since (now - age) for which the user is the owner.
            The caller needs to be a valid CMS user.
@@ -177,19 +179,16 @@ class RESTUserWorkflow(RESTEntity):
            :arg int exitcode: exitcode for which the specific subresource is needed (eg log file of a job with that exitcode)
            :retrun: workflow with the relative status summary in case of per user request; or
                     the requested subresource."""
-
         result = []
         if workflow:
             # if have the wf then retrieve the wf status summary
             if not subresource:
-                result = self.userworkflowmgr.status(workflow)
+                result = self.userworkflowmgr.status(workflow, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
             # if have a subresource then it should be one of these
             elif subresource == 'logs':
-                result = self.userworkflowmgr.logs(workflow, limit, exitcode)
-            elif subresource == 'fwjr':
-                result = self.userworkflowmgr.fwjr(workflow, limit, exitcode)
+                result = self.userworkflowmgr.logs(workflow, limit, exitcode, pandaids)
             elif subresource == 'data':
-                result = self.userworkflowmgr.output(workflow, limit)
+                result = self.userworkflowmgr.output(workflow, limit, pandaids)
             elif subresource == 'errors':
                 result = self.userworkflowmgr.errors(workflow, shortformat)
             elif subresource == 'report':
@@ -222,5 +221,5 @@ class RESTUserWorkflow(RESTEntity):
 
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.userworkflowmgr, [workflow], retrieve_docs=False)
-        self.userworkflowmgr.kill(workflow, force)
+        self.userworkflowmgr.kill(workflow, force, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
         return [{"result":"ok"}]

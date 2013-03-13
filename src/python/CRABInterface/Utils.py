@@ -1,22 +1,71 @@
 import logging
 import copy
 import traceback
+import os
+from subprocess import call
 from collections import namedtuple
 from time import mktime, gmtime
+import inspect
 
-from WMCore.REST.Error import ExecutionError
-from WMCore.Database.CMSCouch import CouchServer, CouchError
+from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import addSiteWildcards
 from WMCore.Services.WMStats.WMStatsWriter import WMStatsWriter
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
+from WMCore.Credential.Proxy import Proxy
 
 """
 The module contains some utility functions used by the various modules of the CRAB REST interface
 """
 
-CouchDBConn = namedtuple("CouchDBConn", ["db", "name", "conn"])
 CMSSitesCache = namedtuple("CMSSitesCache", ["cachetime", "sites"])
+
+#These parameters are set in the globalinit (called in RESTBaseAPI)
+serverCert = None
+serverKey = None
+serverDN = None
+uiSource = None
+credServerPath = '/tmp'
+
+def globalinit(serverkey, servercert, serverdn, uisource, credpath):
+    global serverCert, serverKey, serverDN, uiSource, credServerPath
+    serverCert, serverKey, serverDN, uiSource, credServerPath = servercert, serverkey, serverdn, uisource, credpath
+
+def execute_command( command, logger, timeout ):
+    """
+    _execute_command_
+    Funtion to manage commands.
+    """
+
+    stdout, stderr, rc = None, None, 99999
+    proc = subprocess.Popen(
+            command, shell=True, cwd=os.environ['PWD'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+    )
+
+    t_beginning = time.time()
+    seconds_passed = 0
+    while True:
+        if proc.poll() is not None:
+            break
+        seconds_passed = time.time() - t_beginning
+        if timeout and seconds_passed > timeout:
+            proc.terminate()
+            logger.error('Timeout in %s execution.' % command )
+            return stdout, rc
+
+        time.sleep(0.1)
+
+    stdout, stderr = proc.communicate()
+    rc = proc.returncode
+
+    logger.debug('Executing : \n command : %s\n output : %s\n error: %s\n retcode : %s' % (command, stdout, stderr, rc))
+
+    return stdout, rc
+
+
 
 def conn_handler(services):
     """
@@ -29,59 +78,48 @@ def conn_handler(services):
     """
     def wrap(func):
         def wrapped_func(*args, **kwargs):
-            if 'monitor' in services and not args[0].monitordb.conn:
-                args[0].monitordb = args[0].monitordb._replace(conn=args[0].monitordb.db.connectDatabase(args[0].monitordb.name, create=False))
-            if 'asomonitor' in services and not args[0].asodb.conn:
-                args[0].asodb = args[0].asodb._replace(conn=args[0].asodb.db.connectDatabase(args[0].asodb.name, create=False))
             if 'sitedb' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
                 args[0].allCMSNames = CMSSitesCache(sites=SiteDBJSON().getAllCMSNames(), cachetime=mktime(gmtime()))
                 if hasattr(args[0], 'wildcardKeys') and hasattr(args[0], 'wildcardSites'):
                     addSiteWildcards(args[0].wildcardKeys, args[0].allCMSNames.sites, args[0].wildcardSites)
-            if 'wmstats' in services and not args[0].wmstats:
-                args[0].wmstats = WMStatsWriter(args[0].wmstatsurl)
             if 'phedex' in services and not args[0].phedex:
                 args[0].phedex = PhEDEx(responseType='xml', dict=args[0].phedexargs)
             return func(*args, **kwargs)
         return wrapped_func
     return wrap
 
-def setProcessingVersion(request, reqmgrurl, reqmgrname):
-    """
-    If no ProcessingVersion is specified, go to couch to figure out next one.
-    """
-    logger = logging.getLogger("CRABLogger.Utils")
+def retriveUserCert(clean=True):
+    def wrap(func):
+        def wrapped_func(*args, **kwargs):
+            logger = logging.getLogger("CRABLogger.Utils")
+            myproxyserver = "myproxy.cern.ch"
+            userdn = kwargs['userdn']
+            defaultDelegation = { 'vo': 'cms',
+                                  'logger': logger,
+                                  'myProxySvr': 'myproxy.cern.ch',
+                                  'proxyValidity' : '192:00',
+                                  'min_time_left' : 36000,
+                                  'userDN' : userdn,
+                                  'server_key': serverKey,
+                                  'server_cert': serverCert,
+                                  'serverDN': serverDN,
+                                  'uisource': uiSource,
+                                  'credServerPath': credServerPath,}
+            timeleftthreshold = 60 * 60 * 24
+            proxy = Proxy(defaultDelegation)
+            userproxy = proxy.getProxyFilename(serverRenewer=True)
+            if proxy.getTimeLeft() < timeleftthreshold:
+                proxy.logonRenewMyProxy()
+                timeleft = proxy.getTimeLeft( userproxy )
+                if timeleft is None or timeleft <= 0:
+                    raise InvalidParameter("Impossible to retrieve proxy from %s for %s." %(defaultDelegation['myProxySvr'], defaultDelegation['userDN']))
 
-    if request.get('ProcessingVersion', None):
-        return
+                logger.debug("User proxy file path: %s" % userproxy)
+            out = func(*args, **kwargs)
+            if clean:
+                logger.debug("Rimuovo %s" % clean)
+                os.remove(userproxy)
+            return out
+        return wrapped_func
+    return wrap
 
-    try:
-        logger.debug("Connecting to database %s using the couch instance at %s: " % (reqmgrname, reqmgrurl))
-        couchdb = CouchServer(reqmgrurl)
-        database = couchdb.connectDatabase(reqmgrname, create=False)
-    except CouchError, ex:
-        raise ExecutionError("Error connecting to couch database", errobj = ex, trace=traceback.format_exc())
-
-    inputDataset = request.get("InputDataset", None)
-    startkey = [request['Requestor'], request['PublishDataName'], inputDataset]
-    endkey = copy.copy(startkey)
-    endkey.append({})
-    options = {"startkey" : startkey, "endkey" : endkey}
-
-    requests = database.loadView("ReqMgr", "requestsByUser", options)
-    logger.debug("Found %d rows in the requests database." % requests["total_rows"])
-
-    versions = []
-    for row in requests['rows']:
-        oldVersion = row['value']['version']
-        try:
-            versions.append(int(oldVersion))
-        except ValueError: # Not an int, so we ignore it
-            pass
-
-    logger.debug("Existing versions for workflow are: %s" % versions)
-    newVersion = 1
-    if versions:
-        newVersion = max(versions) + 1
-
-    logger.debug("New version is: %s" % newVersion)
-    return newVersion
