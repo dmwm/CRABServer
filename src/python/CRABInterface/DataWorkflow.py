@@ -53,6 +53,9 @@ class DataWorkflow(object):
         #  naming convention).
         self.typemapping = {'Analysis': {'report': self._reportAnalysis},
                             'PrivateMC': {'report': self._reportPrivateMC},}
+        self.splitArgMap = { "LumiBased" : "lumis_per_job",
+                        "FileBased" : "files_per_job"
+                      }
 
     def getLatests(self, user, limit, timestamp):
         """Retrives the latest workflows for the user
@@ -216,6 +219,8 @@ class DataWorkflow(object):
         #add the user in the reqmgr database
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         requestname = '%s_%s_%s' % (timestamp, userhn, workflow)
+        splitArgName = self.splitArgMap[splitalgo]
+        dbSerializer = str
 
         self.api.modify(New.sql,
                             task_name       = [requestname],\
@@ -229,7 +234,7 @@ class DataWorkflow(object):
                             site_whitelist   = [json.dumps(sitewhitelist)],\
                             site_blacklist  = [json.dumps(siteblacklist)],\
                             split_algo      = [splitalgo],\
-                            split_args      = [algoargs],\
+                            split_args      = [dbSerializer({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : algoargs})],\
                             #parameter userisburl is the same as cacheurl since we use panda
                             #and the pset is put in the pandacache with the usersandbox (and not in the configcache)
                             user_sandbox    = [cacheurl],\
@@ -243,10 +248,10 @@ class DataWorkflow(object):
                             asyncdest       = [asyncdest],\
                             dbs_url         = [dbsurl],\
                             publish_dbs_url = [publishdbsurl],\
-                            outfiles        = [json.dumps(addoutputfiles)],\
-                            tfile_outfiles  = [json.dumps(tfileoutfiles)],\
-                            edm_outfiles    = [json.dumps(edmoutfiles)],\
-                            data_runs       = [json.dumps(buildLumiMask(runs, lumis))],\
+                            outfiles        = [dbSerializer(addoutputfiles)],\
+                            tfile_outfiles  = [dbSerializer(tfileoutfiles)],\
+                            edm_outfiles    = [dbSerializer(edmoutfiles)],\
+                            data_runs       = [dbSerializer(buildLumiMask(runs, lumis))],\
                             transformation  = ['http://common-analysis-framework.cern.ch/CMSRunAnaly.sh'],\
                             arguments       = [''],\
         )
