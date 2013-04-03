@@ -1,0 +1,31 @@
+#!/bin/bash
+
+command -v python2.6 > /dev/null
+rc=$?
+if [[ $rc != 0 ]]
+then
+	echo "Error: Python2.6 isn't available on `hostname`." >&2
+	echo "Error: bootstrap execution requires python2.6" >&2
+	exit 1
+else
+	echo "I found python2.6 at.."
+	echo `which python2.6`
+fi
+
+wget http://hcc-briantest.unl.edu/TaskManagerRun.tar.gz
+if [[ $? != 0 ]]
+then
+	echo "Error: Unable to download the task manager runtime environment." >&2
+	exit 3
+fi
+tar xvfzm TaskManagerRun.tar.gz
+if [[ $? != 0 ]]
+then
+	echo "Error: Unable to unpack the task manager runtime environment." >&2
+	exit 4
+fi
+
+export PYTHONPATH=`pwd`/WMCore.zip:`pwd`/TaskWorker.zip:$PYTHONPATH
+echo "Now running the job in `pwd`..."
+exec python2.6 -m CAFTaskManagerBootstrap.py -r "`pwd`" "$@"
+
