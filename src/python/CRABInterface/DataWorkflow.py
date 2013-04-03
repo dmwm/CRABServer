@@ -25,21 +25,24 @@ from CRABInterface.Utils import CMSSitesCache, conn_handler
 from CRABInterface.Utils import retriveUserCert
 from CRABInterface.Regexps import RX_WFRESUB
 
+from Schedulers.PandaScheduler import PandaScheduler
+
 #SQL queries
 from TaskDB.Oracle.Task.New import New
 from TaskDB.Oracle.Task.ID import ID
+from TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
 
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
        No aggregation of workflows provided here."""
-    splitMap = {'LumiBased' : 'lumis_per_job', 'EventBased' : 'events_per_job', 'FileBased' : 'files_per_job'}
 
     @staticmethod
-    def globalinit(dbapi, phedexargs=None, dbsurl=None):
+    def globalinit(dbapi, phedexargs=None, dbsurl=None, credpath='/tmp'):
         DataWorkflow.api = dbapi
         DataWorkflow.phedexargs = phedexargs
         DataWorkflow.phedex = None
         DataWorkflow.dbsurl = dbsurl
+        DataWorkflow.credpath = credpath
 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
@@ -53,6 +56,9 @@ class DataWorkflow(object):
         #  naming convention).
         self.typemapping = {'Analysis': {'report': self._reportAnalysis},
                             'PrivateMC': {'report': self._reportPrivateMC},}
+
+        self.splitArgMap = { "LumiBased" : "lumis_per_job",
+                        "FileBased" : "files_per_job",}
 
     def getLatests(self, user, limit, timestamp):
         """Retrives the latest workflows for the user
@@ -216,6 +222,8 @@ class DataWorkflow(object):
         #add the user in the reqmgr database
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         requestname = '%s_%s_%s' % (timestamp, userhn, workflow)
+        splitArgName = self.splitArgMap[splitalgo]
+        dbSerializer = str
 
         self.api.modify(New.sql,
                             task_name       = [requestname],\
@@ -229,7 +237,7 @@ class DataWorkflow(object):
                             site_whitelist   = [json.dumps(sitewhitelist)],\
                             site_blacklist  = [json.dumps(siteblacklist)],\
                             split_algo      = [splitalgo],\
-                            split_args      = [algoargs],\
+                            split_args      = [dbSerializer({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : algoargs})],\
                             #parameter userisburl is the same as cacheurl since we use panda
                             #and the pset is put in the pandacache with the usersandbox (and not in the configcache)
                             user_sandbox    = [cacheurl],\
@@ -241,12 +249,12 @@ class DataWorkflow(object):
                             user_group      = [''],\
                             publish_name    = [publishname],\
                             asyncdest       = [asyncdest],\
-                            dbs_url         = [dbsurl],\
+                            dbs_url         = [dbsurl or self.dbsurl],\
                             publish_dbs_url = [publishdbsurl],\
-                            outfiles        = [json.dumps(addoutputfiles)],\
-                            tfile_outfiles  = [json.dumps(tfileoutfiles)],\
-                            edm_outfiles    = [json.dumps(edmoutfiles)],\
-                            data_runs       = [json.dumps(buildLumiMask(runs, lumis))],\
+                            outfiles        = [dbSerializer(addoutputfiles)],\
+                            tfile_outfiles  = [dbSerializer(tfileoutfiles)],\
+                            edm_outfiles    = [dbSerializer(edmoutfiles)],\
+                            data_runs       = [dbSerializer(buildLumiMask(runs, lumis))],\
                             transformation  = ['http://common-analysis-framework.cern.ch/CMSRunAnaly.sh'],\
                             arguments       = [''],\
         )
@@ -327,22 +335,38 @@ class DataWorkflow(object):
         self._inject(request)
 
     def status(self, workflow, userdn):
-        """Retrieve the status of the workflow
+        """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
            :return: a workflow status summary document"""
+        scheduler = PandaScheduler
 
-        self.logger.info("Getting status for workflow %s" % workflow)
+        self.logger.debug("Getting status for workflow %s" % workflow)
+        row = self.api.query(None, None, ID.sql, taskname = workflow)
+        _, jobsetid, status, vogroup, vorole, taskFailure = row.next() #just one row is picked up by the previous query
+        self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
+        self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
 
-        row = self.api.query(None, None, "SELECT tm_task_status FROM tasks WHERE tm_taskname = :taskname", taskname = workflow)
-        status = row.next()[0] #just one row is picked up by the previous query
-        self.logger.debug("Status result for workflow %s: %s" % (workflow, status))
+        rows = self.api.query(None, None, GetJobGroupFromID.sql, taskname = workflow)
+        jobsPerStatus = {}
+        totalJobdefs = 0
+        failedJobdefs = 0
+        for jobdef in rows:
+            jobdefid = jobdef[0]
+            schedEC, res = scheduler(self.credpath,userdn,'cms',vogroup,vorole).status(jobdefid)
+            self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
+            if schedEC:
+                jobDefs[-1]["failure"] = "Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC)
+                self.logger.debug(jobDefs[-1]["failure"])
+                failedJobdefs += 1
+            else:
+                self.logger.debug("Iterating on: %s" % res)
+                for jobstatus, _ in res.values():
+                    jobsPerStatus[jobstatus] = jobsPerStatus[jobstatus]+1 if jobstatus in jobsPerStatus else 1
+            totalJobdefs += 1
 
-        rows = self.api.query(None, None, "SELECT panda_jobdef_id FROM jobgroups WHERE tm_taskname = :taskname", taskname = workflow)
-        for jobdef in row:
-            status, pandaIDstatus = PandaBooking(userdn,'cms','','').getPandIDsWithJobID(jobdef[0], True)
-
-        return pandaIDstatus
+        return [{"status" : status, "taskFailureMsg" : taskFailure, "jobSetID" : jobsetid, "jobsPerStatus" : jobsPerStatus,\
+                    "failedJobdefs" : failedJobdefs, "totalJobdefs" : totalJobdefs}]
 
     def kill(self, workflow):
         """Request to Abort a workflow.
