@@ -161,11 +161,4 @@ class DataUserWorkflow(object):
                 raise InvalidParameter("Workflow cannot be killed because already finished.")
         self.workflow.kill(workflow)
         """
-        wfchain = self._getWorkflowChain(workflow)
-        for wf in wfchain:
-            yield self.workflow.kill(wf)
-#        self.logger.info("Killing workflow: %s" % workflow)
-#        ids, pbook, _ = self._getJobidsFromWF(workflow)
-#        if pbook is None or len(ids) <= 0:
-#            raise MissingObject("No jobs to kill in the workflow")
-#        status, pandaJobs = pbook.killJobs(ids.keys(), verbose=True)
+        self.workflow.kill(workflow, force, userdn)

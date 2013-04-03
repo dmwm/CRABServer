@@ -10,7 +10,6 @@ import json
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 import WMCore.RequestManager.RequestMaker.Processing.AnalysisRequest #for registering Analysis request maker
 import WMCore.RequestManager.RequestMaker.Production.PrivateMCRequest
-from WMCore.Database.CMSCouch import CouchServer, CouchError, Database, CouchNotFoundError
 from WMCore.RequestManager.RequestMaker.Registry import retrieveRequestMaker
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 from WMCore.RequestManager.RequestMaker import CheckIn
@@ -30,6 +29,7 @@ from Schedulers.PandaScheduler import PandaScheduler
 #SQL queries
 from TaskDB.Oracle.Task.New import New
 from TaskDB.Oracle.Task.ID import ID
+from TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
 from TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
 
 class DataWorkflow(object):
@@ -59,6 +59,10 @@ class DataWorkflow(object):
 
         self.splitArgMap = { "LumiBased" : "lumis_per_job",
                         "FileBased" : "files_per_job",}
+
+        self.scheduler = PandaScheduler
+        self.scheInstance = None
+
 
     def getLatests(self, user, limit, timestamp):
         """Retrives the latest workflows for the user
@@ -238,9 +242,7 @@ class DataWorkflow(object):
                             site_blacklist  = [json.dumps(siteblacklist)],\
                             split_algo      = [splitalgo],\
                             split_args      = [dbSerializer({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : algoargs})],\
-                            #parameter userisburl is the same as cacheurl since we use panda
-                            #and the pset is put in the pandacache with the usersandbox (and not in the configcache)
-                            user_sandbox    = [cacheurl],\
+                            user_sandbox    = [cachefilename],\
                             cache_url       = [cacheurl],\
                             username        = [userhn],\
                             user_dn         = [userdn],\
@@ -339,8 +341,6 @@ class DataWorkflow(object):
 
            :arg str workflow: a valid workflow name
            :return: a workflow status summary document"""
-        scheduler = PandaScheduler
-
         self.logger.debug("Getting status for workflow %s" % workflow)
         row = self.api.query(None, None, ID.sql, taskname = workflow)
         _, jobsetid, status, vogroup, vorole, taskFailure = row.next() #just one row is picked up by the previous query
@@ -349,11 +349,13 @@ class DataWorkflow(object):
 
         rows = self.api.query(None, None, GetJobGroupFromID.sql, taskname = workflow)
         jobsPerStatus = {}
+        jobList = []
         totalJobdefs = 0
         failedJobdefs = 0
         for jobdef in rows:
             jobdefid = jobdef[0]
-            schedEC, res = scheduler(self.credpath,userdn,'cms',vogroup,vorole).status(jobdefid)
+            self.schedInstance = self.scheduler(self.credpath,userdn,'cms',vogroup,vorole)
+            schedEC, res = self.schedInstance.status(jobdefid)
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
                 jobDefs[-1]["failure"] = "Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC)
@@ -361,22 +363,40 @@ class DataWorkflow(object):
                 failedJobdefs += 1
             else:
                 self.logger.debug("Iterating on: %s" % res)
-                for jobstatus, _ in res.values():
+                for jobid, (jobstatus, _) in res.iteritems():
                     jobsPerStatus[jobstatus] = jobsPerStatus[jobstatus]+1 if jobstatus in jobsPerStatus else 1
+                    jobList.append((jobstatus,jobid))
             totalJobdefs += 1
 
-        return [{"status" : status, "taskFailureMsg" : taskFailure, "jobSetID" : jobsetid, "jobsPerStatus" : jobsPerStatus,\
-                    "failedJobdefs" : failedJobdefs, "totalJobdefs" : totalJobdefs}]
+        return [ {"status" : status,\
+                  "taskFailureMsg" : taskFailure.read() if taskFailure else '',\
+                  "jobSetID"        : jobsetid if jobsetid else '',\
+                  "jobsPerStatus"   : jobsPerStatus,\
+                  "failedJobdefs"   : failedJobdefs,\
+                  "totalJobdefs"    : totalJobdefs,\
+                  "jobList"         : jobList }]
 
-    def kill(self, workflow):
+    def kill(self, workflow, force, userdn):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name"""
-        try:
-            ChangeState.changeRequestStatus(workflow, 'aborted', wmstatUrl=self.wmstatsurl)
-            abortRequest(workflow)
-        except RuntimeError, re:
-            raise ExecutionError("Problem killing the request", trace=traceback.format_exc(), errobj=re)
+
+        self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
+        statusRes = self.status(workflow, userdn)[0]
+
+        if statusRes['status'] == 'SUBMITTED':
+            killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus!='completed']
+            self.logger.info("Jobs to kill: %s" % killList)
+            status, pandaJobs = self.schedInstance.kill(killList)
+            self.logger.info("Kill exit status %s, res %s" % (status, pandaJobs))
+            if status == 0:
+                self.api.modify(SetStatusTask.sql, status = ["KILLED"], taskname = [workflow])
+            else:
+                raise ExecutionError("Problem contacting the backend during kill. Exit code %s: " % status)
+        elif statusRes['status'] == 'NEW':
+            self.api.modify(SetStatusTask.sql, status = ["KILLED"], taskname = [workflow])
+        else:
+            raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
 
     def getType(self, workflow):
         """Retrieves the workflow type from the monitoring
