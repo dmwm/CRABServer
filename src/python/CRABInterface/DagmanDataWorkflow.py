@@ -56,6 +56,7 @@ crab_meta_headers = \
 
 job_splitting_submit_file = crab_headers + crab_meta_headers + \
 """
+universe = local
 Executable = dag_bootstrap.sh
 Output = job_splitting.out
 Error = job_splitting.err
@@ -64,6 +65,7 @@ Args = Split
 
 dbs_discovery_submit_file = crab_headers + crab_meta_headers + \
 """
+universe = local
 Executable = dag_bootstrap.sh
 Output = dbs_discovery.out
 Error = dbs_discovery.err
@@ -72,11 +74,13 @@ Args = DBS
 
 job_submit = crab_headers + \
 """
+universe = vanilla
 Executable = CMSRunAnaly.sh
 Output = $(CRAB.Workflow)/out.$(CRAB.Id)
 Error = $(CRAB.Workflow)/err.$(CRAB.Id)
 Args = -o $(CRAB.AdditionalOutputFiles) --sourceURL $(CRAB.ISB) --inputFile $(CRAB.AdditionalUserFiles) --lumiMask lumimask.$(CRAB.Id) --cmsswVersion $(CRAB.JobSW) --scramArch $(CRAB.JobArch) --jobNumber $(CRAB.Id)
-transfer_input = $(CRAB.Workflow)/lumimask.$(CRAB.Id), http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz
+transfer_input = $(CRAB.ISB), $(CRAB.Workflow)/lumimask.$(CRAB.Id), http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz
+x509userproxy = x509up
 """
 
 class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
@@ -117,6 +121,13 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         Returns the directory of pithy shell scripts
         """
         return "/User/bbockelm/projects/CRABServer/bin"
+
+
+    def getRemoteCondorSetup():
+        """
+        Returns the environment setup file for the remote schedd.
+        """
+        return ""
 
 
     @retriveUserCert(clean=False)
@@ -182,13 +193,16 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         dag_ad = classad.ClassAd()
         dag_ad["RequestName"] = requestname
         dag_ad["Out"] = os.path.join(scratch, "request.out")
-        dag_ad["Err"] = os.path.join(scratch, "request.out")
+        dag_ad["Err"] = os.path.join(scratch, "request.err")
         dag_ad["Executable"] = os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh")
-        dag_ad["TransferInput"] = ",".join([os.path.join(self.getBinDir(), "dag_bootstrap.sh"),
+        dag_ad["TransferInput"] = ", ".join([os.path.join(self.getBinDir(), "dag_bootstrap.sh"),
             os.path.join(scratch, "master_dag"),
             os.path.join(scratch, "dbs_discovery_submit_file"),
             os.path.join(scratch, "job_splitting_submit_file"),
             os.path.join(scratch, "job_submit")])
+        dag_ad["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
+        dag_ad["TransferOutput"] = ""
+        dag_ad["RemoteCondorSetup"] = self.getRemoteCondorSetup()
 
         schedd = self.getScheddObj()
 
@@ -228,7 +242,23 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
 
         return status
 
-if __name__ == "__main__":
-
+def main():
     dag = DagmanDataWorkflow()
+    workflow = 'bbockelm'
+    jobtype = 'analysis'
+    jobsw = 'CMSSW_5_3_7'
+    jobarch = 'slc5_amd64_gcc434'
+    inputdata = '/SingleMu/Run2012D-PromptReco-v1/AOD'
+    siteblacklist = []
+    sitewhitelist = []
+    blockwhitelist = []
+    blockblacklist = []
+    dag.submit(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
+               blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,
+               userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
+               runs, lumis): #TODO delete unused parameters
+
+
+if __name__ == "__main__":
+    main()
 
