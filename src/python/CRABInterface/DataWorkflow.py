@@ -30,6 +30,7 @@ from Schedulers.PandaScheduler import PandaScheduler
 from TaskDB.Oracle.Task.New import New
 from TaskDB.Oracle.Task.ID import ID
 from TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
+from TaskDB.Oracle.Task.SetArgumentsTask import SetArgumentsTask
 from TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
 
 class DataWorkflow(object):
@@ -238,8 +239,8 @@ class DataWorkflow(object):
                             job_sw          = [jobsw],\
                             job_arch        = [jobarch],\
                             input_dataset   = [inputdata],\
-                            site_whitelist   = [json.dumps(sitewhitelist)],\
-                            site_blacklist  = [json.dumps(siteblacklist)],\
+                            site_whitelist   = [dbSerializer(sitewhitelist)],\
+                            site_blacklist  = [dbSerializer(siteblacklist)],\
                             split_algo      = [splitalgo],\
                             split_args      = [dbSerializer({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : algoargs})],\
                             user_sandbox    = [cachefilename],\
@@ -284,57 +285,26 @@ class DataWorkflow(object):
 
         return [{'RequestName': requestname}]
 
-    def resubmit(self, workflow, siteblacklist, sitewhitelist):
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, userdn):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
 
            :arg str workflow: a valid workflow name
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name."""
-        # TODO: change this
-        taskresubmit = "Analysis"
-        # TODO: part of the code here needs to be shared with inject
-        originalwf = GetRequest.getRequestByName( workflow )
-        helper = loadWorkload(originalwf)
-        originalschema = helper.data.request.schema.dictionary_()
-        wmtask = helper.getTask(taskresubmit)
-        if not wmtask:
-            exctask = ValueError('%s task not found in the workflow %s.' %(taskResubmit, lastSubmission))
-            invalidp = InvalidParameter("Problem resubmitting workflow because task to resubmit was not found.", errobj = exctask)
-            setattr(invalidp, 'trace', '')
-            raise invalidp
-        taskpath = wmtask.getPathName()
-        resubmitschema = originalschema.copy()
-        newpars = { 'OriginalRequestName': workflow,
-                    'InitialTaskPath':     taskpath,
-                    'SiteWhitelist':       sitewhitelist if sitewhitelist else originalschema.get('SiteWhitelist', []),
-                    'SiteBlacklist':       siteblacklist if siteblacklist else originalschema.get('SiteBlacklist', []),
-                    'Submission':          originalschema['Submission'] + 1,
-                    'ACDCServer':          originalschema['ACDCUrl'],
-                    'ACDCDatabase':        originalschema['ACDCDBName'],
-                  }
-        resubmitschema.update(newpars)
-        maker = retrieveRequestMaker("Resubmission")
-        schema = maker.newSchema()
-        ## updating it with resubmission parameters
-        schema.update( resubmitschema )
-        ## generating a new name: I am choosing the original name plus resubmit and date
 
-        if RX_WFRESUB.match(workflow):
-            times = int(workflow.rsplit('_resubmit')[-1].split('_')[-1])+1
-            basenewname = workflow.rsplit('_resubmit')[0]
-            schema['RequestName'] = basenewname + '_resubmit_' + str(times)
+        self.logger.info("About to resubmit workflow: %s. Getting status first." % workflow)
+        statusRes = self.status(workflow, userdn)[0]
+
+        if statusRes['status'] in ['SUBMITTED','KILLED']:
+            resubmitList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus in ['cancelled','failed']]
+            self.logger.info("Jobs to resubmit: %s" % resubmitList)
+            self.api.modify(SetStatusTask.sql, status = ["RESUBMIT"], taskname = [workflow])
+            self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
+                            arguments = [str({"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList})])
         else:
-            schema['RequestName'] = workflow + '_resubmit_1'
-        request = maker(schema)
-        newhelper = WMWorkloadHelper(request['WorkflowSpec'])
-        # can't save Request object directly, because it makes it hard to retrieve the _rev
-        metadata = {}
-        metadata.update(request)
-        # don't want to JSONify the whole workflow
-        del metadata['WorkflowSpec']
-        request['RequestWorkflow'] = newhelper.saveCouch(self.reqmgrurl, self.reqmgrname, metadata=metadata)
-        self._inject(request)
+            raise ExecutionError("You cannot resubmit a task if it is in the %s state" % statusRes['status'])
+
 
     def status(self, workflow, userdn):
         """Retrieve the status of the workflow.

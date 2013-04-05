@@ -35,7 +35,7 @@ def authz_owner_match(dbapi, workflows):
         if wfrow[0] == cherrypy.request.user['login']:
             alldocs.append(wfrow)
             continue
-        log("ERROR: authz denied for user '%s' to the resource '%s'" % (user, wf))
+        log("ERROR: authz denied for user '%s' to the resource '%s. Resource belong to %s'" % (user, wf, wfrow[0]))
         raise cherrypy.HTTPError(403, "You are not allowed to access this resource.")
 
     if len(workflows) == len(alldocs):
