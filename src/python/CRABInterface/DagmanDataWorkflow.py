@@ -60,7 +60,9 @@ universe = local
 Executable = dag_bootstrap.sh
 Output = job_splitting.out
 Error = job_splitting.err
-Args = Split
+Args = SPLIT dbs_results job_splitting_results
+transfer_input = dbs_results
+transfer_output = splitting_results
 """
 
 dbs_discovery_submit_file = crab_headers + crab_meta_headers + \
@@ -69,11 +71,13 @@ universe = local
 Executable = dag_bootstrap.sh
 Output = dbs_discovery.out
 Error = dbs_discovery.err
-Args = DBS
+Args = DBS None dbs_results
+transfer_output = dbs_results
 """
 
 job_submit = crab_headers + \
 """
+CRAB.Id = $(count)d
 universe = vanilla
 Executable = CMSRunAnaly.sh
 Output = $(CRAB.Workflow)/out.$(CRAB.Id)
@@ -81,6 +85,15 @@ Error = $(CRAB.Workflow)/err.$(CRAB.Id)
 Args = -o $(CRAB.AdditionalOutputFiles) --sourceURL $(CRAB.ISB) --inputFile $(CRAB.AdditionalUserFiles) --lumiMask lumimask.$(CRAB.Id) --cmsswVersion $(CRAB.JobSW) --scramArch $(CRAB.JobArch) --jobNumber $(CRAB.Id)
 transfer_input = $(CRAB.ISB), $(CRAB.Workflow)/lumimask.$(CRAB.Id), http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz
 x509userproxy = x509up
+"""
+
+async_submit = crab_headers + \
+"""
+universe = local
+Executable = dag_bootstrap.sh
+Args = ASO $(count)
+Output = aso.$(count).out
+Error = aso.$(count).err
 """
 
 class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
@@ -181,14 +194,21 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         scratch = os.path.join(scratch, requestname)
         os.path.mkdirs(scratch)
 
+        info = {}
+        for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'siteblacklist', 'sitewhitelist', 'blockwhitelist',\
+               'blockblacklist', 'splitalgo', 'algoargs', 'configdoc', 'userisburl', 'cachefilename', 'cacheurl', 'adduserfiles', 'addoutputfiles', 'savelogsflag',\
+               'userhn', 'publishname', 'asyncdest', 'campaign', 'blacklistT1', 'dbsurl', 'publishdbsurl', 'tfileoutfiles', 'edmoutfiles', 'userdn',\
+               'runs', 'lumis':
+            info[var] = classad.ExprTree(locals()['var'])
+
         with open(os.path.join(scratch, "master_dag")) as fd:
-            fd.write(master_dag_submit_file % locals())
-        with open(os.path.join(scratch, "dbs_discovery_submit_file")) as fd:
-            fd.write(dbs_discovery_submit_file % locals())
-        with open(os.path.join(scratch, "job_splitting_submit_file")) as fd:
-            fd.write(job_splitting_submit_file % locals())
-        with open(os.path.join(scratch, "job_submit_file")) as fd:
-            fd.write(job_submit % locals())
+            fd.write(master_dag_submit_file % info)
+        with open(os.path.join(scratch, "DBSDiscovery.submit")) as fd:
+            fd.write(dbs_discovery_submit_file % info)
+        with open(os.path.join(scratch, "JobSplitting.submit")) as fd:
+            fd.write(job_splitting_submit_file % info)
+        with open(os.path.join(scratch, "Job.submit")) as fd:
+            fd.write(job_submit % info)
 
         dag_ad = classad.ClassAd()
         dag_ad["RequestName"] = requestname
@@ -197,9 +217,9 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         dag_ad["Executable"] = os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh")
         dag_ad["TransferInput"] = ", ".join([os.path.join(self.getBinDir(), "dag_bootstrap.sh"),
             os.path.join(scratch, "master_dag"),
-            os.path.join(scratch, "dbs_discovery_submit_file"),
-            os.path.join(scratch, "job_splitting_submit_file"),
-            os.path.join(scratch, "job_submit")])
+            os.path.join(scratch, "DBSDiscovery.submit"),
+            os.path.join(scratch, "JobSplitting.submit"),
+            os.path.join(scratch, "Job.submit")])
         dag_ad["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
         dag_ad["TransferOutput"] = ""
         dag_ad["RemoteCondorSetup"] = self.getRemoteCondorSetup()
@@ -250,9 +270,32 @@ def main():
     jobarch = 'slc5_amd64_gcc434'
     inputdata = '/SingleMu/Run2012D-PromptReco-v1/AOD'
     siteblacklist = []
-    sitewhitelist = []
+    sitewhitelist = ['T2_US_Nebraska']
     blockwhitelist = []
     blockblacklist = []
+    splitalgo = None
+    algoargs = None
+    configdoc = ''
+    userisburl = ''
+    cachefilename = ''
+    cacheurl = ''
+    adduserfiles = []
+    addoutputfiles = []
+    savelogsflag = ''
+    userhn = 'bbockelm'
+    publishname = ''
+    asyncdest = 'T2_US_Nebraska'
+    campaign = ''
+    blacklistT1 = True
+    dbsurl = ''
+    vorole = 'cmsuser'
+    vogroup = ''
+    publishdbsurl = ''
+    tfileoutfiles = []
+    edmoutfiles = []
+    userdn = '/CN=Brian Bockelman'
+    runs = []
+    lumis = []
     dag.submit(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,
                userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
