@@ -82,14 +82,21 @@ queue
 
 job_submit = crab_headers + \
 """
+CRAB_ISB = %(userisburl_flatten)s
+CRAB_AdditionalUserFiles = %(adduserfiles_flatten)s
+CRAB_JobSW = %(jobsw_flatten)s
+CRAB_JobArch = %(jobarch_flatten)s
 CRAB_Id = $(count)
+
 universe = vanilla
 Executable = CMSRunAnaly.sh
-Output = $(CRAB_Workflow)/out.$(CRAB_Id)
-Error = $(CRAB_Workflow)/err.$(CRAB_Id)
-Args = -o $(CRAB_AdditionalOutputFiles) --sourceURL $(CRAB_ISB) --inputFile $(CRAB_AdditionalUserFiles) --lumiMask lumimask.$(CRAB_Id) --cmsswVersion $(CRAB_JobSW) --scramArch $(CRAB_JobArch) --jobNumber $(CRAB_Id)
-transfer_input = $(CRAB_ISB), $(CRAB_Workflow)/lumimask.$(CRAB_Id), http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz
-x509userproxy = x509up
+Output = job_out.$(CRAB_Id)
+Error = job_err.$(CRAB_Id)
+Args = -o $(CRAB_AdditionalOutputFiles) --sourceURL $(CRAB_ISB) --inputFile $(CRAB_AdditionalUserFiles) --lumiMask $(runAndLumiMask) --cmsswVersion $(CRAB_JobSW) --scramArch $(CRAB_JobArch) --jobNumber $(CRAB_Id)
+transfer_input = $(CRAB_ISB), http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz
+Environment = SCRAM_ARCH=$(CRAB_JobArch)
+should_transfer_files = YES
+#x509userproxy = x509up
 queue
 """
 
@@ -145,6 +152,13 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         Returns the directory of pithy shell scripts
         """
         return os.path.expanduser("~/projects/CRABServer/bin")
+
+
+    def getTransformLocation(self):
+        """
+        Returns the location of the PanDA job transform
+        """
+        return os.path.expanduser("~/projects/CAFUtilities/src/python/transformation/CMSRunAnaly.sh")
 
 
     def getRemoteCondorSetup(self):
@@ -222,6 +236,9 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         info = {}
         for key in classad_info:
             info[key] = classad_info.lookup(key).__repr__()
+        for key in ["userisburl", "jobsw", "jobarch"]:
+            info[key+"_flatten"] = classad_info[key]
+        info["adduserfiles_flatten"] = json.dumps(classad_info["adduserfiles"].eval())
 
         schedd_name = self.getSchedd()
         schedd, address = self.getScheddObj(schedd_name)
@@ -246,6 +263,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             os.path.join(scratch, "DBSDiscovery.submit"),
             os.path.join(scratch, "JobSplitting.submit"),
             os.path.join(scratch, "Job.submit"),
+            self.getTransformLocation(),
         ])
         dag_ad["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
         dag_ad["TransferOutput"] = ""
@@ -306,7 +324,7 @@ def main():
     blockwhitelist = []
     blockblacklist = []
     splitalgo = "LumiBased"
-    algoargs = 4
+    algoargs = 400
     configdoc = ''
     userisburl = ''
     cachefilename = ''
