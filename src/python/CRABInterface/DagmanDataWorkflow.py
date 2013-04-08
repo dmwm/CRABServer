@@ -1,5 +1,6 @@
 
 import os
+import json
 import time
 
 import classad
@@ -32,6 +33,8 @@ crab_headers = \
 +CRAB_SiteWhitelist = %(sitewhitelist)s
 +CRAB_AdditionalUserFiles = %(adduserfiles)s
 +CRAB_AdditionalOutputFiles = %(addoutputfiles)s
++CRAB_EDMOutputFiles = %(edmoutfiles)s
++CRAB_TFileOutputFiles = %(tfileoutfiles)s
 +CRAB_SaveLogsFlag = %(savelogsflag)s
 +CRAB_UserDN = %(userdn)s
 +CRAB_UserHN = %(userhn)s
@@ -60,7 +63,7 @@ Output = job_splitting.out
 Error = job_splitting.err
 Args = SPLIT dbs_results job_splitting_results
 transfer_input = dbs_results
-transfer_output = splitting_results
+transfer_output_files = splitting_results
 Environment = PATH=/usr/bin:/bin
 queue
 """
@@ -72,7 +75,7 @@ Executable = dag_bootstrap.sh
 Output = dbs_discovery.out
 Error = dbs_discovery.err
 Args = DBS None dbs_results
-transfer_output = dbs_results
+transfer_output_files = dbs_results
 Environment = PATH=/usr/bin:/bin
 queue
 """
@@ -212,6 +215,10 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             else:
                 classad_info[var] = locals()[var]
         classad_info['requestname'] = requestname
+
+        splitArgName = self.splitArgMap[splitalgo]
+        classad_info['algoargs'] = json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : algoargs})
+
         info = {}
         for key in classad_info:
             info[key] = classad_info.lookup(key).__repr__()
@@ -293,13 +300,13 @@ def main():
     jobtype = 'analysis'
     jobsw = 'CMSSW_5_3_7'
     jobarch = 'slc5_amd64_gcc434'
-    inputdata = '/SingleMu/Run2012D-PromptReco-v1/AOD'
+    inputdata = '/GenericTTbar/HC-CMSSW_5_3_1_START53_V5-v1/GEN-SIM-RECO'
     siteblacklist = []
     sitewhitelist = ['T2_US_Nebraska']
     blockwhitelist = []
     blockblacklist = []
-    splitalgo = None
-    algoargs = None
+    splitalgo = "LumiBased"
+    algoargs = 4
     configdoc = ''
     userisburl = ''
     cachefilename = ''
