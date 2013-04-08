@@ -1,11 +1,9 @@
 
+import os
 import time
 
-try:
-    import classad
-    import htcondor
-except:
-    pass
+import classad
+import htcondor
 
 import WMCore.REST.Error as Error
 
@@ -23,35 +21,35 @@ PARENT JobSplitting CHILD RunJobs
 
 crab_headers = \
 """
-+CRAB.ReqName = %{requestname}s
-+CRAB.Workflow = %{workflow}s
-+CRAB.JobType = %{jobtype}s
-+CRAB.JobSW = %{jobsw}s
-+CRAB.JobArch = %{jobarch}s
-+CRAB.InputData = %{inputdata}s
-+CRAB.ISB = %{userisburl}s
-+CRAB.SiteBlacklist = %{siteblacklist}s
-+CRAB.SiteWhitelist = %{sitewhitelist}s
-+CRAB.AdditionalUserFiles = %{adduserfiles}s
-+CRAB.AdditionalOutputFiles = %{addoutputfiles}s
-+CRAB.SaveLogsFlag = %{savelogsflag}d
-+CRAB.UserDN = %{userdn}s
-+CRAB.UserHN = %{userhn}s
-+CRAB.AsyncDest = %{asyncdest}s
-+CRAB.Campaign = %{campaign}s
-+CRAB.BlacklistT1 = %{blacklistT1}d
++CRAB.ReqName = %(requestname)s
++CRAB.Workflow = %(workflow)s
++CRAB.JobType = %(jobtype)s
++CRAB.JobSW = %(jobsw)s
++CRAB.JobArch = %(jobarch)s
++CRAB.InputData = %(inputdata)s
++CRAB.ISB = %(userisburl)s
++CRAB.SiteBlacklist = %(siteblacklist)s
++CRAB.SiteWhitelist = %(sitewhitelist)s
++CRAB.AdditionalUserFiles = %(adduserfiles)s
++CRAB.AdditionalOutputFiles = %(addoutputfiles)s
++CRAB.SaveLogsFlag = %(savelogsflag)d
++CRAB.UserDN = %(userdn)s
++CRAB.UserHN = %(userhn)s
++CRAB.AsyncDest = %(asyncdest)s
++CRAB.Campaign = %(campaign)s
++CRAB.BlacklistT1 = %(blacklistT1)d
 """
 
 crab_meta_headers = \
 """
-+CRAB.SplitAlgo = %{splitalgo}s
-+CRAB.AlgoArgs = %{algoargs}s
-+CRAB.ConfigDoc = %{configdoc}s
-+CRAB.PublishName = %{publishname}s
-+CRAB.DBSUrl = %{dbsurl}s
-+CRAB.PublishDBSUrl = %{publishdbsurl}s
-+CRAB.Runs = %{runs}s
-+CRAB.Lumis = %{lumis}s
++CRAB.SplitAlgo = %(splitalgo)s
++CRAB.AlgoArgs = %(algoargs)s
++CRAB.ConfigDoc = %(configdoc)s
++CRAB.PublishName = %(publishname)s
++CRAB.DBSUrl = %(dbsurl)s
++CRAB.PublishDBSUrl = %(publishdbsurl)s
++CRAB.Runs = %(runs)s
++CRAB.Lumis = %(lumis)s
 """
 
 job_splitting_submit_file = crab_headers + crab_meta_headers + \
@@ -101,14 +99,14 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
        PanDA
     """
 
-    def getSchedd():
+    def getSchedd(self):
         """
         Determine a schedd to use for this task.
         """
         return "localhost"
 
 
-    def getScheddObj(name):
+    def getScheddObj(self, name):
         if name == "localhost":
             schedd = htcondor.Schedd()
         else:
@@ -118,32 +116,31 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         return schedd
 
 
-    def getCollector():
+    def getCollector(self):
         return "localhost"
 
 
-    def getScratchDir():
+    def getScratchDir(self):
         """
         Returns a scratch dir for working files.
         """
         return "/tmp/crab3"
 
 
-    def getBinDir():
+    def getBinDir(self):
         """
         Returns the directory of pithy shell scripts
         """
-        return "/User/bbockelm/projects/CRABServer/bin"
+        return os.path.expanduser("~/projects/CRABServer/bin")
 
 
-    def getRemoteCondorSetup():
+    def getRemoteCondorSetup(self):
         """
         Returns the environment setup file for the remote schedd.
         """
         return ""
 
 
-    @retriveUserCert(clean=False)
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,
                userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
@@ -192,22 +189,28 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
 
         scratch = self.getScratchDir()
         scratch = os.path.join(scratch, requestname)
-        os.path.mkdirs(scratch)
+        os.makedirs(scratch)
 
-        info = {}
+        info = classad.ClassAd()
         for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'siteblacklist', 'sitewhitelist', 'blockwhitelist',\
                'blockblacklist', 'splitalgo', 'algoargs', 'configdoc', 'userisburl', 'cachefilename', 'cacheurl', 'adduserfiles', 'addoutputfiles', 'savelogsflag',\
                'userhn', 'publishname', 'asyncdest', 'campaign', 'blacklistT1', 'dbsurl', 'publishdbsurl', 'tfileoutfiles', 'edmoutfiles', 'userdn',\
                'runs', 'lumis':
-            info[var] = classad.ExprTree(locals()['var'])
+            val = locals()[var]
+            if val == None:
+                info[var] = classad.Value.Undefined
+            else:
+                info[var] = locals()[var]
+        info['requestname'] = requestname
+        print info
 
-        with open(os.path.join(scratch, "master_dag")) as fd:
+        with open(os.path.join(scratch, "master_dag"), "w") as fd:
             fd.write(master_dag_submit_file % info)
-        with open(os.path.join(scratch, "DBSDiscovery.submit")) as fd:
+        with open(os.path.join(scratch, "DBSDiscovery.submit"), "w") as fd:
             fd.write(dbs_discovery_submit_file % info)
-        with open(os.path.join(scratch, "JobSplitting.submit")) as fd:
+        with open(os.path.join(scratch, "JobSplitting.submit"), "w") as fd:
             fd.write(job_splitting_submit_file % info)
-        with open(os.path.join(scratch, "Job.submit")) as fd:
+        with open(os.path.join(scratch, "Job.submit"), "w") as fd:
             fd.write(job_submit % info)
 
         dag_ad = classad.ClassAd()
@@ -224,10 +227,11 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         dag_ad["TransferOutput"] = ""
         dag_ad["RemoteCondorSetup"] = self.getRemoteCondorSetup()
 
-        schedd = self.getScheddObj()
+        schedd_name = self.getSchedd()
+        schedd = self.getScheddObj(schedd_name)
 
         result_ads = []
-        cluster = schedd.submit(dag_ad, 1, result_ads)
+        cluster = schedd.submit(dag_ad, 1, True, result_ads)
         schedd.spool(result_ads)
 
         return [{'RequestName': requestname}]
@@ -281,7 +285,7 @@ def main():
     cacheurl = ''
     adduserfiles = []
     addoutputfiles = []
-    savelogsflag = ''
+    savelogsflag = False
     userhn = 'bbockelm'
     publishname = ''
     asyncdest = 'T2_US_Nebraska'
@@ -299,7 +303,7 @@ def main():
     dag.submit(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,
                userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
-               runs, lumis): #TODO delete unused parameters
+               runs, lumis) #TODO delete unused parameters
 
 
 if __name__ == "__main__":

@@ -8,8 +8,6 @@ import json
 
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-import WMCore.RequestManager.RequestMaker.Processing.AnalysisRequest #for registering Analysis request maker
-import WMCore.RequestManager.RequestMaker.Production.PrivateMCRequest
 from WMCore.Database.CMSCouch import CouchServer, CouchError, Database, CouchNotFoundError
 from WMCore.RequestManager.RequestMaker.Registry import retrieveRequestMaker
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
@@ -24,8 +22,6 @@ from WMCore.WMSpec.WMTask import buildLumiMask
 from CRABInterface.Utils import CMSSitesCache, conn_handler
 from CRABInterface.Utils import retriveUserCert
 from CRABInterface.Regexps import RX_WFRESUB
-
-from Schedulers.PandaScheduler import PandaScheduler
 
 #SQL queries
 from TaskDB.Oracle.Task.New import New
