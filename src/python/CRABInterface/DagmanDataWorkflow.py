@@ -21,35 +21,35 @@ PARENT JobSplitting CHILD RunJobs
 
 crab_headers = \
 """
-+CRAB.ReqName = %(requestname)s
-+CRAB.Workflow = %(workflow)s
-+CRAB.JobType = %(jobtype)s
-+CRAB.JobSW = %(jobsw)s
-+CRAB.JobArch = %(jobarch)s
-+CRAB.InputData = %(inputdata)s
-+CRAB.ISB = %(userisburl)s
-+CRAB.SiteBlacklist = %(siteblacklist)s
-+CRAB.SiteWhitelist = %(sitewhitelist)s
-+CRAB.AdditionalUserFiles = %(adduserfiles)s
-+CRAB.AdditionalOutputFiles = %(addoutputfiles)s
-+CRAB.SaveLogsFlag = %(savelogsflag)d
-+CRAB.UserDN = %(userdn)s
-+CRAB.UserHN = %(userhn)s
-+CRAB.AsyncDest = %(asyncdest)s
-+CRAB.Campaign = %(campaign)s
-+CRAB.BlacklistT1 = %(blacklistT1)d
++CRAB_ReqName = %(requestname)s
++CRAB_Workflow = %(workflow)s
++CRAB_JobType = %(jobtype)s
++CRAB_JobSW = %(jobsw)s
++CRAB_JobArch = %(jobarch)s
++CRAB_InputData = %(inputdata)s
++CRAB_ISB = %(userisburl)s
++CRAB_SiteBlacklist = %(siteblacklist)s
++CRAB_SiteWhitelist = %(sitewhitelist)s
++CRAB_AdditionalUserFiles = %(adduserfiles)s
++CRAB_AdditionalOutputFiles = %(addoutputfiles)s
++CRAB_SaveLogsFlag = %(savelogsflag)s
++CRAB_UserDN = %(userdn)s
++CRAB_UserHN = %(userhn)s
++CRAB_AsyncDest = %(asyncdest)s
++CRAB_Campaign = %(campaign)s
++CRAB_BlacklistT1 = %(blacklistT1)s
 """
 
 crab_meta_headers = \
 """
-+CRAB.SplitAlgo = %(splitalgo)s
-+CRAB.AlgoArgs = %(algoargs)s
-+CRAB.ConfigDoc = %(configdoc)s
-+CRAB.PublishName = %(publishname)s
-+CRAB.DBSUrl = %(dbsurl)s
-+CRAB.PublishDBSUrl = %(publishdbsurl)s
-+CRAB.Runs = %(runs)s
-+CRAB.Lumis = %(lumis)s
++CRAB_SplitAlgo = %(splitalgo)s
++CRAB_AlgoArgs = %(algoargs)s
++CRAB_ConfigDoc = %(configdoc)s
++CRAB_PublishName = %(publishname)s
++CRAB_DBSUrl = %(dbsurl)s
++CRAB_PublishDBSUrl = %(publishdbsurl)s
++CRAB_Runs = %(runs)s
++CRAB_Lumis = %(lumis)s
 """
 
 job_splitting_submit_file = crab_headers + crab_meta_headers + \
@@ -61,6 +61,8 @@ Error = job_splitting.err
 Args = SPLIT dbs_results job_splitting_results
 transfer_input = dbs_results
 transfer_output = splitting_results
+Environment = PATH=/usr/bin:/bin
+queue
 """
 
 dbs_discovery_submit_file = crab_headers + crab_meta_headers + \
@@ -71,18 +73,21 @@ Output = dbs_discovery.out
 Error = dbs_discovery.err
 Args = DBS None dbs_results
 transfer_output = dbs_results
+Environment = PATH=/usr/bin:/bin
+queue
 """
 
 job_submit = crab_headers + \
 """
-CRAB.Id = $(count)d
+CRAB_Id = $(count)
 universe = vanilla
 Executable = CMSRunAnaly.sh
-Output = $(CRAB.Workflow)/out.$(CRAB.Id)
-Error = $(CRAB.Workflow)/err.$(CRAB.Id)
-Args = -o $(CRAB.AdditionalOutputFiles) --sourceURL $(CRAB.ISB) --inputFile $(CRAB.AdditionalUserFiles) --lumiMask lumimask.$(CRAB.Id) --cmsswVersion $(CRAB.JobSW) --scramArch $(CRAB.JobArch) --jobNumber $(CRAB.Id)
-transfer_input = $(CRAB.ISB), $(CRAB.Workflow)/lumimask.$(CRAB.Id), http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz
+Output = $(CRAB_Workflow)/out.$(CRAB_Id)
+Error = $(CRAB_Workflow)/err.$(CRAB_Id)
+Args = -o $(CRAB_AdditionalOutputFiles) --sourceURL $(CRAB_ISB) --inputFile $(CRAB_AdditionalUserFiles) --lumiMask lumimask.$(CRAB_Id) --cmsswVersion $(CRAB_JobSW) --scramArch $(CRAB_JobArch) --jobNumber $(CRAB_Id)
+transfer_input = $(CRAB_ISB), $(CRAB_Workflow)/lumimask.$(CRAB_Id), http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz
 x509userproxy = x509up
+queue
 """
 
 async_submit = crab_headers + \
@@ -92,6 +97,8 @@ Executable = dag_bootstrap.sh
 Args = ASO $(count)
 Output = aso.$(count).out
 Error = aso.$(count).err
+Environment = PATH=/usr/bin:/bin
+queue
 """
 
 class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
@@ -109,11 +116,14 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
     def getScheddObj(self, name):
         if name == "localhost":
             schedd = htcondor.Schedd()
+            with open(htcondor.param['SCHEDD_ADDRESS_FILE']) as fd:
+                address = fd.read()
         else:
             coll = htcondor.Collector(self.getCollector())
             schedd_ad = coll.locate(htcondor.DaemonTypes.Collector, name)
+            address = fd.read()
             schedd = htcondor.Schedd(schedd_ad)
-        return schedd
+        return schedd, address
 
 
     def getCollector(self):
@@ -191,18 +201,23 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         scratch = os.path.join(scratch, requestname)
         os.makedirs(scratch)
 
-        info = classad.ClassAd()
+        classad_info = classad.ClassAd()
         for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'siteblacklist', 'sitewhitelist', 'blockwhitelist',\
                'blockblacklist', 'splitalgo', 'algoargs', 'configdoc', 'userisburl', 'cachefilename', 'cacheurl', 'adduserfiles', 'addoutputfiles', 'savelogsflag',\
                'userhn', 'publishname', 'asyncdest', 'campaign', 'blacklistT1', 'dbsurl', 'publishdbsurl', 'tfileoutfiles', 'edmoutfiles', 'userdn',\
                'runs', 'lumis':
             val = locals()[var]
             if val == None:
-                info[var] = classad.Value.Undefined
+                classad_info[var] = classad.Value.Undefined
             else:
-                info[var] = locals()[var]
-        info['requestname'] = requestname
-        print info
+                classad_info[var] = locals()[var]
+        classad_info['requestname'] = requestname
+        info = {}
+        for key in classad_info:
+            info[key] = classad_info.lookup(key).__repr__()
+
+        schedd_name = self.getSchedd()
+        schedd, address = self.getScheddObj(schedd_name)
 
         with open(os.path.join(scratch, "master_dag"), "w") as fd:
             fd.write(master_dag_submit_file % info)
@@ -214,25 +229,31 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             fd.write(job_submit % info)
 
         dag_ad = classad.ClassAd()
+        dag_ad["JobUniverse"] = 12
         dag_ad["RequestName"] = requestname
         dag_ad["Out"] = os.path.join(scratch, "request.out")
         dag_ad["Err"] = os.path.join(scratch, "request.err")
-        dag_ad["Executable"] = os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh")
+        dag_ad["Cmd"] = os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh")
         dag_ad["TransferInput"] = ", ".join([os.path.join(self.getBinDir(), "dag_bootstrap.sh"),
             os.path.join(scratch, "master_dag"),
             os.path.join(scratch, "DBSDiscovery.submit"),
             os.path.join(scratch, "JobSplitting.submit"),
-            os.path.join(scratch, "Job.submit")])
+            os.path.join(scratch, "Job.submit"),
+        ])
         dag_ad["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
         dag_ad["TransferOutput"] = ""
+        dag_ad["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
+        dag_ad["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
+        dag_ad["RemoveKillSig"] = "SIGUSR1"
+        dag_ad["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)')
         dag_ad["RemoteCondorSetup"] = self.getRemoteCondorSetup()
-
-        schedd_name = self.getSchedd()
-        schedd = self.getScheddObj(schedd_name)
+        dag_ad["Requirements"] = classad.ExprTree('true || false')
 
         result_ads = []
         cluster = schedd.submit(dag_ad, 1, True, result_ads)
         schedd.spool(result_ads)
+
+        schedd.reschedule()
 
         return [{'RequestName': requestname}]
 
