@@ -84,15 +84,17 @@ job_submit = crab_headers + \
 """
 CRAB_ISB = %(userisburl_flatten)s
 CRAB_AdditionalUserFiles = %(adduserfiles_flatten)s
+CRAB_AdditionalOutputFiles = %(addoutputfiles_flatten)s
 CRAB_JobSW = %(jobsw_flatten)s
 CRAB_JobArch = %(jobarch_flatten)s
+CRAB_Archive = %(cachefilename_flatten)s
 CRAB_Id = $(count)
 
 universe = vanilla
 Executable = CMSRunAnaly.sh
 Output = job_out.$(CRAB_Id)
 Error = job_err.$(CRAB_Id)
-Args = -o $(CRAB_AdditionalOutputFiles) --sourceURL $(CRAB_ISB) --inputFile $(CRAB_AdditionalUserFiles) --lumiMask $(runAndLumiMask) --cmsswVersion $(CRAB_JobSW) --scramArch $(CRAB_JobArch) --jobNumber $(CRAB_Id)
+Arguments = "-o $(CRAB_AdditionalOutputFiles) -a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) '--inputFile=$(inputFiles)' '--lumiMask=$(runAndLumiMask)' --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) --jobNumber=$(CRAB_Id)"
 transfer_input = $(CRAB_ISB), http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz
 Environment = SCRAM_ARCH=$(CRAB_JobArch)
 should_transfer_files = YES
@@ -236,9 +238,10 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         info = {}
         for key in classad_info:
             info[key] = classad_info.lookup(key).__repr__()
-        for key in ["userisburl", "jobsw", "jobarch"]:
+        for key in ["userisburl", "jobsw", "jobarch", "cachefilename"]:
             info[key+"_flatten"] = classad_info[key]
         info["adduserfiles_flatten"] = json.dumps(classad_info["adduserfiles"].eval())
+        info["addoutputfiles_flatten"] = json.dumps(classad_info["addoutputfiles"].eval())
 
         schedd_name = self.getSchedd()
         schedd, address = self.getScheddObj(schedd_name)
@@ -317,7 +320,7 @@ def main():
     workflow = 'bbockelm'
     jobtype = 'analysis'
     jobsw = 'CMSSW_5_3_7'
-    jobarch = 'slc5_amd64_gcc434'
+    jobarch = 'slc5_amd64_gcc462'
     inputdata = '/GenericTTbar/HC-CMSSW_5_3_1_START53_V5-v1/GEN-SIM-RECO'
     siteblacklist = []
     sitewhitelist = ['T2_US_Nebraska']
@@ -326,9 +329,9 @@ def main():
     splitalgo = "LumiBased"
     algoargs = 400
     configdoc = ''
-    userisburl = ''
-    cachefilename = ''
-    cacheurl = ''
+    userisburl = 'https://voatlas178.cern.ch:25443'
+    cachefilename = 'default.tgz'
+    cacheurl = 'https://voatlas178.cern.ch:25443'
     adduserfiles = []
     addoutputfiles = []
     savelogsflag = False
