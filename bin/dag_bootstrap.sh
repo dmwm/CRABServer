@@ -33,12 +33,13 @@ then
 	fi
 	rm TaskManagerRun.tar.gz
 
-	export PYTHONPATH=$PWD:`pwd`/DBSAPI.zip:`pwd`/WMCore.zip:`pwd`/TaskWorker.zip:$PYTHONPATH
-	# This is for development-only, due to the rapid rate we're updating the TaskWorker files.
-	# TODO: Remove the below lines before the first release.
-	export PYTHONPATH=~/projects/CAFTaskWorker/src/python:$PYTHONPATH
         export TASKWORKER_ENV="1"
 fi
+
+export PYTHONPATH=$PWD:$PWD/DBSAPI.zip:$PWD/WMCore.zip:$PWD/TaskWorker.zip:$PYTHONPATH
+# This is for development-only, due to the rapid rate we're updating the TaskWorker files.
+# TODO: Remove the below lines before the first release.
+export PYTHONPATH=~/projects/CAFTaskWorker/src/python:$PYTHONPATH
 
 echo "Now running the job in `pwd`..."
 exec python2.6 -m TaskWorker.TaskManagerBootstrap "$@"

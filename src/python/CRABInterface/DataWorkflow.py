@@ -8,8 +8,6 @@ import json
 
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-import WMCore.RequestManager.RequestMaker.Processing.AnalysisRequest #for registering Analysis request maker
-import WMCore.RequestManager.RequestMaker.Production.PrivateMCRequest
 from WMCore.RequestManager.RequestMaker.Registry import retrieveRequestMaker
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 from WMCore.RequestManager.RequestMaker import CheckIn
@@ -59,7 +57,10 @@ class DataWorkflow(object):
         self.splitArgMap = { "LumiBased" : "lumis_per_job",
                         "FileBased" : "files_per_job",}
 
-        self.scheduler = PandaScheduler
+        if 'PandaScheduler' in globals():
+            self.scheduler = PandaScheduler
+        else:
+            self.scheduler = None
         self.scheInstance = None
 
 

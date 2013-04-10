@@ -256,6 +256,8 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             fd.write(job_submit % info)
 
         dag_ad = classad.ClassAd()
+        dag_ad["CRAB_Workflow"] = workflow
+        dag_ad["CRAB_UserDN"] = userdn
         dag_ad["JobUniverse"] = 12
         dag_ad["RequestName"] = requestname
         dag_ad["Out"] = os.path.join(scratch, "request.out")
@@ -284,6 +286,19 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         schedd.reschedule()
 
         return [{'RequestName': requestname}]
+
+
+    def kill(self, workflow, force, userdn):
+        """Request to Abort a workflow.
+
+           :arg str workflow: a workflow name"""
+
+        self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
+
+        schedd_name = self.getSchedd()
+        schedd, address = self.getScheddObj(schedd_name)
+
+        schedd.act(htcondor.JobAction.Remove, 'CRAB_Workflow =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn))
 
 
     def status(self, workflow, userdn):
