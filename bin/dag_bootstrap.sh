@@ -4,7 +4,7 @@
 # This script bootstraps the WMCore environment
 #
 
-if [ "X$TASKWORKER_ENV" = "X" ];
+if [ "X$TASKWORKER_ENV" = "X" -a ! -e WMCore.zip ]
 then
 
 	command -v python2.6 > /dev/null
@@ -33,7 +33,10 @@ then
 	fi
 	rm TaskManagerRun.tar.gz
 
-	export PYTHONPATH=~/projects/CAFTaskWorker/src/python/:`pwd`/WMCore.zip:`pwd`/TaskWorker.zip:$PYTHONPATH
+	export PYTHONPATH=$PWD:`pwd`/DBSAPI.zip:`pwd`/WMCore.zip:`pwd`/TaskWorker.zip:$PYTHONPATH
+	# This is for development-only, due to the rapid rate we're updating the TaskWorker files.
+	# TODO: Remove the below lines before the first release.
+	export PYTHONPATH=~/projects/CAFTaskWorker/src/python:$PYTHONPATH
         export TASKWORKER_ENV="1"
 fi
 
