@@ -162,7 +162,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name."""
         # strict check on authz: only the workflow owner can modify it
-        authz_owner_match(self.userworkflowmgr, [workflow], retrieve_docs=False)
+        authz_owner_match(self.api, [workflow])
         self.userworkflowmgr.resubmit(workflow=workflow, siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
         return [{"result":"ok"}]
 
@@ -220,6 +220,6 @@ class RESTUserWorkflow(RESTEntity):
            :return: nothing"""
 
         # strict check on authz: only the workflow owner can modify it
-        authz_owner_match(self.userworkflowmgr, [workflow], retrieve_docs=False)
+        authz_owner_match(self.api, [workflow])
         self.userworkflowmgr.kill(workflow, force, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
         return [{"result":"ok"}]

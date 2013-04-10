@@ -135,7 +135,7 @@ class DataUserWorkflow(object):
 
            :arg str workflow: a workflow name
            :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
-        raise NotImplementedError
+        return self.workflow.resubmit(workflow, siteblacklist, sitewhitelist, userdn)
 
     @retriveUserCert(clean=False)
     def status(self, workflow, userdn):
@@ -152,20 +152,4 @@ class DataUserWorkflow(object):
 
            :arg str workflow: a workflow name
            :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
-        """
-        skipkill = ["aborted", "failed", "completed"]
-        latestwf = self._getWorkflowChain(workflow)[-1]
-        wfdoc = self.workflow.getWorkflow(latestwf)
-        if not force:
-            if wfdoc['request_status'][-1]['status'] in skipkill:
-                raise InvalidParameter("Workflow cannot be killed because already finished.")
-        self.workflow.kill(workflow)
-        """
-        wfchain = self._getWorkflowChain(workflow)
-        for wf in wfchain:
-            yield self.workflow.kill(wf)
-#        self.logger.info("Killing workflow: %s" % workflow)
-#        ids, pbook, _ = self._getJobidsFromWF(workflow)
-#        if pbook is None or len(ids) <= 0:
-#            raise MissingObject("No jobs to kill in the workflow")
-#        status, pandaJobs = pbook.killJobs(ids.keys(), verbose=True)
+        return self.workflow.kill(workflow, force, userdn)

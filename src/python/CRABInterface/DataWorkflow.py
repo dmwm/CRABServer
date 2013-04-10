@@ -8,7 +8,8 @@ import json
 
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.Database.CMSCouch import CouchServer, CouchError, Database, CouchNotFoundError
+import WMCore.RequestManager.RequestMaker.Processing.AnalysisRequest #for registering Analysis request maker
+import WMCore.RequestManager.RequestMaker.Production.PrivateMCRequest
 from WMCore.RequestManager.RequestMaker.Registry import retrieveRequestMaker
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 from WMCore.RequestManager.RequestMaker import CheckIn
@@ -26,6 +27,8 @@ from CRABInterface.Regexps import RX_WFRESUB
 #SQL queries
 from TaskDB.Oracle.Task.New import New
 from TaskDB.Oracle.Task.ID import ID
+from TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
+from TaskDB.Oracle.Task.SetArgumentsTask import SetArgumentsTask
 from TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
 
 class DataWorkflow(object):
@@ -55,6 +58,10 @@ class DataWorkflow(object):
 
         self.splitArgMap = { "LumiBased" : "lumis_per_job",
                         "FileBased" : "files_per_job",}
+
+        self.scheduler = PandaScheduler
+        self.scheInstance = None
+
 
     def getLatests(self, user, limit, timestamp):
         """Retrives the latest workflows for the user
@@ -230,13 +237,11 @@ class DataWorkflow(object):
                             job_sw          = [jobsw],\
                             job_arch        = [jobarch],\
                             input_dataset   = [inputdata],\
-                            site_whitelist   = [json.dumps(sitewhitelist)],\
-                            site_blacklist  = [json.dumps(siteblacklist)],\
+                            site_whitelist   = [dbSerializer(sitewhitelist)],\
+                            site_blacklist  = [dbSerializer(siteblacklist)],\
                             split_algo      = [splitalgo],\
                             split_args      = [dbSerializer({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : algoargs})],\
-                            #parameter userisburl is the same as cacheurl since we use panda
-                            #and the pset is put in the pandacache with the usersandbox (and not in the configcache)
-                            user_sandbox    = [cacheurl],\
+                            user_sandbox    = [cachefilename],\
                             cache_url       = [cacheurl],\
                             username        = [userhn],\
                             user_dn         = [userdn],\
@@ -278,65 +283,32 @@ class DataWorkflow(object):
 
         return [{'RequestName': requestname}]
 
-    def resubmit(self, workflow, siteblacklist, sitewhitelist):
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, userdn):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
 
            :arg str workflow: a valid workflow name
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name."""
-        # TODO: change this
-        taskresubmit = "Analysis"
-        # TODO: part of the code here needs to be shared with inject
-        originalwf = GetRequest.getRequestByName( workflow )
-        helper = loadWorkload(originalwf)
-        originalschema = helper.data.request.schema.dictionary_()
-        wmtask = helper.getTask(taskresubmit)
-        if not wmtask:
-            exctask = ValueError('%s task not found in the workflow %s.' %(taskResubmit, lastSubmission))
-            invalidp = InvalidParameter("Problem resubmitting workflow because task to resubmit was not found.", errobj = exctask)
-            setattr(invalidp, 'trace', '')
-            raise invalidp
-        taskpath = wmtask.getPathName()
-        resubmitschema = originalschema.copy()
-        newpars = { 'OriginalRequestName': workflow,
-                    'InitialTaskPath':     taskpath,
-                    'SiteWhitelist':       sitewhitelist if sitewhitelist else originalschema.get('SiteWhitelist', []),
-                    'SiteBlacklist':       siteblacklist if siteblacklist else originalschema.get('SiteBlacklist', []),
-                    'Submission':          originalschema['Submission'] + 1,
-                    'ACDCServer':          originalschema['ACDCUrl'],
-                    'ACDCDatabase':        originalschema['ACDCDBName'],
-                  }
-        resubmitschema.update(newpars)
-        maker = retrieveRequestMaker("Resubmission")
-        schema = maker.newSchema()
-        ## updating it with resubmission parameters
-        schema.update( resubmitschema )
-        ## generating a new name: I am choosing the original name plus resubmit and date
 
-        if RX_WFRESUB.match(workflow):
-            times = int(workflow.rsplit('_resubmit')[-1].split('_')[-1])+1
-            basenewname = workflow.rsplit('_resubmit')[0]
-            schema['RequestName'] = basenewname + '_resubmit_' + str(times)
+        self.logger.info("About to resubmit workflow: %s. Getting status first." % workflow)
+        statusRes = self.status(workflow, userdn)[0]
+
+        if statusRes['status'] in ['SUBMITTED','KILLED']:
+            resubmitList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus in ['cancelled','failed']]
+            self.logger.info("Jobs to resubmit: %s" % resubmitList)
+            self.api.modify(SetStatusTask.sql, status = ["RESUBMIT"], taskname = [workflow])
+            self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
+                            arguments = [str({"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList})])
         else:
-            schema['RequestName'] = workflow + '_resubmit_1'
-        request = maker(schema)
-        newhelper = WMWorkloadHelper(request['WorkflowSpec'])
-        # can't save Request object directly, because it makes it hard to retrieve the _rev
-        metadata = {}
-        metadata.update(request)
-        # don't want to JSONify the whole workflow
-        del metadata['WorkflowSpec']
-        request['RequestWorkflow'] = newhelper.saveCouch(self.reqmgrurl, self.reqmgrname, metadata=metadata)
-        self._inject(request)
+            raise ExecutionError("You cannot resubmit a task if it is in the %s state" % statusRes['status'])
+
 
     def status(self, workflow, userdn):
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
            :return: a workflow status summary document"""
-        scheduler = PandaScheduler
-
         self.logger.debug("Getting status for workflow %s" % workflow)
         row = self.api.query(None, None, ID.sql, taskname = workflow)
         _, jobsetid, status, vogroup, vorole, taskFailure = row.next() #just one row is picked up by the previous query
@@ -345,11 +317,13 @@ class DataWorkflow(object):
 
         rows = self.api.query(None, None, GetJobGroupFromID.sql, taskname = workflow)
         jobsPerStatus = {}
+        jobList = []
         totalJobdefs = 0
         failedJobdefs = 0
         for jobdef in rows:
             jobdefid = jobdef[0]
-            schedEC, res = scheduler(self.credpath,userdn,'cms',vogroup,vorole).status(jobdefid)
+            self.schedInstance = self.scheduler(self.credpath,userdn,'cms',vogroup,vorole)
+            schedEC, res = self.schedInstance.status(jobdefid)
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
                 jobDefs[-1]["failure"] = "Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC)
@@ -357,22 +331,40 @@ class DataWorkflow(object):
                 failedJobdefs += 1
             else:
                 self.logger.debug("Iterating on: %s" % res)
-                for jobstatus, _ in res.values():
+                for jobid, (jobstatus, _) in res.iteritems():
                     jobsPerStatus[jobstatus] = jobsPerStatus[jobstatus]+1 if jobstatus in jobsPerStatus else 1
+                    jobList.append((jobstatus,jobid))
             totalJobdefs += 1
 
-        return [{"status" : status, "taskFailureMsg" : taskFailure, "jobSetID" : jobsetid, "jobsPerStatus" : jobsPerStatus,\
-                    "failedJobdefs" : failedJobdefs, "totalJobdefs" : totalJobdefs}]
+        return [ {"status" : status,\
+                  "taskFailureMsg" : taskFailure.read() if taskFailure else '',\
+                  "jobSetID"        : jobsetid if jobsetid else '',\
+                  "jobsPerStatus"   : jobsPerStatus,\
+                  "failedJobdefs"   : failedJobdefs,\
+                  "totalJobdefs"    : totalJobdefs,\
+                  "jobList"         : jobList }]
 
-    def kill(self, workflow):
+    def kill(self, workflow, force, userdn):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name"""
-        try:
-            ChangeState.changeRequestStatus(workflow, 'aborted', wmstatUrl=self.wmstatsurl)
-            abortRequest(workflow)
-        except RuntimeError, re:
-            raise ExecutionError("Problem killing the request", trace=traceback.format_exc(), errobj=re)
+
+        self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
+        statusRes = self.status(workflow, userdn)[0]
+
+        if statusRes['status'] == 'SUBMITTED':
+            killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus!='completed']
+            self.logger.info("Jobs to kill: %s" % killList)
+            status, pandaJobs = self.schedInstance.kill(killList)
+            self.logger.info("Kill exit status %s, res %s" % (status, pandaJobs))
+            if status == 0:
+                self.api.modify(SetStatusTask.sql, status = ["KILLED"], taskname = [workflow])
+            else:
+                raise ExecutionError("Problem contacting the backend during kill. Exit code %s: " % status)
+        elif statusRes['status'] == 'NEW':
+            self.api.modify(SetStatusTask.sql, status = ["KILLED"], taskname = [workflow])
+        else:
+            raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
 
     def getType(self, workflow):
         """Retrieves the workflow type from the monitoring
