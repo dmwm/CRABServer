@@ -57,6 +57,7 @@ crab_meta_headers = \
 
 job_splitting_submit_file = crab_headers + crab_meta_headers + \
 """
++TaskType = "SPLIT"
 universe = local
 Executable = dag_bootstrap.sh
 Output = job_splitting.out
@@ -70,6 +71,7 @@ queue
 
 dbs_discovery_submit_file = crab_headers + crab_meta_headers + \
 """
++TaskType = "DBS"
 universe = local
 Executable = dag_bootstrap.sh
 Output = dbs_discovery.out
@@ -89,13 +91,16 @@ CRAB_JobSW = %(jobsw_flatten)s
 CRAB_JobArch = %(jobarch_flatten)s
 CRAB_Archive = %(cachefilename_flatten)s
 CRAB_Id = $(count)
++TaskType = "Job"
 
 universe = vanilla
 Executable = CMSRunAnaly.sh
 Output = job_out.$(CRAB_Id)
 Error = job_err.$(CRAB_Id)
 Arguments = "-o $(CRAB_AdditionalOutputFiles) -a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) '--inputFile=$(inputFiles)' '--lumiMask=$(runAndLumiMask)' --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) --jobNumber=$(CRAB_Id)"
-transfer_input = $(CRAB_ISB), http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz
+#transfer_input = $(CRAB_ISB)
+transfer_output_files = cmsRun-stderr.log?compressCount=2&remoteName=cmsRun_$(count).log, cmsRun-stdout.log?compressCount=2&remoteName=cmsRun_$(count).log, $(localOutputFiles)
+output_destination = cms://%(output_dest)s
 Environment = SCRAM_ARCH=$(CRAB_JobArch)
 should_transfer_files = YES
 #x509userproxy = x509up
@@ -243,6 +248,8 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         info["adduserfiles_flatten"] = json.dumps(classad_info["adduserfiles"].eval())
         info["addoutputfiles_flatten"] = json.dumps(classad_info["addoutputfiles"].eval())
 
+        info["output_dest"] = os.path.join("/store/user", userhn, workflow, publishname)
+
         schedd_name = self.getSchedd()
         schedd, address = self.getScheddObj(schedd_name)
 
@@ -278,6 +285,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         dag_ad["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)')
         dag_ad["RemoteCondorSetup"] = self.getRemoteCondorSetup()
         dag_ad["Requirements"] = classad.ExprTree('true || false')
+        dag_ad["TaskType"] = "ROOT"
 
         result_ads = []
         cluster = schedd.submit(dag_ad, 1, True, result_ads)
@@ -312,23 +320,35 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
 
         name = workflow.split("_")[0]
 
-        schedd = self.getScheddObj(name)
+        schedd, _ = self.getScheddObj(name)
         ad = classad.ClassAd()
         ad["foo"] = workflow
-        results = schedd.query("RequestName =?= %s" % ad.lookup("foo"), ["JobStatus"])
+        results = schedd.query("TaskType =?= \"ROOT\" && RequestName =?= %s" % ad.lookup("foo"), ["JobStatus", 'ExitCode'])
 
         if not results:
             self.logger.info("An invalid workflow name was requested: %s" % workflow)
             raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
 
-        if 'JobStatus' not in results:
-            self.logger.info("JobStatus is unknown for workflow %s" % workflow)
-            raise Error.MissingObject("JobStatus is unknown for workflow %s" % workflow)
+        jobsPerStatus = {}
+        jobList = []
+        retval = {"status": results[0]['JobStatus'], "taskFailureMsg": "", "jobSetID": "",
+            "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
+        if results[0]['JobStatus'] == 4: # Job is completed.
+            retval["ExitCode"] = results[0]["ExitCode"]
 
-        status = results['JobStatus']
-        self.logger.debug("Status result for workflow %s: %d" % (workflow, status))
+        results = schedd.query("TaskType =?= \"Job\" && RequestName =?= %s" % ad.lookup("foo"), ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID'])
+        totalJobdefs = 0
+        failedJobdefs = 0
+        for result in results:
+            totalJobdefs += 1
+            if (result['JobStatus'] == 4) and ('ExitCode' in result) and (result['ExitCode']):
+                failedJobdefs += 1
+            jobsPerStatus[result['JobStatus']] = jobsPerStatus.setdefault(result['JobStatus'], 0) + 1
+            jobList.append((result['JobStatus'], result['GlobalJobID']))
 
-        return status
+        self.logger.debug("Status result for workflow %s: %s" % (workflow, retval))
+
+        return retval
 
 def main():
     dag = DagmanDataWorkflow()
