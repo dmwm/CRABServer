@@ -7,6 +7,7 @@ import classad
 import htcondor
 
 import WMCore.REST.Error as Error
+from CRABInterface.Utils import retriveUserCert
 
 import DataWorkflow
 
@@ -93,40 +94,60 @@ CRAB_Archive = %(cachefilename_flatten)s
 CRAB_Id = $(count)
 +TaskType = "Job"
 
++JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
+job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite
+
 universe = vanilla
 Executable = CMSRunAnaly.sh
 Output = job_out.$(CRAB_Id)
 Error = job_err.$(CRAB_Id)
+Log = job_log.$(CRAB_Id)
 Arguments = "-o $(CRAB_AdditionalOutputFiles) -a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) '--inputFile=$(inputFiles)' '--lumiMask=$(runAndLumiMask)' --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) --jobNumber=$(CRAB_Id)"
 #transfer_input = $(CRAB_ISB)
-transfer_output_files = cmsRun-stderr.log?compressCount=2&remoteName=cmsRun_$(count).log, cmsRun-stdout.log?compressCount=2&remoteName=cmsRun_$(count).log, $(localOutputFiles)
-output_destination = cms://%(output_dest)s
+transfer_output_files = cmsRun-stderr.log?compressCount=3&remoteName=cmsRun_$(count).log, cmsRun-stdout.log?compressCount=3&remoteName=cmsRun_$(count).log, FrameworkJobReport.xml?compressCount=3&remoteName=cmsRun_$(count).log, $(localOutputFiles)
+output_destination = cms://%(temp_dest)s
 Environment = SCRAM_ARCH=$(CRAB_JobArch)
 should_transfer_files = YES
-#x509userproxy = x509up
+x509userproxy = %(x509up_file)s
+# TODO: Uncomment this when we get out of testing mode
+# Requirements = GLIDEIN_CMSSite isnt undefined
 queue
 """
 
 async_submit = crab_headers + \
 """
+CRAB_AsyncDest = %(asyncdest_flatten)s
+
 universe = local
 Executable = dag_bootstrap.sh
-Args = ASO $(count)
+Arguments = "ASO $(CRAB_AsyncDest) %(temp_dest)s %(output_dest)s $(count) cmsRun_$(count).log.tar.gz $(remoteOutputFiles)"
 Output = aso.$(count).out
+transfer_input_files = job_log.$(CRAB_Id)
 Error = aso.$(count).err
 Environment = PATH=/usr/bin:/bin
 queue
 """
+
+#def globalinit(serverkey, servercert, serverdn, uisource, credpath):
+    
 
 class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
     """A specialization of the DataWorkflow for submitting to HTCondor DAGMan instead of
        PanDA
     """
 
+    def __init__(self, **kwargs):
+        super(DagmanDataWorkflow, self).__init__()
+        self.config = None
+        if 'config' in kwargs:
+            self.config = kwargs['config']
+
     def getSchedd(self):
         """
         Determine a schedd to use for this task.
         """
+        if self.config and hasattr(self.config.General, 'condorScheddList'):
+            return random.shuffle(self.config.General.condorScheddList, 1)
         return "localhost"
 
 
@@ -144,6 +165,8 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
 
 
     def getCollector(self):
+        if self.config and hasattr(self.config.General, 'condorPool'):
+            return self.config.General.condorPool
         return "localhost"
 
 
@@ -175,10 +198,11 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         return ""
 
 
+    @retriveUserCert(clean=False)
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,
                userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
-               runs, lumis): #TODO delete unused parameters
+               runs, lumis, **kwargs): #TODO delete unused parameters
         """Perform the workflow injection into the reqmgr + couch
 
            :arg str workflow: workflow name requested by the user;
@@ -243,12 +267,14 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         info = {}
         for key in classad_info:
             info[key] = classad_info.lookup(key).__repr__()
-        for key in ["userisburl", "jobsw", "jobarch", "cachefilename"]:
+        for key in ["userisburl", "jobsw", "jobarch", "cachefilename", "asyncdest"]:
             info[key+"_flatten"] = classad_info[key]
         info["adduserfiles_flatten"] = json.dumps(classad_info["adduserfiles"].eval())
         info["addoutputfiles_flatten"] = json.dumps(classad_info["addoutputfiles"].eval())
 
         info["output_dest"] = os.path.join("/store/user", userhn, workflow, publishname)
+        info["temp_dest"] = os.path.join("/store/temp/user", userhn, workflow, publishname)
+        info['x509up_file'] = os.path.split(kwargs['userproxy'])[-1]
 
         schedd_name = self.getSchedd()
         schedd, address = self.getScheddObj(schedd_name)
@@ -261,6 +287,8 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             fd.write(job_splitting_submit_file % info)
         with open(os.path.join(scratch, "Job.submit"), "w") as fd:
             fd.write(job_submit % info)
+        with open(os.path.join(scratch, 'ASO.submit'), 'w') as fd:
+            fd.write(async_submit % info)
 
         dag_ad = classad.ClassAd()
         dag_ad["CRAB_Workflow"] = workflow
@@ -275,6 +303,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             os.path.join(scratch, "DBSDiscovery.submit"),
             os.path.join(scratch, "JobSplitting.submit"),
             os.path.join(scratch, "Job.submit"),
+            os.path.join(scratch, "ASO.submit"),
             self.getTransformLocation(),
         ])
         dag_ad["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
@@ -286,10 +315,30 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         dag_ad["RemoteCondorSetup"] = self.getRemoteCondorSetup()
         dag_ad["Requirements"] = classad.ExprTree('true || false')
         dag_ad["TaskType"] = "ROOT"
+        dag_ad["X509UserProxy"] = kwargs['userproxy']
 
-        result_ads = []
-        cluster = schedd.submit(dag_ad, 1, True, result_ads)
-        schedd.spool(result_ads)
+        r, w = os.pipe()
+        rpipe = os.fdopen(r, 'r')
+        wpipe = os.fdopen(w, 'w')
+        if os.fork():
+            try:
+                rpipe.close()
+                try:
+                    result_ads = []
+                    htcondor.SecMan().invalidateAllSessions()
+                    cluster = schedd.submit(dag_ad, 1, True, result_ads)
+                    schedd.spool(result_ads)
+                    wpipe.write("OK")
+                    wpipe.close()
+                    os._exit(0)
+                except Exception, e:
+                    wpipe.write(str(e))
+            finally:
+                os._exit(1)
+        wpipe.close()
+        results = rpipe.read()
+        if results != "OK":
+            raise Exception("Failure when submitting to HTCondor: %s" % results)
 
         schedd.reschedule()
 

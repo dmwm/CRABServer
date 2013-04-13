@@ -105,9 +105,13 @@ def retriveUserCert(clean=True):
                                   'serverDN': serverDN,
                                   'uisource': uiSource,
                                   'credServerPath': credServerPath,}
+            print defaultDelegation
             timeleftthreshold = 60 * 60 * 24
             proxy = Proxy(defaultDelegation)
-            userproxy = proxy.getProxyFilename(serverRenewer=True)
+            if serverCert:
+                userproxy = proxy.getProxyFilename(serverRenewer=True)
+            else:
+                userproxy = proxy.getProxyFilename()
             if proxy.getTimeLeft() < timeleftthreshold:
                 proxy.logonRenewMyProxy()
                 timeleft = proxy.getTimeLeft( userproxy )
@@ -115,6 +119,7 @@ def retriveUserCert(clean=True):
                     raise InvalidParameter("Impossible to retrieve proxy from %s for %s." %(defaultDelegation['myProxySvr'], defaultDelegation['userDN']))
 
                 logger.debug("User proxy file path: %s" % userproxy)
+            kwargs['userproxy'] = userproxy
             out = func(*args, **kwargs)
             if clean:
                 logger.debug("Rimuovo %s" % clean)
