@@ -120,11 +120,12 @@ CRAB_AsyncDest = %(asyncdest_flatten)s
 
 universe = local
 Executable = dag_bootstrap.sh
-Arguments = "ASO $(CRAB_AsyncDest) %(temp_dest)s %(output_dest)s $(count) cmsRun_$(count).log.tar.gz $(remoteOutputFiles)"
+Arguments = "ASO $(CRAB_AsyncDest) %(temp_dest)s %(output_dest)s $(count) cmsRun_$(count).log.tar.gz $(outputFiles)"
 Output = aso.$(count).out
-transfer_input_files = job_log.$(CRAB_Id)
+transfer_input_files = job_log.$(count)
 Error = aso.$(count).err
 Environment = PATH=/usr/bin:/bin
+x509userproxy = %(x509up_file)s
 queue
 """
 
@@ -270,7 +271,9 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         for key in ["userisburl", "jobsw", "jobarch", "cachefilename", "asyncdest"]:
             info[key+"_flatten"] = classad_info[key]
         info["adduserfiles_flatten"] = json.dumps(classad_info["adduserfiles"].eval())
-        info["addoutputfiles_flatten"] = json.dumps(classad_info["addoutputfiles"].eval())
+        #info["addoutputfiles_flatten"] = json.dumps(classad_info["addoutputfiles"].eval())
+        # TODO: PanDA wrapper wants some sort of dictionary.
+        info["addoutputfiles_flatten"] = '{}'
 
         info["output_dest"] = os.path.join("/store/user", userhn, workflow, publishname)
         info["temp_dest"] = os.path.join("/store/temp/user", userhn, workflow, publishname)
