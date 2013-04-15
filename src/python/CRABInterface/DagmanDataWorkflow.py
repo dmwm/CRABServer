@@ -1,17 +1,29 @@
 
 import os
+import re
 import json
 import time
 
-import classad
-import htcondor
+try:
+    import classad
+    import htcondor
+except ImportError:
+    classad = None
+    htcondor = None
+try:
+    import WMCore.BossAir.Plugins.RemoteCondorPlugin as RemoteCondorPlugin
+except ImportError:
+    if not htcondor:
+        raise
+
+from WMCore.WMSpec.WMTask import buildLumiMask
 
 import WMCore.REST.Error as Error
 from CRABInterface.Utils import retriveUserCert
 
 import DataWorkflow
 
-master_dag_submit_file = \
+master_dag_file = \
 """
 JOB DBSDiscovery DBSDiscovery.submit
 JOB JobSplitting JobSplitting.submit
@@ -19,6 +31,30 @@ SUBDAG EXTERNAL RunJobs RunJobs.dag
 
 PARENT DBSDiscovery CHILD JobSplitting
 PARENT JobSplitting CHILD RunJobs
+"""
+
+master_dag_submit_file = \
+"""
++CRAB_Workflow = %(workflow)s
++CRAB_UserDN = %(userdn)s
+universe = vanilla
++RequestName = %(requestname)s
+scratch = %(scratch)s
+bindir = %(bindir)s
+output = $(scratch)/request.out
+error = $(scratch)/request.err
+executable = $(bindir)/dag_bootstrap_startup.sh
+transfer_input_files = $(bindir)/dag_bootstrap.sh, $(scratch)/master_dag, $(scratch)/DBSDiscovery.submit, $(scratch)/JobSplitting.submit, $(scratch)/Job.submit, $(scratch)/ASO.submit, %(transform_location)s
+leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))
++TransferOutput = ""
+on_exit_remove = ( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))
++OtherJobRemoveRequirements = DAGManJobId =?= ClusterId
+remove_kill_sig = SIGUSR1
++Environment= strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)
++RemoteCondorSetup = %(remote_condor_setup)s
++TaskType = "ROOT"
+X509UserProxy = %(userproxy)s
+queue 1
 """
 
 crab_headers = \
@@ -52,8 +88,7 @@ crab_meta_headers = \
 +CRAB_PublishName = %(publishname)s
 +CRAB_DBSUrl = %(dbsurl)s
 +CRAB_PublishDBSUrl = %(publishdbsurl)s
-+CRAB_Runs = %(runs)s
-+CRAB_Lumis = %(lumis)s
++CRAB_LumiMask = %(lumimask)s
 """
 
 job_splitting_submit_file = crab_headers + crab_meta_headers + \
@@ -129,8 +164,7 @@ x509userproxy = %(x509up_file)s
 queue
 """
 
-#def globalinit(serverkey, servercert, serverdn, uisource, credpath):
-    
+WORKFLOW_RE = re.compile("[a-z0-9_]+")
 
 class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
     """A specialization of the DataWorkflow for submitting to HTCondor DAGMan instead of
@@ -142,27 +176,38 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         self.config = None
         if 'config' in kwargs:
             self.config = kwargs['config']
+        else:
+            self.config = Configuration()
+        self.config.section_("BossAir")
+        if not hasattr(self.config.BossAir, "remoteUserHost"):
+            self.config.BossAir.remoteUserHost = "cmssubmit-r1.t2.ucsd.edu"
+
 
     def getSchedd(self):
         """
         Determine a schedd to use for this task.
         """
+        if not htcondor:
+            return self.config.remoteUserHost
         if self.config and hasattr(self.config.General, 'condorScheddList'):
             return random.shuffle(self.config.General.condorScheddList, 1)
         return "localhost"
 
 
     def getScheddObj(self, name):
-        if name == "localhost":
-            schedd = htcondor.Schedd()
-            with open(htcondor.param['SCHEDD_ADDRESS_FILE']) as fd:
+        if htcondor:
+            if name == "localhost":
+                schedd = htcondor.Schedd()
+                with open(htcondor.param['SCHEDD_ADDRESS_FILE']) as fd:
+                    address = fd.read()
+            else:
+                coll = htcondor.Collector(self.getCollector())
+                schedd_ad = coll.locate(htcondor.DaemonTypes.Collector, name)
                 address = fd.read()
+                schedd = htcondor.Schedd(schedd_ad)
+            return schedd, address
         else:
-            coll = htcondor.Collector(self.getCollector())
-            schedd_ad = coll.locate(htcondor.DaemonTypes.Collector, name)
-            address = fd.read()
-            schedd = htcondor.Schedd(schedd_ad)
-        return schedd, address
+            return RemoteCondorPlugin(self.config), None
 
 
     def getCollector(self):
@@ -241,7 +286,6 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,\
                userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,\
                runs, lumis))
-        #add the user in the reqmgr database
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         schedd = self.getSchedd()
         requestname = '%s_%s_%s_%s' % (self.getSchedd(), timestamp, userhn, workflow)
@@ -250,40 +294,53 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         scratch = os.path.join(scratch, requestname)
         os.makedirs(scratch)
 
-        classad_info = classad.ClassAd()
-        for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'siteblacklist', 'sitewhitelist', 'blockwhitelist',\
-               'blockblacklist', 'splitalgo', 'algoargs', 'configdoc', 'userisburl', 'cachefilename', 'cacheurl', 'adduserfiles', 'addoutputfiles', 'savelogsflag',\
-               'userhn', 'publishname', 'asyncdest', 'campaign', 'blacklistT1', 'dbsurl', 'publishdbsurl', 'tfileoutfiles', 'edmoutfiles', 'userdn',\
-               'runs', 'lumis':
+        # Poor-man's string escaping.  We do this as classad module isn't guaranteed to be present.
+        info = {}
+        for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', 'configdoc', 'userisburl', \
+               'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'campaign', 'dbsurl', 'publishdbsurl', \
+               'userdn', 'requestname':
             val = locals()[var]
             if val == None:
-                classad_info[var] = classad.Value.Undefined
+                info[var] = 'undefined'
             else:
-                classad_info[var] = locals()[var]
-        classad_info['requestname'] = requestname
+                info[var] = json.dumps(val)
 
+        for var in 'savelogsflag', 'blacklistT1':
+            info[var] = int(locals()[var])
+
+        for var in 'siteblacklist', 'sitewhitelist', 'blockwhitelist', 'blockblacklist', 'adduserfiles', 'addoutputfiles', \
+               'tfileoutfiles', 'edmoutfiles':
+            val = locals()[var]
+            if val == None:
+                info[var] = "{}"
+            else:
+                info[var] = "{" + json.dumps(val)[1:-1] + "}"
+
+        #TODO: We don't handle user-specified lumi masks correctly.
+        info['lumimask'] = '"' + json.dumps(buildLumiMask(runs, lumis)).replace(r'"', r'\"') + '"'
         splitArgName = self.splitArgMap[splitalgo]
-        classad_info['algoargs'] = json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : algoargs})
+        info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : algoargs}).replace('"', r'\"') + '"'
 
-        info = {}
-        for key in classad_info:
-            info[key] = classad_info.lookup(key).__repr__()
         for key in ["userisburl", "jobsw", "jobarch", "cachefilename", "asyncdest"]:
-            info[key+"_flatten"] = classad_info[key]
-        info["adduserfiles_flatten"] = json.dumps(classad_info["adduserfiles"].eval())
-        #info["addoutputfiles_flatten"] = json.dumps(classad_info["addoutputfiles"].eval())
+            info[key+"_flatten"] = locals()[var]
+        info["adduserfiles_flatten"] = json.dumps(adduserfiles)
+
         # TODO: PanDA wrapper wants some sort of dictionary.
         info["addoutputfiles_flatten"] = '{}'
 
         info["output_dest"] = os.path.join("/store/user", userhn, workflow, publishname)
         info["temp_dest"] = os.path.join("/store/temp/user", userhn, workflow, publishname)
         info['x509up_file'] = os.path.split(kwargs['userproxy'])[-1]
+        info['remote_condor_setup'] = self.getRemoteCondorSetup()
+        info['bindir'] = self.getBinDir()
+        info['scratch'] = scratch
+        info['transform_location'] = self.getTransformLocation()
 
         schedd_name = self.getSchedd()
         schedd, address = self.getScheddObj(schedd_name)
 
         with open(os.path.join(scratch, "master_dag"), "w") as fd:
-            fd.write(master_dag_submit_file % info)
+            fd.write(master_dag_file % info)
         with open(os.path.join(scratch, "DBSDiscovery.submit"), "w") as fd:
             fd.write(dbs_discovery_submit_file % info)
         with open(os.path.join(scratch, "JobSplitting.submit"), "w") as fd:
@@ -293,6 +350,23 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         with open(os.path.join(scratch, 'ASO.submit'), 'w') as fd:
             fd.write(async_submit % info)
 
+        input_files = [os.path.join(self.getBinDir(), "dag_bootstrap.sh"),
+                       self.getTransformLocation()]
+        scratch_files = ['master_dag', 'DBSDiscovery.submit', 'JobSplitting.submit', 'master_dag', 'Job.submit', 'ASO.submit']
+        input_files.extend([os.path.join(scratch, i) for i in scratch_files])
+
+        if address:
+            self.submitDirect(schedd, workflow, userdn, requestname, kwargs['userproxy'], scratch, input_files)
+        else:
+            jdl = master_dag_submit_file % info
+            schedd.submitRaw(requestname, jdl, kwargs['userproxy'], input_files)
+
+        return [{'RequestName': requestname}]
+
+    def submitDirect(self, schedd, workflow, userdn, requestname, userproxy, scratch, input_files):
+        """
+        Submit directly to the schedd using the HTCondor module
+        """
         dag_ad = classad.ClassAd()
         dag_ad["CRAB_Workflow"] = workflow
         dag_ad["CRAB_UserDN"] = userdn
@@ -301,14 +375,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         dag_ad["Out"] = os.path.join(scratch, "request.out")
         dag_ad["Err"] = os.path.join(scratch, "request.err")
         dag_ad["Cmd"] = os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh")
-        dag_ad["TransferInput"] = ", ".join([os.path.join(self.getBinDir(), "dag_bootstrap.sh"),
-            os.path.join(scratch, "master_dag"),
-            os.path.join(scratch, "DBSDiscovery.submit"),
-            os.path.join(scratch, "JobSplitting.submit"),
-            os.path.join(scratch, "Job.submit"),
-            os.path.join(scratch, "ASO.submit"),
-            self.getTransformLocation(),
-        ])
+        dag_ad["TransferInput"] = ", ".join(input_files)
         dag_ad["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
         dag_ad["TransferOutput"] = ""
         dag_ad["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
@@ -318,7 +385,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         dag_ad["RemoteCondorSetup"] = self.getRemoteCondorSetup()
         dag_ad["Requirements"] = classad.ExprTree('true || false')
         dag_ad["TaskType"] = "ROOT"
-        dag_ad["X509UserProxy"] = kwargs['userproxy']
+        dag_ad["X509UserProxy"] = userproxy
 
         r, w = os.pipe()
         rpipe = os.fdopen(r, 'r')
@@ -345,8 +412,6 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
 
         schedd.reschedule()
 
-        return [{'RequestName': requestname}]
-
 
     def kill(self, workflow, force, userdn):
         """Request to Abort a workflow.
@@ -355,10 +420,17 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
 
         self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
 
+        workflow = str(workflow)
+        if not WORKFLOW_RE.match(workflow):
+            raise Exception("Invalid workflow name.")
+
         schedd_name = self.getSchedd()
         schedd, address = self.getScheddObj(schedd_name)
 
-        schedd.act(htcondor.JobAction.Remove, 'CRAB_Workflow =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn))
+        if address:
+            schedd.act(htcondor.JobAction.Remove, 'CRAB_Workflow =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn))
+        else:
+            schedd.kill('CRAB_Workflow =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn))
 
 
     def status(self, workflow, userdn):
@@ -367,15 +439,21 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
            :arg str workflow: a valid workflow name
            :return: a workflow status summary document"""
         workflow = str(workflow)
+        if not WORKFLOW_RE.match(workflow):
+            raise Exception("Invalid workflow name.")
 
         self.logger.info("Getting status for workflow %s" % workflow)
 
         name = workflow.split("_")[0]
 
-        schedd, _ = self.getScheddObj(name)
-        ad = classad.ClassAd()
-        ad["foo"] = workflow
-        results = schedd.query("TaskType =?= \"ROOT\" && RequestName =?= %s" % ad.lookup("foo"), ["JobStatus", 'ExitCode'])
+        schedd, address = self.getScheddObj(name)
+
+        root_const = "TaskType =?= \"ROOT\" && RequestName =?= \"%s\"" % workflow
+        root_attr_list = ["JobStatus", "ExitCode"]
+        if address:
+            results = schedd.query(root_const, root_attr_list)
+        else:
+            results = schedd.getClassAds(root_const, root_attr_list)
 
         if not results:
             self.logger.info("An invalid workflow name was requested: %s" % workflow)
@@ -385,18 +463,23 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         jobList = []
         retval = {"status": results[0]['JobStatus'], "taskFailureMsg": "", "jobSetID": "",
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
-        if results[0]['JobStatus'] == 4: # Job is completed.
+        if int(results[0]['JobStatus']) == 4: # Job is completed.
             retval["ExitCode"] = results[0]["ExitCode"]
 
-        results = schedd.query("TaskType =?= \"Job\" && RequestName =?= %s" % ad.lookup("foo"), ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID'])
+        job_const = "TaskType =?= \"Job\" && RequestName =?= \"%s\"" % workflow
+        job_list = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID']
+        if address:
+            results = schedd.query(job_const, job_list)
+        else:
+            results = schedd.getClassAds(job_const, job_list)
         totalJobdefs = 0
         failedJobdefs = 0
         for result in results:
             totalJobdefs += 1
-            if (result['JobStatus'] == 4) and ('ExitCode' in result) and (result['ExitCode']):
+            if (int(result['JobStatus']) == 4) and ('ExitCode' in result) and (result['ExitCode']):
                 failedJobdefs += 1
-            jobsPerStatus[result['JobStatus']] = jobsPerStatus.setdefault(result['JobStatus'], 0) + 1
-            jobList.append((result['JobStatus'], result['GlobalJobID']))
+            jobsPerStatus[int(result['JobStatus'])] = jobsPerStatus.setdefault(int(result['JobStatus']), 0) + 1
+            jobList.append((int(result['JobStatus']), result['GlobalJobID']))
 
         self.logger.debug("Status result for workflow %s: %s" % (workflow, retval))
 
