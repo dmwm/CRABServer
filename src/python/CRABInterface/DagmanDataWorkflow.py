@@ -15,6 +15,8 @@ try:
 except ImportError:
     if not htcondor:
         raise
+classad = None
+htcondor = None
 
 from WMCore.WMSpec.WMTask import buildLumiMask
 
@@ -188,7 +190,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         Determine a schedd to use for this task.
         """
         if not htcondor:
-            return self.config.remoteUserHost
+            return self.config.BossAir.remoteUserHost
         if self.config and hasattr(self.config.General, 'condorScheddList'):
             return random.shuffle(self.config.General.condorScheddList, 1)
         return "localhost"
@@ -199,7 +201,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             if name == "localhost":
                 schedd = htcondor.Schedd()
                 with open(htcondor.param['SCHEDD_ADDRESS_FILE']) as fd:
-                    address = fd.read()
+                    address = fd.read().split("\n")[0]
             else:
                 coll = htcondor.Collector(self.getCollector())
                 schedd_ad = coll.locate(htcondor.DaemonTypes.Collector, name)
@@ -207,7 +209,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
                 schedd = htcondor.Schedd(schedd_ad)
             return schedd, address
         else:
-            return RemoteCondorPlugin(self.config), None
+            return RemoteCondorPlugin.RemoteCondorPlugin(self.config, logger=self.logger), None
 
 
     def getCollector(self):
@@ -331,6 +333,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         info["output_dest"] = os.path.join("/store/user", userhn, workflow, publishname)
         info["temp_dest"] = os.path.join("/store/temp/user", userhn, workflow, publishname)
         info['x509up_file'] = os.path.split(kwargs['userproxy'])[-1]
+        info['userproxy'] = kwargs['userproxy']
         info['remote_condor_setup'] = self.getRemoteCondorSetup()
         info['bindir'] = self.getBinDir()
         info['scratch'] = scratch
@@ -355,6 +358,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         scratch_files = ['master_dag', 'DBSDiscovery.submit', 'JobSplitting.submit', 'master_dag', 'Job.submit', 'ASO.submit']
         input_files.extend([os.path.join(scratch, i) for i in scratch_files])
 
+        print address
         if address:
             self.submitDirect(schedd, workflow, userdn, requestname, kwargs['userproxy'], scratch, input_files)
         else:
