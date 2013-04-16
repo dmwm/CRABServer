@@ -4,7 +4,7 @@
 # This script bootstraps the WMCore environment
 #
 
-if [ "X$TASKWORKER_ENV" = "X" -a ! -e WMCore.zip ]
+if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]
 then
 
 	command -v python2.6 > /dev/null
@@ -36,7 +36,7 @@ then
         export TASKWORKER_ENV="1"
 fi
 
-export PYTHONPATH=$PWD:$PWD/DBSAPI.zip:$PWD/WMCore.zip:$PWD/TaskWorker.zip:$PYTHONPATH
+export PYTHONPATH=$PWD:$PWD/CRAB3.zip:$PYTHONPATH
 # This is for development-only, due to the rapid rate we're updating the TaskWorker files.
 # TODO: Remove the below lines before the first release.
 export PYTHONPATH=~/projects/CAFTaskWorker/src/python:$PYTHONPATH

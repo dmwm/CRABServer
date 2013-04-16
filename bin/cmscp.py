@@ -19,8 +19,8 @@ if 'CMS_PATH' not in os.environ:
     elif os.path.exists('/cvmfs/cms.cern.ch'):
         os.environ['CMS_PATH'] = '/cvmfs/cms.cern.ch'
 
-if os.path.exists("WMCore.zip") and "WMCore.zip" not in sys.path:
-    sys.path.append("WMCore.zip")
+if os.path.exists("CRAB3.zip") and "CRAB3.zip" not in sys.path:
+    sys.path.append("CRAB3.zip")
 
 try:
     import WMCore
@@ -30,9 +30,9 @@ except ImportError, ie:
     with tempfile.TemporaryFile() as fd2:
        fd2.write(fd.read()); fd2.seek(0)
        tf = tarfile.open(mode='r:gz', fileobj=fd2)
-       fd3 = tf.extractfile("WMCore.zip")
+       fd3 = tf.extractfile("CRAB3.zip")
        try:
-           name = "WMCore.zip"
+           name = "CRAB3.zip"
            fd4 = os.open(name, os.O_EXCL | os.O_RDWR | os.O_CREAT, 0644)
        except:
            fd4, name = tempfile.mkstemp()
