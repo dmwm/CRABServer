@@ -15,10 +15,11 @@ try:
 except ImportError:
     if not htcondor:
         raise
-classad = None
-htcondor = None
+#classad = None
+#htcondor = None
 
 from WMCore.WMSpec.WMTask import buildLumiMask
+from WMCore.Configuration import Configuration
 
 import WMCore.REST.Error as Error
 from CRABInterface.Utils import retriveUserCert
@@ -129,20 +130,23 @@ CRAB_JobSW = %(jobsw_flatten)s
 CRAB_JobArch = %(jobarch_flatten)s
 CRAB_Archive = %(cachefilename_flatten)s
 CRAB_Id = $(count)
++CRAB_Id = $(count)
++CRAB_Dest = "cms://%(temp_dest)s"
 +TaskType = "Job"
 
 +JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
 job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite
 
 universe = vanilla
-Executable = CMSRunAnaly.sh
+Executable = gWMS-CMSRunAnaly.sh
 Output = job_out.$(CRAB_Id)
 Error = job_err.$(CRAB_Id)
 Log = job_log.$(CRAB_Id)
 Arguments = "-o $(CRAB_AdditionalOutputFiles) -a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) '--inputFile=$(inputFiles)' '--lumiMask=$(runAndLumiMask)' --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) --jobNumber=$(CRAB_Id)"
-#transfer_input = $(CRAB_ISB)
-transfer_output_files = cmsRun-stderr.log?compressCount=3&remoteName=cmsRun_$(count).log, cmsRun-stdout.log?compressCount=3&remoteName=cmsRun_$(count).log, FrameworkJobReport.xml?compressCount=3&remoteName=cmsRun_$(count).log, $(localOutputFiles)
-output_destination = cms://%(temp_dest)s
+transfer_input_files = CMSRunAnaly.sh, cmscp.py
+TransferOutputFiles = ""
+#transfer_output_files = cmsRun-stderr.log?compressCount=3&remoteName=cmsRun_$(count).log, cmsRun-stdout.log?compressCount=3&remoteName=cmsRun_$(count).log, FrameworkJobReport.xml?compressCount=3&remoteName=cmsRun_$(count).log, $(localOutputFiles)
+#output_destination = cms://%(temp_dest)s
 Environment = SCRAM_ARCH=$(CRAB_JobArch)
 should_transfer_files = YES
 x509userproxy = %(x509up_file)s
@@ -181,6 +185,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         else:
             self.config = Configuration()
         self.config.section_("BossAir")
+        self.config.section_("General")
         if not hasattr(self.config.BossAir, "remoteUserHost"):
             self.config.BossAir.remoteUserHost = "cmssubmit-r1.t2.ucsd.edu"
 
@@ -246,8 +251,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         return ""
 
 
-    @retriveUserCert(clean=False)
-    def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
+    def submitRaw(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,
                userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
                runs, lumis, **kwargs): #TODO delete unused parameters
@@ -323,8 +327,8 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         splitArgName = self.splitArgMap[splitalgo]
         info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : algoargs}).replace('"', r'\"') + '"'
 
-        for key in ["userisburl", "jobsw", "jobarch", "cachefilename", "asyncdest"]:
-            info[key+"_flatten"] = locals()[var]
+        for var in ["userisburl", "jobsw", "jobarch", "cachefilename", "asyncdest"]:
+            info[var+"_flatten"] = locals()[var]
         info["adduserfiles_flatten"] = json.dumps(adduserfiles)
 
         # TODO: PanDA wrapper wants some sort of dictionary.
@@ -354,11 +358,11 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             fd.write(async_submit % info)
 
         input_files = [os.path.join(self.getBinDir(), "dag_bootstrap.sh"),
-                       self.getTransformLocation()]
+                       self.getTransformLocation(),
+                       os.path.join(self.getBinDir(), "cmscp.py")]
         scratch_files = ['master_dag', 'DBSDiscovery.submit', 'JobSplitting.submit', 'master_dag', 'Job.submit', 'ASO.submit']
         input_files.extend([os.path.join(scratch, i) for i in scratch_files])
 
-        print address
         if address:
             self.submitDirect(schedd, workflow, userdn, requestname, kwargs['userproxy'], scratch, input_files)
         else:
@@ -366,6 +370,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             schedd.submitRaw(requestname, jdl, kwargs['userproxy'], input_files)
 
         return [{'RequestName': requestname}]
+    submit = retriveUserCert(clean=False)(submitRaw)
 
     def submitDirect(self, schedd, workflow, userdn, requestname, userproxy, scratch, input_files):
         """
@@ -523,10 +528,10 @@ def main():
     userdn = '/CN=Brian Bockelman'
     runs = []
     lumis = []
-    dag.submit(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
+    dag.submitRaw(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,
                userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
-               runs, lumis) #TODO delete unused parameters
+               runs, lumis, userproxy = '/tmp/x509up_u%d' % os.geteuid()) #TODO delete unused parameters
 
 
 if __name__ == "__main__":
