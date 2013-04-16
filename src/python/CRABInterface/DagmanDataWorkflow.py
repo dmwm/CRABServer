@@ -48,8 +48,8 @@ output = $(scratch)/request.out
 error = $(scratch)/request.err
 executable = $(bindir)/dag_bootstrap_startup.sh
 transfer_input_files = $(bindir)/dag_bootstrap.sh, $(scratch)/master_dag, $(scratch)/DBSDiscovery.submit, $(scratch)/JobSplitting.submit, $(scratch)/Job.submit, $(scratch)/ASO.submit, %(transform_location)s
+transfer_output_files = master_dag.dagman.out, master_dag.rescue.001, RunJobs.dag, RunJobs.dag.dagman.out, RunJobs.dag.rescue.001, dbs_discovery.err, dbs_discovery.out, job_splitting.err, job_splitting.out
 leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))
-+TransferOutput = ""
 on_exit_remove = ( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))
 +OtherJobRemoveRequirements = DAGManJobId =?= ClusterId
 remove_kill_sig = SIGUSR1
@@ -386,7 +386,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         dag_ad["Cmd"] = os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh")
         dag_ad["TransferInput"] = ", ".join(input_files)
         dag_ad["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
-        dag_ad["TransferOutput"] = ""
+        dag_ad["TransferOutput"] = "master_dag.dagman.out, master_dag.rescue.001, RunJobs.dag, RunJobs.dag.dagman.out, RunJobs.dag.rescue.001, dbs_discovery.err, dbs_discovery.out, job_splitting.err, job_splitting.out"
         dag_ad["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
         dag_ad["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
         dag_ad["RemoveKillSig"] = "SIGUSR1"
@@ -506,7 +506,7 @@ def main():
     blockwhitelist = []
     blockblacklist = []
     splitalgo = "LumiBased"
-    algoargs = 400
+    algoargs = 40
     configdoc = ''
     userisburl = 'https://voatlas178.cern.ch:25443'
     cachefilename = 'default.tgz'
