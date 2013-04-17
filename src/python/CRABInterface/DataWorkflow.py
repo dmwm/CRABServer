@@ -17,7 +17,6 @@ from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState, GetRe
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import loadWorkload, abortRequest
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.Database.DBFactory import DBFactory
-from WMCore.WMSpec.WMTask import buildLumiMask
 
 #CRAB dependencies
 from CRABInterface.Utils import CMSSitesCache, conn_handler
@@ -242,14 +241,15 @@ class DataWorkflow(object):
                             site_whitelist   = [dbSerializer(sitewhitelist)],\
                             site_blacklist  = [dbSerializer(siteblacklist)],\
                             split_algo      = [splitalgo],\
-                            split_args      = [dbSerializer({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : algoargs})],\
+                            split_args      = [dbSerializer({'halt_job_on_file_boundaries': False, 'splitOnRun': False,\
+                                                splitArgName : algoargs, 'runs': runs, 'lumis': lumis})],\
                             user_sandbox    = [cachefilename],\
                             cache_url       = [cacheurl],\
                             username        = [userhn],\
                             user_dn         = [userdn],\
                             user_vo         = ['cms'],\
-                            user_role       = [''],\
-                            user_group      = [''],\
+                            user_role       = [vorole],\
+                            user_group      = [vogroup],\
                             publish_name    = [publishname],\
                             asyncdest       = [asyncdest],\
                             dbs_url         = [dbsurl or self.dbsurl],\
@@ -257,9 +257,8 @@ class DataWorkflow(object):
                             outfiles        = [dbSerializer(addoutputfiles)],\
                             tfile_outfiles  = [dbSerializer(tfileoutfiles)],\
                             edm_outfiles    = [dbSerializer(edmoutfiles)],\
-                            data_runs       = [dbSerializer(buildLumiMask(runs, lumis))],\
                             transformation  = ['http://common-analysis-framework.cern.ch/CMSRunAnaly.sh'],\
-                            arguments       = [''],\
+                            arguments       = [dbSerializer({})],\
         )
 
         """
