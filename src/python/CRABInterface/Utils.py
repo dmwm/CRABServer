@@ -105,7 +105,7 @@ def retriveUserCert(clean=True):
                                   'serverDN': serverDN,
                                   'uisource': uiSource,
                                   'credServerPath': credServerPath,}
-            print defaultDelegation
+            #print defaultDelegation
             timeleftthreshold = 60 * 60 * 24
             proxy = Proxy(defaultDelegation)
             if serverCert:

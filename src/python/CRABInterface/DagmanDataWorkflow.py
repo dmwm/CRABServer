@@ -3,6 +3,7 @@ import os
 import re
 import json
 import time
+import traceback
 
 try:
     import classad
@@ -37,28 +38,12 @@ PARENT DBSDiscovery CHILD JobSplitting
 PARENT JobSplitting CHILD RunJobs
 """
 
-master_dag_submit_file = \
+resubmit_dag_file = \
 """
-+CRAB_Workflow = %(workflow)s
-+CRAB_UserDN = %(userdn)s
-universe = vanilla
-+CRAB_ReqName = %(requestname)s
-scratch = %(scratch)s
-bindir = %(bindir)s
-output = $(scratch)/request.out
-error = $(scratch)/request.err
-executable = $(bindir)/dag_bootstrap_startup.sh
-transfer_input_files = $(bindir)/dag_bootstrap.sh, $(scratch)/master_dag, $(scratch)/DBSDiscovery.submit, $(scratch)/JobSplitting.submit, $(scratch)/Job.submit, $(scratch)/ASO.submit, %(transform_location)s
-transfer_output_files = master_dag.dagman.out, master_dag.rescue.001, RunJobs.dag, RunJobs.dag.dagman.out, RunJobs.dag.rescue.001, dbs_discovery.err, dbs_discovery.out, job_splitting.err, job_splitting.out
-leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
-on_exit_remove = ( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))
-+OtherJobRemoveRequirements = DAGManJobId =?= ClusterId
-remove_kill_sig = SIGUSR1
-+Environment= strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)
-+RemoteCondorSetup = %(remote_condor_setup)s
-+TaskType = "ROOT"
-X509UserProxy = %(userproxy)s
-queue 1
+JOB JobRecovery JobRecovery.submit
+SUBDAG EXTERNAL RecreateJobs RecreateJobs.dag
+
+PARENT JobRecovery CHILD RecreateJobs
 """
 
 crab_headers = \
@@ -95,6 +80,55 @@ crab_meta_headers = \
 +CRAB_LumiMask = %(lumimask)s
 """
 
+master_dag_submit_file = crab_headers + crab_meta_headers + \
+"""
++CRAB_Attempt = 0
++CRAB_Workflow = %(workflow)s
++CRAB_UserDN = %(userdn)s
+universe = vanilla
++CRAB_ReqName = %(requestname)s
+scratch = %(scratch)s
+bindir = %(bindir)s
+output = $(scratch)/request.out
+error = $(scratch)/request.err
+executable = $(bindir)/dag_bootstrap_startup.sh
+transfer_input_files = $(bindir)/dag_bootstrap.sh, $(scratch)/master_dag, $(scratch)/DBSDiscovery.submit, $(scratch)/JobSplitting.submit, $(scratch)/Job.submit, $(scratch)/ASO.submit, %(transform_location)s
+transfer_output_files = master_dag.dagman.out, master_dag.rescue.001, RunJobs.dag, RunJobs.dag.dagman.out, RunJobs.dag.rescue.001, dbs_discovery.err, dbs_discovery.out, job_splitting.err, job_splitting.out
+leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
+on_exit_remove = ( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))
++OtherJobRemoveRequirements = DAGManJobId =?= ClusterId
+remove_kill_sig = SIGUSR1
++Environment= strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)
++RemoteCondorSetup = %(remote_condor_setup)s
++TaskType = "ROOT"
+X509UserProxy = %(userproxy)s
+queue 1
+"""
+
+resubmit_dag_submit_file = \
+"""
++CRAB_Attempt = %(attempt)d
++CRAB_UserDN = %(userdn)s
+universe = vanilla
++CRAB_ReqName = %(requestname)s
+scratch = %(scratch)s
+bindir = %(bindir)s
+output = $(scratch)/request.out
+error = $(scratch)/request.err
+executable = $(bindir)/dag_bootstrap_startup.sh
+transfer_input_files = $(bindir)/dag_bootstrap.sh, $(scratch)/resubmit_dag, $(scratch)/JobRecovery.submit, $(scratch)/Job.submit, $(scratch)/ASO.submit, %(transform_location)s
+transfer_output_files = resubmit_dag.dagman.out, resubmit_dag.rescue.001, RunJobs.dag, RunJobs.dag.dagman.out, RunJobs.dag.rescue.001, job_recovery.err, job_recovery.out
+leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
+on_exit_remove = ( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))
++OtherJobRemoveRequirements = DAGManJobId =?= ClusterId
+remove_kill_sig = SIGUSR1
++Environment= strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)
++RemoteCondorSetup = %(remote_condor_setup)s
++TaskType = "ROOT"
+X509UserProxy = %(userproxy)s
+queue 1
+"""
+
 job_splitting_submit_file = crab_headers + crab_meta_headers + \
 """
 +TaskType = "SPLIT"
@@ -122,8 +156,13 @@ Environment = PATH=/usr/bin:/bin
 queue
 """
 
+job_recovery_submit_file = crab_headers + crab_meta_headers + \
+"""
+"""
+
 job_submit = crab_headers + \
 """
+CRAB_Attempt = %(attempt)d
 CRAB_ISB = %(userisburl_flatten)s
 CRAB_AdditionalUserFiles = %(adduserfiles_flatten)s
 CRAB_AdditionalOutputFiles = %(addoutputfiles_flatten)s
@@ -163,9 +202,10 @@ CRAB_AsyncDest = %(asyncdest_flatten)s
 
 universe = local
 Executable = dag_bootstrap.sh
-Arguments = "ASO $(CRAB_AsyncDest) %(temp_dest)s %(output_dest)s $(ClusterId).$(ProcId) $(count) cmsRun_$(count).log.tar.gz $(outputFiles)"
+Arguments = "ASO $(CRAB_AsyncDest) %(temp_dest)s %(output_dest)s $(count) $(Cluster).$(Process) cmsRun_$(count).log.tar.gz $(outputFiles)"
 Output = aso.$(count).out
 transfer_input_files = job_log.$(count), jobReport.json.$(count)
++TransferOutput = ""
 Error = aso.$(count).err
 Environment = PATH=/usr/bin:/bin
 x509userproxy = %(x509up_file)s
@@ -329,6 +369,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         info['lumimask'] = '"' + json.dumps(buildLumiMask(runs, lumis)).replace(r'"', r'\"') + '"'
         splitArgName = self.splitArgMap[splitalgo]
         info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : algoargs}).replace('"', r'\"') + '"'
+        info['attempt'] = 0
 
         for var in ["userisburl", "jobsw", "jobarch", "cachefilename", "asyncdest"]:
             info[var+"_flatten"] = locals()[var]
@@ -367,7 +408,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         input_files.extend([os.path.join(scratch, i) for i in scratch_files])
 
         if address:
-            self.submitDirect(schedd, workflow, userdn, requestname, kwargs['userproxy'], scratch, input_files)
+            self.submitDirect(schedd, kwargs['userproxy'], scratch, input_files, info)
         else:
             jdl = master_dag_submit_file % info
             schedd.submitRaw(requestname, jdl, kwargs['userproxy'], input_files)
@@ -375,15 +416,43 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         return [{'RequestName': requestname}]
     submit = retriveUserCert(clean=False)(submitRaw)
 
-    def submitDirect(self, schedd, workflow, userdn, requestname, userproxy, scratch, input_files):
+    def submitDirect(self, schedd, userproxy, scratch, input_files, info):
         """
         Submit directly to the schedd using the HTCondor module
         """
         dag_ad = classad.ClassAd()
-        dag_ad["CRAB_Workflow"] = workflow
-        dag_ad["CRAB_UserDN"] = userdn
+        submit_info = [ \
+            ('CRAB_Workflow', 'workflow'),
+            ('CRAB_ReqName', 'requestname'),
+            ('CRAB_JobType', 'jobtype'),
+            ('CRAB_JobSW', 'jobsw'),
+            ('CRAB_JobArch', 'jobarch'),
+            ('CRAB_InputData', 'inputdata'),
+            ('CRAB_ISB', 'userisburl'),
+            ('CRAB_SiteBlacklist', 'siteblacklist'),
+            ('CRAB_SiteWhitelist', 'sitewhitelist'),
+            ('CRAB_AdditionalUserFiles', 'adduserfiles'),
+            ('CRAB_AdditionalOutputFiles', 'addoutputfiles'),
+            ('CRAB_EDMOutputFiles', 'edmoutfiles'),
+            ('CRAB_TFileOutputFiles', 'tfileoutfiles'),
+            ('CRAB_SaveLogsFlag', 'savelogsflag'),
+            ('CRAB_UserDN', 'userdn'),
+            ('CRAB_UserHN', 'userhn'),
+            ('CRAB_AsyncDest', 'asyncdest'),
+            ('CRAB_Campaign', 'campaign'),
+            ('CRAB_BlacklistT1', 'blacklistT1'),
+            ('CRAB_SplitAlgo', 'splitalgo'),
+            ('CRAB_AlgoArgs', 'algoargs'),
+            ('CRAB_ConfigDoc', 'configdoc'),
+            ('CRAB_PublishName', 'publishname'),
+            ('CRAB_DBSUrl', 'dbsurl'),
+            ('CRAB_PublishDBSUrl', 'publishdbsurl'),
+            ('CRAB_LumiMask', 'lumimask')]
+        for ad_name, dict_name in submit_info:
+             dag_ad[ad_name] = classad.ExprTree(str(info[dict_name]))
+
+        dag_ad["CRAB_Attempt"] = 0
         dag_ad["JobUniverse"] = 12
-        dag_ad["CRAB_ReqName"] = requestname
         dag_ad["Out"] = os.path.join(scratch, "request.out")
         dag_ad["Err"] = os.path.join(scratch, "request.err")
         dag_ad["Cmd"] = os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh")
@@ -402,7 +471,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         r, w = os.pipe()
         rpipe = os.fdopen(r, 'r')
         wpipe = os.fdopen(w, 'w')
-        if os.fork():
+        if os.fork() == 0:
             try:
                 rpipe.close()
                 try:
@@ -415,24 +484,26 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
                     wpipe.close()
                     os._exit(0)
                 except Exception, e:
-                    wpipe.write(str(e))
+                    wpipe.write(str(traceback.format_exc()))
             finally:
                 os._exit(1)
         wpipe.close()
         results = rpipe.read()
         if results != "OK":
-            raise Exception("Failure when submitting to HTCondor: %s" % results)
+            raise Exception("Failure when killing HTCondor task: %s" % results)
 
         schedd.reschedule()
 
 
-    def kill(self, workflow, force, userdn):
+    @retriveUserCert(clean=False)
+    def kill(self, workflow, force, userdn, **kwargs):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name"""
 
         self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
 
+        userproxy = kwargs['userproxy']
         workflow = str(workflow)
         if not WORKFLOW_RE.match(workflow):
             raise Exception("Invalid workflow name.")
@@ -440,23 +511,23 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         schedd_name = self.getSchedd()
         schedd, address = self.getScheddObj(schedd_name)
 
+        const = 'CRAB_ReqName =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn)
         if address:
             r, w = os.pipe()
             rpipe = os.fdopen(r, 'r')
             wpipe = os.fdopen(w, 'w')
-            if os.fork():
+            if os.fork() == 0:
                 try:
                     rpipe.close()
                     try:
-                        result_ads = []
                         htcondor.SecMan().invalidateAllSessions()
                         os.environ['X509_USER_PROXY'] = userproxy
-                        schedd.act(htcondor.JobAction.Remove, 'CRAB_Workflow =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn))
+                        schedd.act(htcondor.JobAction.Remove, const)
                         wpipe.write("OK")
                         wpipe.close()
                         os._exit(0)
                     except Exception, e:
-                        wpipe.write(str(e))
+                        wpipe.write(str(traceback.format_exc()))
                 finally:
                     os._exit(1)
             wpipe.close()
@@ -464,7 +535,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             if results != "OK":
                 raise Exception("Failure when submitting to HTCondor: %s" % results)
         else:
-            schedd.kill('CRAB_Workflow =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn))
+            schedd.kill(const)
 
 
     def status(self, workflow, userdn):
@@ -482,7 +553,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
 
         schedd, address = self.getScheddObj(name)
 
-        root_const = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\"" % workflow
+        root_const = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
         root_attr_list = ["JobStatus", "ExitCode"]
         if address:
             results = schedd.query(root_const, root_attr_list)
@@ -545,6 +616,9 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         retval["failedJobdefs"] = len(failedJobs)
         retval["totalJobdefs"] = len(jobStatus)
 
+        if len(jobStatus) == 0 and retval['status'] == 'Running':
+            retval['status'] == 'Running (jobs not submitted)'
+
         self.logger.info("Status result for workflow %s: %s" % (workflow, retval))
         #print "Status result for workflow %s: %s" % (workflow, retval)
 
@@ -587,6 +661,76 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             return {'result': files[:max]}
         return {'result': files}
 
+
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, userdn):
+
+        workflow = str(workflow)
+        if not WORKFLOW_RE.match(workflow):
+            raise Exception("Invalid workflow name.")
+        self.logger.info("Resubmitting workflow %s" % workflow)
+        name = workflow.split("_")[0]
+        schedd, address = self.getScheddObj(name)
+
+        root_const = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\"" % workflow
+        root_attr_list = ["JobStatus", "ExitCode"]
+        if address:
+            results = schedd.query(root_const, root_attr_list)
+        else:
+            results = schedd.getClassAds(root_const, root_attr_list)
+        if not results:
+            self.logger.info("An invalid workflow name was requested: %s" % workflow)
+            raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
+        attempt = len(results)
+
+    def resubmitDirect(self, schedd, userdn, requestname, userproxy, scratch, input_files):
+        """
+        Resubmit directly to the schedd using the HTCondor module
+        """
+        dag_ad = classad.ClassAd()
+        dag_ad["CRAB_Attempt"] = 0
+        dag_ad["CRAB_UserDN"] = userdn
+        dag_ad["JobUniverse"] = 12
+        dag_ad["CRAB_ReqName"] = requestname
+        dag_ad["Out"] = os.path.join(scratch, "request.out")
+        dag_ad["Err"] = os.path.join(scratch, "request.err")
+        dag_ad["Cmd"] = os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh")
+        dag_ad["TransferInput"] = ", ".join(input_files)
+        dag_ad["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
+        dag_ad["TransferOutput"] = "master_dag.dagman.out, master_dag.rescue.001, RunJobs.dag, RunJobs.dag.dagman.out, RunJobs.dag.rescue.001, dbs_discovery.err, dbs_discovery.out, job_splitting.err, job_splitting.out"
+        dag_ad["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
+        dag_ad["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
+        dag_ad["RemoveKillSig"] = "SIGUSR1"
+        dag_ad["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)')
+        dag_ad["RemoteCondorSetup"] = self.getRemoteCondorSetup()
+        dag_ad["Requirements"] = classad.ExprTree('true || false')
+        dag_ad["TaskType"] = "ROOT"
+        dag_ad["X509UserProxy"] = userproxy
+
+        r, w = os.pipe()
+        rpipe = os.fdopen(r, 'r')
+        wpipe = os.fdopen(w, 'w')
+        if os.fork() == 0:
+            try:
+                rpipe.close()
+                try:
+                    result_ads = []
+                    htcondor.SecMan().invalidateAllSessions()
+                    os.environ['X509_USER_PROXY'] = userproxy
+                    cluster = schedd.submit(dag_ad, 1, True, result_ads)
+                    schedd.spool(result_ads)
+                    wpipe.write("OK")
+                    wpipe.close()
+                    os._exit(0)
+                except Exception, e:
+                    wpipe.write(str(traceback.format_exc()))
+            finally:
+                os._exit(1)
+        wpipe.close()
+        results = rpipe.read()
+        if results != "OK":
+            raise Exception("Failure when killing HTCondor task: %s" % results)
+
+        schedd.reschedule()
 
 def main():
     dag = DagmanDataWorkflow()
