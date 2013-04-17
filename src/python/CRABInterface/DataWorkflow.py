@@ -58,7 +58,8 @@ class DataWorkflow(object):
                             'PrivateMC': {'report': self._reportPrivateMC},}
 
         self.splitArgMap = { "LumiBased" : "lumis_per_job",
-                        "FileBased" : "files_per_job",}
+                        "FileBased" : "files_per_job",
+                        "EventBased" : "events_per_job",}
 
         self.scheduler = PandaScheduler
         self.scheInstance = None
