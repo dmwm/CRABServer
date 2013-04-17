@@ -20,6 +20,7 @@ except ImportError:
 
 from WMCore.WMSpec.WMTask import buildLumiMask
 from WMCore.Configuration import Configuration
+from WMCore.REST.Error import InvalidParameter
 
 import WMCore.REST.Error as Error
 from CRABInterface.Utils import retriveUserCert
@@ -41,7 +42,7 @@ master_dag_submit_file = \
 +CRAB_Workflow = %(workflow)s
 +CRAB_UserDN = %(userdn)s
 universe = vanilla
-+RequestName = %(requestname)s
++CRAB_ReqName = %(requestname)s
 scratch = %(scratch)s
 bindir = %(bindir)s
 output = $(scratch)/request.out
@@ -49,7 +50,7 @@ error = $(scratch)/request.err
 executable = $(bindir)/dag_bootstrap_startup.sh
 transfer_input_files = $(bindir)/dag_bootstrap.sh, $(scratch)/master_dag, $(scratch)/DBSDiscovery.submit, $(scratch)/JobSplitting.submit, $(scratch)/Job.submit, $(scratch)/ASO.submit, %(transform_location)s
 transfer_output_files = master_dag.dagman.out, master_dag.rescue.001, RunJobs.dag, RunJobs.dag.dagman.out, RunJobs.dag.rescue.001, dbs_discovery.err, dbs_discovery.out, job_splitting.err, job_splitting.out
-leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))
+leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 on_exit_remove = ( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))
 +OtherJobRemoveRequirements = DAGManJobId =?= ClusterId
 remove_kill_sig = SIGUSR1
@@ -152,6 +153,7 @@ should_transfer_files = YES
 x509userproxy = %(x509up_file)s
 # TODO: Uncomment this when we get out of testing mode
 # Requirements = GLIDEIN_CMSSite isnt undefined
+leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 queue
 """
 
@@ -167,6 +169,7 @@ transfer_input_files = job_log.$(count)
 Error = aso.$(count).err
 Environment = PATH=/usr/bin:/bin
 x509userproxy = %(x509up_file)s
+leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 queue
 """
 
@@ -380,7 +383,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         dag_ad["CRAB_Workflow"] = workflow
         dag_ad["CRAB_UserDN"] = userdn
         dag_ad["JobUniverse"] = 12
-        dag_ad["RequestName"] = requestname
+        dag_ad["CRAB_ReqName"] = requestname
         dag_ad["Out"] = os.path.join(scratch, "request.out")
         dag_ad["Err"] = os.path.join(scratch, "request.err")
         dag_ad["Cmd"] = os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh")
@@ -457,7 +460,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
 
         schedd, address = self.getScheddObj(name)
 
-        root_const = "TaskType =?= \"ROOT\" && RequestName =?= \"%s\"" % workflow
+        root_const = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\"" % workflow
         root_attr_list = ["JobStatus", "ExitCode"]
         if address:
             results = schedd.query(root_const, root_attr_list)
@@ -470,13 +473,15 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
 
         jobsPerStatus = {}
         jobList = []
-        retval = {"status": results[0]['JobStatus'], "taskFailureMsg": "", "jobSetID": "",
+        statusCode = results[0]['JobStatus']
+        codes = {1: 'Idle', 2: 'Running', 4: 'Completed (Success)'}
+        retval = {"status": codes.get(statusCode, 'Unknown'), "taskFailureMsg": "", "jobSetID": "",
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
-        if int(results[0]['JobStatus']) == 4: # Job is completed.
-            retval["ExitCode"] = results[0]["ExitCode"]
+        #if int(results[0]['JobStatus']) == 4: # Job is completed.
+        #    retval["ExitCode"] = results[0]["ExitCode"]
 
-        job_const = "TaskType =?= \"Job\" && RequestName =?= \"%s\"" % workflow
-        job_list = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID']
+        job_const = "TaskType =?= \"Job\" && CRAB_ReqName =?= \"%s\"" % workflow
+        job_list = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'GlobalJobId']
         if address:
             results = schedd.query(job_const, job_list)
         else:
@@ -485,12 +490,19 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         failedJobdefs = 0
         for result in results:
             totalJobdefs += 1
-            if (int(result['JobStatus']) == 4) and ('ExitCode' in result) and (result['ExitCode']):
+            jobStatus = int(result['JobStatus'])
+            if (jobStatus == 4) and ('ExitCode' in result) and (result['ExitCode']):
                 failedJobdefs += 1
-            jobsPerStatus[int(result['JobStatus'])] = jobsPerStatus.setdefault(int(result['JobStatus']), 0) + 1
-            jobList.append((int(result['JobStatus']), result['GlobalJobID']))
+                statusName = "Failed (%s)" % result['ExitCode']
+            else:
+                statusName = codes.get(jobStatus, 'Unknown')
+            jobsPerStatus[statusName] = jobsPerStatus.setdefault(statusName, 0) + 1
+            jobList.append((statusName, result['GlobalJobId']))
+        retval["failedJobdefs"] = failedJobdefs
+        retval["totalJobdefs"] = totalJobdefs
 
-        self.logger.debug("Status result for workflow %s: %s" % (workflow, retval))
+        self.logger.info("Status result for workflow %s: %s" % (workflow, retval))
+        #print "Status result for workflow %s: %s" % (workflow, retval)
 
         return retval
 
