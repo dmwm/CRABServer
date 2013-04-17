@@ -145,9 +145,7 @@ Error = job_err.$(CRAB_Id)
 Log = job_log.$(CRAB_Id)
 Arguments = "-o $(CRAB_AdditionalOutputFiles) -a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) '--inputFile=$(inputFiles)' '--lumiMask=$(runAndLumiMask)' --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) --jobNumber=$(CRAB_Id)"
 transfer_input_files = CMSRunAnaly.sh, cmscp.py
-TransferOutputFiles = ""
-#transfer_output_files = cmsRun-stderr.log?compressCount=3&remoteName=cmsRun_$(count).log, cmsRun-stdout.log?compressCount=3&remoteName=cmsRun_$(count).log, FrameworkJobReport.xml?compressCount=3&remoteName=cmsRun_$(count).log, $(localOutputFiles)
-#output_destination = cms://%(temp_dest)s
+transfer_output_files = jobReport.json.$(count)
 Environment = SCRAM_ARCH=$(CRAB_JobArch)
 should_transfer_files = YES
 x509userproxy = %(x509up_file)s
@@ -159,13 +157,15 @@ queue
 
 async_submit = crab_headers + \
 """
++TaskType = "ASO"
++CRAB_Id = $(count)
 CRAB_AsyncDest = %(asyncdest_flatten)s
 
 universe = local
 Executable = dag_bootstrap.sh
-Arguments = "ASO $(CRAB_AsyncDest) %(temp_dest)s %(output_dest)s $(count) cmsRun_$(count).log.tar.gz $(outputFiles)"
+Arguments = "ASO $(CRAB_AsyncDest) %(temp_dest)s %(output_dest)s $(ClusterId).$(ProcId) $(count) cmsRun_$(count).log.tar.gz $(outputFiles)"
 Output = aso.$(count).out
-transfer_input_files = job_log.$(count)
+transfer_input_files = job_log.$(count), jobReport.json.$(count)
 Error = aso.$(count).err
 Environment = PATH=/usr/bin:/bin
 x509userproxy = %(x509up_file)s
@@ -408,6 +408,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
                 try:
                     result_ads = []
                     htcondor.SecMan().invalidateAllSessions()
+                    os.environ['X509_USER_PROXY'] = userproxy
                     cluster = schedd.submit(dag_ad, 1, True, result_ads)
                     schedd.spool(result_ads)
                     wpipe.write("OK")
@@ -440,7 +441,28 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         schedd, address = self.getScheddObj(schedd_name)
 
         if address:
-            schedd.act(htcondor.JobAction.Remove, 'CRAB_Workflow =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn))
+            r, w = os.pipe()
+            rpipe = os.fdopen(r, 'r')
+            wpipe = os.fdopen(w, 'w')
+            if os.fork():
+                try:
+                    rpipe.close()
+                    try:
+                        result_ads = []
+                        htcondor.SecMan().invalidateAllSessions()
+                        os.environ['X509_USER_PROXY'] = userproxy
+                        schedd.act(htcondor.JobAction.Remove, 'CRAB_Workflow =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn))
+                        wpipe.write("OK")
+                        wpipe.close()
+                        os._exit(0)
+                    except Exception, e:
+                        wpipe.write(str(e))
+                finally:
+                    os._exit(1)
+            wpipe.close()
+            results = rpipe.read()
+            if results != "OK":
+                raise Exception("Failure when submitting to HTCondor: %s" % results)
         else:
             schedd.kill('CRAB_Workflow =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn))
 
@@ -472,39 +494,99 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
 
         jobsPerStatus = {}
+        jobStatus = {}
         jobList = []
         statusCode = results[0]['JobStatus']
         codes = {1: 'Idle', 2: 'Running', 4: 'Completed (Success)'}
-        retval = {"status": codes.get(statusCode, 'Unknown'), "taskFailureMsg": "", "jobSetID": "",
+        retval = {"status": codes.get(statusCode, 'Unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
-        #if int(results[0]['JobStatus']) == 4: # Job is completed.
-        #    retval["ExitCode"] = results[0]["ExitCode"]
 
         job_const = "TaskType =?= \"Job\" && CRAB_ReqName =?= \"%s\"" % workflow
-        job_list = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'GlobalJobId']
+        job_list = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
         if address:
             results = schedd.query(job_const, job_list)
         else:
             results = schedd.getClassAds(job_const, job_list)
-        totalJobdefs = 0
-        failedJobdefs = 0
+        failedJobs = []
         for result in results:
-            totalJobdefs += 1
-            jobStatus = int(result['JobStatus'])
-            if (jobStatus == 4) and ('ExitCode' in result) and (result['ExitCode']):
-                failedJobdefs += 1
+            jobState = int(result['JobStatus'])
+            if result['CRAB_Id'] in failedJobs:
+                failedJobs.remove(result['CRAB_Id'])
+            if (jobState == 4) and ('ExitCode' in result) and (result['ExitCode']):
+                failedJobs.append(result['CRAB_Id'])
                 statusName = "Failed (%s)" % result['ExitCode']
             else:
-                statusName = codes.get(jobStatus, 'Unknown')
-            jobsPerStatus[statusName] = jobsPerStatus.setdefault(statusName, 0) + 1
-            jobList.append((statusName, result['GlobalJobId']))
-        retval["failedJobdefs"] = failedJobdefs
-        retval["totalJobdefs"] = totalJobdefs
+                statusName = codes.get(jobState, 'Unknown')
+            jobStatus[result['CRAB_Id']] = statusName
+
+        job_const = "TaskType =?= \"ASO\" && CRAB_ReqName =?= \"%s\"" % workflow
+        job_list = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
+        if address:
+            results = schedd.query(job_const, job_list)
+        else:
+            results = schedd.getClassAds(job_const, job_list)
+        aso_codes = {1: 'ASO Queued', 2: 'ASO Running', 4: 'Stageout Complete (Success)'}
+        for result in results:
+            if result['CRAB_Id'] in failedJobs:
+                failedJobs.remove(result['CRAB_Id'])
+            jobState = int(result['JobStatus'])
+            if (jobState == 4) and ('ExitCode' in result) and (result['ExitCode']):
+                failedJobs.append(result['CRAB_Id'])
+                statusName = "Failed Stage-Out (%s)" % result['ExitCode']
+            else:
+                statusName = aso_codes.get(jobState, 'Unknown')
+            jobStatus[result['CRAB_Id']] = statusName
+
+        for job, status in jobStatus.items():
+            jobsPerStatus.setdefault(status, 0)
+            jobsPerStatus[status] += 1
+            jobList.append((status, job))
+
+        retval["failedJobdefs"] = len(failedJobs)
+        retval["totalJobdefs"] = len(jobStatus)
 
         self.logger.info("Status result for workflow %s: %s" % (workflow, retval))
         #print "Status result for workflow %s: %s" % (workflow, retval)
 
         return retval
+
+
+    def outputLocation(self, workflow, max, pandaids):
+        """
+        Retrieves the output LFN from async stage out
+
+        :arg str workflow: the unique workflow name
+        :arg int max: the maximum number of output files to retrieve
+        :return: the result of the view as it is."""
+        workflow = str(workflow)
+        if not WORKFLOW_RE.match(workflow):
+            raise Exception("Invalid workflow name.")
+
+        name = workflow.split("_")[0]
+        schedd, address = self.getScheddObj(name)
+
+        job_const = 'TaskType =?= \"ASO\"&& CRAB_ReqName =?= \"%s\"' % workflow
+        job_list = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'GlobalJobId', 'OutputSizes', 'OutputPFNs']
+
+        if address:
+            results = schedd.query(job_const, job_list)
+        else:
+            results = schedd.getClassAds(job_const, job_list)
+        files = []
+        for result in results:
+            try:
+                outputSizes = [int(i.strip()) for i in result.get("OutputSizes", "").split(",") if i]
+            except ValueError:
+                self.logger.info("Invalid OutputSizes (%s) for workflow %s" % (result.get("OutputSizes", ""), workflow))
+                raise InvalidParameter("Internal state had invalid OutputSize.")
+            outputFiles = [i.strip() for i in result.get("OutputPFNs", "").split(",")]
+            for idx in range(min(len(outputSizes), len(outputFiles))):
+                files.append({'pfn': outputFiles[idx], 'size': outputSizes[idx]})
+
+        if max > 0:
+            return {'result': files[:max]}
+        return {'result': files}
+
 
 def main():
     dag = DagmanDataWorkflow()
