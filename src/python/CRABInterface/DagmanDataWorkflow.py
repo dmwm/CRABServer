@@ -102,7 +102,7 @@ on_exit_remove = ( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 
 +OtherJobRemoveRequirements = DAGManJobId =?= ClusterId
 remove_kill_sig = SIGUSR1
 +Environment= strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)
-+RemoteCondorSetup = %(remote_condor_setup)s
++RemoteCondorSetup = "%(remote_condor_setup)s"
 +TaskType = "ROOT"
 X509UserProxy = %(userproxy)s
 queue 1
@@ -126,7 +126,7 @@ on_exit_remove = ( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 
 +OtherJobRemoveRequirements = DAGManJobId =?= ClusterId
 remove_kill_sig = SIGUSR1
 +Environment= strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)
-+RemoteCondorSetup = %(remote_condor_setup)s
++RemoteCondorSetup = "%(remote_condor_setup)s"
 +TaskType = "ROOT"
 X509UserProxy = %(userproxy)s
 queue 1
