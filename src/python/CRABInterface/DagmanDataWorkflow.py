@@ -105,7 +105,7 @@ X509UserProxy = %(userproxy)s
 queue 1
 """
 
-resubmit_dag_submit_file = \
+resubmit_dag_submit_file = crab_headers + crab_meta_headers + \
 """
 +CRAB_Attempt = %(attempt)d
 +CRAB_UserDN = %(userdn)s
@@ -214,6 +214,43 @@ queue
 """
 
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
+
+SUBMIT_INFO = [ \
+            ('CRAB_Workflow', 'workflow'),
+            ('CRAB_ReqName', 'requestname'),
+            ('CRAB_JobType', 'jobtype'),
+            ('CRAB_JobSW', 'jobsw'),
+            ('CRAB_JobArch', 'jobarch'),
+            ('CRAB_InputData', 'inputdata'),
+            ('CRAB_ISB', 'userisburl'),
+            ('CRAB_SiteBlacklist', 'siteblacklist'),
+            ('CRAB_SiteWhitelist', 'sitewhitelist'),
+            ('CRAB_AdditionalUserFiles', 'adduserfiles'),
+            ('CRAB_AdditionalOutputFiles', 'addoutputfiles'),
+            ('CRAB_EDMOutputFiles', 'edmoutfiles'),
+            ('CRAB_TFileOutputFiles', 'tfileoutfiles'),
+            ('CRAB_SaveLogsFlag', 'savelogsflag'),
+            ('CRAB_UserDN', 'userdn'),
+            ('CRAB_UserHN', 'userhn'),
+            ('CRAB_AsyncDest', 'asyncdest'),
+            ('CRAB_Campaign', 'campaign'),
+            ('CRAB_BlacklistT1', 'blacklistT1'),
+            ('CRAB_SplitAlgo', 'splitalgo'),
+            ('CRAB_AlgoArgs', 'algoargs'),
+            ('CRAB_ConfigDoc', 'configdoc'),
+            ('CRAB_PublishName', 'publishname'),
+            ('CRAB_DBSUrl', 'dbsurl'),
+            ('CRAB_PublishDBSUrl', 'publishdbsurl'),
+            ('CRAB_LumiMask', 'lumimask')]
+
+def addCRABInfoToClassAd(ad, info):
+    for ad_name, dict_name in SUBMIT_INFO:
+        ad[ad_name] = classad.ExprTree(str(info[dict_name]))
+
+def getCRABInfoFromClassAd(ad):
+    info = {}
+    for ad_name, dict_name in SUBMIT_INFO:
+        pass
 
 class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
     """A specialization of the DataWorkflow for submitting to HTCondor DAGMan instead of
@@ -421,35 +458,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         Submit directly to the schedd using the HTCondor module
         """
         dag_ad = classad.ClassAd()
-        submit_info = [ \
-            ('CRAB_Workflow', 'workflow'),
-            ('CRAB_ReqName', 'requestname'),
-            ('CRAB_JobType', 'jobtype'),
-            ('CRAB_JobSW', 'jobsw'),
-            ('CRAB_JobArch', 'jobarch'),
-            ('CRAB_InputData', 'inputdata'),
-            ('CRAB_ISB', 'userisburl'),
-            ('CRAB_SiteBlacklist', 'siteblacklist'),
-            ('CRAB_SiteWhitelist', 'sitewhitelist'),
-            ('CRAB_AdditionalUserFiles', 'adduserfiles'),
-            ('CRAB_AdditionalOutputFiles', 'addoutputfiles'),
-            ('CRAB_EDMOutputFiles', 'edmoutfiles'),
-            ('CRAB_TFileOutputFiles', 'tfileoutfiles'),
-            ('CRAB_SaveLogsFlag', 'savelogsflag'),
-            ('CRAB_UserDN', 'userdn'),
-            ('CRAB_UserHN', 'userhn'),
-            ('CRAB_AsyncDest', 'asyncdest'),
-            ('CRAB_Campaign', 'campaign'),
-            ('CRAB_BlacklistT1', 'blacklistT1'),
-            ('CRAB_SplitAlgo', 'splitalgo'),
-            ('CRAB_AlgoArgs', 'algoargs'),
-            ('CRAB_ConfigDoc', 'configdoc'),
-            ('CRAB_PublishName', 'publishname'),
-            ('CRAB_DBSUrl', 'dbsurl'),
-            ('CRAB_PublishDBSUrl', 'publishdbsurl'),
-            ('CRAB_LumiMask', 'lumimask')]
-        for ad_name, dict_name in submit_info:
-             dag_ad[ad_name] = classad.ExprTree(str(info[dict_name]))
+        addCRABInfoToClassAd(dag_ad, info)
 
         dag_ad["CRAB_Attempt"] = 0
         dag_ad["JobUniverse"] = 12
@@ -511,7 +520,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         schedd_name = self.getSchedd()
         schedd, address = self.getScheddObj(schedd_name)
 
-        const = 'CRAB_ReqName =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn)
+        const = 'TaskType =?= \"ROOT\" && CRAB_ReqName =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn)
         if address:
             r, w = os.pipe()
             rpipe = os.fdopen(r, 'r')
@@ -522,7 +531,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
                     try:
                         htcondor.SecMan().invalidateAllSessions()
                         os.environ['X509_USER_PROXY'] = userproxy
-                        schedd.act(htcondor.JobAction.Remove, const)
+                        schedd.act(htcondor.JobAction.Hold, const)
                         wpipe.write("OK")
                         wpipe.close()
                         os._exit(0)
@@ -554,7 +563,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         schedd, address = self.getScheddObj(name)
 
         root_const = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
-        root_attr_list = ["JobStatus", "ExitCode"]
+        root_attr_list = ["JobStatus", "ExitCode", 'CRAB_JobCount']
         if address:
             results = schedd.query(root_const, root_attr_list)
         else:
@@ -567,9 +576,10 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         jobsPerStatus = {}
         jobStatus = {}
         jobList = []
-        statusCode = results[0]['JobStatus']
-        codes = {1: 'Idle', 2: 'Running', 4: 'Completed (Success)'}
-        retval = {"status": codes.get(statusCode, 'Unknown'), "taskFailureMsg": "", "jobSetID": workflow,
+        taskStatusCode = results[0]['JobStatus']
+        taskJobCount = results[0].get('CRAB_JobCount', 0)
+        codes = {1: 'Idle', 2: 'Running', 4: 'Completed (Success)', 5: 'Killed'}
+        retval = {"status": codes.get(taskStatusCode, 'Unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
 
         job_const = "TaskType =?= \"Job\" && CRAB_ReqName =?= \"%s\"" % workflow
@@ -608,6 +618,13 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
                 statusName = aso_codes.get(jobState, 'Unknown')
             jobStatus[result['CRAB_Id']] = statusName
 
+        for i in range(1, taskJobCount+1):
+            if i not in jobStatus:
+                if taskStatusCode == 5:
+                    jobStatus[i] = 'Killed'
+                else:
+                    jobStatus[i] = 'Unsubmitted'
+
         for job, status in jobStatus.items():
             jobsPerStatus.setdefault(status, 0)
             jobsPerStatus[status] += 1
@@ -616,7 +633,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         retval["failedJobdefs"] = len(failedJobs)
         retval["totalJobdefs"] = len(jobStatus)
 
-        if len(jobStatus) == 0 and retval['status'] == 'Running':
+        if len(jobStatus) == 0 and taskJobCount == 0 and retval['status'] == 'Running':
             retval['status'] == 'Running (jobs not submitted)'
 
         self.logger.info("Status result for workflow %s: %s" % (workflow, retval))
@@ -671,8 +688,9 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         name = workflow.split("_")[0]
         schedd, address = self.getScheddObj(name)
 
+        # Retrieve the original task ClassAd
         root_const = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\"" % workflow
-        root_attr_list = ["JobStatus", "ExitCode"]
+        root_attr_list = []
         if address:
             results = schedd.query(root_const, root_attr_list)
         else:
@@ -681,12 +699,19 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             self.logger.info("An invalid workflow name was requested: %s" % workflow)
             raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
         attempt = len(results)
+        original_task = [i for i in results if str(i.get('CRAB_Attempt', '-1')) == '0']
+        if not original_task:
+            raise InvalidParameter("Unable to determine original task for workflow.")
+        original_task = original_task[0]
 
-    def resubmitDirect(self, schedd, userdn, requestname, userproxy, scratch, input_files):
+        # Reconstruct the 
+
+    def resubmitDirect(self, schedd, userproxy, scratch, input_files):
         """
         Resubmit directly to the schedd using the HTCondor module
         """
         dag_ad = classad.ClassAd()
+        addCRABInfoToClassAd(dag_ad, info)
         dag_ad["CRAB_Attempt"] = 0
         dag_ad["CRAB_UserDN"] = userdn
         dag_ad["JobUniverse"] = 12
