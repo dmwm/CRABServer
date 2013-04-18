@@ -24,6 +24,9 @@ from WMCore.Configuration import Configuration
 import WMCore.REST.Error as Error
 from CRABInterface.Utils import retriveUserCert
 
+from CRABInterface.CRABServerBase import getCRABServerBase
+from TaskDB.CAFUtilitiesBase import getCAFUtilitiesBase
+
 import DataWorkflow
 
 master_dag_file = \
@@ -54,7 +57,7 @@ on_exit_remove = ( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 
 +OtherJobRemoveRequirements = DAGManJobId =?= ClusterId
 remove_kill_sig = SIGUSR1
 +Environment= strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)
-+RemoteCondorSetup = %(remote_condor_setup)s
++RemoteCondorSetup = "%(remote_condor_setup)s"
 +TaskType = "ROOT"
 X509UserProxy = %(userproxy)s
 queue 1
@@ -233,15 +236,17 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
     def getBinDir(self):
         """
         Returns the directory of pithy shell scripts
+	TODO this is definitely a thing that needs to be fixed for an RPM-deploy
         """
-        return os.path.expanduser("~/projects/CRABServer/bin")
+        return os.path.join(getCRABServerBase(), "bin")
 
 
     def getTransformLocation(self):
         """
         Returns the location of the PanDA job transform
         """
-        return os.path.expanduser("~/projects/CAFUtilities/src/python/transformation/CMSRunAnaly.sh")
+	return os.path.join(getCAFUtilitiesBase(), "src", "python",\
+				"transformation", "CMSRunAnaly.sh")
 
 
     def getRemoteCondorSetup(self):
@@ -358,6 +363,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             fd.write(async_submit % info)
 
         input_files = [os.path.join(self.getBinDir(), "dag_bootstrap.sh"),
+		       os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh"),
                        self.getTransformLocation(),
                        os.path.join(self.getBinDir(), "cmscp.py")]
         scratch_files = ['master_dag', 'DBSDiscovery.submit', 'JobSplitting.submit', 'master_dag', 'Job.submit', 'ASO.submit']
@@ -366,6 +372,11 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         if address:
             self.submitDirect(schedd, workflow, userdn, requestname, kwargs['userproxy'], scratch, input_files)
         else:
+	    info['scratch'] = '%s/' % requestname
+	    info['bindir'] = '%s/' % requestname
+	    info['transform_location'] = '%s/%s' % (requestname, os.path.basename(info['transform_location']))
+	    info['x509up_file'] = '%s/user.proxy' % requestname
+	    info['userproxy'] = '%s/user.proxy' % requestname
             jdl = master_dag_submit_file % info
             schedd.submitRaw(requestname, jdl, kwargs['userproxy'], input_files)
 
