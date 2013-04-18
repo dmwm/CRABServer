@@ -1,12 +1,11 @@
 import logging
 
 # WMCore dependecies here
-from WMCore.Database.CMSCouch import CouchServer
 from WMCore.REST.Error import MissingObject
 
 # CRABServer dependencies here
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
-from CRABInterface.Utils import CouchDBConn, conn_handler
+from CRABInterface.Utils import conn_handler
 
 class DataCampaign(object):
     """Entity that allows to operate on campaign resources.
@@ -27,11 +26,10 @@ class DataCampaign(object):
        and it returns a list of workflows. Aggregation of workflows which have a hierarchical
        relationship (e.g. resubmission) is left to the DataUserWorkflow class.
        This means that it shows information of the first column of the schema above,
-       where the first column aggregates the row information (thanks to DataUserWorkflow)."""
+       where the first column aggregates the row information (thanks to DataUserWorkflow).
 
-    @staticmethod
-    def globalinit(monurl, monname):
-        DataCampaign.monitordb = CouchDBConn(db=CouchServer(monurl), name=monname, conn=None)
+       In the current implementation DataUserWorkflow just mirror DataWorkflow and therefore
+       workflow-1.1, workflow-2.1, workflow-2.2 ... are not there"""
 
     def __init__(self, config):
         self.logger = logging.getLogger('CRABLogger.DataCampaign')
@@ -88,7 +86,6 @@ class DataCampaign(object):
         for workflow in workflows:
             yield self.userworkflow.kill(workflow)
 
-    @conn_handler(services=['monitor'])
     def getCampaignWorkflows(self, campaign):
         """Retrieve the list of workflow names part of the campaign.
            This considers only top level workflows and not their resubmissions.

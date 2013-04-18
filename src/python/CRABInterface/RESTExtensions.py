@@ -7,45 +7,39 @@ Currently authz_owner_match uses a WMCore.Database.CMSCouch method
 but in next versions it should be dropped, as from the CRABInterface.
 """
 from WMCore.REST.Error import MissingObject
-from CRABInterface.Utils import CouchDBConn, conn_handler
+from TaskDB.Oracle.Task.GetUserFromID import GetUserFromID
 
 import cherrypy
 import traceback
 
-@conn_handler(services=['monitor'])
-def authz_owner_match(accessobj, workflows, retrieve_docs=True):
+def authz_owner_match(dbapi, workflows):
     """Match user against authorisation requirements to modify an existing resource.
        Allows to cache couchdb fetched documents if the caller needs them.
 
        :arg WMCore.CMSCouch.Database database: database connection to retrieve the docs
        :arg str list workflows: a list of workflows unique name as positive check
        :return: in case retrieve_docs is not false the list of couchdb documents."""
-
     user = cherrypy.request.user
     log = cherrypy.log
 
-    # this means document are cached in memory
     alldocs = []
 
     for wf in workflows:
-        wfdoc = None
+        wfrow = None
         try:
-            wfdoc = accessobj.monitordb.conn.document( id = wf )
+            wfrow = dbapi.query(None, None, GetUserFromID.sql, taskname = wf).next()
         except Exception, ex:
             excauthz = RuntimeError("The document '%s' is not retrievable '%s'" % (wf, str(ex)))
             raise MissingObject("The resource requested does not exist", trace=traceback.format_exc(), errobj = excauthz)
 
-        if wfdoc and 'requestor' in wfdoc:
-            if wfdoc['requestor'] == cherrypy.request.user['login']:
-                alldocs.append(wfdoc)
-                continue
-        log("ERROR: authz denied for user '%s' to the resource '%s'" % (user, wf))
+        if wfrow[0] == cherrypy.request.user['login']:
+            alldocs.append(wfrow)
+            continue
+        log("ERROR: authz denied for user '%s' to the resource '%s. Resource belong to %s'" % (user, wf, wfrow[0]))
         raise cherrypy.HTTPError(403, "You are not allowed to access this resource.")
 
     if len(workflows) == len(alldocs):
-        log("DEBUG: authz user %s to access resource %s")
-        if retrieve_docs:
-            return alldocs
+        log("DEBUG: authz user %s to access resources %s" % (user, workflows))
         return
 
     log("ERROR: authz denied for user '%s' to resource '%s'" % (user, str(workflows)))

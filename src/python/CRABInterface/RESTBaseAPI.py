@@ -1,10 +1,11 @@
 import logging
 
 # WMCore dependecies here
-from WMCore.REST.Server import RESTApi
+from WMCore.REST.Server import DatabaseRESTApi
 from WMCore.REST.Format import JSONFormat
 
 # CRABServer dependecies here
+import Utils
 from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTCampaign import RESTCampaign
 from CRABInterface.RESTServerInfo import RESTServerInfo
@@ -18,22 +19,17 @@ class NullHandler(logging.Handler):
     def emit(self, record):
         pass
 
-class RESTBaseAPI(RESTApi):
+class RESTBaseAPI(DatabaseRESTApi):
     """The CRABServer REST API modules"""
 
     def __init__(self, app, config, mount):
-        RESTApi.__init__(self, app, config, mount)
+        DatabaseRESTApi.__init__(self, app, config, mount)
 
         self.formats = [ ('application/json', JSONFormat()) ]
 
         #Global initialization of Data objects. Parameters coming from the config should go here
-        DataWorkflow.globalinit(config.monurl, config.monname, config.asomonurl, config.asomonname,
-                                config.reqmgrurl, config.reqmgrname, config.configcacheurl,
-                                config.configcachename, config.connectUrl, {'endpoint': config.phedexurl},
-                                config.dbsurl, acdcurl=config.acdcurl, acdcdb=config.acdcdb,
-                                defaultBlacklist=config.defaultBlacklist)
-        DataUserWorkflow.globalinit(config.monurl, config.monname, config.asomonurl, config.asomonname)
-        DataCampaign.globalinit(config.monurl, config.monname)
+        DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl, credpath=config.credpath)
+        Utils.globalinit(config.serverhostkey, config.serverhostcert, config.serverdn, config.uisource, config.credpath)
 
         self._add( {'workflow': RESTUserWorkflow(app, self, config, mount),
                     'campaign': RESTCampaign(app, self, config, mount),
