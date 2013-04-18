@@ -5,6 +5,8 @@ import logging
 import cherrypy #cherrypy import is needed here because we need the 'start_thread' subscription
 import traceback
 import json
+import sha
+import os
 
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
@@ -23,7 +25,7 @@ from CRABInterface.Utils import CMSSitesCache, conn_handler
 from CRABInterface.Utils import retriveUserCert
 from CRABInterface.Regexps import RX_WFRESUB
 
-from Schedulers.PandaScheduler import PandaScheduler
+import PandaServerInterface as server
 
 #SQL queries
 from TaskDB.Oracle.Task.New import New
@@ -60,9 +62,6 @@ class DataWorkflow(object):
         self.splitArgMap = { "LumiBased" : "lumis_per_job",
                         "FileBased" : "files_per_job",
                         "EventBased" : "events_per_job",}
-
-        self.scheduler = PandaScheduler
-        self.scheInstance = None
 
 
     def getLatests(self, user, limit, timestamp):
@@ -324,8 +323,9 @@ class DataWorkflow(object):
         failedJobdefs = 0
         for jobdef in rows:
             jobdefid = jobdef[0]
-            self.schedInstance = self.scheduler(self.credpath,userdn,'cms',vogroup,vorole)
-            schedEC, res = self.schedInstance.status(jobdefid)
+
+            os.environ['X509_USER_PROXY'] = self.credpath + '/' + sha.sha(userdn + 'cms' + (vogroup or '') + (vorole or '')).hexdigest()
+            schedEC, res = server.getPandIDsWithJobID(jobdefid, userdn, 'cms', vogroup, vorole)
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
                 jobDefs[-1]["failure"] = "Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC)
@@ -357,12 +357,10 @@ class DataWorkflow(object):
         if statusRes['status'] == 'SUBMITTED':
             killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus!='completed']
             self.logger.info("Jobs to kill: %s" % killList)
-            status, pandaJobs = self.schedInstance.kill(killList)
-            self.logger.info("Kill exit status %s, res %s" % (status, pandaJobs))
-            if status == 0:
-                self.api.modify(SetStatusTask.sql, status = ["KILLED"], taskname = [workflow])
-            else:
-                raise ExecutionError("Problem contacting the backend during kill. Exit code %s: " % status)
+
+            self.api.modify(SetStatusTask.sql, status = ["KILL"], taskname = [workflow])
+            self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
+                            arguments = [str({"killList": killList, "killAll": True})])
         elif statusRes['status'] == 'NEW':
             self.api.modify(SetStatusTask.sql, status = ["KILLED"], taskname = [workflow])
         else:
