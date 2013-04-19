@@ -9,7 +9,6 @@ import inspect
 
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
-from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import addSiteWildcards
 from WMCore.Services.WMStats.WMStatsWriter import WMStatsWriter
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.Credential.Proxy import Proxy
@@ -80,8 +79,6 @@ def conn_handler(services):
         def wrapped_func(*args, **kwargs):
             if 'sitedb' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
                 args[0].allCMSNames = CMSSitesCache(sites=SiteDBJSON().getAllCMSNames(), cachetime=mktime(gmtime()))
-                if hasattr(args[0], 'wildcardKeys') and hasattr(args[0], 'wildcardSites'):
-                    addSiteWildcards(args[0].wildcardKeys, args[0].allCMSNames.sites, args[0].wildcardSites)
             if 'phedex' in services and not args[0].phedex:
                 args[0].phedex = PhEDEx(responseType='xml', dict=args[0].phedexargs)
             return func(*args, **kwargs)
