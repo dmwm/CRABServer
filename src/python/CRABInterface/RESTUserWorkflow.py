@@ -25,7 +25,7 @@ class RESTUserWorkflow(RESTEntity):
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
 
     def _checkSite(self, site):
-        if site not in self.allCMSNames.sites and site not in DataWorkflow.sitewildcards:
+        if site not in self.allCMSNames.sites:
             excasync = ValueError("Remote output data site not valid")
             invalidp = InvalidParameter("The parameter %s is not in the list of known CMS sites %s" % (site, self.allCMSNames.sites), errobj = excasync)
             setattr(invalidp, 'trace', '')
@@ -77,7 +77,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_strlist("runs", param, safe, RX_RUNS)
             validate_strlist("lumis", param, safe, RX_LUMILIST)
             if len(safe.kwargs["runs"]) != len(safe.kwargs["lumis"]):
-                raise InvalidParameter("The number of runs and the number of limi lists are different")
+                raise InvalidParameter("The number of runs and the number of lumis lists are different")
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
