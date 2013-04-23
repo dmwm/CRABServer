@@ -10,9 +10,7 @@ import os
 
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
-from WMCore.Database.DBFactory import DBFactory
 
 #CRAB dependencies
 from CRABInterface.Utils import CMSSitesCache, conn_handler
