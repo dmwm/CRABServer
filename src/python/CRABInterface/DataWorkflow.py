@@ -10,13 +10,7 @@ import os
 
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-import WMCore.RequestManager.RequestMaker.Processing.AnalysisRequest #for registering Analysis request maker
-import WMCore.RequestManager.RequestMaker.Production.PrivateMCRequest
-from WMCore.RequestManager.RequestMaker.Registry import retrieveRequestMaker
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
-from WMCore.RequestManager.RequestMaker import CheckIn
-from WMCore.RequestManager.RequestDB.Interface.Request import ChangeState, GetRequest
-from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import loadWorkload, abortRequest
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.Database.DBFactory import DBFactory
 
@@ -165,7 +159,7 @@ class DataWorkflow(object):
 
            :arg str workflow: a workflow name
            :return: a json corresponding to the workflow schema"""
-        # it probably needs to connect to the reqmgr couch database
+        # it probably needs to connect to the database
         # TODO: verify + code the above point
         # probably we need to explicitely select the schema parameters to return
         raise NotImplementedError
@@ -176,7 +170,7 @@ class DataWorkflow(object):
 
            :arg str workflow: a workflow name
            :return: the config cache couch json object"""
-        # it probably needs to connect to the reqmgr and config cache couch databases
+        # it probably needs to connect to the database
         # TODO: verify + code the above point
         raise NotImplementedError
         return [{}]
@@ -186,7 +180,7 @@ class DataWorkflow(object):
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,
                userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
                runs, lumis): #TODO delete unused parameters
-        """Perform the workflow injection into the reqmgr + couch
+        """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
            :arg str jobtype: job type of the workflow, usually Analysis;
@@ -223,7 +217,6 @@ class DataWorkflow(object):
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,\
                userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,\
                runs, lumis))
-        #add the user in the reqmgr database
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         requestname = '%s_%s_%s' % (timestamp, userhn, workflow)
         splitArgName = self.splitArgMap[splitalgo]

@@ -99,7 +99,7 @@ class DataUserWorkflow(object):
             yield self.workflow.output(wf)
 
     def submit(self, *args, **kwargs):
-        """Perform the workflow injection into the reqmgr + couch
+        """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
            :arg str jobtype: job type of the workflow, usually Analysis;
