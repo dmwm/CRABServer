@@ -5,7 +5,7 @@ import logging
 import cherrypy #cherrypy import is needed here because we need the 'start_thread' subscription
 import traceback
 import json
-import sha
+from hashlib import sha1
 import os
 
 # WMCore dependecies here
@@ -317,7 +317,7 @@ class DataWorkflow(object):
         for jobdef in rows:
             jobdefid = jobdef[0]
 
-            os.environ['X509_USER_PROXY'] = self.credpath + '/' + sha.sha(userdn + 'cms' + (vogroup or '') + (vorole or '')).hexdigest()
+            os.environ['X509_USER_PROXY'] = self.credpath + '/' + sha1(userdn + 'cms' + (vogroup or '') + (vorole or '')).hexdigest()
             schedEC, res = server.getPandIDsWithJobID(jobdefid, userdn, 'cms', vogroup, vorole)
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
