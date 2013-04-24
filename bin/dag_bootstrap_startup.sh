@@ -28,7 +28,10 @@ CONDOR_VERSION=`condor_version | head -n 1`
 
 echo "condor_dagman -f -l . -Lockfile $PWD/master_dag.lock -AutoRescue 1 -DoRescueFrom 0 -Dag $PWD/master_dag -Suppress_notification -CsdVersion $CONDOR_VERSION -Dagman `which condor_dagman`"
 condor_dagman -f -l . -Lockfile $PWD/master_dag.lock -AutoRescue 1 -DoRescueFrom 0 -Dag $PWD/master_dag -Suppress_notification -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION"
+EXIT_STATUS=$?
 
 # We do this after the job because dagman will cowardly refuse to overwrite any pre-existing file, even if it's empty
 touch master_dag.rescue.001
+
+exit $EXIT_STATUS
 
