@@ -317,14 +317,26 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         """
         Returns the directory of pithy shell scripts
         """
-        return os.path.expanduser("~/projects/CRABServer/bin")
+        # TODO: Nuke this with the rest of the dev hooks
+        dir = os.path.expanduser("~/projects/CRABServer/bin")
+        if self.config and hasattr(self.config.General, 'binDir'):
+            dir = self.config.General.binDir
+        if 'CRAB3_BASEPATH' in os.environ:
+            dir = os.path.join(os.environ["CRAB3_BASEPATH"], "bin")
+        return os.path.expanduser(dir)
 
 
     def getTransformLocation(self):
         """
         Returns the location of the PanDA job transform
         """
-        return os.path.expanduser("~/projects/CAFUtilities/src/python/transformation/CMSRunAnaly.sh")
+        # TODO: Nuke this with the rest of the dev hooks
+        dir = "~/projects/CAFUtilities/src/python/transformation"
+        if self.config and hasattr(self.config.General, 'transformDir'):
+            dir = self.config.General.transformDir
+        if 'CRAB3_BASEPATH' in os.environ:
+            dir = os.path.join(os.environ["CRAB3_BASEPATH"], "bin")
+        return os.path.join(os.path.expanduser(dir), "CMSRunAnaly.sh")
 
 
     def getRemoteCondorSetup(self):
@@ -504,7 +516,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         wpipe.close()
         results = rpipe.read()
         if results != "OK":
-            raise Exception("Failure when killing HTCondor task: %s" % results)
+            raise Exception("Failure when submitting HTCondor task: %s" % results)
 
         schedd.reschedule()
 
