@@ -282,10 +282,16 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         """
         if not htcondor:
             return self.config.BossAir.remoteUserHost
+        collector = None
+        if self.config and hasattr(self.config.General, 'condorPool'):
+            collector = self.config.General.condorPool
+        schedd = "localhost"
         if self.config and hasattr(self.config.General, 'condorScheddList'):
             random.shuffle(self.config.General.condorScheddList)
-            return self.config.General.condorScheddList[0]
-        return "localhost"
+            schedd = self.config.General.condorScheddList[0]
+        if collector:
+            return "%s:%s" % (schedd, collector)
+        return schedd
 
 
     def getScheddObj(self, name):
@@ -295,8 +301,12 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
                 with open(htcondor.param['SCHEDD_ADDRESS_FILE']) as fd:
                     address = fd.read().split("\n")[0]
             else:
-                coll = htcondor.Collector(self.getCollector())
-                schedd_ad = coll.locate(htcondor.DaemonTypes.Schedd, name)
+                info = name.split(":")
+                pool = "localhost"
+                if len(info) == 2:
+                    pool = info[1]
+                coll = htcondor.Collector(self.getCollector(pool))
+                schedd_ad = coll.locate(htcondor.DaemonTypes.Schedd, info[0])
                 address = schedd_ad['MyAddress']
                 schedd = htcondor.Schedd(schedd_ad)
             return schedd, address
@@ -304,10 +314,10 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             return RemoteCondorPlugin.RemoteCondorPlugin(self.config, logger=self.logger), None
 
 
-    def getCollector(self):
+    def getCollector(self, name="localhost"):
         if self.config and hasattr(self.config.General, 'condorPool'):
             return self.config.General.condorPool
-        return "localhost"
+        return name
 
 
     def getScratchDir(self):
