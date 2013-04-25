@@ -3,6 +3,7 @@ import os
 import re
 import json
 import time
+import random
 import traceback
 
 try:
@@ -143,6 +144,7 @@ Args = SPLIT dbs_results job_splitting_results
 transfer_input = dbs_results
 transfer_output_files = splitting_results
 Environment = PATH=/usr/bin:/bin
+x509userproxy = %(x509up_file)s
 queue
 """
 
@@ -156,6 +158,7 @@ Error = dbs_discovery.err
 Args = DBS None dbs_results
 transfer_output_files = dbs_results
 Environment = PATH=/usr/bin:/bin
+x509userproxy = %(x509up_file)s
 queue
 """
 
@@ -192,7 +195,7 @@ Environment = SCRAM_ARCH=$(CRAB_JobArch)
 should_transfer_files = YES
 x509userproxy = %(x509up_file)s
 # TODO: Uncomment this when we get out of testing mode
-# Requirements = GLIDEIN_CMSSite isnt undefined
+Requirements = ((target.IS_GLIDEIN =!= TRUE) || ((target.GLIDEIN_CMSSite =!= UNDEFINED) && (stringListIMember(target.GLIDEIN_CMSSite, desiredSites) )))
 leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 queue
 """
@@ -280,7 +283,8 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         if not htcondor:
             return self.config.BossAir.remoteUserHost
         if self.config and hasattr(self.config.General, 'condorScheddList'):
-            return random.shuffle(self.config.General.condorScheddList, 1)
+            random.shuffle(self.config.General.condorScheddList)
+            return self.config.General.condorScheddList[0]
         return "localhost"
 
 
@@ -292,8 +296,8 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
                     address = fd.read().split("\n")[0]
             else:
                 coll = htcondor.Collector(self.getCollector())
-                schedd_ad = coll.locate(htcondor.DaemonTypes.Collector, name)
-                address = fd.read()
+                schedd_ad = coll.locate(htcondor.DaemonTypes.Schedd, name)
+                address = schedd_ad['MyAddress']
                 schedd = htcondor.Schedd(schedd_ad)
             return schedd, address
         else:
