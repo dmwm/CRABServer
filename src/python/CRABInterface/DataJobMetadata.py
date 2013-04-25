@@ -4,9 +4,11 @@ import commands
 import json
 from ast import literal_eval
 
-#CRAB dependencies
-from CRABInterface.Utils import conn_handler
+# WMCore dependecies here
+from WMCore.REST.Error import InvalidParameter, ExecutionError, MissingObject
 
+#CRAB dependencies
+from Databases.FileMetaDataDB.Oracle.FileMetaData.New import New
 
 class DataJobMetadata(object):
     @staticmethod
@@ -16,10 +18,8 @@ class DataJobMetadata(object):
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataJobMetadata")
 
-    def inject(self, *args, **kwargs):
-        raise NotImplementedError
-
     def getFiles(self, taskname, filetype):
+        self.logger.debug("Calling jobmetadata for task %s and filetype %s" % (taskname, filetype))
         binds = {'taskname': taskname, 'filetype': filetype}
         sql = """SELECT panda_job_id AS pandajobid,
                         fmd_outdataset AS outdataset,
@@ -57,3 +57,16 @@ class DataJobMetadata(object):
                    'lfn': row[12],
                    'filesize': row[13],
                    'parents': literal_eval(row[14].read()),}
+
+    def inject(self, *args, **kwargs):
+        self.logger.debug("Calling jobmetadata inject with parameters %s" % kwargs)
+
+        bindnames = set(kwargs.keys()) - set(['outfileruns', 'outfilelumis'])
+        binds = {}
+        for name in bindnames:
+            binds[name] = [str(kwargs[name])]
+        binds['runlumi'] = [str(dict(zip(map(str, kwargs['outfileruns']), [map(str, lumilist.split(',')) for lumilist in kwargs['outfilelumis']])))]
+
+        self.api.modify(New.sql, **binds)
+        return []
+

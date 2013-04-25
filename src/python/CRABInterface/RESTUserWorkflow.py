@@ -75,7 +75,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES)
             validate_strlist("edmoutfiles", param, safe, RX_OUTFILES)
             validate_strlist("runs", param, safe, RX_RUNS)
-            validate_strlist("lumis", param, safe, RX_LUMILIST)
+            validate_strlist("lumis", param, safe, RX_LUMIRANGE)
             if len(safe.kwargs["runs"]) != len(safe.kwargs["lumis"]):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
 
@@ -193,12 +193,6 @@ class RESTUserWorkflow(RESTEntity):
                 result = self.userworkflowmgr.errors(workflow, shortformat)
             elif subresource == 'report':
                 result = self.userworkflowmgr.report(workflow)
-            elif subresource == 'schema':
-                result = rows([self.userworkflowmgr.schema(workflow)])
-            elif subresource == 'configcache':
-                result = rows([self.userworkflowmgr.configcache(workflow)])
-            elif subresource == 'type':
-                result = self.userworkflowmgr.getType(workflow)
             # if here means that no valid subresource has been requested
             # flow should never pass through here since validation restrict this
             else:
