@@ -7,7 +7,7 @@ Currently authz_owner_match uses a WMCore.Database.CMSCouch method
 but in next versions it should be dropped, as from the CRABInterface.
 """
 from WMCore.REST.Error import MissingObject
-from TaskDB.Oracle.Task.GetUserFromID import GetUserFromID
+from Databases.TaskDB.Oracle.Task.GetUserFromID import GetUserFromID
 
 import cherrypy
 import traceback

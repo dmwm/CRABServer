@@ -22,11 +22,11 @@ from CRABInterface.Regexps import RX_WFRESUB
 import PandaServerInterface as server
 
 #SQL queries
-from TaskDB.Oracle.Task.New import New
-from TaskDB.Oracle.Task.ID import ID
-from TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
-from TaskDB.Oracle.Task.SetArgumentsTask import SetArgumentsTask
-from TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
+from Databases.TaskDB.Oracle.Task.New import New
+from Databases.TaskDB.Oracle.Task.ID import ID
+from Databases.TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
+from Databases.TaskDB.Oracle.Task.SetArgumentsTask import SetArgumentsTask
+from Databases.TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
 
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
