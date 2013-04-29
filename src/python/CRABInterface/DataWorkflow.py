@@ -5,7 +5,7 @@ import logging
 import cherrypy #cherrypy import is needed here because we need the 'start_thread' subscription
 import traceback
 import json
-import sha
+from hashlib import sha1
 import os
 
 # WMCore dependecies here
@@ -20,11 +20,11 @@ from CRABInterface.Regexps import RX_WFRESUB
 import PandaServerInterface as server
 
 #SQL queries
-from TaskDB.Oracle.Task.New import New
-from TaskDB.Oracle.Task.ID import ID
-from TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
-from TaskDB.Oracle.Task.SetArgumentsTask import SetArgumentsTask
-from TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
+from Databases.TaskDB.Oracle.Task.New import New
+from Databases.TaskDB.Oracle.Task.ID import ID
+from Databases.TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
+from Databases.TaskDB.Oracle.Task.SetArgumentsTask import SetArgumentsTask
+from Databases.TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
 
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
@@ -315,7 +315,7 @@ class DataWorkflow(object):
         for jobdef in rows:
             jobdefid = jobdef[0]
 
-            os.environ['X509_USER_PROXY'] = self.credpath + '/' + sha.sha(userdn + 'cms' + (vogroup or '') + (vorole or '')).hexdigest()
+            os.environ['X509_USER_PROXY'] = self.credpath + '/' + sha1(userdn + 'cms' + (vogroup or '') + (vorole or '')).hexdigest()
             schedEC, res = server.getPandIDsWithJobID(jobdefid, userdn, 'cms', vogroup, vorole)
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
