@@ -15,7 +15,6 @@ from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 #CRAB dependencies
 from CRABInterface.Utils import CMSSitesCache, conn_handler
 from CRABInterface.Utils import retriveUserCert
-from CRABInterface.Regexps import RX_WFRESUB
 
 import PandaServerInterface as server
 

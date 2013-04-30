@@ -18,15 +18,20 @@ RX_PUBLISH   = re.compile(r"[a-zA-Z0-9\-_]+")
 RX_CMSSITE   = re.compile(r"^T[0-3%]((_[A-Z]{2}(_[A-Za-z0-9]+)*)?)$")
 RX_DBSURL    = re.compile(r"^https?://cmsweb([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
 RX_PUBDBSURL = re.compile(r"^https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
-RX_VOPARAMS   = re.compile(r"^[A-Za-z0-9]*$")
+RX_VOPARAMS  = re.compile(r"^[A-Za-z0-9]*$")
 RX_CACHENAME = RX_WORKFLOW
 RX_OUTFILES  = re.compile(r"^[A-Za-z0-9\.\-_]*\.root$")
 RX_RUNS      = re.compile(r"^\d+$")
-RX_LUMILIST  = re.compile(r"^\d+,\d+(,\d+,\d+)*$")
-RX_OUTTYPES  = re.compile(r'^EDM|LOG$')                                                                                                                                                                                            
+RX_LUMIRANGE  = re.compile(r"^\d+,\d+(,\d+,\d+)*$")
+RX_LUMILIST  = re.compile(r"^\d+(,\d+)*$")
+RX_GLOBALTAG = re.compile(r'^[a-zA-Z0-9\s\.\-_:]{1,100}$')
+RX_OUTTYPES  = re.compile(r'^EDM|LOG$')
+RX_LFN       = re.compile(r'.*')#TODO find out the right regular expression. Maybe in relation with previous WMCore Lexicon merge(see TODO at the beginning). BTW, Lexicon has 5 regexp for lfn
+RX_CHECKSUM  = re.compile(r'^[A-Za-z0-9\-]+$')#TODO check the format of checksum
 
-RX_SUBRESTAT = re.compile(r"^errors|report|logs|data|schema|configcache|type$")
+#subresourced of DataUserWorkflow (/workflow) resource
+RX_SUBRESTAT = re.compile(r"^errors|report|logs|data$")
+
 #subresources of the ServerInfo (/info) resource
 RX_SUBRES_SI = re.compile(r"^delegatedn$")
 
-RX_WFRESUB   = re.compile(r"^[a-zA-Z0-9\.\-_]*_resubmit_[0-9]+")
