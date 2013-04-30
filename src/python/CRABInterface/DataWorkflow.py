@@ -13,9 +13,8 @@ from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 
 #CRAB dependencies
 from CRABInterface.Utils import CMSSitesCache, conn_handler, retrieveUserCert
-from CRABInterface.Regexps import RX_WFRESUB
 
-import PandaServerInterface as server
+import PandaServerInterface as pserver
 
 #SQL queries
 from Databases.TaskDB.Oracle.Task.New import New
@@ -281,7 +280,7 @@ class DataWorkflow(object):
         failedJobdefs = 0
         for jobdef in rows:
             jobdefid = jobdef[0]
-            schedEC, res = server.getPandIDsWithJobID(jobID=jobdefid, user=userdn, vo='cms', group=vogroup, role=vorole, userproxy=userproxy, credpath=self.credpath)
+            schedEC, res = pserver.getPandIDsWithJobID(jobID=jobdefid, user=userdn, vo='cms', group=vogroup, role=vorole, userproxy=userproxy, credpath=self.credpath)
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
                 jobDefs[-1]["failure"] = "Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC)
