@@ -1,18 +1,16 @@
 import logging
-import copy
-import traceback
 import os
-from subprocess import call
 from collections import namedtuple
 from time import mktime, gmtime
-import inspect
+import re
+from hashlib import sha1
 
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
-from WMCore.Services.WMStats.WMStatsWriter import WMStatsWriter
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
-from WMCore.Credential.Proxy import Proxy
+from WMCore.Credential.SimpleMyProxy import SimpleMyProxy, MyProxyException
 
+from CRABInterface.Regexps import RX_CERT
 """
 The module contains some utility functions used by the various modules of the CRAB REST interface
 """
@@ -85,38 +83,27 @@ def conn_handler(services):
         return wrapped_func
     return wrap
 
-def retriveUserCert(clean=True):
-    def wrap(func):
-        def wrapped_func(*args, **kwargs):
-            logger = logging.getLogger("CRABLogger.Utils")
-            myproxyserver = "myproxy.cern.ch"
-            userdn = kwargs['userdn']
-            defaultDelegation = { 'vo': 'cms',
-                                  'logger': logger,
-                                  'myProxySvr': 'myproxy.cern.ch',
-                                  'proxyValidity' : '192:00',
-                                  'min_time_left' : 36000,
-                                  'userDN' : userdn,
-                                  'server_key': serverKey,
-                                  'server_cert': serverCert,
-                                  'serverDN': serverDN,
-                                  'uisource': uiSource,
-                                  'credServerPath': credServerPath,}
-            timeleftthreshold = 60 * 60 * 24
-            proxy = Proxy(defaultDelegation)
-            userproxy = proxy.getProxyFilename(serverRenewer=True)
-            if proxy.getTimeLeft() < timeleftthreshold:
-                proxy.logonRenewMyProxy()
-                timeleft = proxy.getTimeLeft( userproxy )
-                if timeleft is None or timeleft <= 0:
-                    raise InvalidParameter("Impossible to retrieve proxy from %s for %s." %(defaultDelegation['myProxySvr'], defaultDelegation['userDN']))
-
-                logger.debug("User proxy file path: %s" % userproxy)
-            out = func(*args, **kwargs)
-            if clean:
-                logger.debug("Rimuovo %s" % clean)
-                os.remove(userproxy)
-            return out
-        return wrapped_func
-    return wrap
-
+def retrieveUserCert(func):
+    def wrapped_func(*args, **kwargs):
+        logger = logging.getLogger("CRABLogger.Utils")
+        myproxyserver = "myproxy.cern.ch"
+        userdn = kwargs['userdn']
+        defaultDelegation = {'logger': logger,
+                             'proxyValidity' : '192:00',
+                             'min_time_left' : 36000,
+                             'server_key': serverKey,
+                             'server_cert': serverCert,}
+        timeleftthreshold = 60 * 60 * 24
+        mypclient = SimpleMyProxy(defaultDelegation)
+        userproxy = None
+        try:
+            userproxy = mypclient.logonRenewMyProxy(username=sha1(kwargs['userdn']).hexdigest(), myproxyserver=myproxyserver, myproxyport=7512)
+        except MyProxyException, me:
+            raise InvalidParameter("Impossible to retrieve proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
+        else:
+            if not re.match(RX_CERT, userproxy):
+                raise InvalidParameter("Retrieved malformed proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
+        kwargs['userproxy'] = userproxy
+        out = func(*args, **kwargs)
+        return out
+    return wrapped_func

@@ -29,9 +29,11 @@ RX_OUTTYPES  = re.compile(r'^EDM|LOG$')
 RX_LFN       = re.compile(r'.*')#TODO find out the right regular expression. Maybe in relation with previous WMCore Lexicon merge(see TODO at the beginning). BTW, Lexicon has 5 regexp for lfn
 RX_CHECKSUM  = re.compile(r'^[A-Za-z0-9\-]+$')#TODO check the format of checksum
 
+#basic certificate check -- used for proxies retrieved from myproxy
+RX_CERT = re.compile(r'^[-]{5}BEGIN CERTIFICATE[-]{5}[\w\W]+[-]{5}END CERTIFICATE[-]{5}\n$')
+
 #subresourced of DataUserWorkflow (/workflow) resource
 RX_SUBRESTAT = re.compile(r"^errors|report|logs|data$")
 
 #subresources of the ServerInfo (/info) resource
 RX_SUBRES_SI = re.compile(r"^delegatedn$")
-
