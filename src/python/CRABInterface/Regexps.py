@@ -23,6 +23,7 @@ RX_CACHENAME = RX_WORKFLOW
 RX_OUTFILES  = re.compile(r"^[A-Za-z0-9\.\-_]*\.root$")
 RX_RUNS      = re.compile(r"^\d+$")
 RX_LUMILIST  = re.compile(r"^\d+,\d+(,\d+,\d+)*$")
+RX_OUTTYPES  = re.compile(r'^EDM|LOG$')                                                                                                                                                                                            
 
 RX_SUBRESTAT = re.compile(r"^errors|report|logs|data|schema|configcache|type$")
 #subresources of the ServerInfo (/info) resource
