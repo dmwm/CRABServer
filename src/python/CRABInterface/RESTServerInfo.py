@@ -31,4 +31,4 @@ class RESTServerInfo(RESTEntity):
         return getattr(RESTServerInfo, subresource)(self)
 
     def delegatedn(self):
-        return {'rest': self.serverdn, 'services': self.delegatedn}
+        yield {'rest': self.serverdn, 'services': self.delegatedn}
