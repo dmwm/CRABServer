@@ -10,13 +10,8 @@ from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 
 #CRAB dependencies
 from CRABInterface.DataWorkflow import DataWorkflow
-from CRABInterface.Utils import conn_handler
-from CRABInterface.Utils import retriveUserCert
+from CRABInterface.Utils import conn_handler, retrieveUserCert
 
-#Common solution dependencies
-from PandaBooking import PandaBooking
-from taskbuffer.JobSpec import JobSpec
-from taskbuffer.FileSpec import FileSpec
 
 class DataUserWorkflow(object):
     """Entity that allows to operate on workflow resources from the user point of view.
@@ -130,26 +125,31 @@ class DataUserWorkflow(object):
 
         return self.workflow.submit(*args, **kwargs)
 
-    def resubmit(self, workflow, siteblacklist, sitewhitelist, userdn):
+    @retrieveUserCert
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, userdn, userproxy=None):
         """Request to Resubmit a workflow.
 
            :arg str workflow: a workflow name
            :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
-        return self.workflow.resubmit(workflow, siteblacklist, sitewhitelist, userdn)
+        return self.workflow.resubmit(workflow, siteblacklist, sitewhitelist, userdn, userproxy)
 
-    @retriveUserCert(clean=False)
-    def status(self, workflow, userdn):
+    @retrieveUserCert
+    def status(self, workflow, userdn, userproxy=None):
         """Retrieve the status of the workflow
 
            :arg str workflow: a valid workflow name
+           :arg str userdn: the user dn makind the request
+           :arg str userproxy: the user proxy retrieved by `retrieveUserCert`
            :return: a generator of workflow states
         """
-        return self.workflow.status(workflow, userdn)
+        return self.workflow.status(workflow, userdn, userproxy)
 
-    @retriveUserCert(clean=False)
-    def kill(self, workflow, force, userdn):
+    @retrieveUserCert
+    def kill(self, workflow, force, userdn, userproxy=None):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name
+           :arg str force: a flag to know if kill should be brutal
+           :arg str userproxy: the user proxy retrieved by `retrieveUserCert`
            :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
-        return self.workflow.kill(workflow, force, userdn)
+        return self.workflow.kill(workflow, force, userdn, userproxy)
