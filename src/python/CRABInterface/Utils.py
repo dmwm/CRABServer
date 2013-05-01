@@ -97,7 +97,7 @@ def retrieveUserCert(func):
         mypclient = SimpleMyProxy(defaultDelegation)
         userproxy = None
         try:
-            userproxy = mypclient.logonRenewMyProxy(username=sha1(kwargs['userdn']).hexdigest(), myproxyserver=myproxyserver, myproxyport=7512)
+            userproxy = mypclient.logonRenewMyProxy(username=sha1(serverDN+kwargs['userdn']).hexdigest(), myproxyserver=myproxyserver, myproxyport=7512)
         except MyProxyException, me:
             raise InvalidParameter("Impossible to retrieve proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
         else:
