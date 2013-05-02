@@ -39,15 +39,6 @@ class DataWorkflow(object):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
 
-        # Supporting different types of workflows means providing
-        # different functionalities depending on the type.
-        # This dictionary contains pointer to workflow type methods
-        # (when many more methods are needed it can be evaluated to have
-        #  a common base class and implemantation of types with common
-        #  naming convention).
-        self.typemapping = {'Analysis': {'report': self._reportAnalysis},
-                            'PrivateMC': {'report': self._reportPrivateMC},}
-
         self.splitArgMap = { "LumiBased" : "lumis_per_job",
                         "FileBased" : "files_per_job",
                         "EventBased" : "events_per_job",}
@@ -92,10 +83,6 @@ class DataWorkflow(object):
            :return: what?"""
 
         raise NotImplementedError
-        try:
-            return self.typemapping[self.getType(workflow)]['report'](workflow)
-        except KeyError, ex:
-            raise InvalidParameter("Not valid scehma provided", trace=traceback.format_exc(), errobj = ex)
 
     def logs(self, workflow, howmany, exitcode, pandaids):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
@@ -107,35 +94,6 @@ class DataWorkflow(object):
         #default is 1 logfile per exitcode
         self.logger.info("Retrieving %s log(s) for %s" % (howmany, workflow))
         raise NotImplementedError
-
-
-    @conn_handler(services=['asomonitor'])
-    def outputLocation(self, workflow, max, pandaids):
-        """
-        Retrieves the output LFN from async stage out
-
-        :arg str workflow: the unique workflow name
-        :arg int max: the maximum number of output files to retrieve
-        :return: the result of the view as it is."""
-        options = {"reduce": False, "startkey": [workflow, "output"], "endkey": [workflow, 'output', {}]}
-        if max and not pandaids: #do not use limits if there are pandaids
-            options["limit"] = max
-        return self._filterids(self.asodb.conn.loadView("UserMonitoring", "FilesByWorkflow", options)['rows'], pandaids)
-
-    @conn_handler(services=['monitor'])
-    def outputTempLocation(self, workflow, howmany, jobtoskip):
-        """Returns the workflow output LFN from the temporary location after the
-           local stage out at the site where the job was running.
-
-           :arg str workflow: a workflow name
-           :arg int howmany: the limit on the number of PFN to return
-           :arg list int: the list of jobid to ignore
-           :return: a generator of list of output pfns"""
-        options = {"reduce": False, "limit": howmany}
-        options["startkey"] = [workflow, 'output']
-        options["endkey"] = [workflow, 'output', {}]
-        tempresult = self.monitordb.conn.loadView("WMStats", "filesByWorkflow", options)['rows']
-        return [t for t in tempresult if not t['value']['jobid'] in jobtoskip]
 
     def output(self, workflow, howmany):
         """
@@ -160,11 +118,10 @@ class DataWorkflow(object):
         raise NotImplementedError
         return [{}]
 
-    @retrieveUserCert
-    def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
-               blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,
-               userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
-               runs, lumis, userproxy=None): #TODO delete unused parameters
+    @retriveUserCert(clean=False)
+    def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
+               userhn, userdn, savelogsflag, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
+               userproxy=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -174,34 +131,27 @@ class DataWorkflow(object):
            :arg str inputdata: input dataset;
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name;
-           :arg str list blockwhitelist: selective list of input iblock from the specified input dataset;
-           :arg str list blockblacklist:  input blocks to be excluded from the specified input dataset;
            :arg str splitalgo: algorithm to be used for the workflow splitting;
            :arg str algoargs: argument to be used by the splitting algorithm;
-           :arg str configdoc: URL of the configuration object ot be used;
-           :arg str userisburl: URL of the input sandbox file;
-           :arg str list adduserfiles: list of additional input files;
+           :arg str cachefilename: name of the file inside the cache
+           :arg str cacheurl: URL of the cache
            :arg str list addoutputfiles: list of additional output files;
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
            :arg str userdn: DN of user doing the request;
            :arg str userhn: hyper new name of the user doing the request;
            :arg str publishname: name to use for data publication;
            :arg str asyncdest: CMS site name for storage destination of the output files;
-           :arg str campaign: needed just in case the workflow has to be appended to an existing campaign;
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
+           :arg str vorole: user vo role
+           :arg str vogroup: user vo group
+           :arg str tfileoutfiles: list of t-output files
+           :arg str edmoutfiles: list of edm output files
            :arg str list runs: list of run numbers
            :arg str list lumis: list of lumi section numbers
            :returns: a dict which contaians details of the request"""
 
-        self.logger.debug("""workflow %s, jobtype %s, jobsw %s, jobarch %s, inputdata %s, siteblacklist %s, sitewhitelist %s, blockwhitelist %s,
-               blockblacklist %s, splitalgo %s, algoargs %s, configdoc %s, userisburl %s, cachefilename %s, cacheurl %s, adduserfiles %s, addoutputfiles %s, savelogsflag %s,
-               userhn %s, publishname %s, asyncdest %s, campaign %s, blacklistT1 %s, dbsurl %s, publishdbsurl %s, tfileoutfiles %s, edmoutfiles %s, userdn %s,
-               runs %s, lumis %s"""%(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,\
-               blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,\
-               userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,\
-               runs, lumis))
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         requestname = '%s_%s_%s' % (timestamp, userhn, workflow)
         splitArgName = self.splitArgMap[splitalgo]
@@ -343,33 +293,3 @@ class DataWorkflow(object):
             self.api.modify(SetStatusTask.sql, status = ["KILLED"], taskname = [workflow])
         else:
             raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
-
-    def getType(self, workflow):
-        """Retrieves the workflow type from the monitoring
-
-           :arg str workflow: a workflow name
-           :return: a string of the job type supported by the workflow."""
-        return self.monitordb.conn.document(id=workflow).get('request_type', None)
-
-    def _reportAnalysis(self, workflow):
-        """Retrieves the quality of the workflow in term of what has been processed
-           from an analysis point of view, looking at good lumis.
-
-           :arg str workflow: a workflow name
-           :return: dictionary with run-lumis information"""
-
-        options = {"reduce": False, "include_docs" : True, "startkey": [workflow, "success", 0], "endkey": [workflow, "success", 0, {}, {}]}
-        output = {}
-        for singlelumi in self.monitordb.conn.loadView("WMStats", "jobsByStatusWorkflow", options)['rows']:
-            if 'lumis' in singlelumi['doc'] and singlelumi['doc']['lumis']:
-                for run in singlelumi['doc']['lumis']:
-                    output.update((k, run[k]+output.get(k,[])) for k in run)
-        return [output]
-
-    def _reportPrivateMC(self, workflow):
-        """Retrieves the quality of the workflow in term of what has been processed.
-
-           :arg str workflow: a workflow name
-           :return: what?"""
-
-        raise NotImplementedError
