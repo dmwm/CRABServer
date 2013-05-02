@@ -28,12 +28,13 @@ class DataWorkflow(object):
        No aggregation of workflows provided here."""
 
     @staticmethod
-    def globalinit(dbapi, phedexargs=None, dbsurl=None, credpath='/tmp'):
+    def globalinit(dbapi, phedexargs=None, dbsurl=None, credpath='/tmp', transformation=None):
         DataWorkflow.api = dbapi
         DataWorkflow.phedexargs = phedexargs
         DataWorkflow.phedex = None
         DataWorkflow.dbsurl = dbsurl
         DataWorkflow.credpath = credpath
+        DataWorkflow.transformation = transformation
 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
@@ -185,7 +186,7 @@ class DataWorkflow(object):
                             outfiles        = [dbSerializer(addoutputfiles)],\
                             tfile_outfiles  = [dbSerializer(tfileoutfiles)],\
                             edm_outfiles    = [dbSerializer(edmoutfiles)],\
-                            transformation  = ['http://common-analysis-framework.cern.ch/CMSRunAnaly.sh'],\
+                            transformation  = [self.transformation],\
                             arguments       = [dbSerializer({})],\
         )
 

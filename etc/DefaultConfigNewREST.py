@@ -32,5 +32,6 @@ data.serverdn = serverdn
 data.db = 'CRABServerAuth.dbconfig'
 data.uisource = '/afs/cern.ch/cms/LCG/LCG-2/UI/cms_ui_env.sh'
 data.credpath = '%s/state/crabserver/proxy/' % __file__.rsplit('/', 4)[0]
+data.transformation = 'http://common-analysis-framework.cern.ch/CMSRunAnaly.sh'
 data.loggingLevel = 10
 data.loggingFile = '/tmp/CRAB.log'
