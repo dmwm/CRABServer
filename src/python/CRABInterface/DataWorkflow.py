@@ -262,6 +262,27 @@ class DataWorkflow(object):
             raise ExecutionError("You cannot resubmit a task if it is in the %s state" % statusRes['status'])
 
 
+    def _updateTaskStatus(self, workflow, status, jobsPerStatus):
+        """
+        Update the status of the task when it is finished.
+        More details: if the status of the task is submitted => all the jobs are finished then taskStatus=COMPLETED
+                                                             => all the jobs are finished or failed then taskStatus=FAILED
+        """
+        if status=='SUBMITTED':
+             #only failed and completed jobs (completed may not be there) => task failed
+            if ('failed' in jobsPerStatus and len(jobsPerStatus)==1) or \
+               ('finished' in jobsPerStatus and 'failed' in jobsPerStatus and len(jobsPerStatus)==2):
+                self.logger.debug("Changing task status to FAILED")
+                self.api.modify(SetStatusTask.sql, status = ["FAILED"], taskname = [workflow])
+                return "FAILED"
+             #only completed jobs
+            if 'finished' in jobsPerStatus and len(jobsPerStatus)==1:
+                self.logger.debug("Changing task status to COMPLETED")
+                self.api.modify(SetStatusTask.sql, status = ["COMPLETED"], taskname = [workflow])
+                return "COMPLETED"
+        return status
+
+
     def status(self, workflow, userdn, userproxy=None):
         """Retrieve the status of the workflow.
 
@@ -292,6 +313,8 @@ class DataWorkflow(object):
                     jobsPerStatus[jobstatus] = jobsPerStatus[jobstatus]+1 if jobstatus in jobsPerStatus else 1
                     jobList.append((jobstatus,jobid))
             totalJobdefs += 1
+
+        status = self._updateTaskStatus(workflow, status, jobsPerStatus)
 
         return [ {"status" : status,\
                   "taskFailureMsg" : taskFailure.read() if taskFailure else '',\
