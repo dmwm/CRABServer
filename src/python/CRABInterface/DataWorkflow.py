@@ -119,7 +119,7 @@ class DataWorkflow(object):
         raise NotImplementedError
         return [{}]
 
-    @retriveUserCert(clean=False)
+    @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                userhn, userdn, savelogsflag, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
                userproxy=None):
