@@ -6,17 +6,15 @@ import cherrypy #cherrypy import is needed here because we need the 'start_threa
 import traceback
 import json
 from hashlib import sha1
-import os
 
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 
 #CRAB dependencies
-from CRABInterface.Utils import CMSSitesCache, conn_handler
-from CRABInterface.Utils import retriveUserCert
+from CRABInterface.Utils import CMSSitesCache, conn_handler, retrieveUserCert
 
-import PandaServerInterface as server
+import PandaServerInterface as pserver
 
 #SQL queries
 from Databases.TaskDB.Oracle.Task.New import New
@@ -162,21 +160,11 @@ class DataWorkflow(object):
         raise NotImplementedError
         return [{}]
 
-    def configcache(self, workflow):
-        """Returns the config cache associated to the workflow.
-
-           :arg str workflow: a workflow name
-           :return: the config cache couch json object"""
-        # it probably needs to connect to the database
-        # TODO: verify + code the above point
-        raise NotImplementedError
-        return [{}]
-
-    @retriveUserCert(clean=False)
+    @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
                blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,
                userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
-               runs, lumis): #TODO delete unused parameters
+               runs, lumis, userproxy=None): #TODO delete unused parameters
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -251,30 +239,9 @@ class DataWorkflow(object):
                             arguments       = [dbSerializer({})],\
         )
 
-        """
-        if schemaWf.get("ACDCDoc", None) and schemaWf['JobSplitAlgo'] != 'LumiBased':
-            excsplit = ValueError("You must use LumiBased splitting if specifying a lumiMask.")
-            invalidp = InvalidParameter("You must use LumiBased splitting if specifying a lumiMask.", errobj = excsplit)
-            setattr(invalidp, 'trace', '')
-            raise invalidp
-
-        try:
-            specificSchema.allCMSNames = self.allCMSNames.sites
-            specificSchema.validate()
-        except Exception, ex:
-            raise InvalidParameter("Not valid scehma provided", trace=traceback.format_exc(), errobj = ex)
-
-        #The client set BlacklistT1 as true if the user has not t1access role.
-        if blacklistT1:
-            if schemaWf['SiteBlacklist']:
-                schemaWf['SiteBlacklist'].append("T1*")
-            else:
-                specificSchema['SiteBlacklist'] = ["T1*"]
-        """
-
         return [{'RequestName': requestname}]
 
-    def resubmit(self, workflow, siteblacklist, sitewhitelist, userdn):
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, userdn, userproxy):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
 
@@ -283,7 +250,7 @@ class DataWorkflow(object):
            :arg str list sitewhitelist: white list of sites, with CMS name."""
 
         self.logger.info("About to resubmit workflow: %s. Getting status first." % workflow)
-        statusRes = self.status(workflow, userdn)[0]
+        statusRes = self.status(workflow, userdn, userproxy)[0]
 
         if statusRes['status'] in ['SUBMITTED','KILLED']:
             resubmitList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus in ['cancelled','failed']]
@@ -295,7 +262,7 @@ class DataWorkflow(object):
             raise ExecutionError("You cannot resubmit a task if it is in the %s state" % statusRes['status'])
 
 
-    def status(self, workflow, userdn):
+    def status(self, workflow, userdn, userproxy=None):
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
@@ -313,9 +280,7 @@ class DataWorkflow(object):
         failedJobdefs = 0
         for jobdef in rows:
             jobdefid = jobdef[0]
-
-            os.environ['X509_USER_PROXY'] = self.credpath + '/' + sha1(userdn + 'cms' + (vogroup or '') + (vorole or '')).hexdigest()
-            schedEC, res = server.getPandIDsWithJobID(jobdefid, userdn, 'cms', vogroup, vorole)
+            schedEC, res = pserver.getPandIDsWithJobID(jobID=jobdefid, user=userdn, vo='cms', group=vogroup, role=vorole, userproxy=userproxy, credpath=self.credpath)
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
                 jobDefs[-1]["failure"] = "Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC)
@@ -336,13 +301,13 @@ class DataWorkflow(object):
                   "totalJobdefs"    : totalJobdefs,\
                   "jobList"         : jobList }]
 
-    def kill(self, workflow, force, userdn):
+    def kill(self, workflow, force, userdn, userproxy=None):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name"""
 
         self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
-        statusRes = self.status(workflow, userdn)[0]
+        statusRes = self.status(workflow, userdn, userproxy)[0]
 
         if statusRes['status'] == 'SUBMITTED':
             killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus!='completed']

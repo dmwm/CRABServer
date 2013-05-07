@@ -13,6 +13,7 @@ class RESTServerInfo(RESTEntity):
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
         self.delegatedn = config.delegatedn
+        self.serverdn = config.serverdn
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
@@ -30,4 +31,4 @@ class RESTServerInfo(RESTEntity):
         return getattr(RESTServerInfo, subresource)(self)
 
     def delegatedn(self):
-        return self.delegatedn
+        yield {'rest': self.serverdn, 'services': self.delegatedn}
