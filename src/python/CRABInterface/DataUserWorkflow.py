@@ -100,25 +100,26 @@ class DataUserWorkflow(object):
            :arg str jobtype: job type of the workflow, usually Analysis;
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
-           :arg str list inputdata: input datasets;
+           :arg str inputdata: input dataset;
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name;
-           :arg str list blockwhitelist: selective list of input iblock from the specified input dataset;
-           :arg str list blockblacklist:  input blocks to be excluded from the specified input dataset;
            :arg str splitalgo: algorithm to be used for the workflow splitting;
            :arg str algoargs: argument to be used by the splitting algorithm;
-           :arg str configdoc: URL of the configuration object ot be used;
-           :arg str userisburl: URL of the input sandbox file;
-           :arg str list adduserfiles: list of additional input files;
+           :arg str cachefilename: name of the file inside the cache
+           :arg str cacheurl: URL of the cache
            :arg str list addoutputfiles: list of additional output files;
+           :arg str userdn: DN of user doing the request;
+           :arg str userhn: hyper new name of the user doing the request;
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
            :arg str publishname: name to use for data publication;
            :arg str asyncdest: CMS site name for storage destination of the output files;
-           :arg str campaign: needed just in case the workflow has to be appended to an existing campaign;
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
-           :arg str acdcdoc: input acdc document which contains the input information for data selction (eg: lumi mask)
+           :arg str vorole: user vo role
+           :arg str vogroup: user vo group
+           :arg str tfileoutfiles: list of t-output files
+           :arg str edmoutfiles: list of edm output files
            :arg str list runs: list of run numbers
            :arg str list lumis: list of lumi section numbers
            :returns: a dict which contaians details of the request"""

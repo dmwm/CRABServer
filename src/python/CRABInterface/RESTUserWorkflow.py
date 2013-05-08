@@ -48,16 +48,11 @@ class RESTUserWorkflow(RESTEntity):
             [self._checkSite(site) for site in safe.kwargs['siteblacklist']]
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
             [self._checkSite(site) for site in safe.kwargs['sitewhitelist']]
-            validate_strlist("blockwhitelist", param, safe, RX_BLOCK)
-            validate_strlist("blockblacklist", param, safe, RX_BLOCK)
             validate_str("splitalgo", param, safe, RX_SPLIT, optional=False)
             validate_num("algoargs", param, safe, optional=False)
-            validate_str("configdoc", param, safe, RX_CFGDOC, optional=False)
-            validate_str("userisburl", param, safe, RX_CACHEURL, optional=True)
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
             validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
             #validate_str("userisburl", param, safe, re.compile(r"^[A-Za-z]*$"), optional=False)
-            validate_strlist("adduserfiles", param, safe, RX_ADDFILE)
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE)
             validate_num("savelogsflag", param, safe, optional=False)
             validate_str("vorole", param, safe, RX_VOPARAMS, optional=True)
@@ -69,7 +64,6 @@ class RESTUserWorkflow(RESTEntity):
                 raise InvalidParameter("You need to set both publishDataName and publishDbsUrl parameters if you need the automatic publication")
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkSite(safe.kwargs['asyncdest'])
-            validate_str("campaign", param, safe, RX_CAMPAIGN, optional=True)
             validate_num("blacklistT1", param, safe, optional=False)
             validate_str("dbsurl", param, safe, RX_DBSURL, optional=True)
             validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES)
@@ -80,12 +74,12 @@ class RESTUserWorkflow(RESTEntity):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
 
         elif method in ['POST']:
-            validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
+            validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
 
         elif method in ['GET']:
-            validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
+            validate_str("workflow", param, safe, RX_UNIQUEWF, optional=True)
             validate_str('subresource', param, safe, RX_SUBRESTAT, optional=True)
             #parameters of subresources calls has to be put here
             #used by get latest
@@ -105,52 +99,51 @@ class RESTUserWorkflow(RESTEntity):
                 raise InvalidParameter("Invalid input parameters")
 
         elif method in ['DELETE']:
-            validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
+            validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
             validate_num("force", param, safe, optional=True)
 
 
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
-    def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist, blockblacklist,
-            splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl,  adduserfiles, addoutputfiles, savelogsflag, vorole, vogroup,
-            publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, tfileoutfiles, edmoutfiles, runs, lumis):
-        """Insert a new workflow. The caller needs to be a CMS user with a valid CMS x509 cert/proxy.
+    def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
+               savelogsflag, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis):
+        """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
-           :arg str jobtype: job type of the workflow, usally CMSSW;
+           :arg str jobtype: job type of the workflow, usually Analysis;
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
            :arg str inputdata: input dataset;
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name;
-           :arg str asyncdest: CMS site name for storage destination of the output files;
-           :arg str list blockwhitelist: selective list of input iblock from the specified input dataset;
-           :arg str list blockblacklist:  input blocks to be excluded from the specified input dataset;
            :arg str splitalgo: algorithm to be used for the workflow splitting;
            :arg str algoargs: argument to be used by the splitting algorithm;
-           :arg str configdoc: the document id of the config cache document;
-           :arg str userisburl: URL of the input sandbox file;
-           :arg str list adduserfiles: list of additional input files;
+           :arg str cachefilename: name of the file inside the cache
+           :arg str cacheurl: URL of the cache
            :arg str list addoutputfiles: list of additional output files;
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
+           :arg str userdn: DN of user doing the request;
+           :arg str userhn: hyper new name of the user doing the request;
            :arg str publishname: name to use for data publication;
-           :arg str asyncdest: final destination of workflow output files;
-           :arg str campaign: needed just in case the workflow has to be appended to an existing campaign;
+           :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
-           :arg str list outfiles: list of the name of the output files
+           :arg str vorole: user vo role
+           :arg str vogroup: user vo group
+           :arg str tfileoutfiles: list of t-output files
+           :arg str edmoutfiles: list of edm output files
            :arg str list runs: list of run numbers
            :arg str list lumis: list of lumi section numbers
-           :returns: a dict which contaians details of the submitted request"""
+           :returns: a dict which contaians details of the request"""
+
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
         return self.userworkflowmgr.submit(workflow=workflow, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata,
-                                       siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, blockwhitelist=blockwhitelist,
-                                       blockblacklist=blockblacklist, splitalgo=splitalgo, algoargs=algoargs, configdoc=configdoc,
-                                       userisburl=userisburl, cachefilename=cachefilename, cacheurl=cacheurl, adduserfiles=adduserfiles,
-                                       addoutputfiles=addoutputfiles, savelogsflag=savelogsflag, userdn=cherrypy.request.user['dn'],
-                                       userhn=cherrypy.request.user['login'], vorole=vorole, vogroup=vogroup,
-                                       publishname=publishname, asyncdest=asyncdest, campaign=campaign, blacklistT1=blacklistT1,
+                                       siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, splitalgo=splitalgo, algoargs=algoargs,
+                                       cachefilename=cachefilename, cacheurl=cacheurl,
+                                       addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
+                                       userhn=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
+                                       publishname=publishname, asyncdest=asyncdest, blacklistT1=blacklistT1,
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,\
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis)
 
