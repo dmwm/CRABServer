@@ -32,7 +32,8 @@ class RESTBaseAPI(DatabaseRESTApi):
         self.formats = [ ('application/json', JSONFormat()) ]
 
         #Global initialization of Data objects. Parameters coming from the config should go here
-        DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl, credpath=config.credpath)
+        DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl,\
+                                        credpath=config.credpath, transformation=config.transformation)
         DataJobMetadata.globalinit(dbapi=self)
         Utils.globalinit(config.serverhostkey, config.serverhostcert, config.serverdn, config.uisource, config.credpath)
 
