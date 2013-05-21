@@ -57,60 +57,7 @@ CRAB_META_HEADERS = \
 +CRAB_LumiMask = %(lumimask)s
 """
 
-<<<<<<< HEAD
-master_dag_submit_file = crab_headers + crab_meta_headers + \
-"""
-+CRAB_Attempt = 0
-+CRAB_Workflow = %(workflow)s
-+CRAB_UserDN = %(userdn)s
-universe = local
-+CRAB_ReqName = %(requestname)s
-output = request.out
-error = request.err
-executable = dag_bootstrap_startup.sh
-transfer_input_files = dag_bootstrap.sh, master_dag, DBSDiscovery.submit, JobSplitting.submit, Job.submit, ASO.submit, %(transform_location)s
-transfer_output_files = master_dag.dagman.out, master_dag.rescue.001, RunJobs.dag, RunJobs.dag.dagman.out, RunJobs.dag.rescue.001, dbs_discovery.err, dbs_discovery.out, job_splitting.err, job_splitting.out
-leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
-on_exit_remove = ( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))
-+OtherJobRemoveRequirements = DAGManJobId =?= ClusterId
-remove_kill_sig = SIGUSR1
-#+Environment= strcat("CONDOR_ID=", ClusterId, ".", ProcId)
-+RemoteCondorSetup = "%(remote_condor_setup)s"
-+TaskType = "ROOT"
-X509UserProxy = %(userproxy)s
-getenv = True
-queue 1
-
-"""
-
-resubmit_dag_submit_file = \
-"""
-+CRAB_Attempt = %(attempt)d
-+CRAB_UserDN = %(userdn)s
-universe = vanilla
-+CRAB_ReqName = %(requestname)s
-scratch = %(scratch)s
-bindir = %(bindir)s
-output = $(scratch)/request.out
-error = $(scratch)/request.err
-executable = $(bindir)/dag_bootstrap_startup.sh
-transfer_input_files = $(bindir)/dag_bootstrap.sh, $(scratch)/resubmit_dag, $(scratch)/JobRecovery.submit, $(scratch)/Job.submit, $(scratch)/ASO.submit, %(transform_location)s
-transfer_output_files = resubmit_dag.dagman.out, resubmit_dag.rescue.001, RunJobs.dag, RunJobs.dag.dagman.out, RunJobs.dag.rescue.001, job_recovery.err, job_recovery.out
-leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
-on_exit_remove = ( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))
-+OtherJobRemoveRequirements = DAGManJobId =?= ClusterId
-remove_kill_sig = SIGUSR1
-+Environment= strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)
-+RemoteCondorSetup = "%(remote_condor_setup)s"
-+TaskType = "ROOT"
-X509UserProxy = %(userproxy)s
-queue 1
-"""
-
-job_splitting_submit_file = crab_headers + crab_meta_headers + \
-=======
 JOB_SPLITTING_SUBMIT_FILE = CRAB_HEADERS + CRAB_META_HEADERS + \
->>>>>>> origin/dagman
 """
 +TaskType = "SPLIT"
 universe = local
