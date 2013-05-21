@@ -1,37 +1,42 @@
 
+"""
+DagmanDataWorkflow,
+
+A module providing HTCondor querying capabilities to the CRABServer
+"""
+
 import os
 import re
-import json
 import time
 import traceback
 
 try:
-    import classad
     import htcondor
 except ImportError:
-    classad = None
-    htcondor = None
+    htcondor = None #pylint: disable=C0103
 try:
     import WMCore.BossAir.Plugins.RemoteCondorPlugin as RemoteCondorPlugin
 except ImportError:
     if not htcondor:
         raise
-#classad = None
-#htcondor = None
 
-from WMCore.WMSpec.WMTask import buildLumiMask
 from WMCore.Configuration import Configuration
 from WMCore.REST.Error import InvalidParameter
 
-import WMCore.REST.Error as Error
 from CRABInterface.Utils import retriveUserCert
 
+# FIXME really clean up these imports
 from CRABInterface.CRABServerBase import getCRABServerBase
 from TaskDB.CAFUtilitiesBase import getCAFUtilitiesBase
 
 import DataWorkflow
+import TaskWorker.Actions.DagmanSubmitter
+from TaskWorker.Actions.DagmanCreator import CRAB_HEADERS, JOB_SUBMIT, ASYNC_SUBMIT, escape_strings_to_classads
+from TaskWorker.Actions.DagmanSubmitter import MASTER_DAG_SUBMIT_FILE, CRAB_HEADERS, CRAB_META_HEADERS, SUBMIT_INFO
 
-master_dag_file = \
+import CRABInterface.DataWorkflow
+
+MASTER_DAG_FILE = \
 """
 JOB DBSDiscovery DBSDiscovery.submit
 JOB JobSplitting JobSplitting.submit
@@ -41,38 +46,7 @@ PARENT DBSDiscovery CHILD JobSplitting
 PARENT JobSplitting CHILD RunJobs
 """
 
-resubmit_dag_file = \
-"""
-JOB JobRecovery JobRecovery.submit
-SUBDAG EXTERNAL RecreateJobs RecreateJobs.dag
-
-PARENT JobRecovery CHILD RecreateJobs
-"""
-
-crab_headers = \
-"""
-+CRAB_ReqName = %(requestname)s
-+CRAB_Workflow = %(workflow)s
-+CRAB_JobType = %(jobtype)s
-+CRAB_JobSW = %(jobsw)s
-+CRAB_JobArch = %(jobarch)s
-+CRAB_InputData = %(inputdata)s
-+CRAB_ISB = %(userisburl)s
-+CRAB_SiteBlacklist = %(siteblacklist)s
-+CRAB_SiteWhitelist = %(sitewhitelist)s
-+CRAB_AdditionalUserFiles = %(adduserfiles)s
-+CRAB_AdditionalOutputFiles = %(addoutputfiles)s
-+CRAB_EDMOutputFiles = %(edmoutfiles)s
-+CRAB_TFileOutputFiles = %(tfileoutfiles)s
-+CRAB_SaveLogsFlag = %(savelogsflag)s
-+CRAB_UserDN = %(userdn)s
-+CRAB_UserHN = %(userhn)s
-+CRAB_AsyncDest = %(asyncdest)s
-+CRAB_Campaign = %(campaign)s
-+CRAB_BlacklistT1 = %(blacklistT1)s
-"""
-
-crab_meta_headers = \
+CRAB_META_HEADERS = \
 """
 +CRAB_SplitAlgo = %(splitalgo)s
 +CRAB_AlgoArgs = %(algoargs)s
@@ -83,6 +57,7 @@ crab_meta_headers = \
 +CRAB_LumiMask = %(lumimask)s
 """
 
+<<<<<<< HEAD
 master_dag_submit_file = crab_headers + crab_meta_headers + \
 """
 +CRAB_Attempt = 0
@@ -133,6 +108,9 @@ queue 1
 """
 
 job_splitting_submit_file = crab_headers + crab_meta_headers + \
+=======
+JOB_SPLITTING_SUBMIT_FILE = CRAB_HEADERS + CRAB_META_HEADERS + \
+>>>>>>> origin/dagman
 """
 +TaskType = "SPLIT"
 universe = local
@@ -142,11 +120,14 @@ Error = job_splitting.err
 Args = SPLIT dbs_results job_splitting_results
 transfer_input = dbs_results
 transfer_output_files = splitting_results
+# TODO - need to clean this bit up
 #Environment = PATH=/usr/bin:/bin
+Environment = PATH=/usr/bin:/bin
+x509userproxy = %(x509up_file)s
 queue
 """
 
-dbs_discovery_submit_file = crab_headers + crab_meta_headers + \
+DBS_DISCOVERY_SUBMIT_FILE = CRAB_HEADERS + CRAB_META_HEADERS + \
 """
 +TaskType = "DBS"
 universe = local
@@ -155,49 +136,12 @@ Output = dbs_discovery.out
 Error = dbs_discovery.err
 Args = DBS None dbs_results
 transfer_output_files = dbs_results
-#Environment = PATH=/usr/bin:/bin
-queue
-"""
-
-job_recovery_submit_file = crab_headers + crab_meta_headers + \
-"""
-"""
-
-job_submit = crab_headers + \
-"""
-CRAB_Attempt = %(attempt)d
-CRAB_ISB = %(userisburl_flatten)s
-CRAB_AdditionalUserFiles = %(adduserfiles_flatten)s
-CRAB_AdditionalOutputFiles = %(addoutputfiles_flatten)s
-CRAB_JobSW = %(jobsw_flatten)s
-CRAB_JobArch = %(jobarch_flatten)s
-CRAB_Archive = %(cachefilename_flatten)s
-CRAB_Id = $(count)
-+CRAB_Id = $(count)
-+CRAB_Dest = "cms://%(temp_dest)s"
-+TaskType = "Job"
-
-+JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
-job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite
-
-universe = vanilla
-Executable = gWMS-CMSRunAnaly.sh
-Output = job_out.$(CRAB_Id)
-Error = job_err.$(CRAB_Id)
-Log = job_log.$(CRAB_Id)
-Arguments = "-o $(CRAB_AdditionalOutputFiles) -a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) '--inputFile=$(inputFiles)' '--lumiMask=$(runAndLumiMask)' --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) --jobNumber=$(CRAB_Id)"
-transfer_input_files = CMSRunAnaly.sh, cmscp.py
-transfer_output_files = jobReport.json.$(count)
-Environment = SCRAM_ARCH=$(CRAB_JobArch)
-should_transfer_files = YES
+Environment = PATH=/usr/bin:/bin
 x509userproxy = %(x509up_file)s
-# TODO: Uncomment this when we get out of testing mode
-# Requirements = GLIDEIN_CMSSite isnt undefined
-leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 queue
 """
 
-async_submit = crab_headers + \
+ASYNC_SUBMIT = CRAB_HEADERS + \
 """
 +TaskType = "ASO"
 +CRAB_Id = $(count)
@@ -207,7 +151,7 @@ universe = local
 Executable = dag_bootstrap.sh
 Arguments = "ASO $(CRAB_AsyncDest) %(temp_dest)s %(output_dest)s $(count) $(Cluster).$(Process) cmsRun_$(count).log.tar.gz $(outputFiles)"
 Output = aso.$(count).out
-transfer_input_files = job_log.$(count), jobReport.json.$(count)
+transfer_inputFiles = job_log.$(count), jobReport.json.$(count)
 +TransferOutput = ""
 Error = aso.$(count).err
 #Environment = PATH=/usr/bin:/bin
@@ -218,7 +162,12 @@ queue
 
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 
-class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
+def getCRABInfoFromClassAd(ad):
+    info = {}
+    for adName, dictName in SUBMIT_INFO:
+        pass
+
+class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
     """A specialization of the DataWorkflow for submitting to HTCondor DAGMan instead of
        PanDA
     """
@@ -235,62 +184,40 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         if not hasattr(self.config.BossAir, "remoteUserHost"):
 	    self.config.BossAir.remoteUserHost = "submit-4.t2.ucsd.edu"
 
-
-    def getSchedd(self):
-        """
-        Determine a schedd to use for this task.
-        """
-        if not htcondor:
-            return self.config.BossAir.remoteUserHost
-        if self.config and hasattr(self.config.General, 'condorScheddList'):
-            return random.shuffle(self.config.General.condorScheddList, 1)
-        return "localhost"
-
-
-    def getScheddObj(self, name):
-        if htcondor:
-            if name == "localhost":
-                schedd = htcondor.Schedd()
-                with open(htcondor.param['SCHEDD_ADDRESS_FILE']) as fd:
-                    address = fd.read().split("\n")[0]
-            else:
-                coll = htcondor.Collector(self.getCollector())
-                schedd_ad = coll.locate(htcondor.DaemonTypes.Collector, name)
-                address = fd.read()
-                schedd = htcondor.Schedd(schedd_ad)
-            return schedd, address
-        else:
-            return RemoteCondorPlugin.RemoteCondorPlugin(self.config, logger=self.logger), None
-
-
-    def getCollector(self):
-        if self.config and hasattr(self.config.General, 'condorPool'):
-            return self.config.General.condorPool
-        return "localhost"
-
-
-    def getScratchDir(self):
+    def __getscratchdir__(self):
         """
         Returns a scratch dir for working files.
         """
         return "/tmp/crab3"
 
 
-    def getBinDir(self):
+    def _getBinDir(self):
         """
         Returns the directory of pithy shell scripts
 	TODO this is definitely a thing that needs to be fixed for an RPM-deploy
         """
-        return os.path.join(getCRABServerBase(), "bin")
+        # TODO: Nuke this with the rest of the dev hooks
+        binDir = os.path.join(getCRABServerBase(), "bin")
+        if self.config and hasattr(self.config.General, 'binDir'): #pylint: disable=E1103
+            binDir = self.config.General.binDir #pylint: disable=E1103
+        if 'CRAB3_BASEPATH' in os.environ:
+            binDir = os.path.join(os.environ["CRAB3_BASEPATH"], "bin")
+        return os.path.expanduser(binDir)
 
 
     def getTransformLocation(self):
         """
         Returns the location of the PanDA job transform
         """
-	return os.path.join(getCAFUtilitiesBase(), "src", "python",\
-				"transformation", "CMSRunAnaly.sh")
-
+        # TODO: Nuke this with the rest of the dev hooks
+	tDir = os.path.join(getCAFUtilitiesBase(), "src", "python",\
+				"transformation")
+        tDir = "~/projects/CAFUtilities/src/python/transformation"
+        if self.config and hasattr(self.config.General, 'transformDir'): #pylint: disable=E1103
+            tDir = self.config.General.transformDir #pylint: disable=E1103
+        if 'CRAB3_BASEPATH' in os.environ:
+            tDir = os.path.join(os.environ["CRAB3_BASEPATH"], "bin")
+        return os.path.join(os.path.expanduser(tDir), "CMSRunAnaly.sh")
 
     def getRemoteCondorSetup(self):
         """
@@ -336,85 +263,59 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         self.logger.debug("""workflow %s, jobtype %s, jobsw %s, jobarch %s, inputdata %s, siteblacklist %s, sitewhitelist %s, blockwhitelist %s,
                blockblacklist %s, splitalgo %s, algoargs %s, configdoc %s, userisburl %s, cachefilename %s, cacheurl %s, adduserfiles %s, addoutputfiles %s, savelogsflag %s,
                userhn %s, publishname %s, asyncdest %s, campaign %s, blacklistT1 %s, dbsurl %s, publishdbsurl %s, tfileoutfiles %s, edmoutfiles %s, userdn %s,
-               runs %s, lumis %s"""%(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,\
-               blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,\
-               userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,\
+               runs %s, lumis %s"""%(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist, \
+               blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag, \
+               userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, tfileoutfiles, edmoutfiles, userdn, \
                runs, lumis))
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
-        schedd = self.getSchedd()
-        requestname = '%s_%s_%s_%s' % (self.getSchedd(), timestamp, userhn, workflow)
 
-        scratch = self.getScratchDir()
+        dagmanSubmitter = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
+        schedd_name = dagmanSubmitter.getSchedd()
+
+        requestname = '%s_%s_%s_%s' % (schedd_name, timestamp, userhn, workflow)
+
+        scratch = self.__getscratchdir__()
         scratch = os.path.join(scratch, requestname)
         os.makedirs(scratch)
 
+        userproxy = kwargs['userproxy']
+
         # Poor-man's string escaping.  We do this as classad module isn't guaranteed to be present.
-        info = {}
-        for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', 'configdoc', 'userisburl', \
-               'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'campaign', 'dbsurl', 'publishdbsurl', \
-               'userdn', 'requestname':
-            val = locals()[var]
-            if val == None:
-                info[var] = 'undefined'
-            else:
-                info[var] = json.dumps(val)
-
-        for var in 'savelogsflag', 'blacklistT1':
-            info[var] = int(locals()[var])
-
-        for var in 'siteblacklist', 'sitewhitelist', 'blockwhitelist', 'blockblacklist', 'adduserfiles', 'addoutputfiles', \
-               'tfileoutfiles', 'edmoutfiles':
-            val = locals()[var]
-            if val == None:
-                info[var] = "{}"
-            else:
-                info[var] = "{" + json.dumps(val)[1:-1] + "}"
-
-        #TODO: We don't handle user-specified lumi masks correctly.
-        info['lumimask'] = '"' + json.dumps(buildLumiMask(runs, lumis)).replace(r'"', r'\"') + '"'
-        splitArgName = self.splitArgMap[splitalgo]
-        info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : algoargs}).replace('"', r'\"') + '"'
-        info['attempt'] = 0
-
-        for var in ["userisburl", "jobsw", "jobarch", "cachefilename", "asyncdest"]:
-            info[var+"_flatten"] = locals()[var]
-        info["adduserfiles_flatten"] = json.dumps(adduserfiles)
-
-        # TODO: PanDA wrapper wants some sort of dictionary.
-        info["addoutputfiles_flatten"] = '{}'
-
-        info["output_dest"] = os.path.join("/store/user", userhn, workflow, publishname)
-        info["temp_dest"] = os.path.join("/store/temp/user", userhn, workflow, publishname)
-        info['x509up_file'] = os.path.split(kwargs['userproxy'])[-1]
-        info['userproxy'] = kwargs['userproxy']
+        info = escape_strings_to_classads(locals())
         info['remote_condor_setup'] = self.getRemoteCondorSetup()
-        info['bindir'] = self.getBinDir()
-        info['scratch'] = scratch
+        info['bindir'] = self._getBinDir()
         info['transform_location'] = self.getTransformLocation()
 
-        schedd_name = self.getSchedd()
-        schedd, address = self.getScheddObj(schedd_name)
+        schedd, address = dagmanSubmitter.getScheddObj(schedd_name)
 
         with open(os.path.join(scratch, "master_dag"), "w") as fd:
-            fd.write(master_dag_file % info)
+            fd.write(MASTER_DAG_FILE % info)
         with open(os.path.join(scratch, "DBSDiscovery.submit"), "w") as fd:
-            fd.write(dbs_discovery_submit_file % info)
+            fd.write(DBS_DISCOVERY_SUBMIT_FILE % info)
         with open(os.path.join(scratch, "JobSplitting.submit"), "w") as fd:
-            fd.write(job_splitting_submit_file % info)
+            fd.write(JOB_SPLITTING_SUBMIT_FILE % info)
         with open(os.path.join(scratch, "Job.submit"), "w") as fd:
-            fd.write(job_submit % info)
+            fd.write(JOB_SUBMIT % info)
         with open(os.path.join(scratch, 'ASO.submit'), 'w') as fd:
-            fd.write(async_submit % info)
+            fd.write(ASYNC_SUBMIT % info)
 
-        input_files = [os.path.join(self.getBinDir(), "dag_bootstrap.sh"),
-		       os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh"),
+        input_files = [os.path.join(self._getBinDir(), "dag_bootstrap.sh"),
+		       os.path.join(self._getBinDir(), "dag_bootstrap_startup.sh"),
                        self.getTransformLocation(),
-                       os.path.join(self.getBinDir(), "cmscp.py")]
+                       os.path.join(self._getBinDir(), "cmscp.py")]
         scratch_files = ['master_dag', 'DBSDiscovery.submit', 'JobSplitting.submit', 'master_dag', 'Job.submit', 'ASO.submit']
-        input_files.extend([os.path.join(scratch, i) for i in scratch_files])
+        inputFiles.extend([os.path.join(scratch, i) for i in scratch_files])
+        info['inputFilesString'] = ", ".join(inputFiles)
+
+        outputFiles = ["master_dag.dagman.out", "master_dag.rescue.001", "RunJobs.dag",
+            "RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001", "dbs_discovery.err",
+            "dbs_discovery.out", "job_splitting.err", "job_splitting.out"]
+        info['outputFilesString'] = ", ".join(outputFiles)
 
         if address:
-            self.submitDirect(schedd, kwargs['userproxy'], scratch, input_files, info)
+            dagmanSubmitter.submitDirect(schedd,
+                os.path.join(self._getBinDir(), "dag_bootstrap_startup.sh"), 'master_dag',
+                info)
         else:
 	    # testing getting the right directory
 	    requestname_bak = requestname
@@ -426,91 +327,13 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
 	    info['transform_location'] = os.path.basename(info['transform_location'])
 	    info['x509up_file'] = '%s/user.proxy' % requestname
 	    info['userproxy'] = '%s/user.proxy' % requestname
-            jdl = master_dag_submit_file % info
+            jdl = MASTER_DAG_SUBMIT_FILE % info
 
             requestname = requestname_bak
             schedd.submitRaw(requestname, jdl, kwargs['userproxy'], input_files)
 
         return [{'RequestName': requestname}]
     submit = retriveUserCert(clean=False)(submitRaw)
-
-    def submitDirect(self, schedd, userproxy, scratch, input_files, info):
-        """
-        Submit directly to the schedd using the HTCondor module
-        """
-        dag_ad = classad.ClassAd()
-        submit_info = [ \
-            ('CRAB_Workflow', 'workflow'),
-            ('CRAB_ReqName', 'requestname'),
-            ('CRAB_JobType', 'jobtype'),
-            ('CRAB_JobSW', 'jobsw'),
-            ('CRAB_JobArch', 'jobarch'),
-            ('CRAB_InputData', 'inputdata'),
-            ('CRAB_ISB', 'userisburl'),
-            ('CRAB_SiteBlacklist', 'siteblacklist'),
-            ('CRAB_SiteWhitelist', 'sitewhitelist'),
-            ('CRAB_AdditionalUserFiles', 'adduserfiles'),
-            ('CRAB_AdditionalOutputFiles', 'addoutputfiles'),
-            ('CRAB_EDMOutputFiles', 'edmoutfiles'),
-            ('CRAB_TFileOutputFiles', 'tfileoutfiles'),
-            ('CRAB_SaveLogsFlag', 'savelogsflag'),
-            ('CRAB_UserDN', 'userdn'),
-            ('CRAB_UserHN', 'userhn'),
-            ('CRAB_AsyncDest', 'asyncdest'),
-            ('CRAB_Campaign', 'campaign'),
-            ('CRAB_BlacklistT1', 'blacklistT1'),
-            ('CRAB_SplitAlgo', 'splitalgo'),
-            ('CRAB_AlgoArgs', 'algoargs'),
-            ('CRAB_ConfigDoc', 'configdoc'),
-            ('CRAB_PublishName', 'publishname'),
-            ('CRAB_DBSUrl', 'dbsurl'),
-            ('CRAB_PublishDBSUrl', 'publishdbsurl'),
-            ('CRAB_LumiMask', 'lumimask')]
-        for ad_name, dict_name in submit_info:
-             dag_ad[ad_name] = classad.ExprTree(str(info[dict_name]))
-
-        dag_ad["CRAB_Attempt"] = 0
-        dag_ad["JobUniverse"] = 12
-        dag_ad["Out"] = os.path.join(scratch, "request.out")
-        dag_ad["Err"] = os.path.join(scratch, "request.err")
-        dag_ad["Cmd"] = os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh")
-        dag_ad["TransferInput"] = ", ".join(input_files)
-        dag_ad["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
-        dag_ad["TransferOutput"] = "master_dag.dagman.out, master_dag.rescue.001, RunJobs.dag, RunJobs.dag.dagman.out, RunJobs.dag.rescue.001, dbs_discovery.err, dbs_discovery.out, job_splitting.err, job_splitting.out"
-        dag_ad["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
-        dag_ad["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
-        dag_ad["RemoveKillSig"] = "SIGUSR1"
-        dag_ad["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)')
-        dag_ad["RemoteCondorSetup"] = self.getRemoteCondorSetup()
-        dag_ad["Requirements"] = classad.ExprTree('true || false')
-        dag_ad["TaskType"] = "ROOT"
-        dag_ad["X509UserProxy"] = userproxy
-
-        r, w = os.pipe()
-        rpipe = os.fdopen(r, 'r')
-        wpipe = os.fdopen(w, 'w')
-        if os.fork() == 0:
-            try:
-                rpipe.close()
-                try:
-                    result_ads = []
-                    htcondor.SecMan().invalidateAllSessions()
-                    os.environ['X509_USER_PROXY'] = userproxy
-                    cluster = schedd.submit(dag_ad, 1, True, result_ads)
-                    schedd.spool(result_ads)
-                    wpipe.write("OK")
-                    wpipe.close()
-                    os._exit(0)
-                except Exception, e:
-                    wpipe.write(str(traceback.format_exc()))
-            finally:
-                os._exit(1)
-        wpipe.close()
-        results = rpipe.read()
-        if results != "OK":
-            raise Exception("Failure when killing HTCondor task: %s" % results)
-
-        schedd.reschedule()
 
 
     @retriveUserCert(clean=False)
@@ -526,10 +349,11 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         if not WORKFLOW_RE.match(workflow):
             raise Exception("Invalid workflow name.")
 
-        schedd_name = self.getSchedd()
-        schedd, address = self.getScheddObj(schedd_name)
+        dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
+        schedd_name = dag.getSchedd()
+        schedd, address = dag.getScheddObj(schedd_name)
 
-        const = 'CRAB_ReqName =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn)
+        const = 'TaskType =?= \"ROOT\" && CRAB_ReqName =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn)
         if address:
             r, w = os.pipe()
             rpipe = os.fdopen(r, 'r')
@@ -540,7 +364,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
                     try:
                         htcondor.SecMan().invalidateAllSessions()
                         os.environ['X509_USER_PROXY'] = userproxy
-                        schedd.act(htcondor.JobAction.Remove, const)
+                        schedd.act(htcondor.JobAction.Hold, const)
                         wpipe.write("OK")
                         wpipe.close()
                         os._exit(0)
@@ -553,7 +377,57 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             if results != "OK":
                 raise Exception("Failure when submitting to HTCondor: %s" % results)
         else:
-            schedd.kill(const)
+            schedd.hold(const) #pylint: disable=E1103
+
+        # Search for and hold the sub-dag
+        rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
+        rootAttrList = ["ClusterId"]
+        if address:
+            results = schedd.query(rootConst, rootAttrList)
+        else:
+            results = schedd.getClassAds(rootConst, rootAttrList)
+
+        if not results:
+            return
+
+        subDagConst = "DAGManJobId =?= %s && DAGParentNodeNames =?= \"JobSplitting\"" % results[0]["ClusterId"]
+        if address:
+            sub_dag_results = schedd.query(subDagConst, rootAttrList)
+        else:
+            sub_dag_results = schedd.getClassAds(subDagConst, rootAttrList)
+
+        if not sub_dag_results:
+            return
+        finished_jobConst = "DAGManJobId =?= %s && ExitCode =?= 0" % sub_dag_results[0]["ClusterId"]
+
+        if address:
+            r, w = os.pipe()
+            rpipe = os.fdopen(r, 'r')
+            wpipe = os.fdopen(w, 'w')
+            if os.fork() == 0:
+                try:
+                    rpipe.close()
+                    try:
+                        htcondor.SecMan().invalidateAllSessions()
+                        os.environ['X509_USER_PROXY'] = userproxy
+                        schedd.edit(subDagConst, "HoldKillSig", "\"SIGUSR1\"")
+                        schedd.act(htcondor.JobAction.Hold, subDagConst)
+                        schedd.edit(finished_jobConst, "DAGManJobId", "-1")
+                        wpipe.write("OK")
+                        wpipe.close()
+                        os._exit(0)
+                    except Exception, e:
+                        wpipe.write(str(traceback.format_exc()))
+                finally:
+                    os._exit(1)
+            wpipe.close()
+            results = rpipe.read()
+            if results != "OK":
+                raise Exception("Failure when killing job: %s" % results)
+        else:
+            schedd.edit(subDagConst, "HoldKillSig", "SIGUSR1")
+            schedd.hold(const) #pylint: disable=E1103
+
 
 
     def status(self, workflow, userdn):
@@ -569,14 +443,15 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
 
         name = workflow.split("_")[0]
 
-        schedd, address = self.getScheddObj(name)
+        dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
+        schedd, address = dag.getScheddObj(name)
 
-        root_const = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
-        root_attr_list = ["JobStatus", "ExitCode"]
+        rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
+        rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount']
         if address:
-            results = schedd.query(root_const, root_attr_list)
+            results = schedd.query(rootConst, rootAttrList)
         else:
-            results = schedd.getClassAds(root_const, root_attr_list)
+            results = schedd.getClassAds(rootConst, rootAttrList)
 
         if not results:
             self.logger.info("An invalid workflow name was requested: %s" % workflow)
@@ -585,17 +460,18 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         jobsPerStatus = {}
         jobStatus = {}
         jobList = []
-        statusCode = results[0]['JobStatus']
-        codes = {1: 'Idle', 2: 'Running', 4: 'Completed (Success)'}
-        retval = {"status": codes.get(statusCode, 'Unknown'), "taskFailureMsg": "", "jobSetID": workflow,
+        taskStatusCode = results[0]['JobStatus']
+        taskJobCount = results[0].get('CRAB_JobCount', 0)
+        codes = {1: 'Idle', 2: 'Running', 4: 'Completed (Success)', 5: 'Killed'}
+        retval = {"status": codes.get(taskStatusCode, 'Unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
 
-        job_const = "TaskType =?= \"Job\" && CRAB_ReqName =?= \"%s\"" % workflow
+        jobConst = "TaskType =?= \"Job\" && CRAB_ReqName =?= \"%s\"" % workflow
         job_list = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
         if address:
-            results = schedd.query(job_const, job_list)
+            results = schedd.query(jobConst, job_list)
         else:
-            results = schedd.getClassAds(job_const, job_list)
+            results = schedd.getClassAds(jobConst, job_list)
         failedJobs = []
         for result in results:
             jobState = int(result['JobStatus'])
@@ -608,12 +484,12 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
                 statusName = codes.get(jobState, 'Unknown')
             jobStatus[result['CRAB_Id']] = statusName
 
-        job_const = "TaskType =?= \"ASO\" && CRAB_ReqName =?= \"%s\"" % workflow
+        jobConst = "TaskType =?= \"ASO\" && CRAB_ReqName =?= \"%s\"" % workflow
         job_list = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
         if address:
-            results = schedd.query(job_const, job_list)
+            results = schedd.query(jobConst, job_list)
         else:
-            results = schedd.getClassAds(job_const, job_list)
+            results = schedd.getClassAds(jobConst, job_list)
         aso_codes = {1: 'ASO Queued', 2: 'ASO Running', 4: 'Stageout Complete (Success)'}
         for result in results:
             if result['CRAB_Id'] in failedJobs:
@@ -626,6 +502,13 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
                 statusName = aso_codes.get(jobState, 'Unknown')
             jobStatus[result['CRAB_Id']] = statusName
 
+        for i in range(1, taskJobCount+1):
+            if i not in jobStatus:
+                if taskStatusCode == 5:
+                    jobStatus[i] = 'Killed'
+                else:
+                    jobStatus[i] = 'Unsubmitted'
+
         for job, status in jobStatus.items():
             jobsPerStatus.setdefault(status, 0)
             jobsPerStatus[status] += 1
@@ -634,8 +517,8 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         retval["failedJobdefs"] = len(failedJobs)
         retval["totalJobdefs"] = len(jobStatus)
 
-        if len(jobStatus) == 0 and retval['status'] == 'Running':
-            retval['status'] == 'Running (jobs not submitted)'
+        if len(jobStatus) == 0 and taskJobCount == 0 and taskStatusCode == 2:
+            retval['status'] = 'Running (jobs not submitted)'
 
         self.logger.info("Status result for workflow %s: %s" % (workflow, retval))
         #print "Status result for workflow %s: %s" % (workflow, retval)
@@ -655,15 +538,16 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             raise Exception("Invalid workflow name.")
 
         name = workflow.split("_")[0]
-        schedd, address = self.getScheddObj(name)
+        dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
+        schedd, address = dag.getScheddObj(name)
 
-        job_const = 'TaskType =?= \"ASO\"&& CRAB_ReqName =?= \"%s\"' % workflow
+        jobConst = 'TaskType =?= \"ASO\"&& CRAB_ReqName =?= \"%s\"' % workflow
         job_list = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'GlobalJobId', 'OutputSizes', 'OutputPFNs']
 
         if address:
-            results = schedd.query(job_const, job_list)
+            results = schedd.query(jobConst, job_list)
         else:
-            results = schedd.getClassAds(job_const, job_list)
+            results = schedd.getClassAds(jobConst, job_list)
         files = []
         for result in results:
             try:
@@ -679,76 +563,61 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
             return {'result': files[:max]}
         return {'result': files}
 
+    @retriveUserCert(clean=False)
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, userdn, **kwargs):
+        # TODO: In order to take advantage of the updated white/black list, we need
+        # to sneak those into the resubmitted DAG.
 
-    def resubmit(self, workflow, siteblacklist, sitewhitelist, userdn):
+        self.logger.info("About to resubmit workflow: %s." % workflow)
 
+        userproxy = kwargs['userproxy']
         workflow = str(workflow)
         if not WORKFLOW_RE.match(workflow):
             raise Exception("Invalid workflow name.")
-        self.logger.info("Resubmitting workflow %s" % workflow)
-        name = workflow.split("_")[0]
-        schedd, address = self.getScheddObj(name)
 
-        root_const = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\"" % workflow
-        root_attr_list = ["JobStatus", "ExitCode"]
+        dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
+        schedd_name = dag.getSchedd()
+        schedd, address = dag.getScheddObj(schedd_name)
+
+        # Search for and hold the sub-dag
+        rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
+        rootAttrList = ["ClusterId"]
         if address:
-            results = schedd.query(root_const, root_attr_list)
+            results = schedd.query(rootConst, rootAttrList)
         else:
-            results = schedd.getClassAds(root_const, root_attr_list)
+            results = schedd.getClassAds(rootConst, rootAttrList)
+
         if not results:
-            self.logger.info("An invalid workflow name was requested: %s" % workflow)
-            raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
-        attempt = len(results)
+            return
 
-    def resubmitDirect(self, schedd, userdn, requestname, userproxy, scratch, input_files):
-        """
-        Resubmit directly to the schedd using the HTCondor module
-        """
-        dag_ad = classad.ClassAd()
-        dag_ad["CRAB_Attempt"] = 0
-        dag_ad["CRAB_UserDN"] = userdn
-        dag_ad["JobUniverse"] = 12
-        dag_ad["CRAB_ReqName"] = requestname
-        dag_ad["Out"] = os.path.join(scratch, "request.out")
-        dag_ad["Err"] = os.path.join(scratch, "request.err")
-        dag_ad["Cmd"] = os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh")
-        dag_ad["TransferInput"] = ", ".join(input_files)
-        dag_ad["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
-        dag_ad["TransferOutput"] = "master_dag.dagman.out, master_dag.rescue.001, RunJobs.dag, RunJobs.dag.dagman.out, RunJobs.dag.rescue.001, dbs_discovery.err, dbs_discovery.out, job_splitting.err, job_splitting.out"
-        dag_ad["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
-        dag_ad["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
-        dag_ad["RemoveKillSig"] = "SIGUSR1"
-        dag_ad["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)')
-        dag_ad["RemoteCondorSetup"] = self.getRemoteCondorSetup()
-        dag_ad["Requirements"] = classad.ExprTree('true || false')
-        dag_ad["TaskType"] = "ROOT"
-        dag_ad["X509UserProxy"] = userproxy
-
-        r, w = os.pipe()
-        rpipe = os.fdopen(r, 'r')
-        wpipe = os.fdopen(w, 'w')
-        if os.fork() == 0:
-            try:
-                rpipe.close()
+        subDagConst = "DAGManJobId =?= %s && DAGParentNodeNames =?= \"JobSplitting\"" % results[0]["ClusterId"]
+        if address:
+            r, w = os.pipe()
+            rpipe = os.fdopen(r, 'r')
+            wpipe = os.fdopen(w, 'w')
+            if os.fork() == 0:
                 try:
-                    result_ads = []
-                    htcondor.SecMan().invalidateAllSessions()
-                    os.environ['X509_USER_PROXY'] = userproxy
-                    cluster = schedd.submit(dag_ad, 1, True, result_ads)
-                    schedd.spool(result_ads)
-                    wpipe.write("OK")
-                    wpipe.close()
-                    os._exit(0)
-                except Exception, e:
-                    wpipe.write(str(traceback.format_exc()))
-            finally:
-                os._exit(1)
-        wpipe.close()
-        results = rpipe.read()
-        if results != "OK":
-            raise Exception("Failure when killing HTCondor task: %s" % results)
-
-        schedd.reschedule()
+                    rpipe.close()
+                    try:
+                        htcondor.SecMan().invalidateAllSessions()
+                        os.environ['X509_USER_PROXY'] = userproxy
+                        schedd.act(htcondor.JobAction.Release, subDagConst)
+                        schedd.act(htcondor.JobAction.Release, rootConst)
+                        wpipe.write("OK")
+                        wpipe.close()
+                        os._exit(0)
+                    except Exception, e:
+                        wpipe.write(str(traceback.format_exc()))
+                finally:
+                    os._exit(1)
+            wpipe.close()
+            results = rpipe.read()
+            if results != "OK":
+                raise Exception("Failure when killing job: %s" % results)
+        else:
+            schedd.release(subDagConst) #pylint: disable=E1103
+            schedd.release(rootConst) #pylint: disable=E1103
+        
 
 def main():
     dag = DagmanDataWorkflow()

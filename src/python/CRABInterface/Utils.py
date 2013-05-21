@@ -107,18 +107,24 @@ def retriveUserCert(clean=True):
                                   'credServerPath': credServerPath,}
             #print defaultDelegation
             timeleftthreshold = 60 * 60 * 24
-            proxy = Proxy(defaultDelegation)
-            if serverCert:
-                userproxy = proxy.getProxyFilename(serverRenewer=True)
-            else:
-                userproxy = proxy.getProxyFilename()
-            if proxy.getTimeLeft() < timeleftthreshold:
-                proxy.logonRenewMyProxy()
-                timeleft = proxy.getTimeLeft( userproxy )
-                if timeleft is None or timeleft <= 0:
-                    raise InvalidParameter("Impossible to retrieve proxy from %s for %s." %(defaultDelegation['myProxySvr'], defaultDelegation['userDN']))
+            old_ld_library_path = os.environ['LD_LIBRARY_PATH']
+            os.environ['LD_LIBRARY_PATH'] = ''
+            try:
+                proxy = Proxy(defaultDelegation)
+                if serverCert:
+                    userproxy = proxy.getProxyFilename(serverRenewer=True)
+                else:
+                    userproxy = proxy.getProxyFilename()
+                timeleft = proxy.getTimeLeft()
+                if timeleft < timeleftthreshold:
+                    proxy.logonRenewMyProxy()
+                    timeleft = proxy.getTimeLeft( userproxy )
+                    if timeleft is None or timeleft <= 0:
+                        raise InvalidParameter("Impossible to retrieve proxy from %s for %s." %(defaultDelegation['myProxySvr'], defaultDelegation['userDN']))
 
-                logger.debug("User proxy file path: %s" % userproxy)
+                    logger.debug("User proxy file path: %s" % userproxy)
+            finally:
+                os.environ['LD_LIBRARY_PATH'] = old_ld_library_path
             kwargs['userproxy'] = userproxy
             out = func(*args, **kwargs)
             if clean:
