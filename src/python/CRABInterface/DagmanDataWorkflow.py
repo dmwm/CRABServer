@@ -45,7 +45,6 @@ CRAB_META_HEADERS = \
 """
 +CRAB_SplitAlgo = %(splitalgo)s
 +CRAB_AlgoArgs = %(algoargs)s
-+CRAB_ConfigDoc = %(configdoc)s
 +CRAB_PublishName = %(publishname)s
 +CRAB_DBSUrl = %(dbsurl)s
 +CRAB_PublishDBSUrl = %(publishdbsurl)s
@@ -164,11 +163,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         """
         return ""
 
-
-    def submitRaw(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
-               blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,
-               userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
-               runs, lumis, **kwargs): #TODO delete unused parameters
+    def submitRaw(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles, \
+               userhn, userdn, savelogsflag, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis, userproxy=None, **kwargs):
         """Perform the workflow injection into the reqmgr + couch
 
            :arg str workflow: workflow name requested by the user;
@@ -178,20 +174,15 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
            :arg str inputdata: input dataset;
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name;
-           :arg str list blockwhitelist: selective list of input iblock from the specified input dataset;
            :arg str list blockblacklist:  input blocks to be excluded from the specified input dataset;
            :arg str splitalgo: algorithm to be used for the workflow splitting;
            :arg str algoargs: argument to be used by the splitting algorithm;
-           :arg str configdoc: URL of the configuration object ot be used;
-           :arg str userisburl: URL of the input sandbox file;
-           :arg str list adduserfiles: list of additional input files;
            :arg str list addoutputfiles: list of additional output files;
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
            :arg str userdn: DN of user doing the request;
            :arg str userhn: hyper new name of the user doing the request;
            :arg str publishname: name to use for data publication;
            :arg str asyncdest: CMS site name for storage destination of the output files;
-           :arg str campaign: needed just in case the workflow has to be appended to an existing campaign;
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
@@ -199,12 +190,12 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
            :arg str list lumis: list of lumi section numbers
            :returns: a dict which contaians details of the request"""
 
-        self.logger.debug("""workflow %s, jobtype %s, jobsw %s, jobarch %s, inputdata %s, siteblacklist %s, sitewhitelist %s, blockwhitelist %s,
-               blockblacklist %s, splitalgo %s, algoargs %s, configdoc %s, userisburl %s, cachefilename %s, cacheurl %s, adduserfiles %s, addoutputfiles %s, savelogsflag %s,
-               userhn %s, publishname %s, asyncdest %s, campaign %s, blacklistT1 %s, dbsurl %s, publishdbsurl %s, tfileoutfiles %s, edmoutfiles %s, userdn %s,
-               runs %s, lumis %s"""%(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist, \
-               blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag, \
-               userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, publishdbsurl, tfileoutfiles, edmoutfiles, userdn, \
+        self.logger.debug("""workflow %s, jobtype %s, jobsw %s, jobarch %s, inputdata %s, siteblacklist %s, sitewhitelist %s, 
+               splitalgo %s, algoargs %s, cachefilename %s, cacheurl %s, addoutputfiles %s, savelogsflag %s,
+               userhn %s, publishname %s, asyncdest %s, blacklistT1 %s, dbsurl %s, publishdbsurl %s, tfileoutfiles %s, edmoutfiles %s, userdn %s,
+               runs %s, lumis %s"""%(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, \
+               splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles, savelogsflag, \
+               userhn, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, tfileoutfiles, edmoutfiles, userdn, \
                runs, lumis))
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
 
@@ -216,8 +207,6 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         scratch = self.__getscratchdir__()
         scratch = os.path.join(scratch, requestname)
         os.makedirs(scratch)
-
-        userproxy = kwargs['userproxy']
 
         # Poor-man's string escaping.  We do this as classad module isn't guaranteed to be present.
         info = escape_strings_to_classads(locals())
@@ -256,7 +245,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                 info)
         else:
             jdl = MASTER_DAG_SUBMIT_FILE % info
-            schedd.submitRaw(requestname, jdl, kwargs['userproxy'], inputFiles)
+            schedd.submitRaw(requestname, jdl, userproxy, inputFiles)
 
         return [{'RequestName': requestname}]
     submit = retrieveUserCert(submitRaw)
@@ -446,6 +435,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         if len(jobStatus) == 0 and taskJobCount == 0 and taskStatusCode == 2:
             retval['status'] = 'Running (jobs not submitted)'
 
+        retval['jobdefErrors'] = []
+
         self.logger.info("Status result for workflow %s: %s" % (workflow, retval))
         #print "Status result for workflow %s: %s" % (workflow, retval)
 
@@ -554,21 +545,15 @@ def main():
     inputdata = '/GenericTTbar/HC-CMSSW_5_3_1_START53_V5-v1/GEN-SIM-RECO'
     siteblacklist = []
     sitewhitelist = ['T2_US_Nebraska']
-    blockwhitelist = []
-    blockblacklist = []
     splitalgo = "LumiBased"
     algoargs = 40
-    configdoc = ''
-    userisburl = 'https://voatlas178.cern.ch:25443'
     cachefilename = 'default.tgz'
     cacheurl = 'https://voatlas178.cern.ch:25443'
-    adduserfiles = []
     addoutputfiles = []
     savelogsflag = False
     userhn = 'bbockelm'
     publishname = ''
     asyncdest = 'T2_US_Nebraska'
-    campaign = ''
     blacklistT1 = True
     dbsurl = ''
     vorole = 'cmsuser'
@@ -579,9 +564,9 @@ def main():
     userdn = '/CN=Brian Bockelman'
     runs = []
     lumis = []
-    dag.submitRaw(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, blockwhitelist,
-               blockblacklist, splitalgo, algoargs, configdoc, userisburl, cachefilename, cacheurl, adduserfiles, addoutputfiles, savelogsflag,
-               userhn, publishname, asyncdest, campaign, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
+    dag.submitRaw(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, 
+               splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
+               userhn, userdn, savelogsflag, publishname, asyncdest, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
                runs, lumis, userproxy = '/tmp/x509up_u%d' % os.geteuid()) #TODO delete unused parameters
 
 
