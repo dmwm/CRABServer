@@ -9,6 +9,7 @@ from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.Credential.SimpleMyProxy import SimpleMyProxy, MyProxyException
+from WMCore.Credential.Proxy import Proxy
 
 from CRABInterface.Regexps import RX_CERT
 """
@@ -96,13 +97,17 @@ def retrieveUserCert(func):
         timeleftthreshold = 60 * 60 * 24
         mypclient = SimpleMyProxy(defaultDelegation)
         userproxy = None
-        try:
-            userproxy = mypclient.logonRenewMyProxy(username=sha1(serverDN+kwargs['userdn']).hexdigest(), myproxyserver=myproxyserver, myproxyport=7512)
-        except MyProxyException, me:
-            raise InvalidParameter("Impossible to retrieve proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
+        if serverDN:
+            try:
+                userproxy = mypclient.logonRenewMyProxy(username=sha1(str(serverDN)+kwargs['userdn']).hexdigest(), myproxyserver=myproxyserver, myproxyport=7512)
+            except MyProxyException, me:
+                raise InvalidParameter("Impossible to retrieve proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
+            else:
+                if not re.match(RX_CERT, userproxy):
+                    raise InvalidParameter("Retrieved malformed proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
         else:
-            if not re.match(RX_CERT, userproxy):
-                raise InvalidParameter("Retrieved malformed proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
+            proxy = Proxy(defaultDelegation)
+            userproxy = proxy.getProxyFilename()
         kwargs['userproxy'] = userproxy
         out = func(*args, **kwargs)
         return out
