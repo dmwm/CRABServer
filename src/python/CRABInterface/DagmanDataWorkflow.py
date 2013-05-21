@@ -132,7 +132,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         return "/tmp/crab3"
 
 
-    def _getBinDir(self):
+    def __getbindir__(self):
         """
         Returns the directory of pithy shell scripts
         """
@@ -209,9 +209,9 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
 
         dagmanSubmitter = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
-        schedd_name = dagmanSubmitter.getSchedd()
+        scheddName = dagmanSubmitter.getSchedd()
 
-        requestname = '%s_%s_%s_%s' % (schedd_name, timestamp, userhn, workflow)
+        requestname = '%s_%s_%s_%s' % (scheddName, timestamp, userhn, workflow)
 
         scratch = self.__getscratchdir__()
         scratch = os.path.join(scratch, requestname)
@@ -222,10 +222,10 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         # Poor-man's string escaping.  We do this as classad module isn't guaranteed to be present.
         info = escape_strings_to_classads(locals())
         info['remote_condor_setup'] = self.getRemoteCondorSetup()
-        info['bindir'] = self._getBinDir()
+        info['bindir'] = self.__getbindir__()
         info['transform_location'] = self.getTransformLocation()
 
-        schedd, address = dagmanSubmitter.getScheddObj(schedd_name)
+        schedd, address = dagmanSubmitter.getScheddObj(scheddName)
 
         with open(os.path.join(scratch, "master_dag"), "w") as fd:
             fd.write(MASTER_DAG_FILE % info)
@@ -238,9 +238,9 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         with open(os.path.join(scratch, 'ASO.submit'), 'w') as fd:
             fd.write(ASYNC_SUBMIT % info)
 
-        inputFiles = [os.path.join(self._getBinDir(), "dag_bootstrap.sh"),
+        inputFiles = [os.path.join(self.__getbindir__(), "dag_bootstrap.sh"),
                        self.getTransformLocation(),
-                       os.path.join(self._getBinDir(), "cmscp.py")]
+                       os.path.join(self.__getbindir__(), "cmscp.py")]
         scratch_files = ['master_dag', 'DBSDiscovery.submit', 'JobSplitting.submit', 'master_dag', 'Job.submit', 'ASO.submit']
         inputFiles.extend([os.path.join(scratch, i) for i in scratch_files])
         info['inputFilesString'] = ", ".join(inputFiles)
@@ -252,7 +252,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
 
         if address:
             dagmanSubmitter.submitDirect(schedd,
-                os.path.join(self._getBinDir(), "dag_bootstrap_startup.sh"), 'master_dag',
+                os.path.join(self.__getbindir__(), "dag_bootstrap_startup.sh"), 'master_dag',
                 info)
         else:
             jdl = MASTER_DAG_SUBMIT_FILE % info
@@ -276,8 +276,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             raise Exception("Invalid workflow name.")
 
         dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
-        schedd_name = dag.getSchedd()
-        schedd, address = dag.getScheddObj(schedd_name)
+        scheddName = dag.getSchedd()
+        schedd, address = dag.getScheddObj(scheddName)
 
         const = 'TaskType =?= \"ROOT\" && CRAB_ReqName =?= "%s" && CRAB_UserDN =?= "%s"' % (workflow, userdn)
         if address:
@@ -318,13 +318,13 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
 
         subDagConst = "DAGManJobId =?= %s && DAGParentNodeNames =?= \"JobSplitting\"" % results[0]["ClusterId"]
         if address:
-            sub_dag_results = schedd.query(subDagConst, rootAttrList)
+            subDagResults = schedd.query(subDagConst, rootAttrList)
         else:
-            sub_dag_results = schedd.getClassAds(subDagConst, rootAttrList)
+            subDagResults = schedd.getClassAds(subDagConst, rootAttrList)
 
-        if not sub_dag_results:
+        if not subDagResults:
             return
-        finished_jobConst = "DAGManJobId =?= %s && ExitCode =?= 0" % sub_dag_results[0]["ClusterId"]
+        finished_jobConst = "DAGManJobId =?= %s && ExitCode =?= 0" % subDagResults[0]["ClusterId"]
 
         if address:
             r, w = os.pipe()
@@ -356,7 +356,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
 
 
 
-    def status(self, workflow, userdn):
+    def status(self, workflow, userdn, userproxy=None):
         """Retrieve the status of the workflow
 
            :arg str workflow: a valid workflow name
@@ -393,11 +393,11 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
 
         jobConst = "TaskType =?= \"Job\" && CRAB_ReqName =?= \"%s\"" % workflow
-        job_list = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
+        jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
         if address:
-            results = schedd.query(jobConst, job_list)
+            results = schedd.query(jobConst, jobList)
         else:
-            results = schedd.getClassAds(jobConst, job_list)
+            results = schedd.getClassAds(jobConst, jobList)
         failedJobs = []
         for result in results:
             jobState = int(result['JobStatus'])
@@ -411,11 +411,11 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             jobStatus[result['CRAB_Id']] = statusName
 
         jobConst = "TaskType =?= \"ASO\" && CRAB_ReqName =?= \"%s\"" % workflow
-        job_list = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
+        jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
         if address:
-            results = schedd.query(jobConst, job_list)
+            results = schedd.query(jobConst, jobList)
         else:
-            results = schedd.getClassAds(jobConst, job_list)
+            results = schedd.getClassAds(jobConst, jobList)
         aso_codes = {1: 'ASO Queued', 2: 'ASO Running', 4: 'Stageout Complete (Success)'}
         for result in results:
             if result['CRAB_Id'] in failedJobs:
@@ -452,12 +452,12 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         return retval
 
 
-    def outputLocation(self, workflow, max, pandaids):
+    def outputLocation(self, workflow, maxNum, pandaids):
         """
         Retrieves the output LFN from async stage out
 
         :arg str workflow: the unique workflow name
-        :arg int max: the maximum number of output files to retrieve
+        :arg int maxNum: the maximum number of output files to retrieve
         :return: the result of the view as it is."""
         workflow = str(workflow)
         if not WORKFLOW_RE.match(workflow):
@@ -468,12 +468,12 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         schedd, address = dag.getScheddObj(name)
 
         jobConst = 'TaskType =?= \"ASO\"&& CRAB_ReqName =?= \"%s\"' % workflow
-        job_list = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'GlobalJobId', 'OutputSizes', 'OutputPFNs']
+        jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'GlobalJobId', 'OutputSizes', 'OutputPFNs']
 
         if address:
-            results = schedd.query(jobConst, job_list)
+            results = schedd.query(jobConst, jobList)
         else:
-            results = schedd.getClassAds(jobConst, job_list)
+            results = schedd.getClassAds(jobConst, jobList)
         files = []
         for result in results:
             try:
@@ -485,8 +485,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             for idx in range(min(len(outputSizes), len(outputFiles))):
                 files.append({'pfn': outputFiles[idx], 'size': outputSizes[idx]})
 
-        if max > 0:
-            return {'result': files[:max]}
+        if maxNum > 0:
+            return {'result': files[:maxNum]}
         return {'result': files}
 
     @retrieveUserCert
@@ -502,8 +502,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             raise Exception("Invalid workflow name.")
 
         dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
-        schedd_name = dag.getSchedd()
-        schedd, address = dag.getScheddObj(schedd_name)
+        scheddName = dag.getSchedd()
+        schedd, address = dag.getScheddObj(scheddName)
 
         # Search for and hold the sub-dag
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
@@ -532,7 +532,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                         wpipe.write("OK")
                         wpipe.close()
                         os._exit(0)
-                    except Exception, e:
+                    except Exception:
                         wpipe.write(str(traceback.format_exc()))
                 finally:
                     os._exit(1)

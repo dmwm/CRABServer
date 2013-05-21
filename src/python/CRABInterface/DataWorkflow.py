@@ -5,7 +5,6 @@ import logging
 import cherrypy #cherrypy import is needed here because we need the 'start_thread' subscription
 import traceback
 import json
-from hashlib import sha1
 
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
@@ -104,9 +103,6 @@ class DataWorkflow(object):
            :arg int howmany: the limit on the number of PFN to return
            :return: a generator of list of outputs"""
         raise NotImplementedError
-        self.phedex.getPFN(location, pfn)
-
-        return self.getPhyisicalLocation(result)
 
     def schema(self, workflow):
         """Returns the workflow schema parameters.
