@@ -250,20 +250,34 @@ class DataWorkflow(object):
         jobList = []
         totalJobdefs = 0
         failedJobdefs = 0
+        jobDefErrs = []
         for jobdef in rows:
             jobdefid = jobdef[0]
+            jobdefStatus = jobdef[1]
+            jobdefError = jobdef[2].read() if jobdef[2] else ''
+            totalJobdefs += 1
+            self.logger.debug("DB Status for jobdefid %s is %s. %s" % (jobdefid, jobdefStatus, jobdefError))
+
+            #check if the taskworker succeded in the submission
+            if jobdefStatus == 'FAILED':
+                jobDefErrs.append(jobdefError)
+                failedJobdefs += 1
+                continue
+
+            #check the status of the jobdef in panda
             schedEC, res = pserver.getPandIDsWithJobID(jobID=jobdefid, user=userdn, vo='cms', group=vogroup, role=vorole, userproxy=userproxy, credpath=self.credpath)
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
-                jobDefs[-1]["failure"] = "Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC)
-                self.logger.debug(jobDefs[-1]["failure"])
+                jobDefErrs.append("Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC))
+                self.logger.debug(jobDeErrs[-1])
                 failedJobdefs += 1
-            else:
-                self.logger.debug("Iterating on: %s" % res)
-                for jobid, (jobstatus, _) in res.iteritems():
-                    jobsPerStatus[jobstatus] = jobsPerStatus[jobstatus]+1 if jobstatus in jobsPerStatus else 1
-                    jobList.append((jobstatus,jobid))
-            totalJobdefs += 1
+                continue
+
+            #prepare the result at the job granularity
+            self.logger.debug("Iterating on: %s" % res)
+            for jobid, (jobstatus, _) in res.iteritems():
+                jobsPerStatus[jobstatus] = jobsPerStatus[jobstatus]+1 if jobstatus in jobsPerStatus else 1
+                jobList.append((jobstatus,jobid))
 
         status = self._updateTaskStatus(workflow, status, jobsPerStatus)
 
@@ -273,6 +287,7 @@ class DataWorkflow(object):
                   "jobsPerStatus"   : jobsPerStatus,\
                   "failedJobdefs"   : failedJobdefs,\
                   "totalJobdefs"    : totalJobdefs,\
+                  "jobdefErrors"    : jobDefErrs,\
                   "jobList"         : jobList }]
 
     def kill(self, workflow, force, userdn, userproxy=None):
