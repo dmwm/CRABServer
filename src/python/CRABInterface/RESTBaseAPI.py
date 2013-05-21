@@ -8,8 +8,12 @@ from WMCore.REST.Format import JSONFormat
 import Utils
 from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTCampaign import RESTCampaign
+from CRABInterface.RESTJobMetadata import RESTJobMetadata
 from CRABInterface.RESTServerInfo import RESTServerInfo
+from CRABInterface.RESTJobMetadata import RESTJobMetadata
+from CRABInterface.DataJobMetadata import DataJobMetadata
 from CRABInterface.DataWorkflow import DataWorkflow
+from CRABInterface.DataJobMetadata import DataJobMetadata
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.DataCampaign import DataCampaign
 
@@ -28,12 +32,17 @@ class RESTBaseAPI(DatabaseRESTApi):
         self.formats = [ ('application/json', JSONFormat()) ]
 
         #Global initialization of Data objects. Parameters coming from the config should go here
-        DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl, credpath=config.credpath)
+        DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl,\
+                                        credpath=config.credpath, transformation=config.transformation)
+        DataJobMetadata.globalinit(dbapi=self)
         Utils.globalinit(config.serverhostkey, config.serverhostcert, config.serverdn, config.uisource, config.credpath)
 
+        ## TODO need a check to verify the format depending on the resource
+        ##      the RESTJobMetadata has the specifc requirement of getting xml reports
         self._add( {'workflow': RESTUserWorkflow(app, self, config, mount),
                     'campaign': RESTCampaign(app, self, config, mount),
                     'info': RESTServerInfo(app, self, config, mount),
+                    'jobmetadata': RESTJobMetadata(app, self, config, mount),
                    } )
 
         self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None) )

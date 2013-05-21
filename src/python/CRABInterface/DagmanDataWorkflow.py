@@ -23,7 +23,7 @@ except ImportError:
 from WMCore.Configuration import Configuration
 from WMCore.REST.Error import InvalidParameter
 
-from CRABInterface.Utils import retriveUserCert
+from CRABInterface.Utils import retrieveUserCert
 
 import TaskWorker.Actions.DagmanSubmitter
 from TaskWorker.Actions.DagmanCreator import CRAB_HEADERS, JOB_SUBMIT, ASYNC_SUBMIT, escape_strings_to_classads
@@ -259,10 +259,10 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             schedd.submitRaw(requestname, jdl, kwargs['userproxy'], inputFiles)
 
         return [{'RequestName': requestname}]
-    submit = retriveUserCert(clean=False)(submitRaw)
+    submit = retrieveUserCert(submitRaw)
 
 
-    @retriveUserCert(clean=False)
+    @retrieveUserCert
     def kill(self, workflow, force, userdn, **kwargs):
         """Request to Abort a workflow.
 
@@ -489,7 +489,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             return {'result': files[:max]}
         return {'result': files}
 
-    @retriveUserCert(clean=False)
+    @retrieveUserCert
     def resubmit(self, workflow, siteblacklist, sitewhitelist, userdn, **kwargs):
         # TODO: In order to take advantage of the updated white/black list, we need
         # to sneak those into the resubmitted DAG.
