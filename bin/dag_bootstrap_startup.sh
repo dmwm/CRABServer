@@ -1,15 +1,9 @@
 #!/bin/sh
 
 # Touch a bunch of files to make sure job doesn't go on hold for missing files
-master_dag.dagman.out
-master_dag.rescue.001
-RunJobs.dag
-RunJobs.dag.dagman.out
-RunJobs.dag.rescue.001
-dbs_discovery.err
-dbs_discovery.out
-job_splitting.err
-job_splitting.out
+for FILE in master_dag.dagman.out master_dag.rescue.001 RunJobs.dag RunJobs.dag.dagman.out RunJobs.dag.rescue.001 dbs_discovery.err dbs_discovery.out job_splitting.err job_splitting.out; do
+    touch $FILE
+done
 
 # Bootstrap the HTCondor environment
 if [ "X$_CONDOR_JOB_AD" != "X" ];
@@ -25,7 +19,10 @@ export _CONDOR_DAGMAN_LOG=$PWD/master_dag.dagman.out
 export _CONDOR_MAX_DAGMAN_LOG=0
 
 CONDOR_VERSION=`condor_version | head -n 1`
+PROC_ID=`grep '^ProcId =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
+CLUSTER_ID=`grep '^ClusterId =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
+export CONDOR_ID="${CLUSTER_ID}.${PROC_ID}"
 
-echo "condor_dagman -f -l . -Lockfile $PWD/master_dag.lock -AutoRescue 1 -DoRescueFrom 0 -Dag $PWD/master_dag -Suppress_notification -CsdVersion $CONDOR_VERSION -Dagman `which condor_dagman`"
-exec condor_dagman -f -l . -Lockfile $PWD/master_dag.lock -AutoRescue 1 -DoRescueFrom 0 -Dag $PWD/master_dag -Suppress_notification -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION"
+set -x
+exec condor_dagman -f -l . -Lockfile $PWD/master_dag.lock -AutoRescue 1 -DoRescueFrom 0 -Dag $PWD/master_dag -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION"
 

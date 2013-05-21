@@ -88,24 +88,24 @@ master_dag_submit_file = crab_headers + crab_meta_headers + \
 +CRAB_Attempt = 0
 +CRAB_Workflow = %(workflow)s
 +CRAB_UserDN = %(userdn)s
-universe = vanilla
+universe = local
 +CRAB_ReqName = %(requestname)s
-scratch = %(scratch)s
-bindir = %(bindir)s
-output = $(scratch)/request.out
-error = $(scratch)/request.err
-executable = $(bindir)/dag_bootstrap_startup.sh
-transfer_input_files = $(bindir)/dag_bootstrap.sh, $(scratch)/master_dag, $(scratch)/DBSDiscovery.submit, $(scratch)/JobSplitting.submit, $(scratch)/Job.submit, $(scratch)/ASO.submit, %(transform_location)s
+output = request.out
+error = request.err
+executable = dag_bootstrap_startup.sh
+transfer_input_files = dag_bootstrap.sh, master_dag, DBSDiscovery.submit, JobSplitting.submit, Job.submit, ASO.submit, %(transform_location)s
 transfer_output_files = master_dag.dagman.out, master_dag.rescue.001, RunJobs.dag, RunJobs.dag.dagman.out, RunJobs.dag.rescue.001, dbs_discovery.err, dbs_discovery.out, job_splitting.err, job_splitting.out
 leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 on_exit_remove = ( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))
 +OtherJobRemoveRequirements = DAGManJobId =?= ClusterId
 remove_kill_sig = SIGUSR1
-+Environment= strcat("PATH=/usr/bin:/bin CONDOR_ID=", ClusterId, ".", ProcId)
+#+Environment= strcat("CONDOR_ID=", ClusterId, ".", ProcId)
 +RemoteCondorSetup = "%(remote_condor_setup)s"
 +TaskType = "ROOT"
 X509UserProxy = %(userproxy)s
+getenv = True
 queue 1
+
 """
 
 resubmit_dag_submit_file = \
@@ -142,7 +142,7 @@ Error = job_splitting.err
 Args = SPLIT dbs_results job_splitting_results
 transfer_input = dbs_results
 transfer_output_files = splitting_results
-Environment = PATH=/usr/bin:/bin
+#Environment = PATH=/usr/bin:/bin
 queue
 """
 
@@ -155,7 +155,7 @@ Output = dbs_discovery.out
 Error = dbs_discovery.err
 Args = DBS None dbs_results
 transfer_output_files = dbs_results
-Environment = PATH=/usr/bin:/bin
+#Environment = PATH=/usr/bin:/bin
 queue
 """
 
@@ -210,7 +210,7 @@ Output = aso.$(count).out
 transfer_input_files = job_log.$(count), jobReport.json.$(count)
 +TransferOutput = ""
 Error = aso.$(count).err
-Environment = PATH=/usr/bin:/bin
+#Environment = PATH=/usr/bin:/bin
 x509userproxy = %(x509up_file)s
 leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 queue
@@ -233,7 +233,7 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         self.config.section_("BossAir")
         self.config.section_("General")
         if not hasattr(self.config.BossAir, "remoteUserHost"):
-            self.config.BossAir.remoteUserHost = "cmssubmit-r1.t2.ucsd.edu"
+	    self.config.BossAir.remoteUserHost = "submit-4.t2.ucsd.edu"
 
 
     def getSchedd(self):
@@ -416,12 +416,19 @@ class DagmanDataWorkflow(DataWorkflow.DataWorkflow):
         if address:
             self.submitDirect(schedd, kwargs['userproxy'], scratch, input_files, info)
         else:
+	    # testing getting the right directory
+	    requestname_bak = requestname
+	    requestname = './'
+
+	    info['iwd'] = '%s/' % requestname_bak
 	    info['scratch'] = '%s/' % requestname
 	    info['bindir'] = '%s/' % requestname
-	    info['transform_location'] = '%s/%s' % (requestname, os.path.basename(info['transform_location']))
+	    info['transform_location'] = os.path.basename(info['transform_location'])
 	    info['x509up_file'] = '%s/user.proxy' % requestname
 	    info['userproxy'] = '%s/user.proxy' % requestname
             jdl = master_dag_submit_file % info
+
+            requestname = requestname_bak
             schedd.submitRaw(requestname, jdl, kwargs['userproxy'], input_files)
 
         return [{'RequestName': requestname}]
