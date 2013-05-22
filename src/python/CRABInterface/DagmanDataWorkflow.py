@@ -25,6 +25,11 @@ from WMCore.REST.Error import InvalidParameter
 
 from CRABInterface.Utils import retrieveUserCert
 
+# FIXME really clean up these imports
+from CRABInterface.CRABServerBase import getCRABServerBase
+from TaskDB.CAFUtilitiesBase import getCAFUtilitiesBase
+
+import DataWorkflow
 import TaskWorker.Actions.DagmanSubmitter
 from TaskWorker.Actions.DagmanCreator import CRAB_HEADERS, JOB_SUBMIT, ASYNC_SUBMIT, escape_strings_to_classads
 from TaskWorker.Actions.DagmanSubmitter import MASTER_DAG_SUBMIT_FILE, CRAB_HEADERS, CRAB_META_HEADERS, SUBMIT_INFO
@@ -61,6 +66,8 @@ Error = job_splitting.err
 Args = SPLIT dbs_results job_splitting_results
 transfer_input = dbs_results
 transfer_output_files = splitting_results
+# TODO - need to clean this bit up
+#Environment = PATH=/usr/bin:/bin
 Environment = PATH=/usr/bin:/bin
 x509userproxy = %(x509up_file)s
 queue
@@ -93,7 +100,7 @@ Output = aso.$(count).out
 transfer_inputFiles = job_log.$(count), jobReport.json.$(count)
 +TransferOutput = ""
 Error = aso.$(count).err
-Environment = PATH=/usr/bin:/bin
+#Environment = PATH=/usr/bin:/bin
 x509userproxy = %(x509up_file)s
 leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 queue
@@ -120,9 +127,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             self.config = Configuration()
         self.config.section_("BossAir")
         self.config.section_("General")
-        if not hasattr(self.config.BossAir, "remoteUserHost"): #pylint: disable=E1103
-            self.config.BossAir.remoteUserHost = "cmssubmit-r1.t2.ucsd.edu" #pylint: disable=E1103
-
+        if not hasattr(self.config.BossAir, "remoteUserHost"):
+	    self.config.BossAir.remoteUserHost = "submit-4.t2.ucsd.edu"
 
     def __getscratchdir__(self):
         """
@@ -134,9 +140,10 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
     def __getbindir__(self):
         """
         Returns the directory of pithy shell scripts
+	TODO this is definitely a thing that needs to be fixed for an RPM-deploy
         """
         # TODO: Nuke this with the rest of the dev hooks
-        binDir = os.path.expanduser("~/projects/CRABServer/bin")
+        binDir = os.path.join(getCRABServerBase(), "bin")
         if self.config and hasattr(self.config.General, 'binDir'): #pylint: disable=E1103
             binDir = self.config.General.binDir #pylint: disable=E1103
         if 'CRAB3_BASEPATH' in os.environ:
@@ -149,13 +156,14 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         Returns the location of the PanDA job transform
         """
         # TODO: Nuke this with the rest of the dev hooks
+	tDir = os.path.join(getCAFUtilitiesBase(), "src", "python",\
+				"transformation")
         tDir = "~/projects/CAFUtilities/src/python/transformation"
         if self.config and hasattr(self.config.General, 'transformDir'): #pylint: disable=E1103
             tDir = self.config.General.transformDir #pylint: disable=E1103
         if 'CRAB3_BASEPATH' in os.environ:
             tDir = os.path.join(os.environ["CRAB3_BASEPATH"], "bin")
         return os.path.join(os.path.expanduser(tDir), "CMSRunAnaly.sh")
-
 
     def getRemoteCondorSetup(self):
         """
@@ -228,6 +236,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             fd.write(ASYNC_SUBMIT % info)
 
         inputFiles = [os.path.join(self.__getbindir__(), "dag_bootstrap.sh"),
+		       os.path.join(self.__getbindir__(), "dag_bootstrap_startup.sh"),
                        self.getTransformLocation(),
                        os.path.join(self.__getbindir__(), "cmscp.py")]
         scratch_files = ['master_dag', 'DBSDiscovery.submit', 'JobSplitting.submit', 'master_dag', 'Job.submit', 'ASO.submit']
@@ -244,8 +253,19 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                 os.path.join(self.__getbindir__(), "dag_bootstrap_startup.sh"), 'master_dag',
                 info)
         else:
+	    # testing getting the right directory
+	    requestname_bak = requestname
+	    requestname = './'
+
+	    info['iwd'] = '%s/' % requestname_bak
+	    info['scratch'] = '%s/' % requestname
+	    info['bindir'] = '%s/' % requestname
+	    info['transform_location'] = os.path.basename(info['transform_location'])
+	    info['x509up_file'] = '%s/user.proxy' % requestname
+	    info['userproxy'] = '%s/user.proxy' % requestname
             jdl = MASTER_DAG_SUBMIT_FILE % info
-            schedd.submitRaw(requestname, jdl, userproxy, inputFiles)
+            requestname = requestname_bak
+            schedd.submitRaw(requestname, jdl, kwargs['userproxy'], input_files)
 
         return [{'RequestName': requestname}]
     submit = retrieveUserCert(submitRaw)

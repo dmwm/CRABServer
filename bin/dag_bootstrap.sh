@@ -41,6 +41,21 @@ export PYTHONPATH=$PWD:$PWD/CRAB3.zip:$PYTHONPATH
 # TODO: Remove the below lines before the first release.
 export PYTHONPATH=~/projects/CAFTaskWorker/src/python:$PYTHONPATH
 
+echo "Checking for classad hack at path $HOME/classad_hack_library on host ..."
+if [ -d ~/classad_hack_library ]; then
+    echo "Engaging classad hack in dag_bootstrap.sh"
+    export PYTHONPATH=$PYTHONPATH:~/classad_hack_library
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/classad_hack_library
+    echo "pythonpath: $PYTHONPATH"
+    echo "library path: $LD_LIBRARY_PATH"
+fi
+
+if [[ "x$X509_USER_PROXY" = "x" ]]; then
+    export X509_USER_PROXY=$(pwd)/user.proxy
+fi
+
+export PATH="/opt/glidecondor/bin:/opt/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
+env
 echo "Now running the job in `pwd`..."
 exec python2.6 -m TaskWorker.TaskManagerBootstrap "$@"
 
