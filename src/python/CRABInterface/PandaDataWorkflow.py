@@ -1,8 +1,11 @@
+import re
 import PandaServerInterface as pserver
+from WMCore.REST.Error import ExecutionError, InvalidParameter
 from CRABInterface.DataWorkflow import DataWorkflow
 from Databases.TaskDB.Oracle.Task.ID import ID
 from Databases.TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
-
+from Databases.FileMetaDataDB.Oracle.FileMetaData.GetFromPandaIds import GetFromPandaIds
+from CRABInterface.Utils import conn_handler
 
 class PandaDataWorkflow(DataWorkflow):
     """ Panda implementation of the status command.
@@ -67,3 +70,60 @@ class PandaDataWorkflow(DataWorkflow):
                   "totalJobdefs"    : totalJobdefs,\
                   "jobdefErrors"    : jobDefErrs,\
                   "jobList"         : jobList }]
+
+    def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
+        self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
+        statusRes = self.status(workflow, userdn, userproxy)[0]
+
+        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring']]
+        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
+        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, userdn, userproxy)
+
+    def output(self, workflow, howmany, jobids, userdn, userproxy=None):
+        self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
+        statusRes = self.status(workflow, userdn, userproxy)[0]
+
+        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring']]
+        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
+        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE'], transferingIds, finishedIds, userdn, userproxy)
+
+    @conn_handler(services=['phedex'])
+    def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, userproxy=None):
+        """
+        Retrieves the output PFN aggregating output in final and temporary locations.
+
+        :arg str workflow: the unique workflow name
+        :arg int howmany: the limit on the number of PFN to return
+        :return: a generator of list of outputs"""
+
+        #check that the jobids passed by the user are finished
+        for jobid in jobids:
+            if not jobid in transferingIds + finishedIds:
+                raise InvalidParameter("The job with id %s is not finished" % jobid)
+
+        #If the user do not give us jobids set them to all possible ids
+        if not jobids:
+            jobids = transferingIds + finishedIds
+
+        #user did not give us ids and no ids available in the task
+        if not jobids:
+            self.logger.info("No finished jobs found in the task")
+            return
+
+        self.logger.debug("Retrieving output of jobs: %s" % jobids)
+        rows = self.api.query(None, None, GetFromPandaIds.sql, types=','.join(filetype), taskname=workflow, jobids=','.join(map(str,jobids)),\
+                                        limit=str(howmany) if howmany else str(len(jobids)*100))
+
+        for row in rows:
+            if row[7] in finishedIds:
+                lfn = re.sub('^/store/temp/', '/store/', row[0])
+                pfn = self.phedex.getPFN(row[1], lfn)[(row[1], lfn)]
+            elif row[7] in transferingIds:
+                pfn = self.phedex.getPFN(row[2], row[0])[(row[2], row[0])]
+            else:
+                continue
+
+            yield { 'pfn' : pfn,
+                    'size' : row[3],
+                    'checksum' : {'cksum' : row[4], 'md5' : row[5], 'adler31' : row[6]}
+            }
