@@ -30,9 +30,14 @@ class DataUserWorkflow(object):
              use a field in the monitoring with the name of parent workflow (original
              workflows will have the campaign name as parent)."""
 
+    @staticmethod
+    def globalinit(workflowManager):
+        DataUserWorkflow.workflowManager = workflowManager
+
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataUserWorkflow")
-        self.workflow = DataWorkflow()
+        mod = __import__('CRABInterface.%s' % self.workflowManager, fromlist=self.workflowManager)
+        self.workflow = getattr(mod, self.workflowManager)()
 
     def getLatests(self, user, limit, timestamp):
         """Retrives the latest workflows for the user
