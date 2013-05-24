@@ -41,7 +41,8 @@ class RESTJobMetadata(RESTEntity):
             validate_str("checksummd5", param, safe, RX_CHECKSUM, optional=False)
             validate_str("checksumcksum", param, safe, RX_CHECKSUM, optional=False)
             validate_str("checksumadler32", param, safe, RX_CHECKSUM, optional=False)
-            validate_str("outlocation", param, safe, RX_CMSSITE, optional=False)#TODO I am using the sitename. Is that right? otherwise we need a regex
+            validate_str("outlocation", param, safe, RX_CMSSITE, optional=False)
+            validate_str("outtmplocation", param, safe, RX_CMSSITE, optional=False)
             validate_str("acquisitionera", param, safe, RX_WORKFLOW, optional=False)#TODO Do we really need this?
             validate_str("outdatasetname", param, safe, RX_LFN, optional=False)#TODO temporary, need to come up with a regex
             validate_str("outlfn", param, safe, RX_LFN, optional=False)
@@ -56,12 +57,12 @@ class RESTJobMetadata(RESTEntity):
 
     @restcall
     def put(self, taskname, outfilelumis, inparentlfns, globalTag, outfileruns, pandajobid, outsize, publishdataname, appver, outtype, checksummd5,\
-                checksumcksum, checksumadler32, outlocation, outdatasetname, acquisitionera, outlfn, events):
+                checksumcksum, checksumadler32, outlocation, outtmplocation, outdatasetname, acquisitionera, outlfn, events):
         """Insert a new job metadata information"""
         return self.jobmetadata.inject(taskname=taskname, outfilelumis=outfilelumis, inparentlfns=inparentlfns, globalTag=globalTag, outfileruns=outfileruns,\
                            pandajobid=pandajobid, outsize=outsize, publishdataname=publishdataname, appver=appver, outtype=outtype, checksummd5=checksummd5,\
-                           checksumcksum=checksumcksum, checksumadler32=checksumadler32, outlocation=outlocation, outdatasetname=outdatasetname,\
-                           acquisitionera=acquisitionera, outlfn=outlfn, events=events)
+                           checksumcksum=checksumcksum, checksumadler32=checksumadler32, outlocation=outlocation, outtmplocation=outtmplocation,\
+                           outdatasetname=outdatasetname, acquisitionera=acquisitionera, outlfn=outlfn, events=events)
 
     @restcall
     def post(self):

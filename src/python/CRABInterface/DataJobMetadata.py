@@ -29,6 +29,7 @@ class DataJobMetadata(object):
                         fmd_global_tag AS globaltag,
                         fmd_publish_name AS publishname,
                         fmd_location AS location,
+                        fmd_tmp_location AS tmplocation,
                         fmd_runlumi AS runlumi,
                         fmd_adler32 AS adler32,
                         fmd_cksum AS cksum,
@@ -50,13 +51,14 @@ class DataJobMetadata(object):
                    'globaltag': row[5],
                    'publishname': row[6],
                    'location': row[7],
-                   'runlumi': literal_eval(row[8].read()),
-                   'adler32': row[9],
-                   'cksum': row[10],
-                   'md5': row[11],
-                   'lfn': row[12],
-                   'filesize': row[13],
-                   'parents': literal_eval(row[14].read()),}
+                   'tmplocation': row[8],
+                   'runlumi': literal_eval(row[9].read()),
+                   'adler32': row[10],
+                   'cksum': row[11],
+                   'md5': row[12],
+                   'lfn': row[13],
+                   'filesize': row[14],
+                   'parents': literal_eval(row[15].read()),}
 
     def inject(self, *args, **kwargs):
         self.logger.debug("Calling jobmetadata inject with parameters %s" % kwargs)
