@@ -6,18 +6,18 @@ from WMCore.REST.Validation import validate_str, validate_strlist, validate_num,
 # CRABServer dependecies here
 from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
 from CRABInterface.Regexps import *
-from CRABInterface.DataJobMetadata import DataJobMetadata
+from CRABInterface.DataFileMetadata import DataFileMetadata
 
 # external dependecies here
 import cherrypy
 
 
-class RESTJobMetadata(RESTEntity):
+class RESTFileMetadata(RESTEntity):
     """REST entity to handle job metadata information"""
 
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
-        self.jobmetadata = DataJobMetadata()
+        self.jobmetadata = DataFileMetadata()
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
