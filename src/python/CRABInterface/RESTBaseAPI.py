@@ -1,8 +1,10 @@
 import logging
+from commands import getstatusoutput
 
 # WMCore dependecies here
 from WMCore.REST.Server import DatabaseRESTApi
 from WMCore.REST.Format import JSONFormat
+from WMCore.REST.Error import ExecutionError
 
 # CRABServer dependecies here
 import Utils
@@ -31,17 +33,21 @@ class RESTBaseAPI(DatabaseRESTApi):
 
         self.formats = [ ('application/json', JSONFormat()) ]
 
+        status, serverdn = getstatusoutput('openssl x509 -noout -subject -in %s | cut -f2- -d\ ' % config.serverhostcert)
+        if status is not 0:                                                                                                                                                                                                        
+            raise ExecutionError("Internal issue when retrieving crabserver service DN.")
+
         #Global initialization of Data objects. Parameters coming from the config should go here
         DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl,\
                                         credpath=config.credpath, transformation=config.transformation)
         DataJobMetadata.globalinit(dbapi=self)
-        Utils.globalinit(config.serverhostkey, config.serverhostcert, config.serverdn, config.uisource, config.credpath)
+        Utils.globalinit(config.serverhostkey, config.serverhostcert, serverdn, config.credpath)
 
         ## TODO need a check to verify the format depending on the resource
         ##      the RESTJobMetadata has the specifc requirement of getting xml reports
         self._add( {'workflow': RESTUserWorkflow(app, self, config, mount),
                     'campaign': RESTCampaign(app, self, config, mount),
-                    'info': RESTServerInfo(app, self, config, mount),
+                    'info': RESTServerInfo(app, self, config, mount, serverdn),
                     'jobmetadata': RESTJobMetadata(app, self, config, mount),
                    } )
 

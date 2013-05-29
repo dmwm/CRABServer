@@ -5,8 +5,6 @@ import json
 
 # WMCore dependecies here
 from WMCore.REST.Error import InvalidParameter, ExecutionError, MissingObject
-from WMCore.Database.CMSCouch import CouchServer, CouchError, CouchNotFoundError
-from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 
 #CRAB dependencies
 from CRABInterface.DataWorkflow import DataWorkflow
