@@ -10,12 +10,10 @@ from WMCore.REST.Error import ExecutionError
 import Utils
 from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTCampaign import RESTCampaign
-from CRABInterface.RESTJobMetadata import RESTJobMetadata
 from CRABInterface.RESTServerInfo import RESTServerInfo
-from CRABInterface.RESTJobMetadata import RESTJobMetadata
-from CRABInterface.DataJobMetadata import DataJobMetadata
+from CRABInterface.RESTFileMetadata import RESTFileMetadata
+from CRABInterface.DataFileMetadata import DataFileMetadata
 from CRABInterface.DataWorkflow import DataWorkflow
-from CRABInterface.DataJobMetadata import DataJobMetadata
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.DataCampaign import DataCampaign
 
@@ -34,7 +32,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         self.formats = [ ('application/json', JSONFormat()) ]
 
         status, serverdn = getstatusoutput('openssl x509 -noout -subject -in %s | cut -f2- -d\ ' % config.serverhostcert)
-        if status is not 0:                                                                                                                                                                                                        
+        if status is not 0:
             raise ExecutionError("Internal issue when retrieving crabserver service DN.")
 
         #Global initialization of Data objects. Parameters coming from the config should go here
@@ -45,11 +43,11 @@ class RESTBaseAPI(DatabaseRESTApi):
         Utils.globalinit(config.serverhostkey, config.serverhostcert, serverdn, config.credpath)
 
         ## TODO need a check to verify the format depending on the resource
-        ##      the RESTJobMetadata has the specifc requirement of getting xml reports
+        ##      the RESTFileMetadata has the specifc requirement of getting xml reports
         self._add( {'workflow': RESTUserWorkflow(app, self, config, mount),
                     'campaign': RESTCampaign(app, self, config, mount),
                     'info': RESTServerInfo(app, self, config, mount, serverdn),
-                    'jobmetadata': RESTJobMetadata(app, self, config, mount),
+                    'filemetadata': RESTFileMetadata(app, self, config, mount),
                    } )
 
         self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None) )
