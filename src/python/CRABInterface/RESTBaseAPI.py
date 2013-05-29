@@ -38,6 +38,7 @@ class RESTBaseAPI(DatabaseRESTApi):
             raise ExecutionError("Internal issue when retrieving crabserver service DN.")
 
         #Global initialization of Data objects. Parameters coming from the config should go here
+        DataUserWorkflow.globalinit(config.workflowManager)
         DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl,\
                                         credpath=config.credpath, transformation=config.transformation)
         DataJobMetadata.globalinit(dbapi=self)
