@@ -26,7 +26,7 @@ RX_RUNS      = re.compile(r"^\d+$")
 RX_LUMIRANGE  = re.compile(r"^\d+,\d+(,\d+,\d+)*$")
 RX_LUMILIST  = re.compile(r"^\d+(,\d+)*$")
 RX_GLOBALTAG = re.compile(r'^[a-zA-Z0-9\s\.\-_:]{1,100}$')
-RX_OUTTYPES  = re.compile(r'^EDM|LOG$')
+RX_OUTTYPES  = re.compile(r'^EDM|LOG|TFILE$')
 RX_LFN       = re.compile(r'.*')#TODO find out the right regular expression. Maybe in relation with previous WMCore Lexicon merge(see TODO at the beginning). BTW, Lexicon has 5 regexp for lfn
 RX_CHECKSUM  = re.compile(r'^[A-Za-z0-9\-]+$')#TODO check the format of checksum
 
