@@ -69,7 +69,6 @@ class DataWorkflow(object):
            :arg int shortformat: a flag indicating if the user is asking for detailed
                                  information about sites and list of errors
            :return: a list of errors grouped by exit code, error reason, site"""
-
         raise NotImplementedError
 
     def report(self, workflow):
@@ -78,21 +77,18 @@ class DataWorkflow(object):
 
            :arg str workflow: a workflow name
            :return: what?"""
-
         raise NotImplementedError
 
-    def logs(self, workflow, howmany, exitcode, pandaids):
+    def logs(self, workflow, howmany, exitcode, jobids):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
 
            :arg str workflow: a workflow name
            :arg int howmany: the limit on the number of PFN to return
            :arg int exitcode: the log has to be of a job ended with this exit_code
            :return: (a generator of?) a list of logs pfns"""
-        #default is 1 logfile per exitcode
-        self.logger.info("Retrieving %s log(s) for %s" % (howmany, workflow))
         raise NotImplementedError
 
-    def output(self, workflow, howmany):
+    def output(self, workflow, howmany, jobids):
         """
         Retrieves the output PFN aggregating output in final and temporary locations.
 
@@ -100,9 +96,6 @@ class DataWorkflow(object):
            :arg int howmany: the limit on the number of PFN to return
            :return: a generator of list of outputs"""
         raise NotImplementedError
-        self.phedex.getPFN(location, pfn)
-
-        return self.getPhyisicalLocation(result)
 
     def schema(self, workflow):
         """Returns the workflow schema parameters.
@@ -113,7 +106,6 @@ class DataWorkflow(object):
         # TODO: verify + code the above point
         # probably we need to explicitely select the schema parameters to return
         raise NotImplementedError
-        return [{}]
 
     @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
