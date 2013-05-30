@@ -104,6 +104,8 @@ class PandaDataWorkflow(DataWorkflow):
         #If the user do not give us jobids set them to all possible ids
         if not jobids:
             jobids = transferingIds + finishedIds
+        else:
+            howmany = -1 #if the user specify the jobids return all possible files with those ids
 
         #user did not give us ids and no ids available in the task
         if not jobids:
@@ -112,7 +114,7 @@ class PandaDataWorkflow(DataWorkflow):
 
         self.logger.debug("Retrieving output of jobs: %s" % jobids)
         rows = self.api.query(None, None, GetFromPandaIds.sql, types=','.join(filetype), taskname=workflow, jobids=','.join(map(str,jobids)),\
-                                        limit=str(howmany) if howmany else str(len(jobids)*100))
+                                        limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
 
         for row in rows:
             if row[7] in finishedIds:
