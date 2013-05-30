@@ -97,6 +97,8 @@ class RESTUserWorkflow(RESTEntity):
             #validation parameters
             if not safe.kwargs['workflow'] and safe.kwargs['subresource']:
                 raise InvalidParameter("Invalid input parameters")
+            if safe.kwargs['subresource'] in ['data', 'logs'] and not safe.kwargs['limit'] and not safe.kwargs['jobids']:
+                raise InvalidParameter("You need to specify the number of jobs to retrieve or their ids.")
 
         elif method in ['DELETE']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)

@@ -39,7 +39,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         DataUserWorkflow.globalinit(config.workflowManager)
         DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl,\
                                         credpath=config.credpath, transformation=config.transformation)
-        DataJobMetadata.globalinit(dbapi=self)
+        DataFileMetadata.globalinit(dbapi=self)
         Utils.globalinit(config.serverhostkey, config.serverhostcert, serverdn, config.credpath)
 
         ## TODO need a check to verify the format depending on the resource
