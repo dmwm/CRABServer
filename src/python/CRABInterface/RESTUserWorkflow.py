@@ -81,22 +81,24 @@ class RESTUserWorkflow(RESTEntity):
         elif method in ['GET']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=True)
             validate_str('subresource', param, safe, RX_SUBRESTAT, optional=True)
+
             #parameters of subresources calls has to be put here
             #used by get latest
             validate_num('age', param, safe, optional=True)
+
             #used by get log, get data
             validate_num('limit', param, safe, optional=True)
             validate_num('exitcode', param, safe, optional=True)
-            validate_numlist('pandaids', param, safe)
-            if safe.kwargs['subresource'] not in ['data', 'logs'] and (safe.kwargs['limit'] is not None or \
-                                                safe.kwargs['exitcode'] is not None or safe.kwargs['pandaids']):
-                raise InvalidParameter("Invalid input parameters")
+            validate_numlist('jobids', param, safe)
+
             #used by errors
             validate_num('shortformat', param, safe, optional=True)
-            if safe.kwargs['subresource'] not in ['errors'] and safe.kwargs['shortformat'] is not None:
-                raise InvalidParameter("Invalid input parameters")
+
+            #validation parameters
             if not safe.kwargs['workflow'] and safe.kwargs['subresource']:
                 raise InvalidParameter("Invalid input parameters")
+            if safe.kwargs['subresource'] in ['data', 'logs'] and not safe.kwargs['limit'] and not safe.kwargs['jobids']:
+                raise InvalidParameter("You need to specify the number of jobs to retrieve or their ids.")
 
         elif method in ['DELETE']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
@@ -160,7 +162,7 @@ class RESTUserWorkflow(RESTEntity):
         return [{"result":"ok"}]
 
     @restcall
-    def get(self, workflow, subresource, age, limit, shortformat, exitcode, pandaids):
+    def get(self, workflow, subresource, age, limit, shortformat, exitcode, jobids):
         """Retrieves the workflow information, like a status summary, in case the workflow unique name is specified.
            Otherwise returns all workflows since (now - age) for which the user is the owner.
            The caller needs to be a valid CMS user.
@@ -174,14 +176,15 @@ class RESTUserWorkflow(RESTEntity):
                     the requested subresource."""
         result = []
         if workflow:
+            userdn=cherrypy.request.headers['Cms-Authn-Dn']
             # if have the wf then retrieve the wf status summary
             if not subresource:
-                result = self.userworkflowmgr.status(workflow, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+                result = self.userworkflowmgr.status(workflow, userdn=userdn)
             # if have a subresource then it should be one of these
             elif subresource == 'logs':
-                result = self.userworkflowmgr.logs(workflow, limit, exitcode, pandaids)
+                result = self.userworkflowmgr.logs(workflow, limit, exitcode, jobids, userdn=userdn)
             elif subresource == 'data':
-                result = self.userworkflowmgr.output(workflow, limit, pandaids)
+                result = self.userworkflowmgr.output(workflow, limit, jobids, userdn=userdn)
             elif subresource == 'errors':
                 result = self.userworkflowmgr.errors(workflow, shortformat)
             elif subresource == 'report':

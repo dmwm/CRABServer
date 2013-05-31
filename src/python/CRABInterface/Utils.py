@@ -21,7 +21,7 @@ CMSSitesCache = namedtuple("CMSSitesCache", ["cachetime", "sites"])
 serverCert = None
 serverKey = None
 serverDN = None
-credServerPath = None                                                                                                                                                                                                     
+credServerPath = None
 
 def globalinit(serverkey, servercert, serverdn, credpath):
     global serverCert, serverKey, serverDN, credServerPath

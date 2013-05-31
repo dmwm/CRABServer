@@ -30,3 +30,6 @@ data.serverhostkey = "%s/auth/crabserver/dmwm-service-key.pem" % __file__.rsplit
 data.delegatedn = []
 data.credpath = '%s/state/crabserver/proxy/' % __file__.rsplit('/', 4)[0]
 data.db = 'CRABServerAuth.dbconfig'
+data.workflowManager = 'PandaDataWorkflow'
+#data.loggingLevel = 10
+#data.loggingFile = '/tmp/CRAB.log'
