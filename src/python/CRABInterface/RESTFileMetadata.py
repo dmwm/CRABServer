@@ -31,7 +31,7 @@ class RESTFileMetadata(RESTEntity):
             validate_numlist("outfileruns", param, safe)
             if len(safe.kwargs["outfileruns"]) != len(safe.kwargs["outfilelumis"]):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
-            validate_strlist("inparentlfns", param, safe, RX_LFN)
+            validate_strlist("inparentlfns", param, safe, RX_PARENTLFN)
             validate_str("globalTag", param, safe, RX_GLOBALTAG, optional=True)
             validate_num("pandajobid", param, safe, optional=False)
             validate_num("outsize", param, safe, optional=False)
@@ -44,7 +44,7 @@ class RESTFileMetadata(RESTEntity):
             validate_str("outlocation", param, safe, RX_CMSSITE, optional=False)
             validate_str("outtmplocation", param, safe, RX_CMSSITE, optional=False)
             validate_str("acquisitionera", param, safe, RX_WORKFLOW, optional=False)#TODO Do we really need this?
-            validate_str("outdatasetname", param, safe, RX_LFN, optional=False)#TODO temporary, need to come up with a regex
+            validate_str("outdatasetname", param, safe, RX_OUTDSLFN, optional=False)#TODO temporary, need to come up with a regex
             validate_str("outlfn", param, safe, RX_LFN, optional=False)
             validate_num("events", param, safe, optional=False)
         elif method in ['POST']:
