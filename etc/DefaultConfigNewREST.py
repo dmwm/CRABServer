@@ -1,5 +1,4 @@
 from WMCore.Configuration import Configuration
-from os import getenv
 
 conf = Configuration()
 main = conf.section_('main')
@@ -24,10 +23,10 @@ data.object = 'CRABInterface.RESTBaseAPI.RESTBaseAPI'
 data.transformation = 'http://common-analysis-framework.cern.ch/CMSRunAnaly.sh'
 data.phedexurl = 'https://cmsweb.cern.ch/phedex/datasvc/xml/prod/'
 data.dbsurl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
+data.extconfigurl = 'http://git.cern.ch/pubweb/?p=CAFServicesConfig.git;a=blob_plain;f=cmsweb-dev/rest-config.json'
 data.defaultBlacklist = ['T0_CH_CERN']
 data.serverhostcert = "%s/auth/crabserver/dmwm-service-cert.pem" % __file__.rsplit('/', 3)[0]
 data.serverhostkey = "%s/auth/crabserver/dmwm-service-key.pem" % __file__.rsplit('/', 3)[0]
-data.delegatedn = []
 data.credpath = '%s/state/crabserver/proxy/' % __file__.rsplit('/', 4)[0]
 data.db = 'CRABServerAuth.dbconfig'
 data.workflowManager = 'PandaDataWorkflow'
