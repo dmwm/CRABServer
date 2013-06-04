@@ -58,7 +58,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("vorole", param, safe, RX_VOPARAMS, optional=True)
             validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
             validate_str("publishname", param, safe, RX_PUBLISH, optional=True)
-            validate_str("publishdbsurl", param, safe, RX_PUBDBSURL, optional=True)
+            validate_str("publishdbsurl", param, safe, RX_DBSURL, optional=True)
             #if one and only one between publishDataName and publishDbsUrl is set raise an error (we need both or none of them)
             if bool(safe.kwargs["publishname"]) != bool(safe.kwargs["publishdbsurl"]):
                 raise InvalidParameter("You need to set both publishDataName and publishDbsUrl parameters if you need the automatic publication")
