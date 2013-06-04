@@ -13,6 +13,8 @@ from CRABInterface.Utils import CMSSitesCache, conn_handler
 # external dependecies here
 import cherrypy
 import time
+import logging
+import re
 
 
 class RESTUserWorkflow(RESTEntity):
@@ -21,8 +23,30 @@ class RESTUserWorkflow(RESTEntity):
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
 
+        self.logger = logging.getLogger("CRABLogger.RESTUserWorkflow")
         self.userworkflowmgr = DataUserWorkflow()
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
+
+    def _expandSites(self, sites):
+        """Check if there are sites cotaining the '*' wildcard and convert them in the corresponding list
+           Raise exception if any wildcard site does expand to an empty list
+        """
+        res = set()
+        for site in sites:
+            if '*' in site:
+                sitere = re.compile(site.replace('*','.*'))
+                expanded = map(str, filter(sitere.match, self.allCMSNames.sites))
+                self.logger.debug("Site %s expanded to %s during validate" % (site, expanded))
+                if not expanded:
+                    excasync = ValueError("Remote output data site not valid")
+                    invalidp = InvalidParameter("Cannot expand site %s to anything" % site, errobj = excasync)
+                    setattr(invalidp, 'trace', '')
+                    raise invalidp
+                res = res.union(expanded)
+            else:
+                self._checkSite(site)
+                res.add(site)
+        return res
 
     def _checkSite(self, site):
         if site not in self.allCMSNames.sites:
@@ -45,9 +69,9 @@ class RESTUserWorkflow(RESTEntity):
             if jobtype == 'Analysis':
                 validate_str("inputdata", param, safe, RX_DATASET, optional=False)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
-            [self._checkSite(site) for site in safe.kwargs['siteblacklist']]
+            safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
-            [self._checkSite(site) for site in safe.kwargs['sitewhitelist']]
+            safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
             validate_str("splitalgo", param, safe, RX_SPLIT, optional=False)
             validate_num("algoargs", param, safe, optional=False)
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
@@ -76,7 +100,9 @@ class RESTUserWorkflow(RESTEntity):
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
+            safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
+            safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
 
         elif method in ['GET']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=True)
@@ -188,7 +214,7 @@ class RESTUserWorkflow(RESTEntity):
             elif subresource == 'errors':
                 result = self.userworkflowmgr.errors(workflow, shortformat)
             elif subresource == 'report':
-                result = self.userworkflowmgr.report(workflow)
+                result = self.userworkflowmgr.report(workflow, userdn=userdn)
             # if here means that no valid subresource has been requested
             # flow should never pass through here since validation restrict this
             else:
