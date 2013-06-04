@@ -1,6 +1,8 @@
 import re
+from ast import literal_eval
 import PandaServerInterface as pserver
 from WMCore.REST.Error import ExecutionError, InvalidParameter
+from WMCore.WMSpec.WMTask import buildLumiMask
 from CRABInterface.DataWorkflow import DataWorkflow
 from Databases.TaskDB.Oracle.Task.ID import ID
 from Databases.TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
@@ -22,7 +24,7 @@ class PandaDataWorkflow(DataWorkflow):
            :return: a workflow status summary document"""
         self.logger.debug("Getting status for workflow %s" % workflow)
         row = self.api.query(None, None, ID.sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure = row.next() #just one row is picked up by the previous query
+        _, jobsetid, status, vogroup, vorole, taskFailure, _ = row.next() #just one row is picked up by the previous query
         self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
 
@@ -129,3 +131,26 @@ class PandaDataWorkflow(DataWorkflow):
                     'size' : row[3],
                     'checksum' : {'cksum' : row[4], 'md5' : row[5], 'adler31' : row[6]}
             }
+
+    def report(self, workflow, userdn, userproxy=None):
+        res = {}
+        self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
+        statusRes = self.status(workflow, userdn, userproxy)[0]
+
+        #load the lumimask
+        rows = self.api.query(None, None, ID.sql, taskname = workflow)
+        splitArgs = literal_eval(rows.next()[6].read())
+        res['lumiMask'] = buildLumiMask(splitArgs['runs'], splitArgs['lumis'])
+
+        #extract the finished jobs from filemetadata
+        jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished']]
+        rows = self.api.query(None, None, GetFromPandaIds.sql, types='EDM', taskname=workflow, jobids=','.join(map(str,jobids)),\
+                                        limit=len(jobids)*100)
+        res['runsAndLumis'] = {}
+        for row in rows:
+            res['runsAndLumis'][str(row[GetFromPandaIds.PANDAID])] = { 'parents' : row[GetFromPandaIds.PARENTS].read(),
+                    'runlumi' : row[GetFromPandaIds.RUNLUMI].read(),
+                    'events'  : row[GetFromPandaIds.INEVENTS],
+            }
+
+        yield res
