@@ -46,7 +46,7 @@ class RESTUserWorkflow(RESTEntity):
             else:
                 self._checkSite(site)
                 res.add(site)
-        return res
+        return list(res)
 
     def _checkSite(self, site):
         if site not in self.allCMSNames.sites:
