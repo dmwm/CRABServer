@@ -93,6 +93,7 @@ class DataUserWorkflow(object):
            :arg str userdn: DN of user doing the request;
            :arg str userhn: hyper new name of the user doing the request;
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
+           :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication;
            :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;

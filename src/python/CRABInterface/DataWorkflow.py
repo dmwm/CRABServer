@@ -109,8 +109,8 @@ class DataWorkflow(object):
 
     @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
-               userhn, userdn, savelogsflag, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
-               userproxy=None):
+               userhn, userdn, savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
+               runs, lumis, userproxy=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -128,6 +128,7 @@ class DataWorkflow(object):
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
            :arg str userdn: DN of user doing the request;
            :arg str userhn: hyper new name of the user doing the request;
+           :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication;
            :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
@@ -171,10 +172,12 @@ class DataWorkflow(object):
                             asyncdest       = [asyncdest],\
                             dbs_url         = [dbsurl or self.dbsurl],\
                             publish_dbs_url = [publishdbsurl],\
+                            publication     = ['T' if publication else 'F'],\
                             outfiles        = [dbSerializer(addoutputfiles)],\
                             tfile_outfiles  = [dbSerializer(tfileoutfiles)],\
                             edm_outfiles    = [dbSerializer(edmoutfiles)],\
                             transformation  = [self.transformation],\
+                            job_type        = [jobtype],\
                             arguments       = [dbSerializer({})],\
         )
 
