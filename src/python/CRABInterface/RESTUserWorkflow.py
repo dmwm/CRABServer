@@ -83,6 +83,10 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
             validate_str("publishname", param, safe, RX_PUBLISH, optional=True)
             validate_str("publishdbsurl", param, safe, RX_DBSURL, optional=True)
+            validate_num("publication", param, safe, optional=False)
+            #if publication is set as true both publishDataName and publishDbsUrl are needed
+            if safe.kwargs["publication"] and not (bool(safe.kwargs["publishname"]) and bool(safe.kwargs["publishdbsurl"])):
+                raise InvalidParameter("You need to set both publishDataName and publishDbsUrl parameters if you need the automatic publication")
             #if one and only one between publishDataName and publishDbsUrl is set raise an error (we need both or none of them)
             if bool(safe.kwargs["publishname"]) != bool(safe.kwargs["publishdbsurl"]):
                 raise InvalidParameter("You need to set both publishDataName and publishDbsUrl parameters if you need the automatic publication")
@@ -134,7 +138,7 @@ class RESTUserWorkflow(RESTEntity):
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
-               savelogsflag, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis):
+               savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -152,6 +156,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
            :arg str userdn: DN of user doing the request;
            :arg str userhn: hyper new name of the user doing the request;
+           :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication;
            :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
@@ -171,7 +176,7 @@ class RESTUserWorkflow(RESTEntity):
                                        cachefilename=cachefilename, cacheurl=cacheurl,
                                        addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
                                        userhn=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
-                                       publishname=publishname, asyncdest=asyncdest, blacklistT1=blacklistT1,
+                                       publication=publication, publishname=publishname, asyncdest=asyncdest, blacklistT1=blacklistT1,
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,\
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis)
 

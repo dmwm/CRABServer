@@ -17,7 +17,7 @@ RX_PARENTLFN = re.compile(r'^(/[a-zA-Z0-9\-_\.]+/?)+$')
 RX_OUTDSLFN  = re.compile(r'^(?=.{0,500}$)/%(primDS)s/%(hnName)s-%(publishname)s-%(psethash)s/USER$' % lfnParts)
 RX_CACHENAME = RX_WORKFLOW
 RX_CAMPAIGN  = RX_UNIQUEWF
-RX_JOBTYPE   = re.compile(r"^[A-Za-z]*$")
+RX_JOBTYPE   = re.compile(r"^(?=.{0,255}$)[A-Za-z]*$")
 RX_CMSSW     = re.compile(r"^(?=.{0,255}$)CMSSW(_\d+){3}(_[a-zA-Z0-9_]+)?$") #using a lookahead (?=.{0,255}$) to check maximum size of the regex
 RX_ARCH      = re.compile(r"^(?=.{0,255}$)slc[0-9]{1}_[a-z0-9]+_gcc[a-z0-9]+(_[a-z0-9]+)?$")
 RX_DATASET   = re.compile(r"^(?=.{0,500}$)/(\*|[a-zA-Z\*][a-zA-Z0-9_\-\*]{0,100})(/(\*|[a-zA-Z0-9_\.\-\*]{1,100})){0,1}(/(\*|[A-Z\-\*]{1,50})){0,1}$")
@@ -28,6 +28,7 @@ RX_CACHEURL  = re.compile(r"^https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\
 RX_ADDFILE   = re.compile(r"^(?=.{0,255}$)([a-zA-Z0-9\-\._]+)$")
 RX_CMSSITE   = re.compile(r"^(?=.{0,255}$)T[0-3%]((_[A-Z]{2}(_[A-Za-z0-9]+)*)?)$")
 RX_DBSURL    = re.compile(r"^(?=.{0,255}$)https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
+RX_PUBLICATION = re.compile(r"^[TF]")
 RX_VOPARAMS  = re.compile(r"^(?=.{0,255}$)[A-Za-z0-9]*$")
 RX_OUTFILES  = re.compile(r"^(?=.{0,255}$)[A-Za-z0-9\.\-_]*\.root$")
 RX_RUNS      = re.compile(r"^\d+$")
