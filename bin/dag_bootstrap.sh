@@ -65,6 +65,8 @@ then
 fi
 
 export PATH="/opt/glidecondor/bin:/opt/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
+export PYTHONPATH=/opt/glidecondor/lib/python:$PYTHONPATH
+export LD_LIBRARY_PATH=/opt/glidecondor/lib:/opt/glidecondor/lib/condor:$LD_LIBRARY_PATH
 env
 echo "Now running the job in `pwd`..."
 exec python2.6 -m TaskWorker.TaskManagerBootstrap "$@"

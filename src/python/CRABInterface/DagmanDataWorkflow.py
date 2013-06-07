@@ -4,12 +4,7 @@ DagmanDataWorkflow,
 
 A module providing HTCondor querying capabilities to the CRABServer
 """
-
-import os
-import re
-import time
-import traceback
-
+# First, see if we have python condor libraries
 try:
     import htcondor
 except ImportError:
@@ -20,21 +15,25 @@ except ImportError:
     if not htcondor:
         raise
 
+# FIXME really clean up these imports
+import os
+import re
+import time
+import traceback
+import pprint
+import sys
+import DataWorkflow
+import TaskWorker
+import CRABInterface.DataWorkflow
+import TaskWorker.Actions.DagmanSubmitter
+
 from WMCore.Configuration import Configuration
 from WMCore.REST.Error import InvalidParameter
-
 from CRABInterface.Utils import retrieveUserCert
-
-# FIXME really clean up these imports
 from CRABInterface.CRABServerBase import getCRABServerBase
-from TaskDB.CAFUtilitiesBase import getCAFUtilitiesBase
-
-import DataWorkflow
-import TaskWorker.Actions.DagmanSubmitter
+from Databases.CAFUtilitiesBase import getCAFUtilitiesBase
 from TaskWorker.Actions.DagmanCreator import CRAB_HEADERS, JOB_SUBMIT, ASYNC_SUBMIT, escape_strings_to_classads
 from TaskWorker.Actions.DagmanSubmitter import MASTER_DAG_SUBMIT_FILE, CRAB_HEADERS, CRAB_META_HEADERS, SUBMIT_INFO
-
-import CRABInterface.DataWorkflow
 
 MASTER_DAG_FILE = \
 """
@@ -69,7 +68,8 @@ transfer_output_files = splitting_results
 # TODO - need to clean this bit up
 #Environment = PATH=/usr/bin:/bin
 Environment = PATH=/usr/bin:/bin
-x509userproxy = %(x509up_file)s
+#x509userproxy = %(x509up_file)s
+use_x509userproxy = true
 queue
 """
 
@@ -83,7 +83,7 @@ Error = dbs_discovery.err
 Args = DBS None dbs_results
 transfer_output_files = dbs_results
 Environment = PATH=/usr/bin:/bin
-x509userproxy = %(x509up_file)s
+use_x509userproxy = true # %(x509up_file)s
 queue
 """
 
@@ -101,7 +101,8 @@ transfer_inputFiles = job_log.$(count), jobReport.json.$(count)
 +TransferOutput = ""
 Error = aso.$(count).err
 #Environment = PATH=/usr/bin:/bin
-x509userproxy = %(x509up_file)s
+#x509userproxy = %(x509up_file)s
+use_x509userproxy = true
 leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 queue
 """
@@ -122,13 +123,16 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         super(DagmanDataWorkflow, self).__init__()
         self.config = None
         if 'config' in kwargs:
+            self.logger.error("A config wasn't passed to DagmanDataWorkflow")
             self.config = kwargs['config']
         else:
             self.config = Configuration()
         self.config.section_("BossAir")
         self.config.section_("General")
         if not hasattr(self.config.BossAir, "remoteUserHost"):
-	    self.config.BossAir.remoteUserHost = "submit-4.t2.ucsd.edu"
+            # Not really the best place for a default, I think...
+            # TODO: Also, this default should pull from somewhere smarter
+            self.config.BossAir.remoteUserHost = "submit-5.t2.ucsd.edu"
 
     def __getscratchdir__(self):
         """
@@ -140,7 +144,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
     def __getbindir__(self):
         """
         Returns the directory of pithy shell scripts
-	TODO this is definitely a thing that needs to be fixed for an RPM-deploy
+        TODO this is definitely a thing that needs to be fixed for an RPM-deploy
         """
         # TODO: Nuke this with the rest of the dev hooks
         binDir = os.path.join(getCRABServerBase(), "bin")
@@ -156,9 +160,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         Returns the location of the PanDA job transform
         """
         # TODO: Nuke this with the rest of the dev hooks
-	tDir = os.path.join(getCAFUtilitiesBase(), "src", "python",\
-				"transformation")
-        tDir = "~/projects/CAFUtilities/src/python/transformation"
+        tDir = os.path.join(getCAFUtilitiesBase(), "src", "python",\
+                    "transformation")
         if self.config and hasattr(self.config.General, 'transformDir'): #pylint: disable=E1103
             tDir = self.config.General.transformDir #pylint: disable=E1103
         if 'CRAB3_BASEPATH' in os.environ:
@@ -241,32 +244,36 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                        os.path.join(self.__getbindir__(), "cmscp.py")]
         scratch_files = ['master_dag', 'DBSDiscovery.submit', 'JobSplitting.submit', 'master_dag', 'Job.submit', 'ASO.submit']
         inputFiles.extend([os.path.join(scratch, i) for i in scratch_files])
-        info['inputFilesString'] = ", ".join(inputFiles)
-
         outputFiles = ["master_dag.dagman.out", "master_dag.rescue.001", "RunJobs.dag",
             "RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001", "dbs_discovery.err",
             "dbs_discovery.out", "job_splitting.err", "job_splitting.out"]
-        info['outputFilesString'] = ", ".join(outputFiles)
 
         if address:
+            info['outputFilesString'] = ", ".join(outputFiles)
+            info['inputFilesString'] = ", ".join(inputFiles)
+
             dagmanSubmitter.submitDirect(schedd,
                 os.path.join(self.__getbindir__(), "dag_bootstrap_startup.sh"), 'master_dag',
                 info)
         else:
-	    # testing getting the right directory
-	    requestname_bak = requestname
-	    requestname = './'
-
-	    info['iwd'] = '%s/' % requestname_bak
-	    info['scratch'] = '%s/' % requestname
-	    info['bindir'] = '%s/' % requestname
-	    info['transform_location'] = os.path.basename(info['transform_location'])
-	    info['x509up_file'] = '%s/user.proxy' % requestname
-	    info['userproxy'] = '%s/user.proxy' % requestname
+            # testing getting the right directory
+            requestname_bak = requestname
+            requestname = './'
+            info['outputFilesString'] = ", ".join([os.path.basename(x) for x in outputFiles])
+            info['inputFilesString']  = ", ".join([os.path.basename(x) for x in inputFiles])
+            info['iwd'] = '%s/' % requestname_bak
+            info['scratch'] = '%s/' % requestname
+            info['bindir'] = '%s/' % requestname
+            info['transform_location'] = os.path.basename(info['transform_location'])
+            info['x509up_file'] = '%s/user.proxy' % requestname
+            info['userproxy'] = '%s/user.proxy' % requestname
+            info['configdoc'] = 'CONFIGDOCSUP'
             jdl = MASTER_DAG_SUBMIT_FILE % info
+            with open(os.path.join(scratch, 'submit.jdl'), 'w') as fd:
+                fd.write(jdl)
             requestname = requestname_bak
-            schedd.submitRaw(requestname, jdl, kwargs['userproxy'], input_files)
-
+            #schedd.submitRaw(requestname, os.path.join(scratch, 'submit.jdl'), info['userproxy'], inputFiles)
+            schedd.submitRaw(requestname, os.path.join(scratch, 'submit.jdl'), userproxy, inputFiles)
         return [{'RequestName': requestname}]
     submit = retrieveUserCert(submitRaw)
 
@@ -312,6 +319,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             if results != "OK":
                 raise Exception("Failure when submitting to HTCondor: %s" % results)
         else:
+            # Use the remoteCondor plugin 
             schedd.hold(const) #pylint: disable=E1103
 
         # Search for and hold the sub-dag
@@ -360,6 +368,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             if results != "OK":
                 raise Exception("Failure when killing job: %s" % results)
         else:
+            # Use the remoteCondor plugin
             schedd.edit(subDagConst, "HoldKillSig", "SIGUSR1")
             schedd.hold(const) #pylint: disable=E1103
 
@@ -395,8 +404,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         jobsPerStatus = {}
         jobStatus = {}
         jobList = []
-        taskStatusCode = results[0]['JobStatus']
-        taskJobCount = results[0].get('CRAB_JobCount', 0)
+        taskStatusCode = int(results[0]['JobStatus'])
+        taskJobCount = int(results[0].get('CRAB_JobCount', 0))
         codes = {1: 'Idle', 2: 'Running', 4: 'Completed (Success)', 5: 'Killed'}
         retval = {"status": codes.get(taskStatusCode, 'Unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
@@ -417,7 +426,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                 statusName = "Failed (%s)" % result['ExitCode']
             else:
                 statusName = codes.get(jobState, 'Unknown')
-            jobStatus[result['CRAB_Id']] = statusName
+            jobStatus[int(result['CRAB_Id'])] = statusName
 
         jobConst = "TaskType =?= \"ASO\" && CRAB_ReqName =?= \"%s\"" % workflow
         jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
@@ -435,7 +444,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                 statusName = "Failed Stage-Out (%s)" % result['ExitCode']
             else:
                 statusName = aso_codes.get(jobState, 'Unknown')
-            jobStatus[result['CRAB_Id']] = statusName
+            jobStatus[int(result['CRAB_Id'])] = statusName
 
         for i in range(1, taskJobCount+1):
             if i not in jobStatus:
@@ -586,7 +595,7 @@ def main():
     lumis = []
     dag.submitRaw(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, 
                splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
-               userhn, userdn, savelogsflag, publishname, asyncdest, blacklistT1, dbsurl, vorole, vogroup, publishdbsurl, tfileoutfiles, edmoutfiles, userdn,
+               userhn, userdn, savelogsflag, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, userproxy = '/tmp/x509up_u%d' % os.geteuid()) #TODO delete unused parameters
 
 
