@@ -54,6 +54,16 @@ if [[ "x$X509_USER_PROXY" = "x" ]]; then
     export X509_USER_PROXY=$(pwd)/user.proxy
 fi
 
+# Bootstrap the HTCondor environment
+if [ "X$_CONDOR_JOB_AD" != "X" ];
+then
+    source_script=`grep '^RemoteCondorSetup =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
+    if [ "X$source_script" != "X" ] && [ -e $source_script ];
+    then
+        source $source_script
+    fi
+fi
+
 export PATH="/opt/glidecondor/bin:/opt/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 env
 echo "Now running the job in `pwd`..."
