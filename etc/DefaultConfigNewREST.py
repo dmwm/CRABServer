@@ -1,7 +1,5 @@
 from WMCore.Configuration import Configuration
 
-serverdn = 'FILL ME' #grid-cert-info -file /data/certs/hostcert.pem -subject
-
 conf = Configuration()
 main = conf.section_('main')
 srv = main.section_('server')
@@ -22,16 +20,15 @@ views = conf.section_('views')
 
 data = views.section_('data')
 data.object = 'CRABInterface.RESTBaseAPI.RESTBaseAPI'
-data.serverhostcert = '/data/current/auth/crabserver/hostcert.pem'
-data.serverhostkey = '/data/current/auth/crabserver/hostkey.pem'
+data.transformation = 'http://common-analysis-framework.cern.ch/CMSRunAnaly.sh'
 data.phedexurl = 'https://cmsweb.cern.ch/phedex/datasvc/xml/prod/'
 data.dbsurl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
+data.extconfigurl = 'http://git.cern.ch/pubweb/?p=CAFServicesConfig.git;a=blob_plain;f=cmsweb-dev/rest-config.json'
 data.defaultBlacklist = ['T0_CH_CERN']
-data.delegatedn = []
-data.serverdn = serverdn
-data.db = 'CRABServerAuth.dbconfig'
-data.uisource = '/afs/cern.ch/cms/LCG/LCG-2/UI/cms_ui_env.sh'
+data.serverhostcert = "%s/auth/crabserver/dmwm-service-cert.pem" % __file__.rsplit('/', 3)[0]
+data.serverhostkey = "%s/auth/crabserver/dmwm-service-key.pem" % __file__.rsplit('/', 3)[0]
 data.credpath = '%s/state/crabserver/proxy/' % __file__.rsplit('/', 4)[0]
-data.transformation = 'http://common-analysis-framework.cern.ch/CMSRunAnaly.sh'
-data.loggingLevel = 10
-data.loggingFile = '/tmp/CRAB.log'
+data.db = 'CRABServerAuth.dbconfig'
+data.workflowManager = 'PandaDataWorkflow'
+#data.loggingLevel = 10
+#data.loggingFile = '/tmp/CRAB.log'

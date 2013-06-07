@@ -1,19 +1,24 @@
 import logging
+from commands import getstatusoutput
+import pycurl
+import StringIO
+import cherrypy
+import cjson as json
 
 # WMCore dependecies here
 from WMCore.REST.Server import DatabaseRESTApi
 from WMCore.REST.Format import JSONFormat
+from WMCore.REST.Error import ExecutionError
+from WMCore.Services.pycurl_manager import ResponseHeader
 
 # CRABServer dependecies here
 import Utils
 from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTCampaign import RESTCampaign
-from CRABInterface.RESTJobMetadata import RESTJobMetadata
 from CRABInterface.RESTServerInfo import RESTServerInfo
-from CRABInterface.RESTJobMetadata import RESTJobMetadata
-from CRABInterface.DataJobMetadata import DataJobMetadata
+from CRABInterface.RESTFileMetadata import RESTFileMetadata
+from CRABInterface.DataFileMetadata import DataFileMetadata
 from CRABInterface.DataWorkflow import DataWorkflow
-from CRABInterface.DataJobMetadata import DataJobMetadata
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.DataCampaign import DataCampaign
 
@@ -31,18 +36,40 @@ class RESTBaseAPI(DatabaseRESTApi):
 
         self.formats = [ ('application/json', JSONFormat()) ]
 
+        status, serverdn = getstatusoutput('openssl x509 -noout -subject -in %s | cut -f2- -d\ ' % config.serverhostcert)
+        if status is not 0:
+            raise ExecutionError("Internal issue when retrieving crabserver service DN.")
+
+        hbuf = StringIO.StringIO()
+        bbuf = StringIO.StringIO()
+
+        curl = pycurl.Curl()
+        curl.setopt(pycurl.URL, config.extconfigurl)
+        curl.setopt(pycurl.WRITEFUNCTION, bbuf.write)
+        curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
+        curl.setopt(pycurl.FOLLOWLOCATION, 1)
+        curl.perform()
+        curl.close()
+
+        header = ResponseHeader(hbuf.getvalue())
+        if header.status < 200 or header.status >= 300:
+            cherrypy.log("Problem %d reading from %s." %(config.extconfigurl, header.status))
+            raise ExecutionError("Internal issue when retrieving external confifuration")
+        extconfig = json.decode(bbuf.getvalue())
+
         #Global initialization of Data objects. Parameters coming from the config should go here
+        DataUserWorkflow.globalinit(config.workflowManager)
         DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl,\
                                         credpath=config.credpath, transformation=config.transformation)
-        DataJobMetadata.globalinit(dbapi=self)
-        Utils.globalinit(config.serverhostkey, config.serverhostcert, config.serverdn, config.uisource, config.credpath)
+        DataFileMetadata.globalinit(dbapi=self)
+        Utils.globalinit(config.serverhostkey, config.serverhostcert, serverdn, config.credpath)
 
         ## TODO need a check to verify the format depending on the resource
-        ##      the RESTJobMetadata has the specifc requirement of getting xml reports
+        ##      the RESTFileMetadata has the specifc requirement of getting xml reports
         self._add( {'workflow': RESTUserWorkflow(app, self, config, mount),
                     'campaign': RESTCampaign(app, self, config, mount),
-                    'info': RESTServerInfo(app, self, config, mount),
-                    'jobmetadata': RESTJobMetadata(app, self, config, mount),
+                    'info': RESTServerInfo(app, self, config, mount, serverdn, extconfig.get('delegate-dn', [])),
+                    'filemetadata': RESTFileMetadata(app, self, config, mount),
                    } )
 
         self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None) )

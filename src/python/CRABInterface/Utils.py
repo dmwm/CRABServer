@@ -22,12 +22,11 @@ CMSSitesCache = namedtuple("CMSSitesCache", ["cachetime", "sites"])
 serverCert = None
 serverKey = None
 serverDN = None
-uiSource = None
-credServerPath = '/tmp'
+credServerPath = None
 
-def globalinit(serverkey, servercert, serverdn, uisource, credpath):
-    global serverCert, serverKey, serverDN, uiSource, credServerPath
-    serverCert, serverKey, serverDN, uiSource, credServerPath = servercert, serverkey, serverdn, uisource, credpath
+def globalinit(serverkey, servercert, serverdn, credpath):
+    global serverCert, serverKey, serverDN, credServerPath
+    serverCert, serverKey, serverDN, credServerPath = servercert, serverkey, serverdn, credpath
 
 def execute_command( command, logger, timeout ):
     """
@@ -77,7 +76,7 @@ def conn_handler(services):
     def wrap(func):
         def wrapped_func(*args, **kwargs):
             if 'sitedb' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
-                args[0].allCMSNames = CMSSitesCache(sites=SiteDBJSON().getAllCMSNames(), cachetime=mktime(gmtime()))
+                args[0].allCMSNames = CMSSitesCache(sites=SiteDBJSON(config={'cert': serverCert, 'key': serverKey}).getAllCMSNames(), cachetime=mktime(gmtime()))
             if 'phedex' in services and not args[0].phedex:
                 args[0].phedex = PhEDEx(responseType='xml', dict=args[0].phedexargs)
             return func(*args, **kwargs)
