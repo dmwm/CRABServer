@@ -421,7 +421,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             jobState = int(result['JobStatus'])
             if result['CRAB_Id'] in failedJobs:
                 failedJobs.remove(result['CRAB_Id'])
-            if (jobState == 4) and ('ExitCode' in result) and (result['ExitCode']):
+            if (jobState == 4) and ('ExitCode' in result) and (int(result['ExitCode'])):
                 failedJobs.append(result['CRAB_Id'])
                 statusName = "Failed (%s)" % result['ExitCode']
             else:
@@ -439,7 +439,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             if result['CRAB_Id'] in failedJobs:
                 failedJobs.remove(result['CRAB_Id'])
             jobState = int(result['JobStatus'])
-            if (jobState == 4) and ('ExitCode' in result) and (result['ExitCode']):
+            if (jobState == 4) and ('ExitCode' in result) and (int(result['ExitCode'])):
                 failedJobs.append(result['CRAB_Id'])
                 statusName = "Failed Stage-Out (%s)" % result['ExitCode']
             else:
