@@ -46,7 +46,7 @@ class PandaDataWorkflow(DataWorkflow):
                 continue
 
             #check the status of the jobdef in panda
-            schedEC, res = pserver.getPandIDsWithJobID(jobID=jobdefid, user=userdn, vo='cms', group=vogroup, role=vorole, userproxy=userproxy, credpath=self.credpath)
+            schedEC, res = pserver.getPandIDsWithJobID(jobID=jobdefid, dn=userdn, userproxy=userproxy, credpath=self.credpath)
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
                 jobDefErrs.append("Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC))
