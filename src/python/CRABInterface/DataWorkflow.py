@@ -179,6 +179,9 @@ class DataWorkflow(object):
                             transformation  = [self.transformation],\
                             job_type        = [jobtype],\
                             arguments       = [dbSerializer({})],\
+                            resubmitted_jobs= [dbSerializer([])],\
+                            save_logs       = ['T' if savelogsflag else 'F']\
+
         )
 
         return [{'RequestName': requestname}]
