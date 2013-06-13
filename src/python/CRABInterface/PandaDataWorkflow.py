@@ -6,7 +6,7 @@ from WMCore.WMSpec.WMTask import buildLumiMask
 from CRABInterface.DataWorkflow import DataWorkflow
 from Databases.TaskDB.Oracle.Task.ID import ID
 from Databases.TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
-from Databases.FileMetaDataDB.Oracle.FileMetaData.GetFromPandaIds import GetFromPandaIds
+from Databases.FileMetaDataDB.Oracle.FileMetaData.GetFromTaskAndType import GetFromTaskAndType
 from CRABInterface.Utils import conn_handler
 
 class PandaDataWorkflow(DataWorkflow):
@@ -118,21 +118,24 @@ class PandaDataWorkflow(DataWorkflow):
             return
 
         self.logger.debug("Retrieving output of jobs: %s" % jobids)
-        rows = self.api.query(None, None, GetFromPandaIds.sql, types=','.join(filetype), taskname=workflow, jobids=','.join(map(str,jobids)),\
-                                        limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
+        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype=','.join(filetype), taskname=workflow)
+        rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
+        if howmany!=-1:
+            rows=rows[:howmany]
+        #jobids=','.join(map(str,jobids)), limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
 
         for row in rows:
-            if row[7] in finishedIds:
-                lfn = re.sub('^/store/temp/', '/store/', row[0])
-                pfn = self.phedex.getPFN(row[1], lfn)[(row[1], lfn)]
-            elif row[7] in transferingIds:
-                pfn = self.phedex.getPFN(row[2], row[0])[(row[2], row[0])]
+            if row[GetFromTaskAndType.PANDAID] in finishedIds:
+                lfn = re.sub('^/store/temp/', '/store/', row[GetFromTaskAndType.LFN])
+                pfn = self.phedex.getPFN(row[GetFromTaskAndType.LOCATION], lfn)[(row[GetFromTaskAndType.LOCATION], lfn)]
+            elif row[GetFromTaskAndType.PANDAID] in transferingIds:
+                pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])[(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])]
             else:
                 continue
 
             yield { 'pfn' : pfn,
-                    'size' : row[3],
-                    'checksum' : {'cksum' : row[4], 'md5' : row[5], 'adler31' : row[6]}
+                    'size' : row[GetFromTaskAndType.SIZE],
+                    'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler31' : row[GetFromTaskAndType.ADLER32]}
             }
 
     def report(self, workflow, userdn, userproxy=None):
@@ -146,14 +149,15 @@ class PandaDataWorkflow(DataWorkflow):
         res['lumiMask'] = buildLumiMask(splitArgs['runs'], splitArgs['lumis'])
 
         #extract the finished jobs from filemetadata
-        jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished']]
-        rows = self.api.query(None, None, GetFromPandaIds.sql, types='EDM', taskname=workflow, jobids=','.join(map(str,jobids)),\
-                                        limit=len(jobids)*100)
+        jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'transferring']]
+        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='EDM', taskname=workflow)
+        rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
+
         res['runsAndLumis'] = {}
         for row in rows:
-            res['runsAndLumis'][str(row[GetFromPandaIds.PANDAID])] = { 'parents' : row[GetFromPandaIds.PARENTS].read(),
-                    'runlumi' : row[GetFromPandaIds.RUNLUMI].read(),
-                    'events'  : row[GetFromPandaIds.INEVENTS],
+            res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])] = { 'parents' : row[GetFromTaskAndType.PARENTS].read(),
+                    'runlumi' : row[GetFromTaskAndType.RUNLUMI].read(),
+                    'events'  : row[GetFromTaskAndType.INEVENTS],
             }
 
         yield res
