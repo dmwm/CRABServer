@@ -24,7 +24,9 @@ class PandaDataWorkflow(DataWorkflow):
            :return: a workflow status summary document"""
         self.logger.debug("Getting status for workflow %s" % workflow)
         row = self.api.query(None, None, ID.sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, _ = row.next() #just one row is picked up by the previous query
+        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs  = row.next() #just one row is picked up by the previous query
+        print resJobs
+        resJobs = literal_eval(resJobs.read())
         self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
 
@@ -59,8 +61,9 @@ class PandaDataWorkflow(DataWorkflow):
             #prepare the result at the job granularity
             self.logger.debug("Iterating on: %s" % res)
             for jobid, (jobstatus, _) in res.iteritems():
-                jobsPerStatus[jobstatus] = jobsPerStatus[jobstatus]+1 if jobstatus in jobsPerStatus else 1
-                jobList.append((jobstatus,jobid))
+                if jobid not in resJobs:
+                    jobsPerStatus[jobstatus] = jobsPerStatus[jobstatus]+1 if jobstatus in jobsPerStatus else 1
+                    jobList.append((jobstatus,jobid))
 
         status = self._updateTaskStatus(workflow, status, jobsPerStatus)
 
