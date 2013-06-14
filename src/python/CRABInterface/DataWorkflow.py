@@ -197,8 +197,14 @@ class DataWorkflow(object):
         self.logger.info("About to resubmit workflow: %s. Getting status first." % workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        if statusRes['status'] in ['SUBMITTED','KILLED']:
+        #if there are failed jobdef submission we fail
+        if statusRes['failedJobdefs']:
+            raise ExecutionError("You cannot resubmit a task if not all the jobs have been submitted. The feature will be available in the future")
+
+        if statusRes['status'] in ['SUBMITTED','KILLED','FAILED']:
             resubmitList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus in self.failedList]
+            if not resubmitList:
+                raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
             self.logger.info("Jobs to resubmit: %s" % resubmitList)
             self.api.modify(SetStatusTask.sql, status = ["RESUBMIT"], taskname = [workflow])
             self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
@@ -244,6 +250,8 @@ class DataWorkflow(object):
 
         if statusRes['status'] == 'SUBMITTED':
             killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus not in self.successList]
+            if not killList:
+                raise ExecutionError("There are no jobs to kill. Only jobs not in %s states are resubmitted" % self.successList)
             self.logger.info("Jobs to kill: %s" % killList)
 
             self.api.modify(SetStatusTask.sql, status = ["KILL"], taskname = [workflow])
