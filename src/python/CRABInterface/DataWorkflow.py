@@ -176,7 +176,7 @@ class DataWorkflow(object):
                             outfiles        = [dbSerializer(addoutputfiles)],\
                             tfile_outfiles  = [dbSerializer(tfileoutfiles)],\
                             edm_outfiles    = [dbSerializer(edmoutfiles)],\
-                            transformation  = [self.transformation],\
+                            transformation  = [self.transformation[jobtype]],\
                             job_type        = [jobtype],\
                             arguments       = [dbSerializer({})],\
                             resubmitted_jobs= [dbSerializer([])],\
