@@ -1,5 +1,4 @@
 import time
-import datetime
 import threading
 import logging
 import cherrypy #cherrypy import is needed here because we need the 'start_thread' subscription
@@ -151,7 +150,6 @@ class DataWorkflow(object):
                             task_name       = [requestname],\
                             jobset_id       = [None],
                             task_status     = ['NEW'],\
-                            start_time      = [datetime.datetime.now()],\
                             task_failure    = [''],\
                             job_sw          = [jobsw],\
                             job_arch        = [jobarch],\
