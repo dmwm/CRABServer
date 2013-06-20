@@ -1,4 +1,5 @@
 import time
+import datetime
 import threading
 import logging
 import cherrypy #cherrypy import is needed here because we need the 'start_thread' subscription
@@ -109,7 +110,7 @@ class DataWorkflow(object):
     @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
-               runs, lumis, userproxy=None):
+               runs, lumis, totalunits, userproxy=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -139,6 +140,7 @@ class DataWorkflow(object):
            :arg str edmoutfiles: list of edm output files
            :arg str list runs: list of run numbers
            :arg str list lumis: list of lumi section numbers
+           :arg int totalunits: number of MC event to be generated
            :returns: a dict which contaians details of the request"""
 
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
@@ -150,15 +152,17 @@ class DataWorkflow(object):
                             task_name       = [requestname],\
                             jobset_id       = [None],
                             task_status     = ['NEW'],\
+                            start_time      = [datetime.datetime.now()],\
                             task_failure    = [''],\
                             job_sw          = [jobsw],\
                             job_arch        = [jobarch],\
                             input_dataset   = [inputdata],\
-                            site_whitelist   = [dbSerializer(sitewhitelist)],\
+                            site_whitelist  = [dbSerializer(sitewhitelist)],\
                             site_blacklist  = [dbSerializer(siteblacklist)],\
                             split_algo      = [splitalgo],\
                             split_args      = [dbSerializer({'halt_job_on_file_boundaries': False, 'splitOnRun': False,\
                                                 splitArgName : algoargs, 'runs': runs, 'lumis': lumis})],\
+                            total_units     = [totalunits],\
                             user_sandbox    = [cachefilename],\
                             cache_url       = [cacheurl],\
                             username        = [userhn],\
@@ -166,7 +170,7 @@ class DataWorkflow(object):
                             user_vo         = ['cms'],\
                             user_role       = [vorole],\
                             user_group      = [vogroup],\
-                            publish_name    = [publishname],\
+                            publish_name    = [(timestamp + '-' + publishname) if publishname.find('-')==-1 else publishname],\
                             asyncdest       = [asyncdest],\
                             dbs_url         = [dbsurl or self.dbsurl],\
                             publish_dbs_url = [publishdbsurl],\

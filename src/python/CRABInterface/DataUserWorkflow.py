@@ -105,6 +105,7 @@ class DataUserWorkflow(object):
            :arg str edmoutfiles: list of edm output files
            :arg str list runs: list of run numbers
            :arg str list lumis: list of lumi section numbers
+           :arg int totalunits: number of MC event to be generated
            :returns: a dict which contaians details of the request"""
 
         return self.workflow.submit(*args, **kwargs)
