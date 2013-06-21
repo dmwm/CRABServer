@@ -55,12 +55,12 @@ class RESTBaseAPI(DatabaseRESTApi):
         if header.status < 200 or header.status >= 300:
             cherrypy.log("Problem %d reading from %s." %(config.extconfigurl, header.status))
             raise ExecutionError("Internal issue when retrieving external confifuration")
-        extconfig = json.decode(bbuf.getvalue())
+        extconfig = json.decode(bbuf.getvalue())[config.mode]
 
         #Global initialization of Data objects. Parameters coming from the config should go here
         DataUserWorkflow.globalinit(config.workflowManager)
         DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl,\
-                                        credpath=config.credpath, transformation=config.transformation)
+                                credpath=config.credpath, transformation=extconfig["transformation"])
         DataFileMetadata.globalinit(dbapi=self)
         Utils.globalinit(config.serverhostkey, config.serverhostcert, serverdn, config.credpath)
 
