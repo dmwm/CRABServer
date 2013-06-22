@@ -32,5 +32,5 @@ EXIT_STATUS=$?
 
 # We do this after the job because dagman will cowardly refuse to overwrite any pre-existing file, even if it's empty
 touch $1.rescue.001
-
+echo "dag_bootstrap_startup exited with code $EXIT_STATUS"
 exit $EXIT_STATUS

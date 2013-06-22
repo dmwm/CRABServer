@@ -166,7 +166,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             tDir = self.config.General.transformDir #pylint: disable=E1103
         if 'CRAB3_BASEPATH' in os.environ:
             tDir = os.path.join(os.environ["CRAB3_BASEPATH"], "bin")
-        return os.path.join(os.path.expanduser(tDir), "CMSRunAnaly.sh")
+        return os.path.join(os.path.expanduser(tDir), "CMSRunAnalysis.sh")
 
     def getRemoteCondorSetup(self):
         """
