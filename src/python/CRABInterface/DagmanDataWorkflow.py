@@ -15,14 +15,14 @@ except ImportError:
     if not htcondor:
         raise
 
-# FIXME really clean up these imports
 import os
 import re
+import json
 import time
+import errno
 import traceback
 import pprint
 import sys
-import DataWorkflow
 import TaskWorker
 import CRABInterface.DataWorkflow
 import TaskWorker.Actions.DagmanSubmitter
@@ -133,12 +133,10 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             # Not really the best place for a default, I think...
             # TODO: Also, this default should pull from somewhere smarter
             self.config.BossAir.remoteUserHost = "submit-5.t2.ucsd.edu"
-
-    def __getscratchdir__(self):
-        """
-        Returns a scratch dir for working files.
-        """
-        return "/tmp/crab3"
+        if 'requestarea' in kwargs:
+            self.requestarea = kwargs['requestarea']
+        else:
+            self.requestarea = "/tmp/crab3"
 
 
     def __getbindir__(self):
@@ -160,7 +158,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         Returns the location of the PanDA job transform
         """
         # TODO: Nuke this with the rest of the dev hooks
-        tDir = os.path.join(getCAFUtilitiesBase(), "src", "python",\
+        tDir = os.path.join(getCAFUtilitiesBase(), "src", "python", \
                     "transformation")
         if self.config and hasattr(self.config.General, 'transformDir'): #pylint: disable=E1103
             tDir = self.config.General.transformDir #pylint: disable=E1103
@@ -215,8 +213,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
 
         requestname = '%s_%s_%s_%s' % (scheddName, timestamp, userhn, workflow)
 
-        scratch = self.__getscratchdir__()
-        scratch = os.path.join(scratch, requestname)
+        scratch = os.path.join(self.requestarea, "." + requestname)
         os.makedirs(scratch)
 
         # Poor-man's string escaping.  We do this as classad module isn't guaranteed to be present.
@@ -373,6 +370,101 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             schedd.hold(const) #pylint: disable=E1103
 
 
+    def __getRootTasks(self, workflow, schedd):
+        rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
+        rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount']
+        if address:
+            results = schedd.query(rootConst, rootAttrList)
+        else:
+            results = schedd.getClassAds(rootConst, rootAttrList)
+
+        if not results:
+            self.logger.info("An invalid workflow name was requested: %s" % workflow)
+            raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
+        return results
+
+
+    def __getASOJobs(self, workflow, schedd):
+        jobConst = "TaskType =?= \"ASO\" && CRAB_ReqName =?= \"%s\"" % workflow
+        jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
+        if address:
+            results = schedd.query(jobConst, jobList)
+        else:
+            results = schedd.getClassAds(jobConst, jobList)
+
+
+    def __getJobs(self, workflow, schedd):
+        jobConst = "TaskType =?= \"Job\" && CRAB_ReqName =?= \"%s\"" % workflow
+        jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
+        if address:
+            results = schedd.query(jobConst, jobList)
+        else:
+            results = schedd.getClassAds(jobConst, jobList)
+
+
+    def __serializeFinishedJobs__(self, workflow, userdn, userproxy=None):
+        if not userproxy:
+            return
+        jobdir = os.path.join(self.requestdir, "."+workflow, "finished_condor_jobs")
+        jobdir = os.abspath(jobdir)
+        requestdir = os.abspath(self.requestdir)
+        assert(jobdir.startswith(requestdir))
+        try:
+            os.makedirs(jobdir)
+        except OSError, oe:
+            if oe.errno != errno.EEXIST:
+                raise
+
+        dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
+        schedd, address = dag.getScheddObj(name)
+
+        finished_jobs = {}
+
+        jobs = self.__getJobs(workflow, schedd)
+        jobs.extend(self.__getASOJobs(workflow, schedd))
+        for job in jobs:
+            if 'CRAB_Id' not in job: continue
+            if (int(job.get("JobStatus", "1")) == 4) and (task_is_finished or (int(job.get("ExitCode", -1)) == 0)):
+                finished_jobs["%s.%s" % (job['ClusterID'], job['ProcID']] = job
+
+        # TODO: consider POSIX data integrity
+        for id, job in finished_jobs.items():
+            with open(os.path.join(jobdir, id), "w") as fd:
+                json.dump(dict(job), fd)
+
+        if address:
+            schedd.act(htcondor.JobAction.Remove, finished_jobs.keys())
+        else:
+            schedd.remove(finished_jobs.keys())
+
+
+    def __getreports__(self, workflow, userproxy):
+        if not userproxy: return
+
+        jobdir = os.path.join(self.requestdir, "."+workflow, "job_results")
+        jobdir = os.abspath(jobdir)
+        requestdir = os.abspath(self.requestdir)
+        assert(jobdir.startswith(requestdir))
+        try:
+            os.makedirs(jobdir)
+        except OSError, oe:
+            if oe.errno != errno.EEXIST:
+                raise
+
+        dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
+        schedd, address = dag.getScheddObj(name)
+
+        job_ids = {}
+        aso_ids = set()
+        for job in self.__getJobs(workflow, schedd):
+            if 'CRAB_Id' not in job: continue
+            if int(job.get("JobStatus", "1")) == 4:
+                job_ids[int(job['CRAB_Id'])] = "%s.%s" % (job['ClusterID'], job['ProcID'])
+
+        if address:
+            schedd.edit(job_ids.values(), "TransferOutputRemaps", 'strcat("jobReport.json.", CRAB_Id, "=%s/jobReport.json.", CRAB_Id, ";job_out.", CRAB_Id, "=/dev/null;job_err.", CRAB_Id, "=/dev/null")' % jobdir)
+            schedd.retrieve(job_ids.values())
+
 
     def status(self, workflow, userdn, userproxy=None):
         """Retrieve the status of the workflow
@@ -390,17 +482,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
         schedd, address = dag.getScheddObj(name)
 
-        rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
-        rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount']
-        if address:
-            results = schedd.query(rootConst, rootAttrList)
-        else:
-            results = schedd.getClassAds(rootConst, rootAttrList)
-
-        if not results:
-            self.logger.info("An invalid workflow name was requested: %s" % workflow)
-            raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
-
+        results = self.__getRootTasks(workflow, schedd)
         jobsPerStatus = {}
         jobStatus = {}
         jobList = []
@@ -410,14 +492,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         retval = {"status": codes.get(taskStatusCode, 'Unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
 
-        jobConst = "TaskType =?= \"Job\" && CRAB_ReqName =?= \"%s\"" % workflow
-        jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
-        if address:
-            results = schedd.query(jobConst, jobList)
-        else:
-            results = schedd.getClassAds(jobConst, jobList)
         failedJobs = []
-        for result in results:
+        for result in self.__getJobs(workflow, schedd):
             jobState = int(result['JobStatus'])
             if result['CRAB_Id'] in failedJobs:
                 failedJobs.remove(result['CRAB_Id'])
@@ -428,14 +504,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                 statusName = codes.get(jobState, 'Unknown')
             jobStatus[int(result['CRAB_Id'])] = statusName
 
-        jobConst = "TaskType =?= \"ASO\" && CRAB_ReqName =?= \"%s\"" % workflow
-        jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
-        if address:
-            results = schedd.query(jobConst, jobList)
-        else:
-            results = schedd.getClassAds(jobConst, jobList)
         aso_codes = {1: 'ASO Queued', 2: 'ASO Running', 4: 'Stageout Complete (Success)'}
-        for result in results:
+        for result in self.__getASOJobs(workflow, schedd):
             if result['CRAB_Id'] in failedJobs:
                 failedJobs.remove(result['CRAB_Id'])
             jobState = int(result['JobStatus'])
@@ -472,7 +542,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         return retval
 
 
-    def outputLocation(self, workflow, maxNum, pandaids):
+    def outputLocation(self, workflow, maxNum, _):
         """
         Retrieves the output LFN from async stage out
 
@@ -563,7 +633,30 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         else:
             schedd.release(subDagConst) #pylint: disable=E1103
             schedd.release(rootConst) #pylint: disable=E1103
-        
+
+
+    def report(self, workflow, userdn, userproxy=None):
+
+        self.__getreports__(workflow, userdn, userproxy)
+
+        #load the lumimask
+        rows = self.api.query(None, None, ID.sql, taskname = workflow)
+        splitArgs = literal_eval(rows.next()[6].read())
+        res['lumiMask'] = buildLumiMask(splitArgs['runs'], splitArgs['lumis'])
+
+        #extract the finished jobs from filemetadata
+        jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished']]
+        rows = self.api.query(None, None, GetFromPandaIds.sql, types='EDM', taskname=workflow, jobids=','.join(map(str,jobids)),\
+                                        limit=len(jobids)*100)
+        res['runsAndLumis'] = {}
+        for row in rows:
+            res['runsAndLumis'][str(row[GetFromPandaIds.PANDAID])] = { 'parents' : row[GetFromPandaIds.PARENTS].read(),
+                    'runlumi' : row[GetFromPandaIds.RUNLUMI].read(),
+                    'events'  : row[GetFromPandaIds.INEVENTS],
+            }
+
+        yield res
+
 
 def main():
     dag = DagmanDataWorkflow()

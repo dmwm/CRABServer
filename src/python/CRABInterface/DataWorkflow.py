@@ -13,14 +13,10 @@ from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 #CRAB dependencies
 from CRABInterface.Utils import CMSSitesCache, conn_handler, retrieveUserCert
 
-import PandaServerInterface as pserver
-
 #SQL queries
 from Databases.TaskDB.Oracle.Task.New import New
-from Databases.TaskDB.Oracle.Task.ID import ID
 from Databases.TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
 from Databases.TaskDB.Oracle.Task.SetArgumentsTask import SetArgumentsTask
-from Databases.TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
 
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
@@ -72,7 +68,6 @@ class DataWorkflow(object):
            :arg int shortformat: a flag indicating if the user is asking for detailed
                                  information about sites and list of errors
            :return: a list of errors grouped by exit code, error reason, site"""
-
         raise NotImplementedError
 
     def report(self, workflow):
@@ -81,21 +76,18 @@ class DataWorkflow(object):
 
            :arg str workflow: a workflow name
            :return: what?"""
-
         raise NotImplementedError
 
-    def logs(self, workflow, howmany, exitcode, pandaids):
+    def logs(self, workflow, howmany, exitcode, jobids):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
 
            :arg str workflow: a workflow name
            :arg int howmany: the limit on the number of PFN to return
            :arg int exitcode: the log has to be of a job ended with this exit_code
            :return: (a generator of?) a list of logs pfns"""
-        #default is 1 logfile per exitcode
-        self.logger.info("Retrieving %s log(s) for %s" % (howmany, workflow))
         raise NotImplementedError
 
-    def output(self, workflow, howmany):
+    def output(self, workflow, howmany, jobids):
         """
         Retrieves the output PFN aggregating output in final and temporary locations.
 
@@ -113,12 +105,11 @@ class DataWorkflow(object):
         # TODO: verify + code the above point
         # probably we need to explicitely select the schema parameters to return
         raise NotImplementedError
-        return [{}]
 
     @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
-               userhn, userdn, savelogsflag, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
-               userproxy=None):
+               userhn, userdn, savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
+               runs, lumis, userproxy=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -136,6 +127,7 @@ class DataWorkflow(object):
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
            :arg str userdn: DN of user doing the request;
            :arg str userhn: hyper new name of the user doing the request;
+           :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication;
            :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
@@ -179,10 +171,12 @@ class DataWorkflow(object):
                             asyncdest       = [asyncdest],\
                             dbs_url         = [dbsurl or self.dbsurl],\
                             publish_dbs_url = [publishdbsurl],\
+                            publication     = ['T' if publication else 'F'],\
                             outfiles        = [dbSerializer(addoutputfiles)],\
                             tfile_outfiles  = [dbSerializer(tfileoutfiles)],\
                             edm_outfiles    = [dbSerializer(edmoutfiles)],\
                             transformation  = [self.transformation],\
+                            job_type        = [jobtype],\
                             arguments       = [dbSerializer({})],\
         )
 
@@ -200,7 +194,7 @@ class DataWorkflow(object):
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         if statusRes['status'] in ['SUBMITTED','KILLED']:
-            resubmitList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus in ['cancelled','failed']]
+            resubmitList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus in self.failedList]
             self.logger.info("Jobs to resubmit: %s" % resubmitList)
             self.api.modify(SetStatusTask.sql, status = ["RESUBMIT"], taskname = [workflow])
             self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
@@ -216,17 +210,16 @@ class DataWorkflow(object):
                                                              => all the jobs are finished or failed then taskStatus=FAILED
         """
         if status=='SUBMITTED':
-             #only failed and completed jobs (completed may not be there) => task failed
-            if ('failed' in jobsPerStatus and len(jobsPerStatus)==1) or \
-               ('finished' in jobsPerStatus and 'failed' in jobsPerStatus and len(jobsPerStatus)==2):
-                self.logger.debug("Changing task status to FAILED")
-                self.api.modify(SetStatusTask.sql, status = ["FAILED"], taskname = [workflow])
-                return "FAILED"
-             #only completed jobs
-            if 'finished' in jobsPerStatus and len(jobsPerStatus)==1:
+            #only completed jobs
+            if not set(jobsPerStatus) - set(self.successList):
                 self.logger.debug("Changing task status to COMPLETED")
                 self.api.modify(SetStatusTask.sql, status = ["COMPLETED"], taskname = [workflow])
                 return "COMPLETED"
+            #only failed and completed jobs (completed may not be there) => task failed
+            if not set(jobsPerStatus) - set(self.successList) - set(self.failedList):
+                self.logger.debug("Changing task status to FAILED")
+                self.api.modify(SetStatusTask.sql, status = ["FAILED"], taskname = [workflow])
+                return "FAILED"
         return status
 
 
@@ -235,56 +228,7 @@ class DataWorkflow(object):
 
            :arg str workflow: a valid workflow name
            :return: a workflow status summary document"""
-        self.logger.debug("Getting status for workflow %s" % workflow)
-        row = self.api.query(None, None, ID.sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure = row.next() #just one row is picked up by the previous query
-        self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
-        self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
-
-        rows = self.api.query(None, None, GetJobGroupFromID.sql, taskname = workflow)
-        jobsPerStatus = {}
-        jobList = []
-        totalJobdefs = 0
-        failedJobdefs = 0
-        jobDefErrs = []
-        for jobdef in rows:
-            jobdefid = jobdef[0]
-            jobdefStatus = jobdef[1]
-            jobdefError = jobdef[2].read() if jobdef[2] else ''
-            totalJobdefs += 1
-            self.logger.debug("DB Status for jobdefid %s is %s. %s" % (jobdefid, jobdefStatus, jobdefError))
-
-            #check if the taskworker succeded in the submission
-            if jobdefStatus == 'FAILED':
-                jobDefErrs.append(jobdefError)
-                failedJobdefs += 1
-                continue
-
-            #check the status of the jobdef in panda
-            schedEC, res = pserver.getPandIDsWithJobID(jobID=jobdefid, user=userdn, vo='cms', group=vogroup, role=vorole, userproxy=userproxy, credpath=self.credpath)
-            self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
-            if schedEC:
-                jobDefErrs.append("Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC))
-                self.logger.debug(jobDeErrs[-1])
-                failedJobdefs += 1
-                continue
-
-            #prepare the result at the job granularity
-            self.logger.debug("Iterating on: %s" % res)
-            for jobid, (jobstatus, _) in res.iteritems():
-                jobsPerStatus[jobstatus] = jobsPerStatus[jobstatus]+1 if jobstatus in jobsPerStatus else 1
-                jobList.append((jobstatus,jobid))
-
-        status = self._updateTaskStatus(workflow, status, jobsPerStatus)
-
-        return [ {"status" : status,\
-                  "taskFailureMsg" : taskFailure.read() if taskFailure else '',\
-                  "jobSetID"        : jobsetid if jobsetid else '',\
-                  "jobsPerStatus"   : jobsPerStatus,\
-                  "failedJobdefs"   : failedJobdefs,\
-                  "totalJobdefs"    : totalJobdefs,\
-                  "jobdefErrors"    : jobDefErrs,\
-                  "jobList"         : jobList }]
+        raise NotImplementedError
 
     def kill(self, workflow, force, userdn, userproxy=None):
         """Request to Abort a workflow.
@@ -295,7 +239,7 @@ class DataWorkflow(object):
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         if statusRes['status'] == 'SUBMITTED':
-            killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus!='completed']
+            killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus not in self.successList]
             self.logger.info("Jobs to kill: %s" % killList)
 
             self.api.modify(SetStatusTask.sql, status = ["KILL"], taskname = [workflow])

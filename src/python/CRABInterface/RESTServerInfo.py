@@ -10,10 +10,10 @@ from CRABInterface.Regexps import RX_SUBRES_SI
 class RESTServerInfo(RESTEntity):
     """REST entity for workflows and relative subresources"""
 
-    def __init__(self, app, api, config, mount):
+    def __init__(self, app, api, config, mount, serverdn, delegatedn):
         RESTEntity.__init__(self, app, api, config, mount)
-        self.delegatedn = config.delegatedn
-        self.serverdn = config.serverdn
+        self.delegatedn = delegatedn
+        self.serverdn = serverdn
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
@@ -27,7 +27,6 @@ class RESTServerInfo(RESTEntity):
            machine who is actually submitting the jobs (The WMAgent).
            :arg str subresource: the specific server information to be accessed;
         """
-
         return getattr(RESTServerInfo, subresource)(self)
 
     def delegatedn(self):

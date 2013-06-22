@@ -5,8 +5,6 @@ import json
 
 # WMCore dependecies here
 from WMCore.REST.Error import InvalidParameter, ExecutionError, MissingObject
-from WMCore.Database.CMSCouch import CouchServer, CouchError, CouchNotFoundError
-from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 
 #CRAB dependencies
 from CRABInterface.DataWorkflow import DataWorkflow
@@ -14,25 +12,17 @@ from CRABInterface.Utils import conn_handler, retrieveUserCert
 
 
 class DataUserWorkflow(object):
-    """Entity that allows to operate on workflow resources from the user point of view.
-       This class exploits the funcionalities of the DataWorkflow class to retrieve
-       single workflow information, by aggregating the data of various chained workflows.
-       Chained workflows are related because of resubmission:
-         - each time there is a resubmission a new workflow is created with the previous
-           workflow as parent;
-         - this is completely hidden to the user which will always see the single
-           original workflow;
-         - this class hides the resubmitted workflows, providing an aggregated view
-           of the 'chianed workflows'.
+    """
+    """
 
-       Note. Current implementation uses the concept of campaign to aggregate workflows.
-             This is valid till no campaign use cases are supported. The correct way is to
-             use a field in the monitoring with the name of parent workflow (original
-             workflows will have the campaign name as parent)."""
+    @staticmethod
+    def globalinit(workflowManager):
+        DataUserWorkflow.workflowManager = workflowManager
 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataUserWorkflow")
-        self.workflow = DataWorkflow()
+        mod = __import__('CRABInterface.%s' % self.workflowManager, fromlist=self.workflowManager)
+        self.workflow = getattr(mod, self.workflowManager)()
 
     def getLatests(self, user, limit, timestamp):
         """Retrives the latest workflows for the user
@@ -55,43 +45,35 @@ class DataUserWorkflow(object):
            :arg int shortformat: a flag indicating if the user is asking for detailed
                                  information about sites and list of errors
            :return: a list of errors grouped by exit code, error reason, site"""
-        wfchain = self._getWorkflowChain(workflow)
-        #TODO: how do we merge these?
-        for wf in wfchain:
-            yield self.workflow.errors(wf, shortformat)
+        raise NotImplementedError
 
-    def report(self, workflow):
+    @retrieveUserCert
+    def report(self, workflow, userdn, userproxy):
         """Retrieves the quality of the workflow in term of what has been processed
            (eg: good lumis). This can call a different function depending on the jobtype.
 
            :arg str workflow: a workflow name
            :return: what?"""
-        wfchain = self._getWorkflowChain(workflow)
-        for wf in wfchain:
-            yield self.workflow.report(wf)
+        return self.workflow.report(workflow, userdn, userproxy)
 
-    def logs(self, workflow, howmany, exitcode, pandaids):
+    @retrieveUserCert
+    def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
 
            :arg str workflow: a workflow name
            :arg int howmany: the limit on the number of PFN to return
            :arg int exitcode: the log has to be of a job ended with this exit_code
            :return: a generator of list of logs pfns"""
-        wfchain = self._getWorkflowChain(workflow)
-        #TODO: how do we merge these?
-        for wf in wfchain:
-            yield self.workflow.logs(wf, shortformat)
+        return self.workflow.logs(workflow, howmany, exitcode, jobids, userdn, userproxy)
 
-    def output(self, workflow, howmany, pandaids):
+    @retrieveUserCert
+    def output(self, workflow, howmany, jobids, userdn, userproxy=None):
         """Returns the workflow output PFN. It takes care of the LFN - PFN conversion too.
 
            :arg str list workflow: a workflow name
            :arg int howmany: the limit on the number of PFN to return
            :return: a generator of list of output pfns"""
-
-        wfchain = self._getWorkflowChain(workflow)
-        for wf in wfchain:
-            yield self.workflow.output(wf)
+        return self.workflow.output(workflow, howmany, jobids, userdn, userproxy)
 
     def submit(self, *args, **kwargs):
         """Perform the workflow injection
@@ -111,6 +93,7 @@ class DataUserWorkflow(object):
            :arg str userdn: DN of user doing the request;
            :arg str userhn: hyper new name of the user doing the request;
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
+           :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication;
            :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
