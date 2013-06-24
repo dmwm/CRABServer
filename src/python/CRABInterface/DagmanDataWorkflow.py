@@ -16,6 +16,8 @@ except ImportError:
         raise
 
 import os
+import os.path
+import subprocess
 import re
 import json
 import time
@@ -63,11 +65,11 @@ Executable = dag_bootstrap.sh
 Output = job_splitting.out
 Error = job_splitting.err
 Args = SPLIT dbs_results job_splitting_results
-transfer_input = dbs_results
+transfer_input = dbs_results%(additional_input_files)s
 transfer_output_files = splitting_results
 # TODO - need to clean this bit up
 #Environment = PATH=/usr/bin:/bin
-Environment = PATH=/usr/bin:/bin
+Environment = PATH=/usr/bin:/bin;%(additional_environment_options)s
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
 queue
@@ -81,8 +83,9 @@ Executable = dag_bootstrap.sh
 Output = dbs_discovery.out
 Error = dbs_discovery.err
 Args = DBS None dbs_results
+transfer_input_files = cmscp.py%(additional_input_files)s
 transfer_output_files = dbs_results
-Environment = PATH=/usr/bin:/bin
+Environment = PATH=/usr/bin:/bin;%(additional_environment_options)s
 use_x509userproxy = true # %(x509up_file)s
 queue
 """
@@ -97,10 +100,11 @@ universe = local
 Executable = dag_bootstrap.sh
 Arguments = "ASO $(CRAB_AsyncDest) %(temp_dest)s %(output_dest)s $(count) $(Cluster).$(Process) cmsRun_$(count).log.tar.gz $(outputFiles)"
 Output = aso.$(count).out
-transfer_inputFiles = job_log.$(count), jobReport.json.$(count)
+transfer_inputFiles = job_log.$(count), jobReport.json.$(count)%(additional_input_files)s
 +TransferOutput = ""
 Error = aso.$(count).err
 #Environment = PATH=/usr/bin:/bin
+Environment = %(additional_environment_options)s
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
 leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
@@ -139,7 +143,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             self.requestarea = "/tmp/crab3"
 
 
-    def __getbindir__(self):
+    def getBinDir(self):
         """
         Returns the directory of pithy shell scripts
         TODO this is definitely a thing that needs to be fixed for an RPM-deploy
@@ -217,10 +221,42 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         os.makedirs(scratch)
 
         # Poor-man's string escaping.  We do this as classad module isn't guaranteed to be present.
+        # FIXME: Hack because I think bbockelm forgot to commit the available_sites change
+        available_sites = ['T2_US_Nebraska']
         info = escape_strings_to_classads(locals())
         info['remote_condor_setup'] = self.getRemoteCondorSetup()
-        info['bindir'] = self.__getbindir__()
+        info['bindir'] = self.getBinDir()
         info['transform_location'] = self.getTransformLocation()
+        
+        if kwargs.get('taskManagerTarball', None) and \
+                kwargs.get('taskManagerCodeLocation', None) and \
+                kwargs['taskManagerTarball'] != 'local':
+            raise RuntimeError, "Debug.taskManagerTarball must be 'local' if you provide a code location"
+
+        if kwargs.get('taskManagerCodeLocation', None):
+            kwargs['taskManagerTarball'] = 'local'
+
+        if kwargs.get('taskManagerTarball', None):
+            info['additional_environment_options'] = 'CRAB_TASKMANAGER_TARBALL=%s' % kwargs['taskManagerTarball']
+        else:
+            # need to have  a blank variable to keep the separaters right
+            info['additional_environment_options'] = 'DUMMY=""'
+        info['additional_input_files'] = ''
+        if kwargs.get('taskManagerTarball') == 'local':
+            if not kwargs.get('taskManagerCodeLocation', None):
+                raise RuntimeError, "Tarball was set to local, but not location was set"
+            # we need to generate the tarball to ship along with the jobs
+            #  CAFTaskWorker/bin/dagman_make_runtime.sh
+            self.logger.info('Packing up tarball from local source tree')
+            runtimePath = os.path.expanduser( os.path.join( 
+                                        kwargs['taskManagerCodeLocation'],
+                                        'CAFTaskWorker',
+                                        'bin',
+                                        'dagman_make_runtime.sh') )
+            tarMaker = subprocess.Popen([ runtimePath, kwargs['taskManagerCodeLocation']])
+            tarMaker.communicate()
+            info['additional_input_files'] = ', TaskManagerRun.tar.gz'
+                                          
 
         schedd, address = dagmanSubmitter.getScheddObj(scheddName)
 
@@ -235,24 +271,29 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         with open(os.path.join(scratch, 'ASO.submit'), 'w') as fd:
             fd.write(ASYNC_SUBMIT % info)
 
-        inputFiles = [os.path.join(self.__getbindir__(), "dag_bootstrap.sh"),
-		       os.path.join(self.__getbindir__(), "dag_bootstrap_startup.sh"),
+        inputFiles = [os.path.join(self.getBinDir(), "dag_bootstrap.sh"),
+		       os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh"),
                        self.getTransformLocation(),
-                       os.path.join(self.__getbindir__(), "cmscp.py")]
+                       os.path.join(self.getBinDir(), "cmscp.py")]
         scratch_files = ['master_dag', 'DBSDiscovery.submit', 'JobSplitting.submit', 'master_dag', 'Job.submit', 'ASO.submit']
         inputFiles.extend([os.path.join(scratch, i) for i in scratch_files])
+        if kwargs.get('taskManagerTarball', None) == 'local':
+            inputFiles.append('TaskManagerRun.tar.gz')
+
         outputFiles = ["master_dag.dagman.out", "master_dag.rescue.001", "RunJobs.dag",
             "RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001", "dbs_discovery.err",
             "dbs_discovery.out", "job_splitting.err", "job_splitting.out"]
 
         if address:
+            # Submit directly to a scheduler
             info['outputFilesString'] = ", ".join(outputFiles)
             info['inputFilesString'] = ", ".join(inputFiles)
 
             dagmanSubmitter.submitDirect(schedd,
-                os.path.join(self.__getbindir__(), "dag_bootstrap_startup.sh"), 'master_dag',
+                os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh"), 'master_dag',
                 info)
         else:
+            # Submit over Gsissh
             # testing getting the right directory
             requestname_bak = requestname
             requestname = './'
@@ -425,7 +466,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         for job in jobs:
             if 'CRAB_Id' not in job: continue
             if (int(job.get("JobStatus", "1")) == 4) and (task_is_finished or (int(job.get("ExitCode", -1)) == 0)):
-                finished_jobs["%s.%s" % (job['ClusterID'], job['ProcID']] = job
+                finished_jobs["%s.%s" % (job['ClusterID'], job['ProcID'])] = job
 
         # TODO: consider POSIX data integrity
         for id, job in finished_jobs.items():

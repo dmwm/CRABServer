@@ -22,7 +22,7 @@ then
         CRAB_TASKMANAGER_TARBALL='http://hcc-briantest.unl.edu/TaskManagerRun.tar.gz'
     fi
     
-    if [[ "X$CRAB_TASKMANAGER_TARBALL" != "Xlocal" ]] then
+    if [[ "X$CRAB_TASKMANAGER_TARBALL" != "Xlocal" ]]; then
         # pass, we'll just use that value
 	    curl $CRAB_TASKMANAGER_TARBALL > TaskManagerRun.tar.gz
         if [[ $? != 0 ]]
