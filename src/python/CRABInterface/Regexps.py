@@ -46,3 +46,16 @@ RX_SUBRESTAT = re.compile(r"^errors|report|logs|data$")
 
 #subresources of the ServerInfo (/info) resource
 RX_SUBRES_SI = re.compile(r"^delegatedn$")
+
+#worker workflow
+RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._]{1,100}$")
+## this can be improved by putting a dependency on CAFUtilities task state machine
+RX_STATUS = re.compile(r"^[A-Za-x]{1,20}$")
+## need to be careful with this
+RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s]{1,100}$")
+## user dn
+RX_DN = re.compile(r"^/(?:C|O|DC)=.*/CN=.")
+## worker subresources
+RX_SUBPOSTWORKER = re.compile(r"^state|start|failure|success|process$")
+## resubmitted ids
+RX_RESUBMITID  = re.compile(r"^\d+(,\d+)*$")
