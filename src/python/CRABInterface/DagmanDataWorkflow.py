@@ -22,6 +22,7 @@ import re
 import json
 import time
 import errno
+import logging
 import traceback
 import pprint
 import sys
@@ -224,6 +225,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         # FIXME: Hack because I think bbockelm forgot to commit the available_sites change
         available_sites = ['T2_US_Nebraska']
         info = escape_strings_to_classads(locals())
+        # Condor will barf if the requesname is quoted .. for some reason
+        info['requestname'] = info['requestname'].replace('"','')
         info['remote_condor_setup'] = self.getRemoteCondorSetup()
         info['bindir'] = self.getBinDir()
         info['transform_location'] = self.getTransformLocation()
@@ -410,10 +413,20 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             schedd.edit(subDagConst, "HoldKillSig", "SIGUSR1")
             schedd.hold(const) #pylint: disable=E1103
 
+    def getScheddAndAddress(self):
+        dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
+        scheddName = dag.getSchedd()
+        return  dag.getScheddObj(scheddName)
 
-    def __getRootTasks(self, workflow, schedd):
-        rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
-        rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount']
+    def getRootTasks(self, workflow, schedd):
+        rootConst = "TaskType =?= \"ROOT\" && string(CRAB_ReqName) =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
+        rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType']
+        print "trying to get %s" % workflow
+        #print "Using rootConst: %s" % rootConst
+        dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
+        scheddName = dag.getSchedd()
+        schedd, address = dag.getScheddObj(scheddName)
+
         if address:
             results = schedd.query(rootConst, rootAttrList)
         else:
@@ -421,29 +434,32 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
 
         if not results:
             self.logger.info("An invalid workflow name was requested: %s" % workflow)
+            self.logger.info("Tried to read from address %s" % address)
             raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
         return results
 
 
-    def __getASOJobs(self, workflow, schedd):
+    def getASOJobs(self, workflow, schedd):
         jobConst = "TaskType =?= \"ASO\" && CRAB_ReqName =?= \"%s\"" % workflow
         jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
+        _, address = self.getScheddAndAddress()
         if address:
             results = schedd.query(jobConst, jobList)
         else:
             results = schedd.getClassAds(jobConst, jobList)
+        return results
 
-
-    def __getJobs(self, workflow, schedd):
+    def getJobs(self, workflow, schedd):
         jobConst = "TaskType =?= \"Job\" && CRAB_ReqName =?= \"%s\"" % workflow
         jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
+        _, address = self.getScheddAndAddress()
         if address:
             results = schedd.query(jobConst, jobList)
         else:
             results = schedd.getClassAds(jobConst, jobList)
+        return results
 
-
-    def __serializeFinishedJobs__(self, workflow, userdn, userproxy=None):
+    def serializeFinishedJobs(self, workflow, userdn, userproxy=None):
         if not userproxy:
             return
         jobdir = os.path.join(self.requestdir, "."+workflow, "finished_condor_jobs")
@@ -461,8 +477,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
 
         finished_jobs = {}
 
-        jobs = self.__getJobs(workflow, schedd)
-        jobs.extend(self.__getASOJobs(workflow, schedd))
+        jobs = self.getJobs(workflow, schedd)
+        jobs.extend(self.getASOJobs(workflow, schedd))
         for job in jobs:
             if 'CRAB_Id' not in job: continue
             if (int(job.get("JobStatus", "1")) == 4) and (task_is_finished or (int(job.get("ExitCode", -1)) == 0)):
@@ -479,7 +495,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             schedd.remove(finished_jobs.keys())
 
 
-    def __getreports__(self, workflow, userproxy):
+    def getReports(self, workflow, userproxy):
         if not userproxy: return
 
         jobdir = os.path.join(self.requestdir, "."+workflow, "job_results")
@@ -497,7 +513,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
 
         job_ids = {}
         aso_ids = set()
-        for job in self.__getJobs(workflow, schedd):
+        for job in self.getJobs(workflow, schedd):
             if 'CRAB_Id' not in job: continue
             if int(job.get("JobStatus", "1")) == 4:
                 job_ids[int(job['CRAB_Id'])] = "%s.%s" % (job['ClusterID'], job['ProcID'])
@@ -516,25 +532,30 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         if not WORKFLOW_RE.match(workflow):
             raise Exception("Invalid workflow name.")
 
-        self.logger.info("Getting status for workflow %s" % workflow)
+        print "Getting status for workflow %s" % workflow
 
         name = workflow.split("_")[0]
 
         dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
         schedd, address = dag.getScheddObj(name)
 
-        results = self.__getRootTasks(workflow, schedd)
+        results = self.getRootTasks(workflow, schedd)
+        #print "Got root tasks: %s" % results
         jobsPerStatus = {}
         jobStatus = {}
         jobList = []
-        taskStatusCode = int(results[0]['JobStatus'])
-        taskJobCount = int(results[0].get('CRAB_JobCount', 0))
+        taskStatusCode = int(results[-1]['JobStatus'])
+        print "got status code %s" % taskStatusCode
+        taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
         codes = {1: 'Idle', 2: 'Running', 4: 'Completed (Success)', 5: 'Killed'}
         retval = {"status": codes.get(taskStatusCode, 'Unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
 
         failedJobs = []
-        for result in self.__getJobs(workflow, schedd):
+        allJobs = self.getJobs(workflow, schedd)
+        print "found %s jobs" % len(allJobs)
+        for result in allJobs:
+            # print "Examining one job: %s" % result
             jobState = int(result['JobStatus'])
             if result['CRAB_Id'] in failedJobs:
                 failedJobs.remove(result['CRAB_Id'])
@@ -546,7 +567,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             jobStatus[int(result['CRAB_Id'])] = statusName
 
         aso_codes = {1: 'ASO Queued', 2: 'ASO Running', 4: 'Stageout Complete (Success)'}
-        for result in self.__getASOJobs(workflow, schedd):
+        for result in self.getASOJobs(workflow, schedd):
             if result['CRAB_Id'] in failedJobs:
                 failedJobs.remove(result['CRAB_Id'])
             jobState = int(result['JobStatus'])
@@ -678,7 +699,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
 
     def report(self, workflow, userdn, userproxy=None):
 
-        self.__getreports__(workflow, userdn, userproxy)
+        self.getReports(workflow, userdn, userproxy)
 
         #load the lumimask
         rows = self.api.query(None, None, ID.sql, taskname = workflow)
