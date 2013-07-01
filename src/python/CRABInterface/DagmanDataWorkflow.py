@@ -118,10 +118,10 @@ transfer_inputFiles = job_log.$(count), jobReport.json.$(count)%(additional_inpu
 Error = aso.$(count).err
 #Environment = PATH=/usr/bin:/bin;CRAB3_VERSION=%(crab3_version)s
 Environment = %(additional_environment_options)s
->>>>>>> f0485af365f82ca104d0012b54a5a2004ac987ca
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
-leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
+#leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
+leave_in_queue = (JobStatus == 4)
 queue
 """
 
@@ -436,17 +436,15 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             schedd.edit(subDagConst, "HoldKillSig", "SIGUSR1")
             schedd.hold(const) #pylint: disable=E1103
 
-    def getScheddAndAddress(self, name=None):
+    def getScheddAndAddress(self, scheddName=None):
         dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
-        if name:
-            scheddName = dag.getSchedd(name)
-        else:
-            shceddName = dag.getSchedd()
+        if not scheddName:
+            scheddName = dag.getSchedd()
         return  dag.getScheddObj(scheddName)
 
     def __getroottasks__(self, address, workflow, schedd):
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
-        rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount']
+        rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_LumiMask']
         #print "trying to get %s" % workflow
         #print "Using rootConst: %s" % rootConst
         _, address = self.getScheddAndAddress()
@@ -476,7 +474,6 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
     def __getjobs__(self, address, workflow, schedd):
         jobConst = "TaskType =?= \"Job\" && CRAB_ReqName =?= \"%s\"" % workflow
         jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
-        _, address = self.getScheddAndAddress()
         if address:
             results = schedd.query(jobConst, jobList)
         else:
@@ -484,22 +481,23 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         return results
 
 
-    def __getjobdir__(self, subdir):
-        jobdir = os.path.join(self.requestdir, "."+workflow, subdir)
+    def __getjobdir__(self, workflow, subdir):
+        jobdir = os.path.join(self.requestarea, "."+workflow, subdir)
         jobdir = os.path.abspath(jobdir)
-        requestdir = os.path.abspath(self.requestdir)
-        assert(jobdir.startswith(requestdir))
+        requestarea = os.path.abspath(self.requestarea)
+        assert(jobdir.startswith(requestarea))
         try:
             os.makedirs(jobdir)
         except OSError, oe:
             if oe.errno != errno.EEXIST:
                 raise
+        return jobdir
 
 
     def __serializefinishedjobs__(self, workflow, userdn, userproxy=None):
         if not userproxy:
             return
-        jobdir = self.__getjobdir__("finished_condor_jobs")
+        jobdir = self.__getjobdir__(workflow, "finished_condor_jobs")
 
         name = workflow.split("_")[0]
         dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
@@ -531,21 +529,30 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         if not userproxy:
             return
 
-        jobdir = self.__getjobdir__("job_results")
+        jobdir = self.__getjobdir__(workflow, "job_results")
 
         name = workflow.split("_")[0]
         dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
         schedd, address = dag.getScheddObj(name)
 
         jobIDs = {}
+        jobIDsConstraint = []
         for job in self.__getjobs__(address, workflow, schedd):
-            if 'CRAB_Id' not in job: continue
+            if 'CRAB_Id' not in job:
+                continue
+            if os.path.exists(os.path.join(jobdir, "jobReport.json.%s" % job['CRAB_Id'])):
+                continue
             if int(job.get("JobStatus", "1")) == 4:
                 jobIDs[int(job['CRAB_Id'])] = "%s.%s" % (job['ClusterID'], job['ProcID'])
+                jobIDsConstraint.append((job['ClusterID'], job['ProcID']))
+
+        if not jobIDs:
+            return
 
         if address:
             schedd.edit(jobIDs.values(), "TransferOutputRemaps", 'strcat("jobReport.json.", CRAB_Id, "=%s/jobReport.json.", CRAB_Id, ";job_out.", CRAB_Id, "=/dev/null;job_err.", CRAB_Id, "=/dev/null")' % jobdir)
-            schedd.retrieve(jobIDs.values())
+            const = " || ".join(["(ClusterID == %s && ProcID == %s)" % i for i in jobIDsConstraint])
+            schedd.retrieve(const)
 
 
     def status(self, workflow, userdn, userproxy=None):
@@ -722,22 +729,26 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
 
 
     def report(self, workflow, userdn, userproxy=None):
+        #if not userdn:
+        #    raise Exception("Unable to determine DN for report")
 
         self.__getreports__(workflow, userproxy)
-        jobdir = self.__getjobdir__("job_results")
+        jobdir = self.__getjobdir__(workflow, "job_results")
         name = workflow.split("_")[0]
-        schedd, address = self.getScheddAndAddress()
+        schedd, address = self.getScheddAndAddress(name)
 
-        #load the lumimask
+        #load the lumimas
         results = self.__getroottasks__(address, workflow, schedd)
         if not results:
             raise Exception("Unable to determine task lumimask for workflow %s." % workflow)
-        res['lumiMask'] = results[0]['CRAB_LumiMask']
+
+        res = {}
+        res['lumiMask'] = json.loads(results[0]['CRAB_LumiMask'])
 
         res['runsAndLumis'] = {}
         fileRe = re.compile("jobReport\.json\.([0-9]+)")
-	for filename in glob.glob(os.path.join(job_dir, "jobReport.json.*")):
-            _, shortFilename = os.path.split(filename)
+	for filename in glob.glob(os.path.join(jobdir, "jobReport.json.*")):
+            shortFilename = os.path.split(filename)[1]
             m = fileRe.match(shortFilename)
             if not m:
                 continue
@@ -749,13 +760,17 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                 except ValueError:
                     continue
 
-            for outputModule in report['steps']['cmsRun']['output'].items():
-                if 'output_module_class' not in outputModule:
+            for outputModule in report['steps']['cmsRun']['output'].values():
+                if not outputModule:
+                    continue
+                outputModule = outputModule[0]
+                if u'ouput_module_class' not in outputModule:
                     continue
                 if outputModule['ouput_module_class'] == 'PoolOutputModule':
                     # TODO: this results in the wrong numbers for multi-output jobs.
-                    res['runsAndLumis'][m.groups()[0]] = {'parents': outputModule['input'], 'runlumi': outputModule['runs'], 'events': outputModule['events']}
+                    res['runsAndLumis'][m.groups()[0]] = {'parents': json.dumps(outputModule['input']), 'runlumi': json.dumps(outputModule['runs']), 'events': outputModule['events']}
 
+        print res
         yield res
 
 
