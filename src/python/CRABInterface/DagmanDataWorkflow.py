@@ -770,7 +770,6 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                     # TODO: this results in the wrong numbers for multi-output jobs.
                     res['runsAndLumis'][m.groups()[0]] = {'parents': json.dumps(outputModule['input']), 'runlumi': json.dumps(outputModule['runs']), 'events': outputModule['events']}
 
-        print res
         yield res
 
 
