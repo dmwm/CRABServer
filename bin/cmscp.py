@@ -9,6 +9,7 @@ with warnings.catch_warnings():
 import os
 import sys
 import signal
+import logging
 import tarfile
 
 if 'CMS_PATH' not in os.environ:
@@ -40,7 +41,7 @@ except ImportError, ie:
     sys.path.insert(0, name)
     import WMCore
 
-import WMCore.Storage.StageOutMgr as StageOutMgr
+import WMCore.Storage.FileManager as StageOutMgr
 
 from WMCore.Lexicon                  import lfn     as lfnRegEx
 from WMCore.Lexicon                  import userLfn as userLfnRegEx
@@ -142,5 +143,6 @@ def main():
     return 0
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     sys.exit(main())
 

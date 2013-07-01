@@ -25,11 +25,12 @@ PROC_ID=`grep '^ProcId =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
 CLUSTER_ID=`grep '^ClusterId =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
 export CONDOR_ID="${CLUSTER_ID}.${PROC_ID}"
 
-condor_dagman -f -l . -Lockfile $PWD/$1.lock -AutoRescue 1 -DoRescueFrom 0 -Dag $PWD/$1 -Suppress_notification -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION"
+# There used to be -Suppress_notification here. Why?
+condor_dagman -f -l . -Lockfile $PWD/$1.lock -AutoRescue 1 -DoRescueFrom 0 -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION"
 set +x
 EXIT_STATUS=$?
 
 # We do this after the job because dagman will cowardly refuse to overwrite any pre-existing file, even if it's empty
 touch $1.rescue.001
-
+echo "dag_bootstrap_startup exited with code $EXIT_STATUS"
 exit $EXIT_STATUS

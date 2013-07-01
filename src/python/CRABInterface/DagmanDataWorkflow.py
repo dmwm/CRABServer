@@ -29,10 +29,13 @@ except ImportError:
         raise
 
 import re
+import glob
 import json
 import time
 import errno
+import logging
 import traceback
+import subprocess
 import pprint
 import sys
 import TaskWorker
@@ -77,11 +80,9 @@ Executable = dag_bootstrap.sh
 Output = job_splitting.out
 Error = job_splitting.err
 Args = SPLIT dbs_results job_splitting_results
-transfer_input = dbs_results
+transfer_input = dbs_results%(additional_input_files)s
 transfer_output_files = splitting_results
-# TODO - need to clean this bit up
-#Environment = PATH=/usr/bin:/bin
-Environment = PATH=/usr/bin:/bin;CRAB3_VERSION=%(crab3_version)s
+Environment = PATH=/usr/bin:/bin;CRAB3_VERSION=%(crab3_version)s;%(additional_environment_options)s
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
 queue
@@ -95,8 +96,9 @@ Executable = dag_bootstrap.sh
 Output = dbs_discovery.out
 Error = dbs_discovery.err
 Args = DBS None dbs_results
+transfer_input_files = cmscp.py%(additional_input_files)s
 transfer_output_files = dbs_results
-Environment = PATH=/usr/bin:/bin;CRAB3_VERSION=%(crab3_version)s
+Environment = PATH=/usr/bin:/bin;CRAB3_VERSION=%(crab3_version)s;%(additional_environment_options)s
 use_x509userproxy = true # %(x509up_file)s
 queue
 """
@@ -111,10 +113,12 @@ universe = local
 Executable = dag_bootstrap.sh
 Arguments = "ASO $(CRAB_AsyncDest) %(temp_dest)s %(output_dest)s $(count) $(Cluster).$(Process) cmsRun_$(count).log.tar.gz $(outputFiles)"
 Output = aso.$(count).out
-transfer_inputFiles = job_log.$(count), jobReport.json.$(count)
+transfer_inputFiles = job_log.$(count), jobReport.json.$(count)%(additional_input_files)s
 +TransferOutput = ""
 Error = aso.$(count).err
 #Environment = PATH=/usr/bin:/bin;CRAB3_VERSION=%(crab3_version)s
+Environment = %(additional_environment_options)s
+>>>>>>> f0485af365f82ca104d0012b54a5a2004ac987ca
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
 leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
@@ -154,7 +158,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             self.requestarea = "/tmp/crab3"
 
 
-    def __getbindir__(self):
+    def getBinDir(self):
         """
         Returns the directory of pithy shell scripts
         TODO this is definitely a thing that needs to be fixed for an RPM-deploy
@@ -185,7 +189,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             tDir = self.config.General.transformDir #pylint: disable=E1103
         if 'CRAB3_BASEPATH' in os.environ:
             tDir = os.path.join(os.environ["CRAB3_BASEPATH"], "bin")
-        return os.path.join(os.path.expanduser(tDir), "CMSRunAnaly.sh")
+        return os.path.join(os.path.expanduser(tDir), "CMSRunAnalysis.sh")
 
     def getRemoteCondorSetup(self):
         """
@@ -239,11 +243,44 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         os.makedirs(scratch)
 
         # Poor-man's string escaping.  We do this as classad module isn't guaranteed to be present.
+        # FIXME: Available sites aren't known ahead of time for us.
         available_sites = []
         info = escape_strings_to_classads(locals())
+        # Condor will barf if the requesname is quoted .. for some reason
+        info['requestname'] = info['requestname'].replace('"','')
         info['remote_condor_setup'] = self.getRemoteCondorSetup()
-        info['bindir'] = self.__getbindir__()
+        info['bindir'] = self.getBinDir()
         info['transform_location'] = self.getTransformLocation()
+        
+        if kwargs.get('taskManagerTarball', None) and \
+                kwargs.get('taskManagerCodeLocation', None) and \
+                kwargs['taskManagerTarball'] != 'local':
+            raise RuntimeError, "Debug.taskManagerTarball must be 'local' if you provide a code location"
+
+        if kwargs.get('taskManagerCodeLocation', None):
+            kwargs['taskManagerTarball'] = 'local'
+
+        if kwargs.get('taskManagerTarball', None):
+            info['additional_environment_options'] = 'CRAB_TASKMANAGER_TARBALL=%s' % kwargs['taskManagerTarball']
+        else:
+            # need to have  a blank variable to keep the separaters right
+            info['additional_environment_options'] = 'DUMMY=""'
+        info['additional_input_files'] = ''
+        if kwargs.get('taskManagerTarball') == 'local':
+            if not kwargs.get('taskManagerCodeLocation', None):
+                raise RuntimeError, "Tarball was set to local, but not location was set"
+            # we need to generate the tarball to ship along with the jobs
+            #  CAFTaskWorker/bin/dagman_make_runtime.sh
+            self.logger.info('Packing up tarball from local source tree')
+            runtimePath = os.path.expanduser( os.path.join( 
+                                        kwargs['taskManagerCodeLocation'],
+                                        'CAFTaskWorker',
+                                        'bin',
+                                        'dagman_make_runtime.sh') )
+            tarMaker = subprocess.Popen([ runtimePath, kwargs['taskManagerCodeLocation']])
+            tarMaker.communicate()
+            info['additional_input_files'] = ', TaskManagerRun.tar.gz'
+                                          
 
         info['crab3_version'] = self.__getversion__()
 
@@ -260,24 +297,29 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         with open(os.path.join(scratch, 'ASO.submit'), 'w') as fd:
             fd.write(ASYNC_SUBMIT % info)
 
-        inputFiles = [os.path.join(self.__getbindir__(), "dag_bootstrap.sh"),
-		       os.path.join(self.__getbindir__(), "dag_bootstrap_startup.sh"),
+        inputFiles = [os.path.join(self.getBinDir(), "dag_bootstrap.sh"),
+		       os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh"),
                        self.getTransformLocation(),
-                       os.path.join(self.__getbindir__(), "cmscp.py")]
+                       os.path.join(self.getBinDir(), "cmscp.py")]
         scratch_files = ['master_dag', 'DBSDiscovery.submit', 'JobSplitting.submit', 'master_dag', 'Job.submit', 'ASO.submit']
         inputFiles.extend([os.path.join(scratch, i) for i in scratch_files])
+        if kwargs.get('taskManagerTarball', None) == 'local':
+            inputFiles.append('TaskManagerRun.tar.gz')
+
         outputFiles = ["master_dag.dagman.out", "master_dag.rescue.001", "RunJobs.dag",
             "RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001", "dbs_discovery.err",
             "dbs_discovery.out", "job_splitting.err", "job_splitting.out"]
 
         if address:
+            # Submit directly to a scheduler
             info['outputFilesString'] = ", ".join(outputFiles)
             info['inputFilesString'] = ", ".join(inputFiles)
 
             dagmanSubmitter.submitDirect(schedd,
-                os.path.join(self.__getbindir__(), "dag_bootstrap_startup.sh"), 'master_dag',
+                os.path.join(self.getBinDir(), "dag_bootstrap_startup.sh"), 'master_dag',
                 info)
         else:
+            # Submit over Gsissh
             # testing getting the right directory
             requestname_bak = requestname
             requestname = './'
@@ -394,10 +436,20 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             schedd.edit(subDagConst, "HoldKillSig", "SIGUSR1")
             schedd.hold(const) #pylint: disable=E1103
 
+    def getScheddAndAddress(self, name=None):
+        dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
+        if name:
+            scheddName = dag.getSchedd(name)
+        else:
+            shceddName = dag.getSchedd()
+        return  dag.getScheddObj(scheddName)
 
     def __getroottasks__(self, address, workflow, schedd):
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
         rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount']
+        #print "trying to get %s" % workflow
+        #print "Using rootConst: %s" % rootConst
+        _, address = self.getScheddAndAddress()
         if address:
             results = schedd.query(rootConst, rootAttrList)
         else:
@@ -405,6 +457,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
 
         if not results:
             self.logger.info("An invalid workflow name was requested: %s" % workflow)
+            self.logger.info("Tried to read from address %s" % address)
             raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
         return results
 
@@ -412,19 +465,23 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
     def __getasojobs__(self, address, workflow, schedd):
         jobConst = "TaskType =?= \"ASO\" && CRAB_ReqName =?= \"%s\"" % workflow
         jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
+        _, address = self.getScheddAndAddress()
         if address:
             results = schedd.query(jobConst, jobList)
         else:
             results = schedd.getClassAds(jobConst, jobList)
+        return results
 
 
     def __getjobs__(self, address, workflow, schedd):
         jobConst = "TaskType =?= \"Job\" && CRAB_ReqName =?= \"%s\"" % workflow
         jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
+        _, address = self.getScheddAndAddress()
         if address:
             results = schedd.query(jobConst, jobList)
         else:
             results = schedd.getClassAds(jobConst, jobList)
+        return results
 
 
     def __getjobdir__(self, subdir):
@@ -455,7 +512,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         for job in jobs:
             if 'CRAB_Id' not in job:
                 continue
-            if (int(job.get("JobStatus", "1")) == 4) and (task_is_finished or (int(job.get("ExitCode", -1)) == 0)):
+            #if (int(job.get("JobStatus", "1")) == 4) and (task_is_finished or (int(job.get("ExitCode", -1)) == 0)):
+            if (int(job.get("JobStatus", "1")) == 4):
                 finished_jobs["%s.%s" % (job['ClusterID'], job['ProcID'])] = job
 
         # TODO: consider POSIX data integrity
@@ -499,24 +557,29 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         if not WORKFLOW_RE.match(workflow):
             raise Exception("Invalid workflow name.")
 
-        self.logger.info("Getting status for workflow %s" % workflow)
+        print "Getting status for workflow %s" % workflow
 
         name = workflow.split("_")[0]
         dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
         schedd, address = dag.getScheddObj(name)
 
         results = self.__getroottasks__(address, workflow, schedd)
+        #print "Got root tasks: %s" % results
         jobsPerStatus = {}
         jobStatus = {}
         jobList = []
-        taskStatusCode = int(results[0]['JobStatus'])
-        taskJobCount = int(results[0].get('CRAB_JobCount', 0))
+        taskStatusCode = int(results[-1]['JobStatus'])
+        print "got status code %s" % taskStatusCode
+        taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
         codes = {1: 'Idle', 2: 'Running', 4: 'Completed (Success)', 5: 'Killed'}
         retval = {"status": codes.get(taskStatusCode, 'Unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
 
         failedJobs = []
-        for result in self.__getjobs__(address, workflow, schedd):
+        allJobs = self.__getjobs__(address, workflow, schedd)
+        print "found %s jobs" % len(allJobs)
+        for result in allJobs:
+            # print "Examining one job: %s" % result
             jobState = int(result['JobStatus'])
             if result['CRAB_Id'] in failedJobs:
                 failedJobs.remove(result['CRAB_Id'])
@@ -662,6 +725,8 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
 
         self.__getreports__(workflow, userproxy)
         jobdir = self.__getjobdir__("job_results")
+        name = workflow.split("_")[0]
+        schedd, address = self.getScheddAndAddress()
 
         #load the lumimask
         results = self.__getroottasks__(address, workflow, schedd)

@@ -68,12 +68,15 @@ class RESTUserWorkflow(RESTEntity):
             jobtype = safe.kwargs.get('jobtype', None)
             if jobtype == 'Analysis':
                 validate_str("inputdata", param, safe, RX_DATASET, optional=False)
+            else:
+                validate_str("inputdata", param, safe, RX_DATASET, optional=True)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
             safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
             safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
             validate_str("splitalgo", param, safe, RX_SPLIT, optional=False)
             validate_num("algoargs", param, safe, optional=False)
+            validate_num("totalunits", param, safe, optional=True)
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
             validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
             #validate_str("userisburl", param, safe, re.compile(r"^[A-Za-z]*$"), optional=False)
@@ -88,8 +91,6 @@ class RESTUserWorkflow(RESTEntity):
             if safe.kwargs["publication"] and not (bool(safe.kwargs["publishname"]) and bool(safe.kwargs["publishdbsurl"])):
                 raise InvalidParameter("You need to set both publishDataName and publishDbsUrl parameters if you need the automatic publication")
             #if one and only one between publishDataName and publishDbsUrl is set raise an error (we need both or none of them)
-            if bool(safe.kwargs["publishname"]) != bool(safe.kwargs["publishdbsurl"]):
-                raise InvalidParameter("You need to set both publishDataName and publishDbsUrl parameters if you need the automatic publication")
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkSite(safe.kwargs['asyncdest'])
             validate_num("blacklistT1", param, safe, optional=False)
@@ -138,7 +139,7 @@ class RESTUserWorkflow(RESTEntity):
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
-               savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis):
+               savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis, totalunits):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -168,6 +169,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str edmoutfiles: list of edm output files
            :arg str list runs: list of run numbers
            :arg str list lumis: list of lumi section numbers
+           :arg int totalunits: number of MC event to be generated
            :returns: a dict which contaians details of the request"""
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
@@ -178,7 +180,7 @@ class RESTUserWorkflow(RESTEntity):
                                        userhn=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
                                        publication=publication, publishname=publishname, asyncdest=asyncdest, blacklistT1=blacklistT1,
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,\
-                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis)
+                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits)
 
     @restcall
     def post(self, workflow, siteblacklist, sitewhitelist):

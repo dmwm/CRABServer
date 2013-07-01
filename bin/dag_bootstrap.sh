@@ -25,19 +25,30 @@ then
 		TARBALL_NAME=TaskManagerRun.tar.gz
 	fi
 
-	curl "http://hcc-briantest.unl.edu/$TARBALL_NAME" > TaskManagerRun.tar.gz
-	if [[ $? != 0 ]]
-	then
-		echo "Error: Unable to download the task manager runtime environment." >&2
-		exit 3
+	if [[ "X$CRAB_TASKMANAGER_TARBALL" == "X" ]]; then
+		CRAB_TASKMANAGER_TARBALL="http://hcc-briantest.unl.edu/$TARBALL_NAME"
 	fi
+    
+	if [[ "X$CRAB_TASKMANAGER_TARBALL" != "Xlocal" ]]; then
+		# pass, we'll just use that value
+		echo "Downloading tarball from $CRAB_TASKMANAGER_TARBALL"
+		curl $CRAB_TASKMANAGER_TARBALL > TaskManagerRun.tar.gz
+		if [[ $? != 0 ]]
+		then
+			echo "Error: Unable to download the task manager runtime environment." >&2
+			exit 3
+		fi
+	else
+		echo "Using tarball shipped within condor"
+	fi
+    	
 	tar xvfzm TaskManagerRun.tar.gz
 	if [[ $? != 0 ]]
 	then
 		echo "Error: Unable to unpack the task manager runtime environment." >&2
 		exit 4
 	fi
-	rm TaskManagerRun.tar.gz
+    ls -lah
 
         export TASKWORKER_ENV="1"
 fi
@@ -73,7 +84,10 @@ fi
 export PATH="/opt/glidecondor/bin:/opt/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export PYTHONPATH=/opt/glidecondor/lib/python:$PYTHONPATH
 export LD_LIBRARY_PATH=/opt/glidecondor/lib:/opt/glidecondor/lib/condor:$LD_LIBRARY_PATH
+echo "Printing current environment..."
 env
+echo "Printing current job ad..."
+cat $_CONDOR_JOB_AD
 echo "Now running the job in `pwd`..."
 exec python2.6 -m TaskWorker.TaskManagerBootstrap "$@"
-
+echo "Put this here because Brian hates code after execs :)"
