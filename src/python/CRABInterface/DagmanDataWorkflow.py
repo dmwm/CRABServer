@@ -184,7 +184,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         """
         # TODO: Nuke this with the rest of the dev hooks
         tDir = os.path.join(getCAFUtilitiesBase(), "src", "python", \
-                    "transformation")
+                    "transformation", "CMSRunAnalysis")
         if self.config and hasattr(self.config.General, 'transformDir'): #pylint: disable=E1103
             tDir = self.config.General.transformDir #pylint: disable=E1103
         if 'CRAB3_BASEPATH' in os.environ:
@@ -247,7 +247,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         available_sites = []
         info = escape_strings_to_classads(locals())
         # Condor will barf if the requesname is quoted .. for some reason
-        info['requestname'] = info['requestname'].replace('"','')
+        #info['requestname'] = info['requestname'].replace('"','')
         info['remote_condor_setup'] = self.getRemoteCondorSetup()
         info['bindir'] = self.getBinDir()
         info['transform_location'] = self.getTransformLocation()
@@ -321,6 +321,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         else:
             # Submit over Gsissh
             # testing getting the right directory
+            requestname = info['requestname'].replace('"','')
             requestname_bak = requestname
             requestname = './'
             info['outputFilesString'] = ", ".join([os.path.basename(x) for x in outputFiles])
@@ -576,15 +577,18 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         jobStatus = {}
         jobList = []
         taskStatusCode = int(results[-1]['JobStatus'])
-        print "got status code %s" % taskStatusCode
+        #print "got status code %s" % taskStatusCode
         taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
         codes = {1: 'Idle', 2: 'Running', 4: 'Completed (Success)', 5: 'Killed'}
+        taskExitCode = int(results[-1].get("ExitCode", 0))
         retval = {"status": codes.get(taskStatusCode, 'Unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
+        if taskStatusCode == 4 and taskExitCode:
+            retval['status'] = "Completed (Failed %s)" % str(taskExitCode)
 
         failedJobs = []
         allJobs = self.__getjobs__(address, workflow, schedd)
-        print "found %s jobs" % len(allJobs)
+        #print "found %s jobs" % len(allJobs)
         for result in allJobs:
             # print "Examining one job: %s" % result
             jobState = int(result['JobStatus'])
@@ -628,6 +632,9 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             retval['status'] = 'Running (jobs not submitted)'
 
         retval['jobdefErrors'] = []
+
+        if taskStatusCode == 4 and taskExitCode and retval["totalJobdefs"] == 0:
+            retval['status'] = 'Task failed before any jobs were created'
 
         self.logger.info("Status result for workflow %s: %s" % (workflow, retval))
         #print "Status result for workflow %s: %s" % (workflow, retval)
