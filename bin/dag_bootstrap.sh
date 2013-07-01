@@ -19,7 +19,13 @@ then
 		echo `which python2.6`
 	fi
 
-	curl http://hcc-briantest.unl.edu/TaskManagerRun.tar.gz > TaskManagerRun.tar.gz
+	if [ "x$CRAB3_VERSION" = "x" ]; then
+		TARBALL_NAME=TaskManagerRun-$CRAB3_VERSION.tar.gz
+	else
+		TARBALL_NAME=TaskManagerRun.tar.gz
+	fi
+
+	curl "http://hcc-briantest.unl.edu/$TARBALL_NAME" > TaskManagerRun.tar.gz
 	if [[ $? != 0 ]]
 	then
 		echo "Error: Unable to download the task manager runtime environment." >&2

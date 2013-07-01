@@ -5,8 +5,21 @@ DagmanDataWorkflow,
 A module providing HTCondor querying capabilities to the CRABServer
 """
 # First, see if we have python condor libraries
+import os
 try:
     import htcondor
+    # Strip out condor libraries from base path -- breaks voms-proxy-*
+    if 'LD_LIBRARY_PATH' in os.environ:
+        crab3_basepath = os.environ.get("CRAB3_BASEPATH", "")
+        crab3_dev_base = os.environ.get("CRAB_DEV_BASE", "")
+        paths = []
+        for path in os.environ['LD_LIBRARY_PATH'].split(":"):
+            if crab3_basepath and path.startswith(crab3_basepath):
+                continue
+            if crab3_dev_base and path.startswith(crab3_dev_base):
+                continue
+            paths.append(path)
+        os.environ['LD_LIBRARY_PATH'] = ":".join(paths)
 except ImportError:
     htcondor = None #pylint: disable=C0103
 try:
@@ -15,7 +28,6 @@ except ImportError:
     if not htcondor:
         raise
 
-import os
 import re
 import json
 import time
@@ -34,6 +46,8 @@ from CRABInterface.CRABServerBase import getCRABServerBase
 from Databases.CAFUtilitiesBase import getCAFUtilitiesBase
 from TaskWorker.Actions.DagmanCreator import CRAB_HEADERS, JOB_SUBMIT, ASYNC_SUBMIT, escape_strings_to_classads
 from TaskWorker.Actions.DagmanSubmitter import MASTER_DAG_SUBMIT_FILE, CRAB_HEADERS, CRAB_META_HEADERS, SUBMIT_INFO
+
+VERSION_RE = re.compile("([a-zA-Z0-9_.\-]+)")
 
 MASTER_DAG_FILE = \
 """
@@ -67,7 +81,7 @@ transfer_input = dbs_results
 transfer_output_files = splitting_results
 # TODO - need to clean this bit up
 #Environment = PATH=/usr/bin:/bin
-Environment = PATH=/usr/bin:/bin
+Environment = PATH=/usr/bin:/bin;CRAB3_VERSION=%(crab3_version)s
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
 queue
@@ -82,7 +96,7 @@ Output = dbs_discovery.out
 Error = dbs_discovery.err
 Args = DBS None dbs_results
 transfer_output_files = dbs_results
-Environment = PATH=/usr/bin:/bin
+Environment = PATH=/usr/bin:/bin;CRAB3_VERSION=%(crab3_version)s
 use_x509userproxy = true # %(x509up_file)s
 queue
 """
@@ -100,7 +114,7 @@ Output = aso.$(count).out
 transfer_inputFiles = job_log.$(count), jobReport.json.$(count)
 +TransferOutput = ""
 Error = aso.$(count).err
-#Environment = PATH=/usr/bin:/bin
+#Environment = PATH=/usr/bin:/bin;CRAB3_VERSION=%(crab3_version)s
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
 leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
@@ -110,9 +124,10 @@ queue
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 
 def getCRABInfoFromClassAd(ad):
-    info = {}
-    for adName, dictName in SUBMIT_INFO:
-        pass
+    return
+    #info = {}
+    #for adName, dictName in SUBMIT_INFO:
+    #    pass
 
 class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
     """A specialization of the DataWorkflow for submitting to HTCondor DAGMan instead of
@@ -153,6 +168,12 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         return os.path.expanduser(binDir)
 
 
+    def __getversion__(self):
+        version = os.environ.get("CRAB3_VERSION", "devel")
+        if not VERSION_RE.match(version):
+            version = "unknown"
+        return version
+
     def getTransformLocation(self):
         """
         Returns the location of the PanDA job transform
@@ -173,8 +194,9 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         return ""
 
     def submitRaw(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles, \
-               userhn, userdn, savelogsflag, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis, userproxy=None, **kwargs):
-        """Perform the workflow injection into the reqmgr + couch
+               userhn, userdn, savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis, userproxy=None, **kwargs):
+
+        """Perform the workflow injection into HTCondor
 
            :arg str workflow: workflow name requested by the user;
            :arg str jobtype: job type of the workflow, usually Analysis;
@@ -217,10 +239,13 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         os.makedirs(scratch)
 
         # Poor-man's string escaping.  We do this as classad module isn't guaranteed to be present.
+        available_sites = []
         info = escape_strings_to_classads(locals())
         info['remote_condor_setup'] = self.getRemoteCondorSetup()
         info['bindir'] = self.__getbindir__()
         info['transform_location'] = self.getTransformLocation()
+
+        info['crab3_version'] = self.__getversion__()
 
         schedd, address = dagmanSubmitter.getScheddObj(scheddName)
 
@@ -306,11 +331,11 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                         schedd.act(htcondor.JobAction.Hold, const)
                         wpipe.write("OK")
                         wpipe.close()
-                        os._exit(0)
-                    except Exception, e:
+                        os._exit(0) #pylint: disable=W0212
+                    except Exception:
                         wpipe.write(str(traceback.format_exc()))
                 finally:
-                    os._exit(1)
+                    os._exit(1) #pylint: disable=W0212
             wpipe.close()
             results = rpipe.read()
             if results != "OK":
@@ -355,11 +380,11 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                         schedd.edit(finished_jobConst, "DAGManJobId", "-1")
                         wpipe.write("OK")
                         wpipe.close()
-                        os._exit(0)
+                        os._exit(0) #pylint: disable=W0212
                     except Exception, e:
                         wpipe.write(str(traceback.format_exc()))
                 finally:
-                    os._exit(1)
+                    os._exit(1) #pylint: disable=W0212
             wpipe.close()
             results = rpipe.read()
             if results != "OK":
@@ -370,7 +395,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             schedd.hold(const) #pylint: disable=E1103
 
 
-    def __getRootTasks(self, workflow, schedd):
+    def __getroottasks__(self, address, workflow, schedd):
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
         rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount']
         if address:
@@ -384,7 +409,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         return results
 
 
-    def __getASOJobs(self, workflow, schedd):
+    def __getasojobs__(self, address, workflow, schedd):
         jobConst = "TaskType =?= \"ASO\" && CRAB_ReqName =?= \"%s\"" % workflow
         jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
         if address:
@@ -393,7 +418,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             results = schedd.getClassAds(jobConst, jobList)
 
 
-    def __getJobs(self, workflow, schedd):
+    def __getjobs__(self, address, workflow, schedd):
         jobConst = "TaskType =?= \"Job\" && CRAB_ReqName =?= \"%s\"" % workflow
         jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
         if address:
@@ -402,12 +427,10 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             results = schedd.getClassAds(jobConst, jobList)
 
 
-    def __serializeFinishedJobs__(self, workflow, userdn, userproxy=None):
-        if not userproxy:
-            return
-        jobdir = os.path.join(self.requestdir, "."+workflow, "finished_condor_jobs")
-        jobdir = os.abspath(jobdir)
-        requestdir = os.abspath(self.requestdir)
+    def __getjobdir__(self, subdir):
+        jobdir = os.path.join(self.requestdir, "."+workflow, subdir)
+        jobdir = os.path.abspath(jobdir)
+        requestdir = os.path.abspath(self.requestdir)
         assert(jobdir.startswith(requestdir))
         try:
             os.makedirs(jobdir)
@@ -415,21 +438,29 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             if oe.errno != errno.EEXIST:
                 raise
 
+
+    def __serializefinishedjobs__(self, workflow, userdn, userproxy=None):
+        if not userproxy:
+            return
+        jobdir = self.__getjobdir__("finished_condor_jobs")
+
+        name = workflow.split("_")[0]
         dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
         schedd, address = dag.getScheddObj(name)
 
         finished_jobs = {}
 
-        jobs = self.__getJobs(workflow, schedd)
-        jobs.extend(self.__getASOJobs(workflow, schedd))
+        jobs = self.__getjobs__(address, workflow, schedd)
+        jobs.extend(self.__getasojobs__(address, workflow, schedd))
         for job in jobs:
-            if 'CRAB_Id' not in job: continue
+            if 'CRAB_Id' not in job:
+                continue
             if (int(job.get("JobStatus", "1")) == 4) and (task_is_finished or (int(job.get("ExitCode", -1)) == 0)):
-                finished_jobs["%s.%s" % (job['ClusterID'], job['ProcID']] = job
+                finished_jobs["%s.%s" % (job['ClusterID'], job['ProcID'])] = job
 
         # TODO: consider POSIX data integrity
-        for id, job in finished_jobs.items():
-            with open(os.path.join(jobdir, id), "w") as fd:
+        for jobId, job in finished_jobs.items():
+            with open(os.path.join(jobdir, jobId), "w") as fd:
                 json.dump(dict(job), fd)
 
         if address:
@@ -439,31 +470,24 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
 
 
     def __getreports__(self, workflow, userproxy):
-        if not userproxy: return
+        if not userproxy:
+            return
 
-        jobdir = os.path.join(self.requestdir, "."+workflow, "job_results")
-        jobdir = os.abspath(jobdir)
-        requestdir = os.abspath(self.requestdir)
-        assert(jobdir.startswith(requestdir))
-        try:
-            os.makedirs(jobdir)
-        except OSError, oe:
-            if oe.errno != errno.EEXIST:
-                raise
+        jobdir = self.__getjobdir__("job_results")
 
+        name = workflow.split("_")[0]
         dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
         schedd, address = dag.getScheddObj(name)
 
-        job_ids = {}
-        aso_ids = set()
-        for job in self.__getJobs(workflow, schedd):
+        jobIDs = {}
+        for job in self.__getjobs__(address, workflow, schedd):
             if 'CRAB_Id' not in job: continue
             if int(job.get("JobStatus", "1")) == 4:
-                job_ids[int(job['CRAB_Id'])] = "%s.%s" % (job['ClusterID'], job['ProcID'])
+                jobIDs[int(job['CRAB_Id'])] = "%s.%s" % (job['ClusterID'], job['ProcID'])
 
         if address:
-            schedd.edit(job_ids.values(), "TransferOutputRemaps", 'strcat("jobReport.json.", CRAB_Id, "=%s/jobReport.json.", CRAB_Id, ";job_out.", CRAB_Id, "=/dev/null;job_err.", CRAB_Id, "=/dev/null")' % jobdir)
-            schedd.retrieve(job_ids.values())
+            schedd.edit(jobIDs.values(), "TransferOutputRemaps", 'strcat("jobReport.json.", CRAB_Id, "=%s/jobReport.json.", CRAB_Id, ";job_out.", CRAB_Id, "=/dev/null;job_err.", CRAB_Id, "=/dev/null")' % jobdir)
+            schedd.retrieve(jobIDs.values())
 
 
     def status(self, workflow, userdn, userproxy=None):
@@ -478,11 +502,10 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         self.logger.info("Getting status for workflow %s" % workflow)
 
         name = workflow.split("_")[0]
-
         dag = TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(self.config)
         schedd, address = dag.getScheddObj(name)
 
-        results = self.__getRootTasks(workflow, schedd)
+        results = self.__getroottasks__(address, workflow, schedd)
         jobsPerStatus = {}
         jobStatus = {}
         jobList = []
@@ -493,7 +516,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
 
         failedJobs = []
-        for result in self.__getJobs(workflow, schedd):
+        for result in self.__getjobs__(address, workflow, schedd):
             jobState = int(result['JobStatus'])
             if result['CRAB_Id'] in failedJobs:
                 failedJobs.remove(result['CRAB_Id'])
@@ -505,7 +528,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
             jobStatus[int(result['CRAB_Id'])] = statusName
 
         aso_codes = {1: 'ASO Queued', 2: 'ASO Running', 4: 'Stageout Complete (Success)'}
-        for result in self.__getASOJobs(workflow, schedd):
+        for result in self.__getasojobs__(address, workflow, schedd):
             if result['CRAB_Id'] in failedJobs:
                 failedJobs.remove(result['CRAB_Id'])
             jobState = int(result['JobStatus'])
@@ -621,11 +644,11 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                         schedd.act(htcondor.JobAction.Release, rootConst)
                         wpipe.write("OK")
                         wpipe.close()
-                        os._exit(0)
+                        os._exit(0) #pylint: disable=W0212
                     except Exception:
                         wpipe.write(str(traceback.format_exc()))
                 finally:
-                    os._exit(1)
+                    os._exit(1) #pylint: disable=W0212
             wpipe.close()
             results = rpipe.read()
             if results != "OK":
@@ -637,23 +660,36 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
 
     def report(self, workflow, userdn, userproxy=None):
 
-        self.__getreports__(workflow, userdn, userproxy)
+        self.__getreports__(workflow, userproxy)
+        jobdir = self.__getjobdir__("job_results")
 
         #load the lumimask
-        rows = self.api.query(None, None, ID.sql, taskname = workflow)
-        splitArgs = literal_eval(rows.next()[6].read())
-        res['lumiMask'] = buildLumiMask(splitArgs['runs'], splitArgs['lumis'])
+        results = self.__getroottasks__(address, workflow, schedd)
+        if not results:
+            raise Exception("Unable to determine task lumimask for workflow %s." % workflow)
+        res['lumiMask'] = results[0]['CRAB_LumiMask']
 
-        #extract the finished jobs from filemetadata
-        jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished']]
-        rows = self.api.query(None, None, GetFromPandaIds.sql, types='EDM', taskname=workflow, jobids=','.join(map(str,jobids)),\
-                                        limit=len(jobids)*100)
         res['runsAndLumis'] = {}
-        for row in rows:
-            res['runsAndLumis'][str(row[GetFromPandaIds.PANDAID])] = { 'parents' : row[GetFromPandaIds.PARENTS].read(),
-                    'runlumi' : row[GetFromPandaIds.RUNLUMI].read(),
-                    'events'  : row[GetFromPandaIds.INEVENTS],
-            }
+        fileRe = re.compile("jobReport\.json\.([0-9]+)")
+	for filename in glob.glob(os.path.join(job_dir, "jobReport.json.*")):
+            _, shortFilename = os.path.split(filename)
+            m = fileRe.match(shortFilename)
+            if not m:
+                continue
+
+            report = {}
+            with open(filename, "r") as fd:
+                try:
+                    report = json.load(fd)
+                except ValueError:
+                    continue
+
+            for outputModule in report['steps']['cmsRun']['output'].items():
+                if 'output_module_class' not in outputModule:
+                    continue
+                if outputModule['ouput_module_class'] == 'PoolOutputModule':
+                    # TODO: this results in the wrong numbers for multi-output jobs.
+                    res['runsAndLumis'][m.groups()[0]] = {'parents': outputModule['input'], 'runlumi': outputModule['runs'], 'events': outputModule['events']}
 
         yield res
 
