@@ -125,13 +125,16 @@ class PandaDataWorkflow(DataWorkflow):
         #jobids=','.join(map(str,jobids)), limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
 
         for row in rows:
-            if row[GetFromTaskAndType.PANDAID] in finishedIds:
-                lfn = re.sub('^/store/temp/', '/store/', row[GetFromTaskAndType.LFN])
-                pfn = self.phedex.getPFN(row[GetFromTaskAndType.LOCATION], lfn)[(row[GetFromTaskAndType.LOCATION], lfn)]
-            elif row[GetFromTaskAndType.PANDAID] in transferingIds:
+            if filetype == ['LOG'] and saveLogs == 'F':
                 pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])[(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])]
             else:
-                continue
+                if row[GetFromTaskAndType.PANDAID] in finishedIds:
+                    lfn = re.sub('^/store/temp/', '/store/', row[GetFromTaskAndType.LFN])
+                    pfn = self.phedex.getPFN(row[GetFromTaskAndType.LOCATION], lfn)[(row[GetFromTaskAndType.LOCATION], lfn)]
+                elif row[GetFromTaskAndType.PANDAID] in transferingIds:
+                    pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])[(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])]
+                else:
+                    continue
 
             yield { 'pfn' : pfn,
                     'size' : row[GetFromTaskAndType.SIZE],
@@ -151,13 +154,12 @@ class PandaDataWorkflow(DataWorkflow):
         #extract the finished jobs from filemetadata
         jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'transferring']]
         rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='EDM', taskname=workflow)
-        rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
-
         res['runsAndLumis'] = {}
         for row in rows:
-            res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])] = { 'parents' : row[GetFromTaskAndType.PARENTS].read(),
-                    'runlumi' : row[GetFromTaskAndType.RUNLUMI].read(),
-                    'events'  : row[GetFromTaskAndType.INEVENTS],
-            }
+            if row[GetFromTaskAndType.PANDAID] in jobids:
+                res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])] = { 'parents' : row[GetFromTaskAndType.PARENTS].read(),
+                        'runlumi' : row[GetFromTaskAndType.RUNLUMI].read(),
+                        'events'  : row[GetFromTaskAndType.INEVENTS],
+                }
 
         yield res
