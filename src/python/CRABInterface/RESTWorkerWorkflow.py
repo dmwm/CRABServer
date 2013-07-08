@@ -1,6 +1,7 @@
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
+from WMCore.REST.Error import InvalidParameter
 
 from Databases.TaskDB.Oracle.Task.GetReadyTasks import GetReadyTasks
 from Databases.TaskDB.Oracle.Task.SetReadyTasks import SetReadyTasks
@@ -9,13 +10,15 @@ from Databases.TaskDB.Oracle.Task.SetFailedTasks import SetFailedTasks
 from Databases.TaskDB.Oracle.Task.SetInjectedTasks import SetInjectedTasks
 from Databases.TaskDB.Oracle.Task.UpdateWorker import UpdateWorker
 from Databases.TaskDB.Oracle.JobGroup.AddJobGroup import AddJobGroup
+from Databases.TaskDB.Oracle.JobGroup.GetJobGroupFromJobDef import GetJobGroupFromJobDef
 
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_RESUBMITID
+from CRABInterface.Regexps import RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER
 
 # external dependecies here
 import cherrypy
 from ast import literal_eval
+from base64 import b64decode
 
 
 class RESTWorkerWorkflow(RESTEntity):
@@ -41,7 +44,7 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
             validate_num("jobset", param, safe, optional=True)
             validate_str("failure", param, safe, RX_TEXT_FAIL, optional=True)
-            validate_str("resubmittedjobs", param, safe, RX_RESUBMITID, optional=True)
+            validate_numlist("resubmittedjobs", param, safe)
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("subresource", param, safe, RX_SUBPOSTWORKER, optional=True) 
             validate_num("limit", param, safe, optional=True)
@@ -52,16 +55,27 @@ class RESTWorkerWorkflow(RESTEntity):
             # 4) taskname + status == (1)
             # 5)            status + limit + getstatus + workername
         elif method in ['GET']:
-            validate_str("workername", param, safe, RX_WORKER_NAME, optional=False)
-            validate_str("getstatus", param, safe, RX_STATUS, optional=False)
-            validate_num("limit", param, safe, optional=False)
+            validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
+            validate_str("getstatus", param, safe, RX_STATUS, optional=True)
+            validate_num("limit", param, safe, optional=True)
+            validate_str("subresource", param, safe, RX_SUBGETWORKER, optional=True)
+            validate_num("subjobdef", param, safe, optional=True)
+            validate_str("subuser", param, safe, RX_DN, optional=True)
+            # possible combinations to check
+            # 1) workername + getstatus + limit
+            # 2) subresource + subjobdef + subuser
         elif method in ['DELETE']:
             pass
 
     @restcall
     def put(self, workflow, subjobdef, substatus, subblocks, subfailure, subuser):
         """ Insert a new jobgroup in the task"""
-        binds = {"task_name": [workflow], "jobdef_id": [subjobdef], "jobgroup_status": [substatus], "blocks": [str(subblocks)],
+        if subfailure is not None:
+            try:
+                subfailure = b64decode(subfailure)
+            except TypeError:
+                raise InvalidParameter("Failure message is not in the accepted format")
+        binds = {"task_name": [workflow], "jobdef_id": [subjobdef if subjobdef >= 0 else None], "jobgroup_status": [substatus], "blocks": [str(subblocks)],
                  "jobgroup_failure": [subfailure], "tm_user_dn": [subuser]}
         self.api.modify(AddJobGroup.sql, **binds)
         return []
@@ -69,39 +83,56 @@ class RESTWorkerWorkflow(RESTEntity):
     @restcall
     def post(self, workflow, status, subresource, jobset, failure, resubmittedjobs, getstatus, workername, limit):
         """ Updates task information """
-        sqlmap = {"state": {"sql": SetStatusTask.sql, "binds": {"status": [status],
-                                                                "taskname": [workflow]}},
-                  "start": {"sql": SetReadyTasks.sql, "binds": {"tm_task_status": [status],
-                                                                "tm_taskname": [workflow]}},
-                  "failure": {"sql": SetFailedTasks.sql, "binds": {"tm_task_status": [status],
-                                                                   "failure": [failure],
-                                                                   "tm_taskname": [workflow]}},
-                  "success": {"sql": SetInjectedTasks.sql, "binds": {"tm_task_status": [status],
-                                                                     "panda_jobset_id": [jobset],
-                                                                     "tm_taskname": [workflow],
-                                                                     "resubmitted_jobs": [resubmittedjobs]}},
-                  "process": {"sql": UpdateWorker.sql, "binds": {"tw_name": [workername],
-                                                                 "get_status": [getstatus],
-                                                                 "limit": [limit],
-                                                                 "set_status": [status]}},}
+        if failure is not None:
+            try:
+                failure = b64decode(failure)
+            except TypeError:
+                raise InvalidParameter("Failure message is not in the accepted format")
+        sqlmap = {"state": {"sql": SetStatusTask.sql, "method": self.api.modify, "binds": {"status": [status],
+                                                                                       "taskname": [workflow]}},
+                  "start": {"sql": SetReadyTasks.sql, "method": self.api.modify, "binds": {"tm_task_status": [status],
+                                                                                       "tm_taskname": [workflow]}},
+                  "failure": {"sql": SetFailedTasks.sql, "method": self.api.modify, "binds": {"tm_task_status": [status],
+                                                                                "failure": [failure],
+                                                                               "tm_taskname": [workflow]}},
+                  "success": {"sql": SetInjectedTasks.sql, "method": self.api.modify, "binds": {"tm_task_status": [status],
+                                                                                            "panda_jobset_id": [jobset],
+                                                                                            "tm_taskname": [workflow],
+                                                                                            "resubmitted_jobs": [str(resubmittedjobs)]}},
+                  "process": {"sql": UpdateWorker.sql, "method": self.api.modifynocheck, "binds": {"tw_name": [workername],
+                                                                                                   "get_status": [getstatus],
+                                                                                                   "limit": [limit],
+                                                                                                   "set_status": [status]}},}
         if subresource is None:
             subresource = 'state'
         if not subresource in sqlmap.keys():
-            raise
-        self.api.modify(sqlmap[subresource]['sql'], **sqlmap[subresource]['binds'])
+            raise InvalidParameter("Subresource of workflowdb has not been found")
+        sqlmap[subresource]['method'](sqlmap[subresource]['sql'], **sqlmap[subresource]['binds'])
         return []
 
     @restcall
-    def get(self, workername, getstatus, limit):
+    def get(self, workername, getstatus, limit, subresource, subjobdef, subuser):
         """ Retrieve all columns for a specified task or
             tasks which are in a particular status with 
             particular conditions """
-        binds = {"limit": limit, "tw_name": workername, "get_status": getstatus}
-        rows = self.api.query(None, None, GetReadyTasks.sql, **binds)
-        for row in rows:
-            newtask = Task()
-            newtask.deserialize(row)
-            yield dict(newtask)
+        if subresource is not None and subresource == 'jobgroup':
+            binds = {'jobdef_id': subjobdef, 'user_dn': subuser}
+            rows = self.api.query(None, None, GetJobGroupFromJobDef.sql, **binds)
+            for row in rows:
+                # taskname, jobdefid, status, blocks, failures, dn
+                yield {'tm_taskname': row[0],
+                       'panda_jobdef_id': row[1],
+                       'panda_jobdef_status': row[2],
+                       'tm_data_blocks': literal_eval(row[3] if row[3] is None else row[3].read()),
+                       'panda_jobgroup_failure': row[4] if row[4] is None else row[4].read(),
+                       'tm_user_dn': row[5]}
+        else:
+            binds = {"limit": limit, "tw_name": workername, "get_status": getstatus}
+            rows = self.api.query(None, None, GetReadyTasks.sql, **binds)
+            for row in rows:
+                newtask = Task()
+                newtask.deserialize(row)
+                yield dict(newtask)
 
     @restcall
     def delete(self):
@@ -122,8 +153,6 @@ class Task(dict):
 
            :arg *args/**kwargs: key/value pairs to update the dictionary."""
         self.update(*args, **kwargs)
-        # Not obliged to have a proxy once the workflow is pulled from the database
-        # potentially we can, but we can enforce that in the actions as well
 
     def deserialize(self, task):
         """Deserialize a task from a list format to the self Task dictionary.
@@ -162,7 +191,6 @@ class Task(dict):
         self['tm_edm_outfiles'] = literal_eval(task[29])
         self['tm_transformation'] = task[30]
         self['tm_job_type'] = task[31] 
-        ## We load the arguments one by one here to avoid suprises at a later stage
         extraargs = literal_eval(task[32] if task[32] is None else task[32].read())
         self['resubmit_site_whitelist'] = extraargs['siteWhiteList'] if 'siteWhiteList' in extraargs else []
         self['resubmit_site_blacklist'] = extraargs['siteBlackList'] if 'siteBlackList' in extraargs else []

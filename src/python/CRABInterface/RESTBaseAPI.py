@@ -6,7 +6,7 @@ import cherrypy
 import cjson as json
 
 # WMCore dependecies here
-from WMCore.REST.Server import DatabaseRESTApi
+from WMCore.REST.Server import DatabaseRESTApi, rows
 from WMCore.REST.Format import JSONFormat
 from WMCore.REST.Error import ExecutionError
 from WMCore.Services.pycurl_manager import ResponseHeader
@@ -75,6 +75,25 @@ class RESTBaseAPI(DatabaseRESTApi):
                    } )
 
         self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None) )
+
+    def modifynocheck(self, sql, *binds, **kwbinds):
+        """This is the same as `WMCore.REST.Server`:modify method but
+           not implementing any kind of checks on the number of modified
+           rows.
+
+        :arg str sql: SQL modify statement.
+        :arg list binds: Bind variables by position: list of dictionaries.
+        :arg dict kwbinds: Bind variables by keyword: dictionary of lists.
+        :result: See :meth:`rowstatus` and description in `WMCore.REST.Server`."""
+        if binds:
+            c, _ = self.executemany(sql, *binds, **kwbinds)                                                      
+        else:                                                                                                    
+            kwbinds = self.bindmap(**kwbinds)                                                                    
+            c, _ = self.executemany(sql, kwbinds, *binds)                                                        
+        trace = cherrypy.request.db["handle"]["trace"]
+        trace and cherrypy.log("%s commit" % trace)                                                              
+        cherrypy.request.db["handle"]["connection"].commit()
+        return rows([{ "modified": c.rowcount }])
 
     def _initLogger(self, logfile, loglevel):
         """
