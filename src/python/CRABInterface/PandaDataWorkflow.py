@@ -64,7 +64,8 @@ class PandaDataWorkflow(DataWorkflow):
                     jobsPerStatus[jobstatus] = jobsPerStatus[jobstatus]+1 if jobstatus in jobsPerStatus else 1
                     jobList.append((jobstatus,jobid))
 
-        status = self._updateTaskStatus(workflow, status, jobsPerStatus)
+        if set(jobsPerStatus): #if we actually submitted something
+            status = self._updateTaskStatus(workflow, status, jobsPerStatus)
 
         return [ {"status" : status,\
                   "taskFailureMsg" : taskFailure.read() if taskFailure else '',\
