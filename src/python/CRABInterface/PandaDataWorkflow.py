@@ -49,7 +49,7 @@ class PandaDataWorkflow(DataWorkflow):
                 continue
 
             #check the status of the jobdef in panda
-            schedEC, res = pserver.getPandIDsWithJobID(jobID=jobdefid, dn=userdn, userproxy=userproxy, credpath=self.credpath)
+            schedEC, res = pserver.getPandIDsWithJobID(self.backendurls['baseURLSSL'], jobID=jobdefid, dn=userdn, userproxy=userproxy, credpath=self.credpath)
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
                 jobDefErrs.append("Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC))
@@ -143,17 +143,19 @@ class PandaDataWorkflow(DataWorkflow):
 
     def report(self, workflow, userdn, userproxy=None):
         res = {}
-        self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
+        self.logger.info("About to compute report of workflow: %s. Getting status first." % workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         #load the lumimask
         rows = self.api.query(None, None, ID.sql, taskname = workflow)
         splitArgs = literal_eval(rows.next()[6].read())
         res['lumiMask'] = buildLumiMask(splitArgs['runs'], splitArgs['lumis'])
+        self.logger.info("Lumi mask was: %s" % res['lumiMask'])
 
         #extract the finished jobs from filemetadata
         jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'transferring']]
         rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='EDM', taskname=workflow)
+
         res['runsAndLumis'] = {}
         for row in rows:
             if row[GetFromTaskAndType.PANDAID] in jobids:
@@ -161,5 +163,6 @@ class PandaDataWorkflow(DataWorkflow):
                         'runlumi' : row[GetFromTaskAndType.RUNLUMI].read(),
                         'events'  : row[GetFromTaskAndType.INEVENTS],
                 }
+        self.logger.info("Got %s edm files for workflow %s" % (len(res), workflow))
 
         yield res
