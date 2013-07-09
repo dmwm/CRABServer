@@ -98,7 +98,13 @@ def retrieveUserCert(func):
         try:
             userproxy = mypclient.logonRenewMyProxy(username=sha1(serverDN+kwargs['userdn']).hexdigest(), myproxyserver=myproxyserver, myproxyport=7512)
         except MyProxyException, me:
-            raise InvalidParameter("Impossible to retrieve proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
+            import cherrypy
+            cherrypy.log(str(me))
+            cherrypy.log(str(serverKey))
+            cherrypy.log(str(serverCert))
+            invalidp = InvalidParameter("Impossible to retrieve proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
+            setattr(invalidp, 'trace', str(me))
+            raise invalidp
         else:
             if not re.match(RX_CERT, userproxy):
                 raise InvalidParameter("Retrieved malformed proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
