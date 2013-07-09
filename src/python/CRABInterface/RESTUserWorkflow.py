@@ -26,6 +26,7 @@ class RESTUserWorkflow(RESTEntity):
         self.logger = logging.getLogger("CRABLogger.RESTUserWorkflow")
         self.userworkflowmgr = DataUserWorkflow()
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
+        self.ASOistance = config.ASOistance
 
     def _expandSites(self, sites):
         """Check if there are sites cotaining the '*' wildcard and convert them in the corresponding list
@@ -53,7 +54,7 @@ class RESTUserWorkflow(RESTEntity):
             excasync = ValueError("Remote output data site not valid")
             invalidp = InvalidParameter("The parameter %s is not in the list of known CMS sites %s" % (site, self.allCMSNames.sites), errobj = excasync)
             setattr(invalidp, 'trace', '')
-            raise invalidp
+        #    raise invalidp
 
     @conn_handler(services=['sitedb'])
     def validate(self, apiobj, method, api, param, safe):
@@ -108,6 +109,7 @@ class RESTUserWorkflow(RESTEntity):
             safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
             safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
+            validate_num("ASO", param, safe, optional=False)
 
         elif method in ['GET']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=True)
@@ -134,12 +136,12 @@ class RESTUserWorkflow(RESTEntity):
         elif method in ['DELETE']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
             validate_num("force", param, safe, optional=True)
-
+            validate_num("ASO", param, safe, optional=False)
 
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
-    def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
-               savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis, totalunits):
+    def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles, \
+            savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis, totalunits):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -183,7 +185,7 @@ class RESTUserWorkflow(RESTEntity):
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits)
 
     @restcall
-    def post(self, workflow, siteblacklist, sitewhitelist):
+    def post(self, workflow, siteblacklist, sitewhitelist, ASO):
         """Resubmit an existing workflow. The caller needs to be a CMS user owner of the workflow.
 
            :arg str workflow: unique name identifier of the workflow;
@@ -191,7 +193,10 @@ class RESTUserWorkflow(RESTEntity):
            :arg str list sitewhitelist: white list of sites, with CMS name."""
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.api, [workflow])
-        self.userworkflowmgr.resubmit(workflow=workflow, siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+        if ASO == 1:
+            self.userworkflowmgr.ASOresubmit(workflow, self.ASOistance, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+        else:
+            self.userworkflowmgr.resubmit(workflow=workflow, siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
         return [{"result":"ok"}]
 
     @restcall
@@ -209,7 +214,6 @@ class RESTUserWorkflow(RESTEntity):
                     the requested subresource."""
         result = []
         if workflow:
-            userdn=cherrypy.request.headers['Cms-Authn-Dn']
             # if have the wf then retrieve the wf status summary
             if not subresource:
                 result = self.userworkflowmgr.status(workflow, userdn=userdn)
@@ -235,7 +239,7 @@ class RESTUserWorkflow(RESTEntity):
         return result
 
     @restcall
-    def delete(self, workflow, force):
+    def delete(self, workflow, force, ASO):
         """Aborts a workflow. The user needs to be a CMS owner of the workflow.
 
            :arg str list workflow: list of unique name identifiers of workflows;
@@ -244,5 +248,9 @@ class RESTUserWorkflow(RESTEntity):
 
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.api, [workflow])
-        self.userworkflowmgr.kill(workflow, force, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+        if ASO == 1:
+            self.userworkflowmgr.ASOkill(workflow, self.ASOistance, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+        else:
+            self.userworkflowmgr.kill(workflow, force, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
         return [{"result":"ok"}]
+

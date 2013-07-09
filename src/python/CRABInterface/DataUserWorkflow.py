@@ -10,6 +10,10 @@ from WMCore.REST.Error import InvalidParameter, ExecutionError, MissingObject
 from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.Utils import conn_handler, retrieveUserCert
 
+from WMCore.Database.CMSCouch import CouchServer
+import datetime
+import traceback
+import time
 
 class DataUserWorkflow(object):
     """
@@ -138,3 +142,66 @@ class DataUserWorkflow(object):
            :arg str userproxy: the user proxy retrieved by `retrieveUserCert`
            :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
         return self.workflow.kill(workflow, force, userdn, userproxy)
+
+
+    @retrieveUserCert
+    def ASOkill(self, workflow, istance , userdn, userproxy=None):
+        self.server = CouchServer(istance)
+        try:
+            self.db = self.server.connectDatabase('asynctransfer')
+        except Exception, ex:
+            msg =  "Error while connecting to asynctransfer couchDB  "
+            raise ExecutionError(msg)
+        self.queryKill = {'reduce':False, 'key':workflow}
+        try:
+            self.filesKill = self.db.loadView('AsyncTransfer', 'forKill', self.queryKill)['rows']
+        except Exception, ex:
+            msg =  "Error while connecting to asynctransfer couchDB  "
+            raise ExecutionError(msg)
+        if len(self.filesKill) == 0:
+            raise ExecutionError('No files to kill found')
+        for idt in self.filesKill:
+            now = str(datetime.datetime.now())
+            id = idt['value']
+            data = {}
+            data['end_time'] = now
+            data['state'] = 'killed'
+            data['last_update'] = time.time()
+            data['retry'] = now
+            updateUri = "/" + self.db.name + "/_design/AsyncTransfer/_update/updateJobs/" + id
+            updateUri += "?" + urllib.urlencode(data)
+            try:
+                self.db.makeRequest(uri = updateUri, type = "PUT", decode = False)
+            except Exception, ex:
+                msg =  "Error updating document in couch"
+                msg += str(ex)
+                msg += str(traceback.format_exc())
+                raise ExecutionError(msg)
+
+    @retrieveUserCert
+    def ASOresubmit(self, workflow, istance, userdn, userproxy=None):
+        self.server = CouchServer(istance)
+        try:
+            self.db = self.server.connectDatabase('asynctransfer')
+        except Exception, ex:
+            msg =  "Error while connecting to asynctransfer couchDB "
+            raise ExecutionError(msg)
+        self.queryResub = {'reduce':False, 'key':workflow}
+        self.filesResub = self.db.loadView('AsyncTransfer', 'forResub', self.queryResub)['rows']
+        if len(self.filesResub) == 0:
+            raise ExecutionError('No files to resubmit found')
+        for idt in self.filesResub:
+            id = idt['value']
+            data = {}
+            data['state'] = 'new'
+            data['last_update'] = time.time()
+            updateUri = "/" + self.db.name + "/_design/AsyncTransfer/_update/updateJobs/" + id
+            updateUri += "?" + urllib.urlencode(data)
+            try:
+                self.db.makeRequest(uri = updateUri, type = "PUT", decode = False)
+            except Exception, ex:
+                msg =  "Error updating document in couch"
+                msg += str(ex)
+                msg += str(traceback.format_exc())
+                raise ExecutionError(msg)
+
