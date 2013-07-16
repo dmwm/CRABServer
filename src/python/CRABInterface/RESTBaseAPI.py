@@ -61,7 +61,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         #Global initialization of Data objects. Parameters coming from the config should go here
         DataUserWorkflow.globalinit(config.workflowManager)
         DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl,\
-                                credpath=config.credpath, transformation=extconfig["transformation"])
+                                credpath=config.credpath, transformation=extconfig["transformation"], backendurls=extconfig["backend-urls"])
         DataFileMetadata.globalinit(dbapi=self)
         Utils.globalinit(config.serverhostkey, config.serverhostcert, serverdn, config.credpath)
 
@@ -69,7 +69,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         ##      the RESTFileMetadata has the specifc requirement of getting xml reports
         self._add( {'workflow': RESTUserWorkflow(app, self, config, mount),
                     'campaign': RESTCampaign(app, self, config, mount),
-                    'info': RESTServerInfo(app, self, config, mount, serverdn, extconfig.get('delegate-dn', [])),
+                    'info': RESTServerInfo(app, self, config, mount, serverdn, extconfig.get('delegate-dn', []), extconfig['backend-urls']),
                     'filemetadata': RESTFileMetadata(app, self, config, mount),
                     'workflowdb': RESTWorkerWorkflow(app, self, config, mount),
                    } )
@@ -86,12 +86,12 @@ class RESTBaseAPI(DatabaseRESTApi):
         :arg dict kwbinds: Bind variables by keyword: dictionary of lists.
         :result: See :meth:`rowstatus` and description in `WMCore.REST.Server`."""
         if binds:
-            c, _ = self.executemany(sql, *binds, **kwbinds)                                                      
-        else:                                                                                                    
-            kwbinds = self.bindmap(**kwbinds)                                                                    
-            c, _ = self.executemany(sql, kwbinds, *binds)                                                        
+            c, _ = self.executemany(sql, *binds, **kwbinds)
+        else:
+            kwbinds = self.bindmap(**kwbinds)
+            c, _ = self.executemany(sql, kwbinds, *binds)
         trace = cherrypy.request.db["handle"]["trace"]
-        trace and cherrypy.log("%s commit" % trace)                                                              
+        trace and cherrypy.log("%s commit" % trace)
         cherrypy.request.db["handle"]["connection"].commit()
         return rows([{ "modified": c.rowcount }])
 

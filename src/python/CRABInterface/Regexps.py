@@ -44,7 +44,7 @@ RX_CERT = re.compile(r'^[-]{5}BEGIN CERTIFICATE[-]{5}[\w\W]+[-]{5}END CERTIFICAT
 RX_SUBRESTAT = re.compile(r"^errors|report|logs|data$")
 
 #subresources of the ServerInfo (/info) resource
-RX_SUBRES_SI = re.compile(r"^delegatedn$")
+RX_SUBRES_SI = re.compile(r"^delegatedn|backendurls$")
 
 #worker workflow
 RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._]{1,100}$")
