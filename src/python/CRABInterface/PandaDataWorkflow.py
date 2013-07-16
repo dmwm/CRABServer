@@ -53,7 +53,7 @@ class PandaDataWorkflow(DataWorkflow):
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
                 jobDefErrs.append("Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC))
-                self.logger.debug(jobDeErrs[-1])
+                self.logger.debug(jobDefErrs[-1])
                 failedJobdefs += 1
                 continue
 
