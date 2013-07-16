@@ -24,7 +24,7 @@ class PandaDataWorkflow(DataWorkflow):
            :return: a workflow status summary document"""
         self.logger.debug("Getting status for workflow %s" % workflow)
         row = self.api.query(None, None, ID.sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs  = row.next() #just one row is picked up by the previous query
+        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs  = row.next() #just one row is picked up by the previous query
         resJobs = literal_eval(resJobs.read())
         self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
@@ -74,7 +74,8 @@ class PandaDataWorkflow(DataWorkflow):
                   "failedJobdefs"   : failedJobdefs,\
                   "totalJobdefs"    : totalJobdefs,\
                   "jobdefErrors"    : jobDefErrs,\
-                  "jobList"         : jobList }]
+                  "jobList"         : jobList,\
+                  "saveLogs"        : saveLogs }]
 
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
@@ -82,7 +83,7 @@ class PandaDataWorkflow(DataWorkflow):
 
         transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring']]
         finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
-        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, userdn, userproxy)
+        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, userdn, saveLogs=statusRes['saveLogs'], userproxy=userproxy)
 
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
@@ -90,10 +91,10 @@ class PandaDataWorkflow(DataWorkflow):
 
         transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring']]
         finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
-        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE'], transferingIds, finishedIds, userdn, userproxy)
+        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE'], transferingIds, finishedIds, userdn, userproxy=userproxy)
 
     @conn_handler(services=['phedex'])
-    def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, userproxy=None):
+    def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, saveLogs=None, userproxy=None):
         """
         Retrieves the output PFN aggregating output in final and temporary locations.
 
