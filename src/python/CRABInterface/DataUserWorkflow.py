@@ -111,12 +111,12 @@ class DataUserWorkflow(object):
         return self.workflow.submit(*args, **kwargs)
 
     @retrieveUserCert
-    def resubmit(self, workflow, siteblacklist, sitewhitelist, userdn, userproxy=None):
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, userdn, userproxy=None):
         """Request to Resubmit a workflow.
 
            :arg str workflow: a workflow name
            :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
-        return self.workflow.resubmit(workflow, siteblacklist, sitewhitelist, userdn, userproxy)
+        return self.workflow.resubmit(workflow, siteblacklist, sitewhitelist, jobids, userdn, userproxy)
 
     @retrieveUserCert
     def status(self, workflow, userdn, userproxy=None):
@@ -130,11 +130,11 @@ class DataUserWorkflow(object):
         return self.workflow.status(workflow, userdn, userproxy)
 
     @retrieveUserCert
-    def kill(self, workflow, force, userdn, userproxy=None):
+    def kill(self, workflow, force, jobids, userdn, userproxy=None):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name
            :arg str force: a flag to know if kill should be brutal
            :arg str userproxy: the user proxy retrieved by `retrieveUserCert`
            :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
-        return self.workflow.kill(workflow, force, userdn, userproxy)
+        return self.workflow.kill(workflow, force, jobids, userdn, userproxy)
