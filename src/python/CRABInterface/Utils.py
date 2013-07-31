@@ -4,11 +4,15 @@ from collections import namedtuple
 from time import mktime, gmtime
 import re
 from hashlib import sha1
+import pycurl
+import StringIO
+import cjson as json
 
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.Credential.SimpleMyProxy import SimpleMyProxy, MyProxyException
+from WMCore.Services.pycurl_manager import ResponseHeader
 
 from CRABInterface.Regexps import RX_CERT
 """
@@ -16,6 +20,7 @@ The module contains some utility functions used by the various modules of the CR
 """
 
 CMSSitesCache = namedtuple("CMSSitesCache", ["cachetime", "sites"])
+ConfigCache = namedtuple("ConfigCache", ["cachetime", "centralconfig"])
 
 #These parameters are set in the globalinit (called in RESTBaseAPI)
 serverCert = None
@@ -27,7 +32,7 @@ def globalinit(serverkey, servercert, serverdn, credpath):
     global serverCert, serverKey, serverDN, credServerPath
     serverCert, serverKey, serverDN, credServerPath = servercert, serverkey, serverdn, credpath
 
-def execute_command( command, logger, timeout ):
+def execute_command(command, logger, timeout):
     """
     _execute_command_
     Funtion to manage commands.
@@ -62,6 +67,30 @@ def execute_command( command, logger, timeout ):
     return stdout, rc
 
 
+def getCentralConfig(extconfigurl, mode):
+    """Utility to retrieve the central configuration to be used for dynamic variables
+
+    arg str extconfigurl: the url pointing to the exteranl configuration parameter
+    arg str mode: also known as the variant of the rest (prod, preprod, dev, private) 
+    return: the dictionary containing the external configuration for the selected mode."""
+
+    hbuf = StringIO.StringIO()
+    bbuf = StringIO.StringIO()
+
+    curl = pycurl.Curl()
+    curl.setopt(pycurl.URL, extconfigurl)
+    curl.setopt(pycurl.WRITEFUNCTION, bbuf.write)
+    curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
+    curl.setopt(pycurl.FOLLOWLOCATION, 1)
+    curl.perform()
+    curl.close()
+
+    header = ResponseHeader(hbuf.getvalue())
+    if header.status < 200 or header.status >= 300:
+        cherrypy.log("Problem %d reading from %s." %(extconfigurl, header.status))
+        raise ExecutionError("Internal issue when retrieving external confifuration")
+    return json.decode(bbuf.getvalue())[mode]
+
 
 def conn_handler(services):
     """
@@ -80,6 +109,8 @@ def conn_handler(services):
                 phdict = args[0].phedexargs
                 phdict.update({'cert': serverCert, 'key': serverKey})
                 args[0].phedex = PhEDEx(responseType='xml', dict=phdict)
+            if 'centralconfig' in services and (not args[0].centralcfg.centralconfig or (args[0].centralcfg.cachetime+1800 < mktime(gmtime()))):
+                args[0].centralcfg = ConfigCache(centralconfig=getCentralConfig(extconfigurl=args[0].config.extconfigurl, mode=args[0].config.mode), cachetime=mktime(gmtime()))
             return func(*args, **kwargs)
         return wrapped_func
     return wrap

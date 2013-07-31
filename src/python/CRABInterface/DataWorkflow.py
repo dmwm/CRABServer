@@ -23,14 +23,13 @@ class DataWorkflow(object):
        No aggregation of workflows provided here."""
 
     @staticmethod
-    def globalinit(dbapi, phedexargs=None, dbsurl=None, credpath='/tmp', transformation=None, backendurls=None):
+    def globalinit(dbapi, phedexargs=None, dbsurl=None, credpath='/tmp', centralcfg=None):
         DataWorkflow.api = dbapi
         DataWorkflow.phedexargs = phedexargs
         DataWorkflow.phedex = None
         DataWorkflow.dbsurl = dbsurl
         DataWorkflow.credpath = credpath
-        DataWorkflow.transformation = transformation
-        DataWorkflow.backendurls = backendurls
+        DataWorkflow.centralcfg = centralcfg
 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
@@ -107,6 +106,7 @@ class DataWorkflow(object):
         # probably we need to explicitely select the schema parameters to return
         raise NotImplementedError
 
+    @conn_handler(services=['centralconfig'])
     @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
@@ -177,7 +177,7 @@ class DataWorkflow(object):
                             outfiles        = [dbSerializer(addoutputfiles)],\
                             tfile_outfiles  = [dbSerializer(tfileoutfiles)],\
                             edm_outfiles    = [dbSerializer(edmoutfiles)],\
-                            transformation  = [self.transformation[jobtype]],\
+                            transformation  = [self.centralcfg.centralconfig["transformation"][jobtype]],\
                             job_type        = [jobtype],\
                             arguments       = [dbSerializer({})],\
                             resubmitted_jobs= [dbSerializer([])],\
