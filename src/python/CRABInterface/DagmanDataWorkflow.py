@@ -419,7 +419,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         return  dag.getScheddObj(scheddName)
 
     def getRootTasks(self, workflow, schedd):
-        rootConst = "TaskType =?= \"ROOT\" && string(CRAB_ReqName) =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
+        rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= \"%s\" && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)" % workflow
         rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType']
         print "trying to get %s" % workflow
         #print "Using rootConst: %s" % rootConst
