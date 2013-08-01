@@ -23,14 +23,15 @@ class DataWorkflow(object):
        No aggregation of workflows provided here."""
 
     @staticmethod
-    def globalinit(dbapi, phedexargs=None, dbsurl=None, credpath='/tmp', centralcfg=None):
+    def globalinit(dbapi, phedexargs=None, dbsurl=None, credpath='/tmp', centralcfg=None, config=None):
         DataWorkflow.api = dbapi
         DataWorkflow.phedexargs = phedexargs
         DataWorkflow.phedex = None
         DataWorkflow.dbsurl = dbsurl
         DataWorkflow.credpath = credpath
         DataWorkflow.centralcfg = centralcfg
-
+        DataWorkflow.config = config
+ 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
