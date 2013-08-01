@@ -1,15 +1,12 @@
 import logging
-from commands import getstatusoutput
-import pycurl
-import StringIO
 import cherrypy
-import cjson as json
+from commands import getstatusoutput
+from time import mktime, gmtime
 
 # WMCore dependecies here
 from WMCore.REST.Server import DatabaseRESTApi, rows
 from WMCore.REST.Format import JSONFormat
 from WMCore.REST.Error import ExecutionError
-from WMCore.Services.pycurl_manager import ResponseHeader
 
 # CRABServer dependecies here
 import Utils
@@ -41,27 +38,13 @@ class RESTBaseAPI(DatabaseRESTApi):
         if status is not 0:
             raise ExecutionError("Internal issue when retrieving crabserver service DN.")
 
-        hbuf = StringIO.StringIO()
-        bbuf = StringIO.StringIO()
-
-        curl = pycurl.Curl()
-        curl.setopt(pycurl.URL, config.extconfigurl)
-        curl.setopt(pycurl.WRITEFUNCTION, bbuf.write)
-        curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
-        curl.setopt(pycurl.FOLLOWLOCATION, 1)
-        curl.perform()
-        curl.close()
-
-        header = ResponseHeader(hbuf.getvalue())
-        if header.status < 200 or header.status >= 300:
-            cherrypy.log("Problem %d reading from %s." %(config.extconfigurl, header.status))
-            raise ExecutionError("Internal issue when retrieving external confifuration")
-        extconfig = json.decode(bbuf.getvalue())[config.mode]
+        extconfig = Utils.ConfigCache(centralconfig=Utils.getCentralConfig(extconfigurl=config.extconfigurl, mode=config.mode),
+                                      cachetime=mktime(gmtime()))
 
         #Global initialization of Data objects. Parameters coming from the config should go here
         DataUserWorkflow.globalinit(config.workflowManager)
         DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl,\
-                                credpath=config.credpath, transformation=extconfig["transformation"], backendurls=extconfig["backend-urls"])
+                                credpath=config.credpath, centralcfg=extconfig, config=config)
         DataFileMetadata.globalinit(dbapi=self)
         Utils.globalinit(config.serverhostkey, config.serverhostcert, serverdn, config.credpath)
 
@@ -69,7 +52,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         ##      the RESTFileMetadata has the specifc requirement of getting xml reports
         self._add( {'workflow': RESTUserWorkflow(app, self, config, mount),
                     'campaign': RESTCampaign(app, self, config, mount),
-                    'info': RESTServerInfo(app, self, config, mount, serverdn, extconfig.get('delegate-dn', []), extconfig['backend-urls']),
+                    'info': RESTServerInfo(app, self, config, mount, serverdn, extconfig),
                     'filemetadata': RESTFileMetadata(app, self, config, mount),
                     'workflowdb': RESTWorkerWorkflow(app, self, config, mount),
                    } )
