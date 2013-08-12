@@ -23,7 +23,6 @@ RX_ARCH      = re.compile(r"^(?=.{0,255}$)slc[0-9]{1}_[a-z0-9]+_gcc[a-z0-9]+(_[a
 RX_DATASET   = re.compile(r"^(?=.{0,500}$)/(\*|[a-zA-Z\*][a-zA-Z0-9_\-\*]{0,100})(/(\*|[a-zA-Z0-9_\.\-\*]{1,100})){0,1}(/(\*|[A-Z\-\*]{1,50})){0,1}$")
 RX_BLOCK     = re.compile(r"^(/[a-zA-Z0-9\.\-_]{1,100}){3}#[a-zA-Z0-9\.\-_]{1,100}$")
 RX_SPLIT     = re.compile(r"^FileBased|EventBased|LumiBased$")
-#RX_CACHEURL  = re.compile(r"^(?=.{1,255}$)[0-9A-Za-z](?:(?:[0-9A-Za-z]|\b-){0,61}[0-9A-Za-z])?(?:\.[0-9A-Za-z](?:(?:[0-9A-Za-z]|\b-){0,61}[0-9A-Za-z])?)*\.?$")
 RX_CACHEURL  = re.compile(r"^https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
 RX_ADDFILE   = re.compile(r"^(?=.{0,255}$)([a-zA-Z0-9\-\._]+)$")
 RX_CMSSITE   = re.compile(r"^(?=.{0,255}$)T[0-3%]((_[A-Z]{2}(_[A-Za-z0-9]+)*)?)$")
@@ -45,4 +44,16 @@ RX_CERT = re.compile(r'^[-]{5}BEGIN CERTIFICATE[-]{5}[\w\W]+[-]{5}END CERTIFICAT
 RX_SUBRESTAT = re.compile(r"^errors|report|logs|data$")
 
 #subresources of the ServerInfo (/info) resource
-RX_SUBRES_SI = re.compile(r"^delegatedn$")
+RX_SUBRES_SI = re.compile(r"^delegatedn|backendurls$")
+
+#worker workflow
+RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._]{1,100}$")
+## this can be improved by putting a dependency on CAFUtilities task state machine
+RX_STATUS = re.compile(r"^[A-Za-z]{1,20}$")
+## need to be careful with this
+RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s\=]{0,10000}$")
+## user dn
+RX_DN = re.compile(r"^/(?:C|O|DC)=.*/CN=.")
+## worker subresources
+RX_SUBPOSTWORKER = re.compile(r"^state|start|failure|success|process$")
+RX_SUBGETWORKER = re.compile(r"jobgroup")

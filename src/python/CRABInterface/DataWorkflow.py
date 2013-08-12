@@ -22,13 +22,14 @@ class DataWorkflow(object):
        No aggregation of workflows provided here."""
 
     @staticmethod
-    def globalinit(dbapi, phedexargs=None, dbsurl=None, credpath='/tmp', transformation=None):
+    def globalinit(dbapi, phedexargs=None, dbsurl=None, credpath='/tmp', transformation=None, backendurls=None):
         DataWorkflow.api = dbapi
         DataWorkflow.phedexargs = phedexargs
         DataWorkflow.phedex = None
         DataWorkflow.dbsurl = dbsurl
         DataWorkflow.credpath = credpath
         DataWorkflow.transformation = transformation
+        DataWorkflow.backendurls = backendurls
 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
@@ -185,7 +186,7 @@ class DataWorkflow(object):
 
         return [{'RequestName': requestname}]
 
-    def resubmit(self, workflow, siteblacklist, sitewhitelist, userdn, userproxy):
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, userdn, userproxy):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
 
@@ -193,6 +194,7 @@ class DataWorkflow(object):
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name."""
 
+        retmsg = "ok"
         self.logger.info("About to resubmit workflow: %s. Getting status first." % workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
@@ -202,6 +204,12 @@ class DataWorkflow(object):
 
         if statusRes['status'] in ['SUBMITTED','KILLED','FAILED']:
             resubmitList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus in self.failedList]
+            if jobids:
+                #if the user wants to kill specific jobids make the intersection
+                resubmitList = list(set(resubmitList) & set(jobids))
+                #check if all the requested jobids can be resubmitted
+                if len(resubmitList) != len(jobids):
+                    retmsg = "Cannot request resubmission for %s" % (set(jobids) - set(resubmitList))
             if not resubmitList:
                 raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
             self.logger.info("Jobs to resubmit: %s" % resubmitList)
@@ -210,6 +218,8 @@ class DataWorkflow(object):
                             arguments = [str({"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList})])
         else:
             raise ExecutionError("You cannot resubmit a task if it is in the %s state" % statusRes['status'])
+
+        return [{"result":retmsg}]
 
 
     def _updateTaskStatus(self, workflow, status, jobsPerStatus):
@@ -239,24 +249,33 @@ class DataWorkflow(object):
            :return: a workflow status summary document"""
         raise NotImplementedError
 
-    def kill(self, workflow, force, userdn, userproxy=None):
+    def kill(self, workflow, force, jobids, userdn, userproxy=None):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name"""
 
+        retmsg = "ok"
         self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         if statusRes['status'] == 'SUBMITTED':
             killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus not in self.successList]
+            if jobids:
+                #if the user wants to kill specific jobids make the intersection
+                killList = list(set(killList) & set(jobids))
+                #check if all the requested jobids can be resubmitted
+                if len(killList) != len(jobids):
+                    retmsg = "Cannot request kill for %s" % (set(jobids) - set(killList))
             if not killList:
-                raise ExecutionError("There are no jobs to kill. Only jobs not in %s states are resubmitted" % self.successList)
+                raise ExecutionError("There are no jobs to kill. Only jobs not in %s states can be killed" % self.successList)
             self.logger.info("Jobs to kill: %s" % killList)
 
             self.api.modify(SetStatusTask.sql, status = ["KILL"], taskname = [workflow])
             self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
-                            arguments = [str({"killList": killList, "killAll": True})])
+                            arguments = [str({"killList": killList, "killAll": jobids==[]})])
         elif statusRes['status'] == 'NEW':
             self.api.modify(SetStatusTask.sql, status = ["KILLED"], taskname = [workflow])
         else:
             raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
+
+        return [{"result":retmsg}]

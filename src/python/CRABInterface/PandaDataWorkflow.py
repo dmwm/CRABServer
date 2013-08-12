@@ -24,8 +24,7 @@ class PandaDataWorkflow(DataWorkflow):
            :return: a workflow status summary document"""
         self.logger.debug("Getting status for workflow %s" % workflow)
         row = self.api.query(None, None, ID.sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs  = row.next() #just one row is picked up by the previous query
-        print resJobs
+        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs  = row.next() #just one row is picked up by the previous query
         resJobs = literal_eval(resJobs.read())
         self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
@@ -50,11 +49,11 @@ class PandaDataWorkflow(DataWorkflow):
                 continue
 
             #check the status of the jobdef in panda
-            schedEC, res = pserver.getPandIDsWithJobID(jobID=jobdefid, dn=userdn, userproxy=userproxy, credpath=self.credpath)
+            schedEC, res = pserver.getPandIDsWithJobID(self.backendurls['baseURLSSL'], jobID=jobdefid, dn=userdn, userproxy=userproxy, credpath=self.credpath)
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
                 jobDefErrs.append("Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC))
-                self.logger.debug(jobDeErrs[-1])
+                self.logger.debug(jobDefErrs[-1])
                 failedJobdefs += 1
                 continue
 
@@ -65,7 +64,8 @@ class PandaDataWorkflow(DataWorkflow):
                     jobsPerStatus[jobstatus] = jobsPerStatus[jobstatus]+1 if jobstatus in jobsPerStatus else 1
                     jobList.append((jobstatus,jobid))
 
-        status = self._updateTaskStatus(workflow, status, jobsPerStatus)
+        if set(jobsPerStatus): #if we actually submitted something
+            status = self._updateTaskStatus(workflow, status, jobsPerStatus)
 
         return [ {"status" : status,\
                   "taskFailureMsg" : taskFailure.read() if taskFailure else '',\
@@ -74,7 +74,8 @@ class PandaDataWorkflow(DataWorkflow):
                   "failedJobdefs"   : failedJobdefs,\
                   "totalJobdefs"    : totalJobdefs,\
                   "jobdefErrors"    : jobDefErrs,\
-                  "jobList"         : jobList }]
+                  "jobList"         : jobList,\
+                  "saveLogs"        : saveLogs }]
 
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
@@ -82,7 +83,7 @@ class PandaDataWorkflow(DataWorkflow):
 
         transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring']]
         finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
-        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, userdn, userproxy)
+        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, userdn, saveLogs=statusRes['saveLogs'], userproxy=userproxy)
 
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
@@ -90,10 +91,10 @@ class PandaDataWorkflow(DataWorkflow):
 
         transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring']]
         finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
-        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE'], transferingIds, finishedIds, userdn, userproxy)
+        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE'], transferingIds, finishedIds, userdn, userproxy=userproxy)
 
     @conn_handler(services=['phedex'])
-    def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, userproxy=None):
+    def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, saveLogs=None, userproxy=None):
         """
         Retrieves the output PFN aggregating output in final and temporary locations.
 
@@ -125,13 +126,16 @@ class PandaDataWorkflow(DataWorkflow):
         #jobids=','.join(map(str,jobids)), limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
 
         for row in rows:
-            if row[GetFromTaskAndType.PANDAID] in finishedIds:
-                lfn = re.sub('^/store/temp/', '/store/', row[GetFromTaskAndType.LFN])
-                pfn = self.phedex.getPFN(row[GetFromTaskAndType.LOCATION], lfn)[(row[GetFromTaskAndType.LOCATION], lfn)]
-            elif row[GetFromTaskAndType.PANDAID] in transferingIds:
+            if filetype == ['LOG'] and saveLogs == 'F':
                 pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])[(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])]
             else:
-                continue
+                if row[GetFromTaskAndType.PANDAID] in finishedIds:
+                    lfn = re.sub('^/store/temp/', '/store/', row[GetFromTaskAndType.LFN])
+                    pfn = self.phedex.getPFN(row[GetFromTaskAndType.LOCATION], lfn)[(row[GetFromTaskAndType.LOCATION], lfn)]
+                elif row[GetFromTaskAndType.PANDAID] in transferingIds:
+                    pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])[(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])]
+                else:
+                    continue
 
             yield { 'pfn' : pfn,
                     'size' : row[GetFromTaskAndType.SIZE],
@@ -140,24 +144,26 @@ class PandaDataWorkflow(DataWorkflow):
 
     def report(self, workflow, userdn, userproxy=None):
         res = {}
-        self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
+        self.logger.info("About to compute report of workflow: %s. Getting status first." % workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         #load the lumimask
         rows = self.api.query(None, None, ID.sql, taskname = workflow)
         splitArgs = literal_eval(rows.next()[6].read())
         res['lumiMask'] = buildLumiMask(splitArgs['runs'], splitArgs['lumis'])
+        self.logger.info("Lumi mask was: %s" % res['lumiMask'])
 
         #extract the finished jobs from filemetadata
         jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'transferring']]
         rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='EDM', taskname=workflow)
-        rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
 
         res['runsAndLumis'] = {}
         for row in rows:
-            res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])] = { 'parents' : row[GetFromTaskAndType.PARENTS].read(),
-                    'runlumi' : row[GetFromTaskAndType.RUNLUMI].read(),
-                    'events'  : row[GetFromTaskAndType.INEVENTS],
-            }
+            if row[GetFromTaskAndType.PANDAID] in jobids:
+                res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])] = { 'parents' : row[GetFromTaskAndType.PARENTS].read(),
+                        'runlumi' : row[GetFromTaskAndType.RUNLUMI].read(),
+                        'events'  : row[GetFromTaskAndType.INEVENTS],
+                }
+        self.logger.info("Got %s edm files for workflow %s" % (len(res), workflow))
 
         yield res

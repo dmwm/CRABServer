@@ -6,7 +6,7 @@ import cherrypy
 import cjson as json
 
 # WMCore dependecies here
-from WMCore.REST.Server import DatabaseRESTApi
+from WMCore.REST.Server import DatabaseRESTApi, rows
 from WMCore.REST.Format import JSONFormat
 from WMCore.REST.Error import ExecutionError
 from WMCore.Services.pycurl_manager import ResponseHeader
@@ -17,6 +17,7 @@ from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTCampaign import RESTCampaign
 from CRABInterface.RESTServerInfo import RESTServerInfo
 from CRABInterface.RESTFileMetadata import RESTFileMetadata
+from CRABInterface.RESTWorkerWorkflow import RESTWorkerWorkflow
 from CRABInterface.DataFileMetadata import DataFileMetadata
 from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
@@ -60,7 +61,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         #Global initialization of Data objects. Parameters coming from the config should go here
         DataUserWorkflow.globalinit(config.workflowManager)
         DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl,\
-                                credpath=config.credpath, transformation=extconfig["transformation"])
+                                credpath=config.credpath, transformation=extconfig["transformation"], backendurls=extconfig["backend-urls"])
         DataFileMetadata.globalinit(dbapi=self)
         Utils.globalinit(config.serverhostkey, config.serverhostcert, serverdn, config.credpath)
 
@@ -68,11 +69,31 @@ class RESTBaseAPI(DatabaseRESTApi):
         ##      the RESTFileMetadata has the specifc requirement of getting xml reports
         self._add( {'workflow': RESTUserWorkflow(app, self, config, mount),
                     'campaign': RESTCampaign(app, self, config, mount),
-                    'info': RESTServerInfo(app, self, config, mount, serverdn, extconfig.get('delegate-dn', [])),
+                    'info': RESTServerInfo(app, self, config, mount, serverdn, extconfig.get('delegate-dn', []), extconfig['backend-urls']),
                     'filemetadata': RESTFileMetadata(app, self, config, mount),
+                    'workflowdb': RESTWorkerWorkflow(app, self, config, mount),
                    } )
 
         self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None) )
+
+    def modifynocheck(self, sql, *binds, **kwbinds):
+        """This is the same as `WMCore.REST.Server`:modify method but
+           not implementing any kind of checks on the number of modified
+           rows.
+
+        :arg str sql: SQL modify statement.
+        :arg list binds: Bind variables by position: list of dictionaries.
+        :arg dict kwbinds: Bind variables by keyword: dictionary of lists.
+        :result: See :meth:`rowstatus` and description in `WMCore.REST.Server`."""
+        if binds:
+            c, _ = self.executemany(sql, *binds, **kwbinds)
+        else:
+            kwbinds = self.bindmap(**kwbinds)
+            c, _ = self.executemany(sql, kwbinds, *binds)
+        trace = cherrypy.request.db["handle"]["trace"]
+        trace and cherrypy.log("%s commit" % trace)
+        cherrypy.request.db["handle"]["connection"].commit()
+        return rows([{ "modified": c.rowcount }])
 
     def _initLogger(self, logfile, loglevel):
         """

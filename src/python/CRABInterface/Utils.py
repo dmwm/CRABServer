@@ -78,7 +78,9 @@ def conn_handler(services):
             if 'sitedb' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
                 args[0].allCMSNames = CMSSitesCache(sites=SiteDBJSON(config={'cert': serverCert, 'key': serverKey}).getAllCMSNames(), cachetime=mktime(gmtime()))
             if 'phedex' in services and not args[0].phedex:
-                args[0].phedex = PhEDEx(responseType='xml', dict=args[0].phedexargs)
+                phdict = args[0].phedexargs
+                phdict.update({'cert': serverCert, 'key': serverKey})
+                args[0].phedex = PhEDEx(responseType='xml', dict=phdict)
             return func(*args, **kwargs)
         return wrapped_func
     return wrap
@@ -100,7 +102,15 @@ def retrieveUserCert(func):
             try:
                 userproxy = mypclient.logonRenewMyProxy(username=sha1(str(serverDN)+kwargs['userdn']).hexdigest(), myproxyserver=myproxyserver, myproxyport=7512)
             except MyProxyException, me:
-                raise InvalidParameter("Impossible to retrieve proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
+                # Unsure if this works in standalone mode...
+                import cherrypy
+                cherrypy.log(str(me))
+                cherrypy.log(str(serverKey))
+                cherrypy.log(str(serverCert))
+                invalidp = InvalidParameter("Impossible to retrieve proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
+                setattr(invalidp, 'trace', str(me))
+                raise invalidp
+
             else:
                 if not re.match(RX_CERT, userproxy):
                     raise InvalidParameter("Retrieved malformed proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
