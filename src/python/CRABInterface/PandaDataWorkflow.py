@@ -17,6 +17,7 @@ class PandaDataWorkflow(DataWorkflow):
     successList = ['finished']
     failedList = ['cancelled', 'failed']
 
+    @conn_handler(services=['centralconfig'])
     def status(self, workflow, userdn, userproxy=None):
         """Retrieve the status of the workflow.
 
@@ -49,7 +50,7 @@ class PandaDataWorkflow(DataWorkflow):
                 continue
 
             #check the status of the jobdef in panda
-            schedEC, res = pserver.getPandIDsWithJobID(self.backendurls['baseURLSSL'], jobID=jobdefid, dn=userdn, userproxy=userproxy, credpath=self.credpath)
+            schedEC, res = pserver.getPandIDsWithJobID(self.centralcfg.centralconfig['backend-urls']['baseURLSSL'], jobID=jobdefid, dn=userdn, userproxy=userproxy, credpath=self.credpath)
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
                 jobDefErrs.append("Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC))
