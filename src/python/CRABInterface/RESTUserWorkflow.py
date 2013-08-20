@@ -99,6 +99,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_strlist("edmoutfiles", param, safe, RX_OUTFILES)
             validate_strlist("runs", param, safe, RX_RUNS)
             validate_strlist("lumis", param, safe, RX_LUMIRANGE)
+            validate_str("scheduler", param, safe, RX_SCHEDULER)
             if len(safe.kwargs["runs"]) != len(safe.kwargs["lumis"]):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
 
@@ -141,7 +142,8 @@ class RESTUserWorkflow(RESTEntity):
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
-               savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis, totalunits):
+               savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis, totalunits,
+            scheduler = 'panda'):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -171,6 +173,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str edmoutfiles: list of edm output files
            :arg str list runs: list of run numbers
            :arg str list lumis: list of lumi section numbers
+           :arg str scheduler: Which scheduler to use, can be 'panda' or 'condor'
            :arg int totalunits: number of MC event to be generated
            :returns: a dict which contaians details of the request"""
 
@@ -182,7 +185,8 @@ class RESTUserWorkflow(RESTEntity):
                                        userhn=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
                                        publication=publication, publishname=publishname, asyncdest=asyncdest, blacklistT1=blacklistT1,
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,\
-                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits)
+                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits,
+                                       scheduler = scheduler)
 
     @restcall
     def post(self, workflow, siteblacklist, sitewhitelist, jobids):

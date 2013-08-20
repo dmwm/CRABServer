@@ -109,7 +109,7 @@ class DataWorkflow(object):
     @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
-               runs, lumis, totalunits, userproxy=None):
+               runs, lumis, totalunits, userproxy=None, scheduler='panda'):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -142,6 +142,9 @@ class DataWorkflow(object):
            :arg int totalunits: number of MC event to be generated
            :returns: a dict which contaians details of the request"""
 
+        if scheduler == 'condor':
+            # TODO: hook this around properly
+            raise NotImplementedError, "Need to add the proper CRABServer hooks for condor"
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         requestname = '%s_%s_%s' % (timestamp, userhn, workflow)
         splitArgName = self.splitArgMap[splitalgo]
