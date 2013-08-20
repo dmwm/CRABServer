@@ -18,22 +18,29 @@ then
 		echo "I found python2.6 at.."
 		echo `which python2.6`
 	fi
-    if [[ "X$CRAB_TASKMANAGER_TARBALL" == "X" ]]; then
-        CRAB_TASKMANAGER_TARBALL='http://hcc-briantest.unl.edu/TaskManagerRun.tar.gz'
-    fi
+
+	if [ "x$CRAB3_VERSION" = "x" ]; then
+		TARBALL_NAME=TaskManagerRun-$CRAB3_VERSION.tar.gz
+	else
+		TARBALL_NAME=TaskManagerRun.tar.gz
+	fi
+
+	if [[ "X$CRAB_TASKMANAGER_TARBALL" == "X" ]]; then
+		CRAB_TASKMANAGER_TARBALL="http://hcc-briantest.unl.edu/$TARBALL_NAME"
+	fi
     
-    if [[ "X$CRAB_TASKMANAGER_TARBALL" != "Xlocal" ]]; then
-        # pass, we'll just use that value
-        echo "Downloading tarball from $CRAB_TASKMANAGER_TARBALL"
-	    curl $CRAB_TASKMANAGER_TARBALL > TaskManagerRun.tar.gz
-        if [[ $? != 0 ]]
-        then
-            echo "Error: Unable to download the task manager runtime environment." >&2
-            exit 3
-        fi
-    else
-        echo "Using tarball shipped within condor"
-    fi
+	if [[ "X$CRAB_TASKMANAGER_TARBALL" != "Xlocal" ]]; then
+		# pass, we'll just use that value
+		echo "Downloading tarball from $CRAB_TASKMANAGER_TARBALL"
+		curl $CRAB_TASKMANAGER_TARBALL > TaskManagerRun.tar.gz
+		if [[ $? != 0 ]]
+		then
+			echo "Error: Unable to download the task manager runtime environment." >&2
+			exit 3
+		fi
+	else
+		echo "Using tarball shipped within condor"
+	fi
     	
 	tar xvfzm TaskManagerRun.tar.gz
 	if [[ $? != 0 ]]

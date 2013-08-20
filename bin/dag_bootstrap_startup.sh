@@ -27,7 +27,6 @@ export CONDOR_ID="${CLUSTER_ID}.${PROC_ID}"
 
 # There used to be -Suppress_notification here. Why?
 condor_dagman -f -l . -Lockfile $PWD/$1.lock -AutoRescue 1 -DoRescueFrom 0 -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION"
-set +x
 EXIT_STATUS=$?
 
 # We do this after the job because dagman will cowardly refuse to overwrite any pre-existing file, even if it's empty
