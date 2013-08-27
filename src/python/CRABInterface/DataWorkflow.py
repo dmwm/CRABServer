@@ -5,6 +5,7 @@ import cherrypy #cherrypy import is needed here because we need the 'start_threa
 import traceback
 import json
 from hashlib import sha1
+import urllib
 
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
@@ -18,20 +19,23 @@ from Databases.TaskDB.Oracle.Task.New import New
 from Databases.TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
 from Databases.TaskDB.Oracle.Task.SetArgumentsTask import SetArgumentsTask
 
+from WMCore.Database.CMSCouch import CouchServer
+import datetime
+
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
-       No aggregation of workflows provided here."""
+No aggregation of workflows provided here."""
 
     @staticmethod
-    def globalinit(dbapi, phedexargs=None, dbsurl=None, credpath='/tmp', centralcfg=None, config=None):
+    def globalinit(dbapi, phedexargs=None, dbsurl=None, credpath='/tmp', transformation=None, backendurls=None):
         DataWorkflow.api = dbapi
         DataWorkflow.phedexargs = phedexargs
         DataWorkflow.phedex = None
         DataWorkflow.dbsurl = dbsurl
         DataWorkflow.credpath = credpath
-        DataWorkflow.centralcfg = centralcfg
-        DataWorkflow.config = config
- 
+        DataWorkflow.transformation = transformation
+        DataWorkflow.backendurls = backendurls
+
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
@@ -44,11 +48,11 @@ class DataWorkflow(object):
     def getLatests(self, user, limit, timestamp):
         """Retrives the latest workflows for the user
 
-           :arg str user: a valid user hn login name
-           :arg int limit: the maximum number of workflows to return
-                          (this should probably have a default!)
-           :arg int limit: limit on the workflow age
-           :return: a list of workflows"""
+:arg str user: a valid user hn login name
+:arg int limit: the maximum number of workflows to return
+(this should probably have a default!)
+:arg int limit: limit on the workflow age
+:return: a list of workflows"""
         # convert the workflow age in something eatable by a couch view
         # in practice it's convenient that the timestamp is on a fixed format: latest 1 or 3 days, latest 1 week, latest 1 month
         # and that it's a list (probably it can be converted into it): [year, month-num, day, hh, mm, ss]
@@ -56,93 +60,92 @@ class DataWorkflow(object):
 
         # example:
         # return self.monitordb.conn.loadView('WMStats', 'byUser',
-        #                              options = { "startkey": user,
-        #                                          "endkey": user,
-        #                                          "limit": limit, })
+        # options = { "startkey": user,
+        # "endkey": user,
+        # "limit": limit, })
         #raise NotImplementedError
         return [{}]
 
     def errors(self, workflow, shortformat):
         """Retrieves the sets of errors for a specific workflow
 
-           :arg str workflow: a workflow name
-           :arg int shortformat: a flag indicating if the user is asking for detailed
-                                 information about sites and list of errors
-           :return: a list of errors grouped by exit code, error reason, site"""
+:arg str workflow: a workflow name
+:arg int shortformat: a flag indicating if the user is asking for detailed
+information about sites and list of errors
+:return: a list of errors grouped by exit code, error reason, site"""
         raise NotImplementedError
 
     def report(self, workflow):
         """Retrieves the quality of the workflow in term of what has been processed
-           (eg: good lumis)
+(eg: good lumis)
 
-           :arg str workflow: a workflow name
-           :return: what?"""
+:arg str workflow: a workflow name
+:return: what?"""
         raise NotImplementedError
 
     def logs(self, workflow, howmany, exitcode, jobids):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
 
-           :arg str workflow: a workflow name
-           :arg int howmany: the limit on the number of PFN to return
-           :arg int exitcode: the log has to be of a job ended with this exit_code
-           :return: (a generator of?) a list of logs pfns"""
+:arg str workflow: a workflow name
+:arg int howmany: the limit on the number of PFN to return
+:arg int exitcode: the log has to be of a job ended with this exit_code
+:return: (a generator of?) a list of logs pfns"""
         raise NotImplementedError
 
     def output(self, workflow, howmany, jobids):
         """
-        Retrieves the output PFN aggregating output in final and temporary locations.
+Retrieves the output PFN aggregating output in final and temporary locations.
 
-        :arg str workflow: the unique workflow name
-           :arg int howmany: the limit on the number of PFN to return
-           :return: a generator of list of outputs"""
+:arg str workflow: the unique workflow name
+:arg int howmany: the limit on the number of PFN to return
+:return: a generator of list of outputs"""
         raise NotImplementedError
 
     def schema(self, workflow):
         """Returns the workflow schema parameters.
 
-           :arg str workflow: a workflow name
-           :return: a json corresponding to the workflow schema"""
+:arg str workflow: a workflow name
+:return: a json corresponding to the workflow schema"""
         # it probably needs to connect to the database
         # TODO: verify + code the above point
         # probably we need to explicitely select the schema parameters to return
         raise NotImplementedError
 
-    @conn_handler(services=['centralconfig'])
     @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
                runs, lumis, totalunits, userproxy=None):
         """Perform the workflow injection
 
-           :arg str workflow: workflow name requested by the user;
-           :arg str jobtype: job type of the workflow, usually Analysis;
-           :arg str jobsw: software requirement;
-           :arg str jobarch: software architecture (=SCRAM_ARCH);
-           :arg str inputdata: input dataset;
-           :arg str list siteblacklist: black list of sites, with CMS name;
-           :arg str list sitewhitelist: white list of sites, with CMS name;
-           :arg str splitalgo: algorithm to be used for the workflow splitting;
-           :arg str algoargs: argument to be used by the splitting algorithm;
-           :arg str cachefilename: name of the file inside the cache
-           :arg str cacheurl: URL of the cache
-           :arg str list addoutputfiles: list of additional output files;
-           :arg int savelogsflag: archive the log files? 0 no, everything else yes;
-           :arg str userdn: DN of user doing the request;
-           :arg str userhn: hyper new name of the user doing the request;
-           :arg int publication: flag enabling or disabling data publication;
-           :arg str publishname: name to use for data publication;
-           :arg str asyncdest: CMS site name for storage destination of the output files;
-           :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
-           :arg str dbsurl: dbs url where the input dataset is published;
-           :arg str publishdbsurl: dbs url where the output data has to be published;
-           :arg str vorole: user vo role
-           :arg str vogroup: user vo group
-           :arg str tfileoutfiles: list of t-output files
-           :arg str edmoutfiles: list of edm output files
-           :arg str list runs: list of run numbers
-           :arg str list lumis: list of lumi section numbers
-           :arg int totalunits: number of MC event to be generated
-           :returns: a dict which contaians details of the request"""
+:arg str workflow: workflow name requested by the user;
+:arg str jobtype: job type of the workflow, usually Analysis;
+:arg str jobsw: software requirement;
+:arg str jobarch: software architecture (=SCRAM_ARCH);
+:arg str inputdata: input dataset;
+:arg str list siteblacklist: black list of sites, with CMS name;
+:arg str list sitewhitelist: white list of sites, with CMS name;
+:arg str splitalgo: algorithm to be used for the workflow splitting;
+:arg str algoargs: argument to be used by the splitting algorithm;
+:arg str cachefilename: name of the file inside the cache
+:arg str cacheurl: URL of the cache
+:arg str list addoutputfiles: list of additional output files;
+:arg int savelogsflag: archive the log files? 0 no, everything else yes;
+:arg str userdn: DN of user doing the request;
+:arg str userhn: hyper new name of the user doing the request;
+:arg int publication: flag enabling or disabling data publication;
+:arg str publishname: name to use for data publication;
+:arg str asyncdest: CMS site name for storage destination of the output files;
+:arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
+:arg str dbsurl: dbs url where the input dataset is published;
+:arg str publishdbsurl: dbs url where the output data has to be published;
+:arg str vorole: user vo role
+:arg str vogroup: user vo group
+:arg str tfileoutfiles: list of t-output files
+:arg str edmoutfiles: list of edm output files
+:arg str list runs: list of run numbers
+:arg str list lumis: list of lumi section numbers
+:arg int totalunits: number of MC event to be generated
+:returns: a dict which contaians details of the request"""
 
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         requestname = '%s_%s_%s' % (timestamp, userhn, workflow)
@@ -150,86 +153,111 @@ class DataWorkflow(object):
         dbSerializer = str
 
         self.api.modify(New.sql,
-                            task_name       = [requestname],\
-                            jobset_id       = [None],
-                            task_status     = ['NEW'],\
-                            task_failure    = [''],\
-                            job_sw          = [jobsw],\
-                            job_arch        = [jobarch],\
-                            input_dataset   = [inputdata],\
-                            site_whitelist  = [dbSerializer(sitewhitelist)],\
-                            site_blacklist  = [dbSerializer(siteblacklist)],\
-                            split_algo      = [splitalgo],\
-                            split_args      = [dbSerializer({'halt_job_on_file_boundaries': False, 'splitOnRun': False,\
+                            task_name = [requestname],\
+                            jobset_id = [None],
+                            task_status = ['NEW'],\
+                            task_failure = [''],\
+                            job_sw = [jobsw],\
+                            job_arch = [jobarch],\
+                            input_dataset = [inputdata],\
+                            site_whitelist = [dbSerializer(sitewhitelist)],\
+                            site_blacklist = [dbSerializer(siteblacklist)],\
+                            split_algo = [splitalgo],\
+                            split_args = [dbSerializer({'halt_job_on_file_boundaries': False, 'splitOnRun': False,\
                                                 splitArgName : algoargs, 'runs': runs, 'lumis': lumis})],\
-                            total_units     = [totalunits],\
-                            user_sandbox    = [cachefilename],\
-                            cache_url       = [cacheurl],\
-                            username        = [userhn],\
-                            user_dn         = [userdn],\
-                            user_vo         = ['cms'],\
-                            user_role       = [vorole],\
-                            user_group      = [vogroup],\
-                            publish_name    = [(timestamp + '-' + publishname) if publishname.find('-')==-1 else publishname],\
-                            asyncdest       = [asyncdest],\
-                            dbs_url         = [dbsurl or self.dbsurl],\
+                            total_units = [totalunits],\
+                            user_sandbox = [cachefilename],\
+                            cache_url = [cacheurl],\
+                            username = [userhn],\
+                            user_dn = [userdn],\
+                            user_vo = ['cms'],\
+                            user_role = [vorole],\
+                            user_group = [vogroup],\
+                            publish_name = [(timestamp + '-' + publishname) if publishname.find('-')==-1 else publishname],\
+                            asyncdest = [asyncdest],\
+                            dbs_url = [dbsurl or self.dbsurl],\
                             publish_dbs_url = [publishdbsurl],\
-                            publication     = ['T' if publication else 'F'],\
-                            outfiles        = [dbSerializer(addoutputfiles)],\
-                            tfile_outfiles  = [dbSerializer(tfileoutfiles)],\
-                            edm_outfiles    = [dbSerializer(edmoutfiles)],\
-                            transformation  = [self.centralcfg.centralconfig["transformation"][jobtype]],\
-                            job_type        = [jobtype],\
-                            arguments       = [dbSerializer({})],\
+                            publication = ['T' if publication else 'F'],\
+                            outfiles = [dbSerializer(addoutputfiles)],\
+                            tfile_outfiles = [dbSerializer(tfileoutfiles)],\
+                            edm_outfiles = [dbSerializer(edmoutfiles)],\
+                            transformation = [self.transformation[jobtype]],\
+                            job_type = [jobtype],\
+                            arguments = [dbSerializer({})],\
                             resubmitted_jobs= [dbSerializer([])],\
-                            save_logs       = ['T' if savelogsflag else 'F']\
+                            save_logs = ['T' if savelogsflag else 'F']\
 
         )
 
         return [{'RequestName': requestname}]
 
-    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, userdn, userproxy):
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, ASOinstance, objects, userdn, hostkey, hostcert, userproxy):
         """Request to reprocess what the workflow hasn't finished to reprocess.
-           This needs to create a new workflow in the same campaign
+This needs to create a new workflow in the same campaign
 
-           :arg str workflow: a valid workflow name
-           :arg str list siteblacklist: black list of sites, with CMS name;
-           :arg str list sitewhitelist: white list of sites, with CMS name."""
+:arg str workflow: a valid workflow name
+:arg str list siteblacklist: black list of sites, with CMS name;
+:arg str list sitewhitelist: white list of sites, with CMS name."""
 
         retmsg = "ok"
-        self.logger.info("About to resubmit workflow: %s. Getting status first." % workflow)
-        statusRes = self.status(workflow, userdn, userproxy)[0]
+        self.logger.info("About to resubmit %s workflow: %s. Getting status first." % (objects, workflow))
+        if objects == 'jobs':
+            statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        #if there are failed jobdef submission we fail
-        if statusRes['failedJobdefs']:
-            raise ExecutionError("You cannot resubmit a task if not all the jobs have been submitted. The feature will be available in the future")
+            #if there are failed jobdef submission we fail
+            if statusRes['failedJobdefs']:
+                raise ExecutionError("You cannot resubmit a task if not all the jobs have been submitted. The feature will be available in the future")
 
-        if statusRes['status'] in ['SUBMITTED','KILLED','FAILED']:
-            resubmitList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus in self.failedList]
-            if jobids:
-                #if the user wants to kill specific jobids make the intersection
-                resubmitList = list(set(resubmitList) & set(jobids))
-                #check if all the requested jobids can be resubmitted
-                if len(resubmitList) != len(jobids):
-                    retmsg = "Cannot request resubmission for %s" % (set(jobids) - set(resubmitList))
-            if not resubmitList:
-                raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
-            self.logger.info("Jobs to resubmit: %s" % resubmitList)
-            self.api.modify(SetStatusTask.sql, status = ["RESUBMIT"], taskname = [workflow])
-            self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
-                            arguments = [str({"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList})])
-        else:
-            raise ExecutionError("You cannot resubmit a task if it is in the %s state" % statusRes['status'])
-
+            if statusRes['status'] in ['SUBMITTED','KILLED','FAILED']:
+                resubmitList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus in self.failedList]
+                if jobids:
+                    #if the user wants to kill specific jobids make the intersection
+                    resubmitList = list(set(resubmitList) & set(jobids))
+                    #check if all the requested jobids can be resubmitted
+                    if len(resubmitList) != len(jobids):
+                        retmsg = "Cannot request resubmission for %s" % (set(jobids) - set(resubmitList))
+                if not resubmitList:
+                    raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
+                self.logger.info("Jobs to resubmit: %s" % resubmitList)
+                self.api.modify(SetStatusTask.sql, status = ["RESUBMIT"], taskname = [workflow])
+                self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
+                                arguments = [str({"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList})])
+            else:
+                raise ExecutionError("You cannot resubmit a task if it is in the %s state" % statusRes['status'])
+        if objects == 'files':
+            server = CouchServer(dburl=ASOinstance, ckey=hostkey, cert=hostcert)
+            try:
+                db = server.connectDatabase('asynctransfer')
+            except Exception, ex:
+                msg = "Error while connecting to asynctransfer couchDB "
+                raise ExecutionError(msg)
+            self.queryResub = {'reduce':False, 'key':workflow}
+            self.filesResub = db.loadView('AsyncTransfer', 'forResub', self.queryResub)['rows']
+            if len(self.filesResub) == 0:
+                raise ExecutionError('No files to resubmit found')
+            for idt in self.filesResub:
+                id = idt['value']
+                data = {}
+                data['state'] = 'new'
+                data['last_update'] = time.time()
+                updateUri = "/" + db.name + "/_design/AsyncTransfer/_update/updateJobs/" + id
+                updateUri += "?" + urllib.urlencode(data)
+                try:
+                    db.makeRequest(uri = updateUri, type = "PUT", decode = False)
+                except Exception, ex:
+                    msg = "Error updating document in couch"
+                    msg += str(ex)
+                    msg += str(traceback.format_exc())
+                    raise ExecutionError(msg)
         return [{"result":retmsg}]
 
 
     def _updateTaskStatus(self, workflow, status, jobsPerStatus):
         """
-        Update the status of the task when it is finished.
-        More details: if the status of the task is submitted => all the jobs are finished then taskStatus=COMPLETED
-                                                             => all the jobs are finished or failed then taskStatus=FAILED
-        """
+Update the status of the task when it is finished.
+More details: if the status of the task is submitted => all the jobs are finished then taskStatus=COMPLETED
+=> all the jobs are finished or failed then taskStatus=FAILED
+"""
         if status=='SUBMITTED':
             #only completed jobs
             if not set(jobsPerStatus) - set(self.successList):
@@ -247,37 +275,69 @@ class DataWorkflow(object):
     def status(self, workflow, userdn, userproxy=None):
         """Retrieve the status of the workflow.
 
-           :arg str workflow: a valid workflow name
-           :return: a workflow status summary document"""
+:arg str workflow: a valid workflow name
+:return: a workflow status summary document"""
         raise NotImplementedError
 
-    def kill(self, workflow, force, jobids, userdn, userproxy=None):
+    def kill(self, workflow, force, jobids, ASOinstance, objects, userdn, hostkey, hostcert, userproxy=None):
         """Request to Abort a workflow.
 
-           :arg str workflow: a workflow name"""
+:arg str workflow: a workflow name"""
 
         retmsg = "ok"
-        self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
-        statusRes = self.status(workflow, userdn, userproxy)[0]
+        self.logger.info("About to kill %s of workflow: %s. Getting status first." % (objects, workflow))
+        if objects == 'jobs':
+            statusRes = self.status(workflow, userdn, userproxy)[0]
+            if statusRes['status'] == 'SUBMITTED':
+                killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus not in self.successList]
+                if jobids:
+                    #if the user wants to kill specific jobids make the intersection
+                    killList = list(set(killList) & set(jobids))
+                    #check if all the requested jobids can be resubmitted
+                    if len(killList) != len(jobids):
+                        retmsg = "Cannot request kill for %s" % (set(jobids) - set(killList))
+                if not killList:
+                    raise ExecutionError("There are no jobs to kill. Only jobs not in %s states can be killed" % self.successList)
+                self.logger.info("Jobs to kill: %s" % killList)
 
-        if statusRes['status'] == 'SUBMITTED':
-            killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus not in self.successList]
-            if jobids:
-                #if the user wants to kill specific jobids make the intersection
-                killList = list(set(killList) & set(jobids))
-                #check if all the requested jobids can be resubmitted
-                if len(killList) != len(jobids):
-                    retmsg = "Cannot request kill for %s" % (set(jobids) - set(killList))
-            if not killList:
-                raise ExecutionError("There are no jobs to kill. Only jobs not in %s states can be killed" % self.successList)
-            self.logger.info("Jobs to kill: %s" % killList)
-
-            self.api.modify(SetStatusTask.sql, status = ["KILL"], taskname = [workflow])
-            self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
-                            arguments = [str({"killList": killList, "killAll": jobids==[]})])
-        elif statusRes['status'] == 'NEW':
-            self.api.modify(SetStatusTask.sql, status = ["KILLED"], taskname = [workflow])
-        else:
-            raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
+                self.api.modify(SetStatusTask.sql, status = ["KILL"], taskname = [workflow])
+                self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
+                                arguments = [str({"killList": killList, "killAll": jobids==[]})])
+            elif statusRes['status'] == 'NEW':
+                self.api.modify(SetStatusTask.sql, status = ["KILLED"], taskname = [workflow])
+            else:
+                raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
+        if objects == 'files':
+            server = CouchServer(dburl=ASOinstance, ckey=hostkey, cert=hostcert)
+            try:
+                db = server.connectDatabase('asynctransfer')
+            except Exception, ex:
+                msg = "Error while connecting to asynctransfer couchDB"
+                raise ExecutionError(msg)
+            self.queryKill = {'reduce':False, 'key':workflow}
+            try:
+                self.filesKill = db.loadView('AsyncTransfer', 'forKill', self.queryKill)['rows']
+            except Exception, ex:
+                msg = "Error while connecting to asynctransfer couchDB"
+                raise ExecutionError(msg)
+            if len(self.filesKill) == 0:
+                raise ExecutionError('No files to kill found')
+            for idt in self.filesKill:
+                now = str(datetime.datetime.now())
+                id = idt['value']
+                data = {}
+                data['end_time'] = now
+                data['state'] = 'killed'
+                data['last_update'] = time.time()
+                data['retry'] = now
+                updateUri = "/" + db.name + "/_design/AsyncTransfer/_update/updateJobs/" + id
+                updateUri += "?" + urllib.urlencode(data)
+                try:
+                    db.makeRequest(uri = updateUri, type = "PUT", decode = False)
+                except Exception, ex:
+                    msg = "Error updating document in couch"
+                    msg += str(ex)
+                    msg += str(traceback.format_exc())
+                    raise ExecutionError(msg)
 
         return [{"result":retmsg}]
