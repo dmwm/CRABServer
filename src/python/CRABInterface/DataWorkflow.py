@@ -31,7 +31,7 @@ class DataWorkflow(object):
         DataWorkflow.credpath = credpath
         DataWorkflow.centralcfg = centralcfg
         DataWorkflow.config = config
- 
+
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})

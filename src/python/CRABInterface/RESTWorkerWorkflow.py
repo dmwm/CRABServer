@@ -3,6 +3,8 @@ from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
 from WMCore.REST.Error import InvalidParameter
 
+from Databases.TaskDB.Oracle.Task.ID import ID
+from Databases.TaskDB.Oracle.Task.SetSplitargsTask import SetSplitargsTask
 from Databases.TaskDB.Oracle.Task.GetReadyTasks import GetReadyTasks
 from Databases.TaskDB.Oracle.Task.SetReadyTasks import SetReadyTasks
 from Databases.TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
@@ -13,7 +15,7 @@ from Databases.TaskDB.Oracle.JobGroup.AddJobGroup import AddJobGroup
 from Databases.TaskDB.Oracle.JobGroup.GetJobGroupFromJobDef import GetJobGroupFromJobDef
 
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER
+from CRABInterface.Regexps import RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE
 
 # external dependecies here
 import cherrypy
@@ -40,7 +42,7 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("subuser", param, safe, RX_DN, optional=False)
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
-            validate_str("status", param, safe, RX_STATUS, optional=False)
+            validate_str("status", param, safe, RX_STATUS, optional=True)
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
             validate_num("jobset", param, safe, optional=True)
             validate_str("failure", param, safe, RX_TEXT_FAIL, optional=True)
@@ -48,12 +50,15 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("subresource", param, safe, RX_SUBPOSTWORKER, optional=True) 
             validate_num("limit", param, safe, optional=True)
+            validate_strlist("runs", param, safe, RX_RUNS)
+            validate_strlist("lumis", param, safe, RX_LUMIRANGE)
             # possible combinations to check
             # 1) taskname + status
             # 2) taskname + status + failure
             # 3) taskname + status + resubmitted + jobsetid
             # 4) taskname + status == (1)
             # 5)            status + limit + getstatus + workername
+            # 6) taskname + runs + lumis
         elif method in ['GET']:
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
@@ -81,39 +86,42 @@ class RESTWorkerWorkflow(RESTEntity):
         return []
 
     @restcall
-    def post(self, workflow, status, subresource, jobset, failure, resubmittedjobs, getstatus, workername, limit):
+    def post(self, workflow, status, subresource, jobset, failure, resubmittedjobs, getstatus, workername, limit, runs, lumis):
         """ Updates task information """
         if failure is not None:
             try:
                 failure = b64decode(failure)
             except TypeError:
                 raise InvalidParameter("Failure message is not in the accepted format")
-        sqlmap = {"state": {"sql": SetStatusTask.sql, "method": self.api.modify, "binds": {"status": [status],
+        methodmap = {"state": {"args": (SetStatusTask.sql,), "method": self.api.modify, "kwargs": {"status": [status],
                                                                                        "taskname": [workflow]}},
-                  "start": {"sql": SetReadyTasks.sql, "method": self.api.modify, "binds": {"tm_task_status": [status],
+                  "start": {"args": (SetReadyTasks.sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
                                                                                        "tm_taskname": [workflow]}},
-                  "failure": {"sql": SetFailedTasks.sql, "method": self.api.modify, "binds": {"tm_task_status": [status],
+                  "failure": {"args": (SetFailedTasks.sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
                                                                                 "failure": [failure],
                                                                                "tm_taskname": [workflow]}},
-                  "success": {"sql": SetInjectedTasks.sql, "method": self.api.modify, "binds": {"tm_task_status": [status],
+                  "success": {"args": (SetInjectedTasks.sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
                                                                                             "panda_jobset_id": [jobset],
                                                                                             "tm_taskname": [workflow],
                                                                                             "resubmitted_jobs": [str(resubmittedjobs)]}},
-                  "process": {"sql": UpdateWorker.sql, "method": self.api.modifynocheck, "binds": {"tw_name": [workername],
+                  "process": {"args": (UpdateWorker.sql,), "method": self.api.modifynocheck, "kwargs": {"tw_name": [workername],
                                                                                                    "get_status": [getstatus],
                                                                                                    "limit": [limit],
-                                                                                                   "set_status": [status]}},}
+                                                                                                   "set_status": [status]}},
+                  "lumimask": {"args": (runs, lumis,), "method": self.setLumiMask, "kwargs": {"taskname": [workflow],}},
+        }
+
         if subresource is None:
             subresource = 'state'
-        if not subresource in sqlmap.keys():
+        if not subresource in methodmap.keys():
             raise InvalidParameter("Subresource of workflowdb has not been found")
-        sqlmap[subresource]['method'](sqlmap[subresource]['sql'], **sqlmap[subresource]['binds'])
+        methodmap[subresource]['method'](*methodmap[subresource]['args'], **methodmap[subresource]['kwargs'])
         return []
 
     @restcall
     def get(self, workername, getstatus, limit, subresource, subjobdef, subuser):
         """ Retrieve all columns for a specified task or
-            tasks which are in a particular status with 
+            tasks which are in a particular status with
             particular conditions """
         if subresource is not None and subresource == 'jobgroup':
             binds = {'jobdef_id': subjobdef, 'user_dn': subuser}
@@ -139,8 +147,21 @@ class RESTWorkerWorkflow(RESTEntity):
         """ Delete a task from the DB """
         raise NotImplementedError
 
+    def setLumiMask(self, runs, lumis, **binds):
+        """ Load the old splitargs, convert it into the corresponding dict, and change runs and lumis
+            accordingly to what the TaskWorker provided
+        """
+        #load the task
+        task = self.api.query(None, None, ID.sql, taskname=binds['taskname'][0]).next()
+        splitargs = literal_eval(task[6].read())
+        #update the tm_splitargs
+        splitargs['runs'] = runs
+        splitargs['lumis'] = lumis
+        binds['splitargs'] = [str(splitargs)]
+        self.api.modify(SetSplitargsTask.sql, **binds)
 
-class Task(dict): 
+
+class Task(dict):
     """Main object of work. This will be passed from a class to another.
        This will collect all task parameters contained in the DB, but
        living only in memory.
@@ -190,7 +211,7 @@ class Task(dict):
         self['tm_tfile_outfiles'] = literal_eval(task[28])
         self['tm_edm_outfiles'] = literal_eval(task[29])
         self['tm_transformation'] = task[30]
-        self['tm_job_type'] = task[31] 
+        self['tm_job_type'] = task[31]
         extraargs = literal_eval(task[32] if task[32] is None else task[32].read())
         self['resubmit_site_whitelist'] = extraargs['siteWhiteList'] if 'siteWhiteList' in extraargs else []
         self['resubmit_site_blacklist'] = extraargs['siteBlackList'] if 'siteBlackList' in extraargs else []
