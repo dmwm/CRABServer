@@ -5,6 +5,7 @@ import cherrypy #cherrypy import is needed here because we need the 'start_threa
 import traceback
 import json
 from hashlib import sha1
+import urllib
 
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
@@ -31,7 +32,7 @@ class DataWorkflow(object):
         DataWorkflow.credpath = credpath
         DataWorkflow.centralcfg = centralcfg
         DataWorkflow.config = config
- 
+
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
