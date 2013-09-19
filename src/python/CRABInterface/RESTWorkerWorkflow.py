@@ -48,7 +48,7 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("failure", param, safe, RX_TEXT_FAIL, optional=True)
             validate_numlist("resubmittedjobs", param, safe)
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
-            validate_str("subresource", param, safe, RX_SUBPOSTWORKER, optional=True) 
+            validate_str("subresource", param, safe, RX_SUBPOSTWORKER, optional=True)
             validate_num("limit", param, safe, optional=True)
             validate_strlist("runs", param, safe, RX_RUNS)
             validate_strlist("lumis", param, safe, RX_LUMIRANGE)
@@ -220,4 +220,5 @@ class Task(dict):
         self['kill_all'] = extraargs['killAll'] if 'killAll' in extraargs else False
         self['panda_resubmitted_jobs'] = literal_eval(task[33] if task[33] is None else task[33].read())
         self['tm_save_logs'] = task[34]
-        self['worker_name'] = task[35]
+        self['tm_user_infiles'] = literal_eval(task[35])
+        self['worker_name'] = task[36]

@@ -101,6 +101,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_strlist("lumis", param, safe, RX_LUMIRANGE)
             if len(safe.kwargs["runs"]) != len(safe.kwargs["lumis"]):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
+            validate_strlist("adduserfiles", param, safe, RX_ADDFILE)
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
@@ -182,7 +183,7 @@ class RESTUserWorkflow(RESTEntity):
                                        userhn=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
                                        publication=publication, publishname=publishname, asyncdest=asyncdest, blacklistT1=blacklistT1,
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,\
-                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits)
+                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles)
 
     @restcall
     def post(self, workflow, siteblacklist, sitewhitelist, jobids):
