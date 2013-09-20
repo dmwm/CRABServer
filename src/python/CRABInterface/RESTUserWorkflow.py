@@ -142,7 +142,8 @@ class RESTUserWorkflow(RESTEntity):
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
-               savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis, totalunits):
+               savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
+                totalunits, adduserfiles):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -173,6 +174,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str list runs: list of run numbers
            :arg str list lumis: list of lumi section numbers
            :arg int totalunits: number of MC event to be generated
+           :arg int adduserfiles: additional user file to be copied in the cmsRun directory
            :returns: a dict which contaians details of the request"""
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
