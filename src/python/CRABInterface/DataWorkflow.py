@@ -184,9 +184,8 @@ class DataWorkflow(object):
                             job_type        = [jobtype],\
                             arguments       = [dbSerializer({})],\
                             resubmitted_jobs= [dbSerializer([])],\
-                            save_logs       = ['T' if savelogsflag else 'F']\
-                            user_infiles = [dbSerializer(adduserfiles)]\
-
+                            save_logs       = ['T' if savelogsflag else 'F'],\
+                            user_infiles    = [dbSerializer(adduserfiles)]\
         )
 
         return [{'RequestName': requestname}]
