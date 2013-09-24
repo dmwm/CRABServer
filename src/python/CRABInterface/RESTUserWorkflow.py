@@ -84,7 +84,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("savelogsflag", param, safe, optional=False)
             validate_str("vorole", param, safe, RX_VOPARAMS, optional=True)
             validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
-            validate_str("publishname", param, safe, RX_PUBLISH, optional=True)
+            validate_str("publishname", param, safe, RX_PUBLISH, optional=False)
             validate_str("publishdbsurl", param, safe, RX_DBSURL, optional=True)
             validate_num("publication", param, safe, optional=False)
             #if publication is set as true both publishDataName and publishDbsUrl are needed
@@ -94,7 +94,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkSite(safe.kwargs['asyncdest'])
             validate_num("blacklistT1", param, safe, optional=False)
-            validate_str("dbsurl", param, safe, RX_DBSURL, optional=True)
+            validate_str("dbsurl", param, safe, RX_DBSURL, optional=False)
             validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES)
             validate_strlist("edmoutfiles", param, safe, RX_OUTFILES)
             validate_strlist("runs", param, safe, RX_RUNS)
