@@ -71,7 +71,7 @@ def getCentralConfig(extconfigurl, mode):
     """Utility to retrieve the central configuration to be used for dynamic variables
 
     arg str extconfigurl: the url pointing to the exteranl configuration parameter
-    arg str mode: also known as the variant of the rest (prod, preprod, dev, private) 
+    arg str mode: also known as the variant of the rest (prod, preprod, dev, private)
     return: the dictionary containing the external configuration for the selected mode."""
 
     hbuf = StringIO.StringIO()
@@ -129,7 +129,7 @@ def retrieveUserCert(func):
         mypclient = SimpleMyProxy(defaultDelegation)
         userproxy = None
         try:
-            userproxy = mypclient.logonRenewMyProxy(username=sha1(serverDN+kwargs['userdn']).hexdigest(), myproxyserver=myproxyserver, myproxyport=7512)
+            userproxy = mypclient.logonRenewMyProxy(username=sha1(kwargs['userdn']).hexdigest(), myproxyserver=myproxyserver, myproxyport=7512)
         except MyProxyException, me:
             import cherrypy
             cherrypy.log(str(me))
