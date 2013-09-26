@@ -24,11 +24,10 @@ class DataWorkflow(object):
        No aggregation of workflows provided here."""
 
     @staticmethod
-    def globalinit(dbapi, phedexargs=None, dbsurl=None, credpath='/tmp', centralcfg=None, config=None):
+    def globalinit(dbapi, phedexargs=None, credpath='/tmp', centralcfg=None, config=None):
         DataWorkflow.api = dbapi
         DataWorkflow.phedexargs = phedexargs
         DataWorkflow.phedex = None
-        DataWorkflow.dbsurl = dbsurl
         DataWorkflow.credpath = credpath
         DataWorkflow.centralcfg = centralcfg
         DataWorkflow.config = config
@@ -174,7 +173,7 @@ class DataWorkflow(object):
                             user_group      = [vogroup],\
                             publish_name    = [(timestamp + '-' + publishname) if publishname.find('-')==-1 else publishname],\
                             asyncdest       = [asyncdest],\
-                            dbs_url         = [dbsurl or self.dbsurl],\
+                            dbs_url         = [dbsurl],\
                             publish_dbs_url = [publishdbsurl],\
                             publication     = ['T' if publication else 'F'],\
                             outfiles        = [dbSerializer(addoutputfiles)],\
