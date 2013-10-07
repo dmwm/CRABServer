@@ -3,7 +3,8 @@
 # 
 # This script bootstraps the WMCore environment
 #
-
+echo "Beginning dag_bootstrap.sh (stdout)"
+echo "Beginning dag_bootstrap.sh (stderr)" 1>&2
 if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]
 then
 
@@ -67,8 +68,17 @@ if [ -d ~/classad_hack_library ]; then
     echo "library path: $LD_LIBRARY_PATH"
 fi
 
-if [[ "x$X509_USER_PROXY" = "x" ]]; then
-    export X509_USER_PROXY=$(pwd)/user.proxy
+#if [[ "x$X509_USER_PROXY" = "x" ]]; then
+#    export X509_USER_PROXY=$(pwd)/user.proxy
+#fi
+if [ "x" == "x$X509_USER_PROXY" ] || [ ! -e $X509_USER_PROXY ]]; then
+    echo "ERROR: Couldn't find a valid proxy at $X509_USER_PROXY"
+    echo "Got the following environment variables that may help:"
+    env | grep -i proxy
+    env | grep 509
+    echo "Got the following things in the job ad that may help:"
+    cat $_CONDOR_JOB_AD | sort
+    exit 5
 fi
 
 # Bootstrap the HTCondor environment

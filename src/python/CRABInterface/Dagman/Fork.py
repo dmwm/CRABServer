@@ -15,6 +15,7 @@
 
 """
 import os
+import traceback
 class ReadFork():
     def __enter__(self):
         self.r, self.w = os.pipe()
@@ -33,7 +34,10 @@ class ReadFork():
                 self.wpipe.close()
                 os._exit(0)
             else:
-                msg = "Trapped exception in Dagman.Fork: %s %s %s" % (a,b,c)
+                exceptionString = str(traceback.format_exc(c))
+                # Uh, I forgot what traceback function does this without the join 
+                msg = "Trapped exception in Dagman.Fork: %s %s %s \n%s" % \
+                                (a,b,c,str('\n'.join(traceback.format_tb(c))))
                 self.wpipe.write(msg)
                 self.wpipe.close()
                 os._exit(1)
