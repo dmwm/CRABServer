@@ -1,4 +1,5 @@
 #!/bin/sh
+source /etc/profile
 echo "Beginning dag_boostrap_startup.sh at $(date)"
 echo "On host: $(hostname)"
 echo "At path: $(pwd)"

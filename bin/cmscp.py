@@ -23,7 +23,7 @@ if 'CMS_PATH' not in os.environ:
 if os.path.exists("CRAB3.zip") and "CRAB3.zip" not in sys.path:
     sys.path.append("CRAB3.zip")
 
-if 'http_proxy' in os.environ and not os.environ.startswith("http://"):
+if 'http_proxy' in os.environ and not os.environ['http_proxy'].startswith("http://"):
     os.environ['http_proxy'] = "http://%s" % os.environ['http_proxy']
 
 try:
