@@ -133,39 +133,19 @@ fi
 if [[ ! -e crab3-condor-libs.tar.gz ]]; then
     curl -L http://hcc-briantest.unl.edu/CRAB3-condor-libs.tar.gz > crab3-condor-libs.tar.gz || exit 2
 fi
+if [[ ! -e nose.tar.gz ]]; then
+    curl -L https://github.com/nose-devs/nose/archive/release_1.3.0.tar.gz > nose.tar.gz || exit 2
+fi
+
 tar xzf httplib2.tar.gz || exit 2
 tar xzf cherrypy.tar.gz || exit 2
 tar xzf sqlalchemy.tar.gz || exit 2
 tar xzf crab3-condor-libs.tar.gz *.so* || exit 2
+tar xzf nose.tar.gz || exit 2
 
-pushd $WMCORE_PATH/src/python
-zip -rq $STARTDIR/CRAB3.zip WMCore PSetTweaks -x \*.pyc -x \*.swp || exit 3
-popd
-
-pushd $TASKWORKER_PATH/src/python
-zip -rq $STARTDIR/CRAB3.zip TaskWorker  -x \*.pyc -x \*.swp || exit 3
-popd
-
-pushd $CAFUTILITIES_PATH/src/python
-zip -rq $STARTDIR/CRAB3.zip transform Databases PandaServerInterface.py  -x \*.pyc || exit 3
-popd
-
-pushd DBS-$DBSVER/Clients/Python
-zip -rq $STARTDIR/CRAB3.zip DBSAPI  -x \*.pyc || exit 3
-popd
-
-pushd DLS-$DLSVER/Client/LFCClient
-zip -rq $STARTDIR/CRAB3.zip *.py  -x \*.pyc || exit 3
-popd
-
-pushd $CRABCLIENT_PATH/src/python
-zip -rq $STARTDIR/CRAB3.zip CRABClient  -x \*.pyc || exit 3
-cp ../../bin/crab $STARTDIR/
-cp ../../bin/crab3 $STARTDIR/
-popd
-
-pushd $CRABSERVER_PATH/src/python
-zip -rq $STARTDIR/CRAB3.zip CRABInterface  -x \*.pyc || exit 3
+[[ -e $STARTDIR/CRAB3.zip ]] && rm -f $STARTDIR/CRAB3.zip
+pushd nose-release_1.3.0/
+zip -rq $STARTDIR/CRAB3.zip nose -x \*.pyc || exit 3
 popd
 
 pushd httplib2-0.8/python2
@@ -179,6 +159,42 @@ popd
 pushd opt/cmssw/slc5_amd64_gcc462/external/py2-pyopenssl/0.11/lib/python2.6/site-packages
 rm -rf $STARTDIR/lib/python/OpenSSL
 mv OpenSSL $STARTDIR/lib/python/
+popd
+
+pushd DBS-$DBSVER/Clients/Python
+zip -rq $STARTDIR/CRAB3.zip DBSAPI  -x \*.pyc || exit 3
+popd
+
+pushd DLS-$DLSVER/Client/LFCClient
+zip -rq $STARTDIR/CRAB3.zip *.py  -x \*.pyc || exit 3
+popd
+
+# Up to this point, everything was externals, make a tarball for that
+cp $STARTDIR/CRAB3.zip $ORIGDIR/CRAB3-externals.zip
+
+
+# add crab-specific code
+pushd $CRABCLIENT_PATH/src/python
+zip -rq $STARTDIR/CRAB3.zip CRABClient  -x \*.pyc || exit 3
+cp ../../bin/crab $STARTDIR/
+cp ../../bin/crab3 $STARTDIR/
+popd
+
+
+pushd $CRABSERVER_PATH/src/python
+zip -rq $STARTDIR/CRAB3.zip CRABInterface  -x \*.pyc || exit 3
+popd
+
+pushd $WMCORE_PATH/src/python
+zip -rq $STARTDIR/CRAB3.zip WMCore WMQuality PSetTweaks -x \*.pyc -x \*.swp || exit 3
+popd
+
+pushd $TASKWORKER_PATH/src/python
+zip -rq $STARTDIR/CRAB3.zip TaskWorker  -x \*.pyc -x \*.swp || exit 3
+popd
+
+pushd $CAFUTILITIES_PATH/src/python
+zip -rq $STARTDIR/CRAB3.zip transform Databases PandaServerInterface.py  -x \*.pyc || exit 3
 popd
 
 cat > setup.sh << EOF
