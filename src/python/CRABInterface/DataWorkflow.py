@@ -31,7 +31,8 @@ class DataWorkflow(object):
         DataWorkflow.transformation = transformation
         DataWorkflow.backendurls = backendurls
 
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
 

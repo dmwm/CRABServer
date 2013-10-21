@@ -19,21 +19,22 @@ class HTCondorDataWorkflow(DataWorkflow):
     """ HTCondor implementation of the status command.
     """
 
-    #List of states which in panda are considered completed (and therefore not killed)
-    successList = ['finished']
-    failedList = ['cancelled', 'failed']
-
     def status(self, workflow, userdn, userproxy=None):
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
            :return: a workflow status summary document"""
 
+        import cherrypy
+
         name = workflow.split("_")[0]
-        self.logger.debug("Getting status for workflow %s, looking for schedd %s" %\
+        cherrypy.log("Getting status for workflow %s, looking for schedd %s" %\
                                 (workflow, name))
-        dag = DagmanSubmitter(self.config)
-        schedd, address = dag.getScheddObj(name)
+        locator = HTCondorLocator.HTCondorLocator(self.config)
+        cherrypy.log("Will talk to %s." % locator.getCollector())
+        name = locator.getSchedd()
+        cherrypy.log("Schedd name %s." % name)
+        schedd, address = locator.getScheddObj(name)
 
         results = self.getRootTasks(workflow, schedd)
 
@@ -104,6 +105,8 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         retval['jobdefErrors'] = []
 
+        return [retval]
+
     def getRootTasks(self, workflow, schedd):
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
         rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType', "HoldReason"]
@@ -118,7 +121,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
         return results
 
-    def getActiveJobs(self, workflow, schedd):
+    def getHTCondorJobs(self, workflow, schedd):
         """
         Retrieve all the jobs for executing cmsRun in this workflow
         """
@@ -126,17 +129,16 @@ class HTCondorDataWorkflow(DataWorkflow):
         jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
         return schedd.query(jobConst, jobList)
 
-    def getASOJobs(self, workflow, schedd):
+    def getHTCondorASOJobs(self, workflow, schedd):
         jobConst = 'TaskType =?= "ASO" && CRAB_ReqName =?= %s' % HTCondorUtils.quote(workflow)
         jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
         return schedd.query(jobConst, jobList)
 
-    def getFinishedJobs(self, workflow, schedd):
+    def getFinishedJobs(self, workflow):
         """
-        Get the 
+        Get the finished jobs from the file metadata table.
         """
-        self.logger.debug("Retrieving output of jobs: %s" % jobids)
-        rows = self.api.query(None, None, GetFromTaskAndType.sql, 'LOG', taskname=workflow)
+        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='LOG', taskname=workflow)
 
         for row in rows:
             yield row[GetFromTaskAndType.PANDAID]

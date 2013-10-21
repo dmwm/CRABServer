@@ -99,7 +99,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_strlist("edmoutfiles", param, safe, RX_OUTFILES)
             validate_strlist("runs", param, safe, RX_RUNS)
             validate_strlist("lumis", param, safe, RX_LUMIRANGE)
-            validate_str("scheduler", param, safe, RX_SCHEDULER)
+            #validate_str("scheduler", param, safe, RX_SCHEDULER)
             if len(safe.kwargs["runs"]) != len(safe.kwargs["lumis"]):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
 

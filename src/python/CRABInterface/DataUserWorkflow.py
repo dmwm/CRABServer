@@ -16,13 +16,14 @@ class DataUserWorkflow(object):
     """
 
     @staticmethod
-    def globalinit(workflowManager):
-        DataUserWorkflow.workflowManager = workflowManager
+    def globalinit(config):
+        DataUserWorkflow.config = config
+        DataUserWorkflow.workflowManager = config.workflowManager
 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataUserWorkflow")
         mod = __import__('CRABInterface.%s' % self.workflowManager, fromlist=self.workflowManager)
-        self.workflow = getattr(mod, self.workflowManager)()
+        self.workflow = getattr(mod, self.workflowManager)(DataUserWorkflow.config)
 
     def getLatests(self, user, limit, timestamp):
         """Retrives the latest workflows for the user

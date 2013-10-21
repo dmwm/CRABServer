@@ -59,7 +59,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         extconfig = json.decode(bbuf.getvalue())[config.mode]
 
         #Global initialization of Data objects. Parameters coming from the config should go here
-        DataUserWorkflow.globalinit(config.workflowManager)
+        DataUserWorkflow.globalinit(config)
         DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl}, dbsurl=config.dbsurl,\
                                 credpath=config.credpath, transformation=extconfig["transformation"], backendurls=extconfig["backend-urls"])
         DataFileMetadata.globalinit(dbapi=self)
