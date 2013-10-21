@@ -5,18 +5,18 @@ from WMCore.REST.Validation import validate_str
 # CRABServer dependecies here
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import RX_SUBRES_SI
+from CRABInterface.Utils import conn_handler
 
 
 class RESTServerInfo(RESTEntity):
     """REST entity for workflows and relative subresources"""
 
-    def __init__(self, app, api, config, mount, serverdn, delegatedn, backendurls):
+    def __init__(self, app, api, config, mount, serverdn, centralcfg):
         RESTEntity.__init__(self, app, api, config, mount)
-        self.delegatedn = delegatedn
+        self.centralcfg = centralcfg
         self.serverdn = serverdn
         #used by the client to get the url where to update the cache (cacheSSL)
         #and by the taskworker Panda plugin to get panda urls
-        self.backendurls = backendurls
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
@@ -31,8 +31,10 @@ class RESTServerInfo(RESTEntity):
         """
         return getattr(RESTServerInfo, subresource)(self)
 
+    @conn_handler(services=['centralconfig'])
     def delegatedn(self):
-        yield {'rest': self.serverdn, 'services': self.delegatedn}
+        yield {'services': self.centralcfg.centralconfig['delegate-dn']}
 
+    @conn_handler(services=['centralconfig'])
     def backendurls(self):
-        yield self.backendurls
+        yield self.centralcfg.centralconfig['backend-urls']

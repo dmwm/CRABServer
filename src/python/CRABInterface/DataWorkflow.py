@@ -22,14 +22,13 @@ class DataWorkflow(object):
        No aggregation of workflows provided here."""
 
     @staticmethod
-    def globalinit(dbapi, phedexargs=None, dbsurl=None, credpath='/tmp', transformation=None, backendurls=None):
+    def globalinit(dbapi, phedexargs=None, credpath='/tmp', centralcfg=None, config=None):
         DataWorkflow.api = dbapi
         DataWorkflow.phedexargs = phedexargs
         DataWorkflow.phedex = None
-        DataWorkflow.dbsurl = dbsurl
         DataWorkflow.credpath = credpath
-        DataWorkflow.transformation = transformation
-        DataWorkflow.backendurls = backendurls
+        DataWorkflow.centralcfg = centralcfg
+        DataWorkflow.config = config
 
     def __init__(self, config):
         self.config = config
@@ -107,10 +106,11 @@ class DataWorkflow(object):
         # probably we need to explicitely select the schema parameters to return
         raise NotImplementedError
 
+    @conn_handler(services=['centralconfig'])
     @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
-               runs, lumis, totalunits, userproxy=None, scheduler='panda'):
+               runs, lumis, totalunits, adduserfiles, userproxy=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -141,6 +141,7 @@ class DataWorkflow(object):
            :arg str list runs: list of run numbers
            :arg str list lumis: list of lumi section numbers
            :arg int totalunits: number of MC event to be generated
+           :arg str list adduserfiles: list of additional user input files
            :returns: a dict which contaians details of the request"""
 
         if scheduler == 'condor':
@@ -174,18 +175,18 @@ class DataWorkflow(object):
                             user_group      = [vogroup],\
                             publish_name    = [(timestamp + '-' + publishname) if publishname.find('-')==-1 else publishname],\
                             asyncdest       = [asyncdest],\
-                            dbs_url         = [dbsurl or self.dbsurl],\
+                            dbs_url         = [dbsurl],\
                             publish_dbs_url = [publishdbsurl],\
                             publication     = ['T' if publication else 'F'],\
                             outfiles        = [dbSerializer(addoutputfiles)],\
                             tfile_outfiles  = [dbSerializer(tfileoutfiles)],\
                             edm_outfiles    = [dbSerializer(edmoutfiles)],\
-                            transformation  = [self.transformation[jobtype]],\
+                            transformation  = [self.centralcfg.centralconfig["transformation"][jobtype]],\
                             job_type        = [jobtype],\
                             arguments       = [dbSerializer({})],\
                             resubmitted_jobs= [dbSerializer([])],\
-                            save_logs       = ['T' if savelogsflag else 'F']\
-
+                            save_logs       = ['T' if savelogsflag else 'F'],\
+                            user_infiles    = [dbSerializer(adduserfiles)]\
         )
 
         return [{'RequestName': requestname}]
