@@ -15,9 +15,14 @@ from CRABInterface.Utils import conn_handler
 import HTCondorUtils
 import HTCondorLocator
 
+JOB_KILLED_HOLD_REASON = "Python-initiated action."
+
 class HTCondorDataWorkflow(DataWorkflow):
     """ HTCondor implementation of the status command.
     """
+
+    successList = ['finished']
+    failedList = ['cancelled', 'failed']
 
     def status(self, workflow, userdn, userproxy=None):
         """Retrieve the status of the workflow.
@@ -45,11 +50,12 @@ class HTCondorDataWorkflow(DataWorkflow):
         jobList = []
         taskStatusCode = int(results[-1]['JobStatus'])
         taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
-        codes = {1: 'Idle', 2: 'Running', 4: 'Completed', 5: 'Killed'}
-        retval = {"status": codes.get(taskStatusCode, 'Unknown'), "taskFailureMsg": "", "jobSetID": workflow,
+        codes = {1: 'idle', 2: 'running', 4: 'Completed', 5: 'Killed'}
+        task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
+        retval = {"status": task_codes.get(taskStatusCode, 'unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
         if taskStatusCode == 5 and \
-                results[-1]['HoldReason'] != self.JOB_KILLED_HOLD_REASON:
+                not results[-1]['HoldReason'].startswith(JOB_KILLED_HOLD_REASON):
             retval['status'] = 'InTransition'
 
         # Handle all "real" jobs in HTCondor.
@@ -63,7 +69,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 failedJobs.append(result['CRAB_Id'])
                 statusName = "failed"
             else:
-                statusName = codes.get(jobState, 'Unknown')
+                statusName = codes.get(jobState, 'unknown')
             jobStatus[int(result['CRAB_Id'])] = statusName
 
         # Handle all "ASO" jobs in HTCondor.
@@ -76,7 +82,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 failedJobs.append(result['CRAB_Id'])
                 statusName = "Failed Stage-Out (%s)" % result['ExitCode']
             else:
-                statusName = aso_codes.get(jobState, 'Unknown')
+                statusName = aso_codes.get(jobState, 'unknown')
             jobStatus[int(result['CRAB_Id'])] = statusName
 
         # Handle all "finished" jobs.
