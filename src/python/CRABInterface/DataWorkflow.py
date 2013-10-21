@@ -144,9 +144,9 @@ class DataWorkflow(object):
            :arg str list adduserfiles: list of additional user input files
            :returns: a dict which contaians details of the request"""
 
-        if scheduler == 'condor':
+        #if scheduler == 'condor':
             # TODO: hook this around properly
-            raise NotImplementedError, "Need to add the proper CRABServer hooks for condor"
+        #    raise NotImplementedError, "Need to add the proper CRABServer hooks for condor"
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         requestname = '%s_%s_%s' % (timestamp, userhn, workflow)
         splitArgName = self.splitArgMap[splitalgo]
