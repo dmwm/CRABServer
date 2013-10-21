@@ -29,6 +29,7 @@ data.credpath = '%s/state/crabserver/proxy/' % __file__.rsplit('/', 4)[0]
 data.db = 'CRABServerAuth.dbconfig'
 data.workflowManager = 'PandaDataWorkflow'
 
+data.ASOinstance='http://username:password@aso_instance:port'
 data.mode = 'cmsweb-dev'
 if re.match(r"^vocms(?:10[67]|13[689]|140|16[13])\.cern\.ch$", myhost):
   data.mode = "cmsweb-prod"

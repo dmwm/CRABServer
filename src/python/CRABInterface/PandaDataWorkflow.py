@@ -17,6 +17,7 @@ class PandaDataWorkflow(DataWorkflow):
     successList = ['finished']
     failedList = ['cancelled', 'failed']
 
+    @conn_handler(services=['centralconfig'])
     def status(self, workflow, userdn, userproxy=None):
         """Retrieve the status of the workflow.
 
@@ -49,7 +50,7 @@ class PandaDataWorkflow(DataWorkflow):
                 continue
 
             #check the status of the jobdef in panda
-            schedEC, res = pserver.getPandIDsWithJobID(self.backendurls['baseURLSSL'], jobID=jobdefid, dn=userdn, userproxy=userproxy, credpath=self.credpath)
+            schedEC, res = pserver.getPandIDsWithJobID(self.centralcfg.centralconfig['backend-urls']['baseURLSSL'], jobID=jobdefid, dn=userdn, userproxy=userproxy, credpath=self.credpath)
             self.logger.debug("Status for jobdefid %s: %s" % (jobdefid, schedEC))
             if schedEC:
                 jobDefErrs.append("Cannot get information for jobdefid %s. Panda server error: %s" % (jobdefid, schedEC))
@@ -81,16 +82,16 @@ class PandaDataWorkflow(DataWorkflow):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring']]
-        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
+        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'failed']]
+        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished']]
         return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, userdn, saveLogs=statusRes['saveLogs'], userproxy=userproxy)
 
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring']]
-        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
+        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'failed']]
+        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished']]
         return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE'], transferingIds, finishedIds, userdn, userproxy=userproxy)
 
     @conn_handler(services=['phedex'])

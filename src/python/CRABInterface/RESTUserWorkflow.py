@@ -84,7 +84,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("savelogsflag", param, safe, optional=False)
             validate_str("vorole", param, safe, RX_VOPARAMS, optional=True)
             validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
-            validate_str("publishname", param, safe, RX_PUBLISH, optional=True)
+            validate_str("publishname", param, safe, RX_PUBLISH, optional=False)
             validate_str("publishdbsurl", param, safe, RX_DBSURL, optional=True)
             validate_num("publication", param, safe, optional=False)
             #if publication is set as true both publishDataName and publishDbsUrl are needed
@@ -94,14 +94,15 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkSite(safe.kwargs['asyncdest'])
             validate_num("blacklistT1", param, safe, optional=False)
-            validate_str("dbsurl", param, safe, RX_DBSURL, optional=True)
+            validate_str("dbsurl", param, safe, RX_DBSURL, optional=False)
             validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES)
             validate_strlist("edmoutfiles", param, safe, RX_OUTFILES)
             validate_strlist("runs", param, safe, RX_RUNS)
             validate_strlist("lumis", param, safe, RX_LUMIRANGE)
-            validate_str("scheduler", param, safe, RX_SCHEDULER)
+            #validate_str("scheduler", param, safe, RX_SCHEDULER)
             if len(safe.kwargs["runs"]) != len(safe.kwargs["lumis"]):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
+            validate_strlist("adduserfiles", param, safe, RX_ADDFILE)
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
@@ -142,8 +143,8 @@ class RESTUserWorkflow(RESTEntity):
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
-               savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis, totalunits,
-            scheduler = 'panda'):
+               savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
+                totalunits, adduserfiles):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -175,6 +176,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str list lumis: list of lumi section numbers
            :arg str scheduler: Which scheduler to use, can be 'panda' or 'condor'
            :arg int totalunits: number of MC event to be generated
+           :arg int adduserfiles: additional user file to be copied in the cmsRun directory
            :returns: a dict which contaians details of the request"""
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
@@ -185,8 +187,7 @@ class RESTUserWorkflow(RESTEntity):
                                        userhn=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
                                        publication=publication, publishname=publishname, asyncdest=asyncdest, blacklistT1=blacklistT1,
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,\
-                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits,
-                                       scheduler = scheduler)
+                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles)
 
     @restcall
     def post(self, workflow, siteblacklist, sitewhitelist, jobids):
