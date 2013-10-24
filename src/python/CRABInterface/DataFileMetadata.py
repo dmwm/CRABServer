@@ -8,6 +8,7 @@ from ast import literal_eval
 from WMCore.REST.Error import InvalidParameter, ExecutionError, MissingObject
 
 #CRAB dependencies
+from Databases.FileMetaDataDB.Oracle.FileMetaData.ChangeFileState import ChangeFileState
 from Databases.FileMetaDataDB.Oracle.FileMetaData.New import New
 from Databases.FileMetaDataDB.Oracle.FileMetaData.GetFromTaskAndType import GetFromTaskAndType
 
@@ -55,3 +56,7 @@ class DataFileMetadata(object):
         self.api.modify(New.sql, **binds)
         return []
 
+    def changeState(self, *args, **kwargs):#kwargs are (taskname, outlfn, filestate)
+        self.logger.debug("Changing state of file %(taskname)s in task %(outlfn)s to %(filestate)s" % kwargs)
+
+        self.api.modify(ChangeFileState.sql, **dict((k, [v]) for k,v in kwargs.iteritems()))

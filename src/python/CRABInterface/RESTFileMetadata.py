@@ -49,7 +49,9 @@ class RESTFileMetadata(RESTEntity):
             validate_num("events", param, safe, optional=False)
             validate_str("filestate", param, safe, RX_FILESTATE, optional=True)
         elif method in ['POST']:
-            raise NotImplementedError
+            validate_str("taskname", param, safe, RX_WORKFLOW, optional=False)
+            validate_str("outlfn", param, safe, RX_LFN, optional=False)
+            validate_str("filestate", param, safe, RX_FILESTATE, optional=False)
         elif method in ['GET']:
             validate_str("taskname", param, safe, RX_WORKFLOW, optional=False)
             validate_str("filetype", param, safe, RX_OUTTYPES, optional=False)
@@ -66,10 +68,10 @@ class RESTFileMetadata(RESTEntity):
                            outdatasetname=outdatasetname, acquisitionera=acquisitionera, outlfn=outlfn, events=events, filestate=filestate)
 
     @restcall
-    def post(self):
+    def post(self, taskname, outlfn, filestate):
         """Modifies and existing job metadata information"""
 
-        raise NotImplementedError
+        return self.jobmetadata.changeState(taskname=taskname, outlfn=outlfn, filestate=filestate)
 
     @restcall
     def get(self, taskname, filetype):
