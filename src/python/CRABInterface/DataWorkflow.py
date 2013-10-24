@@ -19,6 +19,9 @@ from Databases.TaskDB.Oracle.Task.New import New
 from Databases.TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
 from Databases.TaskDB.Oracle.Task.SetArgumentsTask import SetArgumentsTask
 
+from WMCore.Database.CMSCouch import CouchServer
+import datetime
+
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
        No aggregation of workflows provided here."""
@@ -189,7 +192,7 @@ class DataWorkflow(object):
 
         return [{'RequestName': requestname}]
 
-    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, userdn, userproxy):
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, ASOinstance, objects, userdn, userproxy):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
 
@@ -198,30 +201,55 @@ class DataWorkflow(object):
            :arg str list sitewhitelist: white list of sites, with CMS name."""
 
         retmsg = "ok"
-        self.logger.info("About to resubmit workflow: %s. Getting status first." % workflow)
-        statusRes = self.status(workflow, userdn, userproxy)[0]
+        self.logger.info("About to resubmit %s workflow: %s. Getting status first." % (objects, workflow))
+        if objects == 'jobs':
+            statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        #if there are failed jobdef submission we fail
-        if statusRes['failedJobdefs']:
-            raise ExecutionError("You cannot resubmit a task if not all the jobs have been submitted. The feature will be available in the future")
+            #if there are failed jobdef submission we fail
+            if statusRes['failedJobdefs']:
+                raise ExecutionError("You cannot resubmit a task if not all the jobs have been submitted. The feature will be available in the future")
 
-        if statusRes['status'] in ['SUBMITTED','KILLED','FAILED']:
-            resubmitList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus in self.failedList]
-            if jobids:
-                #if the user wants to kill specific jobids make the intersection
-                resubmitList = list(set(resubmitList) & set(jobids))
-                #check if all the requested jobids can be resubmitted
-                if len(resubmitList) != len(jobids):
-                    retmsg = "Cannot request resubmission for %s" % (set(jobids) - set(resubmitList))
-            if not resubmitList:
-                raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
-            self.logger.info("Jobs to resubmit: %s" % resubmitList)
-            self.api.modify(SetStatusTask.sql, status = ["RESUBMIT"], taskname = [workflow])
-            self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
-                            arguments = [str({"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList})])
-        else:
-            raise ExecutionError("You cannot resubmit a task if it is in the %s state" % statusRes['status'])
-
+            if statusRes['status'] in ['SUBMITTED','KILLED','FAILED']:
+                resubmitList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus in self.failedList]
+                if jobids:
+                    #if the user wants to kill specific jobids make the intersection
+                    resubmitList = list(set(resubmitList) & set(jobids))
+                    #check if all the requested jobids can be resubmitted
+                    if len(resubmitList) != len(jobids):
+                        retmsg = "Cannot request resubmission for %s" % (set(jobids) - set(resubmitList))
+                if not resubmitList:
+                    raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
+                self.logger.info("Jobs to resubmit: %s" % resubmitList)
+                self.api.modify(SetStatusTask.sql, status = ["RESUBMIT"], taskname = [workflow])
+                self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
+                                arguments = [str({"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList})])
+            else:
+                raise ExecutionError("You cannot resubmit a task if it is in the %s state" % statusRes['status'])
+        if objects == 'files':
+            server = CouchServer(ASOinstance)
+            try:
+                db = server.connectDatabase('asynctransfer')
+            except Exception, ex:
+                msg = "Error while connecting to asynctransfer couchDB "
+                raise ExecutionError(msg)
+            self.queryResub = {'reduce':False, 'key':workflow}
+            self.filesResub = db.loadView('AsyncTransfer', 'forResub', self.queryResub)['rows']
+            if len(self.filesResub) == 0:
+                raise ExecutionError('No files to resubmit found')
+            for idt in self.filesResub:
+                id = idt['value']
+                data = {}
+                data['state'] = 'new'
+                data['last_update'] = time.time()
+                updateUri = "/" + db.name + "/_design/AsyncTransfer/_update/updateJobs/" + id
+                updateUri += "?" + urllib.urlencode(data)
+                try:
+                    db.makeRequest(uri = updateUri, type = "PUT", decode = False)
+                except Exception, ex:
+                    msg = "Error updating document in couch"
+                    msg += str(ex)
+                    msg += str(traceback.format_exc())
+                    raise ExecutionError(msg)
         return [{"result":retmsg}]
 
 
@@ -252,33 +280,65 @@ class DataWorkflow(object):
            :return: a workflow status summary document"""
         raise NotImplementedError
 
-    def kill(self, workflow, force, jobids, userdn, userproxy=None):
+    def kill(self, workflow, force, jobids, ASOinstance, objects, userdn, userproxy=None):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name"""
 
         retmsg = "ok"
-        self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
-        statusRes = self.status(workflow, userdn, userproxy)[0]
+        self.logger.info("About to kill %s of workflow: %s. Getting status first." % (objects, workflow))
+        if objects == 'jobs':
+            statusRes = self.status(workflow, userdn, userproxy)[0]
+            if statusRes['status'] == 'SUBMITTED':
+                killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus not in self.successList]
+                if jobids:
+                    #if the user wants to kill specific jobids make the intersection
+                    killList = list(set(killList) & set(jobids))
+                    #check if all the requested jobids can be resubmitted
+                    if len(killList) != len(jobids):
+                        retmsg = "Cannot request kill for %s" % (set(jobids) - set(killList))
+                if not killList:
+                    raise ExecutionError("There are no jobs to kill. Only jobs not in %s states can be killed" % self.successList)
+                self.logger.info("Jobs to kill: %s" % killList)
 
-        if statusRes['status'] == 'SUBMITTED':
-            killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus not in self.successList]
-            if jobids:
-                #if the user wants to kill specific jobids make the intersection
-                killList = list(set(killList) & set(jobids))
-                #check if all the requested jobids can be resubmitted
-                if len(killList) != len(jobids):
-                    retmsg = "Cannot request kill for %s" % (set(jobids) - set(killList))
-            if not killList:
-                raise ExecutionError("There are no jobs to kill. Only jobs not in %s states can be killed" % self.successList)
-            self.logger.info("Jobs to kill: %s" % killList)
-
-            self.api.modify(SetStatusTask.sql, status = ["KILL"], taskname = [workflow])
-            self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
-                            arguments = [str({"killList": killList, "killAll": jobids==[]})])
-        elif statusRes['status'] == 'NEW':
-            self.api.modify(SetStatusTask.sql, status = ["KILLED"], taskname = [workflow])
-        else:
-            raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
+                self.api.modify(SetStatusTask.sql, status = ["KILL"], taskname = [workflow])
+                self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
+                                arguments = [str({"killList": killList, "killAll": jobids==[]})])
+            elif statusRes['status'] == 'NEW':
+                self.api.modify(SetStatusTask.sql, status = ["KILLED"], taskname = [workflow])
+            else:
+                raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
+        if objects == 'files':
+            server = CouchServer(ASOinstance)
+            try:
+                db = server.connectDatabase('asynctransfer')
+            except Exception, ex:
+                msg =  "Error while connecting to asynctransfer couchDB"
+                raise ExecutionError(msg)
+            self.queryKill = {'reduce':False, 'key':workflow}
+            try:
+                self.filesKill = db.loadView('AsyncTransfer', 'forKill', self.queryKill)['rows']
+            except Exception, ex:
+                msg =  "Error while connecting to asynctransfer couchDB"
+                raise ExecutionError(msg)
+            if len(self.filesKill) == 0:
+                raise ExecutionError('No files to kill found')
+            for idt in self.filesKill:
+                now = str(datetime.datetime.now())
+                id = idt['value']
+                data = {}
+                data['end_time'] = now
+                data['state'] = 'killed'
+                data['last_update'] = time.time()
+                data['retry'] = now
+                updateUri = "/" + db.name + "/_design/AsyncTransfer/_update/updateJobs/" + id
+                updateUri += "?" + urllib.urlencode(data)
+                try:
+                    db.makeRequest(uri = updateUri, type = "PUT", decode = False)
+                except Exception, ex:
+                    msg =  "Error updating document in couch"
+                    msg += str(ex)
+                    msg += str(traceback.format_exc())
+                    raise ExecutionError(msg)
 
         return [{"result":retmsg}]
