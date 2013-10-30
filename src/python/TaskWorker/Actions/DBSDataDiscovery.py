@@ -21,7 +21,6 @@ class DBSDataDiscovery(DataDiscovery):
         # The WMCore DBS3 implementation makes one call to dls for each block
         # with locations = True
         blocks = [ x['Name'] for x in dbs.getFileBlocksInfo(kwargs['task']['tm_input_dataset'], locations=False)]
-        blocks = blocks[:1]
         #Create a map for block's locations: for each block get the list of locations
         ll = dbs.dls.getLocations(list(blocks),  showProd = True)
         if len(ll) == 0:
