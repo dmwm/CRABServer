@@ -102,6 +102,7 @@ use_x509userproxy = true
 Requirements = (target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)
 #Requirements = ((target.IS_GLIDEIN =!= TRUE) || ((target.GLIDEIN_CMSSite =!= UNDEFINED) && (stringListIMember(target.GLIDEIN_CMSSite, DESIRED_SEs) )))
 #leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
+periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30)
 queue
 """
 
@@ -365,7 +366,7 @@ class DagmanCreator(TaskAction.TaskAction):
             kw['task']['scratch'] = temp_dir
 
         kw['task']['restinstance'] = self.server['host']
-        kw['task']['resturl'] = self.resturl.replace("/workflowdb", "/filemetadata'")
+        kw['task']['resturl'] = self.resturl.replace("/workflowdb", "/filemetadata")
 
         try:
             info = create_subdag(*args, **kw)
