@@ -23,7 +23,8 @@ systems = \
   'TaskWorker':
   {
     'py_modules' : ['PandaServerInterface', 'RESTInteractions'],
-    'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects']
+    'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
+                'taskbuffer']
   },
   'UserFileCache':
   {
