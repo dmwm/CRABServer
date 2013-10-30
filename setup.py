@@ -8,31 +8,23 @@ from glob import glob
 
 systems = \
 {
-  'CAFUtilities':
+  'CRABClient': #Will be used if we moved the CRABClient repository
   {
-    'pkg'  :{ 'python': ['Databases', 'pilot', 'taskbuffer', 'transformation', 'TaskStateMachine' 'taskbuffer', 'TaskStateMachine']},
-    'data' :{ 'python': ['src/python/PandaServerInterface.py', 'src/python/RESTInteractions.py']}
-  },
-  'CRABClient':
-  {
-    'pkg'  :{ 'python': []},
-    'data' :{ 'python': ['src/python/PandaServerInterface.py', 'src/python/RESTInteractions.py']}
-  },
-  'CAFTaskWorker':
-  {
-    'pkg'  :{ 'python': ['taskbuffer', 'TaskStateMachine']},
     'data' :{ 'python': ['src/python/PandaServerInterface.py', 'src/python/RESTInteractions.py']},
-    'python': ['TaskWorker']
+    'python': ['CRABClient']
   },
   'CRABInterface':
   {
-    'pkg'  :{ 'python': ['Databases', 'TaskStateMachine']},
-    'data' :{ 'python': ['src/python/PandaServerInterface.py']},
-    'python': ['CRABInterface']
-  },
-  'CAFTaskWorker':
+    'py_modules' : ['PandaServerInterface'],
+    'python': ['CRABInterface',
+               'Databases',
+                 'Databases/FileMetaDataDB', 'Databases/FileMetaDataDB/Oracle', 'Databases/FileMetaDataDB/Oracle/FileMetaData',
+                 'Databases/TaskDB', 'Databases/TaskDB/Oracle', 'Databases/TaskDB/Oracle/JobGroup', 'Databases/TaskDB/Oracle/Task'] },
+  'TaskWorker':
   {
-    'python': ['TaskWorker']
+    'py_modules' : ['PandaServerInterface', 'RESTInteractions'],
+    'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
+                'taskbuffer']
   },
   'UserFileCache':
   {
@@ -40,7 +32,7 @@ systems = \
   },
   'All':
   {
-    'python': ['CAFTaskWorker', 'CRABInterface','UserFileCache', 'CRABClient', 'CAFUtilities']
+    'python': ['TaskWorker', 'CRABInterface', 'UserFileCache', 'CRABClient']
   }
 }
 
@@ -55,7 +47,7 @@ def define_the_build(self, dist, system_name, patch_x = ''):
 
   py_version = (string.split(sys.version))[0]
   pylibdir = '%slib/python%s/site-packages' % (patch_x, py_version[0:3])
- # dist.py_modules = ['CRABServer.__init__']
+  dist.py_modules = system['py_modules']
   dist.packages = system['python']
   #dist.data_files = [('%sbin' % patch_x, binsrc)]
   dist.data_files = []
@@ -76,7 +68,7 @@ class BuildCommand(Command):
   user_options.append(('skip-docs=', 'd' , 'skip documentation'))
 
   def initialize_options(self):
-    self.system = "CRABInterface,CAFTaskWorker"
+    self.system = "CRABInterface,TaskWorker"
     self.skip_docs = False
 
   def finalize_options(self):
