@@ -273,6 +273,7 @@ class PostJob():
             print "Failed to query condor user log:\n%s" % output
             return 1
         source_site = output.split('\n')[-1].strip()
+        print "Determined a source site of %s from the user log" % source_site
         if source_site == 'Unknown' or source_site == "undefined":
             # Didn't find it the first time, try looking in the jobReport.json
             if self.full_report.get('executed_site', None):
@@ -306,9 +307,13 @@ class PostJob():
         fts_job_result = g_Job.run()
 
         source_list = [i[0] for i in transfer_list]
+        print "Source list", source_list
         dest_list = [i[1] for i in transfer_list]
+        print "Dest list", dest_list
         source_sizes = determineSizes(source_list)
+        print "Source sizes", source_sizes
         dest_sizes = determineSizes(source_list)
+        print "Dest sizes", dest_sizes
         sizes = zip(source_sizes, dest_sizes)
 
         failures = len([i for i in sizes if (i[1]<0 or (i[0] != i[1]))])
@@ -320,7 +325,7 @@ class PostJob():
 
     def execute(self, status, retry_count, max_retries, restinstance, rest_url, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
 
-        fd = os.open("postjob.%s" % id, os.O_RDWR | os.O_CREAT)
+        fd = os.open("postjob.%s" % id, os.O_RDWR | os.O_CREAT | os.O_TRUNC)
         os.dup2(fd, 1)
         os.dup2(fd, 2)
 
@@ -330,12 +335,12 @@ class PostJob():
         self.server = HTTPRequests(restinstance, os.environ['X509_USER_PROXY'], os.environ['X509_USER_PROXY'])
         self.rest_url = rest_url
 
+        self.makeAd(reqname, id, outputdata, sw, async_dest)
+
         print "Retry count %s; max retry %s" % (retry_count, max_retries)
         if status and (retry_count == max_retries):
             # This was our last retry and it failed.
             return self.uploadFailure(dest_dir, filenames[0])
-
-        self.makeAd(reqname, id, outputdata, sw, async_dest)
 
         retry = RetryJob.RetryJob()
         retval = retry.execute(status, retry_count, max_retries, self.crab_id)
