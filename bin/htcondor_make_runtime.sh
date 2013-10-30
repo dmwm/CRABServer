@@ -13,16 +13,8 @@ WMCOREDIR=$STARTDIR/WMCore
 WMCOREVER=0.9.70-dagman2
 WMCOREREPO=bbockelm
 
-TASKWORKERDIR=$STARTDIR/TaskWorker
-TASKWORKERVER=3.3.0-pre3
-TASKWORKERREPO=bbockelm
-
-CAFUTILITIESDIR=$STARTDIR/CAFUtilities
-CAFUTILITIESVER=0.0.1pre16-dagman1
-CAFUTILITIESREPO=bbockelm
-
 DBSDIR=$STARTDIR/DBS
-DBSVER=DBS_2_1_9-dagman2
+DBSVER=DBS_2_1_9-dagman3
 DBSREPO=bbockelm
 
 DLSDIR=$STARTDIR/DLS
@@ -45,7 +37,6 @@ cp $BASEDIR/../scripts/gWMS-CMSRunAnalysis.sh $STARTDIR || exit 3
 
 
 rm -rf $WMCOREDIR && mkdir -p $WMCOREDIR
-rm -rf $TASKWORKERDIR && mkdir -p $TASKWORKERDIR
 rm -rf $DBSDIR && mkdir -p $DBSDIR
 rm -rf $DLSDIR && mkdir -p $DLSDIR
 rm -rf $CRABSERVERDIR && mkdir -p $CRABSERVERDIR
@@ -67,14 +58,6 @@ if [[ ! -e external+py2-pyopenssl+0.11-1-1.slc5_amd64_gcc462.rpm ]]; then
 fi
 rpm2cpio external+py2-pyopenssl+0.11-1-1.slc5_amd64_gcc462.rpm | cpio -uimd || exit 2
 
-if [[ -d "$REPLACEMENT_ABSOLUTE/CAFUtilities" ]]; then
-    echo "Using replacement CAFUtlities source at $REPLACEMENT_ABSOLUTE/CAFUtlities"
-    CAFUTILITIES_PATH="$REPLACEMENT_ABSOLUTE/CAFUtilities"
-else
-    curl -L https://github.com/$CAFUTILITIESREPO/CAFUtilities/archive/$CAFUTILITIESVER.tar.gz | tar zx || exit 2
-    CAFUTILITIES_PATH="CAFUtilities-$CAFUTILITIESVER"
-fi
-
 if [[ -d "$REPLACEMENT_ABSOLUTE/WMCore" ]]; then
     echo "Using replacement WMCore source at $REPLACEMENT_ABSOLUTE/WMCore"
     WMCORE_PATH="$REPLACEMENT_ABSOLUTE/WMCore"
@@ -84,14 +67,6 @@ else
     fi
     tar zxf $WMCOREVER.tar.gz || exit 2
     WMCORE_PATH="WMCore-$WMCOREVER"
-fi
-
-if [[ -d "$REPLACEMENT_ABSOLUTE/CAFTaskWorker" ]]; then
-    echo "Using replacement CAFTaskWorker source at $REPLACEMENT_ABSOLUTE/CAFTaskWorker"
-    TASKWORKER_PATH="$REPLACEMENT_ABSOLUTE/CAFTaskWorker"
-else
-    curl -L https://github.com/$TASKWORKERREPO/CAFTaskWorker/archive/$TASKWORKERVER.tar.gz | tar zx || exit 2
-    TASKWORKER_PATH="CAFTaskWorker-$TASKWORKERVER"
 fi
 
 if [ ! -e $DBSVER.tar.gz ]; then
@@ -132,28 +107,15 @@ fi
 if [[ ! -e crab3-condor-libs.tar.gz ]]; then
     curl -L http://hcc-briantest.unl.edu/CRAB3-condor-libs.tar.gz > crab3-condor-libs.tar.gz || exit 2
 fi
+if [[ ! -e nose.tar.gz ]]; then
+    curl -L https://github.com/nose-devs/nose/archive/release_1.3.0.tar.gz > nose.tar.gz || exit 2
+fi
+
 tar xzf httplib2.tar.gz || exit 2
 tar xzf cherrypy.tar.gz || exit 2
 tar xzf sqlalchemy.tar.gz || exit 2
 tar xzf crab3-condor-libs.tar.gz *.so* || exit 2
-
-pushd $WMCORERUNTIMEDIR
-curl -L http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz | tar zx || exit 3
-cp WMCore.zip $STARTDIR/WMCore.zip
-popd
-
-pushd $WMCORE_PATH/src/python
-zip -rq $STARTDIR/CRAB3.zip WMCore PSetTweaks -x \*.pyc || exit 3
-#zip -rq $STARTDIR/WMCore.zip WMCore PSetTweaks -x \*.pyc || exit 3
-popd
-
-pushd $TASKWORKER_PATH/src/python
-zip -rq $STARTDIR/CRAB3.zip TaskWorker  -x \*.pyc || exit 3
-popd
-
-pushd $CAFUTILITIES_PATH/src/python
-zip -rq $STARTDIR/CRAB3.zip transform Databases PandaServerInterface.py  -x \*.pyc || exit 3
-popd
+tar xzf nose.tar.gz || exit 2
 
 pushd DBS-$DBSVER/Clients/Python
 zip -rq $STARTDIR/CRAB3.zip DBSAPI  -x \*.pyc || exit 3
@@ -162,17 +124,6 @@ popd
 pushd DLS-$DLSVER/Client/LFCClient
 zip -rq $STARTDIR/CRAB3.zip *.py  -x \*.pyc || exit 3
 popd
-
-pushd $CRABCLIENT_PATH/src/python
-zip -rq $STARTDIR/CRAB3.zip CRABClient  -x \*.pyc || exit 3
-cp ../../bin/crab $STARTDIR/
-cp ../../bin/crab3 $STARTDIR/
-popd
-
-pushd $CRABSERVER_PATH/src/python
-zip -rq $STARTDIR/CRAB3.zip CRABInterface  -x \*.pyc || exit 3
-popd
-
 pushd httplib2-0.8/python2
 zip -rq $STARTDIR/CRAB3.zip httplib2  -x \*.pyc || exit 3
 popd
@@ -185,6 +136,36 @@ pushd opt/cmssw/slc5_amd64_gcc462/external/py2-pyopenssl/0.11/lib/python2.6/site
 rm -rf $STARTDIR/lib/python/OpenSSL
 mv OpenSSL $STARTDIR/lib/python/
 popd
+
+pushd nose-release_1.3.0/
+zip -rq $STARTDIR/CRAB3.zip nose -x \*.pyc || exit 3
+popd
+
+# up until this point, evertying in CRAB3.zip is an external
+cp $STARTDIR/CRAB3.zip $ORIGDIR/CRAB3-externals.zip
+
+pushd $WMCORERUNTIMEDIR
+curl -L http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz | tar zx || exit 3
+cp WMCore.zip $STARTDIR/WMCore.zip
+popd
+
+pushd $WMCORE_PATH/src/python
+zip -rq $STARTDIR/CRAB3.zip WMCore PSetTweaks -x \*.pyc || exit 3
+#zip -rq $STARTDIR/WMCore.zip WMCore PSetTweaks -x \*.pyc || exit 3
+popd
+
+pushd $CRABCLIENT_PATH/src/python
+zip -rq $STARTDIR/CRAB3.zip CRABClient  -x \*.pyc || exit 3
+cp ../../bin/crab $STARTDIR/
+cp ../../bin/crab3 $STARTDIR/
+popd
+
+pushd $CRABSERVER_PATH/src/python
+zip -rq $STARTDIR/CRAB3.zip CRABInterface  -x \*.pyc || exit 3
+popd
+
+
+
 
 cat > setup.sh << EOF
 export CRAB3_VERSION=$CRAB3_VERSION
@@ -203,9 +184,9 @@ touch lib/fake_condor_config
 
 mkdir -p bin
 cp $CRABSERVER_PATH/bin/* bin/
-cp $TASKWORKER_PATH/scripts/CMSRunAnalysis.sh bin/
-cp $TASKWORKER_PATH/scripts/CMSRunAnalysis.py .
-cp $TASKWORKER_PATH/scripts/TweakPSet.py .
+cp $CRABSERVER_PATH/scripts/CMSRunAnalysis.sh bin/
+cp $CRABSERVER_PATH/scripts/CMSRunAnalysis.py .
+cp $CRABSERVER_PATH/scripts/TweakPSet.py .
 
 echo "Making TaskManagerRun tarball"
 tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip setup.sh crab3 crab gWMS-CMSRunAnalysis.sh CMSRunAnalysis.py bin TweakPSet.py || exit 4
