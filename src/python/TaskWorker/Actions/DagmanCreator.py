@@ -347,11 +347,11 @@ class DagmanCreator(TaskAction.TaskAction):
             # FIXME: In PanDA, we provided the executable as a URL.
             # So, the filename becomes http:// -- and doesn't really work.  Hardcoding the analysis wrapper.
             #transform_location = getLocation(kw['task']['tm_transformation'], 'CAFUtilities/src/python/transformation/CMSRunAnalysis/')
-            transform_location = getLocation('CMSRunAnalysis.sh', 'CAFTaskWorker/scripts/')
-            cmscp_location = getLocation('cmscp.py', 'CAFTaskWorker/scripts/')
-            gwms_location = getLocation('gWMS-CMSRunAnalysis.sh', 'CAFTaskWorker/scripts/')
-            dag_bootstrap_location = getLocation('dag_bootstrap_startup.sh', 'CAFTaskWorker/scripts/')
-            bootstrap_location = getLocation("dag_bootstrap.sh", "CAFTaskWorker/scripts/")
+            transform_location = getLocation('CMSRunAnalysis.sh', 'CRABServer/scripts/')
+            cmscp_location = getLocation('cmscp.py', 'CRABServer/scripts/')
+            gwms_location = getLocation('gWMS-CMSRunAnalysis.sh', 'CRABServer/scripts/')
+            dag_bootstrap_location = getLocation('dag_bootstrap_startup.sh', 'CRABServer/scripts/')
+            bootstrap_location = getLocation("dag_bootstrap.sh", "CRABServer/scripts/")
 
             cwd = os.getcwd()
             os.chdir(temp_dir)

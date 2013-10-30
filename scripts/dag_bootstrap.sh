@@ -60,7 +60,7 @@ export PYTHONPATH=$PWD:$PWD/CRAB3.zip:$PYTHONPATH
 #if [[ "x$X509_USER_PROXY" = "x" ]]; then
 #    export X509_USER_PROXY=$(pwd)/user.proxy
 #fi
-if [ "x" == "x$X509_USER_PROXY" ] || [ ! -e $X509_USER_PROXY ]]; then
+if [ "x" == "x$X509_USER_PROXY" ] || [ ! -e $X509_USER_PROXY ]; then
     echo "ERROR: Couldn't find a valid proxy at $X509_USER_PROXY"
     echo "Got the following environment variables that may help:"
     env | grep -i proxy
