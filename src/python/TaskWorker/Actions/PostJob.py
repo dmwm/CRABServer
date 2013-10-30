@@ -14,6 +14,8 @@ import classad
 
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 
+from RESTInteractions import HTTPRequests
+
 import RetryJob
 
 fts_server = 'https://fts3-pilot.cern.ch:8443'
@@ -167,7 +169,6 @@ class PostJob():
         self.output = None
         self.input = None
         self.outputFiles = []
-        #self.server = HTTPRequests(restinstance, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey)
 
 
     def makeAd(self, reqname, id, outputdata, sw, async_dest):
@@ -252,12 +253,16 @@ class PostJob():
                          "outlfn":          fileInfo['outlfn'],
                          "events":          fileInfo['events'],
                     }
-            # TODO: Figure out the bootstrap of the server / rest URL.
-            #self.server.post(self.resturl, data = urllib.urlencode(configreq))
+            self.server.post(self.resturl, data = urllib.urlencode(configreq))
 
 
-    def uploadFailure(self):
+    def uploadFailure(self, dest_dir, filename):
         # Record this job as a permanent failure
+        configreq = {"taskname":  self.ad['CRAB_ReqName'],
+                     "filestate": "FAILED",
+                     "outlfn":    os.path.join(dest_dir, filename),
+                    }
+        self.server.post(self.resturl, data = urllib.urlencode(configreq))
         return 9
 
 
@@ -313,11 +318,17 @@ class PostJob():
         return fts_job_result
 
 
-    def execute(self, status, retry_count, max_retries, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
+    def execute(self, status, retry_count, max_retries, restinstance, rest_url, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
+
+        if 'X509_USER_PROXY' not in os.environ:
+            return 10
+
+        self.server = HTTPRequests(restinstance, os.environ['X509_USER_PROXY'], os.environ['X509_USER_PROXY'])
+        self.rest_url = rest_url
 
         if status and (retry_count == max_retries):
             # This was our last retry and it failed.
-            return self.uploadFailure()
+            return self.uploadFailure(dest_dir, filenames[0])
 
         self.makeAd(reqname, id, outputdata, sw, async_dest)
 

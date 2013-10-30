@@ -24,16 +24,16 @@ import WMCore.WMSpec.WMTask
 DAG_FRAGMENT = """
 JOB Job%(count)d Job.submit
 #SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY $JOB
-#SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $RETURN $RETRY $MAX_RETRIES %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
+SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 3 UNLESS-EXIT 2
 VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" inputFiles="%(inputFiles)s" +DESIRED_Sites="\\"%(desiredSites)s\\"" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
 
-JOB ASO%(count)d ASO.submit
-VARS ASO%(count)d count="%(count)d" outputFiles="%(remoteOutputFiles)s"
-RETRY ASO%(count)d 3
+#JOB ASO%(count)d ASO.submit
+#VARS ASO%(count)d count="%(count)d" outputFiles="%(remoteOutputFiles)s"
+#RETRY ASO%(count)d 3
 
-PARENT Job%(count)d CHILD ASO%(count)d
+#PARENT Job%(count)d CHILD ASO%(count)d
 """
 
 CRAB_HEADERS = \
@@ -248,7 +248,8 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
                       'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                       'outputData': task['tm_publish_name'],
                       'tempDest': os.path.join("/store/temp/user", task['tm_username'], task['tm_taskname'], task['tm_publish_name']),
-                      'outputDest': os.path.join("/store/user", task['tm_username'], task['tm_taskname'], task['tm_publish_name']),})
+                      'outputDest': os.path.join("/store/user", task['tm_username'], task['tm_taskname'], task['tm_publish_name']),
+                      'restinstance': task['restinstance'], 'resturl': task['resturl']})
 
         LOGGER.debug(specs[-1])
     return specs, i
@@ -362,6 +363,9 @@ class DagmanCreator(TaskAction.TaskAction):
             shutil.copy(bootstrap_location, '.')
 
             kw['task']['scratch'] = temp_dir
+
+        kw['task']['restinstance'] = self.server.host
+        kw['task']['resturl'] = self.rest_url
 
         try:
             info = create_subdag(*args, **kw)
