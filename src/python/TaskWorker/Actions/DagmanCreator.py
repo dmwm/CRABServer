@@ -183,7 +183,7 @@ def makeJobSubmit(task):
         return
     # From here on out, we convert from tm_* names to the DataWorkflow names
     info = dict(task)
-    info['workflow'] = task['tm_taskname'].split("_")[-1]
+    info['workflow'] = task['tm_taskname']
     info['jobtype'] = 'analysis'
     info['jobsw'] = info['tm_job_sw']
     info['jobarch'] = info['tm_job_arch']
@@ -365,7 +365,7 @@ class DagmanCreator(TaskAction.TaskAction):
             kw['task']['scratch'] = temp_dir
 
         kw['task']['restinstance'] = self.server['host']
-        kw['task']['resturl'] = self.resturl
+        kw['task']['resturl'] = self.resturl.replace("/workflowdb", "/filemetadata'")
 
         try:
             info = create_subdag(*args, **kw)
