@@ -267,7 +267,7 @@ class PostJob():
 
 
     def getSourceSite(self):
-        cmd = "condor_q -userlog job_log.%d -af JOBGLIDEIN_CMSSite" % self.crab_id
+        cmd = "condor_q -const true -userlog job_log.%d -af JOBGLIDEIN_CMSSite" % self.crab_id
         status, output = commands.getstatusoutput(cmd)
         if status:
             print "Failed to query condor user log:\n%s" % output

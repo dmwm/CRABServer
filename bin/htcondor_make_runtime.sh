@@ -22,8 +22,8 @@ DLSVER=DLS_1_1_3
 DLSREPO=bbockelm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
-CRABSERVERVER=3.3.0-pre1
-CRABSERVERREPO=bbockelm
+CRABSERVERVER=3.3.0.pre3
+CRABSERVERREPO=dmwm
 
 CRABCLIENTDIR=$STARTDIR/CRABClient
 CRABCLIENTVER=3.2.0pre18-dagman1
@@ -161,7 +161,7 @@ cp ../../bin/crab3 $STARTDIR/
 popd
 
 pushd $CRABSERVER_PATH/src/python
-zip -rq $STARTDIR/CRAB3.zip CRABInterface  -x \*.pyc || exit 3
+zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py TaskWorker CRABInterface  -x \*.pyc || exit 3
 popd
 
 
