@@ -22,7 +22,8 @@ systems = \
                  'Databases/TaskDB', 'Databases/TaskDB/Oracle', 'Databases/TaskDB/Oracle/JobGroup', 'Databases/TaskDB/Oracle/Task'] },
   'TaskWorker':
   {
-    'python': ['TaskWorker']
+    'py_modules' : ['PandaServerInterface', 'RESTInteractions'],
+    'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects']
   },
   'UserFileCache':
   {
