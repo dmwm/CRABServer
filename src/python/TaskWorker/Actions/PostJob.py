@@ -263,7 +263,7 @@ class PostJob():
                      "outlfn":    os.path.join(dest_dir, filename),
                     }
         self.server.post(self.resturl, data = urllib.urlencode(configreq))
-        return 9
+        return 2
 
 
     def getSourceSite(self):
@@ -320,12 +320,17 @@ class PostJob():
 
     def execute(self, status, retry_count, max_retries, restinstance, rest_url, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
 
+        fd = os.open("postjob.%s" % id, os.O_RDWR | os.O_CREAT)
+        os.dup2(fd, 1)
+        os.dup2(fd, 2)
+
         if 'X509_USER_PROXY' not in os.environ:
             return 10
 
         self.server = HTTPRequests(restinstance, os.environ['X509_USER_PROXY'], os.environ['X509_USER_PROXY'])
         self.rest_url = rest_url
 
+        print "Retry count %s; max retry %s" % (retry_count, max_retries)
         if status and (retry_count == max_retries):
             # This was our last retry and it failed.
             return self.uploadFailure(dest_dir, filenames[0])
