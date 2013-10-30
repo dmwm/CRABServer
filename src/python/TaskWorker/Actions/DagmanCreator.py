@@ -364,8 +364,8 @@ class DagmanCreator(TaskAction.TaskAction):
 
             kw['task']['scratch'] = temp_dir
 
-        kw['task']['restinstance'] = self.server.host
-        kw['task']['resturl'] = self.rest_url
+        kw['task']['restinstance'] = self.server['host']
+        kw['task']['resturl'] = self.resturl
 
         try:
             info = create_subdag(*args, **kw)
