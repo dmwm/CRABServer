@@ -4,8 +4,6 @@ import logging
 import time
 import traceback
 
-from WMCore.WMInit import WMInit
-
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.WorkerExceptions import WorkerHandlerException
 
