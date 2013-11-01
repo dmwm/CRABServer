@@ -245,23 +245,45 @@ class PostJob():
                          "publishdataname": self.ad['CRAB_OutputData'],
                          "appver":          self.ad['CRAB_JobSW'],
                          "outtype":         "EDM", # Not implemented
-                         "checksummd5":     "-1", # Not implemented
+                         "checksummd5":     "asda", # Not implemented; garbage value taken from ASO
                          "checksumcksum":   fileInfo['checksums']['cksum'],
                          "checksumadler32": fileInfo['checksums']['adler32'],
                          "outlocation":     fileInfo['outlocation'], 
                          "outtmplocation":  fileInfo['outdatasetname'],
-                         "acquisitionera":  "2012", # Not implemented
+                         "acquisitionera":  "null", # Not implemented
                          "outlfn":          fileInfo['outlfn'],
                          "events":          fileInfo['events'],
                     }
             self.server.post(self.resturl, data = urllib.urlencode(configreq))
 
 
+    def uploadFakeLog(self, state="TRANSFERRING"):
+        # Upload a fake log status
+        configreq = {"taskname":        self.ad['CRAB_ReqName'],
+                     "outfileruns":     fileInfo['outfileruns'],
+                     "pandajobid":      self.crab_id,
+                     "outsize":         "0",
+                     "publishdataname": self.ad['CRAB_OutputData'],
+                     "appver":          self.ad['CRAB_JobSW'],
+                     "outtype":         "FAKE", # Not implemented
+                     "checksummd5":     "asda", # Not implemented
+                     "checksumcksum":   "3701783610", # Not implemented
+                     "checksumadler32": "6d1096fe", # Not implemented
+                     "outlocation":     "T2_US_Nowhere",
+                     "outtmplocation":  "T2_US_Nowhere",
+                     "acquisitionera":  "null", # Not implemented
+                     "events":          "0",
+                     "outlfn":          "/store/user/fakefile/FakeDataset/FakePublish/5b6a581e4ddd41b130711a045d5fecb9/1/log/fake.log.%s" % str(self.crab_id),
+                     "filestate":       state,
+                    }
+        self.server.post(self.resturl, data = urllib.urlencode(configreq))
+
+
     def uploadFailure(self, dest_dir, filename):
         # Record this job as a permanent failure
         configreq = {"taskname":  self.ad['CRAB_ReqName'],
                      "filestate": "FAILED",
-                     "outlfn":    os.path.join(dest_dir, filename),
+                     "outlfn":    "/store/user/fakefile/FakeDataset/FakePublish/5b6a581e4ddd41b130711a045d5fecb9/1/log/fake.log.%s" % str(self.crab_id),
                     }
         self.server.post(self.resturl, data = urllib.urlencode(configreq))
         return 2
@@ -291,6 +313,7 @@ class PostJob():
     def stageout(self, source_dir, dest_dir, *filenames):
         self.dest_site = self.ad['CRAB_AsyncDest']
         source_site = self.getSourceSite()
+        self.source_site = source_site
 
         transfer_list = resolvePFNs(source_site, self.dest_site, source_dir, dest_dir, filenames)
         for source, dest in transfer_list:
@@ -340,10 +363,15 @@ class PostJob():
 
         status = int(status)
 
+        try:
+            self.uploadFakeLog(state="TRANSFERRING")
+        except:
+            pass
+
         print "Retry count %s; max retry %s" % (retry_count, max_retries)
         if status and (retry_count == max_retries):
             # This was our last retry and it failed.
-            return self.uploadFailure(dest_dir, filenames[0])
+            return self.uploadFailure()
 
         retry = RetryJob.RetryJob()
         retval = retry.execute(status, retry_count, max_retries, self.crab_id)
@@ -355,6 +383,7 @@ class PostJob():
         self.fixPerms()
         self.stageout(source_dir, dest_dir, *filenames)
         self.upload()
+        self.uploadFakeLog(state="FINISHED")
 
         return 0
 

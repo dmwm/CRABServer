@@ -72,24 +72,17 @@ class HTCondorDataWorkflow(DataWorkflow):
                 statusName = codes.get(jobState, 'unknown')
             jobStatus[int(result['CRAB_Id'])] = statusName
 
-        # Handle all "ASO" jobs in HTCondor.
-        aso_codes = {1: 'ASO Queued', 2: 'transferring', 3: 'killing', 4: 'Stageout Complete (Success)', 5: 'cancelled'}
-        for result in self.getHTCondorASOJobs(workflow, schedd):
-            if result['CRAB_Id'] in failedJobs:
-                failedJobs.remove(result['CRAB_Id'])
-            jobState = int(result['JobStatus'])
-            if (jobState == 4) and ('ExitCode' in result) and (int(result['ExitCode'])):
-                failedJobs.append(result['CRAB_Id'])
-                statusName = "Failed Stage-Out (%s)" % result['ExitCode']
-            else:
-                statusName = aso_codes.get(jobState, 'unknown')
-            jobStatus[int(result['CRAB_Id'])] = statusName
-
         # Handle all "finished" jobs.
-        for result, file_type in self.getFinishedJobs(workflow):
-            if (result in failedJobs) and (file_type != 'FAILED'):
+        for result, file_state in self.getFinishedJobs(workflow):
+            if result not in jobStatus:
+                if file_state == 'FINISHED':
+                    jobStatus[result] = 'finished'
+                elif file_state == 'FAILED':
+                    jobStatus[result] = 'failed'
+                    failedJobs.append(result)
+            if (result in failedJobs) and (file_state == 'FINISHED'):
                 failedJobs.remove(result)
-            jobStatus[result] = 'finished' if (file_type != 'FAILED') else 'failed'
+                jobStatus[result] = 'finished'
 
         for i in range(1, taskJobCount+1):
             if i not in jobStatus:
@@ -144,10 +137,10 @@ class HTCondorDataWorkflow(DataWorkflow):
         """
         Get the finished jobs from the file metadata table.
         """
-        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='FAILED,LOG', taskname=workflow)
+        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='FAKE', taskname=workflow)
 
         for row in rows:
-            yield row[GetFromTaskAndType.PANDAID], 'LOG' if row[GetFromTaskAndType.LFN] else 'FAILED'
+            yield row[GetFromTaskAndType.PANDAID], row[GetFromTaskAndType.STATE]
 
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
