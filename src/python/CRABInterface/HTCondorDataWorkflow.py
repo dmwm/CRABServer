@@ -54,9 +54,12 @@ class HTCondorDataWorkflow(DataWorkflow):
         task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
         retval = {"status": task_codes.get(taskStatusCode, 'unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
-        if taskStatusCode == 5 and \
-                not results[-1]['HoldReason'].startswith(JOB_KILLED_HOLD_REASON):
+        if taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 3:
+            retval['status'] = 'FAILED'
+        elif taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 16:
             retval['status'] = 'InTransition'
+        elif taskStatusCode == 5:
+            retval['status'] = 'Unknown'
 
         # Handle all "real" jobs in HTCondor.
         failedJobs = []
@@ -70,19 +73,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                 statusName = "failed"
             else:
                 statusName = codes.get(jobState, 'unknown')
-            jobStatus[int(result['CRAB_Id'])] = statusName
-
-        # Handle all "ASO" jobs in HTCondor.
-        aso_codes = {1: 'ASO Queued', 2: 'transferring', 3: 'killing', 4: 'Stageout Complete (Success)', 5: 'cancelled'}
-        for result in self.getHTCondorASOJobs(workflow, schedd):
-            if result['CRAB_Id'] in failedJobs:
-                failedJobs.remove(result['CRAB_Id'])
-            jobState = int(result['JobStatus'])
-            if (jobState == 4) and ('ExitCode' in result) and (int(result['ExitCode'])):
-                failedJobs.append(result['CRAB_Id'])
-                statusName = "Failed Stage-Out (%s)" % result['ExitCode']
-            else:
-                statusName = aso_codes.get(jobState, 'unknown')
             jobStatus[int(result['CRAB_Id'])] = statusName
 
         # Handle all "finished" jobs.
@@ -115,7 +105,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
     def getRootTasks(self, workflow, schedd):
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
-        rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType', "HoldReason"]
+        rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType', "HoldReason", "HoldReasonCode"]
 
         # Note: may throw if the schedd is down.  We may want to think about wrapping the
         # status function and have it catch / translate HTCondor errors.
@@ -132,7 +122,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         Retrieve all the jobs for executing cmsRun in this workflow
         """
         jobConst = 'TaskType =?= "Job" && CRAB_ReqName =?= %s' % HTCondorUtils.quote(workflow)
-        jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id']
+        jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id', "HoldReasonCode"]
         return schedd.query(jobConst, jobList)
 
     def getHTCondorASOJobs(self, workflow, schedd):
