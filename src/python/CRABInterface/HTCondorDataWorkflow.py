@@ -76,10 +76,16 @@ class HTCondorDataWorkflow(DataWorkflow):
             jobStatus[int(result['CRAB_Id'])] = statusName
 
         # Handle all "finished" jobs.
-        for result, file_type in self.getFinishedJobs(workflow):
-            if (result in failedJobs) and (file_type != 'FAILED'):
+        for result, file_state in self.getFinishedJobs(workflow):
+            if result not in jobStatus:
+                if file_state == 'FINISHED':
+                    jobStatus[result] = 'finished'
+                elif file_state == 'FAILED':
+                    jobStatus[result] = 'failed'
+                    failedJobs.append(result)
+            if (result in failedJobs) and (file_state == 'FINISHED'):
                 failedJobs.remove(result)
-            jobStatus[result] = 'finished' if (file_type != 'FAILED') else 'failed'
+                jobStatus[result] = 'finished'
 
         for i in range(1, taskJobCount+1):
             if i not in jobStatus:
@@ -134,10 +140,10 @@ class HTCondorDataWorkflow(DataWorkflow):
         """
         Get the finished jobs from the file metadata table.
         """
-        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='FAILED,LOG', taskname=workflow)
+        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='FAKE', taskname=workflow)
 
         for row in rows:
-            yield row[GetFromTaskAndType.PANDAID], 'LOG' if row[GetFromTaskAndType.LFN] else 'FAILED'
+            yield row[GetFromTaskAndType.PANDAID], row[GetFromTaskAndType.STATE]
 
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
