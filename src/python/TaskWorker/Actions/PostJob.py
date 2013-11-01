@@ -8,6 +8,7 @@ import time
 import json
 import errno
 import signal
+import urllib
 import commands
 
 import classad
@@ -312,7 +313,7 @@ class PostJob():
         print "Dest list", dest_list
         source_sizes = determineSizes(source_list)
         print "Source sizes", source_sizes
-        dest_sizes = determineSizes(source_list)
+        dest_sizes = determineSizes(dest_list)
         print "Dest sizes", dest_sizes
         sizes = zip(source_sizes, dest_sizes)
 
@@ -323,9 +324,9 @@ class PostJob():
         return fts_job_result
 
 
-    def execute(self, status, retry_count, max_retries, restinstance, rest_url, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
+    def execute(self, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
 
-        fd = os.open("postjob.%s" % id, os.O_RDWR | os.O_CREAT | os.O_TRUNC)
+        fd = os.open("postjob.%s" % id, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0755)
         os.dup2(fd, 1)
         os.dup2(fd, 2)
 
@@ -333,9 +334,11 @@ class PostJob():
             return 10
 
         self.server = HTTPRequests(restinstance, os.environ['X509_USER_PROXY'], os.environ['X509_USER_PROXY'])
-        self.rest_url = rest_url
+        self.resturl = resturl
 
         self.makeAd(reqname, id, outputdata, sw, async_dest)
+
+        status = int(status)
 
         print "Retry count %s; max retry %s" % (retry_count, max_retries)
         if status and (retry_count == max_retries):

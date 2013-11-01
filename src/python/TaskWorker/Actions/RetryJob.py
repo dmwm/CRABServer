@@ -84,7 +84,7 @@ class RetryJob(object):
         except ValueError:
             return
 
-        if exitCode == 8021:
+        if exitCode == 8021 or exitCode == 8028 or exitCode == 8020:
             raise RecoverableError("Job failed to open local and fallback files.")
 
         if exitCode:
@@ -105,6 +105,9 @@ class RetryJob(object):
 
         self.check_empty_report()
         self.check_exit_code()
+
+        if status: # Probably means stageout failed!
+            raise RecoverableError("Payload job was successful, but exited wrapper exited non-zero status %d (stageout failure)?" % status)
 
         return OK
 
