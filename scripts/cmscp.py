@@ -44,7 +44,7 @@ except ImportError, ie:
     sys.path.insert(0, name)
     import WMCore
 
-import WMCore.Storage.FileManager as StageOutMgr
+import WMCore.Storage.StageOutMgr as StageOutMgr
 
 from WMCore.Lexicon                  import lfn     as lfnRegEx
 from WMCore.Lexicon                  import userLfn as userLfnRegEx

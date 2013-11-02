@@ -6,8 +6,8 @@ import traceback
 import classad
 
 OK = 0
-FATAL_ERROR = 1
-RECOVERABLE_ERROR = 2
+FATAL_ERROR = 2
+RECOVERABLE_ERROR = 1
 
 # Fatal error limits for job resource usage
 MAX_WALLTIME = 21*60*60 + 30*60

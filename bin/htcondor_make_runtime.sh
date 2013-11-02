@@ -22,7 +22,7 @@ DLSVER=DLS_1_1_3
 DLSREPO=bbockelm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
-CRABSERVERVER=3.3.0.pre3
+CRABSERVERVER=3.3.0.pre8
 CRABSERVERREPO=dmwm
 
 CRABCLIENTDIR=$STARTDIR/CRABClient
@@ -57,6 +57,11 @@ if [[ ! -e external+py2-pyopenssl+0.11-1-1.slc5_amd64_gcc462.rpm ]]; then
     curl -L http://cmsrep.cern.ch/cmssw/cms/RPMS/slc5_amd64_gcc462/external+py2-pyopenssl+0.11-1-1.slc5_amd64_gcc462.rpm > external+py2-pyopenssl+0.11-1-1.slc5_amd64_gcc462.rpm || exit 2
 fi
 rpm2cpio external+py2-pyopenssl+0.11-1-1.slc5_amd64_gcc462.rpm | cpio -uimd || exit 2
+
+if [[ ! -e libcurl.so.4 ]]; then
+    curl -L http://hcc-briantest.unl.edu/libcurl.so.4 > $STARTDIR/libcurl.so.4 || exit 2
+fi
+chmod +x libcurl.so.4
 
 if [[ -d "$REPLACEMENT_ABSOLUTE/WMCore" ]]; then
     echo "Using replacement WMCore source at $REPLACEMENT_ABSOLUTE/WMCore"
@@ -114,7 +119,7 @@ fi
 tar xzf httplib2.tar.gz || exit 2
 tar xzf cherrypy.tar.gz || exit 2
 tar xzf sqlalchemy.tar.gz || exit 2
-tar xzf crab3-condor-libs.tar.gz *.so* || exit 2
+tar xzf crab3-condor-libs.tar.gz || exit 2
 tar xzf nose.tar.gz || exit 2
 
 pushd DBS-$DBSVER/Clients/Python
@@ -172,7 +177,7 @@ export CRAB3_VERSION=$CRAB3_VERSION
 export CRAB3_BASEPATH=\`dirname \${BASH_SOURCE[0]}\`
 export CRAB3_BASEPATH=\`readlink -e \$CRAB3_BASEPATH\`
 export PATH=\$CRAB3_BASEPATH:\$PATH
-export PYTHONPATH=\$CRAB3_BASEPATH/CRAB3.zip:\$CRAB3_BASEPATH/lib/python:\$PYTHONPATH
+export PYTHONPATH=\$CRAB3_BASEPATH/CRAB3.zip:\$CRAB3_BASEPATH/lib/python:\$PYTHONPATH:\$CRAB3_BASEPATH
 export LD_LIBRARY_PATH=\$CRAB3_BASEPATH/lib:\$CRAB3_BASEPATH/lib/condor:\$LD_LIBRARY_PATH
 if [ "x\$CONDOR_CONFIG" = "x" ] && [ ! -e /etc/condor/condor_config ] && [ ! -e \$HOME/.condor/condor_config ];
 then
@@ -188,8 +193,9 @@ cp $CRABSERVER_PATH/scripts/CMSRunAnalysis.sh bin/
 cp $CRABSERVER_PATH/scripts/CMSRunAnalysis.py .
 cp $CRABSERVER_PATH/scripts/TweakPSet.py .
 
+pwd
 echo "Making TaskManagerRun tarball"
-tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip setup.sh crab3 crab gWMS-CMSRunAnalysis.sh CMSRunAnalysis.py bin TweakPSet.py || exit 4
+tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip setup.sh crab3 crab gWMS-CMSRunAnalysis.sh CMSRunAnalysis.py bin TweakPSet.py libcurl.so.4 || exit 4
 echo "Making CRAB3 client install"
 tar zcf $ORIGDIR/CRAB3-gWMS.tar.gz CRAB3.zip setup.sh crab3 crab gWMS-CMSRunAnalysis.sh bin lib || exit 4
 echo "Making CMSRunAnalysis tarball"

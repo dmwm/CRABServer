@@ -7,6 +7,7 @@ import sys
 import time
 import json
 import errno
+import shutil
 import signal
 import urllib
 import commands
@@ -16,6 +17,7 @@ import classad
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 
 from RESTInteractions import HTTPRequests
+from httplib import HTTPException
 
 import RetryJob
 
@@ -254,7 +256,8 @@ class PostJob():
                          "outlfn":          fileInfo['outlfn'],
                          "events":          fileInfo['events'],
                     }
-            self.server.post(self.resturl, data = urllib.urlencode(configreq))
+            print self.resturl, urllib.urlencode(configreq)
+            self.server.put(self.resturl, data = urllib.urlencode(configreq))
 
 
     def uploadFakeLog(self, state="TRANSFERRING"):
@@ -274,15 +277,22 @@ class PostJob():
                      "acquisitionera":  "null", # Not implemented
                      "events":          "0",
                      "outlfn":          "/store/user/fakefile/FakeDataset/FakePublish/5b6a581e4ddd41b130711a045d5fecb9/1/log/fake.log.%s" % str(self.crab_id),
+                     "outdatasetname":  "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER",
                      "filestate":       state,
                     }
-        self.server.post(self.resturl, data = urllib.urlencode(configreq))
+        print self.resturl, urllib.urlencode(configreq)
+        try:
+            self.server.put(self.resturl, data = urllib.urlencode(configreq))
+        except HTTPException, hte:
+            if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
+               not hte.headers.get('X-Error-Http', -1) == '400':
+                   raise 
+            self.uploadState(state)
 
-
-    def uploadFailure(self, dest_dir, filename):
+    def uploadState(self, state):
         # Record this job as a permanent failure
         configreq = {"taskname":  self.ad['CRAB_ReqName'],
-                     "filestate": "FAILED",
+                     "filestate": state,
                      "outlfn":    "/store/user/fakefile/FakeDataset/FakePublish/5b6a581e4ddd41b130711a045d5fecb9/1/log/fake.log.%s" % str(self.crab_id),
                     }
         self.server.post(self.resturl, data = urllib.urlencode(configreq))
@@ -353,6 +363,13 @@ class PostJob():
         os.dup2(fd, 1)
         os.dup2(fd, 2)
 
+        stdout = "job_out.%s" % id
+        stderr = "job_err.%s" % id
+        if os.path.exists(stdout):
+            shutil.copy(stdout, stdout+"."+retry_count)
+        if os.path.exists(stderr):
+            shutil.copy(stderr, stderr+"."+retry_count)
+
         if 'X509_USER_PROXY' not in os.environ:
             return 10
 
@@ -363,19 +380,18 @@ class PostJob():
 
         status = int(status)
 
-        try:
-            self.uploadFakeLog(state="TRANSFERRING")
-        except:
-            pass
+        self.uploadFakeLog(state="TRANSFERRING")
 
         print "Retry count %s; max retry %s" % (retry_count, max_retries)
         if status and (retry_count == max_retries):
             # This was our last retry and it failed.
-            return self.uploadFailure()
+            return self.uploadState("FAILED")
 
         retry = RetryJob.RetryJob()
         retval = retry.execute(status, retry_count, max_retries, self.crab_id)
         if retval:
+           if retval == RetryJob.FATAL_ERROR:
+               return self.uploadState("FAILED")
            return retval
 
         self.parseJson()
