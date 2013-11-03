@@ -263,7 +263,6 @@ class PostJob():
     def uploadFakeLog(self, state="TRANSFERRING"):
         # Upload a fake log status
         configreq = {"taskname":        self.ad['CRAB_ReqName'],
-                     "outfileruns":     fileInfo['outfileruns'],
                      "pandajobid":      self.crab_id,
                      "outsize":         "0",
                      "publishdataname": self.ad['CRAB_OutputData'],
@@ -339,6 +338,9 @@ class PostJob():
         global g_Job
         g_Job = FTSJob(transfer_list, self.crab_id)
         fts_job_result = g_Job.run()
+        # If no files failed, return success immediately.  Otherwise, see how many files failed.
+        if not fts_job_result:
+            return fts_job_result
 
         source_list = [i[0] for i in transfer_list]
         print "Source list", source_list
@@ -397,7 +399,11 @@ class PostJob():
         self.parseJson()
 
         self.fixPerms()
-        self.stageout(source_dir, dest_dir, *filenames)
+        try:
+            self.stageout(source_dir, dest_dir, *filenames)
+        except RuntimeError:
+            self.uploadState("FAILED")
+            raise
         self.upload()
         self.uploadFakeLog(state="FINISHED")
 
