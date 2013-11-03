@@ -172,6 +172,7 @@ def AddChecksums(report):
             cksum = FileInfo.readCksum(fileInfo['pfn'])
             adler32 = FileInfo.readAdler32(fileInfo['pfn'])
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
+            fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
 try:
     setupLogging('.')

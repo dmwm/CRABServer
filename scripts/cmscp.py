@@ -128,6 +128,14 @@ def main():
         else:
             return 0
 
+        _, filename = os.path.split(source)
+        filename_minus_ext = filename.rsplit(".", 1)[0]
+        fileid = filename_minus_ext.rsplit("_", 1)[-1]
+        try:
+            fileid = int(fileid)
+        except ValueError:
+            fileid = -1
+
         fileForTransfer = {'LFN': dest, 'PFN': source}
         signal.signal(signal.SIGALRM, alarmHandler)
         signal.alarm(waitTime)

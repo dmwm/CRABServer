@@ -199,24 +199,32 @@ class PostJob():
 
         for outputModule in self.output.values():
             for outputFile in outputModule:
-                if outputFile.get("output_module_class") != 'PoolOutputModule':
+                print outputFile
+                # Note incorrect spelling of 'output module' in current WMCore
+                if outputFile.get(u"output_module_class") != u'PoolOutputModule' and \
+                        outputFile.get(u"ouput_module_class") != u'PoolOutputModule':
                     continue
                 fileInfo = {}
                 self.outputFiles.append(fileInfo)
 
-                fileInfo['inparentlfns'] = outputFile.get("input", [])
+                fileInfo['inparentlfns'] = [str(i) for i in outputFile.get(u"input", [])]
 
-                fileInfo['events'] = outputFile.get("events", -1)
-                fileInfo['checksums'] = outputFile.get("checksums", {"cksum": "0", "adler32": "0"})
+                fileInfo['events'] = outputFile.get(u"events", -1)
+                fileInfo['checksums'] = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
+                fileInfo['outsize'] = outputFile.get(u"size", 0)
 
-                if 'runs' not in outputFile:
+                # TODO: Finish - this needs to be converted to a site name.
+                if u'SEName' in outputFile:
+                    fileInfo['outtmplocation'] = outputFile['SEName']
+
+                if u'runs' not in outputFile:
                     continue
                 fileInfo['outfileruns'] = []
                 fileInfo['outfilelumis'] = []
-                for run, lumis in outputFile['runs']:
+                for run, lumis in outputFile[u'runs'].items():
                     for lumi in lumis:
-                        fileInfo['outfileruns'].append(run)
-                        fileInfo['outfilelumis'].append(lumi)
+                        fileInfo['outfileruns'].append(str(run))
+                        fileInfo['outfilelumis'].append(str(lumi))
 
 
     def fixPerms(self):
@@ -238,30 +246,59 @@ class PostJob():
     def upload(self):
         for fileInfo in self.outputFiles:
             configreq = {"taskname":        self.ad['CRAB_ReqName'],
-                         "outfilelumis":    fileInfo['outfilelumis'],
-                         "inparentlfns":    fileInfo['inparentlfns'],
-                         "globalTag":       fileInfo['globalTag'],
-                         "outfileruns":     fileInfo['outfileruns'],
+                         "globalTag":       "None",
                          "pandajobid":      self.crab_id,
                          "outsize":         fileInfo['outsize'],
                          "publishdataname": self.ad['CRAB_OutputData'],
                          "appver":          self.ad['CRAB_JobSW'],
-                         "outtype":         "EDM", # Not implemented
+                         "outtype":         "EDM", # TFILE Not implemented
                          "checksummd5":     "asda", # Not implemented; garbage value taken from ASO
                          "checksumcksum":   fileInfo['checksums']['cksum'],
                          "checksumadler32": fileInfo['checksums']['adler32'],
                          "outlocation":     fileInfo['outlocation'], 
-                         "outtmplocation":  fileInfo['outdatasetname'],
+                         "outtmplocation":  fileInfo.get('outtmplocation', self.source_site),
                          "acquisitionera":  "null", # Not implemented
                          "outlfn":          fileInfo['outlfn'],
                          "events":          fileInfo['events'],
                     }
+            configreq = configreq.items()
+            for run in fileInfo['outfileruns']:
+                configreq.append(("outfileruns", run))
+            for lumi in fileInfo['outfilelumis']:
+                configreq.append(("outfilelumis", lumi))
+            for lfn in fileInfo['inparentlfns']:
+                configreq.append(("inparentlfns", lfn))
             print self.resturl, urllib.urlencode(configreq)
             self.server.put(self.resturl, data = urllib.urlencode(configreq))
 
 
+    def uploadLog(self, outlfn):
+        configreq = {"taskname":        self.ad['CRAB_ReqName'],
+                     "pandajobid":      self.crab_id,
+                     "outsize":         "0", # Not implemented
+                     "publishdataname": self.ad['CRAB_OutputData'],
+                     "appver":          self.ad['CRAB_JobSW'],
+                     "outtype":         "LOG",
+                     "checksummd5":     "asda", # Not implemented
+                     "checksumcksum":   "3701783610", # Not implemented
+                     "checksumadler32": "6d1096fe", # Not implemented
+                     "outlocation":     self.ad['CRAB_AsyncDest'],
+                     "outtmplocation":  fileInfo.get('outtmplocation', self.source_site),
+                     "acquisitionera":  "null", # Not implemented
+                     "events":          "0",
+                     "outlfn":          outlfn,
+                     "outdatasetname":  "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER"
+                    }
+        print self.resturl, urllib.urlencode(configreq)
+        try:
+            self.server.put(self.resturl, data = urllib.urlencode(configreq))
+        except HTTPException, hte:
+            if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
+               not hte.headers.get('X-Error-Http', -1) == '400':
+                   raise
+
     def uploadFakeLog(self, state="TRANSFERRING"):
-        # Upload a fake log status
+        # Upload a fake log status.  This is to be replaced by a proper job state table.
         configreq = {"taskname":        self.ad['CRAB_ReqName'],
                      "pandajobid":      self.crab_id,
                      "outsize":         "0",
@@ -321,8 +358,7 @@ class PostJob():
 
     def stageout(self, source_dir, dest_dir, *filenames):
         self.dest_site = self.ad['CRAB_AsyncDest']
-        source_site = self.getSourceSite()
-        self.source_site = source_site
+        source_site = self.source_site
 
         transfer_list = resolvePFNs(source_site, self.dest_site, source_dir, dest_dir, filenames)
         for source, dest in transfer_list:
@@ -332,8 +368,8 @@ class PostJob():
         for outfile in zip(filenames[1:], self.outputFiles, transfer_list):
             outlfn = os.path.join(dest_dir, outfile[0])
             outfile[1]['outlfn'] = outlfn
-            outfile[1]['outtmplocation'] = outfile[2][0]
-            outfile[1]['outlocation'] = outfile[2][1]
+            outfile[1]['outtmplocation'] = self.source_site
+            outfile[1]['outlocation'] = self.dest_site
 
         global g_Job
         g_Job = FTSJob(transfer_list, self.crab_id)
@@ -397,8 +433,10 @@ class PostJob():
            return retval
 
         self.parseJson()
+        self.source_site = self.getSourceSite()
 
         self.fixPerms()
+        self.uploadLog(os.path.join(dest_dir, filenames[0]))
         try:
             self.stageout(source_dir, dest_dir, *filenames)
         except RuntimeError:
