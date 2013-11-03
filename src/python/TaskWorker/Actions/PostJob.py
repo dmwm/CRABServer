@@ -141,15 +141,15 @@ def reportResults(job_id, dest_list, sizes):
     return retval
 
 
-def resolvePFNs(source_site, dest_site, source_dir, dest_dir, filenames):
+def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
 
     p = PhEDEx.PhEDEx()
     lfns = [os.path.join(source_dir, filename) for filename in filenames]
     lfns += [os.path.join(dest_dir, filename) for filename in filenames]
-    dest_info = p.getPFN(nodes=[source_site, dest_site], lfns=lfns)
+    dest_info = p.getPFN(nodes=(source_sites + [dest_site]), lfns=lfns)
 
     results = []
-    for filename in filenames:
+    for source_site, filename in zip(source_sites, filenames):
         slfn = os.path.join(source_dir, filename)
         dlfn = os.path.join(dest_dir, filename)
         if (source_site, slfn) not in dest_info:
@@ -213,9 +213,8 @@ class PostJob():
                 fileInfo['checksums'] = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
                 fileInfo['outsize'] = outputFile.get(u"size", 0)
 
-                # TODO: Finish - this needs to be converted to a site name.
-                if u'SEName' in outputFile:
-                    fileInfo['outtmplocation'] = outputFile['SEName']
+                if u'SEName' in outputFile and self.node_map.get(str(outputFile['SEName'])):
+                    fileInfo['outtmplocation'] = self.node_map[outputFile['SEName']]
 
                 if u'runs' not in outputFile:
                     continue
@@ -260,6 +259,7 @@ class PostJob():
                          "acquisitionera":  "null", # Not implemented
                          "outlfn":          fileInfo['outlfn'],
                          "events":          fileInfo['events'],
+                         "outdatasetname":  "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER",
                     }
             configreq = configreq.items()
             for run in fileInfo['outfileruns']:
@@ -269,10 +269,17 @@ class PostJob():
             for lfn in fileInfo['inparentlfns']:
                 configreq.append(("inparentlfns", lfn))
             print self.resturl, urllib.urlencode(configreq)
-            self.server.put(self.resturl, data = urllib.urlencode(configreq))
+            try:
+                self.server.put(self.resturl, data = urllib.urlencode(configreq))
+            except HTTPException, hte:
+                print hte.headers
+                raise
 
 
     def uploadLog(self, outlfn):
+        source_site = self.source_site
+        if 'SEName' in self.full_report:
+            source_site = self.node_map.get(self.full_report['SEName'], source_site)
         configreq = {"taskname":        self.ad['CRAB_ReqName'],
                      "pandajobid":      self.crab_id,
                      "outsize":         "0", # Not implemented
@@ -283,7 +290,7 @@ class PostJob():
                      "checksumcksum":   "3701783610", # Not implemented
                      "checksumadler32": "6d1096fe", # Not implemented
                      "outlocation":     self.ad['CRAB_AsyncDest'],
-                     "outtmplocation":  fileInfo.get('outtmplocation', self.source_site),
+                     "outtmplocation":  source_site,
                      "acquisitionera":  "null", # Not implemented
                      "events":          "0",
                      "outlfn":          outlfn,
@@ -293,9 +300,11 @@ class PostJob():
         try:
             self.server.put(self.resturl, data = urllib.urlencode(configreq))
         except HTTPException, hte:
+            print hte.headers
             if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
                not hte.headers.get('X-Error-Http', -1) == '400':
                    raise
+
 
     def uploadFakeLog(self, state="TRANSFERRING"):
         # Upload a fake log status.  This is to be replaced by a proper job state table.
@@ -325,6 +334,7 @@ class PostJob():
                    raise 
             self.uploadState(state)
 
+
     def uploadState(self, state):
         # Record this job as a permanent failure
         configreq = {"taskname":  self.ad['CRAB_ReqName'],
@@ -336,39 +346,54 @@ class PostJob():
 
 
     def getSourceSite(self):
+        if self.full_report.get('executed_site', None):
+            print "Getting source_site from jobReport"
+            return self.full_report['executed_site']
+
         cmd = "condor_q -const true -userlog job_log.%d -af JOBGLIDEIN_CMSSite" % self.crab_id
         status, output = commands.getstatusoutput(cmd)
         if status:
             print "Failed to query condor user log:\n%s" % output
-            return 1
+            raise ValueError("Failed to query condor user log:\n%s" % output)
         source_site = output.split('\n')[-1].strip()
         print "Determined a source site of %s from the user log" % source_site
         if source_site == 'Unknown' or source_site == "undefined":
-            # Didn't find it the first time, try looking in the jobReport.json
-            if self.full_report.get('executed_site', None):
-                print "Getting source_site from jobReport"
-                source_site = self.full_report['executed_site']
-            else:
-                # TODO: Testing mode. If nothing turns up, just say it wwas
-                #       Nebraska
-                print "Site was unknown, so we just guessed Nebraska ..."
-                source_site = 'T2_US_Nebraska'
+            raise ValueError("Unable to determine source side")
         return source_site
+
+
+    def getSourceSite(self, filename):
+        filename = os.path.split(filename)[-1]
+        for outfile in self.outputFiles:
+            if (u'pfn' not in outfile) or (u'SEName' not in outfile):
+                continue
+            json_pfn = outfile[u'pfn']
+            pfn = os.path.split(filename)[-1]
+            left_piece, fileid = pfn.rsplit("_", 1)
+            right_piece = fileid.split(".", 1)[-1]
+            pfn = left_piece + "." + right_piece
+            if pfn == json_pfn:
+                return self.node_map.get(outfile[u'SEName'], self.source_site)
+        return self.node_map.get(self.full_report.get(u"SEName"), self.source_site)
 
 
     def stageout(self, source_dir, dest_dir, *filenames):
         self.dest_site = self.ad['CRAB_AsyncDest']
-        source_site = self.source_site
 
-        transfer_list = resolvePFNs(source_site, self.dest_site, source_dir, dest_dir, filenames)
+        source_sites = []
+        for filename in filenames:
+            source_sites.append(self.getSourceSite(filename))
+
+        transfer_list = resolvePFNs(self.dest_site, source_dir, dest_dir, source_sites, filenames)
         for source, dest in transfer_list:
             print "Copying %s to %s" % (source, dest)
 
         # Skip the first file - it's a tarball of the stdout/err
-        for outfile in zip(filenames[1:], self.outputFiles, transfer_list):
+        for outfile in zip(filenames[1:], self.outputFiles, source_sites[1:]):
             outlfn = os.path.join(dest_dir, outfile[0])
             outfile[1]['outlfn'] = outlfn
-            outfile[1]['outtmplocation'] = self.source_site
+            if 'outtmplocation' not in outfile[1]:
+                outfile[1]['outtmplocation'] = outfile[2]
             outfile[1]['outlocation'] = self.dest_site
 
         global g_Job
@@ -395,6 +420,14 @@ class PostJob():
         return fts_job_result
 
 
+    def makeNodeMap(self):
+        p = PhEDEx.PhEDEx()
+        nodes = p.getNodeMap()['phedex']['node']
+        self.node_map = {}
+        for node in nodes:
+            self.node_map[str(node[u'se'])] = str(node[u'name']).replace("_Disk", "").replace("_Buffer", "").replace("_MSS", "").replace("_Export", "")
+
+
     def execute(self, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
 
         fd = os.open("postjob.%s" % id, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0755)
@@ -416,6 +449,8 @@ class PostJob():
 
         self.makeAd(reqname, id, outputdata, sw, async_dest)
 
+        self.makeNodeMap()
+
         status = int(status)
 
         self.uploadFakeLog(state="TRANSFERRING")
@@ -436,13 +471,13 @@ class PostJob():
         self.source_site = self.getSourceSite()
 
         self.fixPerms()
-        self.uploadLog(os.path.join(dest_dir, filenames[0]))
         try:
+            self.uploadLog(os.path.join(dest_dir, filenames[0]))
             self.stageout(source_dir, dest_dir, *filenames)
-        except RuntimeError:
+            self.upload()
+        except:
             self.uploadState("FAILED")
             raise
-        self.upload()
         self.uploadFakeLog(state="FINISHED")
 
         return 0
