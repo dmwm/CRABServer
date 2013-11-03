@@ -86,6 +86,8 @@ class RetryJob(object):
 
         if exitCode == 8021 or exitCode == 8028 or exitCode == 8020:
             raise RecoverableError("Job failed to open local and fallback files.")
+        if exitCode == 50513:
+            raise RecoverableError("Job did not find functioning CMSSW on worker node.")
 
         if exitCode:
             raise FatalError("Job exited with code %d.  Exit message: %s" % (exitCode, exitMsg))
