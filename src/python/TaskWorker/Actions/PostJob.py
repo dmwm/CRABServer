@@ -99,7 +99,7 @@ class FTSJob(object):
 def determineSizes(transfer_list):
     sizes = []
     for pfn in transfer_list:
-        cmd = "lcg-ls -D srmv2 -b -l %s" % pfn
+        cmd = "lcg-ls --srm-timeout 300 --connect-timeout 300 --sendreceive-timeout 60 -D srmv2 -b -l %s" % pfn
         print "+", cmd
         status, output = commands.getstatusoutput(cmd)
         if status:
