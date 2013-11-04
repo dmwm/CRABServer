@@ -102,7 +102,7 @@ use_x509userproxy = true
 Requirements = (target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)
 #Requirements = ((target.IS_GLIDEIN =!= TRUE) || ((target.GLIDEIN_CMSSite =!= UNDEFINED) && (stringListIMember(target.GLIDEIN_CMSSite, DESIRED_SEs) )))
 #leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
-periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30)
+periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13)
 queue
 """
 
@@ -297,8 +297,6 @@ def create_subdag(splitter_result, **kwargs):
         jobgroupspecs, startjobid = make_specs(kwargs['task'], jobgroup, availablesites, outfiles, startjobid)
         specs += jobgroupspecs
 
-        # TODO: PanDA implementation makes a POST call about job data ... not sure what our equiv is.
-
     dag = ""
     for spec in specs:
         dag += DAG_FRAGMENT % spec
@@ -308,6 +306,8 @@ def create_subdag(splitter_result, **kwargs):
 
     task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
     userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
+
+    info["jobcount"] = len(jobgroup.getJobs())
 
     # When running in standalone mode, we want to record the number of jobs in the task
     if ('CRAB_ReqName' in kwargs['task']) and ('CRAB_UserDN' in kwargs['task']):
