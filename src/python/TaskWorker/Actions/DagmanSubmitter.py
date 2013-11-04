@@ -90,7 +90,8 @@ SUBMIT_INFO = [ \
             ('CRAB_PublishName', 'publishname'),
             ('CRAB_DBSUrl', 'dbsurl'),
             ('CRAB_PublishDBSUrl', 'publishdbsurl'),
-            ('CRAB_LumiMask', 'lumimask')]
+            ('CRAB_LumiMask', 'lumimask'),
+            ('CRAB_JobCount', 'jobcount')]
 
 def addCRABInfoToClassAd(ad, info):
     """
