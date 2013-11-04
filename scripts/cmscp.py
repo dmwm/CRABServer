@@ -96,14 +96,14 @@ def get_job_id(source):
     
     return left_piece + "." + right_piece, fileid
 
-def set_se_name(filename, se_name):
+def set_se_name(dest_file, se_name):
     """
     Alter the job report to record where the given file was
     staged out to.  If we cannot determine the matching file,
     then record it in the top-level of the JSON (hopefully it
     means that it is the log file).
     """
-    filename, id = get_job_id(filename)
+    filename, id = get_job_id(dest_file)
 
     with open("jobReport.json.%d" % id) as fd:
         full_report = json.load(fd)
@@ -133,6 +133,10 @@ def set_se_name(filename, se_name):
 
     if not found_output:
         full_report['SEName'] = se_name
+        try:
+            full_report['log_size'] = os.stat(dest_file).st_size
+        except:
+            pass
 
     with open("jobReport.json.%d" % id, "w") as fd:
         json.dump(full_report, fd)
@@ -201,7 +205,7 @@ def main():
             raise
             return 60307
         signal.alarm(0)
-        set_se_name(source, result['SEName'])
+        set_se_name(dest_file, result['SEName'])
     return 0
 
 if __name__ == '__main__':
