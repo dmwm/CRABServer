@@ -427,19 +427,43 @@ class PostJob():
         for node in nodes:
             self.node_map[str(node[u'se'])] = str(node[u'name']).replace("_Disk", "").replace("_Buffer", "").replace("_MSS", "").replace("_Export", "")
 
+    def execute(self, *args, **kw):
+        retry_count = args[1]
+        reqname = args[5]
+        logpath = os.path.expanduser("~/%s" % reqname)
+        postjob = os.path.join(logpath, "postjob.%s" % retry_count)
+        try:
+            retval = self.execute_internal(*args, **kw)
+        except:
+            shutil.copy("postjob.%s" % retry_count, postjob)
+            raise
+        if retval:
+            shutil.copy("postjob.%s" % retry_count, postjob)
+        return retval
 
-    def execute(self, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
+    def execute_internal(self, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
+
+        stdout = "job_out.%s" % id
+        stderr = "job_err.%s" % id
+        jobreport = "jobReport.json.%s" % id
 
         fd = os.open("postjob.%s" % id, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0755)
         os.dup2(fd, 1)
         os.dup2(fd, 2)
 
-        stdout = "job_out.%s" % id
-        stderr = "job_err.%s" % id
+        logpath = os.path.expanduser("~/%s" % reqname)
+        try:
+            os.makedirs(logpath)
+        except OSError, oe:
+            if oe.errno != errno.EEXIST:
+                raise
+
         if os.path.exists(stdout):
-            shutil.copy(stdout, stdout+"."+retry_count)
+            shutil.copy(stdout, os.path.join(logpath, stdout+"."+retry_count))
         if os.path.exists(stderr):
-            shutil.copy(stderr, stderr+"."+retry_count)
+            shutil.copy(stderr, os.path.join(logpath, stderr+"."+retry_count))
+        if os.path.exists(jobreport):
+            shutil.copy(jobreport, os.path.join(logpath, jobreport+"."+retry_count))
 
         if 'X509_USER_PROXY' not in os.environ:
             return 10
