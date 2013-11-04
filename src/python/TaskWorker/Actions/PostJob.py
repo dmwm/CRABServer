@@ -362,7 +362,7 @@ class PostJob():
         return source_site
 
 
-    def getSourceSite(self, filename):
+    def getFileSourceSite(self, filename):
         filename = os.path.split(filename)[-1]
         for outfile in self.outputFiles:
             if (u'pfn' not in outfile) or (u'SEName' not in outfile):
@@ -382,7 +382,7 @@ class PostJob():
 
         source_sites = []
         for filename in filenames:
-            source_sites.append(self.getSourceSite(filename))
+            source_sites.append(self.getFileSourceSite(filename))
 
         transfer_list = resolvePFNs(self.dest_site, source_dir, dest_dir, source_sites, filenames)
         for source, dest in transfer_list:

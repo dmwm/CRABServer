@@ -88,6 +88,10 @@ class RetryJob(object):
             raise RecoverableError("Job failed to open local and fallback files.")
         if exitCode == 50513:
             raise RecoverableError("Job did not find functioning CMSSW on worker node.")
+        # This is a difficult one -- right now CMSRunAnalysis.py will turn things like
+        # segfaults into an invalid FJR.  Will revisit this decision later.
+        if exitCode == 50115:
+            raise RecoverableError("Job did not produce a FJR; will retry.")
 
         if exitCode:
             raise FatalError("Job exited with code %d.  Exit message: %s" % (exitCode, exitMsg))
