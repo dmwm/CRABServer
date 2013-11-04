@@ -29,7 +29,15 @@ class RetryJob(object):
         status, output = commands.getstatusoutput(cmd)
         if status:
             raise FatalError("Failed to query condor user log:\n%s" % output)
-        self.ad = classad.parseOld(output.split("\n\n")[-1])
+        self.ads = []
+        for text_ad in output.split("\n\n"):
+            try:
+                ad = classad.parseOld(text_ad)
+            except SyntaxError:
+                continue
+            if ad:
+                self.ads.append(ad)
+        self.ad = self.ads[-1]
 
     def get_report(self):
         try:
@@ -54,9 +62,16 @@ class RetryJob(object):
         except ValueError:
             return
 
+        integratedJobTime = 0
+        for ad in self.ads:
+            if 'RemoteWallClockTime' in ad:
+                integratedJobTime += ad['RemoteWallClockTime']
+
         # TODO: Compare the job against its requested walltime, not a hardcoded max.
         if totJobTime > MAX_WALLTIME:
             raise FatalError("Not retrying a long running job (job ran for %d hours)" % (totJobTime / 3600))
+        if integratedJobTime > 1.5*MAX_WALLTIME:
+            raise FatalError("Not retrying a job because the integrated time (across all retries) is %d hours." % (integratedJobTime / 3600))
 
     def check_memory_report(self):
         if 'steps' not in self.report: return
