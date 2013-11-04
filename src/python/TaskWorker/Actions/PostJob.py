@@ -432,14 +432,16 @@ class PostJob():
         id = args[6]
         reqname = args[5]
         logpath = os.path.expanduser("~/%s" % reqname)
-        postjob = os.path.join(logpath, "postjob.%s.%s.log" % (id, retry_count))
+        postjob = os.path.join(logpath, "postjob.%s.%s.txt" % (id, retry_count))
         try:
             retval = self.execute_internal(*args, **kw)
         except:
             shutil.copy("postjob.%s" % retry_count, postjob)
+            os.chmod(postjob, 0644)
             raise
         if retval:
             shutil.copy("postjob.%s" % retry_count, postjob)
+            os.chmod(postjob, 0644)
         return retval
 
     def execute_internal(self, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
@@ -460,11 +462,17 @@ class PostJob():
                 raise
 
         if os.path.exists(stdout):
-            shutil.copy(stdout, os.path.join(logpath, "job_out."+id+"."+retry_count+".log"))
+            fname = os.path.join(logpath, "job_out."+id+"."+retry_count+".txt")
+            shutil.copy(stdout, fname)
+            os.chmod(fname, 0644)
         if os.path.exists(stderr):
-            shutil.copy(stderr, os.path.join(logpath, "job_err."+id+"."+retry_count+".log"))
+            fname = os.path.join(logpath, "job_err."+id+"."+retry_count+".txt")
+            shutil.copy(stderr, fname)
+            os.chmod(fname, 0644)
         if os.path.exists(jobreport):
-            shutil.copy(jobreport, os.path.join(logpath, "job_fjr."+id+"."+retry_count+".json"))
+            fname = os.path.join(logpath, "job_fjr."+id+"."+retry_count+".json")
+            shutil.copy(jobreport, fname)
+            os.chmod(fname, 0644)
 
         if 'X509_USER_PROXY' not in os.environ:
             return 10
