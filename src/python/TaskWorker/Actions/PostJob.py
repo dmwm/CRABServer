@@ -429,9 +429,10 @@ class PostJob():
 
     def execute(self, *args, **kw):
         retry_count = args[1]
+        id = args[6]
         reqname = args[5]
         logpath = os.path.expanduser("~/%s" % reqname)
-        postjob = os.path.join(logpath, "postjob.%s" % retry_count)
+        postjob = os.path.join(logpath, "postjob.%s.%s.log" % (id, retry_count))
         try:
             retval = self.execute_internal(*args, **kw)
         except:
@@ -459,11 +460,11 @@ class PostJob():
                 raise
 
         if os.path.exists(stdout):
-            shutil.copy(stdout, os.path.join(logpath, stdout+"."+retry_count))
+            shutil.copy(stdout, os.path.join(logpath, "job_out."+id+"."+retry_count+".log"))
         if os.path.exists(stderr):
-            shutil.copy(stderr, os.path.join(logpath, stderr+"."+retry_count))
+            shutil.copy(stderr, os.path.join(logpath, "job_err."+id+"."+retry_count+".log"))
         if os.path.exists(jobreport):
-            shutil.copy(jobreport, os.path.join(logpath, jobreport+"."+retry_count))
+            shutil.copy(jobreport, os.path.join(logpath, "job_fjr."+id+"."+retry_count+".json"))
 
         if 'X509_USER_PROXY' not in os.environ:
             return 10
