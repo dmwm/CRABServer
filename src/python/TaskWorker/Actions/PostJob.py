@@ -436,11 +436,11 @@ class PostJob():
         try:
             retval = self.execute_internal(*args, **kw)
         except:
-            shutil.copy("postjob.%s" % retry_count, postjob)
+            shutil.copy("postjob.%s" % id, postjob)
             os.chmod(postjob, 0644)
             raise
         if retval:
-            shutil.copy("postjob.%s" % retry_count, postjob)
+            shutil.copy("postjob.%s" % id, postjob)
             os.chmod(postjob, 0644)
         return retval
 
