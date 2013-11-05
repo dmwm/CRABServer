@@ -2,7 +2,7 @@
 from WMCore.Database.DBFormatter import DBFormatter
 
 class GetFromTaskAndType(DBFormatter):
-    PANDAID, OUTDS, ACQERA, SWVER, INEVENTS, GLOBALTAG, PUBLISHNAME, LOCATION, TMPLOCATION, RUNLUMI, ADLER32, CKSUM, MD5, LFN, SIZE, PARENTS, STATE = range(16)
+    PANDAID, OUTDS, ACQERA, SWVER, INEVENTS, GLOBALTAG, PUBLISHNAME, LOCATION, TMPLOCATION, RUNLUMI, ADLER32, CKSUM, MD5, LFN, SIZE, PARENTS, STATE = range(17)
     sql = """SELECT panda_job_id AS pandajobid,
                         fmd_outdataset AS outdataset,
                         fmd_acq_era AS acquisitionera,
