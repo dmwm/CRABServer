@@ -280,9 +280,10 @@ class PostJob():
         source_site = self.source_site
         if 'SEName' in self.full_report:
             source_site = self.node_map.get(self.full_report['SEName'], source_site)
+        log_size = self.full_report.get(u'log_size', 0)
         configreq = {"taskname":        self.ad['CRAB_ReqName'],
                      "pandajobid":      self.crab_id,
-                     "outsize":         "0", # Not implemented
+                     "outsize":         log_size, # Not implemented
                      "publishdataname": self.ad['CRAB_OutputData'],
                      "appver":          self.ad['CRAB_JobSW'],
                      "outtype":         "LOG",
@@ -436,10 +437,14 @@ class PostJob():
         try:
             retval = self.execute_internal(*args, **kw)
         except:
+            sys.stdout.flush()
+            sys.stderr.flush()
             shutil.copy("postjob.%s" % id, postjob)
             os.chmod(postjob, 0644)
             raise
         if retval:
+            sys.stdout.flush()
+            sys.stderr.flush()
             shutil.copy("postjob.%s" % id, postjob)
             os.chmod(postjob, 0644)
         return retval
