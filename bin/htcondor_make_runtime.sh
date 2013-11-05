@@ -29,7 +29,10 @@ CRABCLIENTDIR=$STARTDIR/CRABClient
 CRABCLIENTVER=3.2.0pre18-dagman1
 CRABCLIENTREPO=bbockelm
 
+#As soon as https://github.com/dmwm/WMCore/pull/4845 is merged we may think of dropping these three lines
 WMCORERUNTIMEDIR=$STARTDIR/WMCore-alt
+WMCORERUNTIMEVER=temporary
+WMCORERUNTIMEREPO=mmascher
 
 [[ -d $STARTDIR ]] || mkdir -p $STARTDIR
 
@@ -149,9 +152,12 @@ popd
 # up until this point, evertying in CRAB3.zip is an external
 cp $STARTDIR/CRAB3.zip $ORIGDIR/CRAB3-externals.zip
 
-pushd $WMCORERUNTIMEDIR
-curl -L http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz | tar zx || exit 3
-cp WMCore.zip $STARTDIR/WMCore.zip
+#In the future we may want to use just one WMCore archive
+pushd $WMCORERUNTIMEDIR/
+curl -L https://github.com/$WMCORERUNTIMEREPO/WMCore/archive/$WMCORERUNTIMEVER.tar.gz | tar zx || exit 3
+pushd WMCore-$WMCORERUNTIMEVER/src/python/
+zip -r $STARTDIR/WMCore.zip *
+popd
 popd
 
 pushd $WMCORE_PATH/src/python
