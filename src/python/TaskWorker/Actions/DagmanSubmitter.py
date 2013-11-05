@@ -17,6 +17,8 @@ import TaskWorker.DataObjects.Result as Result
 
 from TaskWorker.Actions.DagmanCreator import CRAB_HEADERS
 
+from ApmonIf import ApmonIf
+
 # Bootstrap either the native module or the BossAir variant.
 try:
     import classad
@@ -128,6 +130,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         task = kw['task']
         tempDir = args[0][0]
         info = args[0][1]
+        dashboard_params = args[0][2]
 
         cwd = os.getcwd()
         os.chdir(tempDir)
@@ -161,6 +164,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         self.logger.debug("Pushing information centrally %s" %(str(configreq)))
         data = urllib.urlencode(configreq)
         self.server.post(self.resturl, data = data)
+
+        self.sendDashboardJobs(dashboard_params, info['apmon'])
     
         return Result.Result(task=kw['task'], result=(-1))
 
@@ -202,4 +207,14 @@ class DagmanSubmitter(TaskAction.TaskAction):
             raise Exception("Failure when submitting HTCondor task: '%s'" % results)
 
         schedd.reschedule()
+
+
+    def sendDashboardJobs(self, params, info):
+        apmon = ApmonIf()
+        for job in info:
+            job.update(params)
+            self.logger.debug("Dashboard job info: %s" % str(job))
+            apmon.sendToML(job)
+        apmon.free()
+
 

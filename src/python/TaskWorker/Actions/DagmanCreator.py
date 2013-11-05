@@ -21,6 +21,8 @@ import TaskWorker.WorkerExceptions
 
 import WMCore.WMSpec.WMTask
 
+from ApmonIf import ApmonIf
+
 DAG_FRAGMENT = """
 JOB Job%(count)d Job.submit
 #SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY $JOB
@@ -320,6 +322,19 @@ def create_subdag(splitter_result, **kwargs):
 
     info["jobcount"] = len(jobgroup.getJobs())
 
+    # Info for ML:
+    ml_info = info.setdefault('apmon', [])
+    for idx in range(1, info['jobcount']+1):
+        taskid = kwargs['task']['tm_taskname'].replace("_", ":")
+        jinfo = {'jobId': ("%d_%d:%s_0" % (idx, idx, taskid)),
+                 'sid': "%d:%s" % (idx, taskid),
+                 'broker': os.environ.get('HOSTNAME',''),
+                 'bossId': str(idx),
+                 'TargetSE': ("%d_Selected_SE" % len(specs[idx-1]['desiredSites'])),
+                 'localId' : '',
+                }
+        ml_info.append(jinfo)
+
     # When running in standalone mode, we want to record the number of jobs in the task
     if ('CRAB_ReqName' in kwargs['task']) and ('CRAB_UserDN' in kwargs['task']):
         const = 'TaskType =?= \"ROOT\" && CRAB_ReqName =?= "%s" && CRAB_UserDN =?= "%s"' % (task_name, userdn)
@@ -348,6 +363,37 @@ class DagmanCreator(TaskAction.TaskAction):
     Given a task definition, create the corresponding DAG files for submission
     into HTCondor
     """
+
+    def buildDashboardInfo(self):
+
+        params = {'tool': 'crab3',
+                  'SubmissionType':'direct',
+                  'JSToolVersion': '3.3.0',
+                  'tool_ui': os.environ.get('HOSTNAME',''),
+                  'scheduler': 'GLIDEIN',
+                  'GridName': self.task['tm_user_dn'],
+                  'ApplicationVersion': 'tm_job_sw',
+                  'taskType': 'integration',
+                  'vo': 'cms',
+                  'CMSUser': self.task['tm_username'],
+                  'user': self.task['tm_username'],
+                  'taskId': self.task['tm_taskname'],
+                  'datasetFull': self.task['tm_input_dataset'],
+                  'resubmitter': self.task['tm_username'],
+                  'exe': 'cmsRun' }
+        return params
+
+
+    def sendDashboardTask(self):
+        apmon = ApmonIf()
+        params = self.buildDashboardInfo()
+        params_copy = dict(params)
+        params_copy['jobId'] = 'TaskMeta'
+        self.logger.debug("Dashboard task info: %s" % str(params_copy))
+        apmon.sendToML(params_copy)
+        apmon.free()
+        return params
+
 
     def executeInternal(self, *args, **kw):
         global LOGGER
@@ -380,13 +426,16 @@ class DagmanCreator(TaskAction.TaskAction):
 
         kw['task']['restinstance'] = self.server['host']
         kw['task']['resturl'] = self.resturl.replace("/workflowdb", "/filemetadata")
+        self.task = kw['task']
+        params = self.sendDashboardTask()
 
         try:
             info = create_subdag(*args, **kw)
         finally:
             if cwd:
                 os.chdir(cwd)
-        return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(temp_dir, info))
+
+        return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(temp_dir, info, params))
 
     def execute(self, *args, **kw):
         try:
