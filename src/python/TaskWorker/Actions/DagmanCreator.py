@@ -26,7 +26,7 @@ JOB Job%(count)d Job.submit
 #SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY $JOB
 SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
-RETRY Job%(count)d 3 UNLESS-EXIT 2
+RETRY Job%(count)d 10 UNLESS-EXIT 2
 VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" inputFiles="%(inputFiles)s" +DESIRED_Sites="\\"%(desiredSites)s\\"" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
 
 #JOB ASO%(count)d ASO.submit
@@ -102,7 +102,7 @@ use_x509userproxy = true
 Requirements = (target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)
 #Requirements = ((target.IS_GLIDEIN =!= TRUE) || ((target.GLIDEIN_CMSSite =!= UNDEFINED) && (stringListIMember(target.GLIDEIN_CMSSite, DESIRED_SEs) )))
 #leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
-periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13)
+periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
 queue
 """
 
@@ -272,7 +272,13 @@ def create_subdag(splitter_result, **kwargs):
 
     server_data = []
 
-    #fixedsites = set(self.config.Sites.available)
+    # TODO: pass config object to this function.
+    # This config setting acts as a global black / white list
+    #if hasattr(self.config.Sites, 'available'):
+    #    global_whitelist = set(self.config.Sites.available)
+    #else:
+    #    global_whitelist = set()
+    #global_blacklist = set(self.config.Sites.banned)
     for jobgroup in splitter_result:
         jobs = jobgroup.getJobs()
 
@@ -286,7 +292,12 @@ def create_subdag(splitter_result, **kwargs):
             availablesites = set(kwargs['task']['tm_site_whitelist'])
         else:
             availablesites = set(possiblesites) - set(kwargs['task']['tm_site_blacklist'])
-        #availablesites = set(availablesites) & fixedsites
+
+        # Apply globals
+        #availablesites = set(availablesites) - global_blacklist
+        #if global_whitelist:
+        #    availablesites = set(availablesites) & global_whitelist
+
         availablesites = [str(i) for i in availablesites]
         LOGGER.info("Resulting available sites: %s" % ", ".join(availablesites))
 
@@ -354,6 +365,7 @@ class DagmanCreator(TaskAction.TaskAction):
             gwms_location = getLocation('gWMS-CMSRunAnalysis.sh', 'CRABServer/scripts/')
             dag_bootstrap_location = getLocation('dag_bootstrap_startup.sh', 'CRABServer/scripts/')
             bootstrap_location = getLocation("dag_bootstrap.sh", "CRABServer/scripts/")
+            adjust_location = getLocation("AdjustSites.py", "CRABServer/scripts/")
 
             cwd = os.getcwd()
             os.chdir(temp_dir)
@@ -362,6 +374,7 @@ class DagmanCreator(TaskAction.TaskAction):
             shutil.copy(gwms_location, '.')
             shutil.copy(dag_bootstrap_location, '.')
             shutil.copy(bootstrap_location, '.')
+            shutil.copy(adjust_location, '.')
 
             kw['task']['scratch'] = temp_dir
 
