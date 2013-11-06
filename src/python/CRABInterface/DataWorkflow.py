@@ -204,8 +204,8 @@ class DataWorkflow(object):
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         #if there are failed jobdef submission we fail
-        if statusRes['failedJobdefs']:
-            raise ExecutionError("You cannot resubmit a task if not all the jobs have been submitted. The feature will be available in the future")
+        #if statusRes['failedJobdefs']:
+        #    raise ExecutionError("You cannot resubmit a task if not all the jobs have been submitted. The feature will be available in the future")
 
         if statusRes['status'] in ['SUBMITTED','KILLED','FAILED']:
             resubmitList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus in self.failedList]
