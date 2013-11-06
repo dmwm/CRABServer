@@ -30,6 +30,22 @@ class HTCondorDataWorkflow(DataWorkflow):
            :arg str workflow: a valid workflow name
            :return: a workflow status summary document"""
 
+        # First, verify the task has been submitted by the backend.
+        row = self.api.query(None, None, ID.sql, taskname = workflow)
+        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs  = row.next() #just one row is picked up by the previous query
+        self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
+        self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
+        if status != 'SUBMITTED':
+            return [ {"status" : status,\
+                      "taskFailureMsg" : taskFailure.read() if taskFailure else '',\
+                      "jobSetID"        : '',
+                      "jobsPerStatus"   : {},
+                      "failedJobdefs"   : 0,
+                      "totalJobdefs"    : 0,
+                      "jobdefErrors"    : [],
+                      "jobList"         : [],
+                      "saveLogs"        : saveLogs }]
+
         import cherrypy
 
         name = workflow.split("_")[0]
@@ -50,7 +66,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         jobList = []
         taskStatusCode = int(results[-1]['JobStatus'])
         taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
-        codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'completed', 5: 'cancelled'}
+        codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'finished', 5: 'cancelled'}
         task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
         retval = {"status": task_codes.get(taskStatusCode, 'unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
@@ -83,7 +99,9 @@ class HTCondorDataWorkflow(DataWorkflow):
                 elif file_state == 'FAILED':
                     jobStatus[result] = 'failed'
                     failedJobs.append(result)
-            if (result in failedJobs) and (file_state == 'FINISHED'):
+                else:
+                    jobStatus[result] = 'transferring'
+            elif (result in failedJobs) and (file_state == 'FINISHED'):
                 failedJobs.remove(result)
                 jobStatus[result] = 'finished'
 
@@ -98,6 +116,8 @@ class HTCondorDataWorkflow(DataWorkflow):
             jobsPerStatus.setdefault(status, 0)
             jobsPerStatus[status] += 1
             jobList.append((status, job))
+
+        self.logger.debug("Job info: %s" % str(jobStatus))
 
         retval["failedJobdefs"] = len(failedJobs)
         retval["totalJobdefs"] = len(jobStatus)
@@ -119,7 +139,6 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         if not results:
             self.logger.info("An invalid workflow name was requested: %s" % workflow)
-            self.logger.info("Tried to read from address %s" % address)
             raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
         return results
 
@@ -147,11 +166,15 @@ class HTCondorDataWorkflow(DataWorkflow):
 
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
+
+        row = self.api.query(None, None, ID.sql, taskname = workflow)
+        saveLogs  = row.next()[-1] #just one row is picked up by the previous query
+
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring']]
         finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
-        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, userdn, saveLogs=statusRes['saveLogs'], userproxy=userproxy)
+        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, userdn, saveLogs=saveLogs, userproxy=userproxy)
 
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
@@ -195,13 +218,15 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         for row in rows:
             if filetype == ['LOG'] and saveLogs == 'F':
-                pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])[(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])]
+                lfn = re.sub('^/store/user/', '/store/temp/user/', row[GetFromTaskAndType.LFN])
+                pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
             else:
                 if row[GetFromTaskAndType.PANDAID] in finishedIds:
                     lfn = re.sub('^/store/temp/', '/store/', row[GetFromTaskAndType.LFN])
                     pfn = self.phedex.getPFN(row[GetFromTaskAndType.LOCATION], lfn)[(row[GetFromTaskAndType.LOCATION], lfn)]
                 elif row[GetFromTaskAndType.PANDAID] in transferingIds:
-                    pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])[(row[GetFromTaskAndType.TMPLOCATION], row[GetFromTaskAndType.LFN])]
+                    lfn = re.sub('^/store/user/', '/store/temp/user/', row[GetFromTaskAndType.LFN])
+                    pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
                 else:
                     continue
 
@@ -227,11 +252,13 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         res['runsAndLumis'] = {}
         for row in rows:
+            self.logger.debug("Got lumi info for job %d." % row[GetFromTaskAndType.PANDAID])
             if row[GetFromTaskAndType.PANDAID] in jobids:
                 res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])] = { 'parents' : row[GetFromTaskAndType.PARENTS].read(),
                         'runlumi' : row[GetFromTaskAndType.RUNLUMI].read(),
                         'events'  : row[GetFromTaskAndType.INEVENTS],
                 }
-        self.logger.info("Got %s edm files for workflow %s" % (len(res), workflow))
+        self.logger.info("Got %s edm files for workflow %s" % (len(res['runsAndLumis']), workflow))
 
         yield res
+
