@@ -11,6 +11,7 @@ systems = \
   'CRABClient': #Will be used if we moved the CRABClient repository
   {
     'py_modules' : ['PandaServerInterface', 'RESTInteractions'],
+    'python': [],
   },
   'CRABInterface':
   {
