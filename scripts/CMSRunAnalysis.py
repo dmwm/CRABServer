@@ -21,9 +21,17 @@ EC_ReportHandlingErr =  50115
 EC_WGET =               99998 #TODO define an error code
 
 print "=== start ==="
+starttime = time.time()
 print time.ctime()
 
 from optparse import (OptionParser,BadOptionError,AmbiguousOptionError)
+
+def mintime():
+    mymin = 20*60
+    tottime = time.time()-starttime
+    remaining = mymin - tottime
+    if remaining > 0:
+        time.sleep(remaining)
 
 class PassThroughOptionParser(OptionParser):
     """
@@ -268,11 +276,13 @@ except WMExecutionFailure, WMex:
     #print "jobExitCode = %s" % jobExitCode
     handleException("FAILED", WMex.code, exmsg)
     #sys.exit(WMex.code)
+    mintime()
     sys.exit(0)
 except Exception, ex:
     #print "jobExitCode = %s" % jobExitCode
     handleException("FAILED", EC_CMSRunWrapper, "failed to generate cmsRun cfg file at runtime")
     #sys.exit(EC_CMSRunWrapper)
+    mintime()
     sys.exit(0)
 
 #Create the report file
@@ -285,7 +295,7 @@ try:
     AddChecksums(report)
     if jobExitCode: #TODO check exitcode from fwjr
         report['exitAcronym'] = "FAILED"
-        report['exitCode'] = jobExitCode #TODO take exitcode from fwjr
+        report['exitCode'] = jobExitCode
         report['exitMsg'] = "Error while running CMSSW:\n"
         for error in report['steps']['cmsRun']['errors']:
             report['exitMsg'] += error['type'] + '\n'
@@ -304,10 +314,12 @@ try:
 except FwkJobReportException, FJRex:
     msg = "BadFWJRXML"
     handleException("FAILED", EC_ReportHandlingErr, msg)
+    mintime()
     sys.exit(EC_ReportHandlingErr)
 except Exception, ex:
     msg = "Exception while handling the job report."
     handleException("FAILED", EC_ReportHandlingErr, msg)
+    mintime()
     sys.exit(EC_ReportHandlingErr)
 
 # rename output files. Doing this after checksums otherwise outfile is not found.
@@ -317,18 +329,8 @@ if jobExitCode == 0:
             os.rename(oldName, newName)
     except Exception, ex:
         handleException("FAILED", EC_MoveOutErr, "Exception while moving the files.")
+        mintime()
         sys.exit(EC_MoveOutErr)
 
-
-#create the Pool File Catalog (?)
-pfcName = 'PoolFileCatalog.xml'
-pfcFile = open(pfcName,'w')
-pfcFile.write("""<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<!-- Edited By POOL -->
-<!DOCTYPE POOLFILECATALOG SYSTEM "InMemory">
-<POOLFILECATALOG>
-
-</POOLFILECATALOG>
-""")
-pfcFile.close()
-
+mintime()
+sys.exit(jobExitCode)
