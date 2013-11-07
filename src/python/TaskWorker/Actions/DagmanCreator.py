@@ -170,8 +170,15 @@ def transform_strings(input):
     # TODO: PanDA wrapper wants some sort of dictionary.
     info["addoutputfiles_flatten"] = '{}'
 
-    info["output_dest"] = os.path.join("/store/user", input['userhn'], input['workflow'], input['publishname'])
-    info["temp_dest"] = os.path.join("/store/temp/user", input['userhn'], input['workflow'], input['publishname'])
+    #info["output_dest"] = os.path.join("/store/user", input['userhn'], input['workflow'], input['publishname'])
+    #info["temp_dest"] = os.path.join("/store/temp/user", input['userhn'], input['workflow'], input['publishname'])
+    if input['inputdata']:
+        primaryds = input['inputdata'].split('/')[1]
+    else:
+        # For MC
+        primaryds = input['publishname'].split('-')[0]
+    info["temp_dest"] = os.path.join("/store/temp/user", input['userhn'], primaryds, input['publishname'].split('-')[0], input['publishname'].split('-')[1])
+    info["output_dest"] = os.path.join("/store/user", input['userhn'], primaryds, input['publishname'].split('-')[0], input['publishname'].split('-')[1])
     info['x509up_file'] = os.path.split(input['user_proxy'])[-1]
     info['user_proxy'] = input['user_proxy']
     info['scratch'] = input['scratch']
@@ -222,7 +229,7 @@ def makeJobSubmit(task):
         fd.write(JOB_SUBMIT % info)
     with open("ASO.submit", "w") as fd:
         fd.write(ASYNC_SUBMIT % info)
-        
+
     return info
 
 def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
@@ -245,13 +252,20 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
             localOutputFiles.append("%s?remoteName=%s" % (origFile, fileName))
         remoteOutputFiles = " ".join(remoteOutputFiles)
         localOutputFiles = ", ".join(localOutputFiles)
+        if task['tm_input_dataset']:
+            primaryds = task['tm_input_dataset'].split('/')[1]
+        else:
+            # For MC
+            primaryds = task['tm_publish_name'].split('-')[0]
         specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
                       'desiredSites': desiredSites, 'remoteOutputFiles': remoteOutputFiles,
                       'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
                       'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                       'outputData': task['tm_publish_name'],
-                      'tempDest': os.path.join("/store/temp/user", task['tm_username'], task['tm_taskname'], task['tm_publish_name']),
-                      'outputDest': os.path.join("/store/user", task['tm_username'], task['tm_taskname'], task['tm_publish_name']),
+                      'tempDest': os.path.join("/store/temp/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1]),
+                      #'tempDest': os.path.join("/store/temp/user", task['tm_username'], task['tm_taskname'], task['tm_publish_name']),
+                      #'outputDest': os.path.join("/store/user", task['tm_username'], task['tm_taskname'], task['tm_publish_name']),
+                      'outputDest': os.path.join("/store/temp/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1]),
                       'restinstance': task['restinstance'], 'resturl': task['resturl']})
 
         LOGGER.debug(specs[-1])
@@ -326,7 +340,7 @@ def create_subdag(splitter_result, **kwargs):
     ml_info = info.setdefault('apmon', [])
     for idx in range(1, info['jobcount']+1):
         taskid = kwargs['task']['tm_taskname'].replace("_", ":")
-        jinfo = {'jobId': ("%d_%d:%s_0" % (idx, idx, taskid)),
+        jinfo = {'jobId': ("%d_https://glidein.%d:%s_0" % (idx, idx, taskid)),
                  'sid': "%d:%s" % (idx, taskid),
                  'broker': os.environ.get('HOSTNAME',''),
                  'bossId': str(idx),
