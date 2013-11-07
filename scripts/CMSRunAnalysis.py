@@ -186,9 +186,9 @@ def executeCMSSWStack(opts):
     cmssw.step.application.configuration.section_("arguments")
     cmssw.step.application.configuration.arguments.globalTag = ""
     cmssw.step.output.modules.section_('o')
-    cmssw.step.output.modules.output.primaryDataset   = ''
-    cmssw.step.output.modules.output.processedDataset = ''
-    cmssw.step.output.modules.output.dataTier         = ''
+    cmssw.step.output.modules.o.primaryDataset   = ''
+    cmssw.step.output.modules.o.processedDataset = ''
+    cmssw.step.output.modules.o.dataTier         = ''
     #cmssw.step.application.command.arguments = '' #TODO
     cmssw.step.user.inputSandboxes = [opts.archiveJob]
     cmssw.step.user.userFiles = opts.userFiles or ''
@@ -219,9 +219,8 @@ def AddChecksums(report):
 def startDashboardMonitoring():
     params = {
         'WNHostName': socket.getfqdn(),
-        'MonitorJobID': '3_https://submit-6.t2.ucsd.edu//131103//53912.2',
-        'SyncGridJobId': 'https://submit-6.t2.ucsd.edu//131103//53912.2',
-        'MonitorID': 'gurrola_W2JetsToLNu_04vnp5',
+        #'MonitorJobID': '3_https://submit-6.t2.ucsd.edu//131103//53912.2',
+        'SyncGridJobId': '%d_https://glidein.%d:%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
         'SyncSite': ad['JOB_CMSSite'],
         'SyncCE': ad['Used_Gatekeeper'].split(":")[0],
     }
