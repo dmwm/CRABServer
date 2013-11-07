@@ -216,17 +216,38 @@ def AddChecksums(report):
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
-def startDashboardMonitoring():
+def parseAd(ad):
+    fd = open(os.environ['_CONDOR_JOB_AD'])
+    ad = {}
+    for line in fd.readlines():
+        info = line.split(" = ", 1)
+        if len(info) != 2:
+            continue
+        if info[1].startswith('"'):
+            val = info[1].strip()[1:-1]
+        else:
+            try:
+                val = int(info[1].strip())
+            except ValueError:
+                continue
+        ad[info[0]] = val
+    return ad
+
+def startDashboardMonitoring(ad):
     params = {
         'WNHostName': socket.getfqdn(),
         #'MonitorJobID': '3_https://submit-6.t2.ucsd.edu//131103//53912.2',
         'SyncGridJobId': '%d_https://glidein.%d:%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
         'SyncSite': ad['JOB_CMSSite'],
         'SyncCE': ad['Used_Gatekeeper'].split(":")[0],
+        'ExeStart': 'cmsRun',
     }
 
-def stopDashboardMonitoring():
-    pass
+def stopDashboardMonitoring(ad):
+    params = {
+        'SyncGridJobId': '%d_https://glidein.%d:%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
+        'ExeEnd': 'cmsRun',
+    }
 
 try:
     setupLogging('.')
@@ -251,7 +272,7 @@ try:
     report = Report("cmsRun")
     report.parse('FrameworkJobReport.xml', "cmsRun")
     jobExitCode = report.getExitCode()
-    import pdb;pdb.set_trace()
+    #import pdb;pdb.set_trace()
     report = report.__to_json__(None)
     AddChecksums(report)
     if jobExitCode: #TODO check exitcode from fwjr
