@@ -103,7 +103,7 @@ print " arguments: %s" % sys.argv
 agentNumber = 0
 #lfnBase = '/store/temp/user/mmascher/RelValProdTTbar/mc/v6' #TODO how is this built?
 lfnBase = None
-outputMods = [] #TODO should not be hardcoded but taken from the config (how?)
+outputMods = ['o'] #TODO should not be hardcoded but taken from the config (how?)
 
 parser = OptionParser()
 parser.add_option('--oneEventMode', dest='oneEventMode', default=False)
