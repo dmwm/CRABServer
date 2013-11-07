@@ -503,7 +503,9 @@ class PostJob():
         if retval:
            if retval == RetryJob.FATAL_ERROR:
                return self.uploadState("FAILED")
-           return retval
+           else:
+               self.uploadState("COOLOFF")
+               return retval
 
         self.parseJson()
         self.source_site = self.getSourceSite()
@@ -514,7 +516,7 @@ class PostJob():
             self.stageout(source_dir, dest_dir, *filenames)
             self.upload()
         except:
-            self.uploadState("FAILED")
+            self.uploadState("COOLOFF")
             raise
         self.uploadFakeLog(state="FINISHED")
 

@@ -37,7 +37,7 @@ RX_LUMILIST  = re.compile(r"^\d+(,\d+)*$")
 RX_GLOBALTAG = re.compile(r'^[a-zA-Z0-9\s\.\-_:]{1,100}$')
 RX_OUTTYPES  = re.compile(r'^EDM|LOG|TFILE|FAKE$')
 RX_CHECKSUM  = re.compile(r'^[A-Za-z0-9\-]+$')
-RX_FILESTATE  = re.compile(r'^TRANSFERRING|FINISHED|FAILED$')
+RX_FILESTATE  = re.compile(r'^TRANSFERRING|FINISHED|FAILED|COOLOFF$')
 
 #basic certificate check -- used for proxies retrieved from myproxy
 RX_CERT = re.compile(r'^[-]{5}BEGIN CERTIFICATE[-]{5}[\w\W]+[-]{5}END CERTIFICATE[-]{5}\n$')

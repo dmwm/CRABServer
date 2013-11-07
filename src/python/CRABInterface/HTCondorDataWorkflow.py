@@ -22,7 +22,7 @@ class HTCondorDataWorkflow(DataWorkflow):
     """
 
     successList = ['finished']
-    failedList = ['cancelled', 'failed']
+    failedList = ['cancelled', 'failed', 'cooloff']
 
     def status(self, workflow, userdn, userproxy=None):
         """Retrieve the status of the workflow.
@@ -96,6 +96,8 @@ class HTCondorDataWorkflow(DataWorkflow):
             if result not in jobStatus:
                 if file_state == 'FINISHED':
                     jobStatus[result] = 'finished'
+                elif file_state == 'COOLOFF':
+                    jobStatus[result] = 'cooloff'
                 elif file_state == 'FAILED':
                     jobStatus[result] = 'failed'
                     failedJobs.append(result)
@@ -103,6 +105,8 @@ class HTCondorDataWorkflow(DataWorkflow):
                     jobStatus[result] = 'transferring'
             elif (result in failedJobs) and (file_state == 'FINISHED'):
                 failedJobs.remove(result)
+                jobStatus[result] = 'finished'
+            elif file_state == 'FINISHED':
                 jobStatus[result] = 'finished'
 
         for i in range(1, taskJobCount+1):
