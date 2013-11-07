@@ -192,7 +192,7 @@ def executeCMSSWStack(opts):
     cmssw.step.application.setup.cmsswVersion = opts.cmsswVersion
     cmssw.step.application.configuration.section_("arguments")
     cmssw.step.application.configuration.arguments.globalTag = ""
-    for output in getOutputModules():
+    for output in ['o']: #getOutputModules():
         cmssw.step.output.modules.section_(output)
         getattr(cmssw.step.output.modules, output).primaryDataset   = ''
         getattr(cmssw.step.output.modules, output).processedDataset = ''
