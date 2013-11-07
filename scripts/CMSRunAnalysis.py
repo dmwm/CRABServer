@@ -172,8 +172,15 @@ from WMCore.WMSpec.WMStep import WMStep
 from WMCore.WMSpec.WMTask import makeWMTask
 from WMCore.WMSpec.WMWorkload import newWorkload
 from WMCore.WMSpec.Steps.Templates.CMSSW import CMSSW as CMSSWTemplate
+from PSetTweaks.WMTweak import makeTweak
 
 def executeCMSSWStack(opts):
+
+    def getOutputModules():
+        config = __import__('WMTaskSpace.cmsRun.PSet', globals(), locals(), ["process"], -1)
+        tweakJson = makeTweak(config.process).jsondictionary()
+        return tweakJson["process"]["outputModules_"]
+
     cmssw = CMSSW()
     cmssw.stepName = "cmsRun"
     cmssw.step = WMStep(cmssw.stepName)
@@ -185,10 +192,11 @@ def executeCMSSWStack(opts):
     cmssw.step.application.setup.cmsswVersion = opts.cmsswVersion
     cmssw.step.application.configuration.section_("arguments")
     cmssw.step.application.configuration.arguments.globalTag = ""
-    cmssw.step.output.modules.section_('o')
-    cmssw.step.output.modules.o.primaryDataset   = ''
-    cmssw.step.output.modules.o.processedDataset = ''
-    cmssw.step.output.modules.o.dataTier         = ''
+    for output in getOutputModules():
+        cmssw.step.output.modules.section_(output)
+        getattr(cmssw.step.output.modules, output).primaryDataset   = ''
+        getattr(cmssw.step.output.modules, output).processedDataset = ''
+        getattr(cmssw.step.output.modules, output).dataTier         = ''
     #cmssw.step.application.command.arguments = '' #TODO
     cmssw.step.user.inputSandboxes = [opts.archiveJob]
     cmssw.step.user.userFiles = opts.userFiles or ''
