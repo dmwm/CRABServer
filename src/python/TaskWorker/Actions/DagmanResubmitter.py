@@ -11,6 +11,8 @@ import HTCondorUtils
 
 import TaskWorker.Actions.TaskAction as TaskAction
 
+from httplib import HTTPException
+
 class DagmanResubmitter(TaskAction.TaskAction):
 
     """
@@ -77,7 +79,10 @@ class DagmanResubmitter(TaskAction.TaskAction):
                          'status': "FAILED",
                          'subresource': 'failure',
                          'failure': base64.b64encode(msg)}
-            self.server.post(self.resturl, data = urllib.urlencode(configreq))
+            try:
+                self.server.post(self.resturl, data = urllib.urlencode(configreq))
+            except HTTPException, hte:
+                self.logger.error(str(hte.headers))
             raise
         finally:
             configreq = {'workflow': kwargs['task']['tm_taskname'],
