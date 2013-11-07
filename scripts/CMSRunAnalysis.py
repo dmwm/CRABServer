@@ -1,5 +1,6 @@
 import os
 import shutil
+import socket
 import os.path
 import getopt
 import time
@@ -184,7 +185,7 @@ def executeCMSSWStack(opts):
     cmssw.step.application.setup.cmsswVersion = opts.cmsswVersion
     cmssw.step.application.configuration.section_("arguments")
     cmssw.step.application.configuration.arguments.globalTag = ""
-    cmssw.step.output.modules.section_('output')
+    cmssw.step.output.modules.section_('o')
     cmssw.step.output.modules.output.primaryDataset   = ''
     cmssw.step.output.modules.output.processedDataset = ''
     cmssw.step.output.modules.output.dataTier         = ''
@@ -208,11 +209,25 @@ def AddChecksums(report):
 
     for module, outputMod in report['steps']['cmsRun']['output'].items():
         for fileInfo in outputMod:
+            if 'checksums' in fileInfo: continue
             if 'pfn' not in fileInfo: continue
             cksum = FileInfo.readCksum(fileInfo['pfn'])
             adler32 = FileInfo.readAdler32(fileInfo['pfn'])
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
+
+def startDashboardMonitoring():
+    params = {
+        'WNHostName': socket.getfqdn(),
+        'MonitorJobID': '3_https://submit-6.t2.ucsd.edu//131103//53912.2',
+        'SyncGridJobId': 'https://submit-6.t2.ucsd.edu//131103//53912.2',
+        'MonitorID': 'gurrola_W2JetsToLNu_04vnp5',
+        'SyncSite': ad['JOB_CMSSite'],
+        'SyncCE': ad['Used_Gatekeeper'].split(":")[0],
+    }
+
+def stopDashboardMonitoring():
+    pass
 
 try:
     setupLogging('.')
