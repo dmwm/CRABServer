@@ -3,11 +3,11 @@
 import warnings
 
 with warnings.catch_warnings():
-    warnings.filterwarnings("ignore",category=DeprecationWarning)
-    import popen2
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import os
 import sys
+import json
 import signal
 import logging
 import tarfile
@@ -29,25 +29,22 @@ if 'http_proxy' in os.environ and not os.environ['http_proxy'].startswith("http:
 try:
     import WMCore
 except ImportError, ie:
-    import urllib, tarfile, tempfile
+    import urllib, tempfile
     fd = urllib.urlopen("http://hcc-briantest.unl.edu/TaskManagerRun.tar.gz")
     with tempfile.TemporaryFile() as fd2:
-       fd2.write(fd.read()); fd2.seek(0)
-       tf = tarfile.open(mode='r:gz', fileobj=fd2)
-       fd3 = tf.extractfile("CRAB3.zip")
-       try:
-           name = "CRAB3.zip"
-           fd4 = os.open(name, os.O_EXCL | os.O_RDWR | os.O_CREAT, 0644)
-       except:
-           fd4, name = tempfile.mkstemp()
-       os.fdopen(fd4, 'w').write(fd3.read())
+        fd2.write(fd.read()); fd2.seek(0)
+        tf = tarfile.open(mode='r:gz', fileobj=fd2)
+        fd3 = tf.extractfile("CRAB3.zip")
+        try:
+            name = "CRAB3.zip"
+            fd4 = os.open(name, os.O_EXCL | os.O_RDWR | os.O_CREAT, 0644)
+        except:
+            fd4, name = tempfile.mkstemp()
+        os.fdopen(fd4, 'w').write(fd3.read())
     sys.path.insert(0, name)
     import WMCore
 
-import WMCore.Storage.FileManager as StageOutMgr
-
-from WMCore.Lexicon                  import lfn     as lfnRegEx
-from WMCore.Lexicon                  import userLfn as userLfnRegEx
+import WMCore.Storage.StageOutMgr as StageOutMgr
 
 from WMCore.Algorithms.Alarm import Alarm, alarmHandler
 
@@ -87,6 +84,63 @@ def compress(source, tarball, count):
         os.system("gzip %s" % output)
         output += '.gz'
     return output, curCount
+
+def get_job_id(source):
+    filename = os.path.split(source)[-1]
+    left_piece, fileid = filename.rsplit("_", 1)
+    fileid, right_piece = fileid.split(".", 1)
+    try:
+        fileid = int(fileid)
+    except ValueError:
+        fileid = -1
+    
+    return left_piece + "." + right_piece, fileid
+
+def set_se_name(dest_file, se_name):
+    """
+    Alter the job report to record where the given file was
+    staged out to.  If we cannot determine the matching file,
+    then record it in the top-level of the JSON (hopefully it
+    means that it is the log file).
+    """
+    filename, id = get_job_id(dest_file)
+
+    with open("jobReport.json.%d" % id) as fd:
+        full_report = json.load(fd)
+
+    if 'steps' not in full_report or 'cmsRun' not in full_report['steps']:
+        raise ValueError("Invalid jobReport.json: missing cmsRun")
+    report = full_report['steps']['cmsRun']
+
+    if 'output' not in report:
+        raise ValueError("Invalid jobReport.json: missing output")
+    output = report['output']
+
+    found_output = False
+    for outputModule in output.values():
+        for outputFile in outputModule:
+
+            if outputFile.get(u"output_module_class") != u'PoolOutputModule' and \
+                    outputFile.get(u"ouput_module_class") != u'PoolOutputModule':
+                continue
+
+            if str(outputFile.get(u"pfn")) != filename:
+                continue
+
+            outputFile['SEName'] = se_name
+            found_output = True
+            break
+
+    if not found_output:
+        full_report['SEName'] = se_name
+        try:
+            full_report['log_size'] = os.stat(dest_file).st_size
+        except:
+            pass
+
+    with open("jobReport.json.%d" % id, "w") as fd:
+        json.dump(full_report, fd)
+
 
 def main():
     source, dest, stageout = parseArgs()
@@ -128,11 +182,19 @@ def main():
         else:
             return 0
 
+        _, filename = os.path.split(source)
+        filename_minus_ext = filename.rsplit(".", 1)[0]
+        fileid = filename_minus_ext.rsplit("_", 1)[-1]
+        try:
+            fileid = int(fileid)
+        except ValueError:
+            fileid = -1
+
         fileForTransfer = {'LFN': dest, 'PFN': source}
         signal.signal(signal.SIGALRM, alarmHandler)
         signal.alarm(waitTime)
         try:
-            manager(fileForTransfer)
+            result = manager(fileForTransfer)
         except Alarm:
             print "Indefinite hang during stageOut of %s" % dest
             manager.cleanSuccessfulStageOuts()
@@ -143,6 +205,7 @@ def main():
             raise
             return 60307
         signal.alarm(0)
+        set_se_name(dest_file, result['SEName'])
     return 0
 
 if __name__ == '__main__':

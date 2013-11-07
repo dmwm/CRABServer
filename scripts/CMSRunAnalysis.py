@@ -47,7 +47,7 @@ def handleException(exitAcronymn, exitCode, exitMsg):
     report['exitAcronym'] = exitAcronymn
     report['exitCode'] = exitCode
     report['exitMsg'] = exitMsg
-    #report['exitMsg'] += traceback.format_exc()
+    print traceback.format_exc()
     with open('jobReport.json','w') as of:
         json.dump(report, of)
     with open('jobReportExtract.pickle','w') as of:
@@ -83,6 +83,9 @@ parser.add_option('--runAndLumis',\
                   dest='runAndLumis',\
                   type='string',\
                   default='{}')
+parser.add_option('--userFiles',\
+                  dest='userFiles',\
+                  type='string')
 parser.add_option('--oneEventMode',\
                   dest='oneEventMode',\
                   default=0)
@@ -100,6 +103,7 @@ try:
     print "inputFile      ", opts.inputFile
     print "outFiles:      ", opts.outFiles
     print "runAndLumis:   ", opts.runAndLumis
+    print "userFiles:     ", opts.userFiles
     print "oneEventMode:  ", opts.oneEventMode
     print "==================="
 except:
@@ -150,16 +154,52 @@ os.makedirs(destDir)
 os.rename('PSet.py', destDir + '/PSet.py')
 open('WMTaskSpace/__init__.py','w').close()
 open(destDir + '/__init__.py','w').close()
-
-#Tracer? line 555 of runGen
+#move the additional user files in the right place
+if opts.userFiles:
+    for myfile in opts.userFiles.split(','):
+        os.rename(myfile, destDir + '/' + myfile)
 
 #WMCore import here
-from WMCore.WMSpec.Steps.Executors.CMSSW import executeCMSSWStack
 from WMCore.WMRuntime.Bootstrap import setupLogging
 from WMCore.FwkJobReport.Report import Report
 from WMCore.FwkJobReport.Report import FwkJobReportException
 from WMCore.WMSpec.Steps.WMExecutionFailure import WMExecutionFailure
 import WMCore.FwkJobReport.FileInfo as FileInfo
+from WMCore.WMSpec.Steps.Executors.CMSSW import CMSSW
+from WMCore.Configuration import Configuration
+from WMCore.WMSpec.WMStep import WMStep
+from WMCore.WMSpec.WMTask import makeWMTask
+from WMCore.WMSpec.WMWorkload import newWorkload
+from WMCore.WMSpec.Steps.Templates.CMSSW import CMSSW as CMSSWTemplate
+
+def executeCMSSWStack(opts):
+    cmssw = CMSSW()
+    cmssw.stepName = "cmsRun"
+    cmssw.step = WMStep(cmssw.stepName)
+    CMSSWTemplate().install(cmssw.step)
+    cmssw.task = makeWMTask(cmssw.stepName)
+    cmssw.workload = newWorkload(cmssw.stepName)
+    cmssw.step.application.setup.softwareEnvironment = ''
+    cmssw.step.application.setup.scramArch = opts.scramArch
+    cmssw.step.application.setup.cmsswVersion = opts.cmsswVersion
+    cmssw.step.application.configuration.section_("arguments")
+    cmssw.step.application.configuration.arguments.globalTag = ""
+    cmssw.step.output.modules.section_('output')
+    cmssw.step.output.modules.output.primaryDataset   = ''
+    cmssw.step.output.modules.output.processedDataset = ''
+    cmssw.step.output.modules.output.dataTier         = ''
+    #cmssw.step.application.command.arguments = '' #TODO
+    cmssw.step.user.inputSandboxes = [opts.archiveJob]
+    cmssw.step.user.userFiles = opts.userFiles or ''
+    cmssw.step.section_("builder")
+    cmssw.step.builder.workingDir = os.getcwd()
+    cmssw.step.runtime.invokeCommand = 'python'
+    cmssw.step.runtime.preScripts = []
+    cmssw.step.runtime.scramPreScripts = ['%s/TweakPSet.py Analy %s \'%s\' \'%s\' --oneEventMode=%s' % (os.getcwd(), os.getcwd(), opts.inputFile, opts.runAndLumis, opts.oneEventMode)]
+    cmssw.step.section_("execution") #exitStatus of cmsRun is set here
+    cmssw.report = Report("cmsRun") #report is loaded and put here
+    cmssw.execute()
+    return cmssw
 
 def AddChecksums(report):
     if 'steps' not in report: return
@@ -172,10 +212,12 @@ def AddChecksums(report):
             cksum = FileInfo.readCksum(fileInfo['pfn'])
             adler32 = FileInfo.readAdler32(fileInfo['pfn'])
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
+            fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
 try:
     setupLogging('.')
-    jobExitCode, _, _, _ = executeCMSSWStack(taskName = 'Analysis', stepName = 'cmsRun', scramSetup = '', scramCommand = 'scramv1', scramProject = 'CMSSW', scramArch = opts.scramArch, cmsswVersion = opts.cmsswVersion, jobReportXML = 'FrameworkJobReport.xml', cmsswCommand = 'cmsRun', cmsswConfig = 'PSet.py', cmsswArguments = '', workDir = os.getcwd(), userTarball = opts.archiveJob, userFiles ='', preScripts = [], scramPreScripts = ['%s/TweakPSet.py Analy %s \'%s\' \'%s\' --oneEventMode=%s' % (os.getcwd(), os.getcwd(), opts.inputFile, opts.runAndLumis, opts.oneEventMode)], stdOutFile = 'cmsRun-stdout.log', stdInFile = 'cmsRun-stderr.log', jobId = opts.jobNumber, jobRetryCount = 0, invokeCmd = 'python')
+    cmssw = executeCMSSWStack(opts)
+    jobExitCode = cmssw.step.execution.exitStatus
 except WMExecutionFailure, WMex:
     print "caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail)
     exmsg = WMex.name
@@ -190,20 +232,12 @@ except Exception, ex:
     #sys.exit(EC_CMSRunWrapper)
     sys.exit(0)
 
-# rename output files
-if jobExitCode == 0:
-    try:
-        for oldName,newName in literal_eval(opts.outFiles).iteritems():
-            os.rename(oldName, newName)
-    except Exception, ex:
-        handleException("FAILED", EC_MoveOutErr, "Exception while moving the files.")
-        sys.exit(EC_MoveOutErr)
-
 #Create the report file
 try:
     report = Report("cmsRun")
     report.parse('FrameworkJobReport.xml', "cmsRun")
     jobExitCode = report.getExitCode()
+    import pdb;pdb.set_trace()
     report = report.__to_json__(None)
     AddChecksums(report)
     if jobExitCode: #TODO check exitcode from fwjr
@@ -232,6 +266,16 @@ except Exception, ex:
     msg = "Exception while handling the job report."
     handleException("FAILED", EC_ReportHandlingErr, msg)
     sys.exit(EC_ReportHandlingErr)
+
+# rename output files. Doing this after checksums otherwise outfile is not found.
+if jobExitCode == 0:
+    try:
+        for oldName,newName in literal_eval(opts.outFiles).iteritems():
+            os.rename(oldName, newName)
+    except Exception, ex:
+        handleException("FAILED", EC_MoveOutErr, "Exception while moving the files.")
+        sys.exit(EC_MoveOutErr)
+
 
 #create the Pool File Catalog (?)
 pfcName = 'PoolFileCatalog.xml'

@@ -21,12 +21,14 @@ import TaskWorker.WorkerExceptions
 
 import WMCore.WMSpec.WMTask
 
+from ApmonIf import ApmonIf
+
 DAG_FRAGMENT = """
 JOB Job%(count)d Job.submit
 #SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY $JOB
 SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
-RETRY Job%(count)d 3 UNLESS-EXIT 2
+RETRY Job%(count)d 10 UNLESS-EXIT 2
 VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" inputFiles="%(inputFiles)s" +DESIRED_Sites="\\"%(desiredSites)s\\"" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
 
 #JOB ASO%(count)d ASO.submit
@@ -102,7 +104,7 @@ use_x509userproxy = true
 Requirements = (target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)
 #Requirements = ((target.IS_GLIDEIN =!= TRUE) || ((target.GLIDEIN_CMSSite =!= UNDEFINED) && (stringListIMember(target.GLIDEIN_CMSSite, DESIRED_SEs) )))
 #leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
-periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30)
+periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
 queue
 """
 
@@ -272,7 +274,13 @@ def create_subdag(splitter_result, **kwargs):
 
     server_data = []
 
-    #fixedsites = set(self.config.Sites.available)
+    # TODO: pass config object to this function.
+    # This config setting acts as a global black / white list
+    #if hasattr(self.config.Sites, 'available'):
+    #    global_whitelist = set(self.config.Sites.available)
+    #else:
+    #    global_whitelist = set()
+    #global_blacklist = set(self.config.Sites.banned)
     for jobgroup in splitter_result:
         jobs = jobgroup.getJobs()
 
@@ -286,7 +294,12 @@ def create_subdag(splitter_result, **kwargs):
             availablesites = set(kwargs['task']['tm_site_whitelist'])
         else:
             availablesites = set(possiblesites) - set(kwargs['task']['tm_site_blacklist'])
-        #availablesites = set(availablesites) & fixedsites
+
+        # Apply globals
+        #availablesites = set(availablesites) - global_blacklist
+        #if global_whitelist:
+        #    availablesites = set(availablesites) & global_whitelist
+
         availablesites = [str(i) for i in availablesites]
         LOGGER.info("Resulting available sites: %s" % ", ".join(availablesites))
 
@@ -297,8 +310,6 @@ def create_subdag(splitter_result, **kwargs):
         jobgroupspecs, startjobid = make_specs(kwargs['task'], jobgroup, availablesites, outfiles, startjobid)
         specs += jobgroupspecs
 
-        # TODO: PanDA implementation makes a POST call about job data ... not sure what our equiv is.
-
     dag = ""
     for spec in specs:
         dag += DAG_FRAGMENT % spec
@@ -308,6 +319,21 @@ def create_subdag(splitter_result, **kwargs):
 
     task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
     userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
+
+    info["jobcount"] = len(jobgroup.getJobs())
+
+    # Info for ML:
+    ml_info = info.setdefault('apmon', [])
+    for idx in range(1, info['jobcount']+1):
+        taskid = kwargs['task']['tm_taskname'].replace("_", ":")
+        jinfo = {'jobId': ("%d_%d:%s_0" % (idx, idx, taskid)),
+                 'sid': "%d:%s" % (idx, taskid),
+                 'broker': os.environ.get('HOSTNAME',''),
+                 'bossId': str(idx),
+                 'TargetSE': ("%d_Selected_SE" % len(specs[idx-1]['desiredSites'])),
+                 'localId' : '',
+                }
+        ml_info.append(jinfo)
 
     # When running in standalone mode, we want to record the number of jobs in the task
     if ('CRAB_ReqName' in kwargs['task']) and ('CRAB_UserDN' in kwargs['task']):
@@ -338,6 +364,37 @@ class DagmanCreator(TaskAction.TaskAction):
     into HTCondor
     """
 
+    def buildDashboardInfo(self):
+
+        params = {'tool': 'crab3',
+                  'SubmissionType':'direct',
+                  'JSToolVersion': '3.3.0',
+                  'tool_ui': os.environ.get('HOSTNAME',''),
+                  'scheduler': 'GLIDEIN',
+                  'GridName': self.task['tm_user_dn'],
+                  'ApplicationVersion': 'tm_job_sw',
+                  'taskType': 'integration',
+                  'vo': 'cms',
+                  'CMSUser': self.task['tm_username'],
+                  'user': self.task['tm_username'],
+                  'taskId': self.task['tm_taskname'],
+                  'datasetFull': self.task['tm_input_dataset'],
+                  'resubmitter': self.task['tm_username'],
+                  'exe': 'cmsRun' }
+        return params
+
+
+    def sendDashboardTask(self):
+        apmon = ApmonIf()
+        params = self.buildDashboardInfo()
+        params_copy = dict(params)
+        params_copy['jobId'] = 'TaskMeta'
+        self.logger.debug("Dashboard task info: %s" % str(params_copy))
+        apmon.sendToML(params_copy)
+        apmon.free()
+        return params
+
+
     def executeInternal(self, *args, **kw):
         global LOGGER
         LOGGER = self.logger
@@ -354,6 +411,7 @@ class DagmanCreator(TaskAction.TaskAction):
             gwms_location = getLocation('gWMS-CMSRunAnalysis.sh', 'CRABServer/scripts/')
             dag_bootstrap_location = getLocation('dag_bootstrap_startup.sh', 'CRABServer/scripts/')
             bootstrap_location = getLocation("dag_bootstrap.sh", "CRABServer/scripts/")
+            adjust_location = getLocation("AdjustSites.py", "CRABServer/scripts/")
 
             cwd = os.getcwd()
             os.chdir(temp_dir)
@@ -362,18 +420,22 @@ class DagmanCreator(TaskAction.TaskAction):
             shutil.copy(gwms_location, '.')
             shutil.copy(dag_bootstrap_location, '.')
             shutil.copy(bootstrap_location, '.')
+            shutil.copy(adjust_location, '.')
 
             kw['task']['scratch'] = temp_dir
 
         kw['task']['restinstance'] = self.server['host']
         kw['task']['resturl'] = self.resturl.replace("/workflowdb", "/filemetadata")
+        self.task = kw['task']
+        params = self.sendDashboardTask()
 
         try:
             info = create_subdag(*args, **kw)
         finally:
             if cwd:
                 os.chdir(cwd)
-        return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(temp_dir, info))
+
+        return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(temp_dir, info, params))
 
     def execute(self, *args, **kw):
         try:

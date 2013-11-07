@@ -106,7 +106,7 @@ echo "Starting Stageout"
 OIFS=$IFS
 IFS=" ,"
 for file in $CRAB_localOutputFiles; do
-    ./cmscp.py "$PWD/$file" $CRAB_Dest/$file
+    ./cmscp.py "$PWD/$file" $CRAB_Dest/$file || exit $?
 done
 echo "Finished stageout"
 
