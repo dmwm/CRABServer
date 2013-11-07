@@ -22,7 +22,7 @@ DLSVER=DLS_1_1_3
 DLSREPO=bbockelm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
-CRABSERVERVER=3.3.0.pre10
+CRABSERVERVER=3.3.0.pre22
 CRABSERVERREPO=dmwm
 
 CRABCLIENTDIR=$STARTDIR/CRABClient
@@ -198,6 +198,7 @@ cp $CRABSERVER_PATH/bin/* bin/
 cp $CRABSERVER_PATH/scripts/CMSRunAnalysis.sh bin/
 cp $CRABSERVER_PATH/scripts/CMSRunAnalysis.py .
 cp $CRABSERVER_PATH/scripts/TweakPSet.py .
+cp $CRABSERVER_PATH/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py} .
 
 pwd
 echo "Making TaskManagerRun tarball"
@@ -205,7 +206,7 @@ tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip setup.sh crab3 c
 echo "Making CRAB3 client install"
 tar zcf $ORIGDIR/CRAB3-gWMS.tar.gz CRAB3.zip setup.sh crab3 crab gWMS-CMSRunAnalysis.sh bin lib || exit 4
 echo "Making CMSRunAnalysis tarball"
-tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py TweakPSet.py
+tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py || exit 4
 
 popd
 
