@@ -10,7 +10,7 @@ STARTDIR=$PWD/tmp/runtime
 CRAB3_VERSION=3.3.0-pre1
 
 WMCOREDIR=$STARTDIR/WMCore
-WMCOREVER=0.9.70-dagman2
+WMCOREVER=0.9.83.htcondor3
 WMCOREREPO=bbockelm
 
 DBSDIR=$STARTDIR/DBS
@@ -22,7 +22,7 @@ DLSVER=DLS_1_1_3
 DLSREPO=bbockelm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
-CRABSERVERVER=3.3.0.pre22
+CRABSERVERVER=3.3.0.pre27
 CRABSERVERREPO=dmwm
 
 CRABCLIENTDIR=$STARTDIR/CRABClient
@@ -153,12 +153,13 @@ popd
 cp $STARTDIR/CRAB3.zip $ORIGDIR/CRAB3-externals.zip
 
 #In the future we may want to use just one WMCore archive
-pushd $WMCORERUNTIMEDIR/
-curl -L https://github.com/$WMCORERUNTIMEREPO/WMCore/archive/$WMCORERUNTIMEVER.tar.gz | tar zx || exit 3
-pushd WMCore-$WMCORERUNTIMEVER/src/python/
+#pushd $WMCORERUNTIMEDIR/
+#curl -L https://github.com/$WMCORERUNTIMEREPO/WMCore/archive/$WMCORERUNTIMEVER.tar.gz | tar zx || exit 3
+#pushd WMCore-$WMCORERUNTIMEVER/src/python/
+pushd $WMCORE_PATH/src/python
 zip -r $STARTDIR/WMCore.zip *
 popd
-popd
+#popd
 
 pushd $WMCORE_PATH/src/python
 zip -rq $STARTDIR/CRAB3.zip WMCore PSetTweaks -x \*.pyc || exit 3
@@ -202,7 +203,7 @@ cp $CRABSERVER_PATH/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py
 
 pwd
 echo "Making TaskManagerRun tarball"
-tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip setup.sh crab3 crab gWMS-CMSRunAnalysis.sh CMSRunAnalysis.py bin TweakPSet.py libcurl.so.4 || exit 4
+tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip setup.sh crab3 crab gWMS-CMSRunAnalysis.sh CMSRunAnalysis.py bin TweakPSet.py libcurl.so.4 ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py || exit 4
 echo "Making CRAB3 client install"
 tar zcf $ORIGDIR/CRAB3-gWMS.tar.gz CRAB3.zip setup.sh crab3 crab gWMS-CMSRunAnalysis.sh bin lib || exit 4
 echo "Making CMSRunAnalysis tarball"
