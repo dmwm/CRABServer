@@ -11,6 +11,8 @@ import HTCondorUtils
 
 import TaskWorker.Actions.TaskAction as TaskAction
 
+from httplib import HTTPException
+
 class DagmanResubmitter(TaskAction.TaskAction):
 
     """
@@ -46,11 +48,21 @@ class DagmanResubmitter(TaskAction.TaskAction):
         ad['whitelist'] = task['resubmit_site_whitelist']
         ad['blacklist'] = task['resubmit_site_blacklist']
 
-        with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
-            if not parent:
-                schedd.edit(rootConst, "CRAB_SiteBlacklist", ad['blacklist'])
-                schedd.edit(rootConst, "CRAB_SiteWhitelist", ad['whitelist'])
-                schedd.act(htcondor.JobAction.Release, rootConst)
+        if ('resubmit_ids' in task) and task['resubmit_ids']:
+            ad['resubmit'] = task['resubmit_ids']
+            with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
+                if not parent:
+                    schedd.edit(rootConst, "HoldKillSig", ad['SIGKILL'])
+                    schedd.edit(rootConst, "CRAB_ResubmitList", ad['resubmit'])
+                    schedd.act(htcondor.JobAction.Hold, rootConst)
+                    schedd.edit(rootConst, "HoldKillSig", ad['SIGUSR1'])
+                    schedd.act(htcondor.JobAction.Release, rootConst)
+        else:
+            with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
+                if not parent:
+                    schedd.edit(rootConst, "CRAB_SiteBlacklist", ad['blacklist'])
+                    schedd.edit(rootConst, "CRAB_SiteWhitelist", ad['whitelist'])
+                    schedd.act(htcondor.JobAction.Release, rootConst)
         results = rpipe.read()
         if results != "OK":
             raise Exception("Failure when killing job: %s" % results)
@@ -67,7 +79,10 @@ class DagmanResubmitter(TaskAction.TaskAction):
                          'status': "FAILED",
                          'subresource': 'failure',
                          'failure': base64.b64encode(msg)}
-            self.server.post(self.resturl, data = urllib.urlencode(configreq))
+            try:
+                self.server.post(self.resturl, data = urllib.urlencode(configreq))
+            except HTTPException, hte:
+                self.logger.error(str(hte.headers))
             raise
         finally:
             configreq = {'workflow': kwargs['task']['tm_taskname'],

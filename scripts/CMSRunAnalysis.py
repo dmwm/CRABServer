@@ -1,5 +1,6 @@
 import os
 import shutil
+import socket
 import os.path
 import getopt
 import time
@@ -20,9 +21,20 @@ EC_ReportHandlingErr =  50115
 EC_WGET =               99998 #TODO define an error code
 
 print "=== start ==="
+starttime = time.time()
 print time.ctime()
 
 from optparse import (OptionParser,BadOptionError,AmbiguousOptionError)
+
+def mintime():
+    mymin = 20*60
+    tottime = time.time()-starttime
+    remaining = mymin - tottime
+    if remaining > 0:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        print "Sleeping for %d seconds due to failure." % remaining
+        time.sleep(remaining)
 
 class PassThroughOptionParser(OptionParser):
     """
@@ -171,8 +183,15 @@ from WMCore.WMSpec.WMStep import WMStep
 from WMCore.WMSpec.WMTask import makeWMTask
 from WMCore.WMSpec.WMWorkload import newWorkload
 from WMCore.WMSpec.Steps.Templates.CMSSW import CMSSW as CMSSWTemplate
+from PSetTweaks.WMTweak import makeTweak
 
 def executeCMSSWStack(opts):
+
+    def getOutputModules():
+        config = __import__('WMTaskSpace.cmsRun.PSet', globals(), locals(), ["process"], -1)
+        tweakJson = makeTweak(config.process).jsondictionary()
+        return tweakJson["process"]["outputModules_"]
+
     cmssw = CMSSW()
     cmssw.stepName = "cmsRun"
     cmssw.step = WMStep(cmssw.stepName)
@@ -184,10 +203,11 @@ def executeCMSSWStack(opts):
     cmssw.step.application.setup.cmsswVersion = opts.cmsswVersion
     cmssw.step.application.configuration.section_("arguments")
     cmssw.step.application.configuration.arguments.globalTag = ""
-    cmssw.step.output.modules.section_('output')
-    cmssw.step.output.modules.output.primaryDataset   = ''
-    cmssw.step.output.modules.output.processedDataset = ''
-    cmssw.step.output.modules.output.dataTier         = ''
+    for output in ['o']: #getOutputModules():
+        cmssw.step.output.modules.section_(output)
+        getattr(cmssw.step.output.modules, output).primaryDataset   = ''
+        getattr(cmssw.step.output.modules, output).processedDataset = ''
+        getattr(cmssw.step.output.modules, output).dataTier         = ''
     #cmssw.step.application.command.arguments = '' #TODO
     cmssw.step.user.inputSandboxes = [opts.archiveJob]
     cmssw.step.user.userFiles = opts.userFiles or ''
@@ -208,41 +228,76 @@ def AddChecksums(report):
 
     for module, outputMod in report['steps']['cmsRun']['output'].items():
         for fileInfo in outputMod:
+            if 'checksums' in fileInfo: continue
             if 'pfn' not in fileInfo: continue
             cksum = FileInfo.readCksum(fileInfo['pfn'])
             adler32 = FileInfo.readAdler32(fileInfo['pfn'])
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
+def parseAd(ad):
+    fd = open(os.environ['_CONDOR_JOB_AD'])
+    ad = {}
+    for line in fd.readlines():
+        info = line.split(" = ", 1)
+        if len(info) != 2:
+            continue
+        if info[1].startswith('"'):
+            val = info[1].strip()[1:-1]
+        else:
+            try:
+                val = int(info[1].strip())
+            except ValueError:
+                continue
+        ad[info[0]] = val
+    return ad
+
+def startDashboardMonitoring(ad):
+    params = {
+        'WNHostName': socket.getfqdn(),
+        #'MonitorJobID': '3_https://submit-6.t2.ucsd.edu//131103//53912.2',
+        'SyncGridJobId': '%d_https://glidein.%d:%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
+        'SyncSite': ad['JOB_CMSSite'],
+        'SyncCE': ad['Used_Gatekeeper'].split(":")[0],
+        'ExeStart': 'cmsRun',
+    }
+
+def stopDashboardMonitoring(ad):
+    params = {
+        'SyncGridJobId': '%d_https://glidein.%d:%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
+        'ExeEnd': 'cmsRun',
+    }
+
 try:
     setupLogging('.')
     cmssw = executeCMSSWStack(opts)
     jobExitCode = cmssw.step.execution.exitStatus
+    print "Job exit code: %s" % str(jobExitCode)
 except WMExecutionFailure, WMex:
     print "caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail)
     exmsg = WMex.name
     #exmsg += WMex.detail
     #print "jobExitCode = %s" % jobExitCode
     handleException("FAILED", WMex.code, exmsg)
-    #sys.exit(WMex.code)
-    sys.exit(0)
+    mintime()
+    sys.exit(WMex.code)
 except Exception, ex:
     #print "jobExitCode = %s" % jobExitCode
     handleException("FAILED", EC_CMSRunWrapper, "failed to generate cmsRun cfg file at runtime")
-    #sys.exit(EC_CMSRunWrapper)
-    sys.exit(0)
+    mintime()
+    sys.exit(EC_CMSRunWrapper)
 
 #Create the report file
 try:
     report = Report("cmsRun")
     report.parse('FrameworkJobReport.xml', "cmsRun")
     jobExitCode = report.getExitCode()
-    import pdb;pdb.set_trace()
+    #import pdb;pdb.set_trace()
     report = report.__to_json__(None)
     AddChecksums(report)
     if jobExitCode: #TODO check exitcode from fwjr
         report['exitAcronym'] = "FAILED"
-        report['exitCode'] = jobExitCode #TODO take exitcode from fwjr
+        report['exitCode'] = jobExitCode
         report['exitMsg'] = "Error while running CMSSW:\n"
         for error in report['steps']['cmsRun']['errors']:
             report['exitMsg'] += error['type'] + '\n'
@@ -261,10 +316,12 @@ try:
 except FwkJobReportException, FJRex:
     msg = "BadFWJRXML"
     handleException("FAILED", EC_ReportHandlingErr, msg)
+    mintime()
     sys.exit(EC_ReportHandlingErr)
 except Exception, ex:
     msg = "Exception while handling the job report."
     handleException("FAILED", EC_ReportHandlingErr, msg)
+    mintime()
     sys.exit(EC_ReportHandlingErr)
 
 # rename output files. Doing this after checksums otherwise outfile is not found.
@@ -274,18 +331,8 @@ if jobExitCode == 0:
             os.rename(oldName, newName)
     except Exception, ex:
         handleException("FAILED", EC_MoveOutErr, "Exception while moving the files.")
+        mintime()
         sys.exit(EC_MoveOutErr)
-
-
-#create the Pool File Catalog (?)
-pfcName = 'PoolFileCatalog.xml'
-pfcFile = open(pfcName,'w')
-pfcFile.write("""<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<!-- Edited By POOL -->
-<!DOCTYPE POOLFILECATALOG SYSTEM "InMemory">
-<POOLFILECATALOG>
-
-</POOLFILECATALOG>
-""")
-pfcFile.close()
-
+else:
+    mintime()
+sys.exit(jobExitCode)

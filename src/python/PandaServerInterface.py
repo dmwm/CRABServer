@@ -559,7 +559,7 @@ def wrappedUuidGen():
     if tmpSt == 0:
         # use uuidgen
         st, output = commands.getstatusoutput('uuidgen 2>/dev/null')
-        if st:
+        if st == 0:
             return output
     # use python uuidgen
     try:
