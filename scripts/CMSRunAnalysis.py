@@ -31,6 +31,9 @@ def mintime():
     tottime = time.time()-starttime
     remaining = mymin - tottime
     if remaining > 0:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        print "Sleeping for %d seconds due to failure." % remaining
         time.sleep(remaining)
 
 class PassThroughOptionParser(OptionParser):
@@ -269,21 +272,20 @@ try:
     setupLogging('.')
     cmssw = executeCMSSWStack(opts)
     jobExitCode = cmssw.step.execution.exitStatus
+    print "Job exit code: %s" % str(jobExitCode)
 except WMExecutionFailure, WMex:
     print "caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail)
     exmsg = WMex.name
     #exmsg += WMex.detail
     #print "jobExitCode = %s" % jobExitCode
     handleException("FAILED", WMex.code, exmsg)
-    #sys.exit(WMex.code)
     mintime()
-    sys.exit(0)
+    sys.exit(WMex.code)
 except Exception, ex:
     #print "jobExitCode = %s" % jobExitCode
     handleException("FAILED", EC_CMSRunWrapper, "failed to generate cmsRun cfg file at runtime")
-    #sys.exit(EC_CMSRunWrapper)
     mintime()
-    sys.exit(0)
+    sys.exit(EC_CMSRunWrapper)
 
 #Create the report file
 try:
@@ -331,6 +333,6 @@ if jobExitCode == 0:
         handleException("FAILED", EC_MoveOutErr, "Exception while moving the files.")
         mintime()
         sys.exit(EC_MoveOutErr)
-
-mintime()
+else:
+    mintime()
 sys.exit(jobExitCode)
