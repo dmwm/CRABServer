@@ -29,8 +29,29 @@ def resubmitDag(filename, resubmit):
     output_fd.write(output)
     output_fd.close()
 
+def make_webdir(ad):
+    path = os.path.expanduser("~/%s" % ad['CRAB_ReqName'])
+    try:
+        os.makedirs(path)
+    except OSError:
+        pass
+    try:
+        storage_rules = htcondor.param['CRAB_StorageRules']
+    except:
+        storage_rules = "^/home/remoteGlidein,http://submit-5.t2.ucsd.edu/CSstoragePath"
+    sinfo = storage_rules.split(",")
+    storage_re = re.compile(sinfo[0])
+    val = storage_re.sub(sinfo[1], path)
+    ad['CRAB_UserWebDir'] = val
+    id = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
+    try:
+        htcondor.Schedd().edit([id], 'CRAB_UserWebDir', ad.lookup('CRAB_UserWebDir'))
+    except RuntimeError, reerror:
+        print str(reerror)
+
 def main():
     ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
+    make_webdir(ad)
 
     blacklist = set()
     if 'CRAB_SiteBlacklist' in ad:
