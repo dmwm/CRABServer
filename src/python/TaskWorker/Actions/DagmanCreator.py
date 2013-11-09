@@ -366,6 +366,10 @@ def create_subdag(splitter_result, **kwargs):
 def getLocation(default_name, checkout_location):
     loc = default_name
     if not os.path.exists(loc):
+        if 'CRABTASKWORKER_ROOT' in os.environ:
+            fname = os.path.join(os.environ['CRABTASKWORKER_ROOT'], 'bin', loc)
+            if os.path.exists(fname):
+                return fname
         if 'CRAB3_CHECKOUT' not in os.environ:
             raise Exception("Unable to locate %s" % loc)
         loc = os.path.join(os.environ['CRAB3_CHECKOUT'], checkout_location, loc)
