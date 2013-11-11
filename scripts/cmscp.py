@@ -165,7 +165,10 @@ def main():
         if not os.path.exists(source):
             return 1
 
-        fileid = get_job_id(source)[1]
+        try:
+            fileid = get_job_id(source)[1]
+        except ValueError:
+            fileid = 0
         counter = "%04d" % (fileid / 1000)
 
         if len(info) == 2:
