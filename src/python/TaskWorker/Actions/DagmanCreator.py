@@ -257,15 +257,14 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
         else:
             # For MC
             primaryds = task['tm_publish_name'].split('-')[0]
+        counter = "%04d" % (i / 1000)
         specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
                       'desiredSites': desiredSites, 'remoteOutputFiles': remoteOutputFiles,
                       'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
                       'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                       'outputData': task['tm_publish_name'],
-                      'tempDest': os.path.join("/store/temp/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1]),
-                      #'tempDest': os.path.join("/store/temp/user", task['tm_username'], task['tm_taskname'], task['tm_publish_name']),
-                      #'outputDest': os.path.join("/store/user", task['tm_username'], task['tm_taskname'], task['tm_publish_name']),
-                      'outputDest': os.path.join("/store/temp/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1]),
+                      'tempDest': os.path.join("/store/temp/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1], counter),
+                      'outputDest': os.path.join("/store/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1], counter),
                       'restinstance': task['restinstance'], 'resturl': task['resturl']})
 
         LOGGER.debug(specs[-1])
@@ -366,6 +365,10 @@ def create_subdag(splitter_result, **kwargs):
 def getLocation(default_name, checkout_location):
     loc = default_name
     if not os.path.exists(loc):
+        if 'CRABTASKWORKER_ROOT' in os.environ:
+            fname = os.path.join(os.environ['CRABTASKWORKER_ROOT'], 'bin', loc)
+            if os.path.exists(fname):
+                return fname
         if 'CRAB3_CHECKOUT' not in os.environ:
             raise Exception("Unable to locate %s" % loc)
         loc = os.path.join(os.environ['CRAB3_CHECKOUT'], checkout_location, loc)

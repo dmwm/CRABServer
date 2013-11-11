@@ -109,11 +109,13 @@ def set_se_name(dest_file, se_name):
         full_report = json.load(fd)
 
     if 'steps' not in full_report or 'cmsRun' not in full_report['steps']:
-        raise ValueError("Invalid jobReport.json: missing cmsRun")
+        #raise ValueError("Invalid jobReport.json: missing cmsRun")
+        return
     report = full_report['steps']['cmsRun']
 
     if 'output' not in report:
-        raise ValueError("Invalid jobReport.json: missing output")
+        #raise ValueError("Invalid jobReport.json: missing output")
+        return
     output = report['output']
 
     found_output = False
@@ -162,6 +164,10 @@ def main():
         source = source.split("?")[0]
         if not os.path.exists(source):
             return 1
+
+        fileid = get_job_id(source)[1]
+        counter = "%04d" % (fileid / 1000)
+
         if len(info) == 2:
             dest = info[0]
             info = info[1].split("&")
@@ -178,17 +184,11 @@ def main():
                 dest_file += '.tar.gz'
                 if curCount < count:
                     return 0
-            dest = os.path.join(dest_dir, dest_file)
+                dest = os.path.join(dest_dir, counter, "log", dest_file)
+            else:
+                dest = os.path.join(dest_dir, counter, dest_file)
         else:
             return 0
-
-        _, filename = os.path.split(source)
-        filename_minus_ext = filename.rsplit(".", 1)[0]
-        fileid = filename_minus_ext.rsplit("_", 1)[-1]
-        try:
-            fileid = int(fileid)
-        except ValueError:
-            fileid = -1
 
         fileForTransfer = {'LFN': dest, 'PFN': source}
         signal.signal(signal.SIGALRM, alarmHandler)
