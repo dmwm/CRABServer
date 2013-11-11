@@ -173,7 +173,7 @@ class DataWorkflow(object):
                             user_vo         = ['cms'],\
                             user_role       = [vorole],\
                             user_group      = [vogroup],\
-                            publish_name    = [(timestamp + '-' + publishname) if publishname.find('-')==-1 else publishname],\
+                            publish_name    = [(requestname + '-' + publishname) if publishname.find('-')==-1 else publishname],\
                             asyncdest       = [asyncdest],\
                             dbs_url         = [dbsurl],\
                             publish_dbs_url = [publishdbsurl],\
