@@ -201,10 +201,14 @@ class PostJob():
             for outputFile in outputModule:
                 print outputFile
                 # Note incorrect spelling of 'output module' in current WMCore
-                if outputFile.get(u"output_module_class") != u'PoolOutputModule' and \
-                        outputFile.get(u"ouput_module_class") != u'PoolOutputModule':
-                    continue
                 fileInfo = {}
+                if outputFile.get(u"output_module_class") == u'PoolOutputModule' or \
+                        outputFile.get(u"ouput_module_class") == u'PoolOutputModule':
+                    fileInfo['filetype'] = "EDM"
+                elif outputFile.get(u"Source"):
+                    fileInfo['filetype'] = "TFILE"
+                else:
+                    continue
                 self.outputFiles.append(fileInfo)
 
                 fileInfo['inparentlfns'] = [str(i) for i in outputFile.get(u"input", [])]
@@ -250,7 +254,7 @@ class PostJob():
                          "outsize":         fileInfo['outsize'],
                          "publishdataname": self.ad['CRAB_OutputData'],
                          "appver":          self.ad['CRAB_JobSW'],
-                         "outtype":         "EDM", # TFILE Not implemented
+                         "outtype":         fileInfo['filetype'],
                          "checksummd5":     "asda", # Not implemented; garbage value taken from ASO
                          "checksumcksum":   fileInfo['checksums']['cksum'],
                          "checksumadler32": fileInfo['checksums']['adler32'],
