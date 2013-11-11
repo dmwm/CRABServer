@@ -211,6 +211,10 @@ def executeCMSSWStack(opts):
     #cmssw.step.application.command.arguments = '' #TODO
     cmssw.step.user.inputSandboxes = [opts.archiveJob]
     cmssw.step.user.userFiles = opts.userFiles or ''
+    #Setting the following job attribute is required because in the CMSSW executor there is a call to analysisFileLFN to set up some attributes for TFiles.
+    #Same for lfnbase. We actually don't use these information so I am setting these to dummy values. Next: fix and use this lfn or drop WMCore runtime..
+    cmssw.job = {'counter' : 0, 'workflow' : 'unused'}
+    cmssw.step.user.lfnBase = '/store/temp/user/'
     cmssw.step.section_("builder")
     cmssw.step.builder.workingDir = os.getcwd()
     cmssw.step.runtime.invokeCommand = 'python'
