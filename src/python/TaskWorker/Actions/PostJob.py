@@ -149,9 +149,12 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
     dest_info = p.getPFN(nodes=(source_sites + [dest_site]), lfns=lfns)
 
     results = []
+    found_log = False
     for source_site, filename in zip(source_sites, filenames):
-        slfn = os.path.join(source_dir, filename)
-        dlfn = os.path.join(dest_dir, filename)
+        if not found_log and filename.startswith("cmsRun") and (filename[-7:] == ".tar.gz"):
+            slfn = os.path.join(source_dir, "log", filename)
+            dlfn = os.path.join(dest_dir, "log", filename)
+        found_log = True
         if (source_site, slfn) not in dest_info:
             print "Unable to map LFN %s at site %s" % (slfn, source_site)
         if (dest_site, dlfn) not in dest_info:
