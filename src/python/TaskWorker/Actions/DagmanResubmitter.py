@@ -52,10 +52,10 @@ class DagmanResubmitter(TaskAction.TaskAction):
             ad['resubmit'] = task['resubmit_ids']
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
                 if not parent:
-                    schedd.edit(rootConst, "HoldKillSig", ad['SIGKILL'])
+                    schedd.edit(rootConst, "HoldKillSig", 'SIGKILL')
                     schedd.edit(rootConst, "CRAB_ResubmitList", ad['resubmit'])
                     schedd.act(htcondor.JobAction.Hold, rootConst)
-                    schedd.edit(rootConst, "HoldKillSig", ad['SIGUSR1'])
+                    schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
                     schedd.act(htcondor.JobAction.Release, rootConst)
         else:
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
