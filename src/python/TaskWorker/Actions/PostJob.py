@@ -144,8 +144,18 @@ def reportResults(job_id, dest_list, sizes):
 def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
 
     p = PhEDEx.PhEDEx()
-    lfns = [os.path.join(source_dir, filename) for filename in filenames]
-    lfns += [os.path.join(dest_dir, filename) for filename in filenames]
+    found_log = False
+    lfns = []
+    for filename in filenames:
+        if not found_log and filename.startswith("cmsRun") and (filename[-7:] == ".tar.gz"):
+            slfn = os.path.join(source_dir, "log", filename)
+            dlfn = os.path.join(dest_dir, "log", filename)
+        else:
+            slfn = os.path.join(source_dir, filename)
+            dlfn = os.path.join(dest_dir, filename)
+        found_log = True
+        lfns.append(slfn)
+        lfns.append(dlfn)
     dest_info = p.getPFN(nodes=(source_sites + [dest_site]), lfns=lfns)
 
     results = []
@@ -154,6 +164,9 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
         if not found_log and filename.startswith("cmsRun") and (filename[-7:] == ".tar.gz"):
             slfn = os.path.join(source_dir, "log", filename)
             dlfn = os.path.join(dest_dir, "log", filename)
+        else:
+            slfn = os.path.join(source_dir, filename)
+            dlfn = os.path.join(dest_dir, filename)
         found_log = True
         if (source_site, slfn) not in dest_info:
             print "Unable to map LFN %s at site %s" % (slfn, source_site)
