@@ -11,6 +11,7 @@ import json
 import signal
 import logging
 import tarfile
+import traceback
 
 if 'CMS_PATH' not in os.environ:
     if 'VO_CMS_SW_DIR' in os.environ:
@@ -163,7 +164,7 @@ def main():
         info = dest.split("?")
         source = source.split("?")[0]
         if not os.path.exists(source):
-            return 1
+            return 60318
 
         try:
             fileid = get_job_id(source)[1]
@@ -213,5 +214,10 @@ def main():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    sys.exit(main())
+    try:
+        retval = main()
+    except:
+        retval = 60307
+        traceback.print_exc()
+    sys.exit(retval)
 
