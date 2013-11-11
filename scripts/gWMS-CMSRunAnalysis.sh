@@ -102,11 +102,28 @@ fi
 echo "Starting Stageout"
 ./cmscp.py "$PWD/cmsRun-stderr.log?compressCount=3&remoteName=cmsRun_$CRAB_Id.log" "$CRAB_Dest/cmsRun-stderr.log?compressCount=3&remoteName=cmsRun_$CRAB_Id.log"  || exit $?
 ./cmscp.py "$PWD/cmsRun-stdout.log?compressCount=3&remoteName=cmsRun_$CRAB_Id.log" "$CRAB_Dest/cmsRun-stdout.log?compressCount=3&remoteName=cmsRun_$CRAB_Id.log" || exit $?
-./cmscp.py "$PWD/FrameworkJobReport.xml?compressCount=3&remoteName=cmsRun_$CRAB_Id.log" "$CRAB_Dest/FrameworkJobReport.xml?compressCount=3&remoteName=cmsRun_$CRAB_Id.log" || exit $?
+./cmscp.py "$PWD/FrameworkJobReport.xml?compressCount=3&remoteName=cmsRun_$CRAB_Id.log" "$CRAB_Dest/FrameworkJobReport.xml?compressCount=3&remoteName=cmsRun_$CRAB_Id.log"
+STAGEOUT_EXIT_STATUS=$?
+  if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
+    if [ $EXIT_STATUS -ne 0 ]; then
+      exit $EXIT_STATUS
+    else
+      exit $STAGEOUT_EXIT_STATUS
+  fi
+fi
+
 OIFS=$IFS
 IFS=" ,"
 for file in $CRAB_localOutputFiles; do
-    ./cmscp.py "$PWD/$file" $CRAB_Dest/$file || exit $?
+    ./cmscp.py "$PWD/$file" $CRAB_Dest/$file
+    STAGEOUT_EXIT_STATUS=$?
+    if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
+      if [ $EXIT_STATUS -ne 0 ]; then
+        exit $EXIT_STATUS
+      else
+        exit $STAGEOUT_EXIT_STATUS
+      fi
+    fi
 done
 echo "Finished stageout"
 
