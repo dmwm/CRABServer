@@ -53,7 +53,7 @@ RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._]{1,100}$")
 ## this can be improved by putting a dependency on CAFUtilities task state machine
 RX_STATUS = re.compile(r"^[A-Za-z]{1,20}$")
 ## need to be careful with this
-RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s\=]{0,10000}$")
+RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s\=\+]{0,10000}$")
 ## user dn
 RX_DN = re.compile(r"^/(?:C|O|DC)=.*/CN=.")
 ## worker subresources
