@@ -257,15 +257,14 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
         else:
             # For MC
             primaryds = task['tm_publish_name'].split('-')[0]
+        counter = "%04d" % (i / 1000)
         specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
                       'desiredSites': desiredSites, 'remoteOutputFiles': remoteOutputFiles,
                       'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
                       'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                       'outputData': task['tm_publish_name'],
-                      'tempDest': os.path.join("/store/temp/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1]),
-                      #'tempDest': os.path.join("/store/temp/user", task['tm_username'], task['tm_taskname'], task['tm_publish_name']),
-                      #'outputDest': os.path.join("/store/user", task['tm_username'], task['tm_taskname'], task['tm_publish_name']),
-                      'outputDest': os.path.join("/store/temp/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1]),
+                      'tempDest': os.path.join("/store/temp/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1], counter),
+                      'outputDest': os.path.join("/store/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1], counter),
                       'restinstance': task['restinstance'], 'resturl': task['resturl']})
 
         LOGGER.debug(specs[-1])
