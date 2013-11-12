@@ -129,22 +129,25 @@ def retrieveUserCert(func):
         timeleftthreshold = 60 * 60 * 24
         mypclient = SimpleMyProxy(defaultDelegation)
         userproxy = None
+        userhash  = sha1(kwargs['userdn']).hexdigest()
         if serverDN:
             try:
-                userproxy = mypclient.logonRenewMyProxy(username=sha1(kwargs['userdn']).hexdigest(), myproxyserver=myproxyserver, myproxyport=7512)
+                userproxy = mypclient.logonRenewMyProxy(username=userhash, myproxyserver=myproxyserver, myproxyport=7512)
             except MyProxyException, me:
                 # Unsure if this works in standalone mode...
                 import cherrypy
                 cherrypy.log(str(me))
                 cherrypy.log(str(serverKey))
                 cherrypy.log(str(serverCert))
-                invalidp = InvalidParameter("Impossible to retrieve proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
+                invalidp = InvalidParameter("Impossible to retrieve proxy from %s for %s and hash %s" %
+                                                (myproxyserver, kwargs['userdn'], userhash))
                 setattr(invalidp, 'trace', str(me))
                 raise invalidp
 
             else:
                 if not re.match(RX_CERT, userproxy):
-                    raise InvalidParameter("Retrieved malformed proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
+                    raise InvalidParameter("Retrieved malformed proxy from %s for %s and hash %s" %
+                                                (myproxyserver, kwargs['userdn'], userhash))
         else:
             proxy = Proxy(defaultDelegation)
             userproxy = proxy.getProxyFilename()
