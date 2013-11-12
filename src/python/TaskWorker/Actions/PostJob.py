@@ -175,18 +175,6 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
         results.append((dest_info[source_site, slfn], dest_info[dest_site, dlfn]))
     return results
 
-
-def get_job_id(source):
-    filename = os.path.split(source)[-1]
-    left_piece, fileid = filename.rsplit("_", 1)
-    fileid, right_piece = fileid.split(".", 1)
-    try:
-        fileid = int(fileid)
-    except ValueError:
-        fileid = -1
-
-    return left_piece + "." + right_piece, fileid
-
 REQUIRED_ATTRS = ['CRAB_ReqName', 'CRAB_Id', 'CRAB_OutputData', 'CRAB_JobSW', 'CRAB_AsyncDest']
 
 class PostJob():
@@ -311,12 +299,7 @@ class PostJob():
 
 
     def uploadLog(self, dest_dir, filename):
-        try:
-            counter = get_job_id(filename)[1]
-        except ValueError:
-            counter = 0
-        counter = "%04d" % (counter / 1000)
-        outlfn = os.path.join(dest_dir, "log", counter, filename)
+        outlfn = os.path.join(dest_dir, "log", filename)
         source_site = self.source_site
         if 'SEName' in self.full_report:
             source_site = self.node_map.get(self.full_report['SEName'], source_site)
