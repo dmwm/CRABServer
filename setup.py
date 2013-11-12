@@ -22,7 +22,7 @@ systems = \
                  'Databases/TaskDB', 'Databases/TaskDB/Oracle', 'Databases/TaskDB/Oracle/JobGroup', 'Databases/TaskDB/Oracle/Task'] },
   'TaskWorker':
   {
-    'py_modules' : ['PandaServerInterface', 'RESTInteractions'],
+    'py_modules' : ['PandaServerInterface', 'RESTInteractions', 'ApmonIf', 'apmon', 'DashboardAPI', 'Logger', 'ProcInfo'],
     'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
                 'taskbuffer']
   },
@@ -50,7 +50,9 @@ def define_the_build(self, dist, system_name, patch_x = ''):
   dist.py_modules = system['py_modules']
   dist.packages = system['python']
   #dist.data_files = [('%sbin' % patch_x, binsrc)]
-  dist.data_files = []
+  #dist.data_files = [ ("%sdata" % (patch_x, ), "scripts/%s" % (x,)) 
+  #				for x in ['CMSRunAnalysis.sh']]
+  #dist.data_files = ['scripts/CMSRunAnalysis.sh']
   if os.path.exists(docroot):
     for dirpath, dirs, files in os.walk(docroot):
       dist.data_files.append(("%sdoc%s" % (patch_x, dirpath[len(docroot):]),
@@ -139,13 +141,15 @@ class InstallCommand(install):
     if self.patch:
       self.install_lib = re.sub(r'(.*)/lib/python(.*)', r'\1/xlib/python\2', self.install_lib)
       self.install_scripts = re.sub(r'(.*)/bin$', r'\1/xbin', self.install_scripts)
+      self.install_data = re.sub(r'(.*)/data$', r'\1/xdata', self.install_data)
 
   def run(self):
     for cmd_name in self.get_sub_commands():
       cmd = self.distribution.get_command_obj(cmd_name)
       cmd.distribution = self.distribution
       if cmd_name == 'install_data':
-        cmd.install_dir = self.prefix
+        data_dir = '/xdata' if self.patch else '/data'
+        cmd.install_dir = self.prefix + data_dir
       else:
         cmd.install_dir = self.install_lib
       cmd.ensure_finalized()
@@ -157,5 +161,11 @@ setup(name = 'crabserver',
       maintainer_email = 'hn-cms-crabdevelopment@cern.ch',
       cmdclass = { 'build_system': BuildCommand,
                    'install_system': InstallCommand },
+      #include_package_data=True,
       # base directory for all the packages
-      package_dir = { '' : 'src/python' })
+      package_dir = { '' : 'src/python' },
+      data_files = ['scripts/%s' % x for x in \
+                        ['CMSRunAnalysis.sh', 'cmscp.py',
+                        'gWMS-CMSRunAnalysis.sh', 'dag_bootstrap_startup.sh',
+                        'dag_bootstrap.sh', 'AdjustSites.py'] ]
+)
