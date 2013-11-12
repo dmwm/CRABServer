@@ -176,6 +176,17 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
     return results
 
 
+def get_job_id(source):
+    filename = os.path.split(source)[-1]
+    left_piece, fileid = filename.rsplit("_", 1)
+    fileid, right_piece = fileid.split(".", 1)
+    try:
+        fileid = int(fileid)
+    except ValueError:
+        fileid = -1
+
+    return left_piece + "." + right_piece, fileid
+
 REQUIRED_ATTRS = ['CRAB_ReqName', 'CRAB_Id', 'CRAB_OutputData', 'CRAB_JobSW', 'CRAB_AsyncDest']
 
 class PostJob():
@@ -282,12 +293,15 @@ class PostJob():
                          "outdatasetname":  "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER",
                     }
             configreq = configreq.items()
-            for run in fileInfo['outfileruns']:
-                configreq.append(("outfileruns", run))
-            for lumi in fileInfo['outfilelumis']:
-                configreq.append(("outfilelumis", lumi))
-            for lfn in fileInfo['inparentlfns']:
-                configreq.append(("inparentlfns", lfn))
+            if 'outfileruns' in fileInfo:
+                for run in fileInfo['outfileruns']:
+                    configreq.append(("outfileruns", run))
+            if 'outfilelumis' in fileInfo:
+                for lumi in fileInfo['outfilelumis']:
+                    configreq.append(("outfilelumis", lumi))
+            if 'inparentlfns' in fileInfo:
+                for lfn in fileInfo['inparentlfns']:
+                    configreq.append(("inparentlfns", lfn))
             print self.resturl, urllib.urlencode(configreq)
             try:
                 self.server.put(self.resturl, data = urllib.urlencode(configreq))
@@ -296,7 +310,13 @@ class PostJob():
                 raise
 
 
-    def uploadLog(self, outlfn):
+    def uploadLog(self, dest_dir, filename):
+        try:
+            counter = get_job_id(filename)[1]
+        except ValueError:
+            counter = 0
+        counter = "%04d" % (counter / 1000)
+        outlfn = os.path.join(dest_dir, "log", counter, filename)
         source_site = self.source_site
         if 'SEName' in self.full_report:
             source_site = self.node_map.get(self.full_report['SEName'], source_site)
@@ -532,7 +552,7 @@ class PostJob():
 
         self.fixPerms()
         try:
-            self.uploadLog(os.path.join(dest_dir, filenames[0]))
+            self.uploadLog(dest_dir, filenames[0])
             self.stageout(source_dir, dest_dir, *filenames)
             self.upload()
         except:
