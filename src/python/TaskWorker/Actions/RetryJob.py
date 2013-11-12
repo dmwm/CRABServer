@@ -99,7 +99,9 @@ class RetryJob(object):
         except ValueError:
             return
 
-        if exitCode == 8021 or exitCode == 8028 or exitCode == 8020:
+        # Wrapper script sometimes returns the posix return code (8 bits).
+        if exitCode == 8021 or exitCode == 8028 or exitCode == 8020 or \
+           exitCode == (8021%256) or exitCode == (8028%256) or exitCode == (8020%256):
             raise RecoverableError("Job failed to open local and fallback files.")
         if exitCode == 50513:
             raise RecoverableError("Job did not find functioning CMSSW on worker node.")
