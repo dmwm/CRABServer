@@ -164,7 +164,8 @@ def main():
         info = dest.split("?")
         source = source.split("?")[0]
         if not os.path.exists(source):
-            return 60318
+            print "Output file %s does not exist." % source
+            return 60302
 
         try:
             fileid = get_job_id(source)[1]
