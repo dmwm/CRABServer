@@ -110,7 +110,7 @@ class DataWorkflow(object):
     @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
-               runs, lumis, totalunits, adduserfiles, userproxy=None):
+               runs, lumis, totalunits, adduserfiles, oneEventMode=False, userproxy=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -142,6 +142,7 @@ class DataWorkflow(object):
            :arg str list lumis: list of lumi section numbers
            :arg int totalunits: number of MC event to be generated
            :arg str list adduserfiles: list of additional user input files
+           :arg str oneEventMode: toggle one event mode
            :returns: a dict which contaians details of the request"""
 
         #if scheduler == 'condor':
@@ -183,7 +184,7 @@ class DataWorkflow(object):
                             edm_outfiles    = [dbSerializer(edmoutfiles)],\
                             transformation  = [self.centralcfg.centralconfig["transformation"][jobtype]],\
                             job_type        = [jobtype],\
-                            arguments       = [dbSerializer({})],\
+                            arguments       = [dbSerializer({'oneEventMode' : 'T' if oneEventMode else 'F'})],\
                             resubmitted_jobs= [dbSerializer([])],\
                             save_logs       = ['T' if savelogsflag else 'F'],\
                             user_infiles    = [dbSerializer(adduserfiles)]\

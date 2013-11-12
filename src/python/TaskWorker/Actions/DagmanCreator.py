@@ -77,6 +77,7 @@ CRAB_Publish = %(publication)s
 CRAB_Id = $(count)
 +CRAB_Id = $(count)
 +CRAB_Dest = "cms://%(temp_dest)s"
++CRAB_oneEventMode = %(oneEventMode)s
 +TaskType = "Job"
 +MaxWallTimeMins = 1315
 +AccountingGroup = %(userhn)s
@@ -140,7 +141,7 @@ def transform_strings(input):
     info = {}
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
-           'userdn', 'requestname', 'publication':
+           'userdn', 'requestname', 'publication', 'oneEventMode':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -217,14 +218,12 @@ def makeJobSubmit(task):
     info['addoutputfiles'] = task['tm_outfiles']
     info['tfileoutfiles'] = task['tm_tfile_outfiles']
     info['edmoutfiles'] = task['tm_edm_outfiles']
+    info['oneEventMode'] = 1 if task['tm_arguments']['oneEventMode'] == 'T' else 0
     # TODO: pass through these correctly.
     info['runs'] = []
     info['lumis'] = []
     info = transform_strings(info)
     info.setdefault("additional_environment_options", '')
-    print info
-    print "There was the info ****"
-    logging.info("There was the info ***")
     with open("Job.submit", "w") as fd:
         fd.write(JOB_SUBMIT % info)
     with open("ASO.submit", "w") as fd:
@@ -367,9 +366,10 @@ def getLocation(default_name, checkout_location):
     loc = default_name
     if not os.path.exists(loc):
         if 'CRABTASKWORKER_ROOT' in os.environ:
-            fname = os.path.join(os.environ['CRABTASKWORKER_ROOT'], 'bin', loc)
-            if os.path.exists(fname):
-                return fname
+            for path in ['xdata','data']:
+                fname = os.path.join(os.environ['CRABTASKWORKER_ROOT'], path, loc)
+                if os.path.exists(fname):
+                    return fname
         if 'CRAB3_CHECKOUT' not in os.environ:
             raise Exception("Unable to locate %s" % loc)
         loc = os.path.join(os.environ['CRAB3_CHECKOUT'], checkout_location, loc)

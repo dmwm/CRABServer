@@ -63,9 +63,10 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
     lastEvent:      together with firstEvent used to tweak process.maxEvents.input
     firstRun:       used to tweak process.source.firstRun. Set to 1 if it's None
     seeding:        used in handleSeeding
+    oneEventMode:   toggles one event mode
     """
     def __init__(self, location, inputFiles, runAndLumis, agentNumber, lfnBase, outputMods, firstEvent=0, lastEvent=-1, firstLumi=None,\
-                    firstRun=None, seeding=None, lheInputFiles=False):
+                    firstRun=None, seeding=None, lheInputFiles=False, oneEventMode=False):
         ScriptInterface.__init__(self)
         self.stepSpace = ConfigSection()
         self.stepSpace.location = location
@@ -111,7 +112,7 @@ opts, args = parser.parse_args()
 oneEventMode = opts.oneEventMode
 if opts.oneEventMode:
     print "One event mode disabled until we can put together a decent version of WMCore."
-    #print "TweakPSet.py is going to force one event mode"
+    print "TweakPSet.py is going to force one event mode"
 location = sys.argv[2]
 inputFiles = literal_eval(sys.argv[3])
 runAndLumis = literal_eval(sys.argv[4])
@@ -124,8 +125,8 @@ if sys.argv[1]=='MC':
     seeding=sys.argv[9]
     lheInputFiles=bool(literal_eval(sys.argv[10]))
     pset = SetupCMSSWPsetCore( location, map(str, inputFiles), runAndLumis, agentNumber, lfnBase, outputMods, int(firstEvent), int(lastEvent), int(firstLumi),\
-                    int(firstRun), seeding, lheInputFiles)
+                    int(firstRun), seeding, lheInputFiles, oneEventMode = oneEventMode)
 else:
-    pset = SetupCMSSWPsetCore( location, map(str, inputFiles), runAndLumis, agentNumber, lfnBase, outputMods)
+    pset = SetupCMSSWPsetCore( location, map(str, inputFiles), runAndLumis, agentNumber, lfnBase, outputMods, oneEventMode=oneEventMode)
 
 pset()
