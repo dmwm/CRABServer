@@ -180,7 +180,11 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
         dagAd["Err"] = str(os.path.join(info['scratch'], "request.err"))
         dagAd["CRAB_Attempt"] = 0
-        dagAd["JobUniverse"] = 12
+        # We switched from local to scheduler universe.  Why?  It seems there's no way in the
+        # local universe to change the hold signal at runtime.  That's fairly important for our
+        # resubmit implementation.
+        #dagAd["JobUniverse"] = 12
+        dagAd["JobUniverse"] = 7
         dagAd["HoldKillSig"] = "SIGUSR1"
         dagAd["Cmd"] = cmd
         dagAd['Args'] = arg
