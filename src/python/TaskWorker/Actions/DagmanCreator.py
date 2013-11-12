@@ -269,97 +269,6 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
         LOGGER.debug(specs[-1])
     return specs, i
 
-def create_subdag(splitter_result, **kwargs):
-
-    global LOGGER
-    if not LOGGER:
-        LOGGER = logging.getLogger("DagmanCreator")
-
-    startjobid = 0
-    specs = []
-
-    info = makeJobSubmit(kwargs['task'])
-
-    outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
-
-    os.chmod("CMSRunAnalysis.sh", 0755)
-
-    server_data = []
-
-    # TODO: pass config object to this function.
-    # This config setting acts as a global black / white list
-    #if hasattr(self.config.Sites, 'available'):
-    #    global_whitelist = set(self.config.Sites.available)
-    #else:
-    #    global_whitelist = set()
-    #global_blacklist = set(self.config.Sites.banned)
-    for jobgroup in splitter_result:
-        jobs = jobgroup.getJobs()
-
-        if not jobs:
-            possiblesites = []
-        else:
-            possiblesites = jobs[0]['input_files'][0]['locations']
-        LOGGER.debug("Possible sites: %s" % possiblesites)
-        LOGGER.debug('Blacklist: %s; whitelist %s' % (kwargs['task']['tm_site_blacklist'], kwargs['task']['tm_site_whitelist']))
-        if kwargs['task']['tm_site_whitelist']:
-            availablesites = set(kwargs['task']['tm_site_whitelist'])
-        else:
-            availablesites = set(possiblesites) - set(kwargs['task']['tm_site_blacklist'])
-
-        # Apply globals
-        #availablesites = set(availablesites) - global_blacklist
-        #if global_whitelist:
-        #    availablesites = set(availablesites) & global_whitelist
-
-        availablesites = [str(i) for i in availablesites]
-        LOGGER.info("Resulting available sites: %s" % ", ".join(availablesites))
-
-        if not availablesites:
-            msg = "No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
-            raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
-
-        jobgroupspecs, startjobid = make_specs(kwargs['task'], jobgroup, availablesites, outfiles, startjobid)
-        specs += jobgroupspecs
-
-    dag = ""
-    for spec in specs:
-        dag += DAG_FRAGMENT % spec
-
-    with open("RunJobs.dag", "w") as fd:
-        fd.write(dag)
-
-    task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
-    userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
-
-    info["jobcount"] = len(jobgroup.getJobs())
-
-    # Info for ML:
-    ml_info = info.setdefault('apmon', [])
-    for idx in range(1, info['jobcount']+1):
-        taskid = kwargs['task']['tm_taskname'].replace("_", ":")
-        jinfo = {'jobId': ("%d_https://glidein.%d:%s_0" % (idx, idx, taskid)),
-                 'sid': "%d:%s" % (idx, taskid),
-                 'broker': os.environ.get('HOSTNAME',''),
-                 'bossId': str(idx),
-                 'TargetSE': ("%d_Selected_SE" % len(specs[idx-1]['desiredSites'])),
-                 'localId' : '',
-                }
-        ml_info.append(jinfo)
-
-    # When running in standalone mode, we want to record the number of jobs in the task
-    if ('CRAB_ReqName' in kwargs['task']) and ('CRAB_UserDN' in kwargs['task']):
-        const = 'TaskType =?= \"ROOT\" && CRAB_ReqName =?= "%s" && CRAB_UserDN =?= "%s"' % (task_name, userdn)
-        cmd = "condor_qedit -const '%s' CRAB_JobCount %d" % (const, len(jobgroup.getJobs()))
-        LOGGER.debug("+ %s" % cmd)
-        status, output = commands.getstatusoutput(cmd)
-        if status:
-            LOGGER.error(output)
-            LOGGER.error("Failed to record the number of jobs.")
-            return 1
-
-    return info
-
 
 def getLocation(default_name, checkout_location):
     loc = default_name
@@ -412,6 +321,95 @@ class DagmanCreator(TaskAction.TaskAction):
         return params
 
 
+    def createSubdag(self, splitter_result, **kwargs):
+
+        startjobid = 0
+        specs = []
+
+        info = makeJobSubmit(kwargs['task'])
+
+        outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
+
+        os.chmod("CMSRunAnalysis.sh", 0755)
+
+        server_data = []
+
+        # This config setting acts as a global black / white list
+        global_whitelist = set()
+        global_blacklist = set()
+        if hasattr(self.config.Sites, 'available'):
+            global_whitelist = set(self.config.Sites.available)
+        if hasattr(self.config.Sites, 'banned'):
+            global_blacklist = set(self.config.Sites.banned)
+
+        for jobgroup in splitter_result:
+            jobs = jobgroup.getJobs()
+
+            if not jobs:
+                possiblesites = []
+            else:
+                possiblesites = jobs[0]['input_files'][0]['locations']
+            self.logger.debug("Possible sites: %s" % possiblesites)
+            self.logger.debug('Blacklist: %s; whitelist %s' % (kwargs['task']['tm_site_blacklist'], kwargs['task']['tm_site_whitelist']))
+            if kwargs['task']['tm_site_whitelist']:
+                availablesites = set(kwargs['task']['tm_site_whitelist'])
+            else:
+                availablesites = set(possiblesites) - set(kwargs['task']['tm_site_blacklist'])
+
+            # Apply globals
+            availablesites = set(availablesites) - global_blacklist
+            if global_whitelist:
+                availablesites = set(availablesites) & global_whitelist
+
+            availablesites = [str(i) for i in availablesites]
+            self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
+
+            if not availablesites:
+                msg = "No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
+                raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+
+            jobgroupspecs, startjobid = make_specs(kwargs['task'], jobgroup, availablesites, outfiles, startjobid)
+            specs += jobgroupspecs
+
+        dag = ""
+        for spec in specs:
+            dag += DAG_FRAGMENT % spec
+
+        with open("RunJobs.dag", "w") as fd:
+            fd.write(dag)
+
+        task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
+        userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
+
+        info["jobcount"] = len(jobgroup.getJobs())
+
+        # Info for ML:
+        ml_info = info.setdefault('apmon', [])
+        for idx in range(1, info['jobcount']+1):
+            taskid = kwargs['task']['tm_taskname'].replace("_", ":")
+            jinfo = {'jobId': ("%d_https://glidein.%d:%s_0" % (idx, idx, taskid)),
+                     'sid': "%d:%s" % (idx, taskid),
+                     'broker': os.environ.get('HOSTNAME',''),
+                     'bossId': str(idx),
+                     'TargetSE': ("%d_Selected_SE" % len(specs[idx-1]['desiredSites'])),
+                     'localId' : '',
+                    }
+            ml_info.append(jinfo)
+
+        # When running in standalone mode, we want to record the number of jobs in the task
+        if ('CRAB_ReqName' in kwargs['task']) and ('CRAB_UserDN' in kwargs['task']):
+            const = 'TaskType =?= \"ROOT\" && CRAB_ReqName =?= "%s" && CRAB_UserDN =?= "%s"' % (task_name, userdn)
+            cmd = "condor_qedit -const '%s' CRAB_JobCount %d" % (const, len(jobgroup.getJobs()))
+            self.logger.debug("+ %s" % cmd)
+            status, output = commands.getstatusoutput(cmd)
+            if status:
+                self.logger.error(output)
+                self.logger.error("Failed to record the number of jobs.")
+                return 1
+
+        return info
+
+
     def executeInternal(self, *args, **kw):
         global LOGGER
         LOGGER = self.logger
@@ -447,7 +445,7 @@ class DagmanCreator(TaskAction.TaskAction):
         params = self.sendDashboardTask()
 
         try:
-            info = create_subdag(*args, **kw)
+            info = self.createSubdag(*args, **kw)
         finally:
             if cwd:
                 os.chdir(cwd)
