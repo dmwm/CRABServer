@@ -130,6 +130,7 @@ class MasterWorker(object):
                 self.logger.error("\tresult: %s\n" %(getattr(hte, 'result', 'unknown')))
         except Exception, exc:
             self.logger.error("Server could not process the request: %s" %(str(exc)))
+            self.logger.error(traceback.format_exc())  
         return True
 
     def _getWork(self, limit, getstatus):
@@ -148,6 +149,7 @@ class MasterWorker(object):
                 self.logger.error("\tresult: %s\n" %(getattr(hte, 'result', 'unknown')))
         except Exception, exc:
             self.logger.error("Server could not process the request: %s" %(str(exc)))
+            self.logger.error(traceback.format_exc())
         return pendingwork
 
     def updateWork(self, task, status):
