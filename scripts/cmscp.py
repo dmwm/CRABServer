@@ -167,18 +167,17 @@ def main():
             print "Output file %s does not exist." % source
             return 60302
 
-        try:
-            fileid = get_job_id(source)[1]
-        except ValueError:
-            fileid = 0
-        counter = "%04d" % (fileid / 1000)
-
         if len(info) == 2:
             dest = info[0]
             info = info[1].split("&")
             info = dict([(i.split("=")[0], i.split("=")[1]) for i in info])
             dest_dir, dest_file = os.path.split(dest)
             dest_file = info['remoteName']
+            try:
+                fileid = get_job_id(dest_file)[1]
+            except ValueError:
+                fileid = 0
+            counter = "%04d" % (fileid / 1000)
             if 'compressCount' in info:
                 try:
                     count = int(info['compressCount'])
