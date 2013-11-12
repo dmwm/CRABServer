@@ -9,6 +9,64 @@ import htcondor
 if '_CONDOR_JOB_AD' not in os.environ or not os.path.exists(os.environ["_CONDOR_JOB_AD"]):
     sys.exit(0)
 
+terminator_re = re.compile(r"^\.\.\.$")
+event_re = re.compile(r"016 \(\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
+term_re = re.compile(r"Normal termination \(return value 2\)")
+node_re = re.compile(r"DAG Node: Job(\d+)")
+def adjustPost(resubmit):
+    """
+    ...
+    016 (146493.000.000) 11/11 17:45:46 POST Script terminated.
+        (1) Normal termination (return value 1)
+        DAG Node: Job105
+    ...
+    """
+    if not resubmit:
+        return
+    ra_buffer = []
+    alt = None
+    output = ''
+    for line in open("RunJobs.dag.nodes.log").readlines():
+        if len(ra_buffer) == 0:
+            m = terminator_re.search(line)
+            if m:
+                ra_buffer.append(line)
+            else:
+                output += line
+        elif len(ra_buffer) == 1:
+            m = event_re.search(line)
+            if m:
+                ra_buffer.append(line)
+            else:
+                for l in ra_buffer: output += l
+                output += line
+                ra_buffer = []
+        elif len(ra_buffer) == 2:
+            m = term_re.search(line)
+            if m:
+                ra_buffer.append("        (1) Normal termination (return value 1)\n")
+                alt = line
+            else:
+                for l in ra_buffer: output += l
+                output += line
+                ra_buffer = []
+        elif len(ra_buffer) == 3:
+            m = node_re.search(line)
+            print line, m, m.groups(), resubmit
+            if m and (m.groups()[0] in resubmit):
+                print m.groups()[0], resubmit
+                for l in ra_buffer: output += l
+            else:
+                for l in ra_buffer[:-1]: output += l
+                output += alt
+            output += line
+            ra_buffer = []
+        else:
+            output += line
+    output_fd = open("RunJobs.dag.nodes.log", "w")
+    output_fd.write(output)
+    output_fd.close()
+
 def resubmitDag(filename, resubmit):
     if not os.path.exists(filename):
         return
@@ -75,6 +133,7 @@ def main():
     resubmit = [str(i) for i in resubmit]
 
     if resubmit:
+        adjustPost(resubmit)
         resubmitDag("RunJobs.dag.orig", resubmit)
         resubmitDag("RunJobs.dag", resubmit)
 

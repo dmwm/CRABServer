@@ -214,7 +214,8 @@ class DataWorkflow(object):
                 resubmitList = list(set(resubmitList) & set(jobids))
                 #check if all the requested jobids can be resubmitted
                 if len(resubmitList) != len(jobids):
-                    retmsg = "Cannot request resubmission for %s" % (set(jobids) - set(resubmitList))
+                    retmsg = "Cannot request resubmission for %s" % str(list(set(jobids) - set(resubmitList)))
+                    return [{"result":retmsg}]
             #if not resubmitList:
             #    raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
             self.logger.info("Jobs to resubmit: %s" % resubmitList)
