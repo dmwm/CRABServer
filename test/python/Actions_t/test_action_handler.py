@@ -14,6 +14,7 @@ import TaskWorker.Actions.Splitter
 import TaskWorker.Actions.DagmanCreator
 import TaskWorker.Actions.DagmanSubmitter
 import TaskWorker.Actions.ASOServer
+import TaskWorker.Actions.PostJob
 
 test_base = os.environ.get("CRAB3_TEST_BASE", ".")
 
@@ -98,6 +99,25 @@ class TestActionHandler(unittest.TestCase):
         result = handler.actionWork(*action_args)
 
     def testASOServer(self):
+        #  status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames
+        pj = TaskWorker.Actions.PostJob()
+        async_dest = "T2_US_Vanderbilt"
+
+
+        args = [ status, \
+                 retry_count, \
+                 max_retries, \
+                 restinstance, \
+                 resturl, \
+                 reqname, \
+                 id, \
+                 outputdata, \
+                 sw, \
+                 async_dest, \
+                 source_dir, \
+                 dest_dir, \
+                 *filenames]
+        pj.execute(args)
         TaskWorker.Actions.ASOServer.async_stageout("T2_US_Vanderbilt", '/store/temp/user/bbockelm/crab_bbockelm_crab3_1', '/store/user/bbockelm', '1', '1234.5', 'dumper_111.root', source_site='T2_US_Nebraska')
 
 
