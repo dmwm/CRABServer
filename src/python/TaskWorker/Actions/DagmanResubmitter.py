@@ -33,7 +33,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
             raise ValueError("No proxy provided")
         proxy = task['user_proxy']
 
-        self.logger.info("About to resubmit workflow: %s. Getting status first." % workflow)
+        self.logger.info("About to resubmit workflow: %s." % workflow)
         self.logger.info("Task info: %s" % str(task))
 
         loc = HTCondorLocator.HTCondorLocator(self.config)
@@ -89,7 +89,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
                          'status': "SUBMITTED",
                          'jobset': "-1",
                          'subresource': 'success',}
-            self.logger.debug("Setting the task as submitted with %s " % str(configreq))
+            self.logger.debug("Setting the task as successfully resubmitted with %s " % str(configreq))
             data = urllib.urlencode(configreq)
             self.server.post(self.resturl, data = data)
 
