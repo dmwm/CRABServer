@@ -33,7 +33,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
             raise ValueError("No proxy provided")
         proxy = task['user_proxy']
 
-        self.logger.info("About to resubmit workflow: %s. Getting status first." % workflow)
+        self.logger.info("About to resubmit workflow: %s." % workflow)
         self.logger.info("Task info: %s" % str(task))
 
         loc = HTCondorLocator.HTCondorLocator(self.config)
@@ -52,10 +52,10 @@ class DagmanResubmitter(TaskAction.TaskAction):
             ad['resubmit'] = task['resubmit_ids']
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
                 if not parent:
-                    schedd.edit(rootConst, "HoldKillSig", ad['SIGKILL'])
+                    schedd.edit(rootConst, "HoldKillSig", 'SIGKILL')
                     schedd.edit(rootConst, "CRAB_ResubmitList", ad['resubmit'])
                     schedd.act(htcondor.JobAction.Hold, rootConst)
-                    schedd.edit(rootConst, "HoldKillSig", ad['SIGUSR1'])
+                    schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
                     schedd.act(htcondor.JobAction.Release, rootConst)
         else:
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
@@ -89,7 +89,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
                          'status': "SUBMITTED",
                          'jobset': "-1",
                          'subresource': 'success',}
-            self.logger.debug("Setting the task as submitted with %s " % str(configreq))
+            self.logger.debug("Setting the task as successfully resubmitted with %s " % str(configreq))
             data = urllib.urlencode(configreq)
             self.server.post(self.resturl, data = data)
 

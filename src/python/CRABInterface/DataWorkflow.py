@@ -174,7 +174,7 @@ class DataWorkflow(object):
                             user_vo         = ['cms'],\
                             user_role       = [vorole],\
                             user_group      = [vogroup],\
-                            publish_name    = [(timestamp + '-' + publishname) if publishname.find('-')==-1 else publishname],\
+                            publish_name    = [(requestname + '-' + publishname) if publishname.find('-')==-1 else publishname],\
                             asyncdest       = [asyncdest],\
                             dbs_url         = [dbsurl],\
                             publish_dbs_url = [publishdbsurl],\
@@ -215,7 +215,8 @@ class DataWorkflow(object):
                 resubmitList = list(set(resubmitList) & set(jobids))
                 #check if all the requested jobids can be resubmitted
                 if len(resubmitList) != len(jobids):
-                    retmsg = "Cannot request resubmission for %s" % (set(jobids) - set(resubmitList))
+                    retmsg = "Cannot request resubmission for %s" % str(list(set(jobids) - set(resubmitList)))
+                    return [{"result":retmsg}]
             #if not resubmitList:
             #    raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
             self.logger.info("Jobs to resubmit: %s" % resubmitList)

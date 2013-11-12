@@ -3,6 +3,7 @@ import re
 import urllib
 import traceback
 
+import classad
 import htcondor
 
 import TaskWorker.Actions.TaskAction as TaskAction
@@ -24,31 +25,49 @@ class DagmanKiller(TaskAction.TaskAction):
 
         if 'task' not in kw:
             raise ValueError("No task specified.")
-        task = kw['task']
-        if 'tm_taskname' not in task:
+        self.task = kw['task']
+        if 'tm_taskname' not in self.task:
             raise ValueError("No taskname specified")
-        workflow = task['tm_taskname']
-        if 'user_proxy' not in task:
+        self.workflow = self.task['tm_taskname']
+        if 'user_proxy' not in self.task:
             raise ValueError("No proxy provided")
-        proxy = task['user_proxy']
+        self.proxy = self.task['user_proxy']
 
-        self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
+        self.logger.info("About to kill workflow: %s. Getting status first." % self.workflow)
 
-        workflow = str(workflow)
-        if not WORKFLOW_RE.match(workflow):
+        self.workflow = str(self.workflow)
+        if not WORKFLOW_RE.match(self.workflow):
             raise Exception("Invalid workflow name.")
 
         loc = HTCondorLocator.HTCondorLocator(self.config)
         scheddName = loc.getSchedd()
-        schedd, address = loc.getScheddObj(scheddName)
+        self.schedd, address = loc.getScheddObj(scheddName)
+
+        if self.task['kill_all']:
+            return self.killAll()
+        else:
+            return self.killJobs(self.task['kill_ids'])
+
+    def killJobs(self, ids):
+        ad = classad.ClassAd()
+        ad['foo'] = ids
+        const = "CRAB_ReqName =?= %s && member(CRAB_Id, %s)" % (HTCondorUtils.quote(self.workflow), ad.lookup("foo").__repr__())
+        with HTCondorUtils.AuthenticatedSubprocess(self.proxy) as (parent, rpipe):
+            if not parent:
+               self.schedd.act(htcondor.JobAction.Remove, const)
+        results = rpipe.read()
+        if results != "OK":
+            raise Exception("Failure when killing jobs [%s]: %s" % (", ".join(ids), results))
+
+    def killAll(self):
 
         # Search for and hold the DAG
-        rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(workflow)
+        rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(self.workflow)
         rootAttrList = ["ClusterId"]
 
-        with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
+        with HTCondorUtils.AuthenticatedSubprocess(self.proxy) as (parent, rpipe):
             if not parent:
-               schedd.act(htcondor.JobAction.Hold, rootConst)
+               self.schedd.act(htcondor.JobAction.Hold, rootConst)
         results = rpipe.read()
         if results != "OK":
             raise Exception("Failure when killing task: %s" % results)
@@ -59,12 +78,12 @@ class DagmanKiller(TaskAction.TaskAction):
             self.executeInternal(*args, **kw)
         except Exception, exc:
             self.logger.error(str(traceback.format_exc()))
+            # TODO: fail the task.
         finally:
             if kw['task']['kill_all']:
                 configreq = {'workflow': kw['task']['tm_taskname'], 'status': "KILLED"}
                 self.server.post(self.resturl, data = urllib.urlencode(configreq))
             else:
-                # TODO: Not sure what this does.
                 configreq = {'workflow': kw['task']['tm_taskname'], 'status': "SUBMITTED"}
                 self.server.post(self.resturl, data = urllib.urlencode(configreq))
 

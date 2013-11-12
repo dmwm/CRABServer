@@ -17,6 +17,14 @@ export PYTHONPATH=/opt/glidecondor/lib/python:$PYTHONPATH
 export LD_LIBRARY_PATH=/opt/glidecondor/lib:/opt/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 
 # Bootstrap the HTCondor environment
+if [ "X$_CONDOR_JOB_AD" == "X" ];
+then
+    if [ "X$CONDOR_ID" != "X" ]; then
+        condor_q $CONDOR_ID -l | grep -v '^$' > .job.ad
+        export _CONDOR_JOB_AD=.job.ad
+    fi
+fi
+
 if [ "X$_CONDOR_JOB_AD" != "X" ];
 then
     source_script=`grep '^RemoteCondorSetup =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
