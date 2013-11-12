@@ -99,10 +99,10 @@ class HTTPRequests(dict):
 
         #Quoting the uri since it can contain the request name, and therefore spaces (see #2557)
         uri = urllib.quote(uri)
-
+        caCertPath = self.getCACertPath()
         url = 'https://' + self['host'] + uri
         response, datares = self['conn'].request(url, data, headers, verb=verb, doseq = True, ckey=self['key'], cert=self['cert'], \
-                            capath=self.getCACertPath())#, verbose=True)# for debug
+                            capath=caCertPath)#, verbose=True)# for debug
         if response.status >= 400:
             e = HTTPException()
             setattr(e, 'req_data', data)
