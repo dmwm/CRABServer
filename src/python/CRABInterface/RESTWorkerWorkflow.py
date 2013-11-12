@@ -222,3 +222,4 @@ class Task(dict):
         self['tm_save_logs'] = task[34]
         self['tm_user_infiles'] = literal_eval(task[35])
         self['worker_name'] = task[36]
+        self['tm_arguments'] = literal_eval(task[32] if task[32] is None else task[32].read())

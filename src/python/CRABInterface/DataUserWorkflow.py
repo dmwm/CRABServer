@@ -108,6 +108,7 @@ class DataUserWorkflow(object):
            :arg str list lumis: list of lumi section numbers
            :arg int totalunits: number of MC event to be generated
            :arg str list adduserfiles: list of additional user input files
+           :arg int oneEventMode: enables oneEventMode
            :returns: a dict which contaians details of the request"""
 
         return self.workflow.submit(*args, **kwargs)

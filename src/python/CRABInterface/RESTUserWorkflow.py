@@ -94,6 +94,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkSite(safe.kwargs['asyncdest'])
             validate_num("blacklistT1", param, safe, optional=False)
+            validate_num("oneEventMode", param, safe, optional=True)
             validate_str("dbsurl", param, safe, RX_DBSURL, optional=False)
             validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES)
             validate_strlist("edmoutfiles", param, safe, RX_OUTFILES)
@@ -144,7 +145,7 @@ class RESTUserWorkflow(RESTEntity):
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
-                totalunits, adduserfiles):
+                totalunits, adduserfiles, oneEventMode):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -177,6 +178,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str scheduler: Which scheduler to use, can be 'panda' or 'condor'
            :arg int totalunits: number of MC event to be generated
            :arg int adduserfiles: additional user file to be copied in the cmsRun directory
+           :arg int oneEventMode: flag enabling oneEventMode
            :returns: a dict which contaians details of the request"""
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
@@ -187,7 +189,7 @@ class RESTUserWorkflow(RESTEntity):
                                        userhn=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
                                        publication=publication, publishname=publishname, asyncdest=asyncdest, blacklistT1=blacklistT1,
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,\
-                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles)
+                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode)
 
     @restcall
     def post(self, workflow, siteblacklist, sitewhitelist, jobids):
