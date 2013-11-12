@@ -22,7 +22,7 @@ class HTCondorDataWorkflow(DataWorkflow):
     """
 
     successList = ['finished']
-    failedList = ['cancelled', 'failed', 'cooloff']
+    failedList = ['held', 'failed', 'cooloff']
 
     def status(self, workflow, userdn, userproxy=None):
         """Retrieve the status of the workflow.
@@ -66,7 +66,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         jobList = []
         taskStatusCode = int(results[-1]['JobStatus'])
         taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
-        codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'finished', 5: 'cancelled'}
+        codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'finished', 5: 'held'}
         task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
         retval = {"status": task_codes.get(taskStatusCode, 'unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
@@ -176,7 +176,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring']]
+        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
         finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
         return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, userdn, saveLogs=saveLogs, userproxy=userproxy)
 
@@ -184,7 +184,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring']]
+        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
         finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
         return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE'], transferingIds, finishedIds, userdn, userproxy=userproxy)
 
