@@ -44,7 +44,7 @@ class PassThroughOptionParser(OptionParser):
     until rargs is depleted.  
 
     sys.exit(status) will still be called if a known argument is passed
-    incorrectly (e.g. missing arguments or bad argument types, etc.)        
+    incorrectly (e.g. missing arguments or bad argument types, etc.)
     """
     def _process_args(self, largs, rargs, values):
         while rargs:
@@ -123,7 +123,7 @@ except:
     print 'ERROR: missing parameters : %s - %s' % (type,value)
     handleException("FAILED", EC_MissingArg, 'CMSRunAnalysisERROR: missing parameters : %s - %s' % (type,value))
     sys.exit(EC_MissingArg)
-    
+
 #clean workdir ?
 
 #wget sandnox
@@ -183,14 +183,33 @@ from WMCore.WMSpec.WMStep import WMStep
 from WMCore.WMSpec.WMTask import makeWMTask
 from WMCore.WMSpec.WMWorkload import newWorkload
 from WMCore.WMSpec.Steps.Templates.CMSSW import CMSSW as CMSSWTemplate
-from PSetTweaks.WMTweak import makeTweak
+from WMCore.WMRuntime.Tools.Scram import Scram
+from subprocess import PIPE
 
 def executeCMSSWStack(opts):
 
     def getOutputModules():
-        config = __import__('WMTaskSpace.cmsRun.PSet', globals(), locals(), ["process"], -1)
-        tweakJson = makeTweak(config.process).jsondictionary()
-        return tweakJson["process"]["outputModules_"]
+        scram = Scram(
+            command = cmssw.step.application.setup.scramCommand,
+            version = opts.cmsswVersion,
+            initialise = cmssw.step.application.setup.softwareEnvironment,
+            directory = os.getcwd(),
+            architecture = opts.scramArch,
+            )
+        pythonScript = "from PSetTweaks.WMTweak import makeTweak;"+\
+                       "config = __import__(\"WMTaskSpace.cmsRun.PSet\", globals(), locals(), [\"process\"], -1);"+\
+                       "tweakJson = makeTweak(config.process).jsondictionary();"+\
+                       "print tweakJson[\"process\"][\"outputModules_\"]"
+        if scram.project() or scram.runtime(): #if any of the two commands fail...
+            msg = scram.diagnostic()
+            handleException("FAILED", EC_CMSRunWrapper, 'Error setting CMSSW environment: %s' % msg)
+            sys.exit(EC_CMSRunWrapper)
+        ret = scram("python -c '%s'" % pythonScript, logName=PIPE, runtimeDir=os.getcwd())
+        if ret > 0:
+            msg = scram.diagnostic()
+            handleException("FAILED", EC_CMSRunWrapper, 'Error getting output modules from the pset.\n\tScram Env %s\n\tCommand:%s' % (msg, pythonScript))
+            sys.exit(EC_CMSRunWrapper)
+        return literal_eval(scram.stdout)
 
     cmssw = CMSSW()
     cmssw.stepName = "cmsRun"
@@ -203,7 +222,7 @@ def executeCMSSWStack(opts):
     cmssw.step.application.setup.cmsswVersion = opts.cmsswVersion
     cmssw.step.application.configuration.section_("arguments")
     cmssw.step.application.configuration.arguments.globalTag = ""
-    for output in ['o']: #getOutputModules():
+    for output in getOutputModules():
         cmssw.step.output.modules.section_(output)
         getattr(cmssw.step.output.modules, output).primaryDataset   = ''
         getattr(cmssw.step.output.modules, output).processedDataset = ''
