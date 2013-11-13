@@ -235,7 +235,7 @@ def AddChecksums(report):
             if 'checksums' in fileInfo: continue
             if 'pfn' not in fileInfo:
                 if 'fileName' in fileInfo:
-                    fileInfo['pfn'] = 'file:/' + fileInfo['fileName']
+                    fileInfo['pfn'] = fileInfo['fileName']
                 else:
                     continue
             cksum = FileInfo.readCksum(fileInfo['pfn'])
