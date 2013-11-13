@@ -218,7 +218,7 @@ def makeJobSubmit(task):
     info['addoutputfiles'] = task['tm_outfiles']
     info['tfileoutfiles'] = task['tm_tfile_outfiles']
     info['edmoutfiles'] = task['tm_edm_outfiles']
-    info['oneEventMode'] = 1 if task['tm_arguments']['oneEventMode'] == 'T' else 0
+    info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
     # TODO: pass through these correctly.
     info['runs'] = []
     info['lumis'] = []

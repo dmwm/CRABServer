@@ -233,7 +233,11 @@ def AddChecksums(report):
     for module, outputMod in report['steps']['cmsRun']['output'].items():
         for fileInfo in outputMod:
             if 'checksums' in fileInfo: continue
-            if 'pfn' not in fileInfo: continue
+            if 'pfn' not in fileInfo:
+                if 'fileName' in fileInfo:
+                    fileInfo['pfn'] = 'file:/' + fileInfo['fileName']
+                else:
+                    continue
             cksum = FileInfo.readCksum(fileInfo['pfn'])
             adler32 = FileInfo.readAdler32(fileInfo['pfn'])
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
