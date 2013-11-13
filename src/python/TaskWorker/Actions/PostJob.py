@@ -11,17 +11,21 @@ import shutil
 import signal
 import urllib
 import commands
-
+import unittest
 import classad
-
+import datetime
+import uuid
+import tempfile
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
-
+import WMCore.Database.CMSCouch as CMSCouch
 from RESTInteractions import HTTPRequests
 from httplib import HTTPException
-
+import hashlib
 import RetryJob
+import pprint
 
 fts_server = 'https://fts3-pilot.cern.ch:8443'
+aso_server = 'http://username:password@asoserver:port//asynctransfer'
 
 g_Job = None
 
@@ -37,10 +41,13 @@ REGEX_ID = re.compile("([a-f0-9]{8,8})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]
 
 class FTSJob(object):
 
-    def __init__(self, transfer_list, count):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output):
         self._id = None
         self._cancel = False
         self._sleep = 20
+
+        transfer_list = resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames)
+
         self._transfer_list = transfer_list
         self._count = count
         with open("copyjobfile_%s" % count, "w") as fd:
@@ -88,12 +95,120 @@ class FTSJob(object):
 
             #if status in ['Done', 'Finished', 'FinishedDirty', 'Failed', 'Canceled']:
             #TODO: Do parsing of "-l"
-            if status in ['Done', 'Finished']:
+            if status in ['Done', 'Finished', 'Finishing']:
                 return 0
 
             if status in ['FinishedDirty', 'Failed', 'Canceled']:
                 print self.status(True)
                 return 1
+
+class ASOServerJob(object):
+
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata):
+        self.id = None
+        self.cancel = False
+        self.sleep = 2
+        self.count = count
+        self.dest_site = dest_site
+        self.source_dir = source_dir
+        self.dest_dir = dest_dir
+        self.source_sites = source_sites
+        self.filenames = filenames
+        self.reqname = reqname
+        self.publish = outputdata
+        proxy = os.environ.get('X509_USER_PROXY', None)
+        self.asoHost = "/".join(aso_server.split("/")[:-1])
+        self.asoDB = "/".join(aso_server.split("/")[-1:])
+        print "got aso %s %s " % (self.asoHost, self.asoDB)
+        self.couchServer = CMSCouch.CouchServer(dburl=self.asoHost, ckey=proxy, cert=proxy)
+        self.couchDatabase = self.couchServer.connectDatabase(self.asoDB, create = False)
+
+    def cancel(self):
+        print "cancelling"
+        if self.id:
+            for oneID in self.id:
+                doc = self.couchDatabase.document(oneID)
+                doc['state'] = 'killed'
+                res = self.couchDatabase.commitOne(doc)
+                if error in res:
+                    raise RuntimeError, "Got error killing transfer: %s" % res
+
+    def submit(self):
+        allIDs = []
+        cmdLine = 'openssl x509 -subject -noout -in $X509_USER_PROXY 2>/dev/null | awk \'{ $1=""; print  }\''
+        dn = commands.getstatusoutput(cmdLine)[1].strip()
+        # this seems real brittle
+        dn = "/CN=".join(dn.split("/CN=")[:2])
+        # TODO: Add a method to resolve a single PFN or use resolvePFNs
+        # FIXME: This will breaks for output file name containing log string
+        for oneFile in zip(self.source_sites, self.filenames):
+            if oneFile[1].find('log') == -1:
+                lfn = "%s/%s" % (self.source_dir, oneFile[1])
+            else:
+                lfn = "%s/log/%s" % (self.source_dir, oneFile[1])
+            doc = { '_id' : getHashLfn(lfn),
+                    'destination' : self.dest_site,
+                    'source' : oneFile[0],
+                    'lfn' : lfn.replace('/store/user', '/store/temp/user', 1),
+                    'retry_count' : [],
+                    'failure_reason' : [],
+                    'jobid' : self.count,
+                    'workflow': self.reqname,
+                    'publish': self.publish,
+                    # FIXME need to pass this through
+                    'checksums' : {},
+                    'user' : '',
+                    'group' : '',
+                    'role' : '',
+                    'dn' : dn,
+                    'state' : 'new'
+                }
+            pprint.pprint(doc)
+            allIDs.append(getHashLfn(lfn))
+            if 'error' in self.couchDatabase.commitOne(doc)[0]:
+                print "Couldn't add to couch database"
+                return False
+
+        return allIDs
+
+    def status(self, long_status=False):
+        statuses = []
+        for oneDoc in self.id:
+            couchDoc = self.couchDatabase.document(oneDoc)
+            statuses.append(couchDoc['state'])
+        return statuses
+
+    def run(self):
+        self.id = self.submit()
+        if self.id == False:
+            raise RuntimeError, "Couldn't send to couchdb"
+        while True:
+            time.sleep(self.sleep)
+            status = self.status()
+            print "Got statuses: %s" % status
+            allDone = True
+            for oneStatus, jobID in zip(status, self.id):
+                # states to wait on
+                if oneStatus in ['new', 'acquired']:
+                    allDone = False
+                    continue
+                # good states
+                elif oneStatus in ['done']:
+                    continue
+                # states to stop immediately
+                elif oneStatus in ['failed', 'killed']:
+                    print "Job failed with status %s" % oneStatus
+                    couchDoc = self.couchDatabase.document(jobID)
+                    if "_attachments" in couchDoc:
+                        print "FTS outputs are:"
+                        for log in couchDoc["_attachments"]:
+                            print self.couchDatabase.getAttachment(jobID, log)
+                    return 1
+                else:
+                    raise RuntimeError, "Got a unknown status: %s" % oneStatus
+            if allDone:
+                print "All jobs succeeded"
+                return 0
 
 
 def determineSizes(transfer_list):
@@ -140,7 +255,6 @@ def reportResults(job_id, dest_list, sizes):
 
     return retval
 
-
 def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
 
     p = PhEDEx.PhEDEx()
@@ -174,6 +288,12 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
             print "Unable to map LFN %s at site %s" % (dlfn, dest_site)
         results.append((dest_info[source_site, slfn], dest_info[dest_site, dlfn]))
     return results
+
+def getHashLfn(lfn):
+    """
+    stolen from asyncstageout
+    """
+    return hashlib.sha224(lfn).hexdigest()
 
 REQUIRED_ATTRS = ['CRAB_ReqName', 'CRAB_Id', 'CRAB_OutputData', 'CRAB_JobSW', 'CRAB_AsyncDest']
 
@@ -260,8 +380,9 @@ class PostJob():
                 if oe.errno != errno.ENOENT and oe.errno != errno.EPERM:
                     raise
 
-
     def upload(self):
+        if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
+            return
         for fileInfo in self.outputFiles:
             configreq = {"taskname":        self.ad['CRAB_ReqName'],
                          "globalTag":       "None",
@@ -273,7 +394,7 @@ class PostJob():
                          "checksummd5":     "asda", # Not implemented; garbage value taken from ASO
                          "checksumcksum":   fileInfo['checksums']['cksum'],
                          "checksumadler32": fileInfo['checksums']['adler32'],
-                         "outlocation":     fileInfo['outlocation'], 
+                         "outlocation":     fileInfo['outlocation'],
                          "outtmplocation":  fileInfo.get('outtmplocation', self.source_site),
                          "acquisitionera":  "null", # Not implemented
                          "outlfn":          fileInfo['outlfn'],
@@ -297,8 +418,9 @@ class PostJob():
                 print hte.headers
                 raise
 
-
     def uploadLog(self, dest_dir, filename):
+        if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
+            return
         outlfn = os.path.join(dest_dir, "log", filename)
         source_site = self.source_site
         if 'SEName' in self.full_report:
@@ -329,8 +451,9 @@ class PostJob():
                not hte.headers.get('X-Error-Http', -1) == '400':
                    raise
 
-
     def uploadFakeLog(self, state="TRANSFERRING"):
+        if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
+            return
         # Upload a fake log status.  This is to be replaced by a proper job state table.
         configreq = {"taskname":        self.ad['CRAB_ReqName'],
                      "pandajobid":      self.crab_id,
@@ -355,11 +478,13 @@ class PostJob():
         except HTTPException, hte:
             if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
                not hte.headers.get('X-Error-Http', -1) == '400':
-                   raise 
+                   raise
             self.uploadState(state)
 
 
     def uploadState(self, state):
+        if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
+            return
         # Record this job as a permanent failure
         configreq = {"taskname":  self.ad['CRAB_ReqName'],
                      "filestate": state,
@@ -370,6 +495,8 @@ class PostJob():
 
 
     def getSourceSite(self):
+        if os.environ.get('TEST_POSTJOB_SOURCE_SITE_OVERRIDE', False):
+            return os.environ.get('TEST_POSTJOB_SOURCE_SITE_OVERRIDE')
         if self.full_report.get('executed_site', None):
             print "Getting source_site from jobReport"
             return self.full_report['executed_site']
@@ -421,7 +548,12 @@ class PostJob():
             outfile[1]['outlocation'] = self.dest_site
 
         global g_Job
-        g_Job = FTSJob(transfer_list, self.crab_id)
+        if os.environ.get("TEST_POSTJOB_ENABLE_ASOSERVER", False):
+            targetClass = ASOServerJob
+        else:
+            targetClass = FTSJob
+
+        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData)
         fts_job_result = g_Job.run()
         # If no files failed, return success immediately.  Otherwise, see how many files failed.
         if not fts_job_result:
@@ -473,14 +605,17 @@ class PostJob():
         return retval
 
     def execute_internal(self, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
-
+        self.sw = sw
+        self.reqname = reqname
+        self.outputData = outputdata
         stdout = "job_out.%s" % id
         stderr = "job_err.%s" % id
         jobreport = "jobReport.json.%s" % id
 
         fd = os.open("postjob.%s" % id, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0755)
-        os.dup2(fd, 1)
-        os.dup2(fd, 2)
+        if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
+            os.dup2(fd, 1)
+            os.dup2(fd, 2)
 
         logpath = os.path.expanduser("~/%s" % reqname)
         try:
@@ -490,15 +625,15 @@ class PostJob():
                 raise
 
         if os.path.exists(stdout):
-            fname = os.path.join(logpath, "job_out."+id+"."+retry_count+".txt")
+            fname = os.path.join(logpath, "job_out.%s.%s.txt" % (id, retry_count))
             shutil.copy(stdout, fname)
             os.chmod(fname, 0644)
         if os.path.exists(stderr):
-            fname = os.path.join(logpath, "job_err."+id+"."+retry_count+".txt")
+            fname = os.path.join(logpath, "job_err.%s.%s.txt" % (id, retry_count))
             shutil.copy(stderr, fname)
             os.chmod(fname, 0644)
         if os.path.exists(jobreport):
-            fname = os.path.join(logpath, "job_fjr."+id+"."+retry_count+".json")
+            fname = os.path.join(logpath, "job_fjr.%s.%s.json" % (id, retry_count))
             shutil.copy(jobreport, fname)
             os.chmod(fname, 0644)
 
@@ -522,7 +657,10 @@ class PostJob():
             return self.uploadState("FAILED")
 
         retry = RetryJob.RetryJob()
-        retval = retry.execute(status, retry_count, max_retries, self.crab_id)
+        retval = None
+        if not os.environ.get('TEST_POSTJOB_DISABLE_RETRIES', False):
+            retval = retry.execute(status, retry_count, max_retries, self.crab_id)
+
         if retval:
            if retval == RetryJob.FATAL_ERROR:
                return self.uploadState("FAILED")
@@ -545,7 +683,82 @@ class PostJob():
 
         return 0
 
+class testServer(unittest.TestCase):
+    def generateJobJson(self, sourceSite = 'srm.unl.edu'):
+        return {"steps" : {
+            "cmsRun" : { "input" : {},
+              "output":
+                {"outmod1" :
+                    [ { "output_module_class" : "PoolOutputModule",
+                        "input" : ["/test/input2",
+                                   "/test/input2"
+                                  ],
+                        "events" : 200,
+                        "size" : 100,
+                        "SEName" : sourceSite,
+                        "runs" : { 1: [1,2,3],
+                                   2: [2,3,4]},
+                      }]}}}}
+    def setUp(self):
+        self.pj = PostJob()
+        #self.job = ASOServerJob()
+        #status, retry_count, max_retries, restinstance, resturl, reqname, id,
+        #outputdata, sw, async_dest, source_dir, dest_dir, *filenames
+        self.fullArgs = ['0', 1, 3, 'restinstance', 'resturl',
+                         'reqname', 1234, 'outputdata', 'sw', 'T2_US_Vanderbilt']
+        self.jsonName = "jobReport.json.%s" % self.fullArgs[6]
+        open(self.jsonName, 'w').write(json.dumps(self.generateJobJson()))
+
+    def makeTempFile(self, size, pfn):
+        fh, path = tempfile.mkstemp()
+        try:
+            inputString = "CRAB3POSTJOBUNITTEST"
+            os.write(fh, (inputString * ((size/len(inputString))+1))[:size])
+            os.close(fh)
+            cmdLine = "env -u LD_LIBRAY_PATH lcg-cp -b -D srmv2 -v file://%s %s" % (path, pfn)
+            print cmdLine
+            status, res = commands.getstatusoutput(cmdLine)
+            if status:
+                raise RuntimeError, "Couldn't make file: %s" % res
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+    def getLevelOneDir(self):
+        return datetime.datetime.now().strftime("%Y-%m")
+
+    def getLevelTwoDir(self):
+        return datetime.datetime.now().strftime("%d%p")
+
+    def getUniqueFilename(self):
+        return "%s-postjob.txt" % uuid.uuid4()
+
+    def testNonexistent(self):
+        self.fullArgs.extend(['/store/temp/user/meloam/CRAB3-UNITTEST-NONEXISTENT/b/c/',
+                             '/store/user/meloam/CRAB3-UNITTEST-NONEXISTENT/b/c',
+                             self.getUniqueFilename()])
+        self.assertNotEqual(self.pj.execute(*self.fullArgs), 0)
+
+    sourcePrefix = "srm://dcache07.unl.edu:8443/srm/v2/server?SFN=/mnt/hadoop/user/uscms01/pnfs/unl.edu/data4/cms"
+    def testExistent(self):
+        sourceDir  = "/store/temp/user/meloam/CRAB3-UnitTest/%s/%s" % \
+                        (self.getLevelOneDir(), self.getLevelTwoDir())
+        sourceFile = self.getUniqueFilename()
+        sourceLFN  = "%s/%s" % (sourceDir, sourceFile)
+        destDir = sourceDir.replace("temp/user", "user")
+        self.makeTempFile(200, "%s/%s" %(self.sourcePrefix, sourceLFN))
+        self.fullArgs.extend([sourceDir, destDir, sourceFile])
+        self.assertEqual(self.pj.execute(*self.fullArgs), 0)
+
+    def tearDown(self):
+        if os.path.exists(self.jsonName):
+            os.unlink(self.jsonName)
+
 if __name__ == '__main__':
+    if len(sys.argv) >= 2 and sys.argv[1] == 'UNIT_TEST':
+        sys.argv = [sys.argv[0]]
+        print "Beginning testing"
+        unittest.main()
+        print "Testing over"
+        sys.exit()
     pj = PostJob()
     sys.exit(pj.execute(*sys.argv[2:]))
-
