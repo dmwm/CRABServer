@@ -89,7 +89,7 @@ universe = vanilla
 Executable = gWMS-CMSRunAnalysis.sh
 Output = job_out.$(CRAB_Id)
 Error = job_err.$(CRAB_Id)
-Log = job_log.$(CRAB_Id)
+Log = job_log
 # args changed...
 
 Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) '--inputFile=$(inputFiles)' '--runAndLumis=$(runAndLumiMask)' -o $(CRAB_AdditionalOutputFiles)"
@@ -371,7 +371,7 @@ class DagmanCreator(TaskAction.TaskAction):
             jobgroupspecs, startjobid = make_specs(kwargs['task'], jobgroup, availablesites, outfiles, startjobid)
             specs += jobgroupspecs
 
-        dag = ""
+        dag = "\nNODE_STATUS_FILE node_state 30\n"
         for spec in specs:
             dag += DAG_FRAGMENT % spec
 
