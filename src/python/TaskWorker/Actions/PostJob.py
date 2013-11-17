@@ -374,16 +374,7 @@ class PostJob():
             print "Getting source_site from jobReport"
             return self.full_report['executed_site']
 
-        cmd = "condor_q -const true -userlog job_log.%d -af JOBGLIDEIN_CMSSite" % self.crab_id
-        status, output = commands.getstatusoutput(cmd)
-        if status:
-            print "Failed to query condor user log:\n%s" % output
-            raise ValueError("Failed to query condor user log:\n%s" % output)
-        source_site = output.split('\n')[-1].strip()
-        print "Determined a source site of %s from the user log" % source_site
-        if source_site == 'Unknown' or source_site == "undefined":
-            raise ValueError("Unable to determine source side")
-        return source_site
+        raise ValueError("Unable to determine source side")
 
 
     def getFileSourceSite(self, filename):
@@ -472,7 +463,7 @@ class PostJob():
             os.chmod(postjob, 0644)
         return retval
 
-    def execute_internal(self, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
+    def execute_internal(self, cluster, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
 
         stdout = "job_out.%s" % id
         stderr = "job_err.%s" % id
@@ -522,7 +513,7 @@ class PostJob():
             return self.uploadState("FAILED")
 
         retry = RetryJob.RetryJob()
-        retval = retry.execute(status, retry_count, max_retries, self.crab_id)
+        retval = retry.execute(status, retry_count, max_retries, self.crab_id, cluster)
         if retval:
            if retval == RetryJob.FATAL_ERROR:
                return self.uploadState("FAILED")
