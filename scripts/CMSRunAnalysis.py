@@ -262,7 +262,7 @@ def AddChecksums(report):
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
-def parseAd(ad):
+def parseAd():
     fd = open(os.environ['_CONDOR_JOB_AD'])
     ad = {}
     for line in fd.readlines():
@@ -282,21 +282,58 @@ def parseAd(ad):
 def startDashboardMonitoring(ad):
     params = {
         'WNHostName': socket.getfqdn(),
-        #'MonitorJobID': '3_https://submit-6.t2.ucsd.edu//131103//53912.2',
-        'SyncGridJobId': '%d_https://glidein.%d:%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
+        'MonitorID': ad['CRAB_ReqName'],
+        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
+        'SyncGridJobId': '%d_https://glidein.cern.ch/%d/%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
         'SyncSite': ad['JOB_CMSSite'],
         'SyncCE': ad['Used_Gatekeeper'].split(":")[0],
         'ExeStart': 'cmsRun',
     }
+    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+
+def addReportInfo(params):
+    fjr = json.load(open("jobReport.json"))
+    if 'exitCode' in fjr:
+        params['ExeExitCode'] = fjr['exitCode']
+    if 'performance' in fjr and 'cpu' in fjr['performance']:
+        params['ExeTime'] = int(fjr['performance']['cpu']['TotalJobTime'])
+        params['CrabUserCpuTime'] = float(fjr['performance']['cpu']['TotalJobCPU'])
+        if params['ExeTime']:
+            params['CrabCpuPercentage'] = params['CrabUserCpuTime'] / float(params['ExeTime'])
+    inputEvents = 0
+    if 'input' in fjr and 'source' in fjr['input']:
+        for info in fjr['input']['source']:
+            if 'events' in info:
+                params['NoEventsPerRun'] = info['events']
+                params['NbEvPerRun'] = info['events']
+                params['NEventsProcessed'] = info['events']
 
 def stopDashboardMonitoring(ad):
     params = {
-        'SyncGridJobId': '%d_https://glidein.%d:%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
+        'MonitorID': ad['CRAB_ReqName'],
+        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
+        'SyncGridJobId': '%d_https://glidein.cern.ch/%d/%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
         'ExeEnd': 'cmsRun',
     }
+    try:
+        addReportInfo(params)
+    except:
+        if 'ExeExitCode' not in params:
+            params['ExeExitCode'] = 50115
+        print traceback.format_exc()
+    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+    DashboardAPI.apmonFree()
 
 try:
     setupLogging('.')
+    ad = {}
+    try:
+        ad = parseAd()
+    except:
+        print traceback.format_exc()
+        ad = {}
+    if ad:
+         startDashboardMonitoring(ad)
     cmssw = executeCMSSWStack(opts)
     jobExitCode = cmssw.step.execution.exitStatus
     print "Job exit code: %s" % str(jobExitCode)
@@ -340,6 +377,8 @@ try:
         json.dump(report, of)
     with open('jobReportExtract.pickle','w') as of:
         pickle.dump(report, of)
+    if ad:
+        stopDashboardMonitoring(ad)
 except FwkJobReportException, FJRex:
     msg = "BadFWJRXML"
     handleException("FAILED", EC_ReportHandlingErr, msg)
