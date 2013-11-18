@@ -19,7 +19,7 @@ import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 from RESTInteractions import HTTPRequests
 from httplib import HTTPException
 
-import RetryJob
+import TaskWorker.Actions.RetryJob as RetryJob
 
 fts_server = 'https://fts3-pilot.cern.ch:8443'
 
@@ -346,8 +346,8 @@ class PostJob():
         except HTTPException, hte:
             print hte.headers
             if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
-               not hte.headers.get('X-Error-Http', -1) == '400':
-                   raise
+                    not hte.headers.get('X-Error-Http', -1) == '400':
+                raise
 
 
     def uploadFakeLog(self, state="TRANSFERRING"):
@@ -374,8 +374,8 @@ class PostJob():
             self.server.put(self.resturl, data = urllib.urlencode(configreq))
         except HTTPException, hte:
             if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
-               not hte.headers.get('X-Error-Http', -1) == '400':
-                   raise 
+                   not hte.headers.get('X-Error-Http', -1) == '400':
+                raise 
             self.uploadState(state)
 
 
@@ -528,6 +528,8 @@ class PostJob():
         self.uploadFakeLog(state="TRANSFERRING")
 
         print "Retry count %s; max retry %s" % (retry_count, max_retries)
+        fail_state = "COOLOFF"
+        if retry_count == max_retries: fail_state = "FAILED"
         if status and (retry_count == max_retries):
             # This was our last retry and it failed.
             return self.uploadState("FAILED")
@@ -535,11 +537,11 @@ class PostJob():
         retry = RetryJob.RetryJob()
         retval = retry.execute(status, retry_count, max_retries, self.crab_id, cluster)
         if retval:
-           if retval == RetryJob.FATAL_ERROR:
-               return self.uploadState("FAILED")
-           else:
-               self.uploadState("COOLOFF")
-               return retval
+            if retval == RetryJob.FATAL_ERROR:
+                return self.uploadState("FAILED")
+            else:
+                self.uploadState(fail_state)
+                return retval
 
         self.parseJson()
         self.source_site = self.getSourceSite()
@@ -550,7 +552,7 @@ class PostJob():
             self.stageout(source_dir, dest_dir, *filenames)
             self.upload()
         except:
-            self.uploadState("COOLOFF")
+            self.uploadState(fail_state)
             raise
         self.uploadFakeLog(state="FINISHED")
 

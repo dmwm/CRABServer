@@ -31,11 +31,6 @@ SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RET
 RETRY Job%(count)d 10 UNLESS-EXIT 2
 VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" inputFiles="%(inputFiles)s" +DESIRED_Sites="\\"%(desiredSites)s\\"" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
 
-#JOB ASO%(count)d ASO.submit
-#VARS ASO%(count)d count="%(count)d" outputFiles="%(remoteOutputFiles)s"
-#RETRY ASO%(count)d 3
-
-#PARENT Job%(count)d CHILD ASO%(count)d
 """
 
 CRAB_HEADERS = \
@@ -106,25 +101,7 @@ Requirements = (target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEF
 #Requirements = ((target.IS_GLIDEIN =!= TRUE) || ((target.GLIDEIN_CMSSite =!= UNDEFINED) && (stringListIMember(target.GLIDEIN_CMSSite, DESIRED_SEs) )))
 #leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
-queue
-"""
-
-ASYNC_SUBMIT = CRAB_HEADERS + \
-"""
-+TaskType = "ASO"
-+CRAB_Id = $(count)
-
-universe = local
-Executable = dag_bootstrap.sh
-Arguments = "ASO %(asyncdest_flatten)s %(temp_dest)s %(output_dest)s $(count) $(Cluster).$(Process) cmsRun_$(count).log.tar.gz $(outputFiles)"
-Output = aso.$(count).out
-transfer_input_files = job_log.$(count), jobReport.json.$(count)
-+TransferOutput = ""
-Error = aso.$(count).err
-Environment = PATH=/usr/bin:/bin;CRAB3_VERSION=3.3.0-pre1;%(additional_environment_options)s
-use_x509userproxy = true
-#x509userproxy = %(x509up_file)s
-#leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
+periodic_remove = (JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)
 queue
 """
 
@@ -226,8 +203,6 @@ def makeJobSubmit(task):
     info.setdefault("additional_environment_options", '')
     with open("Job.submit", "w") as fd:
         fd.write(JOB_SUBMIT % info)
-    with open("ASO.submit", "w") as fd:
-        fd.write(ASYNC_SUBMIT % info)
 
     return info
 
@@ -387,7 +362,7 @@ class DagmanCreator(TaskAction.TaskAction):
         ml_info = info.setdefault('apmon', [])
         for idx in range(1, info['jobcount']+1):
             taskid = kwargs['task']['tm_taskname'].replace("_", ":")
-            jinfo = {'jobId': ("%d_https://glidein.%d:%s_0" % (idx, idx, taskid)),
+            jinfo = {'jobId': ("%d_https://glidein.cern.ch/%d/%s_0" % (idx, idx, taskid)),
                      'sid': "%d:%s" % (idx, taskid),
                      'broker': os.environ.get('HOSTNAME',''),
                      'bossId': str(idx),
