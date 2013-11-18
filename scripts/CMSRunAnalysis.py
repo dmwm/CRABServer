@@ -297,6 +297,7 @@ def startDashboardMonitoring(ad):
         'SyncCE': ad['Used_Gatekeeper'].split(":")[0],
         'ExeStart': 'cmsRun',
     }
+    print "Dashboard startup parameters: %s" % str(params)
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
 
 def addReportInfo(params):
@@ -329,6 +330,7 @@ def stopDashboardMonitoring(ad):
         if 'ExeExitCode' not in params:
             params['ExeExitCode'] = 50115
         print traceback.format_exc()
+    print "Dashboard end parameters: %s" % str(params)
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
     DashboardAPI.apmonFree()
 
