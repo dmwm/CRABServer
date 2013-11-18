@@ -463,8 +463,14 @@ class HTCondorDataWorkflow(DataWorkflow):
                 node = node_map[event['Cluster'], event['Proc']]
                 nodes[node]['EndTimes'].append(eventtime)
                 nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
-                nodes[node]['State'] = 'transferring'
                 self.insertCpu(event, nodes[node])
+                if event['TerminatedNormally']:
+                    if event['ReturnValue'] == 0:
+                            nodes[node]['State'] = 'transferring'
+                    else:
+                            nodes[node]['State'] = 'cooloff'
+                else:
+                    nodes[node]['State']  = 'cooloff'
             elif event['MyType'] == 'PostScriptTerminatedEvent':
                 m = self.node_name2_re.match(event['DAGNodeName'])
                 if m:
@@ -537,7 +543,11 @@ class HTCondorDataWorkflow(DataWorkflow):
                 continue
             nodeid, status, msg = m.groups()
             if status == "STATUS_READY":
-                nodes[nodeid] = {'State': 'unsubmitted'}
+                info = nodes.setdefault(nodeid, {})
+                if info.get("State") == "transferring":
+                    info["State"] = "cooloff"
+                elif info.get('State') != "cooloff":
+                    info['State'] = 'unsubmitted'
             elif status == "STATUS_PRERUN":
                 info = nodes.setdefault(nodeid, {})
                 info['State'] = 'cooloff'
@@ -546,7 +556,8 @@ class HTCondorDataWorkflow(DataWorkflow):
                 info.setdefault('State', 'idle')
             elif status == 'STATUS_POSTRUN':
                 info = nodes.setdefault(nodeid, {})
-                info['State'] = 'transferring'
+                if info.get("State") != "cooloff":
+                    info['State'] = 'transferring'
             elif status == 'STATUS_DONE':
                 info = nodes.setdefault(nodeid, {})
                 info['State'] = 'finished'
