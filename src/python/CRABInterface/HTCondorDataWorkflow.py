@@ -221,7 +221,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             self.logger.info("No finished jobs found in the task")
             return
 
-        self.logger.debug("Retrieving output of jobs: %s" % jobids)
+        self.logger.debug("Retrieving %s output of jobs: %s" % (','.join(filetype), jobids))
         rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype=','.join(filetype), taskname=workflow)
         rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
         if howmany!=-1:
@@ -345,6 +345,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                     taskStatus[i] = {'State': 'unsubmitted'}
 
         for job, info in taskStatus.items():
+            job = int(job)
             status = info['State']
             jobsPerStatus.setdefault(status, 0)
             jobsPerStatus[status] += 1
@@ -382,7 +383,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         curl.setopt(pycurl.CONNECTTIMEOUT, 30)
         curl.setopt(pycurl.FOLLOWLOCATION, 0)
         curl.setopt(pycurl.MAXREDIRS, 0)
-        curl.setopt(pycurl.ENCODING, 'gzip, deflate')
+        #curl.setopt(pycurl.ENCODING, 'gzip, deflate')
         return curl
 
     def taskWebStatus(self, url):
@@ -395,11 +396,16 @@ class HTCondorDataWorkflow(DataWorkflow):
         curl.setopt(pycurl.WRITEFUNCTION, fp.write)
         hbuf = StringIO.StringIO()
         curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
+        import cherrypy
+        cherrypy.log("Starting download of job log")
         curl.perform()
+        cherrypy.log("Finished download of job log")
         header = ResponseHeader(hbuf.getvalue())
         if header.status == 200:
             fp.seek(0)
+            cherrypy.log("Starting parse of job log")
             self.parseJobLog(fp, nodes)
+            cherrypy.log("Finished parse of job log")
             fp.truncate(0)
         else:
             raise RuntimeError("Failed to parse jobs log")
@@ -407,18 +413,21 @@ class HTCondorDataWorkflow(DataWorkflow):
         nodes_url = url + "/node_state.txt"
         curl.setopt(pycurl.URL, nodes_url)
         hbuf.truncate(0)
+        cherrypy.log("Starting download of node state")
         curl.perform()
+        cherrypy.log("Finished download of node state")
         header = ResponseHeader(hbuf.getvalue())
         if header.status == 200:
             fp.seek(0)
+            cherrypy.log("Starting parse of node state")
             self.parseNodeState(fp, nodes)
+            cherrypy.log("Finished parse of node state")
         else:
             raise RuntimeError("Failed to parse node state log")
 
-        import cherrypy
-
-        for node, info in nodes.items():
-            cherrypy.log("Node %s - Info %s" % (node, str(info)))
+        #import cherrypy
+        #for node, info in nodes.items():
+        #    cherrypy.log("Node %s - Info %s" % (node, str(info)))
 
         return nodes
 
@@ -501,11 +510,22 @@ class HTCondorDataWorkflow(DataWorkflow):
                 self.insertCpu(event, nodes[node])
             elif event['MyType'] == 'JobImageSizeEvent':
                 nodes[node]['ResidentSetSize'][-1] = int(event['ResidentSetSize'])
-                nodes[node]['WallDurations'][-1] = eventtime - nodes[node]['StartTimes'][-1]
+                if nodes[node]['StartTimes']:
+                    nodes[node]['WallDurations'][-1] = eventtime - nodes[node]['StartTimes'][-1]
                 self.insertCpu(event, nodes[node])
             else:
                 import cherrypy
                 cherrypy.log("Unknown event type: %s" % event['MyType'])
+
+        now = time.time()
+        for node, info in nodes.items():
+            last_start = now
+            if info['StartTimes']:
+                last_start = info['StartTimes'][-1]
+            while len(info['WallDurations']) < len(info['SiteHistory']):
+                info['WallDurations'].append(now - last_start)
+            while len(info['WallDurations']) > len(info['SiteHistory']):
+                info['SiteHistory'].append("Unknown")
 
     job_re = re.compile(r"JOB Job(\d+)\s+([A-Z_]+)\s+\((.*)\)")
     post_failure_re = re.compile(r"POST script failed with status (\d+)")
