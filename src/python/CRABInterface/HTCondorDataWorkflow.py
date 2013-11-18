@@ -1,6 +1,8 @@
 
 import re
+import time
 import StringIO
+import tempfile
 import traceback
 from ast import literal_eval
 
@@ -35,7 +37,7 @@ class HTCondorDataWorkflow(DataWorkflow):
            :return: a workflow status summary document"""
 
         try:
-            self.alt_status(workflow, userdn, userproxy=userproxy)
+            return self.alt_status(workflow, userdn, userproxy=userproxy)
         except:
             import cherrypy
             s = traceback.format_exc()
@@ -296,7 +298,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         import cherrypy
 
-        name = workflow.split("_")[0]
+        name = workflow.split("_")[2].split(":")[0]
         cherrypy.log("Getting status for workflow %s, looking for schedd %s" %\
                                 (workflow, name))
         locator = HTCondorLocator.HTCondorLocator(self.config)
@@ -306,7 +308,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         schedd, address = locator.getScheddObj(name)
 
         results = self.getRootTasks(workflow, schedd)
-        if not results or ('CRAB_UserWebDir' not in results[0]):
+        if not results or ('CRAB_UserWebDir' not in results[-1]):
             return [ {"status" : "UNKNOWN",
                       "taskFailureMsg" : "Unable to find root task in HTCondor",
                       "jobSetID"        : '',
@@ -317,7 +319,48 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
 
-        return self.taskWebStatus(results[0]['CRAB_UserWebDir'])
+        taskStatus = self.taskWebStatus(results[0]['CRAB_UserWebDir'])
+
+        jobsPerStatus = {}
+        jobList = []
+        taskStatusCode = int(results[-1]['JobStatus'])
+        taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
+        codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'finished', 5: 'held'}
+        task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
+        retval = {"status": task_codes.get(taskStatusCode, 'unknown'), "taskFailureMsg": "", "jobSetID": workflow,
+            "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
+        if taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 3:
+            retval['status'] = 'FAILED'
+        elif taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 16:
+            retval['status'] = 'InTransition'
+        elif taskStatusCode == 5:
+            retval['status'] = 'Unknown'
+
+        for i in range(1, taskJobCount+1):
+            if i not in taskStatus:
+                if taskStatusCode == 5:
+                    taskStatus[i] = {'State': 'killed'}
+                else:
+                    taskStatus[i] = {'State': 'unsubmitted'}
+
+        for job, info in taskStatus.items():
+            status = info['State']
+            jobsPerStatus.setdefault(status, 0)
+            jobsPerStatus[status] += 1
+            jobList.append((status, job))
+
+        retval["failedJobdefs"] = 0
+        retval["totalJobdefs"] = 0
+
+        if len(taskStatus) == 0 and results[0]['JobStatus'] == 2:
+            retval['status'] = 'Running (jobs not submitted)'
+
+        retval['jobdefErrors'] = []
+
+        #retval['jobs'] = taskStatus
+
+        return [retval]
+
 
     cpu_re = re.compile(r"Usr \d+ (\d+):(\d+):(\d+), Sys \d+ (\d+):(\d+):(\d+)")
     def insertCpu(self, event, info):
@@ -325,14 +368,10 @@ class HTCondorDataWorkflow(DataWorkflow):
             m = self.cpu_re.match(event['TotalRemoteUsage'])
             if m:
                 g = [int(i) for i in m.groups()]
-                info['TotalUserCpuTime'] = g[0]*3600 + g[1]*60 + g[2]
-                info['TotalSysCpuTime'] = g[3]*3600 + g[4]*60 + g[5]
-        if 'RunRemoteUsage' in event:
-            m = self.cpu_re.match(event['RunRemoteUsage'])
-            if m:
-                g = [int(i) for i in m.groups()]
-                info['MostRecentUserCpuTime'] = g[0]*3600 + g[1]*60 + g[2]
-                info['MostRecentSysCpuTime'] = g[3]*3600 + g[4]*60 + g[5]
+                user = g[0]*3600 + g[1]*60 + g[2]
+                sys = g[3]*3600 + g[4]*60 + g[5]
+                info['TotalUserCpuTimeHistory'][-1] = user
+                info['TotalSysCpuTimeHistory'][-1] = sys
 
     def prepareCurl(self):
         curl = pycurl.Curl()
@@ -341,6 +380,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         curl.setopt(pycurl.CONNECTTIMEOUT, 30)
         curl.setopt(pycurl.FOLLOWLOCATION, 0)
         curl.setopt(pycurl.MAXREDIRS, 0)
+        curl.setopt(pycurl.ENCODING, 'gzip, deflate')
+        return curl
 
     def taskWebStatus(self, url):
         nodes = {}
@@ -348,15 +389,15 @@ class HTCondorDataWorkflow(DataWorkflow):
         curl = self.prepareCurl()
         jobs_url = url + "/jobs_log.txt"
         curl.setopt(pycurl.URL, jobs_url)
-        fd = tempfile.TemporaryFile()
-        curl.setopt(pycurl.WRITEFUNCTION, fd.write)
+        fp = tempfile.TemporaryFile()
+        curl.setopt(pycurl.WRITEFUNCTION, fp.write)
         hbuf = StringIO.StringIO()
         curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
         curl.perform()
         header = ResponseHeader(hbuf.getvalue())
         if header.status == 200:
             fp.seek(0)
-            parseJobLog(fp, nodes)
+            self.parseJobLog(fp, nodes)
             fp.truncate(0)
         else:
             raise RuntimeError("Failed to parse jobs log")
@@ -368,7 +409,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         header = ResponseHeader(hbuf.getvalue())
         if header.status == 200:
             fp.seek(0)
-            parseNodeState(fp, nodes)
+            self.parseNodeState(fp, nodes)
         else:
             raise RuntimeError("Failed to parse node state log")
 
@@ -377,73 +418,81 @@ class HTCondorDataWorkflow(DataWorkflow):
         for node, info in nodes.items():
             cherrypy.log("Node %d - Info %s" % (node, str(info)))
 
-        raise NotImplementedError("Haven't finished taskWebStatus")
+        return nodes
 
+    node_name_re = re.compile("DAG Node: Job(\d+)")
+    node_name2_re = re.compile("Job(\d+)")
     def parseJobLog(self, fp, nodes):
+        node_map = {}
         for event in htcondor.readEvents(fp):
             eventtime = time.mktime(time.strptime(event['EventTime'], "%Y-%m-%dT%H:%M:%S"))
             if event['MyType'] == 'SubmitEvent':
-                m = node_name_re.match(event['LogNotes'])
+                m = self.node_name_re.match(event['LogNotes'])
                 if m:
                     node = int(m.groups()[0])
                     proc = event['Cluster'], event['Proc']
-                    info = nodes.setdefault(node, {'Cluster': event['Cluster'], 'Proc': event['Proc'], 'State': 'Idle', 'Retries': 0, 'Restarts': 0, 'SiteHistory': [], 'ResidentSetSize': 0, 'SubmitTimes': [], 'StartTimes': [], 'EndTimes': []})
+                    info = nodes.setdefault(node, {'State': 'idle', 'Retries': 0, 'Restarts': 0, 'SiteHistory': [], 'ResidentSetSize': [], 'SubmitTimes': [], 'StartTimes': [], 'EndTimes': [], 'TotalUserCpuTimeHistory': [], 'TotalSysCpuTimeHistory': [], 'WallDurations': [], 'JobIds': []})
+                    info['JobIds'].append("%d.%d" % proc)
                     info['RecordedSite'] = False
-                    info['MostRecentSite'] = None
                     info['SubmitTimes'].append(eventtime)
-                    info['MostRecentSubmitTime'] = eventtime
-                    retries = info['Retries']
-                    if node in node_map:
-                        info['Retries'] += retries
+                    info['TotalUserCpuTimeHistory'].append(0)
+                    info['TotalSysCpuTimeHistory'].append(0)
+                    info['WallDurations'].append(0)
+                    info['ResidentSetSize'].append(0)
+                    info['Retries'] = len(info['SubmitTimes'])-1
                     node_map[proc] = node
             elif event['MyType'] == 'ExecuteEvent':
                 node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['MostRecentStartTime'] = eventtime
                 nodes[node]['StartTimes'].append(eventtime)
-                nodes[node]['State'] = 'Running'
+                nodes[node]['State'] = 'running'
                 nodes[node].setdefault('RecordedSite', False)
             elif event['MyType'] == 'JobTerminatedEvent':
                 node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['MostRecentEndTime'] = eventtime
                 nodes[node]['EndTimes'].append(eventtime)
-                nodes[node]['State'] = 'Transferring'
+                nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
+                nodes[node]['State'] = 'transferring'
                 self.insertCpu(event, nodes[node])
             elif event['MyType'] == 'PostScriptTerminatedEvent':
-                m = node_name2_re.match(event['DAGNodeName'])
+                m = self.node_name2_re.match(event['DAGNodeName'])
                 if m:
                     node = int(m.groups()[0])
                     if event['TerminatedNormally']:
                         if event['ReturnValue'] == 0:
-                            nodes[node]['State'] = 'Done'
+                            nodes[node]['State'] = 'finished'
                         elif event['ReturnValue'] == 2:
-                            nodes[node]['State'] = 'Failed'
+                            nodes[node]['State'] = 'failed'
                         else:
-                            nodes[node]['State'] = 'Cooloff'
+                            nodes[node]['State'] = 'cooloff'
                     else:
-                        nodes[node]['State']  = 'Cooloff'
+                        nodes[node]['State']  = 'cooloff'
             elif event['MyType'] == 'ShadowExceptionEvent':
                 node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['State'] = 'Idle'
-                nodes[node]['Restarts'] = 1 + nodes[node].setdefault('Restarts', 0)
+                nodes[node]['EndTimes'].append(eventtime)
+                nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
+                nodes[node]['State'] = 'idle'
                 self.insertCpu(event, nodes[node])
             elif event['MyType'] == 'JobHeldEvent':
                 node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['State'] = 'Held'
-                nodes[node]['Restarts'] = 1 + nodes[node].setdefault('Restarts', 0)
+                nodes[node]['EndTimes'].append(eventtime)
+                nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
+                nodes[node]['State'] = 'held'
                 self.insertCpu(event, nodes[node])
             elif event['MyType'] == 'JobReleaseEvent':
                 node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['State'] = 'Released'
+                nodes[node]['State'] = 'idle'
             elif event['MyType'] == 'JobAdInformationEvent':
                 node = node_map[event['Cluster'], event['Proc']]
                 if (not nodes[node]['RecordedSite']) and ('JOBGLIDEIN_CMSSite' in event) and not event['JOBGLIDEIN_CMSSite'].startswith("$$"):
-                    nodes[node]['MostRecentSite'] = event['JOBGLIDEIN_CMSSite']
                     nodes[node]['SiteHistory'].append(event['JOBGLIDEIN_CMSSite'])
                     nodes[node]['RecordedSite'] = True
                 self.insertCpu(event, nodes[node])
             elif event['MyType'] == 'JobImageSizeEvent':
-                nodes[node]['ResidentSetSize'] = event['ResidentSetSize']
+                nodes[node]['ResidentSetSize'][-1] = int(event['ResidentSetSize'])
+                nodes[node]['WallDurations'][-1] = eventtime - nodes[node]['StartTimes'][-1]
                 self.insertCpu(event, nodes[node])
+            else:
+                import cherrypy
+                cherrypy.log("Unknown event type: %s" % event['MyType'])
 
     job_re = re.compile(r"JOB Job(\d+)\s+([A-Z_]+)\s+\((.*)\)")
     post_failure_re = re.compile(r"POST script failed with status (\d+)")
@@ -455,27 +504,27 @@ class HTCondorDataWorkflow(DataWorkflow):
             nodeid, status, msg = m.groups()
             nodeid = int(nodeid)
             if status == "STATUS_READY":
-                nodes[nodeid] = {'State': 'Unsubmitted'}
+                nodes[nodeid] = {'State': 'unsubmitted'}
             elif status == "STATUS_PRERUN":
                 info = nodes.setdefault(nodeid, {})
-                info['State'] = 'Cooloff'
+                info['State'] = 'cooloff'
             elif status == 'STATUS_SUBMITTED':
                 info = nodes.setdefault(nodeid, {})
-                info.setdefault('State', 'Idle')
+                info.setdefault('State', 'idle')
             elif status == 'STATUS_POSTRUN':
                 info = nodes.setdefault(nodeid, {})
-                info['State'] = 'Transferring'
+                info['State'] = 'transferring'
             elif status == 'STATUS_DONE':
                 info = nodes.setdefault(nodeid, {})
-                info['State'] = 'Finished'
+                info['State'] = 'finished'
             elif status == "STATUS_ERROR":
                 info = nodes.setdefault(nodeid, {})
                 m = self.post_failure_re.match(msg)
                 if m:
                     if m.groups()[0] == '2':
-                        info['State'] = 'Failed'
+                        info['State'] = 'failed'
                     else:
-                        info['State'] = 'Cooloff'
+                        info['State'] = 'cooloff'
                 else:
-                    info['State'] = 'Failed2'
+                    info['State'] = 'failed'
 
