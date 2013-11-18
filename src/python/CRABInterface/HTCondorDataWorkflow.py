@@ -431,7 +431,8 @@ class HTCondorDataWorkflow(DataWorkflow):
                 if m:
                     node = int(m.groups()[0])
                     proc = event['Cluster'], event['Proc']
-                    info = nodes.setdefault(node, {'State': 'idle', 'Retries': 0, 'Restarts': 0, 'SiteHistory': [], 'ResidentSetSize': [], 'SubmitTimes': [], 'StartTimes': [], 'EndTimes': [], 'TotalUserCpuTimeHistory': [], 'TotalSysCpuTimeHistory': [], 'WallDurations': [], 'JobIds': []})
+                    info = nodes.setdefault(node, {'Retries': 0, 'Restarts': 0, 'SiteHistory': [], 'ResidentSetSize': [], 'SubmitTimes': [], 'StartTimes': [], 'EndTimes': [], 'TotalUserCpuTimeHistory': [], 'TotalSysCpuTimeHistory': [], 'WallDurations': [], 'JobIds': []})
+                    info['State'] = 'idle'
                     info['JobIds'].append("%d.%d" % proc)
                     info['RecordedSite'] = False
                     info['SubmitTimes'].append(eventtime)
