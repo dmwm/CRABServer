@@ -122,7 +122,7 @@ class DataUserWorkflow(object):
         return self.workflow.resubmit(workflow, siteblacklist, sitewhitelist, jobids, userdn, userproxy)
 
     @retrieveUserCert
-    def status(self, workflow, userdn, userproxy=None):
+    def status(self, workflow, userdn, userproxy=None, verbose=False):
         """Retrieve the status of the workflow
 
            :arg str workflow: a valid workflow name
@@ -130,7 +130,7 @@ class DataUserWorkflow(object):
            :arg str userproxy: the user proxy retrieved by `retrieveUserCert`
            :return: a generator of workflow states
         """
-        return self.workflow.status(workflow, userdn, userproxy)
+        return self.workflow.status(workflow, userdn, userproxy, verbose=verbose)
 
     @retrieveUserCert
     def kill(self, workflow, force, jobids, userdn, userproxy=None):

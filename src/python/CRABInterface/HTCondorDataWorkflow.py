@@ -30,14 +30,14 @@ class HTCondorDataWorkflow(DataWorkflow):
     successList = ['finished']
     failedList = ['held', 'failed', 'cooloff']
 
-    def status(self, workflow, userdn, userproxy=None):
+    def status(self, workflow, userdn, userproxy=None, verbose=False):
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
            :return: a workflow status summary document"""
 
         try:
-            return self.alt_status(workflow, userdn, userproxy=userproxy)
+            return self.alt_status(workflow, userdn, userproxy=userproxy, verbose=verbose)
         except:
             import cherrypy
             s = traceback.format_exc()
@@ -274,7 +274,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         yield res
 
-    def alt_status(self, workflow, userdn, userproxy=None):
+    def alt_status(self, workflow, userdn, userproxy=None, verbose=False):
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
@@ -319,7 +319,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
 
-        taskStatus = self.taskWebStatus(results[0]['CRAB_UserWebDir'])
+        taskStatus = self.taskWebStatus(results[0]['CRAB_UserWebDir'], verbose=verbose)
 
         jobsPerStatus = {}
         jobList = []
@@ -386,7 +386,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         #curl.setopt(pycurl.ENCODING, 'gzip, deflate')
         return curl
 
-    def taskWebStatus(self, url):
+    def taskWebStatus(self, url, verbose):
         nodes = {}
 
         curl = self.prepareCurl()
@@ -397,22 +397,23 @@ class HTCondorDataWorkflow(DataWorkflow):
         hbuf = StringIO.StringIO()
         curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
         import cherrypy
-        cherrypy.log("Starting download of job log")
-        curl.perform()
-        cherrypy.log("Finished download of job log")
-        header = ResponseHeader(hbuf.getvalue())
-        if header.status == 200:
-            fp.seek(0)
-            cherrypy.log("Starting parse of job log")
-            self.parseJobLog(fp, nodes)
-            cherrypy.log("Finished parse of job log")
-            fp.truncate(0)
-        else:
-            raise RuntimeError("Failed to parse jobs log")
+        if verbose:
+            cherrypy.log("Starting download of job log")
+            curl.perform()
+            cherrypy.log("Finished download of job log")
+            header = ResponseHeader(hbuf.getvalue())
+            if header.status == 200:
+                fp.seek(0)
+                cherrypy.log("Starting parse of job log")
+                self.parseJobLog(fp, nodes)
+                cherrypy.log("Finished parse of job log")
+                fp.truncate(0)
+                hbuf.truncate(0)
+            else:
+                raise RuntimeError("Failed to parse jobs log")
 
         nodes_url = url + "/node_state.txt"
         curl.setopt(pycurl.URL, nodes_url)
-        hbuf.truncate(0)
         cherrypy.log("Starting download of node state")
         curl.perform()
         cherrypy.log("Finished download of node state")
