@@ -337,6 +337,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             retval['status'] = 'Unknown'
 
         for i in range(1, taskJobCount+1):
+            i = str(i)
             if i not in taskStatus:
                 if taskStatusCode == 5:
                     taskStatus[i] = {'State': 'killed'}
@@ -357,7 +358,8 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         retval['jobdefErrors'] = []
 
-        #retval['jobs'] = taskStatus
+        retval['jobs'] = taskStatus
+        #cherrypy.log(str(taskStatus))
 
         return [retval]
 
@@ -416,7 +418,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         import cherrypy
 
         for node, info in nodes.items():
-            cherrypy.log("Node %d - Info %s" % (node, str(info)))
+            cherrypy.log("Node %s - Info %s" % (node, str(info)))
 
         return nodes
 
@@ -429,7 +431,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             if event['MyType'] == 'SubmitEvent':
                 m = self.node_name_re.match(event['LogNotes'])
                 if m:
-                    node = int(m.groups()[0])
+                    node = m.groups()[0]
                     proc = event['Cluster'], event['Proc']
                     info = nodes.setdefault(node, {'Retries': 0, 'Restarts': 0, 'SiteHistory': [], 'ResidentSetSize': [], 'SubmitTimes': [], 'StartTimes': [], 'EndTimes': [], 'TotalUserCpuTimeHistory': [], 'TotalSysCpuTimeHistory': [], 'WallDurations': [], 'JobIds': []})
                     info['State'] = 'idle'
@@ -456,7 +458,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             elif event['MyType'] == 'PostScriptTerminatedEvent':
                 m = self.node_name2_re.match(event['DAGNodeName'])
                 if m:
-                    node = int(m.groups()[0])
+                    node = m.groups()[0]
                     if event['TerminatedNormally']:
                         if event['ReturnValue'] == 0:
                             nodes[node]['State'] = 'finished'
@@ -471,6 +473,16 @@ class HTCondorDataWorkflow(DataWorkflow):
                 nodes[node]['EndTimes'].append(eventtime)
                 nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
                 nodes[node]['State'] = 'idle'
+                self.insertCpu(event, nodes[node])
+            elif event['MyType'] == 'JobEvictedEvent':
+                node = node_map[event['Cluster'], event['Proc']]
+                nodes[node]['EndTimes'].append(eventtime)
+                nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
+                nodes[node]['State'] = 'idle'
+                self.insertCpu(event, nodes[node])
+            elif event['MyType'] == 'JobAbortedEvent':
+                node = node_map[event['Cluster'], event['Proc']]
+                nodes[node]['State'] = 'killed'
                 self.insertCpu(event, nodes[node])
             elif event['MyType'] == 'JobHeldEvent':
                 node = node_map[event['Cluster'], event['Proc']]
@@ -503,7 +515,6 @@ class HTCondorDataWorkflow(DataWorkflow):
             if not m:
                 continue
             nodeid, status, msg = m.groups()
-            nodeid = int(nodeid)
             if status == "STATUS_READY":
                 nodes[nodeid] = {'State': 'unsubmitted'}
             elif status == "STATUS_PRERUN":
