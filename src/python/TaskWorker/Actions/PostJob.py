@@ -178,10 +178,12 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
             slfn = os.path.join(source_dir, filename)
             dlfn = os.path.join(dest_dir, filename)
         found_log = True
+        source_site_ = source_site
         if (source_site + "_Buffer", slfn) in dest_info:
             source_site_ = source_site + "_Buffer"
         elif (source_site + "_Disk", slfn) in dest_info:
             source_site_ = source_site + "_Disk"
+        dest_site_= dest_site
         if (dest_site + "_Buffer", dlfn) in dest_info:
             dest_site_ = dest_site + "_Buffer"
         elif (dest_site + "_Disk", dlfn) in dest_info:
@@ -461,9 +463,9 @@ class PostJob():
             self.node_map[str(node[u'se'])] = str(node[u'name']).replace("_Disk", "").replace("_Buffer", "").replace("_MSS", "").replace("_Export", "")
 
     def execute(self, *args, **kw):
-        retry_count = args[1]
-        id = args[6]
-        reqname = args[5]
+        retry_count = args[2]
+        id = args[7]
+        reqname = args[6]
         logpath = os.path.expanduser("~/%s" % reqname)
         postjob = os.path.join(logpath, "postjob.%s.%s.txt" % (id, retry_count))
         try:
