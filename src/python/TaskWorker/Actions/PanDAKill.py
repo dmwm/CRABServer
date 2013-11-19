@@ -16,7 +16,7 @@ class PanDAKill(PanDAAction):
         self.logger.debug("Killing injected jobs ")
         killed = []
         try:
-            status, killed = killJobs(self.pandaurls['baseURLSSL'], ids=kwargs['task']['kill_ids'],
+            status, killed = killJobs(self.backendurls['baseURLSSL'], ids=kwargs['task']['kill_ids'],
                                       proxy=kwargs['task']['user_proxy'])
             notkilled = len([res for res in killed if not res])
             if notkilled > 0:

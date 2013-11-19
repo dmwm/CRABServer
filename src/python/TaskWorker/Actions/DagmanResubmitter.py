@@ -6,8 +6,8 @@ import traceback
 import classad
 import htcondor
 
-import HTCondorLocator
-import HTCondorUtils
+import CRABInterface.HTCondorLocator as HTCondorLocator
+import CRABInterface.HTCondorUtils as HTCondorUtils
 
 import TaskWorker.Actions.TaskAction as TaskAction
 
@@ -36,9 +36,8 @@ class DagmanResubmitter(TaskAction.TaskAction):
         self.logger.info("About to resubmit workflow: %s." % workflow)
         self.logger.info("Task info: %s" % str(task))
 
-        loc = HTCondorLocator.HTCondorLocator(self.config)
-        scheddName = loc.getSchedd()
-        schedd, address = loc.getScheddObj(scheddName)
+        loc = HTCondorLocator.HTCondorLocator(self.backendurls)
+        schedd, address = loc.getScheddObj(workflow)
 
         # Release the DAG
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(workflow)

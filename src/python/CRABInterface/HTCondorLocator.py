@@ -4,6 +4,8 @@ import random
 import classad
 import htcondor
 
+import HTCondorUtils
+
 class HTCondorLocator(object):
 
     def __init__(self, config):
@@ -15,9 +17,9 @@ class HTCondorLocator(object):
         """
         collector = self.getCollector()
         schedd = "localhost"
-        if self.config and hasattr(self.config, 'TaskWorker') and hasattr(self.config.TaskWorker, 'htcondorSchedds'):
-            random.shuffle(self.config.TaskWorker.htcondorSchedds)
-            schedd = self.config.TaskWorker.htcondorSchedds[0]
+        if self.config and "htcondorSchedds" in self.config:
+            random.shuffle(self.config["htcondorSchedds"])
+            schedd = self.config["htcondorSchedds"][0]
         if collector:
             return "%s:%s" % (schedd, collector)
         return schedd
@@ -27,6 +29,11 @@ class HTCondorLocator(object):
         Return a tuple (schedd, address) containing an object representing the
         remote schedd and its corresponding address.
         """
+        info = name.split("_")
+        if len(info) > 3:
+            name = info[2]
+        else:
+            name = self.getSchedd()
         if name == "localhost":
             schedd = htcondor.Schedd()
             with open(htcondor.param['SCHEDD_ADDRESS_FILE']) as fd:
@@ -34,10 +41,10 @@ class HTCondorLocator(object):
         else:
             info = name.split(":")
             pool = "localhost"
-            if len(info) == 2:
+            if len(info) == 3:
                 pool = info[1]
             coll = htcondor.Collector(self.getCollector(pool))
-            scheddAd = coll.locate(htcondor.DaemonTypes.Schedd, info[0])
+            scheddAd = coll.query(htcondor.AdTypes.Schedd, 'regexp(%s, Name)' % HTCondorUtils.quote(info[0]))[0]
             address = scheddAd['MyAddress']
             schedd = htcondor.Schedd(scheddAd)
         return schedd, address
@@ -46,7 +53,7 @@ class HTCondorLocator(object):
         """
         Return an object representing the collector given the pool name.
         """
-        if self.config and hasattr(self.config, 'TaskWorker') and hasattr(self.config.TaskWorker, 'htcondorPool'):
-            return self.config.TaskWorker.htcondorPool
+        if self.config and "htcondorPool" in self.config:
+            return self.config["htcondorPool"]
         return name
 

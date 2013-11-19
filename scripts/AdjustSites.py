@@ -91,6 +91,8 @@ def make_webdir(ad):
     path = os.path.expanduser("~/%s" % ad['CRAB_ReqName'])
     try:
         os.makedirs(path)
+        os.symlink(os.path.abspath(os.path.join(".", "job_log")), os.path.join(path, "jobs_log.txt"))
+        os.symlink(os.path.abspath(os.path.join(".", "node_state")), os.path.join(path, "node_state.txt"))
     except OSError:
         pass
     try:

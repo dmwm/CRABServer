@@ -19,7 +19,7 @@ import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 from RESTInteractions import HTTPRequests
 from httplib import HTTPException
 
-import RetryJob
+import TaskWorker.Actions.RetryJob as RetryJob
 
 fts_server = 'https://fts3-pilot.cern.ch:8443'
 
@@ -156,11 +156,21 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
         found_log = True
         lfns.append(slfn)
         lfns.append(dlfn)
-    dest_info = p.getPFN(nodes=(source_sites + [dest_site]), lfns=lfns)
+    dest_sites_ = [dest_site]
+    if dest_site.startswith("T1_"):
+        dest_sites_.append(dest_site + "_Buffer")
+        dest_sites_.append(dest_site + "_Disk")
+    source_sites_ = []
+    for site in source_sites:
+        source_sites_.append(site)
+        if site.startswith("T1_"):
+            source_sites_.append(site + "_Buffer")
+            source_sites_.append(site + "_Disk")
+    dest_info = p.getPFN(nodes=(source_sites_ + dest_sites_), lfns=lfns)
 
     results = []
     found_log = False
-    for source_site, filename in zip(source_sites, filenames):
+    for source_site, filename in zip(source_sites_, filenames):
         if not found_log and filename.startswith("cmsRun") and (filename[-7:] == ".tar.gz"):
             slfn = os.path.join(source_dir, "log", filename)
             dlfn = os.path.join(dest_dir, "log", filename)
@@ -168,11 +178,21 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
             slfn = os.path.join(source_dir, filename)
             dlfn = os.path.join(dest_dir, filename)
         found_log = True
-        if (source_site, slfn) not in dest_info:
-            print "Unable to map LFN %s at site %s" % (slfn, source_site)
-        if (dest_site, dlfn) not in dest_info:
-            print "Unable to map LFN %s at site %s" % (dlfn, dest_site)
-        results.append((dest_info[source_site, slfn], dest_info[dest_site, dlfn]))
+        source_site_ = source_site
+        if (source_site + "_Buffer", slfn) in dest_info:
+            source_site_ = source_site + "_Buffer"
+        elif (source_site + "_Disk", slfn) in dest_info:
+            source_site_ = source_site + "_Disk"
+        dest_site_= dest_site
+        if (dest_site + "_Buffer", dlfn) in dest_info:
+            dest_site_ = dest_site + "_Buffer"
+        elif (dest_site + "_Disk", dlfn) in dest_info:
+            dest_site_ = dest_site + "_Disk"
+        if ((source_site_, slfn) not in dest_info) or (not dest_info[source_site_, slfn]):
+            print "Unable to map LFN %s at site %s" % (slfn, source_site_)
+        if ((dest_site_, dlfn) not in dest_info) or (not dest_info[dest_site_, dlfn]):
+            print "Unable to map LFN %s at site %s" % (dlfn, dest_site_)
+        results.append((dest_info[source_site_, slfn], dest_info[dest_site_, dlfn]))
     return results
 
 REQUIRED_ATTRS = ['CRAB_ReqName', 'CRAB_Id', 'CRAB_OutputData', 'CRAB_JobSW', 'CRAB_AsyncDest']
@@ -326,8 +346,8 @@ class PostJob():
         except HTTPException, hte:
             print hte.headers
             if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
-               not hte.headers.get('X-Error-Http', -1) == '400':
-                   raise
+                    not hte.headers.get('X-Error-Http', -1) == '400':
+                raise
 
 
     def uploadFakeLog(self, state="TRANSFERRING"):
@@ -354,8 +374,8 @@ class PostJob():
             self.server.put(self.resturl, data = urllib.urlencode(configreq))
         except HTTPException, hte:
             if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
-               not hte.headers.get('X-Error-Http', -1) == '400':
-                   raise 
+                   not hte.headers.get('X-Error-Http', -1) == '400':
+                raise 
             self.uploadState(state)
 
 
@@ -374,16 +394,7 @@ class PostJob():
             print "Getting source_site from jobReport"
             return self.full_report['executed_site']
 
-        cmd = "condor_q -const true -userlog job_log.%d -af JOBGLIDEIN_CMSSite" % self.crab_id
-        status, output = commands.getstatusoutput(cmd)
-        if status:
-            print "Failed to query condor user log:\n%s" % output
-            raise ValueError("Failed to query condor user log:\n%s" % output)
-        source_site = output.split('\n')[-1].strip()
-        print "Determined a source site of %s from the user log" % source_site
-        if source_site == 'Unknown' or source_site == "undefined":
-            raise ValueError("Unable to determine source side")
-        return source_site
+        raise ValueError("Unable to determine source side")
 
 
     def getFileSourceSite(self, filename):
@@ -452,9 +463,9 @@ class PostJob():
             self.node_map[str(node[u'se'])] = str(node[u'name']).replace("_Disk", "").replace("_Buffer", "").replace("_MSS", "").replace("_Export", "")
 
     def execute(self, *args, **kw):
-        retry_count = args[1]
-        id = args[6]
-        reqname = args[5]
+        retry_count = args[2]
+        id = args[7]
+        reqname = args[6]
         logpath = os.path.expanduser("~/%s" % reqname)
         postjob = os.path.join(logpath, "postjob.%s.%s.txt" % (id, retry_count))
         try:
@@ -472,7 +483,7 @@ class PostJob():
             os.chmod(postjob, 0644)
         return retval
 
-    def execute_internal(self, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
+    def execute_internal(self, cluster, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
 
         stdout = "job_out.%s" % id
         stderr = "job_err.%s" % id
@@ -517,18 +528,20 @@ class PostJob():
         self.uploadFakeLog(state="TRANSFERRING")
 
         print "Retry count %s; max retry %s" % (retry_count, max_retries)
+        fail_state = "COOLOFF"
+        if retry_count == max_retries: fail_state = "FAILED"
         if status and (retry_count == max_retries):
             # This was our last retry and it failed.
             return self.uploadState("FAILED")
 
         retry = RetryJob.RetryJob()
-        retval = retry.execute(status, retry_count, max_retries, self.crab_id)
+        retval = retry.execute(status, retry_count, max_retries, self.crab_id, cluster)
         if retval:
-           if retval == RetryJob.FATAL_ERROR:
-               return self.uploadState("FAILED")
-           else:
-               self.uploadState("COOLOFF")
-               return retval
+            if retval == RetryJob.FATAL_ERROR:
+                return self.uploadState("FAILED")
+            else:
+                self.uploadState(fail_state)
+                return retval
 
         self.parseJson()
         self.source_site = self.getSourceSite()
@@ -539,7 +552,7 @@ class PostJob():
             self.stageout(source_dir, dest_dir, *filenames)
             self.upload()
         except:
-            self.uploadState("COOLOFF")
+            self.uploadState(fail_state)
             raise
         self.uploadFakeLog(state="FINISHED")
 

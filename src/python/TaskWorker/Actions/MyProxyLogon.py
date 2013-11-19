@@ -24,7 +24,7 @@ class MyProxyLogon(TaskAction):
         proxycfg = {'vo': kwargs['task']['tm_user_vo'],
                     'logger': self.logger,
                     'myProxySvr': self.config.Services.MyProxy,
-                    'proxyValidity' : '24:0',
+                    'proxyValidity' : '144:0',
                     'min_time_left' : 36000, ## do we need this ? or should we use self.myproxylen? 
                     'userDN' : kwargs['task']['tm_user_dn'],
                     'group' : kwargs['task']['tm_user_group'] if kwargs['task']['tm_user_group'] else '',

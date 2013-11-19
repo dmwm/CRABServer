@@ -10,6 +10,6 @@ class PanDAgetSpecs(PanDAAction):
 
     def execute(self, *args, **kwargs):
         self.logger.info("Getting already existing specs ")
-        status, pandaspecs = getFullJobStatus(self.pandaurls['baseURLSSL'], ids=kwargs['task']['resubmit_ids'],
+        status, pandaspecs = getFullJobStatus(self.backendurls['baseURLSSL'], ids=kwargs['task']['resubmit_ids'],
                                               proxy=kwargs['task']['user_proxy'])
         return Result(task=kwargs['task'], result=pandaspecs)

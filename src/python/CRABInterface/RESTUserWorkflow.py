@@ -117,6 +117,9 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=True)
             validate_str('subresource', param, safe, RX_SUBRESTAT, optional=True)
 
+            # Used to determine how much information to return to the client for status
+            validate_num("verbose", param, safe, optional=True)
+
             #parameters of subresources calls has to be put here
             #used by get latest
             validate_num('age', param, safe, optional=True)
@@ -204,7 +207,7 @@ class RESTUserWorkflow(RESTEntity):
                                         userdn=cherrypy.request.headers['Cms-Authn-Dn'])
 
     @restcall
-    def get(self, workflow, subresource, age, limit, shortformat, exitcode, jobids):
+    def get(self, workflow, subresource, age, limit, shortformat, exitcode, jobids, verbose):
         """Retrieves the workflow information, like a status summary, in case the workflow unique name is specified.
            Otherwise returns all workflows since (now - age) for which the user is the owner.
            The caller needs to be a valid CMS user.
@@ -221,7 +224,7 @@ class RESTUserWorkflow(RESTEntity):
             userdn=cherrypy.request.headers['Cms-Authn-Dn']
             # if have the wf then retrieve the wf status summary
             if not subresource:
-                result = self.userworkflowmgr.status(workflow, userdn=userdn)
+                result = self.userworkflowmgr.status(workflow, verbose=verbose, userdn=userdn)
             # if have a subresource then it should be one of these
             elif subresource == 'logs':
                 result = self.userworkflowmgr.logs(workflow, limit, exitcode, jobids, userdn=userdn)

@@ -25,7 +25,7 @@ class RetryJob(object):
         self.count = "-1"
 
     def get_job_ad(self):
-        cmd = "condor_q -l -userlog job_log.%s" % self.count
+        cmd = "condor_q -l -userlog job_log %s" % str(self.cluster)
         status, output = commands.getstatusoutput(cmd)
         if status:
             raise FatalError("Failed to query condor user log:\n%s" % output)
@@ -99,7 +99,9 @@ class RetryJob(object):
         except ValueError:
             return
 
-        if exitCode == 8021 or exitCode == 8028 or exitCode == 8020:
+        # Wrapper script sometimes returns the posix return code (8 bits).
+        if exitCode == 8021 or exitCode == 8028 or exitCode == 8020 or exitCode == 60307 or \
+           exitCode == (8021%256) or exitCode == (8028%256) or exitCode == (8020%256) or exitCode == (60307%256):
             raise RecoverableError("Job failed to open local and fallback files.")
         if exitCode == 50513:
             raise RecoverableError("Job did not find functioning CMSSW on worker node.")
@@ -115,9 +117,10 @@ class RetryJob(object):
         if not self.report:
             raise RecoverableError("Job did not produce a usable framework job report.")
 
-    def execute_internal(self, status, retry_count, max_retries, count):
+    def execute_internal(self, status, retry_count, max_retries, count, cluster):
 
         self.count = count
+        self.cluster = cluster
         self.get_job_ad()
         self.get_report()
 
