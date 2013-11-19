@@ -39,6 +39,11 @@ class DataWorkflow(object):
                         "FileBased" : "files_per_job",
                         "EventBased" : "events_per_job",}
 
+    def updateRequest(self, workflow):
+        """Provide the implementing class a chance to rename the workflow
+           before it is committed to the DB.
+           """
+        return workflow
 
     def getLatests(self, user, limit, timestamp):
         """Retrives the latest workflows for the user
@@ -149,7 +154,7 @@ class DataWorkflow(object):
             # TODO: hook this around properly
         #    raise NotImplementedError, "Need to add the proper CRABServer hooks for condor"
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
-        requestname = '%s_%s_%s' % (timestamp, userhn, workflow)
+        requestname = self.updateRequest('%s_%s_%s' % (timestamp, userhn, workflow))
         splitArgName = self.splitArgMap[splitalgo]
         dbSerializer = str
 

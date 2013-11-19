@@ -21,21 +21,21 @@ import TaskWorker.WorkerExceptions
 
 import WMCore.WMSpec.WMTask
 
+try:
+    from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
+except ImportError:
+    UserFileCache = None
+
 from ApmonIf import ApmonIf
 
 DAG_FRAGMENT = """
 JOB Job%(count)d Job.submit
 SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY
-SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
+SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 10 UNLESS-EXIT 2
 VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" inputFiles="%(inputFiles)s" +DESIRED_Sites="\\"%(desiredSites)s\\"" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
 
-#JOB ASO%(count)d ASO.submit
-#VARS ASO%(count)d count="%(count)d" outputFiles="%(remoteOutputFiles)s"
-#RETRY ASO%(count)d 3
-
-#PARENT Job%(count)d CHILD ASO%(count)d
 """
 
 CRAB_HEADERS = \
@@ -89,7 +89,7 @@ universe = vanilla
 Executable = gWMS-CMSRunAnalysis.sh
 Output = job_out.$(CRAB_Id)
 Error = job_err.$(CRAB_Id)
-Log = job_log.$(CRAB_Id)
+Log = job_log
 # args changed...
 
 Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) '--inputFile=$(inputFiles)' '--runAndLumis=$(runAndLumiMask)' -o $(CRAB_AdditionalOutputFiles)"
@@ -106,25 +106,7 @@ Requirements = (target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEF
 #Requirements = ((target.IS_GLIDEIN =!= TRUE) || ((target.GLIDEIN_CMSSite =!= UNDEFINED) && (stringListIMember(target.GLIDEIN_CMSSite, DESIRED_SEs) )))
 #leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
-queue
-"""
-
-ASYNC_SUBMIT = CRAB_HEADERS + \
-"""
-+TaskType = "ASO"
-+CRAB_Id = $(count)
-
-universe = local
-Executable = dag_bootstrap.sh
-Arguments = "ASO %(asyncdest_flatten)s %(temp_dest)s %(output_dest)s $(count) $(Cluster).$(Process) cmsRun_$(count).log.tar.gz $(outputFiles)"
-Output = aso.$(count).out
-transfer_input_files = job_log.$(count), jobReport.json.$(count)
-+TransferOutput = ""
-Error = aso.$(count).err
-Environment = PATH=/usr/bin:/bin;CRAB3_VERSION=3.3.0-pre1;%(additional_environment_options)s
-use_x509userproxy = true
-#x509userproxy = %(x509up_file)s
-#leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
+periodic_remove = (JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)
 queue
 """
 
@@ -177,9 +159,9 @@ def transform_strings(input):
         primaryds = input['inputdata'].split('/')[1]
     else:
         # For MC
-        primaryds = input['publishname'].split('-')[0]
-    info["temp_dest"] = os.path.join("/store/temp/user", input['userhn'], primaryds, input['publishname'].split('-')[0], input['publishname'].split('-')[1])
-    info["output_dest"] = os.path.join("/store/user", input['userhn'], primaryds, input['publishname'].split('-')[0], input['publishname'].split('-')[1])
+        primaryds = input['publishname'].rsplit('-', 1)[0]
+    info["temp_dest"] = os.path.join("/store/temp/user", input['userhn'], primaryds, input['publishname'].rsplit('-', 1)[0], input['publishname'].rsplit('-', 1)[1])
+    info["output_dest"] = os.path.join("/store/user", input['userhn'], primaryds, input['publishname'].rsplit('-', 1)[0], input['publishname'].rsplit('-', 1)[1])
     info['x509up_file'] = os.path.split(input['user_proxy'])[-1]
     info['user_proxy'] = input['user_proxy']
     info['scratch'] = input['scratch']
@@ -226,8 +208,6 @@ def makeJobSubmit(task):
     info.setdefault("additional_environment_options", '')
     with open("Job.submit", "w") as fd:
         fd.write(JOB_SUBMIT % info)
-    with open("ASO.submit", "w") as fd:
-        fd.write(ASYNC_SUBMIT % info)
 
     return info
 
@@ -255,15 +235,15 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
             primaryds = task['tm_input_dataset'].split('/')[1]
         else:
             # For MC
-            primaryds = task['tm_publish_name'].split('-')[0]
+            primaryds = task['tm_publish_name'].rsplit('-', 1)[0]
         counter = "%04d" % (i / 1000)
         specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
                       'desiredSites': desiredSites, 'remoteOutputFiles': remoteOutputFiles,
                       'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
                       'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                       'outputData': task['tm_publish_name'],
-                      'tempDest': os.path.join("/store/temp/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1], counter),
-                      'outputDest': os.path.join("/store/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1], counter),
+                      'tempDest': os.path.join("/store/temp/user", task['tm_username'], primaryds, task['tm_publish_name'].rsplit('-', 1)[0], task['tm_publish_name'].rsplit('-', 1)[1], counter),
+                      'outputDest': os.path.join("/store/user", task['tm_username'], primaryds, task['tm_publish_name'].rsplit('-', 1)[0], task['tm_publish_name'].rsplit('-', 1)[1], counter),
                       'restinstance': task['restinstance'], 'resturl': task['resturl']})
 
         LOGGER.debug(specs[-1])
@@ -371,7 +351,7 @@ class DagmanCreator(TaskAction.TaskAction):
             jobgroupspecs, startjobid = make_specs(kwargs['task'], jobgroup, availablesites, outfiles, startjobid)
             specs += jobgroupspecs
 
-        dag = ""
+        dag = "\nNODE_STATUS_FILE node_state 30\n"
         for spec in specs:
             dag += DAG_FRAGMENT % spec
 
@@ -387,8 +367,8 @@ class DagmanCreator(TaskAction.TaskAction):
         ml_info = info.setdefault('apmon', [])
         for idx in range(1, info['jobcount']+1):
             taskid = kwargs['task']['tm_taskname'].replace("_", ":")
-            jinfo = {'jobId': ("%d_https://glidein.%d:%s_0" % (idx, idx, taskid)),
-                     'sid': "%d:%s" % (idx, taskid),
+            jinfo = {'jobId': ("%d_https://glidein.cern.ch/%d/%s_0" % (idx, idx, taskid)),
+                     'sid': "https://glidein.cern.ch/%d/%s" % (idx, taskid),
                      'broker': os.environ.get('HOSTNAME',''),
                      'bossId': str(idx),
                      'TargetSE': ("%d_Selected_SE" % len(specs[idx-1]['desiredSites'])),
@@ -436,6 +416,12 @@ class DagmanCreator(TaskAction.TaskAction):
             shutil.copy(dag_bootstrap_location, '.')
             shutil.copy(bootstrap_location, '.')
             shutil.copy(adjust_location, '.')
+
+            # Bootstrap the ISB if we are using UFC
+            if UserFileCache and (kw['task']['tm_cache_url'] == 'https://cmsweb.cern.ch/crabcache/file'):
+                ufc = UserFileCache()
+                ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
+                kw['task']['tm_user_sandbox'] = 'sandbox.tar.gz'
 
             kw['task']['scratch'] = temp_dir
 

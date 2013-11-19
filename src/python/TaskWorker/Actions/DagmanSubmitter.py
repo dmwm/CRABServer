@@ -9,8 +9,8 @@ import random
 import urllib
 import traceback
 
-import HTCondorUtils
-import HTCondorLocator
+import CRABInterface.HTCondorUtils as HTCondorUtils
+import CRABInterface.HTCondorLocator as HTCondorLocator
 
 import TaskWorker.Actions.TaskAction as TaskAction
 import TaskWorker.DataObjects.Result as Result
@@ -137,7 +137,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         #FIXME: hardcoding the transform name for now.
         #inputFiles = ['gWMS-CMSRunAnalysis.sh', task['tm_transformation'], 'cmscp.py', 'RunJobs.dag']
-        inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'ASO.submit', 'dag_bootstrap.sh', 'AdjustSites.py']
+        inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', 'AdjustSites.py']
+        if task.get('tm_user_sandbox') == 'sandbox.tar.gz':
+            inputFiles.append('sandbox.tar.gz')
         info['inputFilesString'] = ", ".join(inputFiles)
         outputFiles = ["RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001"]
         info['outputFilesString'] = ", ".join(outputFiles)
@@ -146,9 +148,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         try:
             info['remote_condor_setup'] = ''
             loc = HTCondorLocator.HTCondorLocator(self.config)
-            scheddName = loc.getSchedd()
-            self.logger.debug("Using scheduler %s." % scheddName)
-            schedd, address = loc.getScheddObj(scheddName)
+            schedd, address = loc.getScheddObj(task['tm_taskname'])
             if address:
                 self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
             else:
