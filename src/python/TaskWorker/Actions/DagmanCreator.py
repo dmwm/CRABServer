@@ -21,6 +21,11 @@ import TaskWorker.WorkerExceptions
 
 import WMCore.WMSpec.WMTask
 
+try:
+    from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
+except ImportError:
+    UserFileCache = None
+
 from ApmonIf import ApmonIf
 
 DAG_FRAGMENT = """
@@ -411,6 +416,12 @@ class DagmanCreator(TaskAction.TaskAction):
             shutil.copy(dag_bootstrap_location, '.')
             shutil.copy(bootstrap_location, '.')
             shutil.copy(adjust_location, '.')
+
+            # Bootstrap the ISB if we are using UFC
+            if UserFileCache and (kw['task']['tm_cache_url'] == 'https://cmsweb.cern.ch/crabcache/file'):
+                ufc = UserFileCache()
+                ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
+                kw['task']['tm_user_sandbox'] = 'sandbox.tar.gz'
 
             kw['task']['scratch'] = temp_dir
 
