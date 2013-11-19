@@ -3,7 +3,7 @@ from WMCore.Lexicon import lfnParts
 
 # TODO: we should start replacing most of the regex here with what we have in WMCore.Lexicon
 #       (this probably requires to adapt something on Lexicon)
-wfBase = r"^[a-zA-Z0-9\.\-_]{1,%s}$"
+wfBase = r"^[a-zA-Z0-9\.\-_:]{1,%s}$"
 pNameRE      = r"(?=.{0,400}$)[a-zA-Z0-9\-_]+"
 lfnParts.update( {'publishname' : pNameRE,
                   'psethash'    : '[a-f0-9]+',

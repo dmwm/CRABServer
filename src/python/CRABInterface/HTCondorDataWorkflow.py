@@ -30,6 +30,16 @@ class HTCondorDataWorkflow(DataWorkflow):
     successList = ['finished']
     failedList = ['held', 'failed', 'cooloff']
 
+    def updateRequest(self, workflow):
+        info = workflow.split("_", 3)
+        if len(info) < 4:
+            return workflow
+        hn_name = info[2]
+        locator = HTCondorLocator.HTCondorLocator(self.config)
+        name = locator.getSchedd().split("@")[0].split(".")[0]
+        info[2] = "%s:%s" % (name, hn_name)
+        return "_".join(info)
+
     def status(self, workflow, userdn, userproxy=None, verbose=False):
         """Retrieve the status of the workflow.
 
@@ -66,9 +76,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                                 (workflow, name))
         locator = HTCondorLocator.HTCondorLocator(self.config)
         cherrypy.log("Will talk to %s." % locator.getCollector())
-        name = locator.getSchedd()
-        cherrypy.log("Schedd name %s." % name)
-        schedd, address = locator.getScheddObj(name)
+        schedd, address = locator.getScheddObj(workflow)
 
         results = self.getRootTasks(workflow, schedd)
 

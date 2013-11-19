@@ -4,6 +4,8 @@ import random
 import classad
 import htcondor
 
+import HTCondorUtils
+
 class HTCondorLocator(object):
 
     def __init__(self, config):
@@ -27,6 +29,11 @@ class HTCondorLocator(object):
         Return a tuple (schedd, address) containing an object representing the
         remote schedd and its corresponding address.
         """
+        info = name.split("_")
+        if len(info) > 3:
+            name = info[2]
+        else:
+            name = self.getSchedd()
         if name == "localhost":
             schedd = htcondor.Schedd()
             with open(htcondor.param['SCHEDD_ADDRESS_FILE']) as fd:
@@ -34,10 +41,10 @@ class HTCondorLocator(object):
         else:
             info = name.split(":")
             pool = "localhost"
-            if len(info) == 2:
+            if len(info) == 3:
                 pool = info[1]
             coll = htcondor.Collector(self.getCollector(pool))
-            scheddAd = coll.locate(htcondor.DaemonTypes.Schedd, info[0])
+            scheddAd = coll.query(htcondor.AdTypes.Schedd, 'regexp(%s, Name)' % HTCondorUtils.quote(info[0]))[0]
             address = scheddAd['MyAddress']
             schedd = htcondor.Schedd(scheddAd)
         return schedd, address
