@@ -30,16 +30,18 @@ class HTCondorDataWorkflow(DataWorkflow):
     successList = ['finished']
     failedList = ['held', 'failed', 'cooloff']
 
+    @conn_handler(services=['centralconfig'])
     def updateRequest(self, workflow):
         info = workflow.split("_", 3)
         if len(info) < 4:
             return workflow
         hn_name = info[2]
-        locator = HTCondorLocator.HTCondorLocator(self.config)
+        locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
         name = locator.getSchedd().split("@")[0].split(".")[0]
         info[2] = "%s:%s" % (name, hn_name)
         return "_".join(info)
 
+    @conn_handler(services=['centralconfig'])
     def status(self, workflow, userdn, userproxy=None, verbose=False):
         """Retrieve the status of the workflow.
 
@@ -74,7 +76,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         name = workflow.split("_")[0]
         cherrypy.log("Getting status for workflow %s, looking for schedd %s" %\
                                 (workflow, name))
-        locator = HTCondorLocator.HTCondorLocator(self.config)
+        locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
         cherrypy.log("Will talk to %s." % locator.getCollector())
         schedd, address = locator.getScheddObj(workflow)
 
@@ -282,6 +284,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         yield res
 
+    @conn_handler(services=['centralconfig'])
     def alt_status(self, workflow, userdn, userproxy=None, verbose=False):
         """Retrieve the status of the workflow.
 
@@ -309,7 +312,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         name = workflow.split("_")[2].split(":")[0]
         cherrypy.log("Getting status for workflow %s, looking for schedd %s" %\
                                 (workflow, name))
-        locator = HTCondorLocator.HTCondorLocator(self.config)
+        locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
         cherrypy.log("Will talk to %s." % locator.getCollector())
         name = locator.getSchedd()
         cherrypy.log("Schedd name %s." % name)

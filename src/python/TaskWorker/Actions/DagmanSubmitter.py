@@ -147,7 +147,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         try:
             info['remote_condor_setup'] = ''
-            loc = HTCondorLocator.HTCondorLocator(self.config)
+            loc = HTCondorLocator.HTCondorLocator(self.backendurls)
             schedd, address = loc.getScheddObj(task['tm_taskname'])
             if address:
                 self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
