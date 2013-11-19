@@ -363,7 +363,7 @@ class DagmanCreator(TaskAction.TaskAction):
         for idx in range(1, info['jobcount']+1):
             taskid = kwargs['task']['tm_taskname'].replace("_", ":")
             jinfo = {'jobId': ("%d_https://glidein.cern.ch/%d/%s_0" % (idx, idx, taskid)),
-                     'sid': "%d:%s" % (idx, taskid),
+                     'sid': "https://glidein.cern.ch/%d/%s" % (idx, taskid),
                      'broker': os.environ.get('HOSTNAME',''),
                      'bossId': str(idx),
                      'TargetSE': ("%d_Selected_SE" % len(specs[idx-1]['desiredSites'])),

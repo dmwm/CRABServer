@@ -321,7 +321,7 @@ def stopDashboardMonitoring(ad):
     params = {
         'MonitorID': ad['CRAB_ReqName'],
         'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
-        'SyncGridJobId': '%d_https://glidein.cern.ch/%d/%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
+        'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (ad['CRAB_Id'], ad['CRAB_ReqName']),
         'ExeEnd': 'cmsRun',
     }
     try:
