@@ -308,7 +308,7 @@ def addReportInfo(params):
         return
     fjr = fjr['steps']['cmsRun']
     if 'performance' in fjr and 'cpu' in fjr['performance']:
-        params['ExeTime'] = int(fjr['performance']['cpu']['TotalJobTime'])
+        params['ExeTime'] = int(float(fjr['performance']['cpu']['TotalJobTime']))
         params['CrabUserCpuTime'] = float(fjr['performance']['cpu']['TotalJobCPU'])
         if params['ExeTime']:
             params['CrabCpuPercentage'] = params['CrabUserCpuTime'] / float(params['ExeTime'])
@@ -323,8 +323,8 @@ def addReportInfo(params):
 def stopDashboardMonitoring(ad):
     params = {
         'MonitorID': ad['CRAB_ReqName'],
-        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
-        'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (ad['CRAB_Id'], ad['CRAB_ReqName']),
+        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":")),
+        'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":")),
         'ExeEnd': 'cmsRun',
     }
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
