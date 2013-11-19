@@ -304,6 +304,9 @@ def addReportInfo(params):
     fjr = json.load(open("jobReport.json"))
     if 'exitCode' in fjr:
         params['ExeExitCode'] = fjr['exitCode']
+    if 'steps' not in fjr or 'cmsRun' not in fjr['steps']:
+        return
+    fjr = fjr['steps']['cmsRun']
     if 'performance' in fjr and 'cpu' in fjr['performance']:
         params['ExeTime'] = int(fjr['performance']['cpu']['TotalJobTime'])
         params['CrabUserCpuTime'] = float(fjr['performance']['cpu']['TotalJobCPU'])
@@ -324,6 +327,8 @@ def stopDashboardMonitoring(ad):
         'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (ad['CRAB_Id'], ad['CRAB_ReqName']),
         'ExeEnd': 'cmsRun',
     }
+    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+    del params['ExeEnd']
     try:
         addReportInfo(params)
     except:
