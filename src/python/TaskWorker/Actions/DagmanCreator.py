@@ -154,9 +154,9 @@ def transform_strings(input):
         primaryds = input['inputdata'].split('/')[1]
     else:
         # For MC
-        primaryds = input['publishname'].split('-')[0]
-    info["temp_dest"] = os.path.join("/store/temp/user", input['userhn'], primaryds, input['publishname'].split('-')[0], input['publishname'].split('-')[1])
-    info["output_dest"] = os.path.join("/store/user", input['userhn'], primaryds, input['publishname'].split('-')[0], input['publishname'].split('-')[1])
+        primaryds = input['publishname'].rsplit('-', 1)[0]
+    info["temp_dest"] = os.path.join("/store/temp/user", input['userhn'], primaryds, input['publishname'].rsplit('-', 1)[0], input['publishname'].rsplit('-', 1)[1])
+    info["output_dest"] = os.path.join("/store/user", input['userhn'], primaryds, input['publishname'].rsplit('-', 1)[0], input['publishname'].rsplit('-', 1)[1])
     info['x509up_file'] = os.path.split(input['user_proxy'])[-1]
     info['user_proxy'] = input['user_proxy']
     info['scratch'] = input['scratch']
@@ -230,15 +230,15 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
             primaryds = task['tm_input_dataset'].split('/')[1]
         else:
             # For MC
-            primaryds = task['tm_publish_name'].split('-')[0]
+            primaryds = task['tm_publish_name'].rsplit('-', 1)[0]
         counter = "%04d" % (i / 1000)
         specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
                       'desiredSites': desiredSites, 'remoteOutputFiles': remoteOutputFiles,
                       'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
                       'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                       'outputData': task['tm_publish_name'],
-                      'tempDest': os.path.join("/store/temp/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1], counter),
-                      'outputDest': os.path.join("/store/user", task['tm_username'], primaryds, task['tm_publish_name'].split('-')[0], task['tm_publish_name'].split('-')[1], counter),
+                      'tempDest': os.path.join("/store/temp/user", task['tm_username'], primaryds, task['tm_publish_name'].rsplit('-', 1)[0], task['tm_publish_name'].rsplit('-', 1)[1], counter),
+                      'outputDest': os.path.join("/store/user", task['tm_username'], primaryds, task['tm_publish_name'].rsplit('-', 1)[0], task['tm_publish_name'].rsplit('-', 1)[1], counter),
                       'restinstance': task['restinstance'], 'resturl': task['resturl']})
 
         LOGGER.debug(specs[-1])
