@@ -36,7 +36,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
         self.logger.info("About to resubmit workflow: %s." % workflow)
         self.logger.info("Task info: %s" % str(task))
 
-        loc = HTCondorLocator.HTCondorLocator(self.config)
+        loc = HTCondorLocator.HTCondorLocator(self.backendurls)
         schedd, address = loc.getScheddObj(workflow)
 
         # Release the DAG

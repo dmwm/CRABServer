@@ -39,7 +39,7 @@ class DagmanKiller(TaskAction.TaskAction):
         if not WORKFLOW_RE.match(self.workflow):
             raise Exception("Invalid workflow name.")
 
-        loc = HTCondorLocator.HTCondorLocator(self.config)
+        loc = HTCondorLocator.HTCondorLocator(self.backendurls)
         self.schedd, address = loc.getScheddObj(self.workflow)
 
         if self.task['kill_all']:

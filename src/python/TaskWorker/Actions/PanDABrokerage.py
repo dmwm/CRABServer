@@ -32,8 +32,8 @@ class PanDABrokerage(PanDAAction):
                 self.logger.error(msg)
                 results.append(Result(task=kwargs['task'], result=(jgroup, None, []), err=msg))
                 continue
-            self.logger.info("Asking best site to PanDA between %s. Using %s as pandaserver." % (str(availablesites), self.pandaurls['baseURLSSL']))
-            selectedsite = runBrokerage(self.pandaurls['baseURLSSL'], proxy=kwargs['task']['user_proxy'],
+            self.logger.info("Asking best site to PanDA between %s. Using %s as pandaserver." % (str(availablesites), self.backendurls['baseURLSSL']))
+            selectedsite = runBrokerage(self.backendurls['baseURLSSL'], proxy=kwargs['task']['user_proxy'],
                                         sites=self.translateSiteName(availablesites))[-1]
             self.logger.info("Choosed site after brokering " +str(selectedsite))
             if not selectedsite:
