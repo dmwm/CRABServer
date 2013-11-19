@@ -154,9 +154,9 @@ def transform_strings(input):
         primaryds = input['inputdata'].split('/')[1]
     else:
         # For MC
-        primaryds = input['publishname'].split('-')[0]
-    info["temp_dest"] = os.path.join("/store/temp/user", input['userhn'], primaryds, input['publishname'].split('-')[0], input['publishname'].split('-')[1])
-    info["output_dest"] = os.path.join("/store/user", input['userhn'], primaryds, input['publishname'].split('-')[0], input['publishname'].split('-')[1])
+        primaryds = input['publishname'].rsplit('-', 1)[0]
+    info["temp_dest"] = os.path.join("/store/temp/user", input['userhn'], primaryds, input['publishname'].rsplit('-', 1)[0], input['publishname'].rsplit('-', 1)[1])
+    info["output_dest"] = os.path.join("/store/user", input['userhn'], primaryds, input['publishname'].rsplit('-', 1)[0], input['publishname'].rsplit('-', 1)[1])
     info['x509up_file'] = os.path.split(input['user_proxy'])[-1]
     info['user_proxy'] = input['user_proxy']
     info['scratch'] = input['scratch']
