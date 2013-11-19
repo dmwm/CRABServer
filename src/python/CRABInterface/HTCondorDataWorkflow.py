@@ -487,13 +487,15 @@ class HTCondorDataWorkflow(DataWorkflow):
             elif event['MyType'] == 'ShadowExceptionEvent':
                 node = node_map[event['Cluster'], event['Proc']]
                 nodes[node]['EndTimes'].append(eventtime)
-                nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
+                if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
+                    nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
                 nodes[node]['State'] = 'idle'
                 self.insertCpu(event, nodes[node])
             elif event['MyType'] == 'JobEvictedEvent':
                 node = node_map[event['Cluster'], event['Proc']]
                 nodes[node]['EndTimes'].append(eventtime)
-                nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
+                if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
+                    nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
                 nodes[node]['State'] = 'idle'
                 self.insertCpu(event, nodes[node])
             elif event['MyType'] == 'JobAbortedEvent':
@@ -503,7 +505,8 @@ class HTCondorDataWorkflow(DataWorkflow):
             elif event['MyType'] == 'JobHeldEvent':
                 node = node_map[event['Cluster'], event['Proc']]
                 nodes[node]['EndTimes'].append(eventtime)
-                nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
+                if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
+                    nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
                 nodes[node]['State'] = 'held'
                 self.insertCpu(event, nodes[node])
             elif event['MyType'] == 'JobReleaseEvent':
@@ -553,7 +556,10 @@ class HTCondorDataWorkflow(DataWorkflow):
                 info['State'] = 'cooloff'
             elif status == 'STATUS_SUBMITTED':
                 info = nodes.setdefault(nodeid, {})
-                info.setdefault('State', 'idle')
+                if msg == 'not_idle':
+                    info.setdefault('State', 'running')
+                else:
+                    info.setdefault('State', 'idle')
             elif status == 'STATUS_POSTRUN':
                 info = nodes.setdefault(nodeid, {})
                 if info.get("State") != "cooloff":
