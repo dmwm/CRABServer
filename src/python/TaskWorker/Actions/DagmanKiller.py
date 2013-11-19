@@ -8,8 +8,8 @@ import htcondor
 
 import TaskWorker.Actions.TaskAction as TaskAction
 
-import HTCondorLocator
-import HTCondorUtils
+import CRABInterface.HTCondorLocator as HTCondorLocator
+import CRABInterface.HTCondorUtils as HTCondorUtils
 
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 
@@ -40,8 +40,7 @@ class DagmanKiller(TaskAction.TaskAction):
             raise Exception("Invalid workflow name.")
 
         loc = HTCondorLocator.HTCondorLocator(self.config)
-        scheddName = loc.getSchedd()
-        self.schedd, address = loc.getScheddObj(scheddName)
+        self.schedd, address = loc.getScheddObj(self.workflow)
 
         if self.task['kill_all']:
             return self.killAll()
