@@ -129,7 +129,7 @@ class ASOServerJob(object):
             self.couchServer = CMSCouch.CouchServer(dburl=self.aso_db_url, ckey=proxy, cert=proxy)
             self.couchDatabase = self.couchServer.connectDatabase("asynctransfer", create = False)
         except:
-            print "Problem to access the ASO server!"
+            raise RuntimeError("Problem to access the ASO server!")
 
     def cancel(self):
         print "cancelling"
@@ -564,7 +564,10 @@ class PostJob():
             outfile[1]['outlocation'] = self.dest_site
 
         global g_Job
-        if os.environ.get("TEST_POSTJOB_ENABLE_ASOSERVER", False):
+        aso_auth_file = os.path.join(os.environ.get('HOME', "."), "auth_aso_plugin.config")
+        if config:
+            aso_auth_file = getattr(config, "authfile", "auth_aso_plugin.config")
+        if os.path.isfile(aso_auth_file):
             targetClass = ASOServerJob
         else:
             targetClass = FTSJob
