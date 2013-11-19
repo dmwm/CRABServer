@@ -291,8 +291,8 @@ def startDashboardMonitoring(ad):
     params = {
         'WNHostName': socket.getfqdn(),
         'MonitorID': ad['CRAB_ReqName'],
-        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
-        'SyncGridJobId': '%d_https://glidein.cern.ch/%d/%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName']),
+        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":")),
+        'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":")),
         'SyncSite': ad['JOB_CMSSite'],
         'SyncCE': ad['Used_Gatekeeper'].split(":")[0],
         'ExeStart': 'cmsRun',
