@@ -13,6 +13,7 @@ import commands
 import unittest
 import classad
 import datetime
+import traceback
 import uuid
 import tempfile
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
@@ -118,7 +119,7 @@ class ASOServerJob(object):
         self.reqname = reqname
         self.publish = outputdata
         proxy = os.environ.get('X509_USER_PROXY', None)
-        aso_auth_file = os.path.join(os.environ.get('HOME', "."), "auth_aso_plugin.config")
+        aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config")
         if config:
             aso_auth_file = getattr(config, "authfile", "auth_aso_plugin.config")
         try:
@@ -129,7 +130,8 @@ class ASOServerJob(object):
             self.couchServer = CMSCouch.CouchServer(dburl=self.aso_db_url, ckey=proxy, cert=proxy)
             self.couchDatabase = self.couchServer.connectDatabase("asynctransfer", create = False)
         except:
-            raise RuntimeError("Problem to access the ASO server!")
+            print traceback.format_exc()
+            raise
 
     def cancel(self):
         print "cancelling"
@@ -564,7 +566,7 @@ class PostJob():
             outfile[1]['outlocation'] = self.dest_site
 
         global g_Job
-        aso_auth_file = os.path.join(os.environ.get('HOME', "."), "auth_aso_plugin.config")
+        aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config") 
         if config:
             aso_auth_file = getattr(config, "authfile", "auth_aso_plugin.config")
         if os.path.isfile(aso_auth_file) or os.environ.get("TEST_POSTJOB_ENABLE_ASOSERVER", False):
