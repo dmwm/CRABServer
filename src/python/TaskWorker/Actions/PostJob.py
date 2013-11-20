@@ -691,7 +691,15 @@ class PostJob():
         try:
             self.uploadLog(dest_dir, filenames[0])
             self.stageout(source_dir, dest_dir, *filenames)
-            self.upload()
+            try:
+                self.upload()
+            except HTTPException, hte:
+                # Suppressing this exception is a tough decision.  If the file made it back alright,
+                # I suppose we can proceed.
+                print "Potentially fatal error when uploading file locations:", str(hte.headers)
+                if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
+                        not hte.headers.get('X-Error-Http', -1) == '400':
+                    raise
         except:
             self.uploadState(fail_state)
             raise
