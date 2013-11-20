@@ -153,8 +153,6 @@ def transform_strings(input):
     # TODO: PanDA wrapper wants some sort of dictionary.
     info["addoutputfiles_flatten"] = '{}'
 
-    #info["output_dest"] = os.path.join("/store/user", input['userhn'], input['workflow'], input['publishname'])
-    #info["temp_dest"] = os.path.join("/store/temp/user", input['userhn'], input['workflow'], input['publishname'])
     if input['inputdata']:
         primaryds = input['inputdata'].split('/')[1]
     else:

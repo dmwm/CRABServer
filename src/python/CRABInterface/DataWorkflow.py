@@ -17,6 +17,17 @@ from Databases.TaskDB.Oracle.Task.New import New
 from Databases.TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
 from Databases.TaskDB.Oracle.Task.SetArgumentsTask import SetArgumentsTask
 
+def strip_username_from_taskname(workflow):
+    """When auto-generating a destination directory and dataset name for
+       a given task, we want to remove the username (it appears elsewhere) and
+       make sure it doesn't contain ':' (not a valid character in HDFS directory names).
+       """
+    info = workflow.split("_")
+    if len(info) > 3:
+        info = info[:2] + info[3:]
+        return "_".join(info)
+    return workflow.replace(":", "_")
+
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
        No aggregation of workflows provided here."""
@@ -179,7 +190,7 @@ class DataWorkflow(object):
                             user_vo         = ['cms'],\
                             user_role       = [vorole],\
                             user_group      = [vogroup],\
-                            publish_name    = [(requestname + '-' + publishname) if publishname.find('-')==-1 else publishname],\
+                            publish_name    = [(strip_username_from_taskname(requestname) + '-' + publishname) if publishname.find('-')==-1 else publishname],\
                             asyncdest       = [asyncdest],\
                             dbs_url         = [dbsurl],\
                             publish_dbs_url = [publishdbsurl],\
