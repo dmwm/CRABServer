@@ -125,7 +125,7 @@ class ASOServerJob(object):
             f = open(aso_auth_file)
             authParams = json.loads(f.read())
             self.aso_db_url = authParams['ASO_DB_URL']
-            print "Got aso %s" %self.aso_db_url
+            print "Got aso %s" % self.aso_db_url
             self.couchServer = CMSCouch.CouchServer(dburl=self.aso_db_url, ckey=proxy, cert=proxy)
             self.couchDatabase = self.couchServer.connectDatabase("asynctransfer", create = False)
         except:
@@ -567,7 +567,7 @@ class PostJob():
         aso_auth_file = os.path.join(os.environ.get('HOME', "."), "auth_aso_plugin.config")
         if config:
             aso_auth_file = getattr(config, "authfile", "auth_aso_plugin.config")
-        if os.path.isfile(aso_auth_file):
+        if os.path.isfile(aso_auth_file) or os.environ.get("TEST_POSTJOB_ENABLE_ASOSERVER", False):
             targetClass = ASOServerJob
         else:
             targetClass = FTSJob
