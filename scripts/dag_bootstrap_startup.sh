@@ -108,7 +108,7 @@ elif [ ! -r $X509_USER_PROXY ]; then
     EXIT_STATUS=6
 else
     # There used to be -Suppress_notification here. Why?
-    exec condor_dagman -f -l . -Lockfile $PWD/$1.lock -AutoRescue 1 -DoRescueFrom 0 -MaxIdle 100 -MaxPost 20 -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 2 -verbose
+    exec condor_dagman -f -l . -Lockfile $PWD/$1.lock -AutoRescue 1 -DoRescueFrom 0 -MaxPre 200 -MaxIdle 100 -MaxPost 20 -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 2 -verbose
     EXIT_STATUS=$?
 fi
 exit $EXIT_STATUS
