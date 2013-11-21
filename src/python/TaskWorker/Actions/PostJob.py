@@ -24,6 +24,8 @@ import hashlib
 import TaskWorker.Actions.RetryJob as RetryJob
 import pprint
 
+import DashboardAPI
+
 fts_server = 'https://fts3-pilot.cern.ch:8443'
 
 g_Job = None
@@ -482,9 +484,32 @@ class PostJob():
                    not hte.headers.get('X-Error-Http', -1) == '400':
                 raise
 
+    def setDashboardState(self, state, reason=None, logfiles=None):
+        if state == "COOLOFF":
+            state = "Cooloff"
+        elif state == "TRANSFERRING":
+            state = "Transferring"
+        elif state == "FAILED":
+            state = "Aborted"
+        elif state == "FINISHED":
+            state = "Done"
+        params = {
+            'MonitorID': self.ad['CRAB_ReqName'],
+            'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (self.crab_id, self.crab_id, self.ad['CRAB_ReqName'].replace("_", ":")),
+            'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (self.crab_id, self.ad['CRAB_ReqName'].replace("_", ":")),
+            'StatusValue': state,
+        }
+        if reason:
+            params['StatusValueReason'] = reason
+        if logfiles:
+            params['StatusLogFile'] = ",".join(logfiles)
+        DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+
     def uploadFakeLog(self, state="TRANSFERRING"):
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
+        self.setDashboardState(state)
+
         # Upload a fake log status.  This is to be replaced by a proper job state table.
         configreq = {"taskname":        self.ad['CRAB_ReqName'],
                      "pandajobid":      self.crab_id,
@@ -516,6 +541,8 @@ class PostJob():
     def uploadState(self, state):
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
+
+        self.setDashboardState(state)
         # Record this job as a permanent failure
         configreq = {"taskname":  self.ad['CRAB_ReqName'],
                      "filestate": state,
@@ -617,12 +644,14 @@ class PostJob():
             sys.stderr.flush()
             shutil.copy("postjob.%s" % id, postjob)
             os.chmod(postjob, 0644)
+            DashboardAPI.apmonFree()
             raise
         if retval:
             sys.stdout.flush()
             sys.stderr.flush()
             shutil.copy("postjob.%s" % id, postjob)
             os.chmod(postjob, 0644)
+        DashboardAPI.apmonFree()
         return retval
 
     def execute_internal(self, cluster, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
