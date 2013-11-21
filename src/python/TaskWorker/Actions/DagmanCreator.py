@@ -277,7 +277,7 @@ class DagmanCreator(TaskAction.TaskAction):
                   'scheduler': 'GLIDEIN',
                   'GridName': self.task['tm_user_dn'],
                   'ApplicationVersion': 'tm_job_sw',
-                  'taskType': 'integration',
+                  'taskType': 'analysis',
                   'vo': 'cms',
                   'CMSUser': self.task['tm_username'],
                   'user': self.task['tm_username'],
