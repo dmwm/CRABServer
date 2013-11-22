@@ -136,7 +136,7 @@ pushd httplib2-0.8/python2
 zip -rq $STARTDIR/CRAB3.zip httplib2  -x \*.pyc || exit 3
 popd
 
-pushd CherryPy-3.2.2/
+pushd CherryPy-3.1.2/
 zip -rq $STARTDIR/CRAB3.zip cherrypy  -x \*.pyc || exit 3
 popd
 
