@@ -50,7 +50,7 @@ def define_the_build(self, dist, system_name, patch_x = ''):
   dist.py_modules = system['py_modules']
   dist.packages = system['python']
   #dist.data_files = [('%sbin' % patch_x, binsrc)]
-  #dist.data_files = [ ("%sdata" % (patch_x, ), "scripts/%s" % (x,)) 
+  #dist.data_files = [ ("%sdata" % (patch_x, ), "scripts/%s" % (x,))
   #				for x in ['CMSRunAnalysis.sh']]
   #dist.data_files = ['scripts/CMSRunAnalysis.sh']
   if os.path.exists(docroot):
@@ -156,11 +156,26 @@ class InstallCommand(install):
       self.run_command(cmd_name)
       self.distribution.have_run[cmd_name] = 1
 
+class TestCommand(Command):
+    """
+    Test harness entry point
+    """
+    user_options = []
+    def initialize_options(self):
+        pass
+    def finalize_options(self):
+        pass
+    def run(self):
+        #import here, cause we don't want to bomb if nose doesn't exist
+        import CRABQuality
+        sys.exit(CRABQuality.runTests())
+
 setup(name = 'crabserver',
       version = '3.2.0',
       maintainer_email = 'hn-cms-crabdevelopment@cern.ch',
       cmdclass = { 'build_system': BuildCommand,
-                   'install_system': InstallCommand },
+                   'install_system': InstallCommand,
+                   'test' : TestCommand },
       #include_package_data=True,
       # base directory for all the packages
       package_dir = { '' : 'src/python' },
