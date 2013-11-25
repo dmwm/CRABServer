@@ -36,6 +36,62 @@ systems = \
   }
 }
 
+# These repos come from git clone, so we need to speicify the repo and ref
+DEFAULT_CMSDIST_REPO = "git@github.com:cms-sw/cmsdist.git"
+DEFAULT_CMSDIST_REF = "comp"
+DEFAULT_PKGTOOLS_REPO = "git@github.com:cms-sw/cmsdist.git"
+DEFAULT_PKGTOOLS_REF = "V00-21-XX"
+
+DEFAULT_CRABCLIENT = "git://github.com/dmwm/CRABClient.git?obj=master/%{realversion}&export=CRABClient-%{realversion}&output=/CRABClient-%{realversion}.tar.gz"
+DEFAULT_WMCORE = "git://github.com/dmwm/WMCore.git?obj=master/%{wmcver}&export=WMCore-%{wmcver}&output=/WMCore-%{n}-%{wmcver}.tar.gz"
+# crabclient spec and crabserver specs have different defaults
+DEFAULT_CS_CRABSERVER = "git://github.com/dmwm/CRABServer.git?obj=master/%{realversion}&export=CRABServer-%{realversion}&output=/CRABServer-%{realversion}.tar.gz"
+DEFAULT_CC_CRABSERVER = "git://github.com/dmwm/CRABServer.git?obj=master/%{crabserverver}&export=CRABServer-%{crabserverver}&output=/CRABServer-%{crabserverver}.tar.gz"
+
+class PackageCommand(Command):
+    description = """
+        Handles building RPM(s)
+
+        By default, all sources are used from their official locations. However
+        command line options give the user the option to ovveride the different
+        repositories with either different GH tags or a local directory.
+        """
+    user_options = []
+    user_options.append(("targets=", None,
+                        "Package specified systems (default: CRABClient,CRABServer,TaskWorker)"))
+    user_options.append(("crabServerPath=", None, "Override CRABServer repo location"))
+    user_options.append(("crabClientPath=", None, "Override CRABClient repo location"))
+    user_options.append(("wmCorePath=", None, "Override WMCore repo location"))
+
+    user_options.append(("pkgToolsRepo=", None, "Path to existing pkgtools repo"))
+    user_options.append(("pkgToolsRef=", None, "If pkgToolsPath is a git url, what ref to get"))
+    user_options.append(("cmsdistRepo=", None, "Override cmsdist repo location"))
+    user_options.append(("cmsdistRef=", None, "If cmsdistPath is a git url, what ref to get"))
+
+    def initialize_options(self):
+        self.targets = "CRABClient,CRABServer,TaskWorker"
+        # I'll need to fix things later for the crabserver ref
+        self.crabServerPath = None
+        self.crabClientPath = DEFAULT_CRABCLIENT
+        self.wmCorePath = DEFAULT_WMCORE
+        self.pkgToolsRepo = DEFAULT_PKGTOOLS_REPO
+        self.pkgToolsRef = DEFAULT_PKGTOOLS_REF
+        self.cmsdistRepo = DEFAULT_CMSDIST_REPO
+        self.cmsdistRef  = DEFAULT_CMSDIST_REF
+
+    def finalize_options(self):
+        if self.crabServerPath:
+            self.crabCCServerPath = self.crabServerPath
+            self.crabCSServerPath = self.crabServerPath
+        else:
+            self.crabCCServerPath = DEFAULT_CC_CRABSERVER
+            self.crabCSServerPath = DEFAULT_CS_CRABSERVER
+
+    def run(self):
+        """
+            Need to do a few things here:
+        """
+
 def get_relative_path():
   return os.path.dirname(os.path.abspath(os.path.join(os.getcwd(), sys.argv[0])))
 
