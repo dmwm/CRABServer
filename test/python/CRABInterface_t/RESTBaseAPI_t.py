@@ -18,10 +18,9 @@ DBSURL = 'http://localhost/fake_dbs_url/servlet/DBSServlet'
 ACDCDB = 'test_wmagent_acdc'
 
 SUBMIT_BODY="jobarch=slc5_amd64_gcc434&configdoc=0f1dfe2c1a9608367727d1d7e9f57e5e&workflow=pippo&splitalgo=FileBased&publishdbsurl=https%3A%2F%2Fcmsdbsprod.cern.ch%3A8443%2Fcms_dbs_ph_analysis_02_writer%2Fservlet%2FDBSServlet&publishname=1349346832&savelogsflag=0&userisburl=https%3A%2F%2Fcmsweb.cern.ch%2Fcrabcache%2Ffile%3Fhashkey%3Dcc8c74c376a6b5c693dc2246d635dc6f252af940b9ec844af4c873ae3efe6ea5&jobsw=CMSSW_4_2_5&asyncdest=T2_IT_Pisa&algoargs=250&inputdata=%2FRelValProdTTbar%2FJobRobot-MC_3XY_V24_JobRobot-v1%2FGEN-SIM-DIGI-RECO&jobtype=Analysis&blacklistT1=1"
-
 class RESTBaseAPI_t(RESTBaseAPI.RESTBaseAPI):
     """The CRABServer REST API unit test modules"""
-
+    broken = 1
     def __init__(self, app, config, mount):
         config.monurl = COUCH_URL
         config.monname = MON_DB
@@ -45,6 +44,7 @@ class RESTBaseAPI_t(RESTBaseAPI.RESTBaseAPI):
         RESTBaseAPI.RESTBaseAPI.__init__(self, app, config, mount)
 
 class Tester(helper.CPWebCase):
+    broken = 1
     def test_workflow_empty_submit(self, fmt = 'application/json', page = "/test/workflow",inbody = None):
         """Try to submit workflow without any parameters"""
 

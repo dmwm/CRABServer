@@ -13,17 +13,16 @@ import TaskWorker.Actions.DBSDataDiscovery
 import TaskWorker.Actions.Splitter
 import TaskWorker.Actions.DagmanCreator
 import TaskWorker.Actions.DagmanSubmitter
-import TaskWorker.Actions.ASOServer
 import TaskWorker.Actions.PostJob
 
 test_base = os.environ.get("CRAB3_TEST_BASE", ".")
-
+# I set integration to be true below since these call real services
 class TestActionHandler(unittest.TestCase):
-
+    integration = 1
     def setUp(self):
         logging.basicConfig(level=logging.DEBUG)
 
-        TaskWorker.Actions.ASOServer.fake_results = True
+        #TaskWorker.Actions.ASOServer.fake_results = True
         os.environ['_CONDOR_JOB_AD'] = os.path.join(test_base, 'test/data/Actions/dag_aso_completed')
 
         self.job_group_sample_file = os.path.join(test_base, "test/data/Actions/sample_job_group.pkl")
@@ -98,7 +97,7 @@ class TestActionHandler(unittest.TestCase):
         handler.addWork( TaskWorker.Actions.DagmanSubmitter.DagmanSubmitter(config=self.gwms_config) )
         result = handler.actionWork(*action_args)
 
-    def testASOServer(self):
+    def notestASOServer(self):
         #  status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames
         pj = TaskWorker.Actions.PostJob()
         async_dest = "T2_US_Vanderbilt"
@@ -116,10 +115,9 @@ class TestActionHandler(unittest.TestCase):
                  async_dest, \
                  source_dir, \
                  dest_dir, \
-                 *filenames]
+                 filenames]
         pj.execute(args)
         TaskWorker.Actions.ASOServer.async_stageout("T2_US_Vanderbilt", '/store/temp/user/bbockelm/crab_bbockelm_crab3_1', '/store/user/bbockelm', '1', '1234.5', 'dumper_111.root', source_site='T2_US_Nebraska')
-
 
 if __name__ == '__main__':
     unittest.main()

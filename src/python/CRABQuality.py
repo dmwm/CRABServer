@@ -16,7 +16,7 @@ def getTestRoot():
     return os.path.join(CRABServerBase.getCRABServerBase(),
                         'test', 'python')
 
-def runTests(mode='default'):
+def runTests(mode='default',integrationHost=None):
     """
     Top-level function
     """
@@ -29,9 +29,9 @@ def runTests(mode='default'):
 
     extraArgs = []
     if mode == 'default':
-        extraArgs = ['-a', '!integration']
+        extraArgs = ['-a', '!integration,!broken']
     elif mode == 'integration':
-        extraArgs = ['-a', 'integration']
+        extraArgs = ['-a', 'integration,!broken']
 
     args = [__file__,'--with-xunit', '-v', '-s',
                 '-m', '(_t.py$)|(_t$)|(^test)',
@@ -86,7 +86,7 @@ def sendTestJobsToAllSites():
                   'timeout' : time.time() + 60 * 120,
                   'path' : '%s/crab_%s' % (integrationTempDir,configOpts['requestName'])}
         integrationStatus[site] = state
-        cmdLine = "unset LD_LIBRARY_PATH ; %s ; crab -d %s submit -c %s" %
+        cmdLine = "unset LD_LIBRARY_PATH ; %s ; crab -d %s submit -c %s" % \
                                     (cmsswEnv, skipProxy, configPath)
         stdout, returncode = runCommand(cmdLine, integrationTempDir)
         if not os.path.exists(state['path']):
@@ -169,7 +169,7 @@ def getJobStatus(taskDir, timeout, isError):
     # timeout
     assert time.time() < timeout, "Job timed out. Last status: %s" % stdout
 
-testJobsToAllSites.integration = 0
+testJobsToAllSites.integration = 1
 
 def testImport_t():
     importRoot = CRABServerBase.getCRABServerBase() + '/src/python'
@@ -184,7 +184,12 @@ def testImport_t():
                 toImport = "%s.%s" % (baseModule,moduleName)
             else:
                 toImport = moduleName
-            __import__(toImport)
+            importOne.name = "Import.%s" % toImport
+            importOne.description = importOne.name
+            yield importOne, toImport
+
+def importOne(val):
+    __import__(val)
 
 # https://cmsweb.cern.ch/das/request?view=plain&limit=1000&instance=cms_dbs_prod_global&input=site+dataset%3D%2FGenericTTbar%2FHC-CMSSW_5_3_1_START53_V5-v1%2FGEN-SIM-RECO
 allSitesRaw = """T1_CH_CERN_Buffer

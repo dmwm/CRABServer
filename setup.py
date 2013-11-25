@@ -1,3 +1,7 @@
+#!/usr/bin/env python2.6
+"""
+    NOTE: This is intended to run automagically. Keep the deps minimal
+"""
 import sys, os, os.path, re, shutil, string
 from distutils.core import setup, Command
 from distutils.command.build import build
@@ -15,14 +19,19 @@ systems = \
   },
   'CRABInterface':
   {
-    'py_modules' : ['PandaServerInterface'],
+    'py_modules' : ['PandaServerInterface','CRABQuality'],
     'python': ['CRABInterface',
                'Databases',
-                 'Databases/FileMetaDataDB', 'Databases/FileMetaDataDB/Oracle', 'Databases/FileMetaDataDB/Oracle/FileMetaData',
-                 'Databases/TaskDB', 'Databases/TaskDB/Oracle', 'Databases/TaskDB/Oracle/JobGroup', 'Databases/TaskDB/Oracle/Task'] },
+                 'Databases/FileMetaDataDB', 'Databases/FileMetaDataDB/Oracle',
+                 'Databases/FileMetaDataDB/Oracle/FileMetaData',
+                 'Databases/TaskDB', 'Databases/TaskDB/Oracle',
+                 'Databases/TaskDB/Oracle/JobGroup',
+                 'Databases/TaskDB/Oracle/Task'] },
   'TaskWorker':
   {
-    'py_modules' : ['PandaServerInterface', 'RESTInteractions', 'ApmonIf', 'apmon', 'DashboardAPI', 'Logger', 'ProcInfo'],
+    'py_modules' : ['PandaServerInterface', 'RESTInteractions', 'ApmonIf',
+                    'apmon', 'DashboardAPI', 'Logger', 'ProcInfo',
+                    'CRABQuality'],
     'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
                 'taskbuffer']
   },
@@ -105,7 +114,7 @@ class InstallCommand(install):
   """Install a specific system."""
   description = \
     "Install a specific system. You can patch an existing\n" + \
-    "\t\t   installation instead of normal full installation using the '-p' option.\n"
+    "\t\tinstallation instead of normal full installation using the '-p' option.\n"
   user_options = install.user_options
   user_options.append(('system=', 's', 'install the specified system (default: CRABInterface)'))
   user_options.append(('patch', None, 'patch an existing installation (default: no patch)'))
@@ -160,15 +169,24 @@ class TestCommand(Command):
     """
     Test harness entry point
     """
+    description = "Runs tests"
     user_options = []
+    user_options.append(("integration", None, "Run integration tests"))
+    user_options.append(("integrationHost", None,
+                            "Host to run integration tests against"))
     def initialize_options(self):
-        pass
+        self.integration = False
+        self.integrationHost = "crab3-gwms-1.cern.ch"
     def finalize_options(self):
         pass
     def run(self):
         #import here, cause we don't want to bomb if nose doesn't exist
         import CRABQuality
-        sys.exit(CRABQuality.runTests())
+        mode = 'default'
+        if self.integration:
+            mode = 'integration'
+        sys.exit(CRABQuality.runTests(mode=mode,
+                                      integrationHost=self.integrationHost))
 
 setup(name = 'crabserver',
       version = '3.2.0',
