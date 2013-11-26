@@ -22,7 +22,8 @@ class DataDiscovery(TaskAction):
         self.logger.debug(" Formatting data discovery output ")
         # TEMPORARY
         secmsmap = {}
-        sbj = SiteDBJSON()
+        sbj = SiteDBJSON({"key":self.config.TaskWorker.cmskey,
+                          "cert":self.config.TaskWorker.cmscert})
 
         wmfiles = []
         lumicounter = evecounter = 0
