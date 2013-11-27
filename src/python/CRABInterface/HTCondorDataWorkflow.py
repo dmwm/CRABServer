@@ -319,9 +319,20 @@ class HTCondorDataWorkflow(DataWorkflow):
         schedd, address = locator.getScheddObj(name)
 
         results = self.getRootTasks(workflow, schedd)
-        if not results or ('CRAB_UserWebDir' not in results[-1]):
+        if not results:
             return [ {"status" : "UNKNOWN",
                       "taskFailureMsg" : "Unable to find root task in HTCondor",
+                      "jobSetID"        : '',
+                      "jobsPerStatus"   : {},
+                      "failedJobdefs"   : 0,
+                      "totalJobdefs"    : 0,
+                      "jobdefErrors"    : [],
+                      "jobList"         : [],
+                      "saveLogs"        : saveLogs }]
+
+        if 'CRAB_UserWebDir' not in results[-1]:
+            return [ {"status" : "UNKNOWN",
+                      "taskFailureMsg" : "Task failed to bootstrap on schedd %s." % address,
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
