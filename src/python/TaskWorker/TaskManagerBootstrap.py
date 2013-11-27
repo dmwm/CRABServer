@@ -12,7 +12,6 @@ import classad
 import TaskWorker.Actions.DBSDataDiscovery as DBSDataDiscovery
 import TaskWorker.Actions.Splitter as Splitter
 import TaskWorker.Actions.DagmanCreator as DagmanCreator
-import TaskWorker.Actions.ASO as ASO
 import TaskWorker.Actions.PostJob as PostJob
 import TaskWorker.Actions.PreJob as PreJob
 import TaskWorker.Actions.HTCondorUtils as HTCondorUtils

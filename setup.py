@@ -1,3 +1,7 @@
+#!/usr/bin/env python2.6
+"""
+    NOTE: This is intended to run automagically. Keep the deps minimal
+"""
 import sys, os, os.path, re, shutil, string
 from distutils.core import setup, Command
 from distutils.command.build import build
@@ -15,14 +19,19 @@ systems = \
   },
   'CRABInterface':
   {
-    'py_modules' : ['PandaServerInterface'],
+    'py_modules' : ['PandaServerInterface','CRABQuality'],
     'python': ['CRABInterface',
                'Databases',
-                 'Databases/FileMetaDataDB', 'Databases/FileMetaDataDB/Oracle', 'Databases/FileMetaDataDB/Oracle/FileMetaData',
-                 'Databases/TaskDB', 'Databases/TaskDB/Oracle', 'Databases/TaskDB/Oracle/JobGroup', 'Databases/TaskDB/Oracle/Task'] },
+                 'Databases/FileMetaDataDB', 'Databases/FileMetaDataDB/Oracle',
+                 'Databases/FileMetaDataDB/Oracle/FileMetaData',
+                 'Databases/TaskDB', 'Databases/TaskDB/Oracle',
+                 'Databases/TaskDB/Oracle/JobGroup',
+                 'Databases/TaskDB/Oracle/Task'] },
   'TaskWorker':
   {
-    'py_modules' : ['PandaServerInterface', 'RESTInteractions', 'ApmonIf', 'apmon', 'DashboardAPI', 'Logger', 'ProcInfo'],
+    'py_modules' : ['PandaServerInterface', 'RESTInteractions', 'ApmonIf',
+                    'apmon', 'DashboardAPI', 'Logger', 'ProcInfo',
+                    'CRABQuality'],
     'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
                 'taskbuffer']
   },
@@ -35,6 +44,62 @@ systems = \
     'python': ['TaskWorker', 'CRABInterface', 'UserFileCache', 'CRABClient']
   }
 }
+
+# These repos come from git clone, so we need to speicify the repo and ref
+DEFAULT_CMSDIST_REPO = "git@github.com:cms-sw/cmsdist.git"
+DEFAULT_CMSDIST_REF = "comp"
+DEFAULT_PKGTOOLS_REPO = "git@github.com:cms-sw/cmsdist.git"
+DEFAULT_PKGTOOLS_REF = "V00-21-XX"
+
+DEFAULT_CRABCLIENT = "git://github.com/dmwm/CRABClient.git?obj=master/%{realversion}&export=CRABClient-%{realversion}&output=/CRABClient-%{realversion}.tar.gz"
+DEFAULT_WMCORE = "git://github.com/dmwm/WMCore.git?obj=master/%{wmcver}&export=WMCore-%{wmcver}&output=/WMCore-%{n}-%{wmcver}.tar.gz"
+# crabclient spec and crabserver specs have different defaults
+DEFAULT_CS_CRABSERVER = "git://github.com/dmwm/CRABServer.git?obj=master/%{realversion}&export=CRABServer-%{realversion}&output=/CRABServer-%{realversion}.tar.gz"
+DEFAULT_CC_CRABSERVER = "git://github.com/dmwm/CRABServer.git?obj=master/%{crabserverver}&export=CRABServer-%{crabserverver}&output=/CRABServer-%{crabserverver}.tar.gz"
+
+class PackageCommand(Command):
+    description = """
+        Handles building RPM(s)
+
+        By default, all sources are used from their official locations. However
+        command line options give the user the option to ovveride the different
+        repositories with either different GH tags or a local directory.
+        """
+    user_options = []
+    user_options.append(("targets=", None,
+                        "Package specified systems (default: CRABClient,CRABServer,TaskWorker)"))
+    user_options.append(("crabServerPath=", None, "Override CRABServer repo location"))
+    user_options.append(("crabClientPath=", None, "Override CRABClient repo location"))
+    user_options.append(("wmCorePath=", None, "Override WMCore repo location"))
+
+    user_options.append(("pkgToolsRepo=", None, "Path to existing pkgtools repo"))
+    user_options.append(("pkgToolsRef=", None, "If pkgToolsPath is a git url, what ref to get"))
+    user_options.append(("cmsdistRepo=", None, "Override cmsdist repo location"))
+    user_options.append(("cmsdistRef=", None, "If cmsdistPath is a git url, what ref to get"))
+
+    def initialize_options(self):
+        self.targets = "CRABClient,CRABServer,TaskWorker"
+        # I'll need to fix things later for the crabserver ref
+        self.crabServerPath = None
+        self.crabClientPath = DEFAULT_CRABCLIENT
+        self.wmCorePath = DEFAULT_WMCORE
+        self.pkgToolsRepo = DEFAULT_PKGTOOLS_REPO
+        self.pkgToolsRef = DEFAULT_PKGTOOLS_REF
+        self.cmsdistRepo = DEFAULT_CMSDIST_REPO
+        self.cmsdistRef  = DEFAULT_CMSDIST_REF
+
+    def finalize_options(self):
+        if self.crabServerPath:
+            self.crabCCServerPath = self.crabServerPath
+            self.crabCSServerPath = self.crabServerPath
+        else:
+            self.crabCCServerPath = DEFAULT_CC_CRABSERVER
+            self.crabCSServerPath = DEFAULT_CS_CRABSERVER
+
+    def run(self):
+        """
+            Need to do a few things here:
+        """
 
 def get_relative_path():
   return os.path.dirname(os.path.abspath(os.path.join(os.getcwd(), sys.argv[0])))
@@ -50,7 +115,7 @@ def define_the_build(self, dist, system_name, patch_x = ''):
   dist.py_modules = system['py_modules']
   dist.packages = system['python']
   #dist.data_files = [('%sbin' % patch_x, binsrc)]
-  #dist.data_files = [ ("%sdata" % (patch_x, ), "scripts/%s" % (x,)) 
+  #dist.data_files = [ ("%sdata" % (patch_x, ), "scripts/%s" % (x,))
   #				for x in ['CMSRunAnalysis.sh']]
   #dist.data_files = ['scripts/CMSRunAnalysis.sh']
   if os.path.exists(docroot):
@@ -105,7 +170,7 @@ class InstallCommand(install):
   """Install a specific system."""
   description = \
     "Install a specific system. You can patch an existing\n" + \
-    "\t\t   installation instead of normal full installation using the '-p' option.\n"
+    "\t\tinstallation instead of normal full installation using the '-p' option.\n"
   user_options = install.user_options
   user_options.append(('system=', 's', 'install the specified system (default: CRABInterface)'))
   user_options.append(('patch', None, 'patch an existing installation (default: no patch)'))
@@ -156,11 +221,35 @@ class InstallCommand(install):
       self.run_command(cmd_name)
       self.distribution.have_run[cmd_name] = 1
 
+class TestCommand(Command):
+    """
+    Test harness entry point
+    """
+    description = "Runs tests"
+    user_options = []
+    user_options.append(("integration", None, "Run integration tests"))
+    user_options.append(("integrationHost", None,
+                            "Host to run integration tests against"))
+    def initialize_options(self):
+        self.integration = False
+        self.integrationHost = "crab3-gwms-1.cern.ch"
+    def finalize_options(self):
+        pass
+    def run(self):
+        #import here, cause we don't want to bomb if nose doesn't exist
+        import CRABQuality
+        mode = 'default'
+        if self.integration:
+            mode = 'integration'
+        sys.exit(CRABQuality.runTests(mode=mode,
+                                      integrationHost=self.integrationHost))
+
 setup(name = 'crabserver',
       version = '3.2.0',
       maintainer_email = 'hn-cms-crabdevelopment@cern.ch',
       cmdclass = { 'build_system': BuildCommand,
-                   'install_system': InstallCommand },
+                   'install_system': InstallCommand,
+                   'test' : TestCommand },
       #include_package_data=True,
       # base directory for all the packages
       package_dir = { '' : 'src/python' },
