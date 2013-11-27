@@ -97,7 +97,7 @@ Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) -
 transfer_input_files = CMSRunAnalysis.sh, cmscp.py
 transfer_output_files = jobReport.json.$(count)
 # TODO: fold this into the config file instead of hardcoding things.
-Environment = SCRAM_ARCH=$(CRAB_JobArch);CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/CMSRunAnalysis-3.3.0-pre1.tar.gz;%(additional_environment_options)s
+Environment = SCRAM_ARCH=$(CRAB_JobArch);%(additional_environment_options)s
 should_transfer_files = YES
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
@@ -204,6 +204,14 @@ def makeJobSubmit(task):
     info['lumis'] = []
     info = transform_strings(info)
     info.setdefault("additional_environment_options", '')
+    if os.path.exists("CMSRunAnalysis.tar.gz"):
+        info['additional_environment_options'] += 'CRAB_TASKMANAGER_TARBALL=local'
+    else:
+        info['additional_environment_options'] += 'CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/CMSRunAnalysis-3.3.0-pre1.tar.gz'
+    if os.path.exists("TaskManagerRun.tar.gz"):
+        info['additional_environment_options'] += 'CRAB_TASKMANAGER_TARBALL=local'
+    else:
+        info['additional_environment_options'] += 'CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/TaskManagerRun-3.3.0-pre1.tar.gz'
     with open("Job.submit", "w") as fd:
         fd.write(JOB_SUBMIT % info)
 
@@ -420,6 +428,12 @@ class DagmanCreator(TaskAction.TaskAction):
                 ufc = UserFileCache()
                 ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
                 kw['task']['tm_user_sandbox'] = 'sandbox.tar.gz'
+
+            # Bootstrap the runtime if it is available.
+            job_runtime = getLocation('CMSRunAnalysis.tar.gz', 'CRABServer/')
+            shutil.copy(job_runtime, '.')
+            task_runtime = getLocation('TaskManagerRun.tar.gz', 'CRABServer/')
+            shutil.copy(task_runtime, '.')
 
             kw['task']['scratch'] = temp_dir
 

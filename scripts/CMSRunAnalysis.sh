@@ -75,16 +75,16 @@ fi
 echo "Current environment is"
 env
 
-if [[ "X$CRAB_TASKMANAGER_TARBALL" == 'X' ]]; then
+if [[ "X$CRAB_RUNTIME_TARBALL" == 'X' ]]; then
     # Didn't ask to bring a tarball with us
     wget http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz || exit 10042
     tar xvfzm CMSRunAnaly.tgz || exit 10042
-elif [[ $CRAB_TASKMANAGER_TARBALL == 'local' ]]; then
+elif [[ $CRAB_RUNTIME_TARBALL == 'local' ]]; then
     # Tarball was shipped with condor
     tar xvzmf TaskManagerRun.tar.gz || exit 10042
 else
     # Allow user to override the choice
-    curl $CRAB_TASKMANAGER_TARBALL | tar xvzm || exit 10042
+    curl $CRAB_RUNTIME_TARBALL | tar xvzm || exit 10042
 fi
 export PYTHONPATH=`pwd`/CRAB3.zip:`pwd`/WMCore.zip:$PYTHONPATH
 ls
