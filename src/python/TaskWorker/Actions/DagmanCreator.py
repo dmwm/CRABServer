@@ -112,6 +112,7 @@ queue
 """
 
 SPLIT_ARG_MAP = { "LumiBased" : "lumis_per_job",
+                  "EventBased" : "events_per_job",
                   "FileBased" : "files_per_job",}
 
 LOGGER = None
