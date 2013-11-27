@@ -23,6 +23,7 @@ from httplib import HTTPException
 import hashlib
 import TaskWorker.Actions.RetryJob as RetryJob
 import pprint
+import time, datetime
 
 fts_server = 'https://fts3-pilot.cern.ch:8443'
 
@@ -148,32 +149,53 @@ class ASOServerJob(object):
         cmdLine = 'grid-proxy-info -identity 2>/dev/null'
         dn = commands.getstatusoutput(cmdLine)[1].strip()
         # TODO: Add a method to resolve a single PFN or use resolvePFNs
-        # FIXME: This will breaks for output file name containing log string
+        last_update = int(time.time())
+        now = str(datetime.datetime.now())
         found_log = False
         for oneFile in zip(self.source_sites, self.filenames):
             if found_log:
                 lfn = "%s/%s" % (self.source_dir, oneFile[1])
+                type = "output"
             else:
                 lfn = "%s/log/%s" % (self.source_dir, oneFile[1])
+                type = "log"
                 found_log = True
-            # FIXME: need to pass publish flag, checksums, user/role/group, size through
-            doc = { '_id' : getHashLfn(lfn),
-                    'destination' : self.dest_site,
-                    'source' : oneFile[0],
+            if len(lfn.split('/')) > 2:
+                if lfn.split('/')[2] == 'temp':
+                    user = lfn.split('/')[4]
+                else:
+                    user = lfn.split('/')[3]
+            else:
+                user = ''
+            # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
+            doc = { "_id": getHashLfn( lfn ),
+                    "inputdataset": '',
+                    "group": '',
                     # TODO: Remove this if it is not required
-                    'lfn' : lfn.replace('/store/user', '/store/temp/user', 1),
-                    'retry_count' : [],
-                    'failure_reason' : [],
-                    'jobid' : self.count,
-                    'workflow': self.reqname,
-                    'publish': 0,
-                    'checksums' : {},
-                    'user' : '',
-                    'group' : '',
-                    'role' : '',
-                    'dn' : dn,
-                    'state' : 'new',
-                    'size' : '123'
+                    "lfn": lfn.replace('/store/user', '/store/temp/user', 1),
+                    "checksums": {'adler32': 'abc'},
+                    "size": '123',
+                    "user": user,
+                    "source": oneFile[0],
+                    "destination": self.dest_site,
+                    "last_update": last_update,
+                    "state": "new",
+                    "role": '',
+                    "dbSource_url": "gWMS",
+                    "publish_dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_caf_analysis_02_writer/servlet/DBSServlet',
+                    "dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_prod_global/servlet/DBSServlet',
+                    "dn": dn,
+                    "workflow": self.reqname,
+                    "start_time": now,
+                    "end_time": '',
+                    "job_end_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
+                    "jobid": self.count,
+                    "retry_count": [],
+                    "failure_reason": [],
+                    "publication_state": 'not_published',
+                    "publication_retry_count": [],
+                    "type" : type,
+                    "publish" : 0
                 }
             pprint.pprint(doc)
             allIDs.append(getHashLfn(lfn))
