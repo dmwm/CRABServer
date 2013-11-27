@@ -662,6 +662,7 @@ class PostJob():
         try:
             retval = self.execute_internal(*args, **kw)
         except:
+            print traceback.format_exc()
             sys.stdout.flush()
             sys.stderr.flush()
             shutil.copy("postjob.%s" % id, postjob)
