@@ -81,7 +81,7 @@ if [[ "X$CRAB_RUNTIME_TARBALL" == 'X' ]]; then
     tar xvfzm CMSRunAnaly.tgz || exit 10042
 elif [[ $CRAB_RUNTIME_TARBALL == 'local' ]]; then
     # Tarball was shipped with condor
-    tar xvzmf TaskManagerRun.tar.gz || exit 10042
+    tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
 else
     # Allow user to override the choice
     curl $CRAB_RUNTIME_TARBALL | tar xvzm || exit 10042

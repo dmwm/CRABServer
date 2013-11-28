@@ -94,7 +94,7 @@ Log = job_log
 
 Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) '--inputFile=$(inputFiles)' '--runAndLumis=$(runAndLumiMask)' -o $(CRAB_AdditionalOutputFiles)"
 
-transfer_input_files = CMSRunAnalysis.sh, cmscp.py
+transfer_input_files = CMSRunAnalysis.sh, cmscp.py%(additional_input_file)s
 transfer_output_files = jobReport.json.$(count)
 # TODO: fold this into the config file instead of hardcoding things.
 Environment = SCRAM_ARCH=$(CRAB_JobArch);%(additional_environment_options)s
@@ -204,14 +204,18 @@ def makeJobSubmit(task):
     info['lumis'] = []
     info = transform_strings(info)
     info.setdefault("additional_environment_options", '')
+    info.setdefault("additional_input_file", "")
     if os.path.exists("CMSRunAnalysis.tar.gz"):
-        info['additional_environment_options'] += 'CRAB_TASKMANAGER_TARBALL=local'
+        info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=local'
+        info['additional_input_file'] += ", CMSRunAnalysis.tar.gz"
     else:
-        info['additional_environment_options'] += 'CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/CMSRunAnalysis-3.3.0-pre1.tar.gz'
+        info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=http://hcc-briantest.unl.edu/CMSRunAnalysis-3.3.0-pre1.tar.gz'
     if os.path.exists("TaskManagerRun.tar.gz"):
-        info['additional_environment_options'] += 'CRAB_TASKMANAGER_TARBALL=local'
+        info['additional_environment_options'] += ';CRAB_TASKMANAGER_TARBALL=local'
     else:
-        info['additional_environment_options'] += 'CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/TaskManagerRun-3.3.0-pre1.tar.gz'
+        info['additional_environment_options'] += ';CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/TaskManagerRun-3.3.0-pre1.tar.gz'
+    if os.path.exists("sandbox.tar.gz"):
+        info['additional_input_file'] += ", sandbox.tar.gz"
     with open("Job.submit", "w") as fd:
         fd.write(JOB_SUBMIT % info)
 
