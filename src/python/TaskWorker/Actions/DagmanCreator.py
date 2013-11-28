@@ -94,10 +94,10 @@ Log = job_log
 
 Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) '--inputFile=$(inputFiles)' '--runAndLumis=$(runAndLumiMask)' -o $(CRAB_AdditionalOutputFiles)"
 
-transfer_input_files = CMSRunAnalysis.sh, cmscp.py
+transfer_input_files = CMSRunAnalysis.sh, cmscp.py%(additional_input_file)s
 transfer_output_files = jobReport.json.$(count)
 # TODO: fold this into the config file instead of hardcoding things.
-Environment = SCRAM_ARCH=$(CRAB_JobArch);CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/CMSRunAnalysis-3.3.0-pre1.tar.gz;%(additional_environment_options)s
+Environment = SCRAM_ARCH=$(CRAB_JobArch);%(additional_environment_options)s
 should_transfer_files = YES
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
@@ -153,8 +153,6 @@ def transform_strings(input):
     # TODO: PanDA wrapper wants some sort of dictionary.
     info["addoutputfiles_flatten"] = '{}'
 
-    #info["output_dest"] = os.path.join("/store/user", input['userhn'], input['workflow'], input['publishname'])
-    #info["temp_dest"] = os.path.join("/store/temp/user", input['userhn'], input['workflow'], input['publishname'])
     if input['inputdata']:
         primaryds = input['inputdata'].split('/')[1]
     else:
@@ -206,6 +204,18 @@ def makeJobSubmit(task):
     info['lumis'] = []
     info = transform_strings(info)
     info.setdefault("additional_environment_options", '')
+    info.setdefault("additional_input_file", "")
+    if os.path.exists("CMSRunAnalysis.tar.gz"):
+        info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=local'
+        info['additional_input_file'] += ", CMSRunAnalysis.tar.gz"
+    else:
+        info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=http://hcc-briantest.unl.edu/CMSRunAnalysis-3.3.0-pre1.tar.gz'
+    if os.path.exists("TaskManagerRun.tar.gz"):
+        info['additional_environment_options'] += ';CRAB_TASKMANAGER_TARBALL=local'
+    else:
+        info['additional_environment_options'] += ';CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/TaskManagerRun-3.3.0-pre1.tar.gz'
+    if os.path.exists("sandbox.tar.gz"):
+        info['additional_input_file'] += ", sandbox.tar.gz"
     with open("Job.submit", "w") as fd:
         fd.write(JOB_SUBMIT % info)
 
@@ -279,7 +289,7 @@ class DagmanCreator(TaskAction.TaskAction):
                   'scheduler': 'GLIDEIN',
                   'GridName': self.task['tm_user_dn'],
                   'ApplicationVersion': 'tm_job_sw',
-                  'taskType': 'integration',
+                  'taskType': 'analysis',
                   'vo': 'cms',
                   'CMSUser': self.task['tm_username'],
                   'user': self.task['tm_username'],
@@ -419,9 +429,15 @@ class DagmanCreator(TaskAction.TaskAction):
 
             # Bootstrap the ISB if we are using UFC
             if UserFileCache and (kw['task']['tm_cache_url'] == 'https://cmsweb.cern.ch/crabcache/file'):
-                ufc = UserFileCache()
+                ufc = UserFileCache(dict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy']})
                 ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
                 kw['task']['tm_user_sandbox'] = 'sandbox.tar.gz'
+
+            # Bootstrap the runtime if it is available.
+            job_runtime = getLocation('CMSRunAnalysis.tar.gz', 'CRABServer/')
+            shutil.copy(job_runtime, '.')
+            task_runtime = getLocation('TaskManagerRun.tar.gz', 'CRABServer/')
+            shutil.copy(task_runtime, '.')
 
             kw['task']['scratch'] = temp_dir
 

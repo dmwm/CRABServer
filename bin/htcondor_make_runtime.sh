@@ -22,7 +22,7 @@ DLSVER=DLS_1_1_3
 DLSREPO=bbockelm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
-CRABSERVERVER=3.3.0.rc1
+CRABSERVERVER=3.3.0.rc8
 CRABSERVERREPO=dmwm
 
 CRABCLIENTDIR=$STARTDIR/CRABClient
@@ -107,7 +107,7 @@ if [[ ! -e httplib2.tar.gz ]]; then
     curl -L https://httplib2.googlecode.com/files/httplib2-0.8.tar.gz > httplib2.tar.gz || exit 2
 fi
 if [[ ! -e cherrypy.tar.gz ]]; then
-    curl -L http://download.cherrypy.org/cherrypy/3.2.2/CherryPy-3.2.2.tar.gz > cherrypy.tar.gz || exit 2
+    curl -L http://download.cherrypy.org/cherrypy/3.1.2/CherryPy-3.1.2.tar.gz > cherrypy.tar.gz || exit 2
 fi
 if [[ ! -e sqlalchemy.tar.gz ]]; then
     curl -L https://pypi.python.org/packages/source/S/SQLAlchemy/SQLAlchemy-0.8.0.tar.gz > sqlalchemy.tar.gz || exit 2
@@ -136,7 +136,7 @@ pushd httplib2-0.8/python2
 zip -rq $STARTDIR/CRAB3.zip httplib2  -x \*.pyc || exit 3
 popd
 
-pushd CherryPy-3.2.2/
+pushd CherryPy-3.1.2/
 zip -rq $STARTDIR/CRAB3.zip cherrypy  -x \*.pyc || exit 3
 popd
 
