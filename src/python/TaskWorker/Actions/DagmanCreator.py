@@ -425,7 +425,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
             # Bootstrap the ISB if we are using UFC
             if UserFileCache and (kw['task']['tm_cache_url'] == 'https://cmsweb.cern.ch/crabcache/file'):
-                ufc = UserFileCache()
+                ufc = UserFileCache(dict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy']})
                 ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
                 kw['task']['tm_user_sandbox'] = 'sandbox.tar.gz'
 
