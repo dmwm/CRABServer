@@ -1,4 +1,4 @@
-from TaskWorker.CRAB3SetupPset import SetupCMSSWPsetCore
+from TaskWorker.CRAB3SetupPset import SetupCMSSWPSetCore
 from ast import literal_eval
 class testPSetTweak:
     def testVerifyOneEventMode(self):
