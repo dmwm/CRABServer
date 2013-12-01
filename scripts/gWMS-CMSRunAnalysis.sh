@@ -54,11 +54,12 @@ echo "======== CMSRunAnalysis.sh at $(date) STARTING ========"
 time sh ./CMSRunAnalysis.sh "$@" --oneEventMode=$CRAB_oneEventMode
 EXIT_STATUS=$?
 echo "CMSRunAnalysis.sh complete at $(date) with exit status $EXIT_STATUS"
-echo "======== CMSRunAnalsysis at $(date) FINISHING ========"
+echo "======== CMSRunAnalsysis.sh at $(date) FINISHING ========"
 
 mv jobReport.json jobReport.json.$CRAB_Id
 
 echo "======== python2.6 bootstrap for stageout at $(date) STARTING ========"
+set -x
 ### Need python2.6 for stageout also
 if [ "x" != "x$VO_CMS_SW_DIR" ]
 then
@@ -99,6 +100,7 @@ then
 fi
 command -v python2.6 > /dev/null
 rc=$?
+set +x
 if [[ $rc != 0 ]]
 then
 	echo "Error: Python2.6 isn't available on this worker node." >&2
