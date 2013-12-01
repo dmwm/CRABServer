@@ -310,7 +310,7 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
     if dest_site.startswith("T1_"):
         dest_sites_.append(dest_site + "_Buffer")
         dest_sites_.append(dest_site + "_Disk")
-    dest_info = p.getPFN(nodes=(source_sites_ + dest_sites_), lfns=lfns)
+    dest_info = p.getPFN(nodes=(source_sites + dest_sites_), lfns=lfns)
     results = []
     found_log = False
     for source_site, filename in zip(source_sites, filenames):
