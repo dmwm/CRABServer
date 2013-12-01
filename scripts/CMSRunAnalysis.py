@@ -135,6 +135,25 @@ def stopDashboardMonitoring(ad):
     DashboardAPI.apmonFree()
 
 
+def logCMSSW():
+    if not os.path.exists("cmsRun-stdout.log"):
+        print "ERROR: Cannot dump CMSSW stdout; perhaps CMSSW never executed?"
+    print "======== CMSSW OUTPUT STARTING ========"
+    fd = open("cmsRun-stdout.log")
+    st = os.fstat(fd.fileno())
+    if st.st_size > 10*1024*1024:
+        print "WARNING: CMSSW output is over 10MB; truncating to last 10MB."
+        print "Use 'crab getlog' to retrieve full output of this job from storage."
+        fd.seek(-10*1024*1024, 2)
+        it = fd.xreadlines()
+        it.next()
+    else:
+        it = fd.xreadlines()
+    for line in it:
+        print "== CMSSW: ", line,
+    print "======== CMSSW OUTPUT FINSHING ========"
+
+
 def handleException(exitAcronymn, exitCode, exitMsg):
     report = {}
     report['exitAcronym'] = exitAcronymn
@@ -382,6 +401,7 @@ try:
     jobExitCode = cmssw.step.execution.exitStatus
     print "Job exit code: %s" % str(jobExitCode)
     print "==== CMSSW Stack Execution FINISHING at %s ====" % time.ctime()
+    logCMSSW()
 except WMExecutionFailure, WMex:
     print "ERROR: Caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail)
     exmsg = WMex.name
