@@ -310,16 +310,10 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
     if dest_site.startswith("T1_"):
         dest_sites_.append(dest_site + "_Buffer")
         dest_sites_.append(dest_site + "_Disk")
-    source_sites_ = []
-    for site in source_sites:
-        source_sites_.append(site)
-        if site.startswith("T1_"):
-            source_sites_.append(site + "_Buffer")
-            source_sites_.append(site + "_Disk")
     dest_info = p.getPFN(nodes=(source_sites_ + dest_sites_), lfns=lfns)
     results = []
     found_log = False
-    for source_site, filename in zip(source_sites_, filenames):
+    for source_site, filename in zip(source_sites, filenames):
         if not found_log and filename.startswith("cmsRun") and (filename[-7:] == ".tar.gz"):
             slfn = os.path.join(source_dir, "log", filename)
             dlfn = os.path.join(dest_dir, "log", filename)
@@ -327,21 +321,16 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
             slfn = os.path.join(source_dir, filename)
             dlfn = os.path.join(dest_dir, filename)
         found_log = True
-        source_site_ = source_site
-        if (source_site + "_Buffer", slfn) in dest_info:
-            source_site_ = source_site + "_Buffer"
-        elif (source_site + "_Disk", slfn) in dest_info:
-            source_site_ = source_site + "_Disk"
         dest_site_= dest_site
-        if (dest_site + "_Buffer", dlfn) in dest_info:
-            dest_site_ = dest_site + "_Buffer"
-        elif (dest_site + "_Disk", dlfn) in dest_info:
+        if (dest_site + "_Disk", dlfn) in dest_info:
             dest_site_ = dest_site + "_Disk"
-        if ((source_site_, slfn) not in dest_info) or (not dest_info[source_site_, slfn]):
-            print "Unable to map LFN %s at site %s" % (slfn, source_site_)
+        elif (dest_site + "_Buffer", dlfn) in dest_info:
+            dest_site_ = dest_site + "_Buffer"
+        if ((source_site, slfn) not in dest_info) or (not dest_info[source_site, slfn]):
+            print "Unable to map LFN %s at site %s" % (slfn, source_site)
         if ((dest_site_, dlfn) not in dest_info) or (not dest_info[dest_site_, dlfn]):
             print "Unable to map LFN %s at site %s" % (dlfn, dest_site_)
-        results.append((dest_info[source_site_, slfn], dest_info[dest_site_, dlfn]))
+        results.append((dest_info[source_site, slfn], dest_info[dest_site_, dlfn]))
     return results
 
 def getHashLfn(lfn):
@@ -651,7 +640,7 @@ class PostJob():
         nodes = p.getNodeMap()['phedex']['node']
         self.node_map = {}
         for node in nodes:
-            self.node_map[str(node[u'se'])] = str(node[u'name']).replace("_Disk", "").replace("_Buffer", "").replace("_MSS", "").replace("_Export", "")
+            self.node_map[str(node[u'se'])] = str(node[u'name'])
 
     def execute(self, *args, **kw):
         retry_count = args[2]
