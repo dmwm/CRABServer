@@ -1,13 +1,15 @@
 #!/bin/bash
-set -x
+exec 2>&1
 #touch Report.pkl
 
 # should be a bit nicer than before
-echo "Starting CMSRunAnalysis.sh at $(date)..."
+echo "======== CMSRunAnalysis.sh STARTING at $(date) ========"
 
 ### source the CMSSW stuff using either OSG or LCG style entry env. variables
 ###    (incantations per oli's instructions)
 #   LCG style --
+echo "==== CMSSW pre-execution environment bootstrap STARTING ===="
+set -x
 if [ "x" != "x$VO_CMS_SW_DIR" ]
 then
     echo 'LCG style'
@@ -43,8 +45,10 @@ else
 	echo "Error: Because of this, we can't load CMSSW. Not good." >&2
 	exit 2
 fi
-echo "I think I found the correct CMSSW setup script"
+set +x
+echo "==== CMSSW pre-execution environment bootstrap FINISHING at $(date) ===="
 
+echo "==== Python2.6 discovery STARTING ===="
 # check for Python2.6 installation 
 N_PYTHON26=${#VERSIONS[*]}
 if [ $N_PYTHON26 -lt 1 ]; then
@@ -71,15 +75,21 @@ else
 	echo "I found python2.6 at.."
 	echo `which python2.6`
 fi
+echo "==== Python2.6 discovery FINISHING at $(date) ===="
 
-echo "Current environment is"
-env
+echo "======== Current environment dump STARTING ========"
+for i in `env`; do
+  echo "== ENV: $i"
+done
+echo "======== Current environment dump STARTING ========"
 
-if [[ "X$CRAB_RUNTIME_TARBALL" == 'X' ]]; then
+echo "======== Tarball initialization STARTING at $(date) ========"
+set -x
+if [[ "X$CRAB_RUNTIME_TARBALL" == "X" ]]; then
     # Didn't ask to bring a tarball with us
     wget http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz || exit 10042
     tar xvfzm CMSRunAnaly.tgz || exit 10042
-elif [[ $CRAB_RUNTIME_TARBALL == 'local' ]]; then
+elif [[ $CRAB_RUNTIME_TARBALL == "local" ]]; then
     # Tarball was shipped with condor
     tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
 else
@@ -87,20 +97,30 @@ else
     curl $CRAB_RUNTIME_TARBALL | tar xvzm || exit 10042
 fi
 export PYTHONPATH=`pwd`/CRAB3.zip:`pwd`/WMCore.zip:$PYTHONPATH
-ls
+set +x
+echo "======== Tarball initialization FINISHING at $(date) ========"
+echo "==== Local directory contents dump STARTING ===="
+echo "pwd: `pwd`"
+for i in `ls`; do
+  echo "== DIR: $i"
+done
+echo "==== Local directory contents dump FINISHING ===="
+echo "======== CMSRunAnalysis.py STARTING at $(date) ========"
 echo "Now running the CMSRunAnalysis.py job in `pwd`..."
-# Fixing a poorly-chosen abbreviation
-if [[ -e CMSRunAnalysis.py ]]; then
-    python2.6 CMSRunAnalysis.py -r "`pwd`" "$@"
-    jobrc=$?
-else
-    python2.6 CMSRunAnaly.py -r "`pwd`" "$@"
-    jobrc=$?
-fi
-echo "The job had an exit code of $jobrc "
+set -x
+python2.6 CMSRunAnalysis.py -r "`pwd`" "$@"
+jobrc=$?
+set +x
+echo "== The job had an exit code of $jobrc "
+echo "======== CMSRunAnalysis.py FINISHING at $(date) ========"
 
-cat jobLog.*
-cat scramOutput.log
+if [ -e scramOutput.log ]; then
+  echo "==== SCRAM interaction log contents dump STARTING ===="
+  cat scramOutput.log
+  echo "==== SCRAM interaction log contents dump FINISHING ===="
+else
+  echo "ERROR: scramOutput.log does not exist."
+fi
 exit $jobrc
 
 _
