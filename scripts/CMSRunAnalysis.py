@@ -383,7 +383,7 @@ try:
     setupLogging('.')
 
     # Also add stdout to the logging
-    logHandler = logging.StreamHandler(stream=sys.stdout)
+    logHandler = logging.StreamHandler(sys.stdout)
     logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
     logHandler.setFormatter(logFormatter)
     logging.getLogger().addHandler(logHandler)

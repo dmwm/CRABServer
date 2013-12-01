@@ -61,7 +61,6 @@ else
     # Initialize CMS Python 2.6
     set +x
     source $PY_PATH/$VERSION/etc/profile.d/init.sh
-    set -x
 fi
 
 command -v python2.6 > /dev/null
@@ -100,7 +99,7 @@ export PYTHONPATH=`pwd`/CRAB3.zip:`pwd`/WMCore.zip:$PYTHONPATH
 set +x
 echo "======== Tarball initialization FINISHING at $(date) ========"
 echo "==== Local directory contents dump STARTING ===="
-echo "pwd: `pwd`"
+echo "PWD: `pwd`"
 for i in `ls`; do
   echo "== DIR: $i"
 done

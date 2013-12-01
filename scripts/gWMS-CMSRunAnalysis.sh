@@ -39,12 +39,13 @@ then
     fi
    echo "CRAB ID: $CRAB_Id"
    echo "Execution site: $JOB_CMSSite"
+   echo "Current hostname: $(hostname)"
    echo "Destination site: $CRAB_Dest"
    echo "Output files: $CRAB_localOutputFiles"
    echo "==== HTCONDOR JOB AD CONTENTS START ===="
-   for i in `cat $_CONDOR_JOB_AD`; do
+   while read i; do
        echo "== JOB AD: $i"
-   done
+   done < $_CONDOR_JOB_AD
    echo "==== HTCONDOR JOB AD CONTENTS FINISH ===="
    echo "======== HTCONDOR JOB SUMMARY at $(date) FINISH ========"
 fi
