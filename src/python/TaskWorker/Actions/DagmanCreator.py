@@ -271,8 +271,8 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
                       'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
                       'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                       'outputData': task['tm_publish_name'],
-                      'tempDest': temp_dest,
-                      'outputDest': dest,
+                      'tempDest': os.path.join(temp_dest, counter),
+                      'outputDest': os.path.join(dest, counter),
                       'restinstance': task['restinstance'], 'resturl': task['resturl']})
 
         LOGGER.debug(specs[-1])
