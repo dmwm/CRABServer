@@ -14,7 +14,7 @@ import TaskWorker.Actions.Splitter as Splitter
 import TaskWorker.Actions.DagmanCreator as DagmanCreator
 import TaskWorker.Actions.PostJob as PostJob
 import TaskWorker.Actions.PreJob as PreJob
-import TaskWorker.Actions.HTCondorUtils as HTCondorUtils
+import CRABInterface.HTCondorUtils as HTCondorUtils
 
 import WMCore.Configuration as Configuration
 
