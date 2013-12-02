@@ -164,7 +164,7 @@ class ASOServerJob(object):
                 found_log = True
             if len(lfn.split('/')) > 2:
                 if lfn.split('/')[2] == 'temp':
-                    user = lfn.split('/')[4]
+                    user = lfn.split('/')[4].rsplit(".", 1)[0]
                 else:
                     user = lfn.split('/')[3]
             else:

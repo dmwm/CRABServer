@@ -14,6 +14,7 @@ import urllib
 import logging
 import commands
 import tempfile
+import hashlib
 
 import TaskWorker.Actions.TaskAction as TaskAction
 import TaskWorker.DataObjects.Result
@@ -115,6 +116,27 @@ SPLIT_ARG_MAP = { "LumiBased" : "lumis_per_job",
 
 LOGGER = None
 
+
+def makeLFNPrefixes(task):
+    if task['tm_input_dataset']:
+        primaryds = task['tm_input_dataset'].split('/')[1]
+    else:
+        # For MC
+        primaryds = task['tm_publish_name'].rsplit('-', 1)[0]
+    hash_input = task['tm_user_dn']
+    if 'tm_user_group' in task and task['tm_user_group']:
+        hash_input += "," + task['tm_user_group']
+    if 'tm_user_role' in task and task['tm_user_role']:
+        hash_input += "," + task['tm_user_role']
+    hash = hashlib.sha1(hash_input).hexdigest()
+    user = task['tm_username']
+    tmp_user = "%s.%s" % (user, hash)
+    publish_info = task['tm_publish_name'].rsplit('-', 1)
+    temp_dest = os.path.join("/store/temp/user", tmp_user, primaryds, publish_info[0], publish_info[1])
+    dest = os.path.join("/store/user", user, primaryds, publish_info[0], publish_info[1])
+    return temp_dest, dest
+
+
 def transform_strings(input):
     """
     Converts the arguments in the input dictionary to the arguments necessary
@@ -153,13 +175,9 @@ def transform_strings(input):
     # TODO: PanDA wrapper wants some sort of dictionary.
     info["addoutputfiles_flatten"] = '{}'
 
-    if input['inputdata']:
-        primaryds = input['inputdata'].split('/')[1]
-    else:
-        # For MC
-        primaryds = input['publishname'].rsplit('-', 1)[0]
-    info["temp_dest"] = os.path.join("/store/temp/user", input['userhn'], primaryds, input['publishname'].rsplit('-', 1)[0], input['publishname'].rsplit('-', 1)[1])
-    info["output_dest"] = os.path.join("/store/user", input['userhn'], primaryds, input['publishname'].rsplit('-', 1)[0], input['publishname'].rsplit('-', 1)[1])
+    temp_dest, dest = makeLFNPrefixes(input)
+    info["temp_dest"] = temp_dest
+    info["output_dest"] = dest
     info['x509up_file'] = os.path.split(input['user_proxy'])[-1]
     info['user_proxy'] = input['user_proxy']
     info['scratch'] = input['scratch']
@@ -224,6 +242,7 @@ def makeJobSubmit(task):
 def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
     specs = []
     i = startjobid
+    temp_dest, dest = makeLFNPrefixes(task)
     for job in jobgroup.getJobs():
         inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']]).replace('"', r'\"\"')
         runAndLumiMask = json.dumps(job['mask']['runAndLumis']).replace('"', r'\"\"')
@@ -252,8 +271,8 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
                       'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
                       'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                       'outputData': task['tm_publish_name'],
-                      'tempDest': os.path.join("/store/temp/user", task['tm_username'], primaryds, task['tm_publish_name'].rsplit('-', 1)[0], task['tm_publish_name'].rsplit('-', 1)[1], counter),
-                      'outputDest': os.path.join("/store/user", task['tm_username'], primaryds, task['tm_publish_name'].rsplit('-', 1)[0], task['tm_publish_name'].rsplit('-', 1)[1], counter),
+                      'tempDest': temp_dest,
+                      'outputDest': dest,
                       'restinstance': task['restinstance'], 'resturl': task['resturl']})
 
         LOGGER.debug(specs[-1])
