@@ -35,6 +35,7 @@ class AuthenticatedSubprocess(object):
             htcondor.SecMan().invalidateAllSessions()
             htcondor.param['SEC_CLIENT_AUTHENTICATION_METHODS'] = 'FS,GSI'
             htcondor.param['DELEGATE_FULL_JOB_GSI_CREDENTIALS'] = 'true'
+            htcondor.param['DELEGATE_JOB_GSI_CREDENTIALS_LIFETIME'] = '0'
             os.environ['X509_USER_PROXY'] = self.proxy
             self.rpipe.close()
         else:
