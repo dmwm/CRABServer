@@ -170,41 +170,66 @@ class ASOServerJob(object):
             else:
                 user = ''
             # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
-            doc = { "_id": getHashLfn( lfn ),
-                    "inputdataset": '',
-                    "group": '',
-                    # TODO: Remove this if it is not required
-                    "lfn": lfn.replace('/store/user', '/store/temp/user', 1),
-                    "checksums": {'adler32': 'abc'},
-                    "size": '123',
-                    "user": user,
-                    "source": oneFile[0],
-                    "destination": self.dest_site,
-                    "last_update": last_update,
-                    "state": "new",
-                    "role": '',
-                    "dbSource_url": "gWMS",
-                    "publish_dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_caf_analysis_02_writer/servlet/DBSServlet',
-                    "dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_prod_global/servlet/DBSServlet',
-                    "dn": dn,
-                    "workflow": self.reqname,
-                    "start_time": now,
-                    "end_time": '',
-                    "job_end_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
-                    "jobid": self.count,
-                    "retry_count": [],
-                    "failure_reason": [],
-                    "publication_state": 'not_published',
-                    "publication_retry_count": [],
-                    "type" : type,
-                    "publish" : 0
-                }
+            doc_id = getHashLfn( lfn )
+            try:
+                doc = self.couchDatabase.document( doc_id )
+                doc['state'] = 'new'
+                doc['source'] = oneFile[0]
+                doc['destination'] = self.dest_site
+                doc['last_update'] = last_update
+                doc['start_time'] = now
+                doc['end_time'] = ''
+                doc['job_end_time'] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
+                doc['retry_count'] = []
+                doc['failure_reason'] = []
+                print "Updating doc %s for %s" % (doc_id, lfn)
+            except CMSCouch.CouchNotFoundError:
+                msg = "Document %s does not exist in Couch" % doc_id
+                msg += str(ex)
+                msg += str(traceback.format_exc())
+                print msg
+                print "Uploading new doc for %s" % lfn
+                # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
+                doc = { "_id": doc_id,
+                        "inputdataset": '',
+                        "group": '',
+                        # TODO: Remove this if it is not required
+                        "lfn": lfn.replace('/store/user', '/store/temp/user', 1),
+                        "checksums": {'adler32': 'abc'},
+                        "size": '123',
+                        "user": user,
+                        "source": oneFile[0],
+                        "destination": self.dest_site,
+                        "last_update": last_update,
+                        "state": "new",
+                        "role": '',
+                        "dbSource_url": "gWMS",
+                        "publish_dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_caf_analysis_02_writer/servlet/DBSServlet',
+                        "dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_prod_global/servlet/DBSServlet',
+                        "dn": dn,
+                        "workflow": self.reqname,
+                        "start_time": now,
+                        "end_time": '',
+                        "job_end_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
+                        "jobid": self.count,
+                        "retry_count": [],
+                        "failure_reason": [],
+                        "publication_state": 'not_published',
+                        "publication_retry_count": [],
+                        "type" : type,
+                        "publish" : 0
+                    }
+            except Exception, ex:
+                msg = "Error loading document from couch. Transfer submission failed."
+                msg += str(ex)
+                msg += str(traceback.format_exc())
+                print msg
+                return False
             pprint.pprint(doc)
             allIDs.append(getHashLfn(lfn))
             if 'error' in self.couchDatabase.commitOne(doc)[0]:
                 print "Couldn't add to couch database"
                 return False
-
         return allIDs
 
     def status(self, long_status=False):
@@ -615,7 +640,7 @@ class PostJob():
             outfile[1]['outlocation'] = self.dest_site
 
         global g_Job
-        aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config") 
+        aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config")
         if config:
             aso_auth_file = getattr(config, "authfile", "auth_aso_plugin.config")
         if os.path.isfile(aso_auth_file) or os.environ.get("TEST_POSTJOB_ENABLE_ASOSERVER", False):
@@ -843,3 +868,4 @@ if __name__ == '__main__':
         sys.exit()
     pj = PostJob()
     sys.exit(pj.execute(*sys.argv[2:]))
+
