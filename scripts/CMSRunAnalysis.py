@@ -97,6 +97,7 @@ def startDashboardMonitoring(myad):
 def addReportInfo(params):
     fjr = json.load(open("jobReport.json"))
     if 'exitCode' in fjr:
+        params['JobExitCode'] = fjr['exitCode']
         params['ExeExitCode'] = fjr['exitCode']
     if 'steps' not in fjr or 'cmsRun' not in fjr['steps']:
         return
