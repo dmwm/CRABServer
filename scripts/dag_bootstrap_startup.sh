@@ -41,7 +41,7 @@ fi
 # Recalculate the black / whitelist
 if [ -e AdjustSites.py ];
 then
-  python AdjustSites.py
+  python2.6 AdjustSites.py
 fi
 
 # Bootstrap the runtime - we want to do this before DAG is submitted
