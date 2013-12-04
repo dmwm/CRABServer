@@ -145,7 +145,7 @@ def transform_strings(input):
     info = {}
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
-           'userdn', 'requestname', 'publication', 'oneEventMode':
+           'userdn', 'requestname', 'publication', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
