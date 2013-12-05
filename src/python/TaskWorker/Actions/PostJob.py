@@ -164,47 +164,72 @@ class ASOServerJob(object):
                 found_log = True
             if len(lfn.split('/')) > 2:
                 if lfn.split('/')[2] == 'temp':
-                    user = lfn.split('/')[4]
+                    user = lfn.split('/')[4].rsplit(".", 1)[0]
                 else:
                     user = lfn.split('/')[3]
             else:
                 user = ''
             # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
-            doc = { "_id": getHashLfn( lfn ),
-                    "inputdataset": '',
-                    "group": '',
-                    # TODO: Remove this if it is not required
-                    "lfn": lfn.replace('/store/user', '/store/temp/user', 1),
-                    "checksums": {'adler32': 'abc'},
-                    "size": '123',
-                    "user": user,
-                    "source": oneFile[0],
-                    "destination": self.dest_site,
-                    "last_update": last_update,
-                    "state": "new",
-                    "role": '',
-                    "dbSource_url": "gWMS",
-                    "publish_dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_caf_analysis_02_writer/servlet/DBSServlet',
-                    "dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_prod_global/servlet/DBSServlet',
-                    "dn": dn,
-                    "workflow": self.reqname,
-                    "start_time": now,
-                    "end_time": '',
-                    "job_end_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
-                    "jobid": self.count,
-                    "retry_count": [],
-                    "failure_reason": [],
-                    "publication_state": 'not_published',
-                    "publication_retry_count": [],
-                    "type" : type,
-                    "publish" : 0
-                }
+            doc_id = getHashLfn( lfn )
+            try:
+                doc = self.couchDatabase.document( doc_id )
+                doc['state'] = 'new'
+                doc['source'] = oneFile[0]
+                doc['destination'] = self.dest_site
+                doc['last_update'] = last_update
+                doc['start_time'] = now
+                doc['end_time'] = ''
+                doc['job_end_time'] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
+                doc['retry_count'] = []
+                doc['failure_reason'] = []
+                print "Updating doc %s for %s" % (doc_id, lfn)
+            except CMSCouch.CouchNotFoundError:
+                msg = "Document %s does not exist in Couch" % doc_id
+                msg += str(ex)
+                msg += str(traceback.format_exc())
+                print msg
+                print "Uploading new doc for %s" % lfn
+                # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
+                doc = { "_id": doc_id,
+                        "inputdataset": '',
+                        "group": '',
+                        # TODO: Remove this if it is not required
+                        "lfn": lfn.replace('/store/user', '/store/temp/user', 1),
+                        "checksums": {'adler32': 'abc'},
+                        "size": '123',
+                        "user": user,
+                        "source": oneFile[0],
+                        "destination": self.dest_site,
+                        "last_update": last_update,
+                        "state": "new",
+                        "role": '',
+                        "dbSource_url": "gWMS",
+                        "publish_dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_caf_analysis_02_writer/servlet/DBSServlet',
+                        "dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_prod_global/servlet/DBSServlet',
+                        "dn": dn,
+                        "workflow": self.reqname,
+                        "start_time": now,
+                        "end_time": '',
+                        "job_end_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
+                        "jobid": self.count,
+                        "retry_count": [],
+                        "failure_reason": [],
+                        "publication_state": 'not_published',
+                        "publication_retry_count": [],
+                        "type" : type,
+                        "publish" : 0
+                    }
+            except Exception, ex:
+                msg = "Error loading document from couch. Transfer submission failed."
+                msg += str(ex)
+                msg += str(traceback.format_exc())
+                print msg
+                return False
             pprint.pprint(doc)
             allIDs.append(getHashLfn(lfn))
             if 'error' in self.couchDatabase.commitOne(doc)[0]:
                 print "Couldn't add to couch database"
                 return False
-
         return allIDs
 
     def status(self, long_status=False):
@@ -310,16 +335,10 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
     if dest_site.startswith("T1_"):
         dest_sites_.append(dest_site + "_Buffer")
         dest_sites_.append(dest_site + "_Disk")
-    source_sites_ = []
-    for site in source_sites:
-        source_sites_.append(site)
-        if site.startswith("T1_"):
-            source_sites_.append(site + "_Buffer")
-            source_sites_.append(site + "_Disk")
-    dest_info = p.getPFN(nodes=(source_sites_ + dest_sites_), lfns=lfns)
+    dest_info = p.getPFN(nodes=(source_sites + dest_sites_), lfns=lfns)
     results = []
     found_log = False
-    for source_site, filename in zip(source_sites_, filenames):
+    for source_site, filename in zip(source_sites, filenames):
         if not found_log and filename.startswith("cmsRun") and (filename[-7:] == ".tar.gz"):
             slfn = os.path.join(source_dir, "log", filename)
             dlfn = os.path.join(dest_dir, "log", filename)
@@ -327,21 +346,16 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
             slfn = os.path.join(source_dir, filename)
             dlfn = os.path.join(dest_dir, filename)
         found_log = True
-        source_site_ = source_site
-        if (source_site + "_Buffer", slfn) in dest_info:
-            source_site_ = source_site + "_Buffer"
-        elif (source_site + "_Disk", slfn) in dest_info:
-            source_site_ = source_site + "_Disk"
         dest_site_= dest_site
-        if (dest_site + "_Buffer", dlfn) in dest_info:
-            dest_site_ = dest_site + "_Buffer"
-        elif (dest_site + "_Disk", dlfn) in dest_info:
+        if (dest_site + "_Disk", dlfn) in dest_info:
             dest_site_ = dest_site + "_Disk"
-        if ((source_site_, slfn) not in dest_info) or (not dest_info[source_site_, slfn]):
-            print "Unable to map LFN %s at site %s" % (slfn, source_site_)
+        elif (dest_site + "_Buffer", dlfn) in dest_info:
+            dest_site_ = dest_site + "_Buffer"
+        if ((source_site, slfn) not in dest_info) or (not dest_info[source_site, slfn]):
+            print "Unable to map LFN %s at site %s" % (slfn, source_site)
         if ((dest_site_, dlfn) not in dest_info) or (not dest_info[dest_site_, dlfn]):
             print "Unable to map LFN %s at site %s" % (dlfn, dest_site_)
-        results.append((dest_info[source_site_, slfn], dest_info[dest_site_, dlfn]))
+        results.append((dest_info[source_site, slfn], dest_info[dest_site_, dlfn]))
     return results
 
 def getHashLfn(lfn):
@@ -615,7 +629,7 @@ class PostJob():
             outfile[1]['outlocation'] = self.dest_site
 
         global g_Job
-        aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config") 
+        aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config")
         if config:
             aso_auth_file = getattr(config, "authfile", "auth_aso_plugin.config")
         if os.path.isfile(aso_auth_file) or os.environ.get("TEST_POSTJOB_ENABLE_ASOSERVER", False):
@@ -651,7 +665,7 @@ class PostJob():
         nodes = p.getNodeMap()['phedex']['node']
         self.node_map = {}
         for node in nodes:
-            self.node_map[str(node[u'se'])] = str(node[u'name']).replace("_Disk", "").replace("_Buffer", "").replace("_MSS", "").replace("_Export", "")
+            self.node_map[str(node[u'se'])] = str(node[u'name'])
 
     def execute(self, *args, **kw):
         retry_count = args[2]
@@ -843,3 +857,4 @@ if __name__ == '__main__':
         sys.exit()
     pj = PostJob()
     sys.exit(pj.execute(*sys.argv[2:]))
+

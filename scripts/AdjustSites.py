@@ -2,6 +2,7 @@
 import os
 import re
 import sys
+import shutil
 
 import classad
 import htcondor
@@ -109,9 +110,16 @@ def make_webdir(ad):
     except RuntimeError, reerror:
         print str(reerror)
 
+def make_job_submit(ad):
+    count = ad['CRAB_JobCount']
+    for i in range(1, count+1):
+        shutil.copy("Job.submit", "Job.%d.submit" % i)
+
+
 def main():
     ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
     make_webdir(ad)
+    make_job_submit(ad)
 
     blacklist = set()
     if 'CRAB_SiteBlacklist' in ad:

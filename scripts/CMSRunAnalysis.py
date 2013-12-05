@@ -14,6 +14,7 @@ import re
 import json
 import traceback
 import pickle
+import logging
 from ast import literal_eval
 from optparse import OptionParser, BadOptionError, AmbiguousOptionError
 
@@ -28,19 +29,20 @@ EC_WGET =               99998 #TODO define an error code
 
 ad = {}
 
-print "=== start ==="
+print "==== CMSRunAnalysis.py STARTING at %s ====" % time.ctime()
 starttime = time.time()
-print time.ctime()
 
 def mintime():
     mymin = 20*60
     tottime = time.time()-starttime
     remaining = mymin - tottime
     if remaining > 0:
+        print "==== Failure sleep STARTING at %s ====" % time.ctime()
+        print "Sleeping for %d seconds due to failure." % remaining
         sys.stdout.flush()
         sys.stderr.flush()
-        print "Sleeping for %d seconds due to failure." % remaining
         time.sleep(remaining)
+        print "==== Failure sleep FINISHING at %s ====" % time.ctime()
 
 class PassThroughOptionParser(OptionParser):
     """
@@ -95,6 +97,7 @@ def startDashboardMonitoring(myad):
 def addReportInfo(params):
     fjr = json.load(open("jobReport.json"))
     if 'exitCode' in fjr:
+        params['JobExitCode'] = fjr['exitCode']
         params['ExeExitCode'] = fjr['exitCode']
     if 'steps' not in fjr or 'cmsRun' not in fjr['steps']:
         return
@@ -133,13 +136,32 @@ def stopDashboardMonitoring(ad):
     DashboardAPI.apmonFree()
 
 
+def logCMSSW():
+    if not os.path.exists("cmsRun-stdout.log"):
+        print "ERROR: Cannot dump CMSSW stdout; perhaps CMSSW never executed?"
+    print "======== CMSSW OUTPUT STARTING ========"
+    fd = open("cmsRun-stdout.log")
+    st = os.fstat(fd.fileno())
+    if st.st_size > 10*1024*1024:
+        print "WARNING: CMSSW output is over 10MB; truncating to last 10MB."
+        print "Use 'crab getlog' to retrieve full output of this job from storage."
+        fd.seek(-10*1024*1024, 2)
+        it = fd.xreadlines()
+        it.next()
+    else:
+        it = fd.xreadlines()
+    for line in it:
+        print "== CMSSW: ", line,
+    print "======== CMSSW OUTPUT FINSHING ========"
+
+
 def handleException(exitAcronymn, exitCode, exitMsg):
     report = {}
     report['exitAcronym'] = exitAcronymn
     report['exitCode'] = exitCode
     report['exitMsg'] = exitMsg
-    print "Exceptional exit (%s): %s" % (str(exitCode), str(exitMsg))
-    print "Traceback follows as applicable:\n", traceback.format_exc()
+    print "ERROR: Exceptional exit at %s (%s): %s" % (time.ctime(), str(exitCode), str(exitMsg))
+    print "ERROR: Traceback follows as applicable:\n", traceback.format_exc()
     with open('jobReport.json','w') as of:
         json.dump(report, of)
     with open('jobReportExtract.pickle','w') as of:
@@ -187,7 +209,7 @@ parser.add_option('--oneEventMode',
 (opts, args) = parser.parse_args(sys.argv[1:])
 
 try:
-    print "=== parameters ==="
+    print "==== Parameters Dump at %s ===" % time.ctime()
     print "archiveJob:    ", opts.archiveJob
     print "runDir:        ", opts.runDir
     print "sourceURL:     ", opts.sourceURL
@@ -209,6 +231,7 @@ except:
 #clean workdir ?
 
 #wget sandnox
+print "==== Sandbox preparation STARTING at %s ====" % time.ctime()
 if opts.archiveJob:
     os.environ['WMAGENTJOBDIR'] = os.getcwd()
     if os.path.exists(opts.archiveJob):
@@ -239,8 +262,10 @@ if opts.archiveJob:
                 sys.exit(EC_WGET)
             time.sleep(30)
     print commands.getoutput('tar xvfzm %s' % opts.archiveJob)
+print "==== Sandbox preparation FINISHING at %s ====" % time.ctime()
 
 #move the pset in the right place
+print "==== WMCore filesystem preparation STARTING at %s ====" % time.ctime()
 destDir = 'WMTaskSpace/cmsRun'
 if os.path.isdir(destDir):
     shutil.rmtree(destDir)
@@ -252,6 +277,7 @@ open(destDir + '/__init__.py','w').close()
 if opts.userFiles:
     for myfile in opts.userFiles.split(','):
         os.rename(myfile, destDir + '/' + myfile)
+print "==== WMCore filesystem preparation FINISHING at %s ====" % time.ctime()
 
 #WMCore import here
 from WMCore.WMRuntime.Bootstrap import setupLogging
@@ -343,14 +369,26 @@ def AddChecksums(report):
                     fileInfo['pfn'] = fileInfo['fileName']
                 else:
                     continue
+            print "==== Checksum cksum STARTING at %s ====" % time.ctime()
+            print "== Filename: %s" % fileInfo['pfn']
             cksum = FileInfo.readCksum(fileInfo['pfn'])
+            print "==== Checksum finishing FINISHING at %s ====" % time.ctime()
+            print "==== Checksum adler32 STARTING at %s ====" % time.ctime()
             adler32 = FileInfo.readAdler32(fileInfo['pfn'])
+            print "==== Checksum adler32 FINISHING at %s ====" % time.ctime()
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
 
 try:
     setupLogging('.')
+
+    # Also add stdout to the logging
+    logHandler = logging.StreamHandler(sys.stdout)
+    logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
+    logHandler.setFormatter(logFormatter)
+    logging.getLogger().addHandler(logHandler)
+
     ad = {}
     try:
         ad = parseAd()
@@ -359,11 +397,14 @@ try:
         ad = {}
     if ad:
         startDashboardMonitoring(ad)
+    print "==== CMSSW Stack Execution STARTING at %s ====" % time.ctime()
     cmssw = executeCMSSWStack(opts)
     jobExitCode = cmssw.step.execution.exitStatus
     print "Job exit code: %s" % str(jobExitCode)
+    print "==== CMSSW Stack Execution FINISHING at %s ====" % time.ctime()
+    logCMSSW()
 except WMExecutionFailure, WMex:
-    print "caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail)
+    print "ERROR: Caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail)
     exmsg = WMex.name
     #exmsg += WMex.detail
     #print "jobExitCode = %s" % jobExitCode
@@ -378,6 +419,7 @@ except Exception, ex:
 
 #Create the report file
 try:
+    print "==== Report file creation STARTING at %s ====" % time.ctime()
     report = Report("cmsRun")
     report.parse('FrameworkJobReport.xml', "cmsRun")
     jobExitCode = report.getExitCode()
@@ -398,12 +440,14 @@ try:
 
     slc = SiteLocalConfig.loadSiteLocalConfig()
     report['executed_site'] = slc.siteName
+    print "== Execution site from site-local-config.xml: %s" % slc.siteName
     with open('jobReport.json','w') as of:
         json.dump(report, of)
     with open('jobReportExtract.pickle','w') as of:
         pickle.dump(report, of)
     if ad:
         stopDashboardMonitoring(ad)
+    print "==== Report file creation FINISHING at %s ====" % time.ctime()
 except FwkJobReportException, FJRex:
     msg = "BadFWJRXML"
     handleException("FAILED", EC_ReportHandlingErr, msg)
@@ -418,12 +462,15 @@ except Exception, ex:
 # rename output files. Doing this after checksums otherwise outfile is not found.
 if jobExitCode == 0:
     try:
+        oldName = 'UNKNOWN'
+        newName = 'UNKNOWN'
         for oldName, newName in literal_eval(opts.outFiles).iteritems():
             os.rename(oldName, newName)
     except Exception, ex:
-        handleException("FAILED", EC_MoveOutErr, "Exception while moving the files.")
+        handleException("FAILED", EC_MoveOutErr, "Exception while moving file %s to %s." %(oldName, newName))
         mintime()
         sys.exit(EC_MoveOutErr)
 else:
     mintime()
+print "==== CMSRunAnalysis.py FINISHING at %s ====" % time.ctime()
 sys.exit(jobExitCode)

@@ -82,10 +82,16 @@ then
     fi
 fi
 
+# If at CERN, try to bootstrap the UI:
+if [ -e /afs/cern.ch/cms/LCG/LCG-2/UI/cms_ui_env.sh ];
+then
+    . /afs/cern.ch/cms/LCG/LCG-2/UI/cms_ui_env.sh
+fi
+
 export PATH="/opt/glidecondor/bin:/opt/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export PATH="/data/srv/glidecondor/bin:/data/srv/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export PYTHONPATH=/opt/glidecondor/lib/python:$PYTHONPATH
-export PYTHONPATH=/data/srv/glidecondor/lib/python:$PYTHONPATH
+export PYTHONPATH=/data/srv/glidecondor/lib/python2.6:$PYTHONPATH
 export LD_LIBRARY_PATH=/opt/glidecondor/lib:/opt/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/data/srv/glidecondor/lib:/data/srv/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 echo "Printing current environment..."

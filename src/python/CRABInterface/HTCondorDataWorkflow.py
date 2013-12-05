@@ -1,6 +1,7 @@
 
 import re
 import time
+import hashlib
 import StringIO
 import tempfile
 import traceback
@@ -22,6 +23,32 @@ import HTCondorUtils
 import HTCondorLocator
 
 JOB_KILLED_HOLD_REASON = "Python-initiated action."
+
+def lfn_to_temp(lfn, userdn, username, role, group):
+    lfn_parts = lfn[1:].split("/")
+    if lfn_parts[1] == "temp":
+        return lfn
+    del lfn_parts[2]
+    hash_input = userdn
+    if group:
+        hash_input += "," + group
+    if role:
+        hash_input += "," + role
+    user = "%s.%s" % (username, hashlib.sha1(hash_input).hexdigest())
+    lfn_parts.insert(2, user)
+    lfn_parts.insert(1, "temp")
+    return "/" + "/".join(lfn_parts)
+
+
+def temp_to_lfn(lfn, username):
+    lfn_parts = lfn[1:].split("/")
+    if lfn_parts[1] != "temp":
+        return lfn
+    del lfn_parts[1]
+    del lfn_parts[2]
+    lfn_parts.insert(2, username)
+    return "/" + "/".join(lfn_parts)
+
 
 class HTCondorDataWorkflow(DataWorkflow):
     """ HTCondor implementation of the status command.
@@ -57,7 +84,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         # First, verify the task has been submitted by the backend.
         row = self.api.query(None, None, ID.sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs  = row.next() #just one row is picked up by the previous query
+        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, userdn = row.next() #just one row is picked up by the previous query
         self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
         if status != 'SUBMITTED':
@@ -190,24 +217,28 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
 
         row = self.api.query(None, None, ID.sql, taskname = workflow)
-        saveLogs  = row.next()[-1] #just one row is picked up by the previous query
+        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn = row.next()
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
         finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
-        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, userdn, saveLogs=saveLogs, userproxy=userproxy)
+        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, tm_user_dn, tm_username, tm_user_role, tm_user_group, saveLogs=tm_save_logs, userproxy=userproxy)
 
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
+
+        row = self.api.query(None, None, ID.sql, taskname = workflow)
+        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn = row.next()
+
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
         finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
-        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE'], transferingIds, finishedIds, userdn, userproxy=userproxy)
+        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE'], transferingIds, finishedIds, tm_user_dn, tm_username, tm_user_role, tm_user_group, userproxy=userproxy)
 
     @conn_handler(services=['phedex'])
-    def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, saveLogs=None, userproxy=None):
+    def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, username, role, group, saveLogs=None, userproxy=None):
         """
         Retrieves the output PFN aggregating output in final and temporary locations.
 
@@ -240,14 +271,14 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         for row in rows:
             if filetype == ['LOG'] and saveLogs == 'F':
-                lfn = re.sub('^/store/user/', '/store/temp/user/', row[GetFromTaskAndType.LFN])
+                lfn = lfn_to_temp(row[GetFromTaskAndType.LFN], userdn, username, role, group)
                 pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
             else:
                 if row[GetFromTaskAndType.PANDAID] in finishedIds:
-                    lfn = re.sub('^/store/temp/', '/store/', row[GetFromTaskAndType.LFN])
+                    lfn = temp_to_lfn(row[GetFromTaskAndType.LFN], username)
                     pfn = self.phedex.getPFN(row[GetFromTaskAndType.LOCATION], lfn)[(row[GetFromTaskAndType.LOCATION], lfn)]
                 elif row[GetFromTaskAndType.PANDAID] in transferingIds:
-                    lfn = re.sub('^/store/user/', '/store/temp/user/', row[GetFromTaskAndType.LFN])
+                    lfn = lfn_to_temp(row[GetFromTaskAndType.LFN], userdn, username, role, group)
                     pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
                 else:
                     continue
@@ -293,7 +324,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         # First, verify the task has been submitted by the backend.
         row = self.api.query(None, None, ID.sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs  = row.next() #just one row is picked up by the previous query
+        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, userdn = row.next() #just one row is picked up by the previous query
         self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
         if status != 'SUBMITTED':

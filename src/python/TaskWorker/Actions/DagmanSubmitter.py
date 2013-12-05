@@ -93,7 +93,10 @@ SUBMIT_INFO = [ \
             ('CRAB_DBSUrl', 'dbsurl'),
             ('CRAB_PublishDBSUrl', 'publishdbsurl'),
             ('CRAB_LumiMask', 'lumimask'),
-            ('CRAB_JobCount', 'jobcount')]
+            ('CRAB_JobCount', 'jobcount'),
+            ('CRAB_UserVO', 'tm_user_vo'),
+            ('CRAB_UserRole', 'tm_user_role'),
+            ('CRAB_UserGroup', 'tm_user_group')]
 
 def addCRABInfoToClassAd(ad, info):
     """
@@ -101,7 +104,8 @@ def addCRABInfoToClassAd(ad, info):
     from the info directory
     """
     for adName, dictName in SUBMIT_INFO:
-        ad[adName] = classad.ExprTree(str(info[dictName]))
+        if dictName in info and (info[dictName] != None):
+            ad[adName] = classad.ExprTree(str(info[dictName]))
 
 class DagmanSubmitter(TaskAction.TaskAction):
 
@@ -130,6 +134,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         task = kw['task']
         tempDir = args[0][0]
         info = args[0][1]
+        #self.logger.debug("Task input information: %s" % str(info))
         dashboard_params = args[0][2]
 
         cwd = os.getcwd()
