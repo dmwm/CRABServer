@@ -19,7 +19,7 @@ systems = \
   },
   'CRABInterface':
   {
-    'py_modules' : ['PandaServerInterface','CRABQuality'],
+    'py_modules' : ['PandaServerInterface','CRABQuality', 'HTCondorUtils', 'HTCondorLocator'],
     'python': ['CRABInterface',
                'Databases',
                  'Databases/FileMetaDataDB', 'Databases/FileMetaDataDB/Oracle',
@@ -31,7 +31,7 @@ systems = \
   {
     'py_modules' : ['PandaServerInterface', 'RESTInteractions', 'ApmonIf',
                     'apmon', 'DashboardAPI', 'Logger', 'ProcInfo',
-                    'CRABQuality'],
+                    'CRABQuality', 'HTCondorUtils', 'HTCondorLocator'],
     'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
                 'taskbuffer']
   },

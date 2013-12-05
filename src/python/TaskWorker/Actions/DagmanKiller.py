@@ -8,8 +8,8 @@ import htcondor
 
 import TaskWorker.Actions.TaskAction as TaskAction
 
-import CRABInterface.HTCondorLocator as HTCondorLocator
-import CRABInterface.HTCondorUtils as HTCondorUtils
+import HTCondorLocator
+import HTCondorUtils
 
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 

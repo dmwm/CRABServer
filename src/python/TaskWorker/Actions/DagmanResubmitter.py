@@ -6,8 +6,8 @@ import traceback
 import classad
 import htcondor
 
-import CRABInterface.HTCondorLocator as HTCondorLocator
-import CRABInterface.HTCondorUtils as HTCondorUtils
+import HTCondorLocator
+import HTCondorUtils
 
 import TaskWorker.Actions.TaskAction as TaskAction
 
