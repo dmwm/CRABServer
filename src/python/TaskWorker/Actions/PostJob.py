@@ -44,7 +44,7 @@ REGEX_ID = re.compile("([a-f0-9]{8,8})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]
 
 class FTSJob(object):
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, output_metadata):
         self._id = None
         self._cancel = False
         self._sleep = 20
@@ -106,8 +106,7 @@ class FTSJob(object):
                 return 1
 
 class ASOServerJob(object):
-
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, output_metadata):
         self.id = None
         self.couchServer = None
         self.couchDatabase = None
@@ -120,6 +119,8 @@ class ASOServerJob(object):
         self.source_sites = source_sites
         self.filenames = filenames
         self.reqname = reqname
+        self.output_metadata = output_metadata
+        self.log_size = log_size
         self.publish = outputdata
         proxy = os.environ.get('X509_USER_PROXY', None)
         aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config")
@@ -148,19 +149,33 @@ class ASOServerJob(object):
 
     def submit(self):
         allIDs = []
+        outputFiles = []
         cmdLine = 'grid-proxy-info -identity 2>/dev/null'
         dn = commands.getstatusoutput(cmdLine)[1].strip()
         # TODO: Add a method to resolve a single PFN or use resolvePFNs
         last_update = int(time.time())
         now = str(datetime.datetime.now())
         found_log = False
+        file_index = 0
+        for outputModule in self.output_metadata.values():
+            for outputFile in outputModule:
+                print outputFile
+                fileInfo = {}
+                fileInfo['checksums'] = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
+                fileInfo['outsize'] = outputFile.get(u"size", 0)
+                outputFiles.append(fileInfo)
         for oneFile in zip(self.source_sites, self.filenames):
             if found_log:
                 lfn = "%s/%s" % (self.source_dir, oneFile[1])
-                type = "output"
+                file_type = "output"
+                size = outputFiles[file_index]['outsize']
+                checksums = outputFiles[file_index]['checksums']
+                file_index += 1
             else:
                 lfn = "%s/log/%s" % (self.source_dir, oneFile[1])
-                type = "log"
+                file_type = "log"
+                size = self.log_size
+                checksums = {'adler32': 'abc'}
                 found_log = True
             if len(lfn.split('/')) > 2:
                 if lfn.split('/')[2] == 'temp':
@@ -169,13 +184,15 @@ class ASOServerJob(object):
                     user = lfn.split('/')[3]
             else:
                 user = ''
-            # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
+            # TODO: need to pass the user params: publish flag, role/group, inputdataset,  publish_dbs_url, dbs_url through
             doc_id = getHashLfn( lfn )
             try:
                 doc = self.couchDatabase.document( doc_id )
                 doc['state'] = 'new'
                 doc['source'] = oneFile[0]
                 doc['destination'] = self.dest_site
+                doc['checksums'] = checksums,
+                doc['size'] = size,
                 doc['last_update'] = last_update
                 doc['start_time'] = now
                 doc['end_time'] = ''
@@ -185,7 +202,6 @@ class ASOServerJob(object):
                 print "Updating doc %s for %s" % (doc_id, lfn)
             except CMSCouch.CouchNotFoundError:
                 msg = "Document %s does not exist in Couch" % doc_id
-                msg += str(ex)
                 msg += str(traceback.format_exc())
                 print msg
                 print "Uploading new doc for %s" % lfn
@@ -195,8 +211,8 @@ class ASOServerJob(object):
                         "group": '',
                         # TODO: Remove this if it is not required
                         "lfn": lfn.replace('/store/user', '/store/temp/user', 1),
-                        "checksums": {'adler32': 'abc'},
-                        "size": '123',
+                        "checksums": checksums,
+                        "size": size,
                         "user": user,
                         "source": oneFile[0],
                         "destination": self.dest_site,
@@ -216,7 +232,7 @@ class ASOServerJob(object):
                         "failure_reason": [],
                         "publication_state": 'not_published',
                         "publication_retry_count": [],
-                        "type" : type,
+                        "type" : file_type,
                         "publish" : 0
                     }
             except Exception, ex:
@@ -494,10 +510,10 @@ class PostJob():
         source_site = self.source_site
         if 'SEName' in self.full_report:
             source_site = self.node_map.get(self.full_report['SEName'], source_site)
-        log_size = self.full_report.get(u'log_size', 0)
+        self.log_size = self.full_report.get(u'log_size', 0)
         configreq = {"taskname":        self.ad['CRAB_ReqName'],
                      "pandajobid":      self.crab_id,
-                     "outsize":         log_size, # Not implemented
+                     "outsize":         self.log_size, # Not implemented
                      "publishdataname": self.ad['CRAB_OutputData'],
                      "appver":          self.ad['CRAB_JobSW'],
                      "outtype":         "LOG",
@@ -637,7 +653,7 @@ class PostJob():
         else:
             targetClass = FTSJob
 
-        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData)
+        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.output)
         fts_job_result = g_Job.run()
         # If no files failed, return success immediately.  Otherwise, see how many files failed.
         if not fts_job_result:
