@@ -173,7 +173,7 @@ cp ../../bin/crab3 $STARTDIR/
 popd
 
 pushd $CRABSERVER_PATH/src/python
-zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py TaskWorker CRABInterface  -x \*.pyc || exit 3
+zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py TaskWorker CRABInterface  -x \*.pyc || exit 3
 popd
 
 
