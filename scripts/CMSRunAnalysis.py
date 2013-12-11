@@ -200,6 +200,30 @@ parser.add_option('--runAndLumis',
                   dest='runAndLumis',
                   type='string',
                   default='{}')
+parser.add_option('--lheInputFiles',
+                  dest='lheInputFiles',
+                  type='string',
+                  default=False)
+parser.add_option('--firstEvent',
+                  dest='firstEvent',
+                  type='string',
+                  default=0)
+parser.add_option('--firstLumi',
+                  dest='firstLumi',
+                  type='string',
+                  default=None)
+parser.add_option('--lastEvent',
+                  dest='lastEvent',
+                  type='string',
+                  default=-1)
+parser.add_option('--firstRun',
+                  dest='firstRun',
+                  type='string',
+                  default=None)
+parser.add_option('--seeding',
+                  dest='seeding',
+                  type='string',
+                  default=None)
 parser.add_option('--userFiles',
                   dest='userFiles',
                   type='string')
@@ -220,6 +244,12 @@ try:
     print "inputFile      ", opts.inputFile
     print "outFiles:      ", opts.outFiles
     print "runAndLumis:   ", opts.runAndLumis
+    print "lheInputFiles: ", opts.lheInputFiles
+    print "firstEvent:    ", opts.firstEvent
+    print "firstLumi:     ", opts.firstLumi
+    print "lastEvent:     ", opts.lastEvent
+    print "firstRun:      ", opts.firstRun
+    print "seeding:       ", opts.seeding
     print "userFiles:     ", opts.userFiles
     print "oneEventMode:  ", opts.oneEventMode
     print "==================="
@@ -349,7 +379,28 @@ def executeCMSSWStack(opts):
     cmssw.step.builder.workingDir = os.getcwd()
     cmssw.step.runtime.invokeCommand = 'python'
     cmssw.step.runtime.preScripts = []
-    cmssw.step.runtime.scramPreScripts = ['%s/TweakPSet.py Analy %s \'%s\' \'%s\' --oneEventMode=%s' % (os.getcwd(), os.getcwd(), opts.inputFile, opts.runAndLumis, opts.oneEventMode)]
+
+
+    cmssw.step.runtime.scramPreScripts = [('%s/TweakPSet.py --location=%s '+
+                                                          '--inputFile=\'%s\' '+
+                                                          '--runAndLumis=\'%s\' '+
+                                                          '--firstEvent=%s '+
+                                                          '--lastEvent=%s '+
+                                                          '--firstLumi=%s '+
+                                                          '--firstRun=%s '+
+                                                          '--seeding=%s '+
+                                                          '--lheInputFiles=%s '+
+                                                          '--oneEventMode=%s') %
+                                             (os.getcwd(), os.getcwd(),
+                                                           opts.inputFile,
+                                                           opts.runAndLumis,
+                                                           opts.firstEvent,
+                                                           opts.lastEvent,
+                                                           opts.firstLumi,
+                                                           opts.firstRun,
+                                                           opts.seeding,
+                                                           opts.lheInputFiles,
+                                                           opts.oneEventMode)]
     cmssw.step.section_("execution") #exitStatus of cmsRun is set here
     cmssw.report = Report("cmsRun") #report is loaded and put here
     cmssw.execute()

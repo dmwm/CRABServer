@@ -35,7 +35,7 @@ SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d
 SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 10 UNLESS-EXIT 2
-VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" inputFiles="%(inputFiles)s" +DESIRED_Sites="\\"%(desiredSites)s\\"" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
+VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" +DESIRED_Sites="\\"%(desiredSites)s\\"" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
 
 """
 
@@ -93,7 +93,7 @@ Error = job_err.$(CRAB_Id)
 Log = job_log
 # args changed...
 
-Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) '--inputFile=$(inputFiles)' '--runAndLumis=$(runAndLumiMask)' -o $(CRAB_AdditionalOutputFiles)"
+Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) '--inputFile=$(inputFiles)' '--runAndLumis=$(runAndLumiMask)' --lheInputFiles=$(lheInputFiles) --firstEvent=$(firstEvent) --firstLumi=$(firstLumi) --lastEvent=$(lastEvent) --firstRun=$(firstRun) --seeding=$(seeding) -o $(CRAB_AdditionalOutputFiles)"
 
 transfer_input_files = CMSRunAnalysis.sh, cmscp.py%(additional_input_file)s
 transfer_output_files = jobReport.json.$(count)
@@ -112,6 +112,7 @@ queue
 """
 
 SPLIT_ARG_MAP = { "LumiBased" : "lumis_per_job",
+                  "EventBased" : "events_per_job",
                   "FileBased" : "files_per_job",}
 
 LOGGER = None
@@ -165,6 +166,7 @@ def transform_strings(input):
 
     #TODO: We don't handle user-specified lumi masks correctly.
     info['lumimask'] = '"' + json.dumps(WMCore.WMSpec.WMTask.buildLumiMask(input['runs'], input['lumis'])).replace(r'"', r'\"') + '"'
+
     splitArgName = SPLIT_ARG_MAP[input['splitalgo']]
     info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : input['algoargs']}).replace('"', r'\"') + '"'
     info['attempt'] = 0
@@ -250,6 +252,10 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
     for job in jobgroup.getJobs():
         inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']]).replace('"', r'\"\"')
         runAndLumiMask = json.dumps(job['mask']['runAndLumis']).replace('"', r'\"\"')
+        firstEvent = str(job['mask']['FirstEvent'])
+        lastEvent = str(job['mask']['LastEvent'])
+        firstLumi = str(job['mask']['FirstLumi'])
+        firstRun = str(job['mask']['FirstRun'])
         desiredSites = ", ".join(availablesites)
         i += 1
         remoteOutputFiles = []
@@ -273,6 +279,9 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
         specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
                       'desiredSites': desiredSites, 'remoteOutputFiles': remoteOutputFiles,
                       'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
+                      'firstEvent' : firstEvent, 'lastEvent' : lastEvent,
+                      'firstLumi' : firstLumi, 'firstRun' : firstRun,
+                      'seeding' : 'AutomaticSeeding', 'lheInputFiles' : None,
                       'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                       'outputData': task['tm_publish_name'],
                       'tempDest': os.path.join(temp_dest, counter),
