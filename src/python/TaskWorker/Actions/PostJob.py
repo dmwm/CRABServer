@@ -12,7 +12,6 @@ import urllib
 import commands
 import unittest
 import classad
-import htcondor
 import datetime
 import traceback
 import uuid
@@ -400,13 +399,9 @@ class PostJob():
 
     def getTaskAd(self, reqname):
         try:
-            schedd = htcondor.Schedd()
-            results = schedd.query('CRAB_ReqName =?= "%s" && TaskType =?= "ROOT"' % reqname)
+            self.task_ad = classad.parseOld(open(os.environ["_CONDOR_JOB_AD"]))
         except Exception:
             print traceback.format_exc()
-            return
-        if results:
-            self.task_ad = results[0]
 
 
     def makeAd(self, reqname, id, outputdata, sw, async_dest):

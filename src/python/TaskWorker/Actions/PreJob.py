@@ -1,6 +1,6 @@
 
 import os
-import htcondor
+import classad
 
 from ApmonIf import ApmonIf
 
@@ -8,8 +8,9 @@ class PreJob:
 
     def update_dashboard(self, retry, id, reqname, backend):
 
+        self.get_task_ad(reqname)
         if not self.task_ad:
-            continue
+            return
 
         params = {'tool': 'crab3',
                   'SubmissionType':'direct',
@@ -26,7 +27,7 @@ class PreJob:
                   'datasetFull': self.task_ad['CRAB_InputData'],
                   'resubmitter': self.task_ad['CRAB_UserHN'],
                   'exe': 'cmsRun',
-                  'jobId': ("%d_https://glidein.cern.ch/%d/%s_%d" % (id, id, self.task_ad['CRAB_ReqName']), retry),
+                  'jobId': ("%d_https://glidein.cern.ch/%d/%s_%d" % (id, id, self.task_ad['CRAB_ReqName'], retry)),
                   'sid': "https://glidein.cern.ch/%d/%s" % (id, self.task_ad['CRAB_ReqName']),
                   'broker': backend,
                   'bossId': str(id),
@@ -34,20 +35,17 @@ class PreJob:
                  }
 
         apmon = ApmonIf()
-        self.logger.debug("Dashboard task info: %s" % str(params))
+        print("Dashboard task info: %s" % str(params))
         apmon.sendToML(params)
         apmon.free()
 
 
     def get_task_ad(self, reqname):
+        self.task_ad = {}
         try:
-            schedd = htcondor.Schedd()
-            results = schedd.query('CRAB_ReqName =?= "%s" && TaskType =?= "ROOT"' % reqname)
+            self.task_ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
         except Exception:
             print traceback.format_exc()
-            return
-        if results:
-            self.task_ad = results[0]
 
 
     def alter_submit(self, retry, id):
@@ -65,6 +63,6 @@ class PreJob:
         backend = args[3]
         self.alter_submit(retry_num, crab_id)
         if retry_num != 0:
-            self.update_dashboard(retry, id, reqname, backend)
+            self.update_dashboard(retry_num, crab_id, reqname, backend)
         os.execv("/bin/sleep", ["sleep", str(int(args[0])*60)])
 
