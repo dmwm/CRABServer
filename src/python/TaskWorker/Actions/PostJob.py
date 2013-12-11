@@ -397,7 +397,7 @@ class PostJob():
         self.logfiles = None
 
 
-    def getTaskAd(self, reqname):
+    def getTaskAd(self):
         try:
             self.task_ad = classad.parseOld(open(os.environ["_CONDOR_JOB_AD"]))
         except Exception:
@@ -742,10 +742,11 @@ class PostJob():
             fname = os.path.join(logpath, "job_out."+id+"."+retry_count+".txt")
             shutil.copy(stdout, fname)
             os.chmod(fname, 0644)
-        if os.path.exists(stderr):
-            fname = os.path.join(logpath, "job_err."+id+"."+retry_count+".txt")
-            shutil.copy(stderr, fname)
-            os.chmod(fname, 0644)
+        # NOTE: we now redirect stdout -> stderr; hence, I think we don't need this in the webdir.
+        #if os.path.exists(stderr):
+        #    fname = os.path.join(logpath, "job_err."+id+"."+retry_count+".txt")
+        #    shutil.copy(stderr, fname)
+        #    os.chmod(fname, 0644)
         if os.path.exists(jobreport):
             fname = os.path.join(logpath, "job_fjr."+id+"."+retry_count+".json")
             shutil.copy(jobreport, fname)

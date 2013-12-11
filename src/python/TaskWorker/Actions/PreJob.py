@@ -8,7 +8,7 @@ class PreJob:
 
     def update_dashboard(self, retry, id, reqname, backend):
 
-        self.get_task_ad(reqname)
+        self.get_task_ad()
         if not self.task_ad:
             return
 
@@ -40,7 +40,7 @@ class PreJob:
         apmon.free()
 
 
-    def get_task_ad(self, reqname):
+    def get_task_ad(self):
         self.task_ad = {}
         try:
             self.task_ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
@@ -50,7 +50,7 @@ class PreJob:
 
     def alter_submit(self, retry, id):
         new_submit_text = '+CRAB_Retry = %d\n' % retry
-        with open("Job.%d.submit" % id, "r") as fd:
+        with open("Job.submit" % id, "r") as fd:
             new_submit_text += fd.read()
         with open("Job.%d.submit" % id, "w") as fd:
             fd.write(new_submit_text)
