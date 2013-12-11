@@ -221,12 +221,12 @@ def makeJobSubmit(task):
     info['runs'] = []
     info['lumis'] = []
     info = transform_strings(info)
-    info.setdefault("additional_environment_options", '')
-    info.setdefault("additional_input_file", "")
-    if info['jobarch'].startswith("slc6_"):
+    if info['jobarch_flatten'].startswith("slc6_"):
         info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
     else:
         info['opsys_req'] = ''
+    info.setdefault("additional_environment_options", '')
+    info.setdefault("additional_input_file", "")
     if os.path.exists("CMSRunAnalysis.tar.gz"):
         info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=local'
         info['additional_input_file'] += ", CMSRunAnalysis.tar.gz"
