@@ -22,6 +22,7 @@ import DashboardAPI
 import WMCore.Storage.SiteLocalConfig as SiteLocalConfig
 
 EC_MissingArg  =        50113 #10 for ATLAS trf
+EC_CMSMissingSoftware = 10034
 EC_CMSRunWrapper =      10040
 EC_MoveOutErr =         99999 #TODO define an error code
 EC_ReportHandlingErr =  50115
@@ -310,8 +311,8 @@ def executeCMSSWStack(opts):
                        "print tweakJson[\"process\"][\"outputModules_\"]"
         if scram.project() or scram.runtime(): #if any of the two commands fail...
             msg = scram.diagnostic()
-            handleException("FAILED", EC_CMSRunWrapper, 'Error setting CMSSW environment: %s' % msg)
-            sys.exit(EC_CMSRunWrapper)
+            handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
+            sys.exit(EC_CMSMissingSoftware)
         ret = scram("python -c '%s'" % pythonScript, logName=PIPE, runtimeDir=os.getcwd())
         if ret > 0:
             msg = scram.diagnostic()
