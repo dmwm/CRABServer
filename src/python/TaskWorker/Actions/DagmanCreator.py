@@ -31,7 +31,7 @@ from ApmonIf import ApmonIf
 
 DAG_FRAGMENT = """
 JOB Job%(count)d Job.%(count)d.submit
-SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d
+SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %(backend)s
 SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 10 UNLESS-EXIT 2
@@ -286,7 +286,8 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
                       'outputData': task['tm_publish_name'],
                       'tempDest': os.path.join(temp_dest, counter),
                       'outputDest': os.path.join(dest, counter),
-                      'restinstance': task['restinstance'], 'resturl': task['resturl']})
+                      'restinstance': task['restinstance'], 'resturl': task['resturl'],
+                      'backend': os.environ.get('HOSTNAME','')})
 
         LOGGER.debug(specs[-1])
     return specs, i
@@ -320,7 +321,7 @@ class DagmanCreator(TaskAction.TaskAction):
                   'tool_ui': os.environ.get('HOSTNAME',''),
                   'scheduler': 'GLIDEIN',
                   'GridName': self.task['tm_user_dn'],
-                  'ApplicationVersion': 'tm_job_sw',
+                  'ApplicationVersion': self.task['tm_job_sw'],
                   'taskType': 'analysis',
                   'vo': 'cms',
                   'CMSUser': self.task['tm_username'],

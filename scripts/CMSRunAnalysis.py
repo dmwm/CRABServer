@@ -85,7 +85,7 @@ def startDashboardMonitoring(myad):
     params = {
         'WNHostName': socket.getfqdn(),
         'MonitorID': myad['CRAB_ReqName'],
-        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (myad['CRAB_Id'], myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":")),
+        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%d' % (myad['CRAB_Id'], myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":"), myad['CRAB_Retry']),
         'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":")),
         'SyncSite': myad['JOB_CMSSite'],
         'SyncCE': myad['Used_Gatekeeper'].split(":")[0],
@@ -120,7 +120,7 @@ def addReportInfo(params):
 def stopDashboardMonitoring(ad):
     params = {
         'MonitorID': ad['CRAB_ReqName'],
-        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":")),
+        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%d' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":"), ad['CRAB_Retry']),
         'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":")),
         'ExeEnd': 'cmsRun',
     }

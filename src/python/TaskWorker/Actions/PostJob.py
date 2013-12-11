@@ -12,6 +12,7 @@ import urllib
 import commands
 import unittest
 import classad
+import htcondor
 import datetime
 import traceback
 import uuid
@@ -387,11 +388,25 @@ class PostJob():
 
     def __init__(self):
         self.ad = None
+        self.task_ad = {}
         self.crab_id = -1
         self.report = None
         self.output = None
         self.input = None
         self.outputFiles = []
+        self.retry_count = "0"
+        self.logfiles = None
+
+
+    def getTaskAd(self, reqname):
+        try:
+            schedd = htcondor.Schedd()
+            results = schedd.query('CRAB_ReqName =?= "%s" && TaskType =?= "ROOT"' % reqname)
+        except Exception:
+            print traceback.format_exc()
+            return
+        if results:
+            self.task_ad = results[0]
 
 
     def makeAd(self, reqname, id, outputdata, sw, async_dest):
@@ -536,7 +551,7 @@ class PostJob():
                    not hte.headers.get('X-Error-Http', -1) == '400':
                 raise
 
-    def setDashboardState(self, state, reason=None, logfiles=None):
+    def setDashboardState(self, state, reason=None):
         if state == "COOLOFF":
             state = "Cooloff"
         elif state == "TRANSFERRING":
@@ -547,13 +562,13 @@ class PostJob():
             state = "Done"
         params = {
             'MonitorID': self.ad['CRAB_ReqName'],
-            'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (self.crab_id, self.crab_id, self.ad['CRAB_ReqName'].replace("_", ":")),
+            'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%s' % (self.crab_id, self.crab_id, self.ad['CRAB_ReqName'].replace("_", ":"), self.retry_count),
             'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (self.crab_id, self.ad['CRAB_ReqName'].replace("_", ":")),
             'StatusValue': state,
         }
         if reason:
             params['StatusValueReason'] = reason
-        if logfiles:
+        if self.logfiles:
             params['StatusLogFile'] = ",".join(logfiles)
         DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
 
@@ -685,6 +700,7 @@ class PostJob():
 
     def execute(self, *args, **kw):
         retry_count = args[2]
+        self.retry_count = retry_count
         id = args[7]
         reqname = args[6]
         logpath = os.path.expanduser("~/%s" % reqname)
@@ -715,7 +731,7 @@ class PostJob():
         stderr = "job_err.%s" % id
         jobreport = "jobReport.json.%s" % id
 
-        fd = os.open("postjob.%s" % id, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0755)
+        fd = os.open("postjob.%s" % id, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
         if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             os.dup2(fd, 1)
             os.dup2(fd, 2)
@@ -747,6 +763,10 @@ class PostJob():
         self.resturl = resturl
 
         self.makeAd(reqname, id, outputdata, sw, async_dest)
+        self.getTaskAd()
+        if 'CRAB_UserWebDir' in self.task_ad:
+            self.logfiles = [("job_out", "txt"), ("job_fjr", "json"), ("postjob", "txt")]
+            self.logfiles = ["%s/%s.%s.%s.%s" % (self.task_ad['CRAB_UserWebDir'], i[0], str(id), str(retry_count), i[1]) for i in self.logfiles]
 
         self.makeNodeMap()
 
