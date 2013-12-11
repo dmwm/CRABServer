@@ -103,7 +103,7 @@ should_transfer_files = YES
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
 # TODO: Uncomment this when we get out of testing mode
-Requirements = (target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)
+Requirements = ((target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)) %(opsys_req)s
 #Requirements = ((target.IS_GLIDEIN =!= TRUE) || ((target.GLIDEIN_CMSSite =!= UNDEFINED) && (stringListIMember(target.GLIDEIN_CMSSite, DESIRED_SEs) )))
 #leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
@@ -223,6 +223,10 @@ def makeJobSubmit(task):
     info = transform_strings(info)
     info.setdefault("additional_environment_options", '')
     info.setdefault("additional_input_file", "")
+    if info['jobarch'].startswith("slc6_"):
+        info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
+    else:
+        info['opsys_req'] = ''
     if os.path.exists("CMSRunAnalysis.tar.gz"):
         info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=local'
         info['additional_input_file'] += ", CMSRunAnalysis.tar.gz"
