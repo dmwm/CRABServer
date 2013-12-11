@@ -312,11 +312,13 @@ def executeCMSSWStack(opts):
         if scram.project() or scram.runtime(): #if any of the two commands fail...
             msg = scram.diagnostic()
             handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
+            mintime()
             sys.exit(EC_CMSMissingSoftware)
         ret = scram("python -c '%s'" % pythonScript, logName=PIPE, runtimeDir=os.getcwd())
         if ret > 0:
             msg = scram.diagnostic()
             handleException("FAILED", EC_CMSRunWrapper, 'Error getting output modules from the pset.\n\tScram Env %s\n\tCommand:%s' % (msg, pythonScript))
+            mintime()
             sys.exit(EC_CMSRunWrapper)
         return literal_eval(scram.stdout)
 
