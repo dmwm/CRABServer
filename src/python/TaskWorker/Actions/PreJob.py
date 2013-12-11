@@ -50,7 +50,7 @@ class PreJob:
 
     def alter_submit(self, retry, id):
         new_submit_text = '+CRAB_Retry = %d\n' % retry
-        with open("Job.submit" % id, "r") as fd:
+        with open("Job.submit", "r") as fd:
             new_submit_text += fd.read()
         with open("Job.%d.submit" % id, "w") as fd:
             fd.write(new_submit_text)
