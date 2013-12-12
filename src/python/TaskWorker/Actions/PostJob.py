@@ -564,7 +564,7 @@ class PostJob():
         if reason:
             params['StatusValueReason'] = reason
         if self.logfiles:
-            params['StatusLogFile'] = ",".join(logfiles)
+            params['StatusLogFile'] = ",".join(self.logfiles)
         DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
 
     def uploadFakeLog(self, state="TRANSFERRING"):
