@@ -104,7 +104,7 @@ print " arguments: %s" % sys.argv
 agentNumber = 0
 #lfnBase = '/store/temp/user/mmascher/RelValProdTTbar/mc/v6' #TODO how is this built?
 lfnBase = None
-outputMods = ['o'] #TODO should not be hardcoded but taken from the config (how?)
+outputMods = [] #Don't need to tweak this as the client looks for the ouput names and pass them to the job wrapper which moves them
 
 
 parser = OptionParser()
