@@ -9,6 +9,7 @@ import errno
 import shutil
 import signal
 import urllib
+import logging
 import commands
 import unittest
 import classad
@@ -712,7 +713,7 @@ class PostJob():
         try:
             retval = self.execute_internal(*args, **kw)
         except:
-            log.exception("Failure during post-job execution.")
+            logger.exception("Failure during post-job execution.")
             sys.stdout.flush()
             sys.stderr.flush()
             shutil.copy("postjob.%s" % id, postjob)
