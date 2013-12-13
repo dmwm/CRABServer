@@ -27,6 +27,13 @@ import time, datetime
 
 import DashboardAPI
 
+logger = logging.getLogger()
+handler = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
+
 fts_server = 'https://fts3-pilot.cern.ch:8443'
 
 g_Job = None
@@ -506,7 +513,7 @@ class PostJob():
             if 'inparentlfns' in fileInfo:
                 for lfn in fileInfo['inparentlfns']:
                     configreq.append(("inparentlfns", lfn))
-            print self.resturl, urllib.urlencode(configreq)
+            logger.debug("Uploading output file to %s: %s" % (self.resturl, configreq))
             try:
                 self.server.put(self.resturl, data = urllib.urlencode(configreq))
             except HTTPException, hte:
@@ -537,7 +544,7 @@ class PostJob():
                      "outlfn":          outlfn,
                      "outdatasetname":  "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER"
                     }
-        print self.resturl, urllib.urlencode(configreq)
+        logger.debug("Uploading log file record to %s: %s" % (self.resturl, configreq))
         try:
             self.server.put(self.resturl, data = urllib.urlencode(configreq))
         except HTTPException, hte:
@@ -555,6 +562,7 @@ class PostJob():
             state = "Aborted"
         elif state == "FINISHED":
             state = "Done"
+        logger.info("Setting Dashboard state to %s." % state)
         params = {
             'MonitorID': self.ad['CRAB_ReqName'],
             'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%s' % (self.crab_id, self.crab_id, self.ad['CRAB_ReqName'].replace("_", ":"), self.retry_count),
@@ -565,6 +573,7 @@ class PostJob():
             params['StatusValueReason'] = reason
         if self.logfiles:
             params['StatusLogFile'] = ",".join(self.logfiles)
+        logger.info("Dashboard parameters: %s" % str(params))
         DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
 
     def uploadFakeLog(self, state="TRANSFERRING"):
@@ -644,7 +653,7 @@ class PostJob():
 
         transfer_list = resolvePFNs(self.dest_site, source_dir, dest_dir, source_sites, filenames)
         for source, dest in transfer_list:
-            print "Copying %s to %s" % (source, dest)
+            logger.info("Copying %s to %s" % (source, dest))
 
         # Skip the first file - it's a tarball of the stdout/err
         for outfile in zip(filenames[1:], self.outputFiles, source_sites[1:]):
@@ -700,10 +709,11 @@ class PostJob():
         reqname = args[6]
         logpath = os.path.expanduser("~/%s" % reqname)
         postjob = os.path.join(logpath, "postjob.%s.%s.txt" % (id, retry_count))
+        logger.debug("The post-job script will be saved to %s" % postjob)
         try:
             retval = self.execute_internal(*args, **kw)
         except:
-            print traceback.format_exc()
+            log.exception("Failure during post-job execution.")
             sys.stdout.flush()
             sys.stderr.flush()
             shutil.copy("postjob.%s" % id, postjob)
@@ -726,20 +736,26 @@ class PostJob():
         stderr = "job_err.%s" % id
         jobreport = "jobReport.json.%s" % id
 
-        fd = os.open("postjob.%s" % id, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
+        new_stdout = "postjob.%s" % id
+        fd = os.open(new_stdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
         if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             os.dup2(fd, 1)
             os.dup2(fd, 2)
+            logger.info("Post-job started with output redirected to %s." % new_stdout)
+        else:
+            logger.info("Post-job started with no output redirection.")
 
         logpath = os.path.expanduser("~/%s" % reqname)
         try:
             os.makedirs(logpath)
         except OSError, oe:
             if oe.errno != errno.EEXIST:
+                logger.exception("Failed to create log web-shared directory %s" % logpath)
                 raise
 
         if os.path.exists(stdout):
             fname = os.path.join(logpath, "job_out."+id+"."+retry_count+".txt")
+            logger.debug("Copying job stdout from %s to %s" % (stdout, fname))
             shutil.copy(stdout, fname)
             os.chmod(fname, 0644)
         # NOTE: we now redirect stdout -> stderr; hence, I think we don't need this in the webdir.
@@ -749,10 +765,12 @@ class PostJob():
         #    os.chmod(fname, 0644)
         if os.path.exists(jobreport):
             fname = os.path.join(logpath, "job_fjr."+id+"."+retry_count+".json")
+            logger.debug("Copying job FJR from %s to %s" % (jobreport, fname))
             shutil.copy(jobreport, fname)
             os.chmod(fname, 0644)
 
         if 'X509_USER_PROXY' not in os.environ:
+            logger.error("Failure due to X509_USER_PROXY not being present in environment.")
             return 10
 
         self.server = HTTPRequests(restinstance, os.environ['X509_USER_PROXY'], os.environ['X509_USER_PROXY'])
@@ -770,11 +788,13 @@ class PostJob():
 
         self.uploadFakeLog(state="TRANSFERRING")
 
-        print "Retry count %s; max retry %s" % (retry_count, max_retries)
+        logger.info("Retry count %s; max retry %s" % (retry_count, max_retries))
         fail_state = "COOLOFF"
-        if retry_count == max_retries: fail_state = "FAILED"
+        if retry_count == max_retries:
+            fail_state = "FAILED"
         if status and (retry_count == max_retries):
             # This was our last retry and it failed.
+            logger.info("The max retry count was hit and the job failed; setting this node to permanent failure.")
             return self.uploadState("FAILED")
         retry = RetryJob.RetryJob()
         retval = None
@@ -782,8 +802,13 @@ class PostJob():
             retval = retry.execute(status, retry_count, max_retries, self.crab_id, cluster)
         if retval:
             if retval == RetryJob.FATAL_ERROR:
+                logger.info("The retry handler indicated this was a fatal error.")
                 return self.uploadState("FAILED")
             else:
+                if fail_state == "FAILED":
+                    logger.info("The retry handler indicated this was a recoverable error, but the max retries was already hit.  DAGMan will NOT retry.")
+                else:
+                    logger.info("The retry handler indicated this was a recoverable error.  DAGMan will retry")
                 self.uploadState(fail_state)
                 return retval
 
@@ -799,11 +824,12 @@ class PostJob():
             except HTTPException, hte:
                 # Suppressing this exception is a tough decision.  If the file made it back alright,
                 # I suppose we can proceed.
-                print "Potentially fatal error when uploading file locations:", str(hte.headers)
+                logger.exception("Potentially fatal error when uploading file locations: %s" % str(hte.headers))
                 if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
                         not hte.headers.get('X-Error-Http', -1) == '400':
                     raise
         except:
+            logger.exception("Stageout failed.")
             self.uploadState(fail_state)
             raise
         self.uploadFakeLog(state="FINISHED")
