@@ -566,7 +566,6 @@ class PostJob():
         params = {
             'MonitorID': self.ad['CRAB_ReqName'],
             'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%s' % (self.crab_id, self.crab_id, self.ad['CRAB_ReqName'].replace("_", ":"), self.retry_count),
-            'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (self.crab_id, self.ad['CRAB_ReqName'].replace("_", ":")),
             'StatusValue': state,
         }
         if reason:
