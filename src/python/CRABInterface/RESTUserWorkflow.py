@@ -93,7 +93,6 @@ class RESTUserWorkflow(RESTEntity):
             #if one and only one between publishDataName and publishDbsUrl is set raise an error (we need both or none of them)
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkSite(safe.kwargs['asyncdest'])
-            validate_num("blacklistT1", param, safe, optional=False)
             validate_num("oneEventMode", param, safe, optional=True)
             validate_str("dbsurl", param, safe, RX_DBSURL, optional=False)
             validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES)
@@ -147,7 +146,7 @@ class RESTUserWorkflow(RESTEntity):
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
-               savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
+               savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
                 totalunits, adduserfiles, oneEventMode):
         """Perform the workflow injection
 
@@ -169,7 +168,6 @@ class RESTUserWorkflow(RESTEntity):
            :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication;
            :arg str asyncdest: CMS site name for storage destination of the output files;
-           :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
            :arg str vorole: user vo role
@@ -190,8 +188,8 @@ class RESTUserWorkflow(RESTEntity):
                                        cachefilename=cachefilename, cacheurl=cacheurl,
                                        addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
                                        userhn=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
-                                       publication=publication, publishname=publishname, asyncdest=asyncdest, blacklistT1=blacklistT1,
-                                       dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,\
+                                       publication=publication, publishname=publishname, asyncdest=asyncdest,
+                                       dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode)
 
     @restcall
