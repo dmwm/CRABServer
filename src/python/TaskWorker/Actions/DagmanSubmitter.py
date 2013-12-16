@@ -9,8 +9,8 @@ import random
 import urllib
 import traceback
 
-import CRABInterface.HTCondorUtils as HTCondorUtils
-import CRABInterface.HTCondorLocator as HTCondorLocator
+import HTCondorUtils
+import HTCondorLocator
 
 import TaskWorker.Actions.TaskAction as TaskAction
 import TaskWorker.DataObjects.Result as Result

@@ -31,11 +31,11 @@ from ApmonIf import ApmonIf
 
 DAG_FRAGMENT = """
 JOB Job%(count)d Job.%(count)d.submit
-SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d
+SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %(backend)s
 SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 10 UNLESS-EXIT 2
-VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" inputFiles="%(inputFiles)s" +DESIRED_Sites="\\"%(desiredSites)s\\"" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
+VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" +DESIRED_Sites="\\"%(desiredSites)s\\"" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
 
 """
 
@@ -93,7 +93,7 @@ Error = job_err.$(CRAB_Id)
 Log = job_log
 # args changed...
 
-Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) '--inputFile=$(inputFiles)' '--runAndLumis=$(runAndLumiMask)' -o $(CRAB_AdditionalOutputFiles)"
+Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) '--inputFile=$(inputFiles)' '--runAndLumis=$(runAndLumiMask)' --lheInputFiles=$(lheInputFiles) --firstEvent=$(firstEvent) --firstLumi=$(firstLumi) --lastEvent=$(lastEvent) --firstRun=$(firstRun) --seeding=$(seeding) -o $(CRAB_AdditionalOutputFiles)"
 
 transfer_input_files = CMSRunAnalysis.sh, cmscp.py%(additional_input_file)s
 transfer_output_files = jobReport.json.$(count)
@@ -103,7 +103,7 @@ should_transfer_files = YES
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
 # TODO: Uncomment this when we get out of testing mode
-Requirements = (target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)
+Requirements = ((target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)) %(opsys_req)s
 #Requirements = ((target.IS_GLIDEIN =!= TRUE) || ((target.GLIDEIN_CMSSite =!= UNDEFINED) && (stringListIMember(target.GLIDEIN_CMSSite, DESIRED_SEs) )))
 #leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
@@ -112,6 +112,7 @@ queue
 """
 
 SPLIT_ARG_MAP = { "LumiBased" : "lumis_per_job",
+                  "EventBased" : "events_per_job",
                   "FileBased" : "files_per_job",}
 
 LOGGER = None
@@ -165,6 +166,7 @@ def transform_strings(input):
 
     #TODO: We don't handle user-specified lumi masks correctly.
     info['lumimask'] = '"' + json.dumps(WMCore.WMSpec.WMTask.buildLumiMask(input['runs'], input['lumis'])).replace(r'"', r'\"') + '"'
+
     splitArgName = SPLIT_ARG_MAP[input['splitalgo']]
     info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : input['algoargs']}).replace('"', r'\"') + '"'
     info['attempt'] = 0
@@ -221,6 +223,10 @@ def makeJobSubmit(task):
     info['runs'] = []
     info['lumis'] = []
     info = transform_strings(info)
+    if info['jobarch_flatten'].startswith("slc6_"):
+        info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
+    else:
+        info['opsys_req'] = ''
     info.setdefault("additional_environment_options", '')
     info.setdefault("additional_input_file", "")
     if os.path.exists("CMSRunAnalysis.tar.gz"):
@@ -246,6 +252,10 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
     for job in jobgroup.getJobs():
         inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']]).replace('"', r'\"\"')
         runAndLumiMask = json.dumps(job['mask']['runAndLumis']).replace('"', r'\"\"')
+        firstEvent = str(job['mask']['FirstEvent'])
+        lastEvent = str(job['mask']['LastEvent'])
+        firstLumi = str(job['mask']['FirstLumi'])
+        firstRun = str(job['mask']['FirstRun'])
         desiredSites = ", ".join(availablesites)
         i += 1
         remoteOutputFiles = []
@@ -269,11 +279,15 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
         specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
                       'desiredSites': desiredSites, 'remoteOutputFiles': remoteOutputFiles,
                       'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
+                      'firstEvent' : firstEvent, 'lastEvent' : lastEvent,
+                      'firstLumi' : firstLumi, 'firstRun' : firstRun,
+                      'seeding' : 'AutomaticSeeding', 'lheInputFiles' : None,
                       'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                       'outputData': task['tm_publish_name'],
                       'tempDest': os.path.join(temp_dest, counter),
                       'outputDest': os.path.join(dest, counter),
-                      'restinstance': task['restinstance'], 'resturl': task['resturl']})
+                      'restinstance': task['restinstance'], 'resturl': task['resturl'],
+                      'backend': os.environ.get('HOSTNAME','')})
 
         LOGGER.debug(specs[-1])
     return specs, i
@@ -307,7 +321,7 @@ class DagmanCreator(TaskAction.TaskAction):
                   'tool_ui': os.environ.get('HOSTNAME',''),
                   'scheduler': 'GLIDEIN',
                   'GridName': self.task['tm_user_dn'],
-                  'ApplicationVersion': 'tm_job_sw',
+                  'ApplicationVersion': self.task['tm_job_sw'],
                   'taskType': 'analysis',
                   'vo': 'cms',
                   'CMSUser': self.task['tm_username'],

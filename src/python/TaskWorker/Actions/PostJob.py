@@ -9,6 +9,7 @@ import errno
 import shutil
 import signal
 import urllib
+import logging
 import commands
 import unittest
 import classad
@@ -27,6 +28,13 @@ import time, datetime
 
 import DashboardAPI
 
+logger = logging.getLogger()
+handler = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
+
 fts_server = 'https://fts3-pilot.cern.ch:8443'
 
 g_Job = None
@@ -44,7 +52,7 @@ REGEX_ID = re.compile("([a-f0-9]{8,8})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]
 
 class FTSJob(object):
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, output_metadata):
         self._id = None
         self._cancel = False
         self._sleep = 20
@@ -106,8 +114,7 @@ class FTSJob(object):
                 return 1
 
 class ASOServerJob(object):
-
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, output_metadata):
         self.id = None
         self.couchServer = None
         self.couchDatabase = None
@@ -120,6 +127,8 @@ class ASOServerJob(object):
         self.source_sites = source_sites
         self.filenames = filenames
         self.reqname = reqname
+        self.output_metadata = output_metadata
+        self.log_size = log_size
         self.publish = outputdata
         proxy = os.environ.get('X509_USER_PROXY', None)
         aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config")
@@ -148,19 +157,33 @@ class ASOServerJob(object):
 
     def submit(self):
         allIDs = []
+        outputFiles = []
         cmdLine = 'grid-proxy-info -identity 2>/dev/null'
         dn = commands.getstatusoutput(cmdLine)[1].strip()
         # TODO: Add a method to resolve a single PFN or use resolvePFNs
         last_update = int(time.time())
         now = str(datetime.datetime.now())
         found_log = False
+        file_index = 0
+        for outputModule in self.output_metadata.values():
+            for outputFile in outputModule:
+                print outputFile
+                fileInfo = {}
+                fileInfo['checksums'] = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
+                fileInfo['outsize'] = outputFile.get(u"size", 0)
+                outputFiles.append(fileInfo)
         for oneFile in zip(self.source_sites, self.filenames):
             if found_log:
                 lfn = "%s/%s" % (self.source_dir, oneFile[1])
-                type = "output"
+                file_type = "output"
+                size = outputFiles[file_index]['outsize']
+                checksums = outputFiles[file_index]['checksums']
+                file_index += 1
             else:
                 lfn = "%s/log/%s" % (self.source_dir, oneFile[1])
-                type = "log"
+                file_type = "log"
+                size = self.log_size
+                checksums = {'adler32': 'abc'}
                 found_log = True
             if len(lfn.split('/')) > 2:
                 if lfn.split('/')[2] == 'temp':
@@ -169,13 +192,15 @@ class ASOServerJob(object):
                     user = lfn.split('/')[3]
             else:
                 user = ''
-            # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
+            # TODO: need to pass the user params: publish flag, role/group, inputdataset,  publish_dbs_url, dbs_url through
             doc_id = getHashLfn( lfn )
             try:
                 doc = self.couchDatabase.document( doc_id )
                 doc['state'] = 'new'
                 doc['source'] = oneFile[0]
                 doc['destination'] = self.dest_site
+                doc['checksums'] = checksums,
+                doc['size'] = size,
                 doc['last_update'] = last_update
                 doc['start_time'] = now
                 doc['end_time'] = ''
@@ -185,7 +210,6 @@ class ASOServerJob(object):
                 print "Updating doc %s for %s" % (doc_id, lfn)
             except CMSCouch.CouchNotFoundError:
                 msg = "Document %s does not exist in Couch" % doc_id
-                msg += str(ex)
                 msg += str(traceback.format_exc())
                 print msg
                 print "Uploading new doc for %s" % lfn
@@ -195,8 +219,8 @@ class ASOServerJob(object):
                         "group": '',
                         # TODO: Remove this if it is not required
                         "lfn": lfn.replace('/store/user', '/store/temp/user', 1),
-                        "checksums": {'adler32': 'abc'},
-                        "size": '123',
+                        "checksums": checksums,
+                        "size": size,
                         "user": user,
                         "source": oneFile[0],
                         "destination": self.dest_site,
@@ -204,8 +228,8 @@ class ASOServerJob(object):
                         "state": "new",
                         "role": '',
                         "dbSource_url": "gWMS",
-                        "publish_dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_caf_analysis_02_writer/servlet/DBSServlet',
-                        "dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_prod_global/servlet/DBSServlet',
+                        "publish_dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_ph_analysis_02_writer/servlet/DBSServlet',
+                        "dbs_url": 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet',
                         "dn": dn,
                         "workflow": self.reqname,
                         "start_time": now,
@@ -216,7 +240,7 @@ class ASOServerJob(object):
                         "failure_reason": [],
                         "publication_state": 'not_published',
                         "publication_retry_count": [],
-                        "type" : type,
+                        "type" : file_type,
                         "publish" : 0
                     }
             except Exception, ex:
@@ -371,11 +395,21 @@ class PostJob():
 
     def __init__(self):
         self.ad = None
+        self.task_ad = {}
         self.crab_id = -1
         self.report = None
         self.output = None
         self.input = None
         self.outputFiles = []
+        self.retry_count = "0"
+        self.logfiles = None
+
+
+    def getTaskAd(self):
+        try:
+            self.task_ad = classad.parseOld(open(os.environ["_CONDOR_JOB_AD"]))
+        except Exception:
+            print traceback.format_exc()
 
 
     def makeAd(self, reqname, id, outputdata, sw, async_dest):
@@ -480,7 +514,7 @@ class PostJob():
             if 'inparentlfns' in fileInfo:
                 for lfn in fileInfo['inparentlfns']:
                     configreq.append(("inparentlfns", lfn))
-            print self.resturl, urllib.urlencode(configreq)
+            logger.debug("Uploading output file to %s: %s" % (self.resturl, configreq))
             try:
                 self.server.put(self.resturl, data = urllib.urlencode(configreq))
             except HTTPException, hte:
@@ -494,10 +528,10 @@ class PostJob():
         source_site = self.source_site
         if 'SEName' in self.full_report:
             source_site = self.node_map.get(self.full_report['SEName'], source_site)
-        log_size = self.full_report.get(u'log_size', 0)
+        self.log_size = self.full_report.get(u'log_size', 0)
         configreq = {"taskname":        self.ad['CRAB_ReqName'],
                      "pandajobid":      self.crab_id,
-                     "outsize":         log_size, # Not implemented
+                     "outsize":         self.log_size, # Not implemented
                      "publishdataname": self.ad['CRAB_OutputData'],
                      "appver":          self.ad['CRAB_JobSW'],
                      "outtype":         "LOG",
@@ -511,7 +545,7 @@ class PostJob():
                      "outlfn":          outlfn,
                      "outdatasetname":  "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER"
                     }
-        print self.resturl, urllib.urlencode(configreq)
+        logger.debug("Uploading log file record to %s: %s" % (self.resturl, configreq))
         try:
             self.server.put(self.resturl, data = urllib.urlencode(configreq))
         except HTTPException, hte:
@@ -520,7 +554,7 @@ class PostJob():
                    not hte.headers.get('X-Error-Http', -1) == '400':
                 raise
 
-    def setDashboardState(self, state, reason=None, logfiles=None):
+    def setDashboardState(self, state, reason=None):
         if state == "COOLOFF":
             state = "Cooloff"
         elif state == "TRANSFERRING":
@@ -529,16 +563,17 @@ class PostJob():
             state = "Aborted"
         elif state == "FINISHED":
             state = "Done"
+        logger.info("Setting Dashboard state to %s." % state)
         params = {
             'MonitorID': self.ad['CRAB_ReqName'],
-            'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (self.crab_id, self.crab_id, self.ad['CRAB_ReqName'].replace("_", ":")),
-            'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (self.crab_id, self.ad['CRAB_ReqName'].replace("_", ":")),
+            'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%s' % (self.crab_id, self.crab_id, self.ad['CRAB_ReqName'].replace("_", ":"), self.retry_count),
             'StatusValue': state,
         }
         if reason:
             params['StatusValueReason'] = reason
-        if logfiles:
-            params['StatusLogFile'] = ",".join(logfiles)
+        if self.logfiles:
+            params['StatusLogFile'] = ",".join(self.logfiles)
+        logger.info("Dashboard parameters: %s" % str(params))
         DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
 
     def uploadFakeLog(self, state="TRANSFERRING"):
@@ -618,7 +653,7 @@ class PostJob():
 
         transfer_list = resolvePFNs(self.dest_site, source_dir, dest_dir, source_sites, filenames)
         for source, dest in transfer_list:
-            print "Copying %s to %s" % (source, dest)
+            logger.info("Copying %s to %s" % (source, dest))
 
         # Skip the first file - it's a tarball of the stdout/err
         for outfile in zip(filenames[1:], self.outputFiles, source_sites[1:]):
@@ -637,7 +672,7 @@ class PostJob():
         else:
             targetClass = FTSJob
 
-        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData)
+        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.output)
         fts_job_result = g_Job.run()
         # If no files failed, return success immediately.  Otherwise, see how many files failed.
         if not fts_job_result:
@@ -669,14 +704,16 @@ class PostJob():
 
     def execute(self, *args, **kw):
         retry_count = args[2]
+        self.retry_count = retry_count
         id = args[7]
         reqname = args[6]
         logpath = os.path.expanduser("~/%s" % reqname)
         postjob = os.path.join(logpath, "postjob.%s.%s.txt" % (id, retry_count))
+        logger.debug("The post-job script will be saved to %s" % postjob)
         try:
             retval = self.execute_internal(*args, **kw)
         except:
-            print traceback.format_exc()
+            logger.exception("Failure during post-job execution.")
             sys.stdout.flush()
             sys.stderr.flush()
             shutil.copy("postjob.%s" % id, postjob)
@@ -699,38 +736,51 @@ class PostJob():
         stderr = "job_err.%s" % id
         jobreport = "jobReport.json.%s" % id
 
-        fd = os.open("postjob.%s" % id, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0755)
+        new_stdout = "postjob.%s" % id
+        fd = os.open(new_stdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
         if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             os.dup2(fd, 1)
             os.dup2(fd, 2)
+            logger.info("Post-job started with output redirected to %s." % new_stdout)
+        else:
+            logger.info("Post-job started with no output redirection.")
 
         logpath = os.path.expanduser("~/%s" % reqname)
         try:
             os.makedirs(logpath)
         except OSError, oe:
             if oe.errno != errno.EEXIST:
+                logger.exception("Failed to create log web-shared directory %s" % logpath)
                 raise
 
         if os.path.exists(stdout):
             fname = os.path.join(logpath, "job_out."+id+"."+retry_count+".txt")
+            logger.debug("Copying job stdout from %s to %s" % (stdout, fname))
             shutil.copy(stdout, fname)
             os.chmod(fname, 0644)
-        if os.path.exists(stderr):
-            fname = os.path.join(logpath, "job_err."+id+"."+retry_count+".txt")
-            shutil.copy(stderr, fname)
-            os.chmod(fname, 0644)
+        # NOTE: we now redirect stdout -> stderr; hence, I think we don't need this in the webdir.
+        #if os.path.exists(stderr):
+        #    fname = os.path.join(logpath, "job_err."+id+"."+retry_count+".txt")
+        #    shutil.copy(stderr, fname)
+        #    os.chmod(fname, 0644)
         if os.path.exists(jobreport):
             fname = os.path.join(logpath, "job_fjr."+id+"."+retry_count+".json")
+            logger.debug("Copying job FJR from %s to %s" % (jobreport, fname))
             shutil.copy(jobreport, fname)
             os.chmod(fname, 0644)
 
         if 'X509_USER_PROXY' not in os.environ:
+            logger.error("Failure due to X509_USER_PROXY not being present in environment.")
             return 10
 
         self.server = HTTPRequests(restinstance, os.environ['X509_USER_PROXY'], os.environ['X509_USER_PROXY'])
         self.resturl = resturl
 
         self.makeAd(reqname, id, outputdata, sw, async_dest)
+        self.getTaskAd()
+        if 'CRAB_UserWebDir' in self.task_ad:
+            self.logfiles = [("job_out", "txt"), ("job_fjr", "json"), ("postjob", "txt")]
+            self.logfiles = ["%s/%s.%s.%s.%s" % (self.task_ad['CRAB_UserWebDir'], i[0], str(id), str(retry_count), i[1]) for i in self.logfiles]
 
         self.makeNodeMap()
 
@@ -738,11 +788,13 @@ class PostJob():
 
         self.uploadFakeLog(state="TRANSFERRING")
 
-        print "Retry count %s; max retry %s" % (retry_count, max_retries)
+        logger.info("Retry count %s; max retry %s" % (retry_count, max_retries))
         fail_state = "COOLOFF"
-        if retry_count == max_retries: fail_state = "FAILED"
+        if retry_count == max_retries:
+            fail_state = "FAILED"
         if status and (retry_count == max_retries):
             # This was our last retry and it failed.
+            logger.info("The max retry count was hit and the job failed; setting this node to permanent failure.")
             return self.uploadState("FAILED")
         retry = RetryJob.RetryJob()
         retval = None
@@ -750,8 +802,13 @@ class PostJob():
             retval = retry.execute(status, retry_count, max_retries, self.crab_id, cluster)
         if retval:
             if retval == RetryJob.FATAL_ERROR:
+                logger.info("The retry handler indicated this was a fatal error.")
                 return self.uploadState("FAILED")
             else:
+                if fail_state == "FAILED":
+                    logger.info("The retry handler indicated this was a recoverable error, but the max retries was already hit.  DAGMan will NOT retry.")
+                else:
+                    logger.info("The retry handler indicated this was a recoverable error.  DAGMan will retry")
                 self.uploadState(fail_state)
                 return retval
 
@@ -767,11 +824,12 @@ class PostJob():
             except HTTPException, hte:
                 # Suppressing this exception is a tough decision.  If the file made it back alright,
                 # I suppose we can proceed.
-                print "Potentially fatal error when uploading file locations:", str(hte.headers)
+                logger.exception("Potentially fatal error when uploading file locations: %s" % str(hte.headers))
                 if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
                         not hte.headers.get('X-Error-Http', -1) == '400':
                     raise
         except:
+            logger.exception("Stageout failed.")
             self.uploadState(fail_state)
             raise
         self.uploadFakeLog(state="FINISHED")

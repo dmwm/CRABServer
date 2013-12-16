@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import shutil
+import traceback
 
 import classad
 import htcondor
@@ -109,6 +110,11 @@ def make_webdir(ad):
         htcondor.Schedd().edit([id], 'CRAB_UserWebDir', ad.lookup('CRAB_UserWebDir'))
     except RuntimeError, reerror:
         print str(reerror)
+    try:
+        fd = open(os.environ['_CONDOR_JOB_AD'], 'a')
+        fd.write('CRAB_UserWebDir = %s\n' % ad.lookup('CRAB_UserWebDir'))
+    except:
+        print traceback.format_exc()
 
 def make_job_submit(ad):
     count = ad['CRAB_JobCount']

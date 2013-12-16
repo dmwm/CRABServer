@@ -347,7 +347,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         cherrypy.log("Will talk to %s." % locator.getCollector())
         name = locator.getSchedd()
         cherrypy.log("Schedd name %s." % name)
-        schedd, address = locator.getScheddObj(name)
+        schedd, address = locator.getScheddObj(workflow)
 
         results = self.getRootTasks(workflow, schedd)
         if not results:

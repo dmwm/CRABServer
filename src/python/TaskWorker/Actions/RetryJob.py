@@ -110,6 +110,9 @@ class RetryJob(object):
         if exitCode == 50115:
             raise RecoverableError("Job did not produce a FJR; will retry.")
 
+        if exitCode == 10034:
+            raise RecoverableError("Required application version is not found at the site")
+
         if exitCode:
             raise FatalError("Job exited with code %d.  Exit message: %s" % (exitCode, exitMsg))
 
