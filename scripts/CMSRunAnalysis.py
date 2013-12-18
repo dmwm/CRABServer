@@ -110,9 +110,6 @@ def earlyDashboardFailure(myad):
 def startDashboardMonitoring(myad):
     params = {
         'WNHostName': socket.getfqdn(),
-        'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":")),
-        'SyncSite': myad['JOB_CMSSite'],
-        'SyncCE': myad['Used_Gatekeeper'].split(":")[0],
         'ExeStart': 'cmsRun',
     }
     populateDashboardMonitorInfo(myad, params)
