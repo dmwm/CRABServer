@@ -416,6 +416,7 @@ class DagmanCreator(TaskAction.TaskAction):
                      'bossId': str(idx),
                      'TargetSE': ("%d_Selected_SE" % len(specs[idx-1]['desiredSites'])),
                      'localId' : '',
+                     'StatusValue' : 'pending',
                     }
             ml_info.append(jinfo)
 
