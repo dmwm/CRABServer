@@ -10,29 +10,12 @@ STARTDIR=$PWD/tmp/runtime
 CRAB3_VERSION=3.3.0-pre1
 
 WMCOREDIR=$STARTDIR/WMCore
-WMCOREVER=0.9.83.htcondor6
-WMCOREREPO=bbockelm
-
-DBSDIR=$STARTDIR/DBS
-DBSVER=DBS_2_1_9-dagman3
-DBSREPO=bbockelm
-
-DLSDIR=$STARTDIR/DLS
-DLSVER=DLS_1_1_3
-DLSREPO=bbockelm
+WMCOREVER=0.9.86
+WMCOREREPO=dmwm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
-CRABSERVERVER=3.3.0.rc17
+CRABSERVERVER=3.3.1.pre3
 CRABSERVERREPO=dmwm
-
-CRABCLIENTDIR=$STARTDIR/CRABClient
-CRABCLIENTVER=3.2.0pre18-dagman1
-CRABCLIENTREPO=bbockelm
-
-#As soon as https://github.com/dmwm/WMCore/pull/4845 is merged we may think of dropping these three lines
-WMCORERUNTIMEDIR=$STARTDIR/WMCore-alt
-WMCORERUNTIMEVER=temporary
-WMCORERUNTIMEREPO=mmascher
 
 [[ -d $STARTDIR ]] || mkdir -p $STARTDIR
 
@@ -40,11 +23,7 @@ cp $BASEDIR/../scripts/gWMS-CMSRunAnalysis.sh $STARTDIR || exit 3
 
 
 rm -rf $WMCOREDIR && mkdir -p $WMCOREDIR
-rm -rf $DBSDIR && mkdir -p $DBSDIR
-rm -rf $DLSDIR && mkdir -p $DLSDIR
 rm -rf $CRABSERVERDIR && mkdir -p $CRABSERVERDIR
-rm -rf $CRABCLIENTDIR && mkdir -p $CRABCLIENTDIR
-rm -rf $WMCORERUNTIMEDIR && mkdir -p $WMCORERUNTIMEDIR
 
 if [[ -n "$CRAB_OVERRIDE_SOURCE" ]]; then 
     REPLACEMENT_ABSOLUTE=$(readlink -f $CRAB_OVERRIDE_SOURCE)
@@ -77,30 +56,12 @@ else
     WMCORE_PATH="WMCore-$WMCOREVER"
 fi
 
-if [ ! -e $DBSVER.tar.gz ]; then
-    curl -L https://github.com/$DBSREPO/DBS/archive/$DBSVER.tar.gz > $DBSVER.tar.gz || exit 2
-fi
-tar zxf $DBSVER.tar.gz || exit 2
-
-if [[ ! -e dls.tar.gz ]]; then
-    curl -L https://github.com/$DLSREPO/DLS/archive/$DLSVER.tar.gz > dls.tar.gz || exit 2
-fi
-tar zxf dls.tar.gz || exit 2
-
 if [[ -d "$REPLACEMENT_ABSOLUTE/CRABServer" ]]; then
     echo "Using replacement CRABServer source at $REPLACEMENT_ABSOLUTE/CRABServer"
     CRABSERVER_PATH="$REPLACEMENT_ABSOLUTE/CRABServer"
 else
     curl -L https://github.com/$CRABSERVERREPO/CRABServer/archive/$CRABSERVERVER.tar.gz | tar zx || exit 2
     CRABSERVER_PATH="CRABServer-$CRABSERVERVER"
-fi
-
-if [[ -d "$REPLACEMENT_ABSOLUTE/CRABClient" ]]; then
-    echo "Using replacement CRABClient source at $REPLACEMENT_ABSOLUTE/CRABClient"
-    CRABCLIENT_PATH="$REPLACEMENT_ABSOLUTE/CRABClient"
-else
-    curl -L https://github.com/$CRABCLIENTREPO/CRABClient/archive/$CRABCLIENTVER.tar.gz | tar zx || exit 2
-    CRABCLIENT_PATH="CRABClient-$CRABCLIENTVER"
 fi
 
 if [[ ! -e httplib2.tar.gz ]]; then
@@ -112,9 +73,6 @@ fi
 if [[ ! -e sqlalchemy.tar.gz ]]; then
     curl -L https://pypi.python.org/packages/source/S/SQLAlchemy/SQLAlchemy-0.8.0.tar.gz > sqlalchemy.tar.gz || exit 2
 fi
-if [[ ! -e crab3-condor-libs.tar.gz ]]; then
-    curl -L http://hcc-briantest.unl.edu/CRAB3-condor-libs.tar.gz > crab3-condor-libs.tar.gz || exit 2
-fi
 if [[ ! -e nose.tar.gz ]]; then
     curl -L https://github.com/nose-devs/nose/archive/release_1.3.0.tar.gz > nose.tar.gz || exit 2
 fi
@@ -125,13 +83,6 @@ tar xzf sqlalchemy.tar.gz || exit 2
 tar xzf crab3-condor-libs.tar.gz || exit 2
 tar xzf nose.tar.gz || exit 2
 
-pushd DBS-$DBSVER/Clients/Python
-zip -rq $STARTDIR/CRAB3.zip DBSAPI  -x \*.pyc || exit 3
-popd
-
-pushd DLS-$DLSVER/Client/LFCClient
-zip -rq $STARTDIR/CRAB3.zip *.py  -x \*.pyc || exit 3
-popd
 pushd httplib2-0.8/python2
 zip -rq $STARTDIR/CRAB3.zip httplib2  -x \*.pyc || exit 3
 popd
@@ -152,31 +103,18 @@ popd
 # up until this point, evertying in CRAB3.zip is an external
 cp $STARTDIR/CRAB3.zip $ORIGDIR/CRAB3-externals.zip
 
-#In the future we may want to use just one WMCore archive
-#pushd $WMCORERUNTIMEDIR/
-#curl -L https://github.com/$WMCORERUNTIMEREPO/WMCore/archive/$WMCORERUNTIMEVER.tar.gz | tar zx || exit 3
-#pushd WMCore-$WMCORERUNTIMEVER/src/python/
 pushd $WMCORE_PATH/src/python
 zip -r $STARTDIR/WMCore.zip *
 popd
-#popd
 
 pushd $WMCORE_PATH/src/python
 zip -rq $STARTDIR/CRAB3.zip WMCore PSetTweaks -x \*.pyc || exit 3
 #zip -rq $STARTDIR/WMCore.zip WMCore PSetTweaks -x \*.pyc || exit 3
 popd
 
-pushd $CRABCLIENT_PATH/src/python
-zip -rq $STARTDIR/CRAB3.zip CRABClient  -x \*.pyc || exit 3
-cp ../../bin/crab $STARTDIR/
-cp ../../bin/crab3 $STARTDIR/
-popd
-
 pushd $CRABSERVER_PATH/src/python
 zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py TaskWorker CRABInterface  -x \*.pyc || exit 3
 popd
-
-
 
 
 cat > setup.sh << EOF
@@ -203,9 +141,7 @@ cp $CRABSERVER_PATH/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py
 
 pwd
 echo "Making TaskManagerRun tarball"
-tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip setup.sh crab3 crab gWMS-CMSRunAnalysis.sh CMSRunAnalysis.py bin TweakPSet.py libcurl.so.4 ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py || exit 4
-echo "Making CRAB3 client install"
-tar zcf $ORIGDIR/CRAB3-gWMS.tar.gz CRAB3.zip setup.sh crab3 crab gWMS-CMSRunAnalysis.sh bin lib || exit 4
+tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip setup.sh gWMS-CMSRunAnalysis.sh CMSRunAnalysis.py bin TweakPSet.py libcurl.so.4 ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py || exit 4
 echo "Making CMSRunAnalysis tarball"
 tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py || exit 4
 
