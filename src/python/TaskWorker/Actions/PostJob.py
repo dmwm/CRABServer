@@ -52,7 +52,7 @@ REGEX_ID = re.compile("([a-f0-9]{8,8})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]
 
 class FTSJob(object):
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, output_metadata):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, output_metadata, task_ad):
         self._id = None
         self._cancel = False
         self._sleep = 20
@@ -159,16 +159,11 @@ class ASOServerJob(object):
     def submit(self):
         allIDs = []
         outputFiles = []
-        input_dataset = ''
-        role = ''
-        group = ''
-        dbs_url = ''
-        publish_dbs_url = ''
-        if type(self.task_ad['CRAB_InputData']) is str: input_dataset = self.task_ad['CRAB_InputData']
-        if type(self.task_ad['CRAB_UserRole']) is str: role = self.task_ad['CRAB_UserRole']
-        if type(self.task_ad['CRAB_UserGroup']) is str: group = self.task_ad['CRAB_UserGroup']
-        if type(self.task_ad['CRAB_DBSUrl']) is str: dbs_url = self.task_ad['CRAB_DBSUrl']
-        if type(self.task_ad['CRAB_PublishDBSUrl']) is str: publish_dbs_url = self.task_ad['CRAB_PublishDBSUrl']
+        input_dataset = str(self.task_ad['CRAB_InputData'])
+        role = str(self.task_ad['CRAB_UserRole'])
+        group = str(self.task_ad['CRAB_UserGroup'])
+        dbs_url = str(self.task_ad['CRAB_DBSUrl'])
+        publish_dbs_url = str(self.task_ad['CRAB_PublishDBSUrl'])
         # TODO: Add a method to resolve a single PFN or use resolvePFNs
         last_update = int(time.time())
         now = str(datetime.datetime.now())
@@ -494,9 +489,8 @@ class PostJob():
     def upload(self):
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
-        if type(self.task_ad['CRAB_InputData']) is str:
-            # CMS convention for outdataset: /primarydataset>/<yourHyperNewsusername>-<publish_data_name>-<PSETHASH>/USER
-            outdataset = os.path.join('/' + self.task_ad['CRAB_InputData'].split('/')[1], self.task_ad['CRAB_UserHN'] + '-' + self.task_ad['CRAB_PublishName'], 'USER')
+        # CMS convention for outdataset: /primarydataset>/<yourHyperNewsusername>-<publish_data_name>-<PSETHASH>/USER
+        outdataset = os.path.join('/' + str(self.task_ad['CRAB_InputData']).split('/')[1], self.task_ad['CRAB_UserHN'] + '-' + self.task_ad['CRAB_PublishName'], 'USER')
         for fileInfo in self.outputFiles:
             configreq = {"taskname":        self.ad['CRAB_ReqName'],
                          "globalTag":       "None",
