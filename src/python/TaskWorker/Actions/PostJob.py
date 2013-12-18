@@ -114,7 +114,7 @@ class FTSJob(object):
                 return 1
 
 class ASOServerJob(object):
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, output_metadata):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, output_metadata, task_ad):
         self.id = None
         self.couchServer = None
         self.couchDatabase = None
@@ -130,6 +130,7 @@ class ASOServerJob(object):
         self.output_metadata = output_metadata
         self.log_size = log_size
         self.publish = outputdata
+        self.task_ad = task_ad
         proxy = os.environ.get('X509_USER_PROXY', None)
         aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config")
         if config:
@@ -158,6 +159,16 @@ class ASOServerJob(object):
     def submit(self):
         allIDs = []
         outputFiles = []
+        input_dataset = ''
+        role = ''
+        group = ''
+        dbs_url = ''
+        publish_dbs_url = ''
+        if type(self.task_ad['CRAB_InputData']) is str: input_dataset = self.task_ad['CRAB_InputData']
+        if type(self.task_ad['CRAB_UserRole']) is str: role = self.task_ad['CRAB_UserRole']
+        if type(self.task_ad['CRAB_UserGroup']) is str: group = self.task_ad['CRAB_UserGroup']
+        if type(self.task_ad['CRAB_DBSUrl']) is str: dbs_url = self.task_ad['CRAB_DBSUrl']
+        if type(self.task_ad['CRAB_PublishDBSUrl']) is str: publish_dbs_url = self.task_ad['CRAB_PublishDBSUrl']
         # TODO: Add a method to resolve a single PFN or use resolvePFNs
         last_update = int(time.time())
         now = str(datetime.datetime.now())
@@ -213,8 +224,8 @@ class ASOServerJob(object):
                 print "Uploading new doc for %s" % lfn
                 # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
                 doc = { "_id": doc_id,
-                        "inputdataset": '',
-                        "group": '',
+                        "inputdataset": input_dataset,
+                        "group": group,
                         # TODO: Remove this if it is not required
                         "lfn": lfn.replace('/store/user', '/store/temp/user', 1),
                         "checksums": checksums,
@@ -224,10 +235,10 @@ class ASOServerJob(object):
                         "destination": self.dest_site,
                         "last_update": last_update,
                         "state": "new",
-                        "role": '',
+                        "role": role,
                         "dbSource_url": "gWMS",
-                        "publish_dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_ph_analysis_02_writer/servlet/DBSServlet',
-                        "dbs_url": 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet',
+                        "publish_dbs_url": publish_dbs_url,
+                        "dbs_url": dbs_url,
                         "workflow": self.reqname,
                         "start_time": now,
                         "end_time": '',
@@ -483,6 +494,9 @@ class PostJob():
     def upload(self):
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
+        if type(self.task_ad['CRAB_InputData']) is str:
+            # CMS convention for outdataset: /primarydataset>/<yourHyperNewsusername>-<publish_data_name>-<PSETHASH>/USER
+            outdataset = os.path.join('/' + self.task_ad['CRAB_InputData'].split('/')[1], self.task_ad['CRAB_UserHN'] + '-' + self.task_ad['CRAB_PublishName'], 'USER')
         for fileInfo in self.outputFiles:
             configreq = {"taskname":        self.ad['CRAB_ReqName'],
                          "globalTag":       "None",
@@ -499,7 +513,7 @@ class PostJob():
                          "acquisitionera":  "null", # Not implemented
                          "outlfn":          fileInfo['outlfn'],
                          "events":          fileInfo['events'],
-                         "outdatasetname":  "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER",
+                         "outdatasetname":  outdataset,
                     }
             configreq = configreq.items()
             if 'outfileruns' in fileInfo:
@@ -669,7 +683,7 @@ class PostJob():
         else:
             targetClass = FTSJob
 
-        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.output)
+        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.output, self.task_ad)
         fts_job_result = g_Job.run()
         # If no files failed, return success immediately.  Otherwise, see how many files failed.
         if not fts_job_result:
