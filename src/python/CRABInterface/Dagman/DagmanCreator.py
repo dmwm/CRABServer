@@ -48,7 +48,6 @@ def makeJobSubmit(task):
     info['userdn'] = info['tm_user_dn']
     info['requestname'] = string.replace(task['tm_taskname'],'"', '')
     info['savelogsflag'] = 0
-    info['blacklistT1'] = 0
     info['siteblacklist'] = task['tm_site_blacklist']
     info['sitewhitelist'] = task['tm_site_whitelist']
     info['addoutputfiles'] = task['tm_outfiles']

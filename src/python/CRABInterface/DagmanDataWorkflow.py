@@ -117,7 +117,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                 # do I need to escape somehow? I feel like no.
                 info[var] = val
 
-        for var in 'savelogsflag', 'blacklistT1':
+        for var in 'savelogsflag':
             info[var] = int(input[var])
 
         for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', \
@@ -176,8 +176,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                         ('CRAB_SaveLogsFlag', 'savelogsflag'),
                         ('CRAB_UserDN', 'userdn'),
                         ('CRAB_UserHN', 'userhn'),
-                        ('CRAB_AsyncDest', 'asyncdest'),
-                        ('CRAB_BlacklistT1', 'blacklistT1'), )
+                        ('CRAB_AsyncDest', 'asyncdest'), )
     def addCRABHeadersToClassAd(self, ad, info):
         return self.addDictsToClassAd(ad, info, self.CRAB_HEADERS)
     
@@ -423,7 +422,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
                         "siteblacklist", "sitewhitelist", "splitalgo",
                         "algoargs", "cachefilename", "cacheurl",
                         "addoutputfiles", "userhn", "userdn", "savelogsflag",
-                        "publishname", "asyncdest", "blacklistT1", "dbsurl",
+                        "publishname", "asyncdest", "dbsurl",
                         "publishdbsurl", "vorole", "vogroup", "tfileoutfiles",
                         "edmoutfiles", "runs", "lumis"]
 
@@ -536,7 +535,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
     # NOTE NOTE NOTE
     # The following function gets wrapped in a proxy decorator below
     # the wrapped one is called submit (imagine that)
-    def submitUnwrapped(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles, userhn, userdn, savelogsflag, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis, userproxy= None, **kwargs):
+    def submitUnwrapped(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles, userhn, userdn, savelogsflag, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis, userproxy= None, **kwargs):
 
         # Esp for unittesting, you can get the same timestamp
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
@@ -1028,7 +1027,6 @@ def main():
     userhn = 'bbockelm'
     publishname = ''
     asyncdest = 'T2_US_Nebraska'
-    blacklistT1 = True
     dbsurl = ''
     vorole = 'cmsuser'
     vogroup = ''
@@ -1040,7 +1038,7 @@ def main():
     lumis = []
     dag.submitRaw(workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, 
                splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
-               userhn, userdn, savelogsflag, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
+               userhn, userdn, savelogsflag, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, userproxy = '/tmp/x509up_u%d' % os.geteuid()) #TODO delete unused parameters
 
 
