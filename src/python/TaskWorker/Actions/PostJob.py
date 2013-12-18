@@ -158,8 +158,6 @@ class ASOServerJob(object):
     def submit(self):
         allIDs = []
         outputFiles = []
-        cmdLine = 'grid-proxy-info -identity 2>/dev/null'
-        dn = commands.getstatusoutput(cmdLine)[1].strip()
         # TODO: Add a method to resolve a single PFN or use resolvePFNs
         last_update = int(time.time())
         now = str(datetime.datetime.now())
@@ -230,7 +228,6 @@ class ASOServerJob(object):
                         "dbSource_url": "gWMS",
                         "publish_dbs_url": 'https://cmsdbsprod.cern.ch:8443/cms_dbs_ph_analysis_02_writer/servlet/DBSServlet',
                         "dbs_url": 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet',
-                        "dn": dn,
                         "workflow": self.reqname,
                         "start_time": now,
                         "end_time": '',
