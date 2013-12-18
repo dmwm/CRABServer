@@ -53,9 +53,12 @@ chmod +x libcurl.so.4
 # For actual releases, we take the libraries from the build environment RPMs.
 if [[ "x$RPM_RELEASE" != "x" ]]; then
 
-pushd build/lib/
+pushd $ORIGDIR/../WMCore-$WMCOREVER/build/lib/
 zip -r $STARTDIR/WMCore.zip *
 zip -rq $STARTDIR/CRAB3.zip WMCore PSetTweaks -x \*.pyc || exit 3
+popd
+
+pushd $ORIGDIR/build/lib
 zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py TaskWorker CRABInterface  -x \*.pyc || exit 3
 popd
 
@@ -63,22 +66,16 @@ pushd $PY2_HTTPLIB2_ROOT/lib/python2.6/site-packages
 zip -rq $STARTDIR/CRAB3.zip httplib -x \*.pyc
 popd
 
-pushd $PY2_CHERRYPY_ROOT/lib/python2.6/site-packages
+pushd $CHERRYPY_ROOT/lib/python2.6/site-packages
 zip -rq $STARTDIR/CRAB3.zip cherrypy -x \*.pyc
 popd
 
 mkdir -p bin
-cp $ORIGDIR/bin/* bin/
-cp $ORIGDIR/scripts/CMSRunAnalysis.sh bin/
 cp $ORIGDIR/scripts/CMSRunAnalysis.py .
 cp $ORIGDIR/scripts/TweakPSet.py .
 cp $ORIGDIR/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py} .
 
 else
-#if [[ ! -e external+py2-pyopenssl+0.11-1-1.slc5_amd64_gcc462.rpm ]]; then
-#    curl -L http://cmsrep.cern.ch/cmssw/cms/RPMS/slc5_amd64_gcc462/external+py2-pyopenssl+0.11-1-1.slc5_amd64_gcc462.rpm > external+py2-pyopenssl+0.11-1-1.slc5_amd64_gcc462.rpm || exit 2
-#fi
-#rpm2cpio external+py2-pyopenssl+0.11-1-1.slc5_amd64_gcc462.rpm | cpio -uimd || exit 2
 
 if [[ ! -e libcurl.so.4 ]]; then
     curl -L http://hcc-briantest.unl.edu/libcurl.so.4 > $STARTDIR/libcurl.so.4 || exit 2
@@ -110,17 +107,12 @@ fi
 if [[ ! -e cherrypy.tar.gz ]]; then
     curl -L http://download.cherrypy.org/cherrypy/3.1.2/CherryPy-3.1.2.tar.gz > cherrypy.tar.gz || exit 2
 fi
-#if [[ ! -e sqlalchemy.tar.gz ]]; then
-#    curl -L https://pypi.python.org/packages/source/S/SQLAlchemy/SQLAlchemy-0.8.0.tar.gz > sqlalchemy.tar.gz || exit 2
-#fi
 if [[ ! -e nose.tar.gz ]]; then
     curl -L https://github.com/nose-devs/nose/archive/release_1.3.0.tar.gz > nose.tar.gz || exit 2
 fi
 
 tar xzf httplib2.tar.gz || exit 2
 tar xzf cherrypy.tar.gz || exit 2
-#tar xzf sqlalchemy.tar.gz || exit 2
-#tar xzf crab3-condor-libs.tar.gz || exit 2
 tar xzf nose.tar.gz || exit 2
 
 pushd httplib2-0.8/python2
@@ -131,11 +123,6 @@ pushd CherryPy-3.1.2/
 zip -rq $STARTDIR/CRAB3.zip cherrypy  -x \*.pyc || exit 3
 popd
 
-#pushd opt/cmssw/slc5_amd64_gcc462/external/py2-pyopenssl/0.11/lib/python2.6/site-packages
-#rm -rf $STARTDIR/lib/python/OpenSSL
-#mv OpenSSL $STARTDIR/lib/python/
-#popd
-
 pushd nose-release_1.3.0/
 zip -rq $STARTDIR/CRAB3.zip nose -x \*.pyc || exit 3
 popd
@@ -145,11 +132,7 @@ cp $STARTDIR/CRAB3.zip $ORIGDIR/CRAB3-externals.zip
 
 pushd $WMCORE_PATH/src/python
 zip -r $STARTDIR/WMCore.zip *
-popd
-
-pushd $WMCORE_PATH/src/python
 zip -rq $STARTDIR/CRAB3.zip WMCore PSetTweaks -x \*.pyc || exit 3
-#zip -rq $STARTDIR/WMCore.zip WMCore PSetTweaks -x \*.pyc || exit 3
 popd
 
 pushd $CRABSERVER_PATH/src/python
@@ -158,31 +141,14 @@ popd
 
 
 mkdir -p bin
-cp $CRABSERVER_PATH/bin/* bin/
-cp $CRABSERVER_PATH/scripts/CMSRunAnalysis.sh bin/
 cp $CRABSERVER_PATH/scripts/CMSRunAnalysis.py .
 cp $CRABSERVER_PATH/scripts/TweakPSet.py .
 cp $CRABSERVER_PATH/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py} .
 fi
 
-cat > setup.sh << EOF
-export CRAB3_VERSION=$CRAB3_VERSION
-export CRAB3_BASEPATH=\`dirname \${BASH_SOURCE[0]}\`
-export CRAB3_BASEPATH=\`readlink -e \$CRAB3_BASEPATH\`
-export PATH=\$CRAB3_BASEPATH:\$PATH
-export PYTHONPATH=\$CRAB3_BASEPATH/CRAB3.zip:\$CRAB3_BASEPATH/lib/python:\$PYTHONPATH:\$CRAB3_BASEPATH
-export LD_LIBRARY_PATH=\$CRAB3_BASEPATH/lib:\$CRAB3_BASEPATH/lib/condor:\$LD_LIBRARY_PATH
-if [ "x\$CONDOR_CONFIG" = "x" ] && [ ! -e /etc/condor/condor_config ] && [ ! -e \$HOME/.condor/condor_config ];
-then
-  export CONDOR_CONFIG=\$CRAB3_BASEPATH/lib/fake_condor_config
-fi
-EOF
-
-touch lib/fake_condor_config
-
 pwd
 echo "Making TaskManagerRun tarball"
-tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip setup.sh gWMS-CMSRunAnalysis.sh CMSRunAnalysis.py bin TweakPSet.py libcurl.so.4 ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py || exit 4
+tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip CMSRunAnalysis.py TweakPSet.py libcurl.so.4 ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py || exit 4
 echo "Making CMSRunAnalysis tarball"
 tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py || exit 4
 
