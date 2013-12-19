@@ -160,8 +160,14 @@ class ASOServerJob(object):
         allIDs = []
         outputFiles = []
         input_dataset = str(self.task_ad['CRAB_InputData'])
-        role = str(self.task_ad['CRAB_UserRole'])
-        group = str(self.task_ad['CRAB_UserGroup'])
+        if 'CRAB_UserRole' in self.task_ad:
+            role = str(self.task_ad['CRAB_UserRole'])
+        else:
+            role = ''
+        if 'CRAB_UserGroup' in self.task_ad:
+            group = str(self.task_ad['CRAB_UserGroup'])
+        else:
+            group = ''
         dbs_url = str(self.task_ad['CRAB_DBSUrl'])
         publish_dbs_url = str(self.task_ad['CRAB_PublishDBSUrl'])
         # TODO: Add a method to resolve a single PFN or use resolvePFNs
