@@ -14,7 +14,7 @@ WMCOREVER=0.9.86
 WMCOREREPO=dmwm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
-CRABSERVERVER=3.3.1.pre3
+CRABSERVERVER=3.3.1.pre6
 CRABSERVERREPO=dmwm
 
 [[ -d $STARTDIR ]] || mkdir -p $STARTDIR
@@ -62,11 +62,11 @@ pushd $ORIGDIR/build/lib
 zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py TaskWorker CRABInterface  -x \*.pyc || exit 3
 popd
 
-pushd $PY2_HTTPLIB2_ROOT/lib/python2.6/site-packages
+pushd $VO_CMS_SW_DIR/$SCRAM_ARCH/external/py2-httplib2/*/lib/python2.6/site-packages
 zip -rq $STARTDIR/CRAB3.zip httplib -x \*.pyc
 popd
 
-pushd $CHERRYPY_ROOT/lib/python2.6/site-packages
+pushd $VO_CMS_SW_DIR/$SCRAM_ARCH/external/cherrypy/*/lib/python2.6/site-packages
 zip -rq $STARTDIR/CRAB3.zip cherrypy -x \*.pyc
 popd
 
