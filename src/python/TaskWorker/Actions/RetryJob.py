@@ -10,9 +10,9 @@ FATAL_ERROR = 2
 RECOVERABLE_ERROR = 1
 
 id_to_name = { \
-    OK = "OK",
-    FATAL_ERROR = "FATAL_ERROR",
-    RECOVERABLE_ERROR = "RECOVERABLE_ERROR",
+    OK: "OK",
+    FATAL_ERROR: "FATAL_ERROR",
+    RECOVERABLE_ERROR: "RECOVERABLE_ERROR",
 }
 
 # Fatal error limits for job resource usage
