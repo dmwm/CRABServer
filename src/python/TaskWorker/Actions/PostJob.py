@@ -250,7 +250,7 @@ class ASOServerJob(object):
                         "publication_state": 'not_published',
                         "publication_retry_count": [],
                         "type" : file_type,
-                        "publish" : 0
+                        "publish" : 1
                     }
             except Exception, ex:
                 msg = "Error loading document from couch. Transfer submission failed."
