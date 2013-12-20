@@ -8,7 +8,7 @@ from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.DataUserWorkflow import DataWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
 from CRABInterface.Regexps import *
-from CRABInterface.Utils import CMSSitesCache, conn_handler
+from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
 
 # external dependecies here
 import cherrypy
@@ -26,7 +26,8 @@ class RESTUserWorkflow(RESTEntity):
         self.logger = logging.getLogger("CRABLogger.RESTUserWorkflow")
         self.userworkflowmgr = DataUserWorkflow()
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
-
+        self.Task = getDBinstance(config, 'TaskDB', 'Task')
+        
     def _expandSites(self, sites):
         """Check if there are sites cotaining the '*' wildcard and convert them in the corresponding list
            Raise exception if any wildcard site does expand to an empty list
@@ -200,7 +201,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name."""
         # strict check on authz: only the workflow owner can modify it
-        authz_owner_match(self.api, [workflow])
+        authz_owner_match(self.api, [workflow], self.Task)
         return self.userworkflowmgr.resubmit(workflow=workflow, siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, jobids=jobids, \
                                         userdn=cherrypy.request.headers['Cms-Authn-Dn'])
 
@@ -253,5 +254,5 @@ class RESTUserWorkflow(RESTEntity):
            :return: nothing"""
 
         # strict check on authz: only the workflow owner can modify it
-        authz_owner_match(self.api, [workflow])
+        authz_owner_match(self.api, [workflow], self.Task)
         return self.userworkflowmgr.kill(workflow, force, jobids, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
