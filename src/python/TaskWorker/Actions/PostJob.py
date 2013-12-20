@@ -160,11 +160,11 @@ class ASOServerJob(object):
         allIDs = []
         outputFiles = []
         input_dataset = str(self.task_ad['CRAB_InputData'])
-        if 'CRAB_UserRole' in self.task_ad:
+        if 'CRAB_UserRole' in self.task_ad and str(self.task_ad['CRAB_UserRole']).lower() != 'undefined':
             role = str(self.task_ad['CRAB_UserRole'])
         else:
             role = ''
-        if 'CRAB_UserGroup' in self.task_ad:
+        if 'CRAB_UserGroup' in self.task_ad and str(self.task_ad['CRAB_UserGroup']).lower() != 'undefined':
             group = str(self.task_ad['CRAB_UserGroup'])
         else:
             group = ''
