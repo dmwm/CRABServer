@@ -3,17 +3,7 @@ from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
 from WMCore.REST.Error import InvalidParameter
 
-from Databases.TaskDB.Oracle.Task.ID import ID
-from Databases.TaskDB.Oracle.Task.SetSplitargsTask import SetSplitargsTask
-from Databases.TaskDB.Oracle.Task.GetReadyTasks import GetReadyTasks
-from Databases.TaskDB.Oracle.Task.SetReadyTasks import SetReadyTasks
-from Databases.TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
-from Databases.TaskDB.Oracle.Task.SetFailedTasks import SetFailedTasks
-from Databases.TaskDB.Oracle.Task.SetInjectedTasks import SetInjectedTasks
-from Databases.TaskDB.Oracle.Task.UpdateWorker import UpdateWorker
-from Databases.TaskDB.Oracle.JobGroup.AddJobGroup import AddJobGroup
-from Databases.TaskDB.Oracle.JobGroup.GetJobGroupFromJobDef import GetJobGroupFromJobDef
-
+from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE
 
@@ -28,6 +18,8 @@ class RESTWorkerWorkflow(RESTEntity):
 
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
+        self.Task = getDBinstance(config, 'TaskDB', 'Task')
+        self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
@@ -82,7 +74,7 @@ class RESTWorkerWorkflow(RESTEntity):
                 raise InvalidParameter("Failure message is not in the accepted format")
         binds = {"task_name": [workflow], "jobdef_id": [subjobdef if subjobdef >= 0 else None], "jobgroup_status": [substatus], "blocks": [str(subblocks)],
                  "jobgroup_failure": [subfailure], "tm_user_dn": [subuser]}
-        self.api.modify(AddJobGroup.sql, **binds)
+        self.api.modify(self.JobGroup.AddJobGroup_sql, **binds)
         return []
 
     @restcall
@@ -93,18 +85,18 @@ class RESTWorkerWorkflow(RESTEntity):
                 failure = b64decode(failure)
             except TypeError:
                 raise InvalidParameter("Failure message is not in the accepted format")
-        methodmap = {"state": {"args": (SetStatusTask.sql,), "method": self.api.modify, "kwargs": {"status": [status],
+        methodmap = {"state": {"args": (self.Task.SetStatusTask_sql,), "method": self.api.modify, "kwargs": {"status": [status],
                                                                                        "taskname": [workflow]}},
-                  "start": {"args": (SetReadyTasks.sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
+                  "start": {"args": (self.Task.SetReadyTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
                                                                                        "tm_taskname": [workflow]}},
-                  "failure": {"args": (SetFailedTasks.sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
+                  "failure": {"args": (self.Task.SetFailedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
                                                                                 "failure": [failure],
                                                                                "tm_taskname": [workflow]}},
-                  "success": {"args": (SetInjectedTasks.sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
+                  "success": {"args": (self.Task.SetInjectedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
                                                                                             "panda_jobset_id": [jobset],
                                                                                             "tm_taskname": [workflow],
                                                                                             "resubmitted_jobs": [str(resubmittedjobs)]}},
-                  "process": {"args": (UpdateWorker.sql,), "method": self.api.modifynocheck, "kwargs": {"tw_name": [workername],
+                  "process": {"args": (self.Task.UpdateWorker_sql,), "method": self.api.modifynocheck, "kwargs": {"tw_name": [workername],
                                                                                                    "get_status": [getstatus],
                                                                                                    "limit": [limit],
                                                                                                    "set_status": [status]}},
@@ -123,9 +115,10 @@ class RESTWorkerWorkflow(RESTEntity):
         """ Retrieve all columns for a specified task or
             tasks which are in a particular status with
             particular conditions """
+
         if subresource is not None and subresource == 'jobgroup':
             binds = {'jobdef_id': subjobdef, 'user_dn': subuser}
-            rows = self.api.query(None, None, GetJobGroupFromJobDef.sql, **binds)
+            rows = self.api.query(None, None, self.JobGroup.GetJobGroupFromJobDef_sql, **binds)
             for row in rows:
                 # taskname, jobdefid, status, blocks, failures, dn
                 yield {'tm_taskname': row[0],
@@ -136,7 +129,7 @@ class RESTWorkerWorkflow(RESTEntity):
                        'tm_user_dn': row[5]}
         else:
             binds = {"limit": limit, "tw_name": workername, "get_status": getstatus}
-            rows = self.api.query(None, None, GetReadyTasks.sql, **binds)
+            rows = self.api.query(None, None, self.Task.GetReadyTasks_sql, **binds)
             for row in rows:
                 newtask = Task()
                 newtask.deserialize(row)
@@ -152,13 +145,13 @@ class RESTWorkerWorkflow(RESTEntity):
             accordingly to what the TaskWorker provided
         """
         #load the task
-        task = self.api.query(None, None, ID.sql, taskname=binds['taskname'][0]).next()
+        task = self.api.query(None, None, self.Task.ID_sql, taskname=binds['taskname'][0]).next()
         splitargs = literal_eval(task[6].read())
         #update the tm_splitargs
         splitargs['runs'] = runs
         splitargs['lumis'] = lumis
         binds['splitargs'] = [str(splitargs)]
-        self.api.modify(SetSplitargsTask.sql, **binds)
+        self.api.modify(self.Task.SetSplitargsTask_sql, **binds)
 
 
 class Task(dict):
@@ -186,14 +179,14 @@ class Task(dict):
         self['tm_start_time'] = str(task[3])
         self['tm_start_injection'] = str(task[4])
         self['tm_end_injection'] = str(task[5])
-        self['tm_task_failure'] = task[6] if task[6] is None else task[6].read()
+        self['tm_task_failure'] = task[6] if ( task[6] is None or isinstance(task[6], str) ) else task[6].read() 
         self['tm_job_sw'] = task[7]
         self['tm_job_arch'] = task[8]
         self['tm_input_dataset'] = task[9]
         self['tm_site_whitelist'] = literal_eval(task[10])
         self['tm_site_blacklist'] = literal_eval(task[11])
         self['tm_split_algo'] = task[12]
-        self['tm_split_args'] = literal_eval(task[13] if task[13] is None else task[13].read())
+        self['tm_split_args'] = literal_eval(task[13] if ( task[13] is None or isinstance(task[13], str) ) else task[13].read()) 
         self['tm_totalunits'] = task[14]
         self['tm_user_sandbox'] = task[15]
         self['tm_cache_url'] = task[16]
@@ -212,14 +205,14 @@ class Task(dict):
         self['tm_edm_outfiles'] = literal_eval(task[29])
         self['tm_transformation'] = task[30]
         self['tm_job_type'] = task[31]
-        extraargs = literal_eval(task[32] if task[32] is None else task[32].read())
+        extraargs = literal_eval(task[32] if ( task[32] is None or isinstance(task[32],str) ) else task[32].read())
         self['resubmit_site_whitelist'] = extraargs['siteWhiteList'] if 'siteWhiteList' in extraargs else []
         self['resubmit_site_blacklist'] = extraargs['siteBlackList'] if 'siteBlackList' in extraargs else []
         self['resubmit_ids'] = extraargs['resubmitList'] if 'resubmitList' in extraargs else []
         self['kill_ids'] = extraargs['killList'] if 'killList' in extraargs else []
         self['kill_all'] = extraargs['killAll'] if 'killAll' in extraargs else False
-        self['panda_resubmitted_jobs'] = literal_eval(task[33] if task[33] is None else task[33].read())
+        self['panda_resubmitted_jobs'] = literal_eval(task[33] if ( task[33] is None or isinstance(task[33],str)) else task[33].read())
         self['tm_save_logs'] = task[34]
         self['tm_user_infiles'] = literal_eval(task[35])
         self['worker_name'] = task[36]
-        self['tm_arguments'] = literal_eval(task[32] if task[32] is None else task[32].read())
+        self['tm_arguments'] = literal_eval(task[32] if ( task[32] is None or isinstance(task[32],str) ) else task[32].read())

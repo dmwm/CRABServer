@@ -8,6 +8,7 @@ import pycurl
 import StringIO
 import cjson as json
 
+from WMCore.WMFactory import WMFactory
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
@@ -28,6 +29,17 @@ serverCert = None
 serverKey = None
 serverDN = None
 credServerPath = None
+
+def getDBinstance(config, namespace, name):
+    if config.backend.lower() == 'mysql':
+        backend = 'MySQL'
+    elif config.backend.lower() == 'oracle':
+        backend = 'Oracle'
+
+    #factory = WMFactory(name = 'TaskQuery', namespace = 'Databases.TaskDB.%s.Task' % backend)
+    factory = WMFactory(name = name, namespace = 'Databases.%s.%s.%s' % (namespace,backend,name))
+
+    return factory.loadObject( name )
 
 def globalinit(serverkey, servercert, serverdn, credpath):
     global serverCert, serverKey, serverDN, credServerPath
