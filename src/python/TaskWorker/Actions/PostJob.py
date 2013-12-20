@@ -170,6 +170,8 @@ class ASOServerJob(object):
             group = ''
         dbs_url = str(self.task_ad['CRAB_DBSUrl'])
         publish_dbs_url = str(self.task_ad['CRAB_PublishDBSUrl'])
+        if publish_dbs_url.lower() == 'undefined':
+            publish_dbs_url = "https://cmsdbsprod.cern.ch:8443/cms_dbs_ph_analysis_02_writer/servlet/DBSServlet"
         # TODO: Add a method to resolve a single PFN or use resolvePFNs
         last_update = int(time.time())
         now = str(datetime.datetime.now())
