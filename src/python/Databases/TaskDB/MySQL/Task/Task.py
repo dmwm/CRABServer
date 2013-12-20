@@ -58,14 +58,14 @@ class Task(object):
    	       tm_username, tm_user_dn, tm_user_vo, tm_user_role, tm_user_group, tm_publish_name, \
    	       tm_asyncdest, tm_dbs_url, tm_publish_dbs_url, tm_publication, tm_outfiles, \
    	       tm_tfile_outfiles, tm_edm_outfiles, tm_transformation, tm_job_type, tm_arguments,\
-               panda_resubmitted_jobs, tm_save_logs, tm_user_infiles) \
+               panda_resubmitted_jobs, tm_save_logs, tm_user_infiles, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority) \
                VALUES (%(task_name)s, %(jobset_id)s, upper(%(task_status)s), UTC_TIMESTAMP(), \
    	       %(task_failure)s, %(job_sw)s, %(job_arch)s, %(input_dataset)s, %(site_whitelist)s, \
    	       %(site_blacklist)s, %(split_algo)s, %(split_args)s, %(total_units)s, \
                %(user_sandbox)s, %(cache_url)s, %(username)s, %(user_dn)s, %(user_vo)s, %(user_role)s, \
    	       %(user_group)s, %(publish_name)s, %(asyncdest)s, %(dbs_url)s, %(publish_dbs_url)s, \
                %(publication)s, %(outfiles)s, %(tfile_outfiles)s, %(edm_outfiles)s, %(transformation)s, \
-   	       %(job_type)s, %(arguments)s, %(resubmitted_jobs)s, %(save_logs)s, %(user_infiles)s)"
+   	       %(job_type)s, %(arguments)s, %(resubmitted_jobs)s, %(save_logs)s, %(user_infiles)s, %(maxjobruntime)s, %(numcores)s, %(maxmemory)s, %(priority)s)"
 
     SetArgumentsTask_sql = "UPDATE tasks SET tm_arguments = %(arguments)s WHERE tm_taskname = %(taskname)s"
 
