@@ -2,19 +2,18 @@
 
 import logging
 
+class GetFromTaskAndType():
+    """ Used for indexing columns retrieved by the GetFromTaskAndType_sql query
+    """
+    PANDAID, OUTDS, ACQERA, SWVER, INEVENTS, GLOBALTAG, PUBLISHNAME, LOCATION, TMPLOCATION, RUNLUMI, ADLER32, CKSUM, MD5, LFN, SIZE, PARENTS, STATE = range(17)
+
 class FileMetaData(object):
     """
     """
 
     ChangeFileState_sql = """UPDATE filemetadata SET fmd_filestate=:filestate \
                              WHERE fmd_lfn=:outlfn and tm_taskname=:taskname """
-   
-    GetFromPandaIdsatter_sql = "SELECT fmd_lfn, fmd_location, fmd_tmp_location, fmd_size, fmd_cksum, fmd_md5, fmd_adler32, panda_job_id," +\
-             "fmd_parent, fmd_runlumi, fmd_in_events FROM filemetadata WHERE " +\
-             "fmd_type IN (SELECT REGEXP_SUBSTR(:types, '[^,]+', 1, LEVEL) FROM DUAL CONNECT BY LEVEL <= REGEXP_COUNT(:types, ',') + 1) AND " +\
-             "panda_job_id IN (SELECT REGEXP_SUBSTR(:jobids, '[^,]+', 1, LEVEL) FROM DUAL CONNECT BY LEVEL <= REGEXP_COUNT(:jobids, ',') + 1) " +\
-             "AND ROWNUM<=:limit AND tm_taskname=:taskname ORDER BY fmd_creation_time"
-   
+
     GetFromTaskAndType_sql = """SELECT panda_job_id AS pandajobid, \
                            fmd_outdataset AS outdataset, \
                            fmd_acq_era AS acquisitionera, \
@@ -25,7 +24,7 @@ class FileMetaData(object):
                            fmd_location AS location, \
                            fmd_tmp_location AS tmplocation, \
                            fmd_runlumi AS runlumi, \
-                           fmd_adler32 AS adler32, \ 
+                           fmd_adler32 AS adler32, \
                            fmd_cksum AS cksum, \
                            fmd_md5 AS md5, \
                            fmd_lfn AS lfn, \

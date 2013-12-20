@@ -14,6 +14,7 @@ from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.WMSpec.WMTask import buildLumiMask
 from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.Utils import conn_handler
+from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 from WMCore.Services.pycurl_manager import ResponseHeader
 
 import HTCondorUtils
