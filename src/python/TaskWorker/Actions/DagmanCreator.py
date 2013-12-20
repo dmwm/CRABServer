@@ -80,7 +80,6 @@ CRAB_Id = $(count)
 +CRAB_Dest = "cms://%(temp_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
 +TaskType = "Job"
-+MaxWallTimeMins = 1315
 +AccountingGroup = %(userhn)s
 
 +JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"

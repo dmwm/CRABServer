@@ -121,11 +121,19 @@ def make_job_submit(ad):
     for i in range(1, count+1):
         shutil.copy("Job.submit", "Job.%d.submit" % i)
 
+def clear_automatic_blacklist(ad):
+    for file in glob.glob("task_statistics.*"):
+        try:
+            os.unlink(file)
+        except Exception, e:
+            print "ERROR when clearing statistics: %s" % str(e)
 
 def main():
     ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
     make_webdir(ad)
     make_job_submit(ad)
+
+    clear_automatic_blacklist(ad)
 
     blacklist = set()
     if 'CRAB_SiteBlacklist' in ad:
