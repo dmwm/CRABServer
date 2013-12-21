@@ -126,7 +126,7 @@ class DataWorkflow(object):
     @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
-               runs, lumis, totalunits, adduserfiles, oneEventMode=False, userproxy=None):
+               runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, userproxy=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -158,6 +158,10 @@ class DataWorkflow(object):
            :arg int totalunits: number of MC event to be generated
            :arg str list adduserfiles: list of additional user input files
            :arg str oneEventMode: toggle one event mode
+           :arg int maxjobruntime: max job runtime, in minutes
+           :arg int numcores: number of CPU cores required by job
+           :arg int maxmemory: maximum amount of RAM required, in MB
+           :arg int priority: priority of this task
            :returns: a dict which contaians details of the request"""
 
         #if scheduler == 'condor':
@@ -167,6 +171,11 @@ class DataWorkflow(object):
         requestname = self.updateRequest('%s_%s_%s' % (timestamp, userhn, workflow))
         splitArgName = self.splitArgMap[splitalgo]
         dbSerializer = str
+
+        if numcores == None: numcores = 1
+        if maxjobruntime == None: maxjobruntime = 1315
+        if maxmemory == None: maxmemory = 2000
+        if priority == None: priority = 10
 
         self.api.modify(self.Task.New_sql,
                             task_name       = [requestname],\
@@ -202,12 +211,16 @@ class DataWorkflow(object):
                             arguments       = [dbSerializer({'oneEventMode' : 'T' if oneEventMode else 'F'})],\
                             resubmitted_jobs= [dbSerializer([])],\
                             save_logs       = ['T' if savelogsflag else 'F'],\
-                            user_infiles    = [dbSerializer(adduserfiles)]\
+                            user_infiles    = [dbSerializer(adduserfiles)],
+                            maxjobruntime   = [maxjobruntime],
+                            numcores        = [numcores],
+                            maxmemory       = [maxmemory],
+                            priority        = [priority],
         )
 
         return [{'RequestName': requestname}]
 
-    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, userdn, userproxy):
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, userdn, userproxy):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
 
@@ -235,9 +248,18 @@ class DataWorkflow(object):
             #if not resubmitList:
             #    raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
             self.logger.info("Jobs to resubmit: %s" % resubmitList)
-            self.api.modify(self.Task.SetStatusTask_sql, status = ["RESUBMIT"], taskname = [workflow])
+            args = str({"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList})
+            if maxjobruntime != None:
+                args['maxjobruntime'] = maxjobruntime
+            if numcores != None:
+                args['numcores'] = numcores
+            if maxmemory != None:
+                args['maxmemory'] = maxmemory
+            if priority != None:
+                args['priority'] = priority
             self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow],\
-                            arguments = [str({"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList})])
+                            arguments = [args])
+            self.api.modify(self.Task.SetStatusTask_sql, status = ["RESUBMIT"], taskname = [workflow])
         else:
             raise ExecutionError("You cannot resubmit a task if it is in the %s state" % statusRes['status'])
 

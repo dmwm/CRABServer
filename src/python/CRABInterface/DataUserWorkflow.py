@@ -108,12 +108,16 @@ class DataUserWorkflow(object):
            :arg int totalunits: number of MC event to be generated
            :arg str list adduserfiles: list of additional user input files
            :arg int oneEventMode: enables oneEventMode
+           :arg int maxjobruntime: max job runtime, in minutes
+           :arg int numcores: number of CPU cores required by job
+           :arg int maxmemory: maximum amount of RAM required, in MB
+           :arg int priority: priority of this task
            :returns: a dict which contaians details of the request"""
 
         return self.workflow.submit(*args, **kwargs)
 
     @retrieveUserCert
-    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, userdn, userproxy=None):
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, userdn, userproxy=None):
         """Request to Resubmit a workflow.
 
            :arg str workflow: a workflow name

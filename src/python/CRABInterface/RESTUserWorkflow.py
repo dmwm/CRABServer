@@ -94,7 +94,13 @@ class RESTUserWorkflow(RESTEntity):
             #if one and only one between publishDataName and publishDbsUrl is set raise an error (we need both or none of them)
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkSite(safe.kwargs['asyncdest'])
+            # We no longer use this attribute, but keep it around for older client compatibility
+            validate_num("blacklistT1", param, safe, optional=True)
             validate_num("oneEventMode", param, safe, optional=True)
+            validate_num("priority", param, safe, optional=True)
+            validate_num("maxjobruntime", param, safe, optional=True)
+            validate_num("numcores", param, safe, optional=True)
+            validate_num("maxmemory", param, safe, optional=True)
             validate_str("dbsurl", param, safe, RX_DBSURL, optional=False)
             validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES)
             validate_strlist("edmoutfiles", param, safe, RX_OUTFILES)
@@ -112,6 +118,11 @@ class RESTUserWorkflow(RESTEntity):
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
             safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
             validate_numlist('jobids', param, safe)
+            validate_num("priority", param, safe, optional=True)
+            validate_num("maxjobruntime", param, safe, optional=True)
+            validate_num("numcores", param, safe, optional=True)
+            validate_num("maxmemory", param, safe, optional=True)
+
 
         elif method in ['GET']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=True)
@@ -148,7 +159,7 @@ class RESTUserWorkflow(RESTEntity):
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
-                totalunits, adduserfiles, oneEventMode):
+                totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -181,6 +192,10 @@ class RESTUserWorkflow(RESTEntity):
            :arg int totalunits: number of MC event to be generated
            :arg int adduserfiles: additional user file to be copied in the cmsRun directory
            :arg int oneEventMode: flag enabling oneEventMode
+           :arg int maxjobruntime: max job runtime, in minutes
+           :arg int numcores: number of CPU cores required by job
+           :arg int maxmemory: maximum amount of RAM required, in MB
+           :arg int priority: priority of this task
            :returns: a dict which contaians details of the request"""
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
@@ -191,10 +206,11 @@ class RESTUserWorkflow(RESTEntity):
                                        userhn=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
                                        publication=publication, publishname=publishname, asyncdest=asyncdest,
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
-                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode)
+                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
+                                       maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority)
 
     @restcall
-    def post(self, workflow, siteblacklist, sitewhitelist, jobids):
+    def post(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority):
         """Resubmit an existing workflow. The caller needs to be a CMS user owner of the workflow.
 
            :arg str workflow: unique name identifier of the workflow;
@@ -203,6 +219,7 @@ class RESTUserWorkflow(RESTEntity):
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.api, [workflow], self.Task)
         return self.userworkflowmgr.resubmit(workflow=workflow, siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, jobids=jobids, \
+                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority
                                         userdn=cherrypy.request.headers['Cms-Authn-Dn'])
 
     @restcall
