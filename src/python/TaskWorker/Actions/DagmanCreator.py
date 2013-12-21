@@ -22,6 +22,8 @@ import TaskWorker.WorkerExceptions
 
 import WMCore.WMSpec.WMTask
 
+import classad
+
 try:
     from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 except ImportError:
@@ -274,7 +276,7 @@ def make_specs(task, sitead, jobgroup, availablesites, outfiles, startjobid):
             primaryds = task['tm_publish_name'].rsplit('-', 1)[0]
         counter = "%04d" % (i / 1000)
         specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
-                      'desiredSites': desiredSites, 'remoteOutputFiles': remoteOutputFiles,
+                      'remoteOutputFiles': remoteOutputFiles,
                       'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
                       'firstEvent' : firstEvent, 'lastEvent' : lastEvent,
                       'firstLumi' : firstLumi, 'firstRun' : firstRun,
@@ -377,12 +379,18 @@ class DagmanCreator(TaskAction.TaskAction):
             if global_whitelist:
                 availablesites &= global_whitelist
 
-            availablesites = [str(i) for i in availablesites]
-            self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
 
             if not availablesites:
                 msg = "No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+
+            # NOTE: User can still shoot themselves in the foot with the resubmit blacklist
+            if not (availablesites - set(kwargs['task']['tm_site_blacklist'])):
+                msg = "Site blacklist removes only possible sources of data for task %s" % (kwargs['task']['tm_taskname'])
+                raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+
+            availablesites = [str(i) for i in availablesites]
+            self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
 
             jobgroupspecs, startjobid = make_specs(kwargs['task'], sitead, jobgroup, availablesites, outfiles, startjobid)
             specs += jobgroupspecs
@@ -410,7 +418,7 @@ class DagmanCreator(TaskAction.TaskAction):
                      'sid': "https://glidein.cern.ch/%d/%s" % (idx, taskid),
                      'broker': os.environ.get('HOSTNAME',''),
                      'bossId': str(idx),
-                     'TargetSE': ("%d_Selected_SE" % len(specs[idx-1]['desiredSites'])),
+                     'TargetSE': ("%d_Selected_SE" % len(availablesites)),
                      'localId' : '',
                      'StatusValue' : 'pending',
                     }
