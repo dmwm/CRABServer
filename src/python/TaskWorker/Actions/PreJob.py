@@ -104,9 +104,34 @@ class PreJob:
             new_submit_text += '+CRAB_SiteAutomaticBlacklist = %s\n' % str(self.task_ad.lookup('CRAB_SiteAutomaticBlacklist'))
         with open("Job.submit", "r") as fd:
             new_submit_text += fd.read()
+
+        new_submit_text = self.redo_sites(new_submit_text, id, blacklist)
+
         with open("Job.%d.submit" % id, "w") as fd:
             fd.write(new_submit_text)
 
+
+    def redo_sites(self, new_submit_file, id, automatic_blacklist):
+
+        with open("site.ad") as fd:
+            site_ad = classad.parse(fd)
+
+        blacklist = set(self.task_ad['CRAB_SiteBlacklist'])
+        blacklist.update(automatic_blacklist)
+        available = set(site_ad['Job%d' % id])
+        whitelist = set(self.task_ad['CRAB_SiteWhitelist'])
+        if 'CRAB_SiteResubmitWhitelist' in self.task_ad:
+            whitelist.update(self.task_ad['CRAB_SiteResubmitWhitelist'])
+        if 'CRAB_SiteResubmitBlacklist' in self.task_ad:
+            blacklist.update(self.task_ad['CRAB_SiteResubmitBlacklist'])
+
+        if whitelist:
+            available &= whitelist
+        # Never blacklist something on the whitelist
+        available -= (blacklist-whitelist)
+
+        new_submit_file = '+DESIRED_SITES="%s"\n%s' % (",".join(available), new_submit_file)
+        return new_submit_file
 
     def execute(self, *args):
         retry_num = int(args[0])

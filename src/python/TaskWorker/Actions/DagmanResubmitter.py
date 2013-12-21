@@ -56,11 +56,14 @@ class DagmanResubmitter(TaskAction.TaskAction):
                     schedd.act(htcondor.JobAction.Hold, rootConst)
                     schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
                     schedd.act(htcondor.JobAction.Release, rootConst)
-        else:
+
+        if task['resubmit_site_whitelist'] or task['resubmit_site_blacklist']:
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
                 if not parent:
-                    schedd.edit(rootConst, "CRAB_SiteBlacklist", ad['blacklist'])
-                    schedd.edit(rootConst, "CRAB_SiteWhitelist", ad['whitelist'])
+                    if task['resubmit_site_blacklist']:
+                        schedd.edit(rootConst, "CRAB_SiteResubmitBlacklist", ad['blacklist'])
+                    if task['resubmit_site_whitelist']:
+                        schedd.edit(rootConst, "CRAB_SiteResubmitWhitelist", ad['whitelist'])
                     schedd.act(htcondor.JobAction.Release, rootConst)
         results = rpipe.read()
         if results != "OK":

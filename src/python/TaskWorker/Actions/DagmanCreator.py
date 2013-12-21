@@ -35,7 +35,7 @@ SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %
 SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 10 UNLESS-EXIT 2
-VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" +DESIRED_Sites="\\"%(desiredSites)s\\"" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
+VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
 
 """
 
@@ -103,8 +103,6 @@ should_transfer_files = YES
 use_x509userproxy = true
 # TODO: Uncomment this when we get out of testing mode
 Requirements = ((target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)) %(opsys_req)s
-#Requirements = ((target.IS_GLIDEIN =!= TRUE) || ((target.GLIDEIN_CMSSite =!= UNDEFINED) && (stringListIMember(target.GLIDEIN_CMSSite, DESIRED_SEs) )))
-#leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
 periodic_remove = (JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)
 queue
@@ -244,7 +242,7 @@ def makeJobSubmit(task):
 
     return info
 
-def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
+def make_specs(task, sitead, jobgroup, availablesites, outfiles, startjobid):
     specs = []
     i = startjobid
     temp_dest, dest = makeLFNPrefixes(task)
@@ -255,8 +253,8 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
         lastEvent = str(job['mask']['LastEvent'])
         firstLumi = str(job['mask']['FirstLumi'])
         firstRun = str(job['mask']['FirstRun'])
-        desiredSites = ", ".join(availablesites)
         i += 1
+        sitead['Job%d'% i] = list(availablesites)
         remoteOutputFiles = []
         localOutputFiles = []
         for origFile in outfiles:
@@ -364,6 +362,7 @@ class DagmanCreator(TaskAction.TaskAction):
         if hasattr(self.config.Sites, 'banned'):
             global_blacklist = set(self.config.Sites.banned)
 
+        sitead = classad.ClassAd()
         for jobgroup in splitter_result:
             jobs = jobgroup.getJobs()
 
@@ -372,16 +371,11 @@ class DagmanCreator(TaskAction.TaskAction):
             else:
                 possiblesites = jobs[0]['input_files'][0]['locations']
             self.logger.debug("Possible sites: %s" % possiblesites)
-            self.logger.debug('Blacklist: %s; whitelist %s' % (kwargs['task']['tm_site_blacklist'], kwargs['task']['tm_site_whitelist']))
-            if kwargs['task']['tm_site_whitelist']:
-                availablesites = set(kwargs['task']['tm_site_whitelist'])
-            else:
-                availablesites = set(possiblesites) - set(kwargs['task']['tm_site_blacklist'])
 
             # Apply globals
-            availablesites = set(availablesites) - global_blacklist
+            availablesites = set(possiblesites) - global_blacklist
             if global_whitelist:
-                availablesites = set(availablesites) & global_whitelist
+                availablesites &= global_whitelist
 
             availablesites = [str(i) for i in availablesites]
             self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
@@ -390,7 +384,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 msg = "No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
-            jobgroupspecs, startjobid = make_specs(kwargs['task'], jobgroup, availablesites, outfiles, startjobid)
+            jobgroupspecs, startjobid = make_specs(kwargs['task'], sitead, jobgroup, availablesites, outfiles, startjobid)
             specs += jobgroupspecs
 
         dag = "\nNODE_STATUS_FILE node_state 30\n"
@@ -399,6 +393,9 @@ class DagmanCreator(TaskAction.TaskAction):
 
         with open("RunJobs.dag", "w") as fd:
             fd.write(dag)
+
+        with open("site.ad", "w") as fd:
+            fd.write(str(sitead))
 
         task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
         userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
