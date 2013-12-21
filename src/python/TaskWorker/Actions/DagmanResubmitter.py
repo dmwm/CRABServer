@@ -57,8 +57,8 @@ class DagmanResubmitter(TaskAction.TaskAction):
                     schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
                     schedd.act(htcondor.JobAction.Release, rootConst)
 
-        if task['resubmit_site_whitelist'] or task['resubmit_site_blacklist'] or
-                task['resubmit_priority'] != None or task['resubmit_maxmemory'] != None or
+        if task['resubmit_site_whitelist'] or task['resubmit_site_blacklist'] or \
+                task['resubmit_priority'] != None or task['resubmit_maxmemory'] != None or \
                 task['resubmit_numcores'] != None or task['resubmit_maxjobruntime'] != None:
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
                 if not parent:

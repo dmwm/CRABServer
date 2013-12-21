@@ -145,7 +145,8 @@ def transform_strings(input):
     info = {}
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
-           'userdn', 'requestname', 'publication', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group':
+           'userdn', 'requestname', 'publication', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
+           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'

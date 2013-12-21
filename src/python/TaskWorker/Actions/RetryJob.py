@@ -64,14 +64,14 @@ class RetryJob(object):
 
     def record_site(self, result):
         try:
-            with os.fdopen(os.open("task_statistics.%s.%s" % (self.site, id_to_name[result]), os.O_APPEND | os.O_CREAT | os.O_RDWR), "a") as fd:
-                fd.write("%s\n", self.count)
+            with os.fdopen(os.open("task_statistics.%s.%s" % (self.site, id_to_name[result]), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), "a") as fd:
+                fd.write("%s\n" % self.count)
         except Exception, e:
             print "ERROR: %s" % str(e)
             # Swallow the exception - record_site is advisory only
         try:
-            with os.fdopen(os.open("task_statistics.%s" % (id_to_name[result]), os.O_APPEND | os.O_CREAT | os.O_RDWR), "a") as fd:
-                fd.write("%s\n", self.count)
+            with os.fdopen(os.open("task_statistics.%s" % (id_to_name[result]), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), "a") as fd:
+                fd.write("%s\n" % self.count)
         except Exception, e:
             print "ERROR: %s" % str(e)
             # Swallow the exception - record_site is advisory only
