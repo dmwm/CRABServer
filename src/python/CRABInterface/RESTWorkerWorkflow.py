@@ -208,6 +208,10 @@ class Task(dict):
         extraargs = literal_eval(task[32] if ( task[32] is None or isinstance(task[32],str) ) else task[32].read())
         self['resubmit_site_whitelist'] = extraargs['siteWhiteList'] if 'siteWhiteList' in extraargs else []
         self['resubmit_site_blacklist'] = extraargs['siteBlackList'] if 'siteBlackList' in extraargs else []
+        self['resubmit_priority'] = extraargs['priority'] if 'priority' in extraargs else None
+        self['resubmit_numcores'] = extraargs['numcores'] if 'numcores' in extraargs else None
+        self['resubmit_maxmemory'] = extraargs['maxmemory'] if 'maxmemory' in extraargs else None
+        self['resubmit_maxjobruntime'] = extraargs['maxjobruntime'] if 'maxjobruntime' in extraargs else None
         self['resubmit_ids'] = extraargs['resubmitList'] if 'resubmitList' in extraargs else []
         self['kill_ids'] = extraargs['killList'] if 'killList' in extraargs else []
         self['kill_all'] = extraargs['killAll'] if 'killAll' in extraargs else False
@@ -216,3 +220,8 @@ class Task(dict):
         self['tm_user_infiles'] = literal_eval(task[35])
         self['worker_name'] = task[36]
         self['tm_arguments'] = literal_eval(task[32] if ( task[32] is None or isinstance(task[32],str) ) else task[32].read())
+        self['tm_maxjobruntime'] = task[37]
+        self['tm_numcores'] = task[38]
+        self['tm_maxmemory'] = task[39]
+        self['tm_priority'] = task[40]
+

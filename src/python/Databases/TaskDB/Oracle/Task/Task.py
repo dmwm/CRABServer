@@ -63,7 +63,7 @@ class Task(object):
                        tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \
                        tm_publish_dbs_url, tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
                        tm_transformation, tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, \
-                       tm_user_infiles, tw_name \
+                       tm_user_infiles, tw_name, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority \
                        FROM tasks WHERE tm_task_status = :get_status AND ROWNUM <= :limit AND tw_name = :tw_name"""
    
     #GetUserFromID
