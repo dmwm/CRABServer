@@ -35,7 +35,7 @@ SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY
 SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 10 UNLESS-EXIT 2
-VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" inputFiles="%(inputFiles)s" +DESIRED_Sites="\\"%(desiredSites)s\\"" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
+VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" inputFiles="%(inputFiles)s" +DESIRED_Sites="\\"%(desiredSites)s\\"" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\""
 
 """
 
@@ -239,7 +239,7 @@ def makeJobSubmit(task):
 
     return info
 
-def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
+def make_specs(task, jobgroup, block, availablesites, outfiles, startjobid):
     specs = []
     i = startjobid
     temp_dest, dest = makeLFNPrefixes(task)
@@ -273,7 +273,8 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
                       'outputData': task['tm_publish_name'],
                       'tempDest': os.path.join(temp_dest, counter),
                       'outputDest': os.path.join(dest, counter),
-                      'restinstance': task['restinstance'], 'resturl': task['resturl']})
+                      'restinstance': task['restinstance'], 'resturl': task['resturl'],
+                      'block': block})
 
         LOGGER.debug(specs[-1])
     return specs, i
@@ -358,6 +359,8 @@ class DagmanCreator(TaskAction.TaskAction):
                 possiblesites = []
             else:
                 possiblesites = jobs[0]['input_files'][0]['locations']
+            block = jobs[0]['block']
+            self.logger.debug("Block name: %s" % block)
             self.logger.debug("Possible sites: %s" % possiblesites)
             self.logger.debug('Blacklist: %s; whitelist %s' % (kwargs['task']['tm_site_blacklist'], kwargs['task']['tm_site_whitelist']))
             if kwargs['task']['tm_site_whitelist']:
@@ -377,7 +380,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 msg = "No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
-            jobgroupspecs, startjobid = make_specs(kwargs['task'], jobgroup, availablesites, outfiles, startjobid)
+            jobgroupspecs, startjobid = make_specs(kwargs['task'], jobgroup, block, availablesites, outfiles, startjobid)
             specs += jobgroupspecs
 
         dag = "\nNODE_STATUS_FILE node_state 30\n"
