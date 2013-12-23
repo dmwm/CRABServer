@@ -13,10 +13,8 @@ import htcondor
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.WMSpec.WMTask import buildLumiMask
 from CRABInterface.DataWorkflow import DataWorkflow
-from Databases.TaskDB.Oracle.Task.ID import ID
-from Databases.TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
-from Databases.FileMetaDataDB.Oracle.FileMetaData.GetFromTaskAndType import GetFromTaskAndType
 from CRABInterface.Utils import conn_handler
+from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 from WMCore.Services.pycurl_manager import ResponseHeader
 
 import HTCondorUtils
@@ -81,15 +79,15 @@ class HTCondorDataWorkflow(DataWorkflow):
             import cherrypy
             s = traceback.format_exc()
             cherrypy.log("Failure of alt status: %s" % s)
-
         # First, verify the task has been submitted by the backend.
-        row = self.api.query(None, None, ID.sql, taskname = workflow)
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, userdn = row.next() #just one row is picked up by the previous query
         self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
+        if not taskFailure: taskFailure = '' 
         if status != 'SUBMITTED':
             return [ {"status" : status,\
-                      "taskFailureMsg" : taskFailure.read() if taskFailure else '',\
+                      "taskFailureMsg" : taskFailure if isinstance(taskFailure,str) else taskFailure.read(),\
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
@@ -208,7 +206,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         """
         Get the finished jobs from the file metadata table.
         """
-        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='FAKE', taskname=workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='FAKE', taskname=workflow)
 
         for row in rows:
             yield row[GetFromTaskAndType.PANDAID], row[GetFromTaskAndType.STATE]
@@ -216,7 +214,7 @@ class HTCondorDataWorkflow(DataWorkflow):
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
 
-        row = self.api.query(None, None, ID.sql, taskname = workflow)
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn = row.next()
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
@@ -228,7 +226,7 @@ class HTCondorDataWorkflow(DataWorkflow):
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
 
-        row = self.api.query(None, None, ID.sql, taskname = workflow)
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn = row.next()
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
@@ -263,7 +261,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             return
 
         self.logger.debug("Retrieving %s output of jobs: %s" % (','.join(filetype), jobids))
-        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype=','.join(filetype), taskname=workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype=','.join(filetype), taskname=workflow)
         rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
         if howmany!=-1:
             rows=rows[:howmany]
@@ -294,14 +292,14 @@ class HTCondorDataWorkflow(DataWorkflow):
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         #load the lumimask
-        rows = self.api.query(None, None, ID.sql, taskname = workflow)
+        rows = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         splitArgs = literal_eval(rows.next()[6].read())
         res['lumiMask'] = buildLumiMask(splitArgs['runs'], splitArgs['lumis'])
         self.logger.info("Lumi mask was: %s" % res['lumiMask'])
 
         #extract the finished jobs from filemetadata
         jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'transferring']]
-        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='EDM', taskname=workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM', taskname=workflow)
 
         res['runsAndLumis'] = {}
         for row in rows:
@@ -323,13 +321,13 @@ class HTCondorDataWorkflow(DataWorkflow):
            :return: a workflow status summary document"""
 
         # First, verify the task has been submitted by the backend.
-        row = self.api.query(None, None, ID.sql, taskname = workflow)
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, userdn = row.next() #just one row is picked up by the previous query
         self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
         if status != 'SUBMITTED':
             return [ {"status" : status,\
-                      "taskFailureMsg" : taskFailure.read() if taskFailure else '',\
+                      "taskFailureMsg" : taskFailure, #.read() if taskFailure else '',\
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
@@ -347,7 +345,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         cherrypy.log("Will talk to %s." % locator.getCollector())
         name = locator.getSchedd()
         cherrypy.log("Schedd name %s." % name)
-        schedd, address = locator.getScheddObj(name)
+        schedd, address = locator.getScheddObj(workflow)
 
         results = self.getRootTasks(workflow, schedd)
         if not results:

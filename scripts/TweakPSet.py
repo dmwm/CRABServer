@@ -1,6 +1,6 @@
 """
 Can be tested with something like:
-python TweakPSet.py Analy /afs/cern.ch/user/m/mmascher/transformation/refactored/tmp '["/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0010/EA00B1E8-F8AD-E111-90C5-5404A6388697.root"]' '{"1": [[669684, 669684]]}'
+python /afs/cern.ch/user/m/mmascher/transformation/tmp/TweakPSet.py --location=/afs/cern.ch/user/m/mmascher/transformation/tmp --inputFile='["/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0010/EA00B1E8-F8AD-E111-90C5-5404A6388697.root"]' --runAndLumis='{"1": [[669684, 669684]]}' --firstEvent=0 --lastEvent=-1 --firstLumi=None --firstRun=None --seeding=None --lheInputFiles=False --oneEventMode=0
 """
 
 from optparse import OptionParser
@@ -104,29 +104,28 @@ print " arguments: %s" % sys.argv
 agentNumber = 0
 #lfnBase = '/store/temp/user/mmascher/RelValProdTTbar/mc/v6' #TODO how is this built?
 lfnBase = None
-outputMods = ['o'] #TODO should not be hardcoded but taken from the config (how?)
+outputMods = [] #Don't need to tweak this as the client looks for the ouput names and pass them to the job wrapper which moves them
+
 
 parser = OptionParser()
+parser.add_option('--location', dest='location')
+parser.add_option('--inputFile', dest='inputFile')
+parser.add_option('--runAndLumis', dest='runAndLumis')
+parser.add_option('--firstEvent', dest='firstEvent')
+parser.add_option('--lastEvent', dest='lastEvent')
+parser.add_option('--firstLumi', dest='firstLumi')
+parser.add_option('--firstRun', dest='firstRun')
+parser.add_option('--seeding', dest='seeding')
+parser.add_option('--lheInputFiles', dest='lheInputFiles')
 parser.add_option('--oneEventMode', dest='oneEventMode', default=False)
 opts, args = parser.parse_args()
-oneEventMode = opts.oneEventMode
+
 if opts.oneEventMode:
     print "One event mode disabled until we can put together a decent version of WMCore."
     print "TweakPSet.py is going to force one event mode"
-location = sys.argv[2]
-inputFiles = literal_eval(sys.argv[3])
-runAndLumis = literal_eval(sys.argv[4])
 
-if sys.argv[1]=='MC':
-    firstEvent=sys.argv[5]
-    lastEvent=sys.argv[6]
-    firstLumi=sys.argv[7]
-    firstRun=sys.argv[8]
-    seeding=sys.argv[9]
-    lheInputFiles=bool(literal_eval(sys.argv[10]))
-    pset = SetupCMSSWPsetCore( location, map(str, inputFiles), runAndLumis, agentNumber, lfnBase, outputMods, int(firstEvent), int(lastEvent), int(firstLumi),\
-                    int(firstRun), seeding, lheInputFiles, oneEventMode = oneEventMode)
-else:
-    pset = SetupCMSSWPsetCore( location, map(str, inputFiles), runAndLumis, agentNumber, lfnBase, outputMods, oneEventMode=oneEventMode)
+pset = SetupCMSSWPsetCore( opts.location, map(str, literal_eval(opts.inputFile)), literal_eval(opts.runAndLumis), agentNumber, lfnBase, outputMods,\
+                           literal_eval(opts.firstEvent), literal_eval(opts.lastEvent), literal_eval(opts.firstLumi),\
+                           literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode)
 
 pset()

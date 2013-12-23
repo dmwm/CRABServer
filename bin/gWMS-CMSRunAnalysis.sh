@@ -61,6 +61,7 @@ CRAB_ISB=$(extractArg CRAB_ISB) || exit 1
 CRAB_Id=$(extractArg CRAB_Id) || exit 1 
 CRAB_JobSW=$(extractArg CRAB_JobSW) || exit 1 
 CRAB_JobArch=$(extractArg CRAB_JobArch) || exit 1 
+
 CRAB_AdditionalOutputFiles=$(extractArg CRAB_AdditionalOutputFiles) || exit 1
 # put this back into the commandline args until quoting can get figured
 # out

@@ -9,8 +9,8 @@ import random
 import urllib
 import traceback
 
-import CRABInterface.HTCondorUtils as HTCondorUtils
-import CRABInterface.HTCondorLocator as HTCondorLocator
+import HTCondorUtils
+import HTCondorLocator
 
 import TaskWorker.Actions.TaskAction as TaskAction
 import TaskWorker.DataObjects.Result as Result
@@ -96,7 +96,11 @@ SUBMIT_INFO = [ \
             ('CRAB_JobCount', 'jobcount'),
             ('CRAB_UserVO', 'tm_user_vo'),
             ('CRAB_UserRole', 'tm_user_role'),
-            ('CRAB_UserGroup', 'tm_user_group')]
+            ('CRAB_UserGroup', 'tm_user_group'),
+            ('RequestMemory', 'tm_maxmemory'),
+            ('RequestCpus', 'tm_numcores'),
+            ('MaxWallTimeMins', 'tm_maxjobruntime'),
+            ('JobPrio', 'tm_priority')]
 
 def addCRABInfoToClassAd(ad, info):
     """
@@ -142,7 +146,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         #FIXME: hardcoding the transform name for now.
         #inputFiles = ['gWMS-CMSRunAnalysis.sh', task['tm_transformation'], 'cmscp.py', 'RunJobs.dag']
-        inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', 'AdjustSites.py']
+        inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', 'AdjustSites.py', 'site.ad']
         if task.get('tm_user_sandbox') == 'sandbox.tar.gz':
             inputFiles.append('sandbox.tar.gz')
         if os.path.exists("CMSRunAnalysis.tar.gz"):
@@ -184,6 +188,16 @@ class DagmanSubmitter(TaskAction.TaskAction):
         """
         dagAd = classad.ClassAd()
         addCRABInfoToClassAd(dagAd, info)
+
+        # Set default task attributes:
+        if 'RequestMemory' not in dagAd:
+            dagAd['RequestMemory'] = 2000
+        if 'RequestCpus' not in dagAd:
+            dagAd['RequestCpus'] = 1
+        if 'MaxWallTimeMins' not in dagAd:
+            dagAd['MaxWallTimeMins'] = 1315
+        if 'JobPrio' not in dagAd:
+            dagAd['JobPrio'] = 10
 
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))

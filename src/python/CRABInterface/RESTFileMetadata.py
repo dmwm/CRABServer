@@ -4,7 +4,7 @@ from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
 
 # CRABServer dependecies here
-from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
+from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import *
 from CRABInterface.DataFileMetadata import DataFileMetadata
 
@@ -17,7 +17,7 @@ class RESTFileMetadata(RESTEntity):
 
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
-        self.jobmetadata = DataFileMetadata()
+        self.jobmetadata = DataFileMetadata(config)
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""

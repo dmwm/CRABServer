@@ -5,17 +5,13 @@ import cherrypy #cherrypy import is needed here because we need the 'start_threa
 import traceback
 import json
 
+from CRABInterface.Utils import getDBinstance
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 
 #CRAB dependencies
 from CRABInterface.Utils import CMSSitesCache, conn_handler, retrieveUserCert
-
-#SQL queries
-from Databases.TaskDB.Oracle.Task.New import New
-from Databases.TaskDB.Oracle.Task.SetStatusTask import SetStatusTask
-from Databases.TaskDB.Oracle.Task.SetArgumentsTask import SetArgumentsTask
 
 def strip_username_from_taskname(workflow):
     """When auto-generating a destination directory and dataset name for
@@ -49,6 +45,10 @@ class DataWorkflow(object):
         self.splitArgMap = { "LumiBased" : "lumis_per_job",
                         "FileBased" : "files_per_job",
                         "EventBased" : "events_per_job",}
+
+	self.Task = getDBinstance(config, 'TaskDB', 'Task')
+	self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
+	self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
 
     def updateRequest(self, workflow):
         """Provide the implementing class a chance to rename the workflow
@@ -125,8 +125,8 @@ class DataWorkflow(object):
     @conn_handler(services=['centralconfig'])
     @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
-               userhn, userdn, savelogsflag, publication, publishname, asyncdest, blacklistT1, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
-               runs, lumis, totalunits, adduserfiles, oneEventMode=False, userproxy=None):
+               userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
+               runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, userproxy=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -147,7 +147,6 @@ class DataWorkflow(object):
            :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication;
            :arg str asyncdest: CMS site name for storage destination of the output files;
-           :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
            :arg str vorole: user vo role
@@ -159,6 +158,10 @@ class DataWorkflow(object):
            :arg int totalunits: number of MC event to be generated
            :arg str list adduserfiles: list of additional user input files
            :arg str oneEventMode: toggle one event mode
+           :arg int maxjobruntime: max job runtime, in minutes
+           :arg int numcores: number of CPU cores required by job
+           :arg int maxmemory: maximum amount of RAM required, in MB
+           :arg int priority: priority of this task
            :returns: a dict which contaians details of the request"""
 
         #if scheduler == 'condor':
@@ -169,7 +172,12 @@ class DataWorkflow(object):
         splitArgName = self.splitArgMap[splitalgo]
         dbSerializer = str
 
-        self.api.modify(New.sql,
+        if numcores == None: numcores = 1
+        if maxjobruntime == None: maxjobruntime = 1315
+        if maxmemory == None: maxmemory = 2000
+        if priority == None: priority = 10
+
+        self.api.modify(self.Task.New_sql,
                             task_name       = [requestname],\
                             jobset_id       = [None],
                             task_status     = ['NEW'],\
@@ -203,12 +211,16 @@ class DataWorkflow(object):
                             arguments       = [dbSerializer({'oneEventMode' : 'T' if oneEventMode else 'F'})],\
                             resubmitted_jobs= [dbSerializer([])],\
                             save_logs       = ['T' if savelogsflag else 'F'],\
-                            user_infiles    = [dbSerializer(adduserfiles)]\
+                            user_infiles    = [dbSerializer(adduserfiles)],
+                            maxjobruntime   = [maxjobruntime],
+                            numcores        = [numcores],
+                            maxmemory       = [maxmemory],
+                            priority        = [priority],
         )
 
         return [{'RequestName': requestname}]
 
-    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, userdn, userproxy):
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, userdn, userproxy):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
 
@@ -236,9 +248,18 @@ class DataWorkflow(object):
             #if not resubmitList:
             #    raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
             self.logger.info("Jobs to resubmit: %s" % resubmitList)
-            self.api.modify(SetStatusTask.sql, status = ["RESUBMIT"], taskname = [workflow])
-            self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
-                            arguments = [str({"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList})])
+            args = str({"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList})
+            if maxjobruntime != None:
+                args['maxjobruntime'] = maxjobruntime
+            if numcores != None:
+                args['numcores'] = numcores
+            if maxmemory != None:
+                args['maxmemory'] = maxmemory
+            if priority != None:
+                args['priority'] = priority
+            self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow],\
+                            arguments = [args])
+            self.api.modify(self.Task.SetStatusTask_sql, status = ["RESUBMIT"], taskname = [workflow])
         else:
             raise ExecutionError("You cannot resubmit a task if it is in the %s state" % statusRes['status'])
 
@@ -255,12 +276,12 @@ class DataWorkflow(object):
             #only completed jobs
             if not set(jobsPerStatus) - set(self.successList):
                 self.logger.debug("Changing task status to COMPLETED")
-                self.api.modify(SetStatusTask.sql, status = ["COMPLETED"], taskname = [workflow])
+                self.api.modify(self.Task.SetStatusTask_sql, status = ["COMPLETED"], taskname = [workflow])
                 return "COMPLETED"
             #only failed and completed jobs (completed may not be there) => task failed
             if not set(jobsPerStatus) - set(self.successList) - set(self.failedList):
                 self.logger.debug("Changing task status to FAILED")
-                self.api.modify(SetStatusTask.sql, status = ["FAILED"], taskname = [workflow])
+                self.api.modify(self.Task.SetStatusTask_sql, status = ["FAILED"], taskname = [workflow])
                 return "FAILED"
         return status
 
@@ -293,11 +314,11 @@ class DataWorkflow(object):
                 raise ExecutionError("There are no jobs to kill. Only jobs not in %s states can be killed" % self.successList)
             self.logger.info("Jobs to kill: %s" % killList)
 
-            self.api.modify(SetStatusTask.sql, status = ["KILL"], taskname = [workflow])
-            self.api.modify(SetArgumentsTask.sql, taskname = [workflow],\
+            self.api.modify(self.Task.SetStatusTask_sql, status = ["KILL"], taskname = [workflow])
+            self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow],\
                             arguments = [str({"killList": killList, "killAll": jobids==[]})])
         elif statusRes['status'] == 'NEW':
-            self.api.modify(SetStatusTask.sql, status = ["KILLED"], taskname = [workflow])
+            self.api.modify(self.Task.SetStatusTask_sql, status = ["KILLED"], taskname = [workflow])
         else:
             raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
 

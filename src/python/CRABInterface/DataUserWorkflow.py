@@ -97,7 +97,6 @@ class DataUserWorkflow(object):
            :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication;
            :arg str asyncdest: CMS site name for storage destination of the output files;
-           :arg int blacklistT1: flag enabling or disabling the black listing of Tier-1 sites;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
            :arg str vorole: user vo role
@@ -109,12 +108,16 @@ class DataUserWorkflow(object):
            :arg int totalunits: number of MC event to be generated
            :arg str list adduserfiles: list of additional user input files
            :arg int oneEventMode: enables oneEventMode
+           :arg int maxjobruntime: max job runtime, in minutes
+           :arg int numcores: number of CPU cores required by job
+           :arg int maxmemory: maximum amount of RAM required, in MB
+           :arg int priority: priority of this task
            :returns: a dict which contaians details of the request"""
 
         return self.workflow.submit(*args, **kwargs)
 
     @retrieveUserCert
-    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, userdn, userproxy=None):
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, userdn, userproxy=None):
         """Request to Resubmit a workflow.
 
            :arg str workflow: a workflow name

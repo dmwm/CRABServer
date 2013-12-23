@@ -5,6 +5,8 @@ from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
 from WMCore.DataStructs.Run import Run
 
+from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
+
 
 class MakeFakeFileSet(TaskAction):
     """This is needed to make WMCore.JobSplitting lib working... 
@@ -20,11 +22,16 @@ class MakeFakeFileSet(TaskAction):
         lastEvent = totalevents
         firstLumi = 1
         lastLumi = 10
-        
+
         #MC comes with only one MCFakeFile
         singleMCFileset = Fileset(name = "MCFakeFileSet")
         newFile = File("MCFakeFile", size = 1000, events = totalevents)
-        newFile.setLocation(self.config.Sites.available)
+        if hasattr(self.config.Sites, 'available'):
+            newFile.setLocation(self.config.Sites.available)
+        else:
+            sbj = SiteDBJSON({"key":self.config.TaskWorker.cmskey,
+                              "cert":self.config.TaskWorker.cmscert})
+            newFile.setLocation(sbj.getAllCMSNames())
         newFile.addRun(Run(1, *range(firstLumi, lastLumi + 1)))
         newFile["block"] = 'MCFackBlock'
         newFile["first_event"] = firstEvent

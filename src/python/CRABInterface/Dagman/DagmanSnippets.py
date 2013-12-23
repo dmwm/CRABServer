@@ -33,7 +33,6 @@ CRAB_HEADERS = \
 +CRAB_UserDN = %(userdn)s
 +CRAB_UserHN = %(userhn)s
 +CRAB_AsyncDest = %(asyncdest)s
-+CRAB_BlacklistT1 = %(blacklistT1)s
 should_transfer_files = YES
 """
 
@@ -86,7 +85,6 @@ SUBMIT_INFO = [ \
             ('CRAB_UserDN', 'userdn'),
             ('CRAB_UserHN', 'userhn'),
             ('CRAB_AsyncDest', 'asyncdest'),
-            ('CRAB_BlacklistT1', 'blacklistT1'),
             ('CRAB_SplitAlgo', 'splitalgo'),
             ('CRAB_AlgoArgs', 'algoargs'),
             ('CRAB_PublishName', 'publishname'),

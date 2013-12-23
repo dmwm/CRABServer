@@ -1,4 +1,5 @@
 
+import os
 import json
 import commands
 import traceback
@@ -8,6 +9,12 @@ import classad
 OK = 0
 FATAL_ERROR = 2
 RECOVERABLE_ERROR = 1
+
+id_to_name = { \
+    OK: "OK",
+    FATAL_ERROR: "FATAL_ERROR",
+    RECOVERABLE_ERROR: "RECOVERABLE_ERROR",
+}
 
 # Fatal error limits for job resource usage
 MAX_WALLTIME = 21*60*60 + 30*60
@@ -23,6 +30,7 @@ class RetryJob(object):
 
     def __init__(self):
         self.count = "-1"
+        self.site = None
 
     def get_job_ad(self):
         cmd = "condor_q -l -userlog job_log %s" % str(self.cluster)
@@ -38,6 +46,8 @@ class RetryJob(object):
             if ad:
                 self.ads.append(ad)
         self.ad = self.ads[-1]
+        if 'JOBGLIDEIN_CMSSite' in self.ad:
+            self.site = self.ad['JOBGLIDEIN_CMSSite']
 
     def get_report(self):
         try:
@@ -46,8 +56,25 @@ class RetryJob(object):
                     self.report = json.load(fd)
                 except ValueError, ve:
                     self.report = {}
+            site = self.report.get('executed_site', None)
+            if site:
+                self.site = site
         except IOError, ioe:
             raise FatalError("IOError when reading the framework job report JSON: '%s'" % str(ioe))
+
+    def record_site(self, result):
+        try:
+            with os.fdopen(os.open("task_statistics.%s.%s" % (self.site, id_to_name[result]), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), "a") as fd:
+                fd.write("%s\n" % self.count)
+        except Exception, e:
+            print "ERROR: %s" % str(e)
+            # Swallow the exception - record_site is advisory only
+        try:
+            with os.fdopen(os.open("task_statistics.%s" % (id_to_name[result]), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), "a") as fd:
+                fd.write("%s\n" % self.count)
+        except Exception, e:
+            print "ERROR: %s" % str(e)
+            # Swallow the exception - record_site is advisory only
 
     def check_cpu_report(self):
         if 'steps' not in self.report: return
@@ -110,6 +137,9 @@ class RetryJob(object):
         if exitCode == 50115:
             raise RecoverableError("Job did not produce a FJR; will retry.")
 
+        if exitCode == 10034:
+            raise RecoverableError("Required application version is not found at the site")
+
         if exitCode:
             raise FatalError("Job exited with code %d.  Exit message: %s" % (exitCode, exitMsg))
 
@@ -137,12 +167,16 @@ class RetryJob(object):
 
     def execute(self, *args, **kw):
         try:
-            return self.execute_internal(*args, **kw)
+            result = self.execute_internal(*args, **kw)
+            self.record_site(result)
+            return result
         except FatalError, fe:
             print fe
+            self.record_site(FATAL_ERROR)
             return FATAL_ERROR
         except RecoverableError, re:
             print re
+            self.record_site(RECOVERABLE_ERROR)
             return RECOVERABLE_ERROR
         except Exception:
             print str(traceback.format_exc())

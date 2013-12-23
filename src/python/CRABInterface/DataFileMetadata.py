@@ -7,23 +7,22 @@ from ast import literal_eval
 # WMCore dependecies here
 from WMCore.REST.Error import InvalidParameter, ExecutionError, MissingObject
 
-#CRAB dependencies
-from Databases.FileMetaDataDB.Oracle.FileMetaData.ChangeFileState import ChangeFileState
-from Databases.FileMetaDataDB.Oracle.FileMetaData.New import New
-from Databases.FileMetaDataDB.Oracle.FileMetaData.GetFromTaskAndType import GetFromTaskAndType
+from CRABInterface.Utils import getDBinstance
 
 class DataFileMetadata(object):
     @staticmethod
-    def globalinit(dbapi):
+    def globalinit(dbapi, config):
         DataFileMetadata.api = dbapi
+        DataFileMetadata.config = config
 
-    def __init__(self):
+    def __init__(self, config):
         self.logger = logging.getLogger("CRABLogger.DataFileMetadata")
+        self.FileMetaData = getDBinstance(config,'FileMetaDataDB','FileMetaData')
 
     def getFiles(self, taskname, filetype):
         self.logger.debug("Calling jobmetadata for task %s and filetype %s" % (taskname, filetype))
         binds = {'taskname': taskname, 'filetype': filetype}
-        rows = self.api.query(None, None, GetFromTaskAndType.sql, **binds)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, **binds)
         for row in rows:
             yield {'taskname': taskname,
                    'filetype': filetype,
@@ -53,10 +52,10 @@ class DataFileMetadata(object):
             binds[name] = [str(kwargs[name])]
         binds['runlumi'] = [str(dict(zip(map(str, kwargs['outfileruns']), [map(str, lumilist.split(',')) for lumilist in kwargs['outfilelumis']])))]
 
-        self.api.modify(New.sql, **binds)
+        self.api.modify(self.FileMetaData.New_sql, **binds)
         return []
 
     def changeState(self, *args, **kwargs):#kwargs are (taskname, outlfn, filestate)
         self.logger.debug("Changing state of file %(taskname)s in task %(outlfn)s to %(filestate)s" % kwargs)
 
-        self.api.modify(ChangeFileState.sql, **dict((k, [v]) for k,v in kwargs.iteritems()))
+        self.api.modify(self.FileMetaData.ChangeFileState_sql, **dict((k, [v]) for k,v in kwargs.iteritems()))

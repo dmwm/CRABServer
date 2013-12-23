@@ -22,6 +22,7 @@ import DashboardAPI
 import WMCore.Storage.SiteLocalConfig as SiteLocalConfig
 
 EC_MissingArg  =        50113 #10 for ATLAS trf
+EC_CMSMissingSoftware = 10034
 EC_CMSRunWrapper =      10040
 EC_MoveOutErr =         99999 #TODO define an error code
 EC_ReportHandlingErr =  50115
@@ -43,6 +44,7 @@ def mintime():
         sys.stderr.flush()
         time.sleep(remaining)
         print "==== Failure sleep FINISHING at %s ====" % time.ctime()
+
 
 class PassThroughOptionParser(OptionParser):
     """
@@ -80,16 +82,37 @@ def parseAd():
     return jobad
 
 
-def startDashboardMonitoring(myad):
+def populateDashboardMonitorInfo(myad, params):
+    params['MonitorID'] = myad['CRAB_ReqName']
+    params['MonitorJobID'] = '%d_https://glidein.cern.ch/%d/%s_%d' % (myad['CRAB_Id'], myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":"), myad['CRAB_Retry'])
+
+
+def earlyDashboardMonitoring(myad):
     params = {
         'WNHostName': socket.getfqdn(),
-        'MonitorID': myad['CRAB_ReqName'],
-        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (myad['CRAB_Id'], myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":")),
         'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":")),
         'SyncSite': myad['JOB_CMSSite'],
         'SyncCE': myad['Used_Gatekeeper'].split(":")[0],
+    }
+    populateDashboardMonitorInfo(myad, params)
+    print "Dashboard early startup params: %s" % str(params)
+    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+
+def earlyDashboardFailure(myad):
+    params = {
+        'JobExitCode': 10043,
+    }
+    populateDashboardMonitorInfo(myad, params)
+    print "Dashboard early startup params: %s" % str(params)
+    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+
+
+def startDashboardMonitoring(myad):
+    params = {
+        'WNHostName': socket.getfqdn(),
         'ExeStart': 'cmsRun',
     }
+    populateDashboardMonitorInfo(myad, params)
     print "Dashboard startup parameters: %s" % str(params)
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
 
@@ -116,13 +139,11 @@ def addReportInfo(params):
                 params['NEventsProcessed'] = info['events']
 
 
-def stopDashboardMonitoring(ad):
+def stopDashboardMonitoring(myad):
     params = {
-        'MonitorID': ad['CRAB_ReqName'],
-        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_0' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":")),
-        'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":")),
         'ExeEnd': 'cmsRun',
     }
+    populateDashboardMonitorInfo(myad, params)
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
     del params['ExeEnd']
     try:
@@ -130,6 +151,8 @@ def stopDashboardMonitoring(ad):
     except:
         if 'ExeExitCode' not in params:
             params['ExeExitCode'] = 50115
+        if 'JobExitCode' not in params:
+            params['JobExitCode'] = params['ExeExitCode']
         print traceback.format_exc()
     print "Dashboard end parameters: %s" % str(params)
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
@@ -170,129 +193,184 @@ def handleException(exitAcronymn, exitCode, exitMsg):
         stopDashboardMonitoring(ad)
 
 
-parser = PassThroughOptionParser()
-parser.add_option('-a',
-                  dest='archiveJob',
-                  type='string')
-parser.add_option('-o',
-                  dest='outFiles',
-                  type='string')
-parser.add_option('-r',
-                  dest='runDir',
-                  type='string')
-parser.add_option('--inputFile',
-                  dest='inputFile',
-                  type='string')
-parser.add_option('--sourceURL',
-                  dest='sourceURL',
-                  type='string')
-parser.add_option('--jobNumber',
-                  dest='jobNumber',
-                  type='string')
-parser.add_option('--cmsswVersion',
-                  dest='cmsswVersion',
-                  type='string')
-parser.add_option('--scramArch',
-                  dest='scramArch',
-                  type='string')
-parser.add_option('--runAndLumis',
-                  dest='runAndLumis',
-                  type='string',
-                  default='{}')
-parser.add_option('--userFiles',
-                  dest='userFiles',
-                  type='string')
-parser.add_option('--oneEventMode',
-                  dest='oneEventMode',
-                  default=0)
+def parseArgs():
+    parser = PassThroughOptionParser()
+    parser.add_option('-a',
+                      dest='archiveJob',
+                      type='string')
+    parser.add_option('-o',
+                      dest='outFiles',
+                      type='string')
+    parser.add_option('-r',
+                      dest='runDir',
+                      type='string')
+    parser.add_option('--inputFile',
+                      dest='inputFile',
+                      type='string')
+    parser.add_option('--sourceURL',
+                      dest='sourceURL',
+                      type='string')
+    parser.add_option('--jobNumber',
+                      dest='jobNumber',
+                      type='string')
+    parser.add_option('--cmsswVersion',
+                      dest='cmsswVersion',
+                      type='string')
+    parser.add_option('--scramArch',
+                      dest='scramArch',
+                      type='string')
+    parser.add_option('--runAndLumis',
+                      dest='runAndLumis',
+                      type='string',
+                      default='{}')
+    parser.add_option('--lheInputFiles',
+                      dest='lheInputFiles',
+                      type='string',
+                      default=False)
+    parser.add_option('--firstEvent',
+                      dest='firstEvent',
+                      type='string',
+                      default=0)
+    parser.add_option('--firstLumi',
+                      dest='firstLumi',
+                      type='string',
+                      default=None)
+    parser.add_option('--lastEvent',
+                      dest='lastEvent',
+                      type='string',
+                      default=-1)
+    parser.add_option('--firstRun',
+                      dest='firstRun',
+                      type='string',
+                      default=None)
+    parser.add_option('--seeding',
+                      dest='seeding',
+                      type='string',
+                      default=None)
+    parser.add_option('--userFiles',
+                      dest='userFiles',
+                      type='string')
+    parser.add_option('--oneEventMode',
+                      dest='oneEventMode',
+                      default=0)
 
-(opts, args) = parser.parse_args(sys.argv[1:])
+    (opts, args) = parser.parse_args(sys.argv[1:])
 
-try:
-    print "==== Parameters Dump at %s ===" % time.ctime()
-    print "archiveJob:    ", opts.archiveJob
-    print "runDir:        ", opts.runDir
-    print "sourceURL:     ", opts.sourceURL
-    print "jobNumber:     ", opts.jobNumber
-    print "cmsswVersion:  ", opts.cmsswVersion
-    print "scramArch:     ", opts.scramArch
-    print "inputFile      ", opts.inputFile
-    print "outFiles:      ", opts.outFiles
-    print "runAndLumis:   ", opts.runAndLumis
-    print "userFiles:     ", opts.userFiles
-    print "oneEventMode:  ", opts.oneEventMode
-    print "==================="
-except:
-    type, value, traceBack = sys.exc_info()
-    print 'ERROR: missing parameters : %s - %s' % (type, value)
-    handleException("FAILED", EC_MissingArg, 'CMSRunAnalysisERROR: missing parameters : %s - %s' % (type, value))
-    sys.exit(EC_MissingArg)
+    try:
+        print "==== Parameters Dump at %s ===" % time.ctime()
+        print "archiveJob:    ", opts.archiveJob
+        print "runDir:        ", opts.runDir
+        print "sourceURL:     ", opts.sourceURL
+        print "jobNumber:     ", opts.jobNumber
+        print "cmsswVersion:  ", opts.cmsswVersion
+        print "scramArch:     ", opts.scramArch
+        print "inputFile      ", opts.inputFile
+        print "outFiles:      ", opts.outFiles
+        print "runAndLumis:   ", opts.runAndLumis
+        print "lheInputFiles: ", opts.lheInputFiles
+        print "firstEvent:    ", opts.firstEvent
+        print "firstLumi:     ", opts.firstLumi
+        print "lastEvent:     ", opts.lastEvent
+        print "firstRun:      ", opts.firstRun
+        print "seeding:       ", opts.seeding
+        print "userFiles:     ", opts.userFiles
+        print "oneEventMode:  ", opts.oneEventMode
+        print "==================="
+    except:
+        type, value, traceBack = sys.exc_info()
+        print 'ERROR: missing parameters : %s - %s' % (type, value)
+        handleException("FAILED", EC_MissingArg, 'CMSRunAnalysisERROR: missing parameters : %s - %s' % (type, value))
+        mintime()
+        sys.exit(EC_MissingArg)
 
-#clean workdir ?
+    return opts
 
-#wget sandnox
-print "==== Sandbox preparation STARTING at %s ====" % time.ctime()
-if opts.archiveJob:
-    os.environ['WMAGENTJOBDIR'] = os.getcwd()
-    if os.path.exists(opts.archiveJob):
-        print "Sandbox %s already exists, skipping" % opts.archiveJob
-    elif opts.sourceURL == 'LOCAL' and not os.path.exists(opts.archiveJob):
-        print "ERROR: Requested for condor to transfer the tarball, but it didn't show up"
-        handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: cound not get jobO files from panda server')
-        sys.exit(EC_WGET)
-    else:
-        print "--- wget for jobO ---"
-        output = commands.getoutput('wget -h')
-        wgetCommand = 'wget'
-        for line in output.split('\n'):
-            if re.search('--no-check-certificate', line) != None:
-                wgetCommand = 'wget --no-check-certificate'
-                break
-        com = '%s %s/cache/%s' % (wgetCommand, opts.sourceURL, opts.archiveJob)
-        nTry = 3
-        for iTry in range(nTry):
-            print 'Try : %s' % iTry
-            status, output = commands.getstatusoutput(com)
-            print output
-            if status == 0:
-                break
-            if iTry+1 == nTry:
-                print "ERROR : cound not get jobO files from panda server"
-                handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: cound not get jobO files from panda server')
-                sys.exit(EC_WGET)
-            time.sleep(30)
-    print commands.getoutput('tar xvfzm %s' % opts.archiveJob)
-print "==== Sandbox preparation FINISHING at %s ====" % time.ctime()
 
-#move the pset in the right place
-print "==== WMCore filesystem preparation STARTING at %s ====" % time.ctime()
-destDir = 'WMTaskSpace/cmsRun'
-if os.path.isdir(destDir):
-    shutil.rmtree(destDir)
-os.makedirs(destDir)
-os.rename('PSet.py', destDir + '/PSet.py')
-open('WMTaskSpace/__init__.py','w').close()
-open(destDir + '/__init__.py','w').close()
-#move the additional user files in the right place
-if opts.userFiles:
-    for myfile in opts.userFiles.split(','):
-        os.rename(myfile, destDir + '/' + myfile)
-print "==== WMCore filesystem preparation FINISHING at %s ====" % time.ctime()
+def prepSandbox(opts):
+    print "==== Sandbox preparation STARTING at %s ====" % time.ctime()
+    if opts.archiveJob:
+        os.environ['WMAGENTJOBDIR'] = os.getcwd()
+        if os.path.exists(opts.archiveJob):
+            print "Sandbox %s already exists, skipping" % opts.archiveJob
+        elif opts.sourceURL == 'LOCAL' and not os.path.exists(opts.archiveJob):
+            print "ERROR: Requested for condor to transfer the tarball, but it didn't show up"
+            handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: cound not get jobO files from panda server')
+            sys.exit(EC_WGET)
+        else:
+            print "--- wget for jobO ---"
+            output = commands.getoutput('wget -h')
+            wgetCommand = 'wget'
+            for line in output.split('\n'):
+                if re.search('--no-check-certificate', line) != None:
+                    wgetCommand = 'wget --no-check-certificate'
+                    break
+            com = '%s %s/cache/%s' % (wgetCommand, opts.sourceURL, opts.archiveJob)
+            nTry = 3
+            for iTry in range(nTry):
+                print 'Try : %s' % iTry
+                status, output = commands.getstatusoutput(com)
+                print output
+                if status == 0:
+                    break
+                if iTry+1 == nTry:
+                    print "ERROR : cound not get jobO files from panda server"
+                    handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: cound not get jobO files from panda server')
+                    sys.exit(EC_WGET)
+                time.sleep(30)
+        print commands.getoutput('tar xvfzm %s' % opts.archiveJob)
+    print "==== Sandbox preparation FINISHING at %s ====" % time.ctime()
+
+    #move the pset in the right place
+    print "==== WMCore filesystem preparation STARTING at %s ====" % time.ctime()
+    destDir = 'WMTaskSpace/cmsRun'
+    if os.path.isdir(destDir):
+        shutil.rmtree(destDir)
+    os.makedirs(destDir)
+    os.rename('PSet.py', destDir + '/PSet.py')
+    open('WMTaskSpace/__init__.py','w').close()
+    open(destDir + '/__init__.py','w').close()
+    #move the additional user files in the right place
+    if opts.userFiles:
+        for myfile in opts.userFiles.split(','):
+            os.rename(myfile, destDir + '/' + myfile)
+    print "==== WMCore filesystem preparation FINISHING at %s ====" % time.ctime()
 
 #WMCore import here
-from WMCore.WMRuntime.Bootstrap import setupLogging
-from WMCore.FwkJobReport.Report import Report
-from WMCore.FwkJobReport.Report import FwkJobReportException
-from WMCore.WMSpec.Steps.WMExecutionFailure import WMExecutionFailure
-import WMCore.FwkJobReport.FileInfo as FileInfo
-from WMCore.WMSpec.Steps.Executors.CMSSW import CMSSW
-from WMCore.Configuration import Configuration
-from WMCore.WMSpec.WMStep import WMStep
-from WMCore.WMSpec.WMTask import makeWMTask
-from WMCore.WMSpec.WMWorkload import newWorkload
-from WMCore.WMSpec.Steps.Templates.CMSSW import CMSSW as CMSSWTemplate
-from WMCore.WMRuntime.Tools.Scram import Scram
-from subprocess import PIPE
+# Note that we may fail in the imports - hence we try to report to Dashboard first
+
+ad = {}
+try:
+    ad = parseAd()
+except:
+    print traceback.format_exc()
+    ad = {}
+if ad:
+    earlyDashboardMonitoring(ad)
+
+try:
+    opts = parseArgs()
+    prepSandbox(opts)
+    from WMCore.WMRuntime.Bootstrap import setupLogging
+    from WMCore.FwkJobReport.Report import Report
+    from WMCore.FwkJobReport.Report import FwkJobReportException
+    from WMCore.WMSpec.Steps.WMExecutionFailure import WMExecutionFailure
+    import WMCore.FwkJobReport.FileInfo as FileInfo
+    from WMCore.WMSpec.Steps.Executors.CMSSW import CMSSW
+    from WMCore.Configuration import Configuration
+    from WMCore.WMSpec.WMStep import WMStep
+    from WMCore.WMSpec.WMTask import makeWMTask
+    from WMCore.WMSpec.WMWorkload import newWorkload
+    from WMCore.WMSpec.Steps.Templates.CMSSW import CMSSW as CMSSWTemplate
+    from WMCore.WMRuntime.Tools.Scram import Scram
+    from subprocess import PIPE
+except:
+    # We may not even be able to create a FJR at this point.  Record
+    # error and exit.
+    if ad:
+        earlyDashboardFailure(ad)
+    print "==== FAILURE WHEN LOADING WMCORE AT %s ====" % time.ctime()
+    print traceback.format_exc()
+    raise
 
 def executeCMSSWStack(opts):
 
@@ -310,12 +388,14 @@ def executeCMSSWStack(opts):
                        "print tweakJson[\"process\"][\"outputModules_\"]"
         if scram.project() or scram.runtime(): #if any of the two commands fail...
             msg = scram.diagnostic()
-            handleException("FAILED", EC_CMSRunWrapper, 'Error setting CMSSW environment: %s' % msg)
-            sys.exit(EC_CMSRunWrapper)
+            handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
+            mintime()
+            sys.exit(EC_CMSMissingSoftware)
         ret = scram("python -c '%s'" % pythonScript, logName=PIPE, runtimeDir=os.getcwd())
         if ret > 0:
             msg = scram.diagnostic()
             handleException("FAILED", EC_CMSRunWrapper, 'Error getting output modules from the pset.\n\tScram Env %s\n\tCommand:%s' % (msg, pythonScript))
+            mintime()
             sys.exit(EC_CMSRunWrapper)
         return literal_eval(scram.stdout)
 
@@ -346,7 +426,28 @@ def executeCMSSWStack(opts):
     cmssw.step.builder.workingDir = os.getcwd()
     cmssw.step.runtime.invokeCommand = 'python'
     cmssw.step.runtime.preScripts = []
-    cmssw.step.runtime.scramPreScripts = ['%s/TweakPSet.py Analy %s \'%s\' \'%s\' --oneEventMode=%s' % (os.getcwd(), os.getcwd(), opts.inputFile, opts.runAndLumis, opts.oneEventMode)]
+
+
+    cmssw.step.runtime.scramPreScripts = [('%s/TweakPSet.py --location=%s '+
+                                                          '--inputFile=\'%s\' '+
+                                                          '--runAndLumis=\'%s\' '+
+                                                          '--firstEvent=%s '+
+                                                          '--lastEvent=%s '+
+                                                          '--firstLumi=%s '+
+                                                          '--firstRun=%s '+
+                                                          '--seeding=%s '+
+                                                          '--lheInputFiles=%s '+
+                                                          '--oneEventMode=%s') %
+                                             (os.getcwd(), os.getcwd(),
+                                                           opts.inputFile,
+                                                           opts.runAndLumis,
+                                                           opts.firstEvent,
+                                                           opts.lastEvent,
+                                                           opts.firstLumi,
+                                                           opts.firstRun,
+                                                           opts.seeding,
+                                                           opts.lheInputFiles,
+                                                           opts.oneEventMode)]
     cmssw.step.section_("execution") #exitStatus of cmsRun is set here
     cmssw.report = Report("cmsRun") #report is loaded and put here
     cmssw.execute()
@@ -389,12 +490,6 @@ try:
     logHandler.setFormatter(logFormatter)
     logging.getLogger().addHandler(logHandler)
 
-    ad = {}
-    try:
-        ad = parseAd()
-    except:
-        print traceback.format_exc()
-        ad = {}
     if ad:
         startDashboardMonitoring(ad)
     print "==== CMSSW Stack Execution STARTING at %s ====" % time.ctime()
