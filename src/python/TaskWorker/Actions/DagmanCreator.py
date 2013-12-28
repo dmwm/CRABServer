@@ -374,7 +374,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 possiblesites = []
             else:
                 possiblesites = jobs[0]['input_files'][0]['locations']
-            block = jobs[0]['block']
+            block = jobs[0]['input_files'][0]['block']
             self.logger.debug("Block name: %s" % block)
             self.logger.debug("Possible sites: %s" % possiblesites)
 
