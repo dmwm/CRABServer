@@ -287,7 +287,7 @@ def make_specs(task, sitead, jobgroup, block, availablesites, outfiles, startjob
                       'tempDest': os.path.join(temp_dest, counter),
                       'outputDest': os.path.join(dest, counter),
                       'restinstance': task['restinstance'], 'resturl': task['resturl'],
-                      'block': block},
+                      'block': block,
                       'backend': os.environ.get('HOSTNAME','')})
 
         LOGGER.debug(specs[-1])
