@@ -388,8 +388,19 @@ class DagmanCreator(TaskAction.TaskAction):
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             # NOTE: User can still shoot themselves in the foot with the resubmit blacklist
-            if not (availablesites - set(kwargs['task']['tm_site_blacklist'])):
-                msg = "Site blacklist removes only possible sources of data for task %s" % (kwargs['task']['tm_taskname'])
+            # However, this is the last chance we have to warn the users about an impossible task at submit time.
+            whitelist = set(kwargs['task']['tm_site_whitelist'])
+            blacklist = set(kwargs['task']['tm_site_blacklist'])
+            available = set(availablesites)
+            if whitelist:
+                available &= whitelist
+                if not available:
+                    msg = "Site whitelist (%s) removes only possible sources (%s) of data for task %s" % (", ".join(whitelist), ", ".join(availablesites), kwargs['task']['tm_taskname'])
+                    raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+
+            available -= (blacklist-whitelist)
+            if not available:
+                msg = "Site blacklist (%s) removes only possible sources (%s) of data for task %s" % (", ".join(blacklist), ", ".join(availablesites), kwargs['task']['tm_taskname'])
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             availablesites = [str(i) for i in availablesites]
