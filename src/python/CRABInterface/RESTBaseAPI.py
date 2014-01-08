@@ -42,10 +42,10 @@ class RESTBaseAPI(DatabaseRESTApi):
                                       cachetime=mktime(gmtime()))
 
         #Global initialization of Data objects. Parameters coming from the config should go here
-        DataUserWorkflow.globalinit(config.workflowManager)
+        DataUserWorkflow.globalinit(config)
         DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl},\
                                 credpath=config.credpath, centralcfg=extconfig, config=config)
-        DataFileMetadata.globalinit(dbapi=self)
+        DataFileMetadata.globalinit(dbapi=self, config=config)
         Utils.globalinit(config.serverhostkey, config.serverhostcert, serverdn, config.credpath)
 
         ## TODO need a check to verify the format depending on the resource

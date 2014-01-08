@@ -28,6 +28,7 @@ data.serverhostkey = "%s/auth/crabserver/dmwm-service-key.pem" % __file__.rsplit
 data.credpath = '%s/state/crabserver/proxy/' % __file__.rsplit('/', 4)[0]
 data.db = 'CRABServerAuth.dbconfig'
 data.workflowManager = 'PandaDataWorkflow'
+data.backend = 'oracle'
 
 data.ASOinstance='http://username:password@aso_instance:port'
 data.mode = 'cmsweb-dev'
