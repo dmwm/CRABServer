@@ -2,6 +2,7 @@
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.REST.Server import RESTEntity, restcall, rows
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
+from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import allScramArchsAndVersions
 
 # CRABServer dependecies here
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
@@ -27,7 +28,7 @@ class RESTUserWorkflow(RESTEntity):
         self.userworkflowmgr = DataUserWorkflow()
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
-        
+
     def _expandSites(self, sites):
         """Check if there are sites cotaining the '*' wildcard and convert them in the corresponding list
            Raise exception if any wildcard site does expand to an empty list
@@ -51,10 +52,37 @@ class RESTUserWorkflow(RESTEntity):
 
     def _checkSite(self, site):
         if site not in self.allCMSNames.sites:
-            excasync = ValueError("Remote output data site not valid")
+            excasync = ValueError("A site name you specified is not valid")
             invalidp = InvalidParameter("The parameter %s is not in the list of known CMS sites %s" % (site, self.allCMSNames.sites), errobj = excasync)
             setattr(invalidp, 'trace', '')
             raise invalidp
+
+    def _checkReleases(self, jobarch, jobsw):
+        """ Check if the software needed by the user is available in the tag collector
+            Uses allScramArchsAndVersions from WMCore. If an IOError is raised report an error message.
+            If the list of releases is empty (reason may be an ExpatError) then report an error message
+            If the asked released is not there then report an error message
+        """
+
+        msg = False
+        try:
+            goodReleases = allScramArchsAndVersions()
+        except IOError:
+            msg = "Error connecting to https://cmstags.cern.ch/tc/ReleasesXML/?anytype=1 and determine the list of available releases. You may need to contact an operator."
+
+        if goodReleases == {}:
+            msg = "The list of releases at https://cmstags.cern.ch/tc/ReleasesXML/?anytype=1 is empty. You may need to contact an operator."
+
+        if jobarch not in goodReleases or jobsw not in goodReleases[jobarch]:
+            msg = "ERROR: %s on %s is not among supported releases" % (jobsw, jobarch)
+            msg += "\nUse config.JobType.allowNonProductionCMSSW = True if you are sure of what you are doing"
+
+        if msg:
+            excasync = ValueError("A site name you specified is not valid")
+            invalidp = InvalidParameter(msg, errobj = excasync)
+            setattr(invalidp, 'trace', '')
+            raise invalidp
+
 
     @conn_handler(services=['sitedb'])
     def validate(self, apiobj, method, api, param, safe):
@@ -65,7 +93,10 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
             validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
             validate_str("jobsw", param, safe, RX_CMSSW, optional=False)
+            validate_num("nonprodsw", param, safe, optional=False)
             validate_str("jobarch", param, safe, RX_ARCH, optional=False)
+            if not safe.kwargs["nonprodsw"]: #if the user wants to allow non-production releases
+                self._checkReleases(safe.kwargs['jobarch'], safe.kwargs['jobsw'])
             jobtype = safe.kwargs.get('jobtype', None)
             if jobtype == 'Analysis':
                 validate_str("inputdata", param, safe, RX_DATASET, optional=False)
@@ -159,7 +190,7 @@ class RESTUserWorkflow(RESTEntity):
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
-                totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1):
+                totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
