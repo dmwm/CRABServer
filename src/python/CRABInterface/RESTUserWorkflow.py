@@ -250,7 +250,7 @@ class RESTUserWorkflow(RESTEntity):
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.api, [workflow], self.Task)
         return self.userworkflowmgr.resubmit(workflow=workflow, siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, jobids=jobids, \
-                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority
+                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority,
                                         userdn=cherrypy.request.headers['Cms-Authn-Dn'])
 
     @restcall

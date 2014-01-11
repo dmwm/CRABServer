@@ -287,7 +287,7 @@ def make_specs(task, sitead, jobgroup, block, availablesites, outfiles, startjob
                       'tempDest': os.path.join(temp_dest, counter),
                       'outputDest': os.path.join(dest, counter),
                       'restinstance': task['restinstance'], 'resturl': task['resturl'],
-                      'block': block},
+                      'block': block,
                       'backend': os.environ.get('HOSTNAME','')})
 
         LOGGER.debug(specs[-1])
@@ -374,7 +374,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 possiblesites = []
             else:
                 possiblesites = jobs[0]['input_files'][0]['locations']
-            block = jobs[0]['block']
+            block = jobs[0]['input_files'][0]['block']
             self.logger.debug("Block name: %s" % block)
             self.logger.debug("Possible sites: %s" % possiblesites)
 
