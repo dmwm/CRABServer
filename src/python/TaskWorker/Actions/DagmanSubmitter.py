@@ -1,4 +1,3 @@
-
 """
 Submit a DAG directory created by the DagmanCreator component.
 """
@@ -8,6 +7,7 @@ import base64
 import random
 import urllib
 import traceback
+import distutils.spawn
 
 import HTCondorUtils
 import HTCondorLocator
@@ -18,6 +18,13 @@ import TaskWorker.DataObjects.Result as Result
 from TaskWorker.Actions.DagmanCreator import CRAB_HEADERS
 
 from ApmonIf import ApmonIf
+
+# force the use of gsissh with pushy
+os.environ['PUSHY_NATIVE_SSH']=distutils.spawn.find_executable('gsissh')
+assert os.environ['PUSHY_NATIVE_SSH']!=None, "gsissh not found"
+os.environ['PUSHY_NATIVE_SCP']=distutils.spawn.find_executable('gsiscp')
+import pushy
+USE_PUSHY=True
 
 # Bootstrap either the native module or the BossAir variant.
 try:
@@ -102,14 +109,14 @@ SUBMIT_INFO = [ \
             ('MaxWallTimeMins', 'tm_maxjobruntime'),
             ('JobPrio', 'tm_priority')]
 
-def addCRABInfoToClassAd(ad, info):
+def addCRABInfoToClassAd(ad, info, exprtree=classad.ExprTree):
     """
     Given a submit ClassAd, add in the appropriate CRAB_* attributes
     from the info directory
     """
     for adName, dictName in SUBMIT_INFO:
         if dictName in info and (info[dictName] != None):
-            ad[adName] = classad.ExprTree(str(info[dictName]))
+            ad[adName] = exprtree(str(info[dictName]))
 
 class DagmanSubmitter(TaskAction.TaskAction):
 
@@ -163,7 +170,11 @@ class DagmanSubmitter(TaskAction.TaskAction):
             loc = HTCondorLocator.HTCondorLocator(self.backendurls)
             schedd, address = loc.getScheddObj(task['tm_taskname'])
             if address:
-                self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
+                # the following logic is implemented inside loc, but not exposed
+                # To be perfected, though
+                schedd_name=task['tm_taskname'].split("_")[2].split(":")[0]
+                
+                self.submitDirect(schedd, schedd_name, 'dag_bootstrap_startup.sh', arg, info)
             else:
                 jdl = MASTER_DAG_SUBMIT_FILE % info
                 schedd.submitRaw(task['tm_taskname'], jdl, task['user_proxy'], inputFiles)
@@ -182,53 +193,92 @@ class DagmanSubmitter(TaskAction.TaskAction):
     
         return Result.Result(task=kw['task'], result=(-1))
 
-    def submitDirect(self, schedd, cmd, arg, info): #pylint: disable=R0201
+    def submitDirect(self, schedd, schedd_name, cmd, arg, info): #pylint: disable=R0201
         """
         Submit directly to the schedd using the HTCondor module
+        or the gsissh module
         """
-        dagAd = classad.ClassAd()
-        addCRABInfoToClassAd(dagAd, info)
-
-        # Set default task attributes:
-        if 'RequestMemory' not in dagAd:
-            dagAd['RequestMemory'] = 2000
-        if 'RequestCpus' not in dagAd:
-            dagAd['RequestCpus'] = 1
-        if 'MaxWallTimeMins' not in dagAd:
-            dagAd['MaxWallTimeMins'] = 1315
-        if 'JobPrio' not in dagAd:
-            dagAd['JobPrio'] = 10
-
-        # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
-        dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
-        dagAd["Err"] = str(os.path.join(info['scratch'], "request.err"))
-        dagAd["CRAB_Attempt"] = 0
-        # We switched from local to scheduler universe.  Why?  It seems there's no way in the
-        # local universe to change the hold signal at runtime.  That's fairly important for our
-        # resubmit implementation.
-        #dagAd["JobUniverse"] = 12
-        dagAd["JobUniverse"] = 7
-        dagAd["HoldKillSig"] = "SIGUSR1"
-        dagAd["Cmd"] = cmd
-        dagAd['Args'] = arg
-        dagAd["TransferInput"] = str(info['inputFilesString'])
-        dagAd["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
-        dagAd["TransferOutput"] = info['outputFilesString']
-        dagAd["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
-        dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
-        dagAd["RemoveKillSig"] = "SIGUSR1"
-        dagAd["OnExitHold"] = classad.ExprTree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
-        dagAd["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1 CONDOR_ID=", ClusterId, ".", ProcId," %s")' % " ".join(info['additional_environment_options'].split(";")))
-        dagAd["RemoteCondorSetup"] = info['remote_condor_setup']
-        dagAd["Requirements"] = classad.ExprTree('true || false')
-        dagAd["TaskType"] = "ROOT"
-        dagAd["X509UserProxy"] = info['user_proxy']
 
         with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy']) as (parent, rpipe):
-            if not parent:
-                resultAds = []
-                schedd.submit(dagAd, 1, True, resultAds)
-                schedd.spool(resultAds)
+                if not parent:
+                    if not USE_PUSHY:
+                        dagAd = classad.ClassAd()
+                        exprtree=classad.ExprTree
+                    else:
+                        conn = pushy.connect("ssh:%s"%schedd_name)
+                        dagAd = conn.modules.classad.ClassAd()
+                        exprtree = conn.modules.classad.ExprTree
+                    
+                    addCRABInfoToClassAd(dagAd, info, exprtree)
+
+		    # Set default task attributes:
+		    if 'RequestMemory' not in dagAd:
+		        dagAd['RequestMemory'] = 2000
+		    if 'RequestCpus' not in dagAd:
+		        dagAd['RequestCpus'] = 1
+		    if 'MaxWallTimeMins' not in dagAd:
+		        dagAd['MaxWallTimeMins'] = 1315
+		    if 'JobPrio' not in dagAd:
+		        dagAd['JobPrio'] = 10
+
+                    # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
+                    dagAd["CRAB_Attempt"] = 0
+                    # We switched from local to scheduler universe.  Why?  It seems there's no way in the
+                    # local universe to change the hold signal at runtime.  That's fairly important for our
+                    # resubmit implementation.
+                    #dagAd["JobUniverse"] = 12
+                    dagAd["JobUniverse"] = 7
+                    dagAd["HoldKillSig"] = "SIGUSR1"
+                    dagAd["Cmd"] = cmd
+                    dagAd['Args'] = arg
+                    dagAd["OnExitRemove"] = exprtree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
+                    dagAd["OtherJobRemoveRequirements"] = exprtree("DAGManJobId =?= ClusterId")
+                    dagAd["RemoveKillSig"] = "SIGUSR1"
+                    dagAd["OnExitHold"] = exprtree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
+                    dagAd["Environment"] = exprtree('strcat("PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1 CONDOR_ID=", ClusterId, ".", ProcId," %s")' % " ".join(info['additional_environment_options'].split(";")))
+                    dagAd["RemoteCondorSetup"] = info['remote_condor_setup']
+                    dagAd["Requirements"] = exprtree('true || false')
+                    dagAd["TaskType"] = "ROOT"
+
+                    if not USE_PUSHY:
+                        # use direct remote condor calls
+
+                        dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
+                        dagAd["Err"] = str(os.path.join(info['scratch'], "request.err"))
+                        dagAd["TransferInput"] = str(info['inputFilesString'])
+                        dagAd["TransferOutput"] = info['outputFilesString']
+                        dagAd["LeaveJobInQueue"] = exprtree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
+                        dagAd["X509UserProxy"] = info['user_proxy']
+
+                        resultAds = []
+                        schedd.submit(dagAd, 1, True, resultAds)
+                        schedd.spool(resultAds)
+                    else:
+                        # create the work dir and copy over the files
+                        cwarr=dagAd["CRAB_Workflow"].split('_')
+                        rdir='%s/%s'%(conn.modules.os.path.expanduser('~'),"%s_%s"%(cwarr[0],cwarr[1]))
+                        conn.modules.os.mkdir(rdir)
+
+                        ifiles=str(info['inputFilesString']).split(',')
+                        for f in ifiles + [dagAd["Cmd"]]:
+                            f=f.strip()
+                            conn.putfile(f,os.path.join(rdir,f))
+                        # copy over the proxy... the channel is encrypted, so no security risk
+                        # prxy path is also the only one with absdir
+                        proxy_shortname=os.path.basename(info['user_proxy'])
+                        conn.putfile(info['user_proxy'],os.path.join(rdir,proxy_shortname))
+
+                        # change to that work dir remotely
+                        conn.modules.os.chdir(rdir)
+
+                        dagAd["X509UserProxy"]=os.path.join(rdir,proxy_shortname)
+                        dagAd["Err"] = "request.err"
+                        dagAd["Out"] = "request.out"
+
+                        # create a schedd object on the remote end, and use it
+                        rschedd = conn.modules.htcondor.Schedd()
+                        rschedd.submit(dagAd, 1, False)    
+                            
         results = rpipe.read()
         if results != "OK":
             raise Exception("Failure when submitting HTCondor task: '%s'" % results)
