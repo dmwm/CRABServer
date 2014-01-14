@@ -3,7 +3,7 @@ from WMCore.Lexicon import lfnParts
 
 # TODO: we should start replacing most of the regex here with what we have in WMCore.Lexicon
 #       (this probably requires to adapt something on Lexicon)
-wfBase = r"^[a-zA-Z0-9\.\-_]{1,%s}$"
+wfBase = r"^[a-zA-Z0-9\.\-_:]{1,%s}$"
 pNameRE      = r"(?=.{0,400}$)[a-zA-Z0-9\-_]+"
 lfnParts.update( {'publishname' : pNameRE,
                   'psethash'    : '[a-f0-9]+',
@@ -12,7 +12,8 @@ lfnParts.update( {'publishname' : pNameRE,
 RX_WORKFLOW  = re.compile( wfBase % 232) #232 = column length in the db (255) - username (8) - timestamp (12) - unserscores (3)
 RX_UNIQUEWF  = re.compile( wfBase % 255)
 RX_PUBLISH   = re.compile(pNameRE)
-RX_LFN       = re.compile(r'^(?=.{0,500}$)/store/(temp/)?(user|group)/%(hnName)s/%(primDS)s/%(publishname)s/%(psethash)s/%(counter)s/(log/)?%(filename)s+$' % lfnParts)
+#RX_LFN       = re.compile(r'^(?=.{0,500}$)/store/(temp/)?(user|group)/%(hnName)s/%(primDS)s/%(publishname)s/%(psethash)s/%(counter)s/(log/)?%(filename)s+$' % lfnParts)
+RX_LFN       = re.compile(r'^(?=.{0,500}$)/store/(temp/)?(user|group)/%(hnName)s/' % lfnParts)
 RX_PARENTLFN = re.compile(r'^(/[a-zA-Z0-9\-_\.]+/?)+$')
 RX_OUTDSLFN  = re.compile(r'^(?=.{0,500}$)/%(primDS)s/%(hnName)s-%(publishname)s-%(psethash)s/USER$' % lfnParts)
 RX_CACHENAME = RX_WORKFLOW
@@ -25,7 +26,7 @@ RX_BLOCK     = re.compile(r"^(/[a-zA-Z0-9\.\-_]{1,100}){3}#[a-zA-Z0-9\.\-_]{1,10
 RX_SPLIT     = re.compile(r"^FileBased|EventBased|LumiBased$")
 RX_CACHEURL  = re.compile(r"^https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
 RX_ADDFILE   = re.compile(r"^(?=.{0,255}$)([a-zA-Z0-9\-\._]+)$")
-RX_CMSSITE   = re.compile(r"^(?=.{0,255}$)T[0-3%]((_[A-Z]{2}(_[A-Za-z0-9]+)*)?)$")
+RX_CMSSITE   = re.compile(r"^(?=.{0,255}$)T[0-3](_[A-Z]{2}((_[A-Za-z0-9]+)|\*$)+|\*)$")
 RX_DBSURL    = re.compile(r"^(?=.{0,255}$)https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
 RX_PUBLICATION = re.compile(r"^[TF]")
 RX_VOPARAMS  = re.compile(r"^(?=.{0,255}$)[A-Za-z0-9]*$")
@@ -34,8 +35,9 @@ RX_RUNS      = re.compile(r"^\d+$")
 RX_LUMIRANGE = re.compile(r"^\d+,\d+(,\d+,\d+)*$")
 RX_LUMILIST  = re.compile(r"^\d+(,\d+)*$")
 RX_GLOBALTAG = re.compile(r'^[a-zA-Z0-9\s\.\-_:]{1,100}$')
-RX_OUTTYPES  = re.compile(r'^EDM|LOG|TFILE$')
+RX_OUTTYPES  = re.compile(r'^EDM|LOG|TFILE|FAKE$')
 RX_CHECKSUM  = re.compile(r'^[A-Za-z0-9\-]+$')
+RX_FILESTATE  = re.compile(r'^TRANSFERRING|FINISHED|FAILED|COOLOFF$')
 
 #basic certificate check -- used for proxies retrieved from myproxy
 RX_CERT = re.compile(r'^[-]{5}BEGIN CERTIFICATE[-]{5}[\w\W]+[-]{5}END CERTIFICATE[-]{5}\n$')
@@ -51,9 +53,12 @@ RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._]{1,100}$")
 ## this can be improved by putting a dependency on CAFUtilities task state machine
 RX_STATUS = re.compile(r"^[A-Za-z]{1,20}$")
 ## need to be careful with this
-RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s\=]{0,10000}$")
+RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s\=\+]{0,10000}$")
 ## user dn
 RX_DN = re.compile(r"^/(?:C|O|DC)=.*/CN=.")
 ## worker subresources
 RX_SUBPOSTWORKER = re.compile(r"^state|start|failure|success|process|lumimask$")
 RX_SUBGETWORKER = re.compile(r"jobgroup")
+
+# Schedulers
+RX_SCHEDULER = re.compile(r"^panda|condor$")

@@ -8,10 +8,12 @@ import pycurl
 import StringIO
 import cjson as json
 
+from WMCore.WMFactory import WMFactory
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.Credential.SimpleMyProxy import SimpleMyProxy, MyProxyException
+from WMCore.Credential.Proxy import Proxy
 from WMCore.Services.pycurl_manager import ResponseHeader
 
 from CRABInterface.Regexps import RX_CERT
@@ -27,6 +29,17 @@ serverCert = None
 serverKey = None
 serverDN = None
 credServerPath = None
+
+def getDBinstance(config, namespace, name):
+    if config.backend.lower() == 'mysql':
+        backend = 'MySQL'
+    elif config.backend.lower() == 'oracle':
+        backend = 'Oracle'
+
+    #factory = WMFactory(name = 'TaskQuery', namespace = 'Databases.TaskDB.%s.Task' % backend)
+    factory = WMFactory(name = name, namespace = 'Databases.%s.%s.%s' % (namespace,backend,name))
+
+    return factory.loadObject( name )
 
 def globalinit(serverkey, servercert, serverdn, credpath):
     global serverCert, serverKey, serverDN, credServerPath
@@ -128,19 +141,28 @@ def retrieveUserCert(func):
         timeleftthreshold = 60 * 60 * 24
         mypclient = SimpleMyProxy(defaultDelegation)
         userproxy = None
-        try:
-            userproxy = mypclient.logonRenewMyProxy(username=sha1(kwargs['userdn']).hexdigest(), myproxyserver=myproxyserver, myproxyport=7512)
-        except MyProxyException, me:
-            import cherrypy
-            cherrypy.log(str(me))
-            cherrypy.log(str(serverKey))
-            cherrypy.log(str(serverCert))
-            invalidp = InvalidParameter("Impossible to retrieve proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
-            setattr(invalidp, 'trace', str(me))
-            raise invalidp
+        userhash  = sha1(kwargs['userdn']).hexdigest()
+        if serverDN:
+            try:
+                userproxy = mypclient.logonRenewMyProxy(username=userhash, myproxyserver=myproxyserver, myproxyport=7512)
+            except MyProxyException, me:
+                # Unsure if this works in standalone mode...
+                import cherrypy
+                cherrypy.log(str(me))
+                cherrypy.log(str(serverKey))
+                cherrypy.log(str(serverCert))
+                invalidp = InvalidParameter("Impossible to retrieve proxy from %s for %s and hash %s" %
+                                                (myproxyserver, kwargs['userdn'], userhash))
+                setattr(invalidp, 'trace', str(me))
+                raise invalidp
+
+            else:
+                if not re.match(RX_CERT, userproxy):
+                    raise InvalidParameter("Retrieved malformed proxy from %s for %s and hash %s" %
+                                                (myproxyserver, kwargs['userdn'], userhash))
         else:
-            if not re.match(RX_CERT, userproxy):
-                raise InvalidParameter("Retrieved malformed proxy from %s for %s." %(myproxyserver, kwargs['userdn']))
+            proxy = Proxy(defaultDelegation)
+            userproxy = proxy.getProxyFilename()
         kwargs['userproxy'] = userproxy
         out = func(*args, **kwargs)
         return out

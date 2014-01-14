@@ -1,0 +1,40 @@
+
+INTRODUCTION 
+
+This directory provides some simple tests for TaskWorker.
+
+These are not really unit tests - they require a valid grid proxy to run and
+they connect to a real schedd for the HTCondor submit.
+
+REQUIREMENTS
+
+These were tested on a RHEL6 development machine.
+
+They require the following checkouts inside $CRAB3_CHECKOUT:
+
+- CRABServer: git@github.com:bbockelm/CRABServer.git (branch dagman)
+- CAFTaskWorker: git@github.com:bbockelm/CAFTaskWorker.git (branch dagman)
+- CAFUtilities: git@github.com:bbockelm/CAFUtilities.git (branch dagman)
+- WMCore: git@github.com:bbockelm/WMCore.git (branch crab3)
+- DBS: git@github.com:bbockelm/DBS.git (branch dagman)
+
+(and $CRAB3_CHECKOUT to be set to the appropriate directory).  As we
+merge the branches into dmwm github and git.cern.ch, the branches and
+git locations mentioned above will change.
+
+USAGE
+
+To run all tests:
+
+$ ./test/bin/bootstrap_tw_unit.sh
+
+To run a specific test:
+
+$ ./test/bin/bootstrap_tw_unit.sh -v TestActionHandler.testSubmitNewHTCondorTask
+
+To run pylint on a directory:
+
+$ ./test/bin/bootstrap_pylint.sh src/python/TaskWorker/Actions/DagmanSubmitter.py
+
+We generally look for something in the 7+ range on pylint
+
