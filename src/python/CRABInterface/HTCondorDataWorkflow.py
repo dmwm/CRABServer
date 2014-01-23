@@ -8,6 +8,7 @@ import traceback
 from ast import literal_eval
 
 import pycurl
+import classad
 import htcondor
 
 from WMCore.REST.Error import ExecutionError, InvalidParameter
@@ -67,7 +68,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         return "_".join(info)
 
     @conn_handler(services=['centralconfig'])
-    def status(self, workflow, userdn, userproxy=None, verbose=False):
+    def status(self, workflow, userdn, userproxy=None, verbose=0):
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
@@ -76,9 +77,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         try:
             return self.alt_status(workflow, userdn, userproxy=userproxy, verbose=verbose)
         except:
-            import cherrypy
             s = traceback.format_exc()
-            cherrypy.log("Failure of alt status: %s" % s)
+            self.logger.exception("Failure of alt status: %s" % s)
         # First, verify the task has been submitted by the backend.
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, userdn = row.next() #just one row is picked up by the previous query
@@ -183,7 +183,8 @@ class HTCondorDataWorkflow(DataWorkflow):
 
     def getRootTasks(self, workflow, schedd):
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
-        rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType', "HoldReason", "HoldReasonCode", "CRAB_UserWebDir"]
+        rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType', "HoldReason", "HoldReasonCode", "CRAB_UserWebDir",
+                        "CRAB_SiteWhitelist", "CRAB_SiteBlacklist", "CRAB_SiteResubmitWhitelist", "CRAB_SiteResubmitBlacklist"]
 
         # Note: may throw if the schedd is down.  We may want to think about wrapping the
         # status function and have it catch / translate HTCondor errors.
@@ -314,7 +315,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         yield res
 
     @conn_handler(services=['centralconfig'])
-    def alt_status(self, workflow, userdn, userproxy=None, verbose=False):
+    def alt_status(self, workflow, userdn, userproxy=None, verbose=0):
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
@@ -323,11 +324,11 @@ class HTCondorDataWorkflow(DataWorkflow):
         # First, verify the task has been submitted by the backend.
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, userdn = row.next() #just one row is picked up by the previous query
-        self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
+        self.logger.info("Status result for workflow %s: %s (detail level %d)" % (workflow, status, verbose))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
         if status != 'SUBMITTED':
-            return [ {"status" : status,\
-                      "taskFailureMsg" : taskFailure, #.read() if taskFailure else '',\
+            result = [ {"status" : status,
+                      "taskFailureMsg" : taskFailure if isinstance(taskFailure,str) else taskFailure.read(),
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
@@ -335,16 +336,16 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobdefErrors"    : [],
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
-
-        import cherrypy
+            self.logger.debug("Detailed result: %s\n" % result)
+            return result
 
         name = workflow.split("_")[2].split(":")[0]
-        cherrypy.log("Getting status for workflow %s, looking for schedd %s" %\
+        self.logger.info("Getting status for workflow %s, looking for schedd %s" %\
                                 (workflow, name))
         locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
-        cherrypy.log("Will talk to %s." % locator.getCollector())
+        self.logger.debug("Will talk to %s." % locator.getCollector())
         name = locator.getSchedd()
-        cherrypy.log("Schedd name %s." % name)
+        self.logger.debug("Schedd name %s." % name)
         schedd, address = locator.getScheddObj(workflow)
 
         results = self.getRootTasks(workflow, schedd)
@@ -370,7 +371,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
 
-        taskStatus = self.taskWebStatus(results[0]['CRAB_UserWebDir'], verbose=verbose)
+        taskStatus = self.taskWebStatus(results[0], verbose=verbose)
 
         jobsPerStatus = {}
         jobList = []
@@ -411,7 +412,6 @@ class HTCondorDataWorkflow(DataWorkflow):
         retval['jobdefErrors'] = []
 
         retval['jobs'] = taskStatus
-        #cherrypy.log(str(taskStatus))
 
         return [retval]
 
@@ -437,49 +437,64 @@ class HTCondorDataWorkflow(DataWorkflow):
         #curl.setopt(pycurl.ENCODING, 'gzip, deflate')
         return curl
 
-    def taskWebStatus(self, url, verbose):
+    def taskWebStatus(self, task_ad, verbose):
         nodes = {}
 
+        url = task_ad['CRAB_UserWebDir']
+
         curl = self.prepareCurl()
-        jobs_url = url + "/jobs_log.txt"
-        curl.setopt(pycurl.URL, jobs_url)
         fp = tempfile.TemporaryFile()
         curl.setopt(pycurl.WRITEFUNCTION, fp.write)
         hbuf = StringIO.StringIO()
         curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
-        import cherrypy
-        if verbose:
-            cherrypy.log("Starting download of job log")
+        self.logger.debug("Retrieving task status from web with verbosity %d." % verbose)
+        if verbose == 1:
+            jobs_url = url + "/jobs_log.txt"
+            curl.setopt(pycurl.URL, jobs_url)
+            self.logger.info("Starting download of job log")
             curl.perform()
-            cherrypy.log("Finished download of job log")
+            self.logger.info("Finished download of job log")
             header = ResponseHeader(hbuf.getvalue())
             if header.status == 200:
                 fp.seek(0)
-                cherrypy.log("Starting parse of job log")
+                self.logger.debug("Starting parse of job log")
                 self.parseJobLog(fp, nodes)
-                cherrypy.log("Finished parse of job log")
+                self.logger.debug("Finished parse of job log")
                 fp.truncate(0)
                 hbuf.truncate(0)
             else:
                 raise RuntimeError("Failed to parse jobs log")
 
+        elif verbose == 2:
+            site_url = url + "/site_ad.txt"
+            curl.setopt(pycurl.URL, site_url)
+            self.logger.debug("Starting download of site ad")
+            curl.perform()
+            self.logger.debug("Finished download of site ad")
+            header = ResponseHeader(hbuf.getvalue())
+            if header.status == 200:
+                fp.seek(0)
+                self.logger.debug("Starting parse of site ad")
+                self.parseSiteAd(fp, task_ad, nodes)
+                self.logger.debug("Finished parse of site ad")
+                fp.truncate(0)
+                hbuf.truncate(0)
+            else:
+                raise RuntimeError("Failed to parse site ad")
+
         nodes_url = url + "/node_state.txt"
         curl.setopt(pycurl.URL, nodes_url)
-        cherrypy.log("Starting download of node state")
+        self.logger.debug("Starting download of node state")
         curl.perform()
-        cherrypy.log("Finished download of node state")
+        self.logger.debug("Finished download of node state")
         header = ResponseHeader(hbuf.getvalue())
         if header.status == 200:
             fp.seek(0)
-            cherrypy.log("Starting parse of node state")
+            self.logger.debug("Starting parse of node state")
             self.parseNodeState(fp, nodes)
-            cherrypy.log("Finished parse of node state")
+            self.logger.debug("Finished parse of node state")
         else:
             raise RuntimeError("Failed to parse node state log")
-
-        #import cherrypy
-        #for node, info in nodes.items():
-        #    cherrypy.log("Node %s - Info %s" % (node, str(info)))
 
         return nodes
 
@@ -487,7 +502,9 @@ class HTCondorDataWorkflow(DataWorkflow):
     node_name2_re = re.compile("Job(\d+)")
     def parseJobLog(self, fp, nodes):
         node_map = {}
+        count = 0
         for event in htcondor.readEvents(fp):
+            count += 1
             eventtime = time.mktime(time.strptime(event['EventTime'], "%Y-%m-%dT%H:%M:%S"))
             if event['MyType'] == 'SubmitEvent':
                 m = self.node_name_re.match(event['LogNotes'])
@@ -575,9 +592,9 @@ class HTCondorDataWorkflow(DataWorkflow):
                     nodes[node]['WallDurations'][-1] = eventtime - nodes[node]['StartTimes'][-1]
                 self.insertCpu(event, nodes[node])
             else:
-                import cherrypy
-                cherrypy.log("Unknown event type: %s" % event['MyType'])
+                self.logger.warning("Unknown event type: %s" % event['MyType'])
 
+        self.logger.debug("There were %d events in the job log." % count)
         now = time.time()
         for node, info in nodes.items():
             last_start = now
@@ -628,4 +645,32 @@ class HTCondorDataWorkflow(DataWorkflow):
                         info['State'] = 'cooloff'
                 else:
                     info['State'] = 'failed'
+
+    job_name_re = re.compile(r"Job(\d+)")
+    def parseSiteAd(self, fp, task_ad, nodes):
+        site_ad = classad.parse(fp)
+
+        blacklist = set(task_ad['CRAB_SiteBlacklist'])
+        whitelist = set(self.task_ad['CRAB_SiteWhitelist'])
+        if 'CRAB_SiteResubmitWhitelist' in self.task_ad:
+            whitelist.update(self.task_ad['CRAB_SiteResubmitWhitelist'])
+        if 'CRAB_SiteResubmitBlacklist' in self.task_ad:
+            blacklist.update(self.task_ad['CRAB_SiteResubmitBlacklist'])
+
+        for key, val in ad.items():
+            m = self.job_name_re.match(key)
+            if not m:
+                continue
+            nodeid = m.groups()[0]
+            sites = set(val.eval())
+            if whitelist:
+                sites &= whitelist
+            # Never blacklist something on the whitelist
+            site -= (blacklist-whitelist)
+
+            info = nodes.setdefault(nodeid, {})
+            info['AvailableSites'] = list(sites)
+
+    def parsePoolAd(self, fp):
+        pool_ad = classad.parse(fp)
 
