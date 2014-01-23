@@ -820,7 +820,7 @@ class DagmanDataWorkflow(CRABInterface.DataWorkflow.DataWorkflow):
         workflow = str(workflow)
         if not WORKFLOW_RE.match(workflow):
             raise Exception("Invalid workflow name: %s" % workflow)
-        
+
         name = workflow.split("_")[0]
         self.logger.debug("Getting status for workflow %s, looking for schedd %s" %\
                                 (workflow, name))

@@ -37,7 +37,7 @@ SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %
 SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 10 UNLESS-EXIT 2
-VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
+VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\""
 
 """
 
@@ -245,7 +245,7 @@ def makeJobSubmit(task):
 
     return info
 
-def make_specs(task, sitead, jobgroup, availablesites, outfiles, startjobid):
+def make_specs(task, sitead, jobgroup, block, availablesites, outfiles, startjobid):
     specs = []
     i = startjobid
     temp_dest, dest = makeLFNPrefixes(task)
@@ -287,6 +287,7 @@ def make_specs(task, sitead, jobgroup, availablesites, outfiles, startjobid):
                       'tempDest': os.path.join(temp_dest, counter),
                       'outputDest': os.path.join(dest, counter),
                       'restinstance': task['restinstance'], 'resturl': task['resturl'],
+                      'block': block,
                       'backend': os.environ.get('HOSTNAME','')})
 
         LOGGER.debug(specs[-1])
@@ -373,6 +374,8 @@ class DagmanCreator(TaskAction.TaskAction):
                 possiblesites = []
             else:
                 possiblesites = jobs[0]['input_files'][0]['locations']
+            block = jobs[0]['input_files'][0]['block']
+            self.logger.debug("Block name: %s" % block)
             self.logger.debug("Possible sites: %s" % possiblesites)
 
             # Apply globals
@@ -380,20 +383,30 @@ class DagmanCreator(TaskAction.TaskAction):
             if global_whitelist:
                 availablesites &= global_whitelist
 
-
             if not availablesites:
                 msg = "No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             # NOTE: User can still shoot themselves in the foot with the resubmit blacklist
-            if not (availablesites - set(kwargs['task']['tm_site_blacklist'])):
-                msg = "Site blacklist removes only possible sources of data for task %s" % (kwargs['task']['tm_taskname'])
+            # However, this is the last chance we have to warn the users about an impossible task at submit time.
+            whitelist = set(kwargs['task']['tm_site_whitelist'])
+            blacklist = set(kwargs['task']['tm_site_blacklist'])
+            available = set(availablesites)
+            if whitelist:
+                available &= whitelist
+                if not available:
+                    msg = "Site whitelist (%s) removes only possible sources (%s) of data for task %s" % (", ".join(whitelist), ", ".join(availablesites), kwargs['task']['tm_taskname'])
+                    raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+
+            available -= (blacklist-whitelist)
+            if not available:
+                msg = "Site blacklist (%s) removes only possible sources (%s) of data for task %s" % (", ".join(blacklist), ", ".join(availablesites), kwargs['task']['tm_taskname'])
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             availablesites = [str(i) for i in availablesites]
             self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
 
-            jobgroupspecs, startjobid = make_specs(kwargs['task'], sitead, jobgroup, availablesites, outfiles, startjobid)
+            jobgroupspecs, startjobid = make_specs(kwargs['task'], sitead, jobgroup, block, availablesites, outfiles, startjobid)
             specs += jobgroupspecs
 
         dag = "\nNODE_STATUS_FILE node_state 30\n"

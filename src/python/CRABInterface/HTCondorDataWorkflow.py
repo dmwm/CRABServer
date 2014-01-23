@@ -84,7 +84,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, userdn = row.next() #just one row is picked up by the previous query
         self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
-        if not taskFailure: taskFailure = '' 
+        if not taskFailure: taskFailure = ''
         if status != 'SUBMITTED':
             return [ {"status" : status,\
                       "taskFailureMsg" : taskFailure if isinstance(taskFailure,str) else taskFailure.read(),\
