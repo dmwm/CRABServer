@@ -1,4 +1,7 @@
-import urllib, logging
+
+import os
+import urllib
+import logging
 from httplib import HTTPException
 from base64 import b64encode
 
@@ -13,9 +16,19 @@ class DBSDataDiscovery(DataDiscovery):
 
     def execute(self, *args, **kwargs):
         self.logger.info("Data discovery with DBS") ## to be changed into debug
+        old_cert_val = os.getenv("X509_USER_CERT")
+        old_key_val = os.getenv("X509_USER_KEY")
+        os.environ['X509_USER_CERT'] = self.config.TaskWorker.cmscert
+        os.environ['X509_USER_KEY'] = self.config.TaskWorker.cmskey
+        # DBS3 requires X509_USER_CERT to be set - but we don't want to leak that to other modules
         dbs = get_dbs(self.config.Services.DBSUrl)
         if kwargs['task']['tm_dbs_url']:
             dbs = get_dbs(kwargs['task']['tm_dbs_url'])
+        #
+        if old_cert_val != None:
+            os.environ['X509_USER_CERT'] = old_cert_val
+        if old_key_val != None:
+            os.environ['X509_USER_KEY'] = old_key_val
         self.logger.debug("Data discovery through %s for %s" %(dbs, kwargs['task']['tm_taskname']))
         # Get the list of blocks for the locations and then call dls.
         # The WMCore DBS3 implementation makes one call to dls for each block
