@@ -112,6 +112,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("totalunits", param, safe, optional=True)
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
             validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
+            validate_str("lfnprefix", param, safe, RX_LFNPATH, optional=True)
             #validate_str("userisburl", param, safe, re.compile(r"^[A-Za-z]*$"), optional=False)
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE)
             validate_num("savelogsflag", param, safe, optional=False)

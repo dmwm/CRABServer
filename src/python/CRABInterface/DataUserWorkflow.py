@@ -109,6 +109,7 @@ class DataUserWorkflow(object):
            :arg int numcores: number of CPU cores required by job
            :arg int maxmemory: maximum amount of RAM required, in MB
            :arg int priority: priority of this task
+           :arg str lfnprefix: prefix for the output directory inside /store/user.
            :returns: a dict which contaians details of the request"""
 
         return self.workflow.submit(*args, **kwargs)

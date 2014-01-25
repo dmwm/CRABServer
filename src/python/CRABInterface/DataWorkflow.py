@@ -161,6 +161,7 @@ class DataWorkflow(object):
            :arg int numcores: number of CPU cores required by job
            :arg int maxmemory: maximum amount of RAM required, in MB
            :arg int priority: priority of this task
+           :arg str lfnprefix: prefix for output directory in /store/user
            :returns: a dict which contaians details of the request"""
 
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
@@ -204,7 +205,7 @@ class DataWorkflow(object):
                             edm_outfiles    = [dbSerializer(edmoutfiles)],\
                             transformation  = [self.centralcfg.centralconfig["transformation"][jobtype]],\
                             job_type        = [jobtype],\
-                            arguments       = [dbSerializer({'oneEventMode' : 'T' if oneEventMode else 'F'})],\
+                            arguments       = [dbSerializer({'oneEventMode' : 'T' if oneEventMode else 'F', 'lfnprefix' : lfnprefix if lfnprefix else ''})],\
                             resubmitted_jobs= [dbSerializer([])],\
                             save_logs       = ['T' if savelogsflag else 'F'],\
                             user_infiles    = [dbSerializer(adduserfiles)],
