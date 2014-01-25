@@ -136,8 +136,9 @@ def makeLFNPrefixes(task):
     tmp_user = "%s.%s" % (user, hash)
     publish_info = task['tm_publish_name'].rsplit('-', 1)
     timestamp = getCreateTimestamp(task['tm_taskname'])
-    temp_dest = os.path.join("/store/temp/user", tmp_user, primaryds, publish_info[0], timestamp)
-    dest = os.path.join("/store/user", user, primaryds, publish_info[0], timestamp)
+    lfn_prefix = task.get('tm_arguments', {}).get('lfnprefix', '')
+    temp_dest = os.path.join("/store/temp/user", tmp_user, lfn_prefix, primaryds, publish_info[0], timestamp)
+    dest = os.path.join("/store/user", user, lfn_prefix, primaryds, publish_info[0], timestamp)
     return temp_dest, dest
 
 
