@@ -1,5 +1,6 @@
 
 import re
+import json
 import time
 import hashlib
 import StringIO
@@ -371,7 +372,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
 
-        taskStatus = self.taskWebStatus(results[0], verbose=verbose)
+        taskStatus, pool = self.taskWebStatus(results[0], verbose=verbose)
 
         jobsPerStatus = {}
         jobList = []
@@ -412,6 +413,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         retval['jobdefErrors'] = []
 
         retval['jobs'] = taskStatus
+        retval['pool'] = pool
 
         return [retval]
 
@@ -439,6 +441,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
     def taskWebStatus(self, task_ad, verbose):
         nodes = {}
+        pool_info = {}
 
         url = task_ad['CRAB_UserWebDir']
 
@@ -481,6 +484,25 @@ class HTCondorDataWorkflow(DataWorkflow):
                 hbuf.truncate(0)
             else:
                 raise RuntimeError("Failed to parse site ad")
+            pool_info_url = self.centralcfg.centralconfig["backend-urls"].get("poolInfo")
+            if pool_info_url:
+                fp2 = StringIO.StringIO()
+                curl.setopt(pycurl.WRITEFUNCTION, fp2.write)
+                curl.setopt(pycurl.URL, pool_info_url)
+                self.logger.debug("Starting download of pool info from %s" % pool_info_url)
+                curl.perform()
+                curl.setopt(pycurl.WRITEFUNCTION, fp.write)
+                self.logger.debug("Finished download of pool info")
+                header = ResponseHeader(hbuf.getvalue())
+                if header.status == 200:
+                    fp2.seek(0)
+                    self.logger.debug("Starting parse of pool info")
+                    pool_info = json.load(fp2)
+                    self.logger.debug("Finished parse of pool info")
+                    hbuf.truncate(0)
+                else:
+                    raise RuntimeError("Failed to retrieve pool info")
+
 
         nodes_url = url + "/node_state.txt"
         curl.setopt(pycurl.URL, nodes_url)
@@ -496,7 +518,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         else:
             raise RuntimeError("Failed to parse node state log")
 
-        return nodes
+        return nodes, pool_info
 
     node_name_re = re.compile("DAG Node: Job(\d+)")
     node_name2_re = re.compile("Job(\d+)")
@@ -651,13 +673,13 @@ class HTCondorDataWorkflow(DataWorkflow):
         site_ad = classad.parse(fp)
 
         blacklist = set(task_ad['CRAB_SiteBlacklist'])
-        whitelist = set(self.task_ad['CRAB_SiteWhitelist'])
-        if 'CRAB_SiteResubmitWhitelist' in self.task_ad:
-            whitelist.update(self.task_ad['CRAB_SiteResubmitWhitelist'])
-        if 'CRAB_SiteResubmitBlacklist' in self.task_ad:
-            blacklist.update(self.task_ad['CRAB_SiteResubmitBlacklist'])
+        whitelist = set(task_ad['CRAB_SiteWhitelist'])
+        if 'CRAB_SiteResubmitWhitelist' in task_ad:
+            whitelist.update(task_ad['CRAB_SiteResubmitWhitelist'])
+        if 'CRAB_SiteResubmitBlacklist' in task_ad:
+            blacklist.update(task_ad['CRAB_SiteResubmitBlacklist'])
 
-        for key, val in ad.items():
+        for key, val in site_ad.items():
             m = self.job_name_re.match(key)
             if not m:
                 continue
@@ -666,10 +688,10 @@ class HTCondorDataWorkflow(DataWorkflow):
             if whitelist:
                 sites &= whitelist
             # Never blacklist something on the whitelist
-            site -= (blacklist-whitelist)
+            sites -= (blacklist-whitelist)
 
             info = nodes.setdefault(nodeid, {})
-            info['AvailableSites'] = list(sites)
+            info['AvailableSites'] = list([i.eval() for i in sites])
 
     def parsePoolAd(self, fp):
         pool_ad = classad.parse(fp)
