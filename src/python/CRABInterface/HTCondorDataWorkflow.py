@@ -68,118 +68,6 @@ class HTCondorDataWorkflow(DataWorkflow):
         info[2] = "%s:%s" % (name, hn_name)
         return "_".join(info)
 
-    @conn_handler(services=['centralconfig'])
-    def status_old(self, workflow, userdn, userproxy=None, verbose=0):
-        """Retrieve the status of the workflow.
-
-           :arg str workflow: a valid workflow name
-           :return: a workflow status summary document"""
-
-        try:
-            return self.alt_status(workflow, userdn, userproxy=userproxy, verbose=verbose)
-        except:
-            s = traceback.format_exc()
-            self.logger.exception("Failure of alt status: %s" % s)
-        # First, verify the task has been submitted by the backend.
-        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, db_userdn = row.next() #just one row is picked up by the previous query
-
-        self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
-        self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
-        if not taskFailure: taskFailure = ''
-        if status != 'SUBMITTED':
-            return [ {"status" : status,\
-                      "taskFailureMsg" : taskFailure if isinstance(taskFailure,str) else taskFailure.read(),\
-                      "jobSetID"        : '',
-                      "jobsPerStatus"   : {},
-                      "failedJobdefs"   : 0,
-                      "totalJobdefs"    : 0,
-                      "jobdefErrors"    : [],
-                      "jobList"         : [],
-                      "saveLogs"        : saveLogs }]
-
-        name = workflow.split("_")[0]
-        self.logger.debug("Getting status for workflow %s, looking for schedd %s" %\
-                                (workflow, name))
-        locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
-        self.logger.debug("Will talk to %s." % locator.getCollector())
-        schedd, address = locator.getScheddObj(workflow)
-
-        results = self.getRootTasks(workflow, schedd)
-
-        # TODO: handle case where there were no root tasks performed.
-        # In such a case, we ought to check the DB.
-        jobsPerStatus = {}
-        jobStatus = {}
-        jobList = []
-        taskStatusCode = int(results[-1]['JobStatus'])
-        taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
-        codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'finished', 5: 'held'}
-        task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
-        retval = {"status": task_codes.get(taskStatusCode, 'unknown'), "taskFailureMsg": "", "jobSetID": workflow,
-            "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
-        if taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 3:
-            retval['status'] = 'FAILED'
-        elif taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 16:
-            retval['status'] = 'InTransition'
-        elif taskStatusCode == 5:
-            retval['status'] = 'Unknown'
-
-        # Handle all "real" jobs in HTCondor.
-        failedJobs = []
-        allJobs = self.getHTCondorJobs(workflow, schedd)
-        for result in allJobs:
-            jobState = int(result['JobStatus'])
-            if result['CRAB_Id'] in failedJobs:
-                failedJobs.remove(result['CRAB_Id'])
-            if (jobState == 4) and ('ExitCode' in result) and (int(result['ExitCode'])):
-                failedJobs.append(result['CRAB_Id'])
-                statusName = "failed"
-            else:
-                statusName = codes.get(jobState, 'unknown')
-            jobStatus[int(result['CRAB_Id'])] = statusName
-
-        # Handle all "finished" jobs.
-        for result, file_state in self.getFinishedJobs(workflow):
-            if result not in jobStatus:
-                if file_state == 'FINISHED':
-                    jobStatus[result] = 'finished'
-                elif file_state == 'COOLOFF':
-                    jobStatus[result] = 'cooloff'
-                elif file_state == 'FAILED':
-                    jobStatus[result] = 'failed'
-                    failedJobs.append(result)
-                else:
-                    jobStatus[result] = 'transferring'
-            elif (result in failedJobs) and (file_state == 'FINISHED'):
-                failedJobs.remove(result)
-                jobStatus[result] = 'finished'
-            elif file_state == 'FINISHED':
-                jobStatus[result] = 'finished'
-
-        for i in range(1, taskJobCount+1):
-            if i not in jobStatus:
-                if taskStatusCode == 5:
-                    jobStatus[i] = 'killed'
-                else:
-                    jobStatus[i] = 'unsubmitted'
-
-        for job, status in jobStatus.items():
-            jobsPerStatus.setdefault(status, 0)
-            jobsPerStatus[status] += 1
-            jobList.append((status, job))
-
-        self.logger.debug("Job info: %s" % str(jobStatus))
-
-        retval["failedJobdefs"] = len(failedJobs)
-        retval["totalJobdefs"] = len(jobStatus)
-
-        if len(jobStatus) == 0 and taskJobCount == 0 and taskStatusCode == 2:
-            retval['status'] = 'Running (jobs not submitted)'
-
-        retval['jobdefErrors'] = []
-
-        return [retval]
 
     def getRootTasks(self, workflow, schedd):
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
@@ -195,22 +83,6 @@ class HTCondorDataWorkflow(DataWorkflow):
             raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
         return results
 
-    def getHTCondorJobs(self, workflow, schedd):
-        """
-        Retrieve all the jobs for executing cmsRun in this workflow
-        """
-        jobConst = 'TaskType =?= "Job" && CRAB_ReqName =?= %s' % HTCondorUtils.quote(workflow)
-        jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id', "HoldReasonCode"]
-        return schedd.query(jobConst, jobList)
-
-    def getFinishedJobs(self, workflow):
-        """
-        Get the finished jobs from the file metadata table.
-        """
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='FAKE', taskname=workflow)
-
-        for row in rows:
-            yield row[GetFromTaskAndType.PANDAID], row[GetFromTaskAndType.STATE]
 
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
@@ -224,6 +96,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
         return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, tm_user_dn, tm_username, tm_user_role, tm_user_group, saveLogs=tm_save_logs, userproxy=userproxy)
 
+
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
 
@@ -235,6 +108,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
         finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
         return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE'], transferingIds, finishedIds, tm_user_dn, tm_username, tm_user_role, tm_user_group, userproxy=userproxy)
+
 
     @conn_handler(services=['phedex'])
     def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, username, role, group, saveLogs=None, userproxy=None):
@@ -287,6 +161,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                     'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
             }
 
+
     def report(self, workflow, userdn, userproxy=None):
         res = {}
         self.logger.info("About to compute report of workflow: %s. Getting status first." % workflow)
@@ -313,6 +188,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.info("Got %s edm files for workflow %s" % (len(res['runsAndLumis']), workflow))
 
         yield res
+
 
     @conn_handler(services=['centralconfig'])
     def status(self, workflow, userdn, userproxy=None, verbose=0):
@@ -432,6 +308,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 info['TotalUserCpuTimeHistory'][-1] = user
                 info['TotalSysCpuTimeHistory'][-1] = sys
 
+
     def prepareCurl(self):
         curl = pycurl.Curl()
         curl.setopt(pycurl.NOSIGNAL, 0)
@@ -441,6 +318,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         curl.setopt(pycurl.MAXREDIRS, 0)
         #curl.setopt(pycurl.ENCODING, 'gzip, deflate')
         return curl
+
 
     def taskWebStatus(self, task_ad, verbose):
         nodes = {}
@@ -522,6 +400,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             raise RuntimeError("Failed to parse node state log")
 
         return nodes, pool_info
+
 
     node_name_re = re.compile("DAG Node: Job(\d+)")
     node_name2_re = re.compile("Job(\d+)")
@@ -630,6 +509,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             while len(info['WallDurations']) > len(info['SiteHistory']):
                 info['SiteHistory'].append("Unknown")
 
+
     job_re = re.compile(r"JOB Job(\d+)\s+([A-Z_]+)\s+\((.*)\)")
     post_failure_re = re.compile(r"POST script failed with status (\d+)")
     def parseNodeState(self, fp, nodes):
@@ -671,6 +551,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 else:
                     info['State'] = 'failed'
 
+
     job_name_re = re.compile(r"Job(\d+)")
     def parseSiteAd(self, fp, task_ad, nodes):
         site_ad = classad.parse(fp)
@@ -695,6 +576,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
             info = nodes.setdefault(nodeid, {})
             info['AvailableSites'] = list([i.eval() for i in sites])
+
 
     def parsePoolAd(self, fp):
         pool_ad = classad.parse(fp)
