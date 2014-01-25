@@ -123,7 +123,6 @@ class DataWorkflow(object):
         raise NotImplementedError
 
     @conn_handler(services=['centralconfig'])
-    @retrieveUserCert
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, userproxy=None):
@@ -164,9 +163,6 @@ class DataWorkflow(object):
            :arg int priority: priority of this task
            :returns: a dict which contaians details of the request"""
 
-        #if scheduler == 'condor':
-            # TODO: hook this around properly
-        #    raise NotImplementedError, "Need to add the proper CRABServer hooks for condor"
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         requestname = self.updateRequest('%s_%s_%s' % (timestamp, userhn, workflow))
         splitArgName = self.splitArgMap[splitalgo]

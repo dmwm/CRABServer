@@ -48,7 +48,6 @@ class DataUserWorkflow(object):
            :return: a list of errors grouped by exit code, error reason, site"""
         raise NotImplementedError
 
-    @retrieveUserCert
     def report(self, workflow, userdn, userproxy):
         """Retrieves the quality of the workflow in term of what has been processed
            (eg: good lumis). This can call a different function depending on the jobtype.
@@ -57,7 +56,6 @@ class DataUserWorkflow(object):
            :return: what?"""
         return self.workflow.report(workflow, userdn, userproxy)
 
-    @retrieveUserCert
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
 
@@ -67,7 +65,6 @@ class DataUserWorkflow(object):
            :return: a generator of list of logs pfns"""
         return self.workflow.logs(workflow, howmany, exitcode, jobids, userdn, userproxy)
 
-    @retrieveUserCert
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
         """Returns the workflow output PFN. It takes care of the LFN - PFN conversion too.
 
@@ -116,7 +113,6 @@ class DataUserWorkflow(object):
 
         return self.workflow.submit(*args, **kwargs)
 
-    @retrieveUserCert
     def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, userdn, userproxy=None):
         """Request to Resubmit a workflow.
 
@@ -124,7 +120,6 @@ class DataUserWorkflow(object):
            :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
         return self.workflow.resubmit(workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, userdn, userproxy)
 
-    @retrieveUserCert
     def status(self, workflow, userdn, userproxy=None, verbose=False):
         """Retrieve the status of the workflow
 
@@ -135,7 +130,6 @@ class DataUserWorkflow(object):
         """
         return self.workflow.status(workflow, userdn, userproxy, verbose=verbose)
 
-    @retrieveUserCert
     def kill(self, workflow, force, jobids, userdn, userproxy=None):
         """Request to Abort a workflow.
 
