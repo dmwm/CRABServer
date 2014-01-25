@@ -69,7 +69,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         return "_".join(info)
 
     @conn_handler(services=['centralconfig'])
-    def status(self, workflow, userdn, userproxy=None, verbose=0):
+    def status_old(self, workflow, userdn, userproxy=None, verbose=0):
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
@@ -82,7 +82,8 @@ class HTCondorDataWorkflow(DataWorkflow):
             self.logger.exception("Failure of alt status: %s" % s)
         # First, verify the task has been submitted by the backend.
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, userdn = row.next() #just one row is picked up by the previous query
+        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, db_userdn = row.next() #just one row is picked up by the previous query
+
         self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
         if not taskFailure: taskFailure = ''
@@ -97,13 +98,11 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
 
-        import cherrypy
-
         name = workflow.split("_")[0]
-        cherrypy.log("Getting status for workflow %s, looking for schedd %s" %\
+        self.logger.debug("Getting status for workflow %s, looking for schedd %s" %\
                                 (workflow, name))
         locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
-        cherrypy.log("Will talk to %s." % locator.getCollector())
+        self.logger.debug("Will talk to %s." % locator.getCollector())
         schedd, address = locator.getScheddObj(workflow)
 
         results = self.getRootTasks(workflow, schedd)
@@ -316,7 +315,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         yield res
 
     @conn_handler(services=['centralconfig'])
-    def alt_status(self, workflow, userdn, userproxy=None, verbose=0):
+    def status(self, workflow, userdn, userproxy=None, verbose=0):
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
@@ -324,7 +323,11 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         # First, verify the task has been submitted by the backend.
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, userdn = row.next() #just one row is picked up by the previous query
+        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, db_userdn = row.next() #just one row is picked up by the previous query
+
+        if db_userdn != userdn:
+            raise ExecutionError("Your DN, %s, is not the same as the original DN used for task submission" % userdn)
+
         self.logger.info("Status result for workflow %s: %s (detail level %d)" % (workflow, status, verbose))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
         if status != 'SUBMITTED':
