@@ -204,11 +204,19 @@ class HTCondorDataWorkflow(DataWorkflow):
         if db_userdn != userdn:
             raise ExecutionError("Your DN, %s, is not the same as the original DN used for task submission" % userdn)
 
+        if verbose == None:
+            verbose = 0
         self.logger.info("Status result for workflow %s: %s (detail level %d)" % (workflow, status, verbose))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
         if status != 'SUBMITTED':
+            if isinstance(taskFailure, str):
+                taskFailureMsg = taskFailure
+            elif taskFailure == None:
+                taskFailureMsg = ""
+            else:
+                taskFailureMsg = taskFailure.read()
             result = [ {"status" : status,
-                      "taskFailureMsg" : taskFailure if isinstance(taskFailure,str) else taskFailure.read(),
+                      "taskFailureMsg" : taskFailureMsg,
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
@@ -240,9 +248,22 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
 
+        
+        taskStatusCode = int(results[-1]['JobStatus'])
         if 'CRAB_UserWebDir' not in results[-1]:
-            return [ {"status" : "UNKNOWN",
-                      "taskFailureMsg" : "Task failed to bootstrap on schedd %s." % address,
+            if taskStatusCode != 1 and taskStatusCode != 2:
+                return [ {"status" : "UNKNOWN",
+                      "taskFailureMsg"  : "Task failed to bootstrap on schedd %s." % address,
+                      "jobSetID"        : '',
+                      "jobsPerStatus"   : {},
+                      "failedJobdefs"   : 0,
+                      "totalJobdefs"    : 0,
+                      "jobdefErrors"    : [],
+                      "jobList"         : [],
+                      "saveLogs"        : saveLogs }]
+            else:
+                return [ {"status" : "SUBMITTED",
+                      "taskWarningMsg"  : "Task has not yet bootstrapped.",
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
@@ -255,7 +276,6 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         jobsPerStatus = {}
         jobList = []
-        taskStatusCode = int(results[-1]['JobStatus'])
         taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
         codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'finished', 5: 'held'}
         task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
