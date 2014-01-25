@@ -520,7 +520,7 @@ def AddPsetHash(report, opts):
                 continue
             m = re.match(r"^[A-Za-z0-9\-._]+$", filename)
             if not m:
-                print "== EDM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % filename)
+                print "== EDM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % filename
                 continue
             print "==== PSet Hash lookup STARTING at %s ====" % time.ctime()
             for line in getProv(filename, opts).splitlines():
