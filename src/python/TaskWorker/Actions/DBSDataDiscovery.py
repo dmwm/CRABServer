@@ -27,8 +27,12 @@ class DBSDataDiscovery(DataDiscovery):
         #
         if old_cert_val != None:
             os.environ['X509_USER_CERT'] = old_cert_val
+        else:
+            del os.environ['X509_USER_CERT']
         if old_key_val != None:
             os.environ['X509_USER_KEY'] = old_key_val
+        else:
+            del os.environ['X509_USER_KEY']
         self.logger.debug("Data discovery through %s for %s" %(dbs, kwargs['task']['tm_taskname']))
         # Get the list of blocks for the locations and then call dls.
         # The WMCore DBS3 implementation makes one call to dls for each block
