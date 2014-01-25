@@ -15,6 +15,7 @@ import json
 import traceback
 import pickle
 import logging
+import subprocess
 from ast import literal_eval
 from optparse import OptionParser, BadOptionError, AmbiguousOptionError
 
@@ -362,7 +363,6 @@ try:
     from WMCore.WMSpec.WMWorkload import newWorkload
     from WMCore.WMSpec.Steps.Templates.CMSSW import CMSSW as CMSSWTemplate
     from WMCore.WMRuntime.Tools.Scram import Scram
-    from subprocess import PIPE
 except:
     # We may not even be able to create a FJR at this point.  Record
     # error and exit.
@@ -391,7 +391,7 @@ def executeCMSSWStack(opts):
             handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
             mintime()
             sys.exit(EC_CMSMissingSoftware)
-        ret = scram("python -c '%s'" % pythonScript, logName=PIPE, runtimeDir=os.getcwd())
+        ret = scram("python -c '%s'" % pythonScript, logName=subprocess.PIPE, runtimeDir=os.getcwd())
         if ret > 0:
             msg = scram.diagnostic()
             handleException("FAILED", EC_CMSRunWrapper, 'Error getting output modules from the pset.\n\tScram Env %s\n\tCommand:%s' % (msg, pythonScript))
@@ -480,6 +480,38 @@ def AddChecksums(report):
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
+def AddPsetHash(report):
+    if 'steps' not in report:
+        return
+    if 'cmsRun' not in report['steps']:
+        return
+    if 'output' not in report['steps']['cmsRun']:
+        return
+
+    pset_re = re.compile("^ParameterSetID: ([a-f0-9]{32,32})$")
+    for outputMod in report['steps']['cmsRun']['output'].values():
+        for fileInfo in outputMod:
+            if fileInfo.get('ouput_module_class') != 'PoolOutputModule':
+                continue
+            if 'pfn' not in fileInfo:
+                continue
+            print "== Filename: %s" % fileInfo['pfn']
+            if not os.path.exists(fileInfo['pfn']):
+                print "== Output file missing!"
+                continue
+            print "==== PSet Hash lookup STARTING at %s ====" % time.ctime()
+            prov = subprocess.Popen(["edmProvDump", fileInfo['pfn']], stdout=subprocess.PIPE)
+            pset_hash = None
+            for line in prov.stdout.readlines():
+                 m = pset_re.match(line)
+                 if m:
+                     pset_hash = m.groups()[0]
+            rc = prov.wait()
+            print "== edmProvDump return code %d" % rc
+            print "==== PSet Hash lookup FINISHED at %s ====" % time.ctime()
+            if pset_hash and not rc:
+                print "== edmProvDump pset hash %s" % pset_hash
+                fileInfo['pset_hash'] = pset_hash
 
 try:
     setupLogging('.')
@@ -493,7 +525,12 @@ try:
     if ad:
         startDashboardMonitoring(ad)
     print "==== CMSSW Stack Execution STARTING at %s ====" % time.ctime()
-    cmssw = executeCMSSWStack(opts)
+    try:
+        cmssw = executeCMSSWStack(opts)
+    except:
+        print "==== CMSSW Stack Execution FAILED at %s ====" % time.ctime()
+        logCMSSW()
+        raise
     jobExitCode = cmssw.step.execution.exitStatus
     print "Job exit code: %s" % str(jobExitCode)
     print "==== CMSSW Stack Execution FINISHING at %s ====" % time.ctime()
@@ -521,6 +558,7 @@ try:
     #import pdb;pdb.set_trace()
     report = report.__to_json__(None)
     AddChecksums(report)
+    AddPsetHash(report)
     if jobExitCode: #TODO check exitcode from fwjr
         report['exitAcronym'] = "FAILED"
         report['exitCode'] = jobExitCode

@@ -466,6 +466,9 @@ class PostJob():
                 fileInfo['checksums'] = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
                 fileInfo['outsize'] = outputFile.get(u"size", 0)
 
+                if u'pset_hash' in outputFile:
+                    fileInfo['pset_hash'] = outputFile[u'pset_hash']
+
                 if u'SEName' in outputFile and self.node_map.get(str(outputFile['SEName'])):
                     fileInfo['outtmplocation'] = self.node_map[outputFile['SEName']]
 
@@ -499,14 +502,17 @@ class PostJob():
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
 
-        # CMS convention for outdataset: /primarydataset>/<yourHyperNewsusername>-<publish_data_name>-<PSETHASH>/USER
-        outdataset = os.path.join('/' + str(self.task_ad['CRAB_InputData']).split('/')[1], self.task_ad['CRAB_UserHN'] + '-' + self.task_ad['CRAB_PublishName'], 'USER')
         for fileInfo in self.outputFiles:
+            publishname = self.task_ad['CRAB_PublishName']
+            if 'pset_hash' in fileInfo:
+                publishname = "%s-%s" % (publishname.rsplit("-", 1)[0], fileInfo['pset_hash'])
+            # CMS convention for outdataset: /primarydataset>/<yourHyperNewsusername>-<publish_data_name>-<PSETHASH>/USER
+            outdataset = os.path.join('/' + str(self.task_ad['CRAB_InputData']).split('/')[1], self.task_ad['CRAB_UserHN'] + '-' + publishname, 'USER')
             configreq = {"taskname":        self.ad['CRAB_ReqName'],
                          "globalTag":       "None",
                          "pandajobid":      self.crab_id,
                          "outsize":         fileInfo['outsize'],
-                         "publishdataname": self.ad['CRAB_OutputData'],
+                         "publishdataname": publishname,
                          "appver":          self.ad['CRAB_JobSW'],
                          "outtype":         fileInfo['filetype'],
                          "checksummd5":     "asda", # Not implemented; garbage value taken from ASO

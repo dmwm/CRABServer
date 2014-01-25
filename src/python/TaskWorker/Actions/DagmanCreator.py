@@ -117,6 +117,9 @@ SPLIT_ARG_MAP = { "LumiBased" : "lumis_per_job",
 LOGGER = None
 
 
+def getCreateTimestamp(taskname):
+    return "_".join(taskname.split("_")[:2])
+
 def makeLFNPrefixes(task):
     if task['tm_input_dataset']:
         primaryds = task['tm_input_dataset'].split('/')[1]
@@ -132,8 +135,9 @@ def makeLFNPrefixes(task):
     user = task['tm_username']
     tmp_user = "%s.%s" % (user, hash)
     publish_info = task['tm_publish_name'].rsplit('-', 1)
-    temp_dest = os.path.join("/store/temp/user", tmp_user, primaryds, publish_info[0], publish_info[1])
-    dest = os.path.join("/store/user", user, primaryds, publish_info[0], publish_info[1])
+    timestamp = getCreateTimestamp(task['tm_taskname'])
+    temp_dest = os.path.join("/store/temp/user", tmp_user, primaryds, publish_info[0], timestamp)
+    dest = os.path.join("/store/user", user, primaryds, publish_info[0], timestamp)
     return temp_dest, dest
 
 
