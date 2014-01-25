@@ -494,9 +494,11 @@ class PostJob():
                 if oe.errno != errno.ENOENT and oe.errno != errno.EPERM:
                     raise
 
+
     def upload(self):
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
+
         # CMS convention for outdataset: /primarydataset>/<yourHyperNewsusername>-<publish_data_name>-<PSETHASH>/USER
         outdataset = os.path.join('/' + str(self.task_ad['CRAB_InputData']).split('/')[1], self.task_ad['CRAB_UserHN'] + '-' + self.task_ad['CRAB_PublishName'], 'USER')
         for fileInfo in self.outputFiles:
@@ -534,9 +536,11 @@ class PostJob():
                 print hte.headers
                 raise
 
+
     def uploadLog(self, dest_dir, filename):
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
+
         outlfn = os.path.join(dest_dir, "log", filename)
         source_site = self.source_site
         if 'SEName' in self.full_report:
@@ -567,6 +571,7 @@ class PostJob():
                    not hte.headers.get('X-Error-Http', -1) == '400':
                 raise
 
+
     def setDashboardState(self, state, reason=None):
         if state == "COOLOFF":
             state = "Cooloff"
@@ -589,51 +594,14 @@ class PostJob():
         logger.info("Dashboard parameters: %s" % str(params))
         DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
 
-    def uploadFakeLog(self, state="TRANSFERRING"):
-        if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
-            return
-        self.setDashboardState(state)
-
-        # Upload a fake log status.  This is to be replaced by a proper job state table.
-        configreq = {"taskname":        self.ad['CRAB_ReqName'],
-                     "pandajobid":      self.crab_id,
-                     "outsize":         "0",
-                     "publishdataname": self.ad['CRAB_OutputData'],
-                     "appver":          self.ad['CRAB_JobSW'],
-                     "outtype":         "FAKE", # Not implemented
-                     "checksummd5":     "asda", # Not implemented
-                     "checksumcksum":   "3701783610", # Not implemented
-                     "checksumadler32": "6d1096fe", # Not implemented
-                     "outlocation":     "T2_US_Nowhere",
-                     "outtmplocation":  "T2_US_Nowhere",
-                     "acquisitionera":  "null", # Not implemented
-                     "events":          "0",
-                     "outlfn":          "/store/user/fakefile/FakeDataset/FakePublish/5b6a581e4ddd41b130711a045d5fecb9/1/log/fake.log.%s" % str(self.crab_id),
-                     "outdatasetname":  "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER",
-                     "filestate":       state,
-                    }
-        print self.resturl, urllib.urlencode(configreq)
-        try:
-            self.server.put(self.resturl, data = urllib.urlencode(configreq))
-        except HTTPException, hte:
-            if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
-                   not hte.headers.get('X-Error-Http', -1) == '400':
-                raise
-            self.uploadState(state)
-
 
     def uploadState(self, state):
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
 
         self.setDashboardState(state)
-        # Record this job as a permanent failure
-        configreq = {"taskname":  self.ad['CRAB_ReqName'],
-                     "filestate": state,
-                     "outlfn":    "/store/user/fakefile/FakeDataset/FakePublish/5b6a581e4ddd41b130711a045d5fecb9/1/log/fake.log.%s" % str(self.crab_id),
-                    }
-        self.server.post(self.resturl, data = urllib.urlencode(configreq))
         return 2
+
 
     def getSourceSite(self):
         if self.full_report.get('executed_site', None):
@@ -641,6 +609,7 @@ class PostJob():
             return self.full_report['executed_site']
 
         raise ValueError("Unable to determine source side")
+
 
     def getFileSourceSite(self, filename):
         filename = os.path.split(filename)[-1]
@@ -715,6 +684,7 @@ class PostJob():
         for node in nodes:
             self.node_map[str(node[u'se'])] = str(node[u'name'])
 
+
     def execute(self, *args, **kw):
         retry_count = args[2]
         self.retry_count = retry_count
@@ -725,21 +695,15 @@ class PostJob():
         logger.debug("The post-job script will be saved to %s" % postjob)
         try:
             retval = self.execute_internal(*args, **kw)
-        except:
+        finally:
             logger.exception("Failure during post-job execution.")
             sys.stdout.flush()
             sys.stderr.flush()
             shutil.copy("postjob.%s" % id, postjob)
             os.chmod(postjob, 0644)
             DashboardAPI.apmonFree()
-            raise
-        if retval:
-            sys.stdout.flush()
-            sys.stderr.flush()
-            shutil.copy("postjob.%s" % id, postjob)
-            os.chmod(postjob, 0644)
-        DashboardAPI.apmonFree()
         return retval
+
 
     def execute_internal(self, cluster, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
         self.sw = sw
@@ -799,8 +763,6 @@ class PostJob():
 
         status = int(status)
 
-        self.uploadFakeLog(state="TRANSFERRING")
-
         logger.info("Retry count %s; max retry %s" % (retry_count, max_retries))
         fail_state = "COOLOFF"
         if retry_count == max_retries:
@@ -845,9 +807,9 @@ class PostJob():
             logger.exception("Stageout failed.")
             self.uploadState(fail_state)
             raise
-        self.uploadFakeLog(state="FINISHED")
 
         return 0
+
 
 class testServer(unittest.TestCase):
     def generateJobJson(self, sourceSite = 'srm.unl.edu'):
