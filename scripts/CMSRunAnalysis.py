@@ -518,6 +518,7 @@ def AddPsetHash(report, opts):
             if not os.path.exists(fileInfo['pfn']):
                 print "== Output file missing!"
                 continue
+            filename = fileInfo['pfn']
             m = re.match(r"^[A-Za-z0-9\-._]+$", filename)
             if not m:
                 print "== EDM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % filename
