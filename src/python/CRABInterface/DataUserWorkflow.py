@@ -122,7 +122,7 @@ class DataUserWorkflow(object):
 
            :arg str workflow: a workflow name
            :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
-        return self.workflow.resubmit(workflow, siteblacklist, sitewhitelist, jobids, userdn, userproxy)
+        return self.workflow.resubmit(workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, userdn, userproxy)
 
     @retrieveUserCert
     def status(self, workflow, userdn, userproxy=None, verbose=False):
