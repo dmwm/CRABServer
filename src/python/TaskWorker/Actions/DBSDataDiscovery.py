@@ -74,7 +74,8 @@ if __name__ == '__main__':
     config = Configuration()
     config.section_("Services")
     #config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/dev/global/DBSReader'
-    config.Services.DBSUrl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
+    #config.Services.DBSUrl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
+    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/'
     for dataset in datasets:
         fileset = DBSDataDiscovery(config)
         print fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})

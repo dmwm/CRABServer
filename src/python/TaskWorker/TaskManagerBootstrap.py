@@ -42,7 +42,7 @@ def bootstrap():
 
     config = Configuration.Configuration()
     config.section_("Services")
-    config.Services.DBSUrl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
+    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/'
     
     ad['tm_taskname'] = ad.eval("CRAB_Workflow")
     ad['tm_split_algo'] = ad.eval("CRAB_SplitAlgo")
