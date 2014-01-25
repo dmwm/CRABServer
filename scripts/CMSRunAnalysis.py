@@ -372,6 +372,25 @@ except:
     print traceback.format_exc()
     raise
 
+def getProv(filename, opts):
+    scram = Scram(
+        version = opts.cmsswVersion,
+        directory = os.getcwd(),
+        architecture = opts.scramArch,
+    )
+    if scram.project() or scram.runtime(): #if any of the two commands fail...
+        msg = scram.diagnostic()
+        handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
+        mintime()
+        sys.exit(EC_CMSMissingSoftware)
+    ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd())
+    if ret > 0:
+        msg = scram.diagnostic()
+        handleException("FAILED", EC_CMSRunWrapper, 'Error getting pset hash from file.\n\tScram Env %s\n\tCommand:edmProvDump %s' % (msg, filename))
+        mintime()
+        sys.exit(EC_CMSRunWrapper)
+    return scram.stdout
+
 def executeCMSSWStack(opts):
 
     def getOutputModules():
@@ -480,7 +499,7 @@ def AddChecksums(report):
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
-def AddPsetHash(report):
+def AddPsetHash(report, opts):
     if 'steps' not in report:
         return
     if 'cmsRun' not in report['steps']:
@@ -499,15 +518,16 @@ def AddPsetHash(report):
             if not os.path.exists(fileInfo['pfn']):
                 print "== Output file missing!"
                 continue
+            m = re.match(r"^[A-Za-z0-9\-._]+$", filename)
+            if not m:
+                print "== EDM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % filename)
+                continue
             print "==== PSet Hash lookup STARTING at %s ====" % time.ctime()
-            prov = subprocess.Popen(["edmProvDump", fileInfo['pfn']], stdout=subprocess.PIPE)
-            pset_hash = None
-            for line in prov.stdout.readlines():
+            for line in getProv(filename, opts).splitlines():
                  m = pset_re.match(line)
                  if m:
+                     # Note we want the last hash in the file.
                      pset_hash = m.groups()[0]
-            rc = prov.wait()
-            print "== edmProvDump return code %d" % rc
             print "==== PSet Hash lookup FINISHED at %s ====" % time.ctime()
             if pset_hash and not rc:
                 print "== edmProvDump pset hash %s" % pset_hash
@@ -558,7 +578,7 @@ try:
     #import pdb;pdb.set_trace()
     report = report.__to_json__(None)
     AddChecksums(report)
-    AddPsetHash(report)
+    AddPsetHash(report, opts)
     if jobExitCode: #TODO check exitcode from fwjr
         report['exitAcronym'] = "FAILED"
         report['exitCode'] = jobExitCode
