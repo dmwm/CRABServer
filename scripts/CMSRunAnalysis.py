@@ -533,7 +533,7 @@ def AddPsetHash(report, opts):
                      # Note we want the last hash in the file.
                      pset_hash = m.groups()[0]
             print "==== PSet Hash lookup FINISHED at %s ====" % time.ctime()
-            if pset_hash and not rc:
+            if pset_hash:
                 print "== edmProvDump pset hash %s" % pset_hash
                 fileInfo['pset_hash'] = pset_hash
 
