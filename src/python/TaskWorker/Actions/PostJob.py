@@ -114,6 +114,8 @@ class FTSJob(object):
                 return 1
 
 class ASOServerJob(object):
+
+
     def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, output_metadata, task_ad):
         self.id = None
         self.couchServer = None
@@ -135,16 +137,20 @@ class ASOServerJob(object):
         aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config")
         if config:
             aso_auth_file = getattr(config, "authfile", "auth_aso_plugin.config")
-        try:
+        if 'CRAB_ASOURL' in self.task_ad and self.task_ad['CRAB_ASOURL']:
+            self.aso_db_url = self.task_ad['CRAB_ASOURL']
+        else:
             f = open(aso_auth_file)
             authParams = json.loads(f.read())
             self.aso_db_url = authParams['ASO_DB_URL']
+        try:
             print "Got aso %s" % self.aso_db_url
             self.couchServer = CMSCouch.CouchServer(dburl=self.aso_db_url, ckey=proxy, cert=proxy)
             self.couchDatabase = self.couchServer.connectDatabase("asynctransfer", create = False)
         except:
             print traceback.format_exc()
             raise
+
 
     def cancel(self):
         print "cancelling"
@@ -667,6 +673,8 @@ class PostJob():
             aso_auth_file = getattr(config, "authfile", "auth_aso_plugin.config")
         if os.path.isfile(aso_auth_file) or os.environ.get("TEST_POSTJOB_ENABLE_ASOSERVER", False):
             targetClass = ASOServerJob
+        elif 'CRAB_ASOURL' in self.task_ad and self.task_ad['CRAB_ASOURL']:
+            targetClass = ASOServerJob
         else:
             targetClass = FTSJob
 
@@ -751,11 +759,7 @@ class PostJob():
             logger.debug("Copying job stdout from %s to %s" % (stdout, fname))
             shutil.copy(stdout, fname)
             os.chmod(fname, 0644)
-        # NOTE: we now redirect stdout -> stderr; hence, I think we don't need this in the webdir.
-        #if os.path.exists(stderr):
-        #    fname = os.path.join(logpath, "job_err."+id+"."+retry_count+".txt")
-        #    shutil.copy(stderr, fname)
-        #    os.chmod(fname, 0644)
+        # NOTE: we now redirect stdout -> stderr; hence, we don't keep stderr in the webdir.
         if os.path.exists(jobreport):
             fname = os.path.join(logpath, "job_fjr."+id+"."+retry_count+".json")
             logger.debug("Copying job FJR from %s to %s" % (jobreport, fname))
@@ -806,10 +810,15 @@ class PostJob():
         self.parseJson()
         self.source_site = self.getSourceSite()
 
+        skipASO = False
+        if 'CRAB_SkipASO' in self.task_ad and self.task_ad['CRAB_SkipASO']:
+            skipASO = True
+
         self.fixPerms()
         try:
             self.uploadLog(dest_dir, filenames[0])
-            self.stageout(source_dir, dest_dir, *filenames)
+            if not skipASO:
+                self.stageout(source_dir, dest_dir, *filenames)
             try:
                 self.upload()
             except HTTPException, hte:

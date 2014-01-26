@@ -224,6 +224,9 @@ def makeJobSubmit(task):
     info['tfileoutfiles'] = task['tm_tfile_outfiles']
     info['edmoutfiles'] = task['tm_edm_outfiles']
     info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
+    info['saveoutput'] = True if task.get('tm_arguments', {}).get('saveoutput', 'T') == 'T' else False
+    info['ASOURL'] = task.get('tm_arguments', {}).get('ASOURL', '')
+
     # TODO: pass through these correctly.
     info['runs'] = []
     info['lumis'] = []
@@ -375,8 +378,12 @@ class DagmanCreator(TaskAction.TaskAction):
         for jobgroup in splitter_result:
             jobs = jobgroup.getJobs()
 
+            whitelist = set(kwargs['task']['tm_site_whitelist'])
+
             if not jobs:
                 possiblesites = []
+            elif info.get('tm_arguments', {}).get('ignorelocality', 'F') == 'T':
+                possiblesites = global_whitelist | whitelist
             else:
                 possiblesites = jobs[0]['input_files'][0]['locations']
             block = jobs[0]['input_files'][0]['block']
@@ -394,7 +401,6 @@ class DagmanCreator(TaskAction.TaskAction):
 
             # NOTE: User can still shoot themselves in the foot with the resubmit blacklist
             # However, this is the last chance we have to warn the users about an impossible task at submit time.
-            whitelist = set(kwargs['task']['tm_site_whitelist'])
             blacklist = set(kwargs['task']['tm_site_blacklist'])
             available = set(availablesites)
             if whitelist:

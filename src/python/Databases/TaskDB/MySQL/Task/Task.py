@@ -48,7 +48,7 @@ class Task(object):
 
     ID_sql = "SELECT tm_taskname, panda_jobset_id, tm_task_status, tm_user_role, \
              tm_user_group, tm_task_failure, tm_split_args, panda_resubmitted_jobs, \
-   	     tm_save_logs, tm_username, tm_user_dn \
+   	     tm_save_logs, tm_username, tm_user_dn, tm_arguments \
    	     FROM tasks WHERE tm_taskname=%(taskname)s"
 
     New_sql = "INSERT INTO tasks ( \

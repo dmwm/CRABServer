@@ -125,7 +125,8 @@ class DataWorkflow(object):
     @conn_handler(services=['centralconfig'])
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
-               runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None, userproxy=None):
+               runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None,
+               ignorelocality=None, saveoutput=None, userproxy=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -174,40 +175,49 @@ class DataWorkflow(object):
         if maxmemory == None: maxmemory = 2000
         if priority == None: priority = 10
 
+        arguments = { \
+            'oneEventMode' : 'T' if oneEventMode else 'F',
+            'lfnprefix' : lfnprefix if lfnprefix else '',
+            'saveoutput' : 'F' if saveoutput == False else 'T',
+            'ignorelocality' : 'F' if ignorelocality == False else 'T',
+            'ASOURL' : self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", ""),
+        }
+            
+
         self.api.modify(self.Task.New_sql,
-                            task_name       = [requestname],\
+                            task_name       = [requestname],
                             jobset_id       = [None],
-                            task_status     = ['NEW'],\
-                            task_failure    = [''],\
-                            job_sw          = [jobsw],\
-                            job_arch        = [jobarch],\
-                            input_dataset   = [inputdata],\
-                            site_whitelist  = [dbSerializer(sitewhitelist)],\
-                            site_blacklist  = [dbSerializer(siteblacklist)],\
-                            split_algo      = [splitalgo],\
-                            split_args      = [dbSerializer({'halt_job_on_file_boundaries': False, 'splitOnRun': False,\
-                                                splitArgName : algoargs, 'runs': runs, 'lumis': lumis})],\
-                            total_units     = [totalunits],\
-                            user_sandbox    = [cachefilename],\
-                            cache_url       = [cacheurl],\
-                            username        = [userhn],\
-                            user_dn         = [userdn],\
-                            user_vo         = ['cms'],\
-                            user_role       = [vorole],\
-                            user_group      = [vogroup],\
-                            publish_name    = [(strip_username_from_taskname(requestname) + '-' + publishname) if publishname.find('-')==-1 else publishname],\
-                            asyncdest       = [asyncdest],\
-                            dbs_url         = [dbsurl],\
-                            publish_dbs_url = [publishdbsurl],\
-                            publication     = ['T' if publication else 'F'],\
-                            outfiles        = [dbSerializer(addoutputfiles)],\
-                            tfile_outfiles  = [dbSerializer(tfileoutfiles)],\
-                            edm_outfiles    = [dbSerializer(edmoutfiles)],\
-                            transformation  = [self.centralcfg.centralconfig["transformation"][jobtype]],\
-                            job_type        = [jobtype],\
-                            arguments       = [dbSerializer({'oneEventMode' : 'T' if oneEventMode else 'F', 'lfnprefix' : lfnprefix if lfnprefix else ''})],\
-                            resubmitted_jobs= [dbSerializer([])],\
-                            save_logs       = ['T' if savelogsflag else 'F'],\
+                            task_status     = ['NEW'],
+                            task_failure    = [''],
+                            job_sw          = [jobsw],
+                            job_arch        = [jobarch],
+                            input_dataset   = [inputdata],
+                            site_whitelist  = [dbSerializer(sitewhitelist)],
+                            site_blacklist  = [dbSerializer(siteblacklist)],
+                            split_algo      = [splitalgo],
+                            split_args      = [dbSerializer({'halt_job_on_file_boundaries': False, 'splitOnRun': False,
+                                                splitArgName : algoargs, 'runs': runs, 'lumis': lumis})],
+                            total_units     = [totalunits],
+                            user_sandbox    = [cachefilename],
+                            cache_url       = [cacheurl],
+                            username        = [userhn],
+                            user_dn         = [userdn],
+                            user_vo         = ['cms'],
+                            user_role       = [vorole],
+                            user_group      = [vogroup],
+                            publish_name    = [(strip_username_from_taskname(requestname) + '-' + publishname) if publishname.find('-')==-1 else publishname],
+                            asyncdest       = [asyncdest],
+                            dbs_url         = [dbsurl],
+                            publish_dbs_url = [publishdbsurl],
+                            publication     = ['T' if publication else 'F'],
+                            outfiles        = [dbSerializer(addoutputfiles)],
+                            tfile_outfiles  = [dbSerializer(tfileoutfiles)],
+                            edm_outfiles    = [dbSerializer(edmoutfiles)],
+                            transformation  = [self.centralcfg.centralconfig["transformation"][jobtype]],
+                            job_type        = [jobtype],
+                            arguments       = [dbSerializer(arguments)],
+                            resubmitted_jobs= [dbSerializer([])],
+                            save_logs       = ['T' if savelogsflag else 'F'],
                             user_infiles    = [dbSerializer(adduserfiles)],
                             maxjobruntime   = [maxjobruntime],
                             numcores        = [numcores],

@@ -100,7 +100,8 @@ SUBMIT_INFO = [ \
             ('RequestMemory', 'tm_maxmemory'),
             ('RequestCpus', 'tm_numcores'),
             ('MaxWallTimeMins', 'tm_maxjobruntime'),
-            ('JobPrio', 'tm_priority')]
+            ('JobPrio', 'tm_priority'),
+            ("CRAB_ASOURL", "ASOURL"]
 
 def addCRABInfoToClassAd(ad, info):
     """
@@ -198,6 +199,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
             dagAd['MaxWallTimeMins'] = 1315
         if 'JobPrio' not in dagAd:
             dagAd['JobPrio'] = 10
+
+        if not info['saveoutput']:
+            dagAd['CRAB_SkipASO'] = True
 
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))

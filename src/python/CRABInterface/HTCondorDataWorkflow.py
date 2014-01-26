@@ -88,7 +88,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
 
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn = row.next()
+        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, _ = row.next()
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
@@ -101,12 +101,18 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
 
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn = row.next()
+        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, tm_arguments = row.next()
+        arguments = literal_eval(tm_arguments.read())
+        saveoutput = True if arguments.get("saveoutput", "T") == 'T' else False
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
-        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
+        if saveoutput:
+            transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
+            finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
+        else:
+            transferingIds = []
+            finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferring', 'cooloff', 'held']]
         return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE'], transferingIds, finishedIds, tm_user_dn, tm_username, tm_user_role, tm_user_group, userproxy=userproxy)
 
 
@@ -199,7 +205,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         # First, verify the task has been submitted by the backend.
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, db_userdn = row.next() #just one row is picked up by the previous query
+        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, db_userdn, _ = row.next() #just one row is picked up by the previous query
 
         if db_userdn != userdn:
             raise ExecutionError("Your DN, %s, is not the same as the original DN used for task submission" % userdn)
