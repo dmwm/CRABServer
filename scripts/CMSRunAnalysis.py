@@ -383,13 +383,16 @@ def getProv(filename, opts):
         handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
         mintime()
         sys.exit(EC_CMSMissingSoftware)
-    ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd())
+    ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd(), logName="edmProvDumpOutput.log")
     if ret > 0:
         msg = scram.diagnostic()
         handleException("FAILED", EC_CMSRunWrapper, 'Error getting pset hash from file.\n\tScram Env %s\n\tCommand:edmProvDump %s' % (msg, filename))
         mintime()
         sys.exit(EC_CMSRunWrapper)
-    return scram.stdout
+    output = ''
+    with open("edmProvDumpOutput.log", "r") as fd:
+        output = fd.read()
+    return output
 
 def executeCMSSWStack(opts):
 
