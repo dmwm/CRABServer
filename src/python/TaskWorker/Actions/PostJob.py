@@ -460,6 +460,8 @@ class PostJob():
                     continue
                 self.outputFiles.append(fileInfo)
 
+                fileInfo['module_label'] = outputFile.get(u"module_label", "unknown")
+
                 fileInfo['inparentlfns'] = [str(i) for i in outputFile.get(u"input", [])]
 
                 fileInfo['events'] = outputFile.get(u"events", -1)
@@ -502,10 +504,18 @@ class PostJob():
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
 
+        edm_file_count = 0
+        for fileInfo in self.outputFiles:
+            if fileInfo['filetype'] == 'EDM':
+                edm_file_count += 1
+        multiple_edm = edm_file_count > 1
         for fileInfo in self.outputFiles:
             publishname = self.task_ad['CRAB_PublishName']
             if 'pset_hash' in fileInfo:
                 publishname = "%s-%s" % (publishname.rsplit("-", 1)[0], fileInfo['pset_hash'])
+            if multiple_edm and fileInfo.get("module_label"):
+                left, right = publishname.rsplit("-", 1)
+                publishname = "%s_%s-%s" % (left, fileInfo['module_label'], right)
             # CMS convention for outdataset: /primarydataset>/<yourHyperNewsusername>-<publish_data_name>-<PSETHASH>/USER
             outdataset = os.path.join('/' + str(self.task_ad['CRAB_InputData']).split('/')[1], self.task_ad['CRAB_UserHN'] + '-' + publishname, 'USER')
             configreq = {"taskname":        self.ad['CRAB_ReqName'],
