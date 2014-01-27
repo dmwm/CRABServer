@@ -101,7 +101,7 @@ SUBMIT_INFO = [ \
             ('RequestCpus', 'tm_numcores'),
             ('MaxWallTimeMins', 'tm_maxjobruntime'),
             ('JobPrio', 'tm_priority'),
-            ("CRAB_ASOURL", "ASOURL"]
+            ("CRAB_ASOURL", "ASOURL")]
 
 def addCRABInfoToClassAd(ad, info):
     """
