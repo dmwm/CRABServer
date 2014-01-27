@@ -151,7 +151,7 @@ def transform_strings(input):
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
            'userdn', 'requestname', 'publication', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority':
+           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -224,13 +224,13 @@ def makeJobSubmit(task):
     info['tfileoutfiles'] = task['tm_tfile_outfiles']
     info['edmoutfiles'] = task['tm_edm_outfiles']
     info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
-    info['saveoutput'] = True if task.get('tm_arguments', {}).get('saveoutput', 'T') == 'T' else False
     info['ASOURL'] = task.get('tm_arguments', {}).get('ASOURL', '')
 
     # TODO: pass through these correctly.
     info['runs'] = []
     info['lumis'] = []
     info = transform_strings(info)
+    info['saveoutput'] = True if task.get('tm_arguments', {}).get('saveoutput', 'T') == 'T' else False
     if info['jobarch_flatten'].startswith("slc6_"):
         info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
     else:
