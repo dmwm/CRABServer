@@ -121,7 +121,7 @@ class ASOServerJob(object):
         self.couchServer = None
         self.couchDatabase = None
         self.cancel = False
-        self.sleep = 2
+        self.sleep = 200
         self.count = count
         self.dest_site = dest_site
         self.source_dir = source_dir
