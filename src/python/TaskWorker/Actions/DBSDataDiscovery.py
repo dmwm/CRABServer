@@ -1,4 +1,7 @@
-import urllib, logging
+
+import os
+import urllib
+import logging
 from httplib import HTTPException
 from base64 import b64encode
 
@@ -13,9 +16,23 @@ class DBSDataDiscovery(DataDiscovery):
 
     def execute(self, *args, **kwargs):
         self.logger.info("Data discovery with DBS") ## to be changed into debug
+        old_cert_val = os.getenv("X509_USER_CERT")
+        old_key_val = os.getenv("X509_USER_KEY")
+        os.environ['X509_USER_CERT'] = self.config.TaskWorker.cmscert
+        os.environ['X509_USER_KEY'] = self.config.TaskWorker.cmskey
+        # DBS3 requires X509_USER_CERT to be set - but we don't want to leak that to other modules
         dbs = get_dbs(self.config.Services.DBSUrl)
         if kwargs['task']['tm_dbs_url']:
             dbs = get_dbs(kwargs['task']['tm_dbs_url'])
+        #
+        if old_cert_val != None:
+            os.environ['X509_USER_CERT'] = old_cert_val
+        else:
+            del os.environ['X509_USER_CERT']
+        if old_key_val != None:
+            os.environ['X509_USER_KEY'] = old_key_val
+        else:
+            del os.environ['X509_USER_KEY']
         self.logger.debug("Data discovery through %s for %s" %(dbs, kwargs['task']['tm_taskname']))
         # Get the list of blocks for the locations and then call dls.
         # The WMCore DBS3 implementation makes one call to dls for each block
@@ -57,7 +74,8 @@ if __name__ == '__main__':
     config = Configuration()
     config.section_("Services")
     #config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/dev/global/DBSReader'
-    config.Services.DBSUrl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
+    #config.Services.DBSUrl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
+    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/'
     for dataset in datasets:
         fileset = DBSDataDiscovery(config)
         print fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})

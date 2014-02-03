@@ -4,9 +4,6 @@ import PandaServerInterface as pserver
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.WMSpec.WMTask import buildLumiMask
 from CRABInterface.DataWorkflow import DataWorkflow
-from Databases.TaskDB.Oracle.Task.ID import ID
-from Databases.TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
-from Databases.FileMetaDataDB.Oracle.FileMetaData.GetFromTaskAndType import GetFromTaskAndType
 from CRABInterface.Utils import conn_handler
 
 class PandaDataWorkflow(DataWorkflow):
@@ -24,13 +21,13 @@ class PandaDataWorkflow(DataWorkflow):
            :arg str workflow: a valid workflow name
            :return: a workflow status summary document"""
         self.logger.debug("Getting status for workflow %s" % workflow)
-        row = self.api.query(None, None, ID.sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs  = row.next() #just one row is picked up by the previous query
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
+        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, _ = row.next() #just one row is picked up by the previous query
         resJobs = literal_eval(resJobs.read())
         self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
 
-        rows = self.api.query(None, None, GetJobGroupFromID.sql, taskname = workflow)
+        rows = self.api.query(None, None, self.JobGroup.GetJobGroupFromID_sql, taskname = workflow)
         jobsPerStatus = {}
         jobList = []
         totalJobdefs = 0
@@ -120,7 +117,7 @@ class PandaDataWorkflow(DataWorkflow):
             return
 
         self.logger.debug("Retrieving output of jobs: %s" % jobids)
-        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype=','.join(filetype), taskname=workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype=','.join(filetype), taskname=workflow)
         rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
         if howmany!=-1:
             rows=rows[:howmany]
@@ -149,14 +146,14 @@ class PandaDataWorkflow(DataWorkflow):
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         #load the lumimask
-        rows = self.api.query(None, None, ID.sql, taskname = workflow)
+        rows = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         splitArgs = literal_eval(rows.next()[6].read())
         res['lumiMask'] = buildLumiMask(splitArgs['runs'], splitArgs['lumis'])
         self.logger.info("Lumi mask was: %s" % res['lumiMask'])
 
         #extract the finished jobs from filemetadata
         jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'transferring']]
-        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='EDM', taskname=workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM', taskname=workflow)
 
         res['runsAndLumis'] = {}
         for row in rows:

@@ -56,12 +56,34 @@ class DagmanResubmitter(TaskAction.TaskAction):
                     schedd.act(htcondor.JobAction.Hold, rootConst)
                     schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
                     schedd.act(htcondor.JobAction.Release, rootConst)
+
+        elif task['resubmit_site_whitelist'] or task['resubmit_site_blacklist'] or \
+                task['resubmit_priority'] != None or task['resubmit_maxmemory'] != None or \
+                task['resubmit_numcores'] != None or task['resubmit_maxjobruntime'] != None:
+            with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
+                if not parent:
+                    if task['resubmit_site_blacklist']:
+                        schedd.edit(rootConst, "CRAB_SiteResubmitBlacklist", ad['blacklist'])
+                    if task['resubmit_site_whitelist']:
+                        schedd.edit(rootConst, "CRAB_SiteResubmitWhitelist", ad['whitelist'])
+                    if task['resubmit_priority'] != None:
+                        schedd.edit(rootConst, "JobPrio", task['resubmit_priority'])
+                    if task['resubmit_numcores'] != None:
+                        schedd.edit(rootConst, "RequestCpus", task['resubmit_numcores'])
+                    if task['resubmit_maxjobruntime'] != None:
+                        schedd.edit(rootConst, "MaxWallTimeMins", task['resubmit_maxjobruntime'])
+                    if task['resubmit_maxmemory'] != None:
+                        schedd.edit(rootConst, "RequestMemory", task['resubmit_maxmemory'])
+                    schedd.act(htcondor.JobAction.Release, rootConst)
+
         else:
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
                 if not parent:
-                    schedd.edit(rootConst, "CRAB_SiteBlacklist", ad['blacklist'])
-                    schedd.edit(rootConst, "CRAB_SiteWhitelist", ad['whitelist'])
+                    schedd.edit(rootConst, "HoldKillSig", 'SIGKILL')
+                    schedd.act(htcondor.JobAction.Hold, rootConst)
+                    schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
                     schedd.act(htcondor.JobAction.Release, rootConst)
+
         results = rpipe.read()
         if results != "OK":
             raise Exception("Failure when killing job: %s" % results)

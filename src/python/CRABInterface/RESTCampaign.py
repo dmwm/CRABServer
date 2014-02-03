@@ -5,7 +5,7 @@ from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 
 # CRABServer dependecies here
 from CRABInterface.DataCampaign import DataCampaign
-from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
+from CRABInterface.RESTExtensions import  authz_login_valid
 from CRABInterface.Regexps import RX_CAMPAIGN, RX_WORKFLOW, RX_SUBRESTAT
 
 # external dependecies here

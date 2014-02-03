@@ -95,6 +95,7 @@ def make_webdir(ad):
         os.makedirs(path)
         os.symlink(os.path.abspath(os.path.join(".", "job_log")), os.path.join(path, "jobs_log.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "node_state")), os.path.join(path, "node_state.txt"))
+        os.symlink(os.path.abspath(os.path.join(".", "site.ad")), os.path.join(path, "site_ad.txt"))
     except OSError:
         pass
     try:
@@ -121,11 +122,19 @@ def make_job_submit(ad):
     for i in range(1, count+1):
         shutil.copy("Job.submit", "Job.%d.submit" % i)
 
+def clear_automatic_blacklist(ad):
+    for file in glob.glob("task_statistics.*"):
+        try:
+            os.unlink(file)
+        except Exception, e:
+            print "ERROR when clearing statistics: %s" % str(e)
 
 def main():
     ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
     make_webdir(ad)
     make_job_submit(ad)
+
+    clear_automatic_blacklist(ad)
 
     blacklist = set()
     if 'CRAB_SiteBlacklist' in ad:
@@ -143,33 +152,28 @@ def main():
         try:
             htcondor.Schedd().edit([id], 'CRAB_ResubmitList', ad['foo'])
         except RuntimeError, reerror:
-            print str(reerror)
+            print "ERROR: %s" % str(reerror)
         # To do this right, we ought to look up how many existing retries were done
         # and adjust the retry account according to that.
     resubmit = [str(i) for i in resubmit]
 
     if resubmit:
         adjustPost(resubmit)
-        resubmitDag("RunJobs.dag.orig", resubmit)
         resubmitDag("RunJobs.dag", resubmit)
 
-    desired_re = re.compile(r'DESIRED_Sites="\\"(.*?)\\""')
-    split_re = re.compile(",\s*")
-
-    if not os.path.exists('RunJobs.dag.orig'):
-        os.rename('RunJobs.dag', 'RunJobs.dag.orig')
-    output_fd = open('RunJobs.dag', 'w')
-    for line in open('RunJobs.dag.orig').readlines():
-        if line.startswith('VARS '):
-            m = desired_re.search(line)
-            if m:
-                orig_sites = m.groups()[0]
-                orig_sites = set(split_re.split(orig_sites))
-                if whitelist:
-                    orig_sites = orig_sites & whitelist
-                orig_sites = orig_sites - blacklist
-                line = desired_re.sub(r'DESIRED_Sites="\"%s\""' % (", ".join(orig_sites)), line)
-        output_fd.write(line)
+    if 'CRAB_SiteAdUpdate' in ad:
+        new_site_ad = ad['CRAB_SiteAdUpdate']
+        with open("site.ad") as fd:
+            site_ad = classad.parse(fd)
+        site_ad.update(new_site_ad)
+        with open("site.ad", "w") as fd:
+            fd.write(str(site_ad))
+        id = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
+        ad['foo'] = []
+        try:
+            htcondor.Schedd().edit([id], 'CRAB_ResubmitList', ad['foo'])
+        except RuntimeError, reerror:
+            print "ERROR: %s" % str(reerror)
 
 if __name__ == '__main__':
     main()

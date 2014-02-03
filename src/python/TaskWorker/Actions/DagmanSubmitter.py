@@ -96,7 +96,13 @@ SUBMIT_INFO = [ \
             ('CRAB_JobCount', 'jobcount'),
             ('CRAB_UserVO', 'tm_user_vo'),
             ('CRAB_UserRole', 'tm_user_role'),
-            ('CRAB_UserGroup', 'tm_user_group')]
+            ('CRAB_UserGroup', 'tm_user_group'),
+            ('RequestMemory', 'tm_maxmemory'),
+            ('RequestCpus', 'tm_numcores'),
+            ('MaxWallTimeMins', 'tm_maxjobruntime'),
+            ('JobPrio', 'tm_priority'),
+            ("CRAB_ASOURL", "ASOURL"),
+            ("CRAB_FailedNodeLimit", "faillimit")]
 
 def addCRABInfoToClassAd(ad, info):
     """
@@ -126,6 +132,40 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.server.post(self.resturl, data = urllib.urlencode(configreq))
             raise
 
+    def duplicateCheck(self, task):
+        """
+        Look to see if the task we are about to submit is already in the schedd.
+        If so, assume that this task in TaskWorker was run successfully, but killed
+        before it could update the frontend.
+        """
+        workflow = task['tm_taskname']
+
+        loc = HTCondorLocator.HTCondorLocator(self.backendurls)
+        schedd, address = loc.getScheddObj(workflow)
+
+        rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
+
+        results = schedd.query(rootConst, [])
+
+        if not results:
+            # Task not already in schedd
+            return None
+
+        configreq = {'workflow': workflow,
+                     'status': "SUBMITTED",
+                     'jobset': "-1",
+                     'subresource': 'success',
+                    }
+        self.logger.warning("Task %s already submitted to HTCondor; pushing information centrally: %s" % (workflow, str(configreq)))
+        data = urllib.urlencode(configreq)
+        self.server.post(self.resturl, data = data)
+
+        # Note that we don't re-send Dashboard jobs; we assume this is a rare occurrance and
+        # don't want to upset any info already in the Dashboard.
+
+        return Result.Result(task=task, result=(-1))
+
+
     def executeInternal(self, *args, **kw):
 
         if not htcondor:
@@ -137,12 +177,16 @@ class DagmanSubmitter(TaskAction.TaskAction):
         #self.logger.debug("Task input information: %s" % str(info))
         dashboard_params = args[0][2]
 
+        dup = self.duplicateCheck(task)
+        if dup != None:
+            return dup
+
         cwd = os.getcwd()
         os.chdir(tempDir)
 
         #FIXME: hardcoding the transform name for now.
         #inputFiles = ['gWMS-CMSRunAnalysis.sh', task['tm_transformation'], 'cmscp.py', 'RunJobs.dag']
-        inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', 'AdjustSites.py']
+        inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', 'AdjustSites.py', 'site.ad']
         if task.get('tm_user_sandbox') == 'sandbox.tar.gz':
             inputFiles.append('sandbox.tar.gz')
         if os.path.exists("CMSRunAnalysis.tar.gz"):
@@ -184,6 +228,19 @@ class DagmanSubmitter(TaskAction.TaskAction):
         """
         dagAd = classad.ClassAd()
         addCRABInfoToClassAd(dagAd, info)
+
+        # Set default task attributes:
+        if 'RequestMemory' not in dagAd:
+            dagAd['RequestMemory'] = 2000
+        if 'RequestCpus' not in dagAd:
+            dagAd['RequestCpus'] = 1
+        if 'MaxWallTimeMins' not in dagAd:
+            dagAd['MaxWallTimeMins'] = 1315
+        if 'JobPrio' not in dagAd:
+            dagAd['JobPrio'] = 10
+
+        if not info['saveoutput']:
+            dagAd['CRAB_SkipASO'] = True
 
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))

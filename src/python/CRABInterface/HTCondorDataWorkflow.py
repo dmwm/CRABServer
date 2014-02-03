@@ -1,5 +1,6 @@
 
 import re
+import json
 import time
 import hashlib
 import StringIO
@@ -8,15 +9,14 @@ import traceback
 from ast import literal_eval
 
 import pycurl
+import classad
 import htcondor
 
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.WMSpec.WMTask import buildLumiMask
 from CRABInterface.DataWorkflow import DataWorkflow
-from Databases.TaskDB.Oracle.Task.ID import ID
-from Databases.TaskDB.Oracle.JobGroup.GetJobGroupFromID import GetJobGroupFromID
-from Databases.FileMetaDataDB.Oracle.FileMetaData.GetFromTaskAndType import GetFromTaskAndType
 from CRABInterface.Utils import conn_handler
+from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 from WMCore.Services.pycurl_manager import ResponseHeader
 
 import HTCondorUtils
@@ -68,124 +68,11 @@ class HTCondorDataWorkflow(DataWorkflow):
         info[2] = "%s:%s" % (name, hn_name)
         return "_".join(info)
 
-    @conn_handler(services=['centralconfig'])
-    def status(self, workflow, userdn, userproxy=None, verbose=False):
-        """Retrieve the status of the workflow.
-
-           :arg str workflow: a valid workflow name
-           :return: a workflow status summary document"""
-
-        try:
-            return self.alt_status(workflow, userdn, userproxy=userproxy, verbose=verbose)
-        except:
-            import cherrypy
-            s = traceback.format_exc()
-            cherrypy.log("Failure of alt status: %s" % s)
-
-        # First, verify the task has been submitted by the backend.
-        row = self.api.query(None, None, ID.sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, userdn = row.next() #just one row is picked up by the previous query
-        self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
-        self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
-        if status != 'SUBMITTED':
-            return [ {"status" : status,\
-                      "taskFailureMsg" : taskFailure.read() if taskFailure else '',\
-                      "jobSetID"        : '',
-                      "jobsPerStatus"   : {},
-                      "failedJobdefs"   : 0,
-                      "totalJobdefs"    : 0,
-                      "jobdefErrors"    : [],
-                      "jobList"         : [],
-                      "saveLogs"        : saveLogs }]
-
-        import cherrypy
-
-        name = workflow.split("_")[0]
-        cherrypy.log("Getting status for workflow %s, looking for schedd %s" %\
-                                (workflow, name))
-        locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
-        cherrypy.log("Will talk to %s." % locator.getCollector())
-        schedd, address = locator.getScheddObj(workflow)
-
-        results = self.getRootTasks(workflow, schedd)
-
-        # TODO: handle case where there were no root tasks performed.
-        # In such a case, we ought to check the DB.
-        jobsPerStatus = {}
-        jobStatus = {}
-        jobList = []
-        taskStatusCode = int(results[-1]['JobStatus'])
-        taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
-        codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'finished', 5: 'held'}
-        task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
-        retval = {"status": task_codes.get(taskStatusCode, 'unknown'), "taskFailureMsg": "", "jobSetID": workflow,
-            "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
-        if taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 3:
-            retval['status'] = 'FAILED'
-        elif taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 16:
-            retval['status'] = 'InTransition'
-        elif taskStatusCode == 5:
-            retval['status'] = 'Unknown'
-
-        # Handle all "real" jobs in HTCondor.
-        failedJobs = []
-        allJobs = self.getHTCondorJobs(workflow, schedd)
-        for result in allJobs:
-            jobState = int(result['JobStatus'])
-            if result['CRAB_Id'] in failedJobs:
-                failedJobs.remove(result['CRAB_Id'])
-            if (jobState == 4) and ('ExitCode' in result) and (int(result['ExitCode'])):
-                failedJobs.append(result['CRAB_Id'])
-                statusName = "failed"
-            else:
-                statusName = codes.get(jobState, 'unknown')
-            jobStatus[int(result['CRAB_Id'])] = statusName
-
-        # Handle all "finished" jobs.
-        for result, file_state in self.getFinishedJobs(workflow):
-            if result not in jobStatus:
-                if file_state == 'FINISHED':
-                    jobStatus[result] = 'finished'
-                elif file_state == 'COOLOFF':
-                    jobStatus[result] = 'cooloff'
-                elif file_state == 'FAILED':
-                    jobStatus[result] = 'failed'
-                    failedJobs.append(result)
-                else:
-                    jobStatus[result] = 'transferring'
-            elif (result in failedJobs) and (file_state == 'FINISHED'):
-                failedJobs.remove(result)
-                jobStatus[result] = 'finished'
-            elif file_state == 'FINISHED':
-                jobStatus[result] = 'finished'
-
-        for i in range(1, taskJobCount+1):
-            if i not in jobStatus:
-                if taskStatusCode == 5:
-                    jobStatus[i] = 'killed'
-                else:
-                    jobStatus[i] = 'unsubmitted'
-
-        for job, status in jobStatus.items():
-            jobsPerStatus.setdefault(status, 0)
-            jobsPerStatus[status] += 1
-            jobList.append((status, job))
-
-        self.logger.debug("Job info: %s" % str(jobStatus))
-
-        retval["failedJobdefs"] = len(failedJobs)
-        retval["totalJobdefs"] = len(jobStatus)
-
-        if len(jobStatus) == 0 and taskJobCount == 0 and taskStatusCode == 2:
-            retval['status'] = 'Running (jobs not submitted)'
-
-        retval['jobdefErrors'] = []
-
-        return [retval]
 
     def getRootTasks(self, workflow, schedd):
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
-        rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType', "HoldReason", "HoldReasonCode", "CRAB_UserWebDir"]
+        rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType', "HoldReason", "HoldReasonCode", "CRAB_UserWebDir",
+                        "CRAB_SiteWhitelist", "CRAB_SiteBlacklist", "CRAB_SiteResubmitWhitelist", "CRAB_SiteResubmitBlacklist"]
 
         # Note: may throw if the schedd is down.  We may want to think about wrapping the
         # status function and have it catch / translate HTCondor errors.
@@ -196,28 +83,12 @@ class HTCondorDataWorkflow(DataWorkflow):
             raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
         return results
 
-    def getHTCondorJobs(self, workflow, schedd):
-        """
-        Retrieve all the jobs for executing cmsRun in this workflow
-        """
-        jobConst = 'TaskType =?= "Job" && CRAB_ReqName =?= %s' % HTCondorUtils.quote(workflow)
-        jobList = ["JobStatus", 'ExitCode', 'ClusterID', 'ProcID', 'CRAB_Id', "HoldReasonCode"]
-        return schedd.query(jobConst, jobList)
-
-    def getFinishedJobs(self, workflow):
-        """
-        Get the finished jobs from the file metadata table.
-        """
-        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='FAKE', taskname=workflow)
-
-        for row in rows:
-            yield row[GetFromTaskAndType.PANDAID], row[GetFromTaskAndType.STATE]
 
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
 
-        row = self.api.query(None, None, ID.sql, taskname = workflow)
-        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn = row.next()
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
+        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, _ = row.next()
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
@@ -225,17 +96,25 @@ class HTCondorDataWorkflow(DataWorkflow):
         finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
         return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, tm_user_dn, tm_username, tm_user_role, tm_user_group, saveLogs=tm_save_logs, userproxy=userproxy)
 
+
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
 
-        row = self.api.query(None, None, ID.sql, taskname = workflow)
-        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn = row.next()
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
+        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, tm_arguments = row.next()
+        arguments = literal_eval(tm_arguments.read())
+        saveoutput = True if arguments.get("saveoutput", "T") == 'T' else False
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
-        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
+        if saveoutput:
+            transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
+            finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
+        else:
+            transferingIds = []
+            finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferring', 'cooloff', 'held']]
         return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE'], transferingIds, finishedIds, tm_user_dn, tm_username, tm_user_role, tm_user_group, userproxy=userproxy)
+
 
     @conn_handler(services=['phedex'])
     def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, username, role, group, saveLogs=None, userproxy=None):
@@ -263,7 +142,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             return
 
         self.logger.debug("Retrieving %s output of jobs: %s" % (','.join(filetype), jobids))
-        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype=','.join(filetype), taskname=workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype=','.join(filetype), taskname=workflow)
         rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
         if howmany!=-1:
             rows=rows[:howmany]
@@ -288,20 +167,21 @@ class HTCondorDataWorkflow(DataWorkflow):
                     'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
             }
 
+
     def report(self, workflow, userdn, userproxy=None):
         res = {}
         self.logger.info("About to compute report of workflow: %s. Getting status first." % workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         #load the lumimask
-        rows = self.api.query(None, None, ID.sql, taskname = workflow)
+        rows = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         splitArgs = literal_eval(rows.next()[6].read())
         res['lumiMask'] = buildLumiMask(splitArgs['runs'], splitArgs['lumis'])
         self.logger.info("Lumi mask was: %s" % res['lumiMask'])
 
         #extract the finished jobs from filemetadata
         jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'transferring']]
-        rows = self.api.query(None, None, GetFromTaskAndType.sql, filetype='EDM', taskname=workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM', taskname=workflow)
 
         res['runsAndLumis'] = {}
         for row in rows:
@@ -315,21 +195,34 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         yield res
 
+
     @conn_handler(services=['centralconfig'])
-    def alt_status(self, workflow, userdn, userproxy=None, verbose=False):
+    def status(self, workflow, userdn, userproxy=None, verbose=0):
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
            :return: a workflow status summary document"""
 
         # First, verify the task has been submitted by the backend.
-        row = self.api.query(None, None, ID.sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, userdn = row.next() #just one row is picked up by the previous query
-        self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
+        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, db_userdn, _ = row.next() #just one row is picked up by the previous query
+
+        if db_userdn != userdn:
+            raise ExecutionError("Your DN, %s, is not the same as the original DN used for task submission" % userdn)
+
+        if verbose == None:
+            verbose = 0
+        self.logger.info("Status result for workflow %s: %s (detail level %d)" % (workflow, status, verbose))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
         if status != 'SUBMITTED':
-            return [ {"status" : status,\
-                      "taskFailureMsg" : taskFailure.read() if taskFailure else '',\
+            if isinstance(taskFailure, str):
+                taskFailureMsg = taskFailure
+            elif taskFailure == None:
+                taskFailureMsg = ""
+            else:
+                taskFailureMsg = taskFailure.read()
+            result = [ {"status" : status,
+                      "taskFailureMsg" : taskFailureMsg,
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
@@ -337,16 +230,16 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobdefErrors"    : [],
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
-
-        import cherrypy
+            self.logger.debug("Detailed result: %s\n" % result)
+            return result
 
         name = workflow.split("_")[2].split(":")[0]
-        cherrypy.log("Getting status for workflow %s, looking for schedd %s" %\
+        self.logger.info("Getting status for workflow %s, looking for schedd %s" %\
                                 (workflow, name))
         locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
-        cherrypy.log("Will talk to %s." % locator.getCollector())
+        self.logger.debug("Will talk to %s." % locator.getCollector())
         name = locator.getSchedd()
-        cherrypy.log("Schedd name %s." % name)
+        self.logger.debug("Schedd name %s." % name)
         schedd, address = locator.getScheddObj(workflow)
 
         results = self.getRootTasks(workflow, schedd)
@@ -361,9 +254,22 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
 
+        
+        taskStatusCode = int(results[-1]['JobStatus'])
         if 'CRAB_UserWebDir' not in results[-1]:
-            return [ {"status" : "UNKNOWN",
-                      "taskFailureMsg" : "Task failed to bootstrap on schedd %s." % address,
+            if taskStatusCode != 1 and taskStatusCode != 2:
+                return [ {"status" : "UNKNOWN",
+                      "taskFailureMsg"  : "Task failed to bootstrap on schedd %s." % address,
+                      "jobSetID"        : '',
+                      "jobsPerStatus"   : {},
+                      "failedJobdefs"   : 0,
+                      "totalJobdefs"    : 0,
+                      "jobdefErrors"    : [],
+                      "jobList"         : [],
+                      "saveLogs"        : saveLogs }]
+            else:
+                return [ {"status" : "SUBMITTED",
+                      "taskWarningMsg"  : "Task has not yet bootstrapped.",
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
@@ -372,11 +278,10 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
 
-        taskStatus = self.taskWebStatus(results[0]['CRAB_UserWebDir'], verbose=verbose)
+        taskStatus, pool = self.taskWebStatus(results[0], verbose=verbose)
 
         jobsPerStatus = {}
         jobList = []
-        taskStatusCode = int(results[-1]['JobStatus'])
         taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
         codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'finished', 5: 'held'}
         task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
@@ -413,7 +318,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         retval['jobdefErrors'] = []
 
         retval['jobs'] = taskStatus
-        #cherrypy.log(str(taskStatus))
+        retval['pool'] = pool
 
         return [retval]
 
@@ -429,6 +334,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 info['TotalUserCpuTimeHistory'][-1] = user
                 info['TotalSysCpuTimeHistory'][-1] = sys
 
+
     def prepareCurl(self):
         curl = pycurl.Curl()
         curl.setopt(pycurl.NOSIGNAL, 0)
@@ -439,57 +345,96 @@ class HTCondorDataWorkflow(DataWorkflow):
         #curl.setopt(pycurl.ENCODING, 'gzip, deflate')
         return curl
 
-    def taskWebStatus(self, url, verbose):
+
+    def taskWebStatus(self, task_ad, verbose):
         nodes = {}
+        pool_info = {}
+
+        url = task_ad['CRAB_UserWebDir']
 
         curl = self.prepareCurl()
-        jobs_url = url + "/jobs_log.txt"
-        curl.setopt(pycurl.URL, jobs_url)
         fp = tempfile.TemporaryFile()
         curl.setopt(pycurl.WRITEFUNCTION, fp.write)
         hbuf = StringIO.StringIO()
         curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
-        import cherrypy
-        if verbose:
-            cherrypy.log("Starting download of job log")
+        self.logger.debug("Retrieving task status from web with verbosity %d." % verbose)
+        if verbose == 1:
+            jobs_url = url + "/jobs_log.txt"
+            curl.setopt(pycurl.URL, jobs_url)
+            self.logger.info("Starting download of job log")
             curl.perform()
-            cherrypy.log("Finished download of job log")
+            self.logger.info("Finished download of job log")
             header = ResponseHeader(hbuf.getvalue())
             if header.status == 200:
                 fp.seek(0)
-                cherrypy.log("Starting parse of job log")
+                self.logger.debug("Starting parse of job log")
                 self.parseJobLog(fp, nodes)
-                cherrypy.log("Finished parse of job log")
+                self.logger.debug("Finished parse of job log")
                 fp.truncate(0)
                 hbuf.truncate(0)
             else:
                 raise RuntimeError("Failed to parse jobs log")
 
+        elif verbose == 2:
+            site_url = url + "/site_ad.txt"
+            curl.setopt(pycurl.URL, site_url)
+            self.logger.debug("Starting download of site ad")
+            curl.perform()
+            self.logger.debug("Finished download of site ad")
+            header = ResponseHeader(hbuf.getvalue())
+            if header.status == 200:
+                fp.seek(0)
+                self.logger.debug("Starting parse of site ad")
+                self.parseSiteAd(fp, task_ad, nodes)
+                self.logger.debug("Finished parse of site ad")
+                fp.truncate(0)
+                hbuf.truncate(0)
+            else:
+                raise RuntimeError("Failed to parse site ad")
+            pool_info_url = self.centralcfg.centralconfig["backend-urls"].get("poolInfo")
+            if pool_info_url:
+                fp2 = StringIO.StringIO()
+                curl.setopt(pycurl.WRITEFUNCTION, fp2.write)
+                curl.setopt(pycurl.URL, pool_info_url)
+                self.logger.debug("Starting download of pool info from %s" % pool_info_url)
+                curl.perform()
+                curl.setopt(pycurl.WRITEFUNCTION, fp.write)
+                self.logger.debug("Finished download of pool info")
+                header = ResponseHeader(hbuf.getvalue())
+                if header.status == 200:
+                    fp2.seek(0)
+                    self.logger.debug("Starting parse of pool info")
+                    pool_info = json.load(fp2)
+                    self.logger.debug("Finished parse of pool info")
+                    hbuf.truncate(0)
+                else:
+                    raise RuntimeError("Failed to retrieve pool info")
+
+
         nodes_url = url + "/node_state.txt"
         curl.setopt(pycurl.URL, nodes_url)
-        cherrypy.log("Starting download of node state")
+        self.logger.debug("Starting download of node state")
         curl.perform()
-        cherrypy.log("Finished download of node state")
+        self.logger.debug("Finished download of node state")
         header = ResponseHeader(hbuf.getvalue())
         if header.status == 200:
             fp.seek(0)
-            cherrypy.log("Starting parse of node state")
+            self.logger.debug("Starting parse of node state")
             self.parseNodeState(fp, nodes)
-            cherrypy.log("Finished parse of node state")
+            self.logger.debug("Finished parse of node state")
         else:
             raise RuntimeError("Failed to parse node state log")
 
-        #import cherrypy
-        #for node, info in nodes.items():
-        #    cherrypy.log("Node %s - Info %s" % (node, str(info)))
+        return nodes, pool_info
 
-        return nodes
 
     node_name_re = re.compile("DAG Node: Job(\d+)")
     node_name2_re = re.compile("Job(\d+)")
     def parseJobLog(self, fp, nodes):
         node_map = {}
+        count = 0
         for event in htcondor.readEvents(fp):
+            count += 1
             eventtime = time.mktime(time.strptime(event['EventTime'], "%Y-%m-%dT%H:%M:%S"))
             if event['MyType'] == 'SubmitEvent':
                 m = self.node_name_re.match(event['LogNotes'])
@@ -577,9 +522,9 @@ class HTCondorDataWorkflow(DataWorkflow):
                     nodes[node]['WallDurations'][-1] = eventtime - nodes[node]['StartTimes'][-1]
                 self.insertCpu(event, nodes[node])
             else:
-                import cherrypy
-                cherrypy.log("Unknown event type: %s" % event['MyType'])
+                self.logger.warning("Unknown event type: %s" % event['MyType'])
 
+        self.logger.debug("There were %d events in the job log." % count)
         now = time.time()
         for node, info in nodes.items():
             last_start = now
@@ -589,6 +534,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 info['WallDurations'].append(now - last_start)
             while len(info['WallDurations']) > len(info['SiteHistory']):
                 info['SiteHistory'].append("Unknown")
+
 
     job_re = re.compile(r"JOB Job(\d+)\s+([A-Z_]+)\s+\((.*)\)")
     post_failure_re = re.compile(r"POST script failed with status (\d+)")
@@ -630,4 +576,34 @@ class HTCondorDataWorkflow(DataWorkflow):
                         info['State'] = 'cooloff'
                 else:
                     info['State'] = 'failed'
+
+
+    job_name_re = re.compile(r"Job(\d+)")
+    def parseSiteAd(self, fp, task_ad, nodes):
+        site_ad = classad.parse(fp)
+
+        blacklist = set(task_ad['CRAB_SiteBlacklist'])
+        whitelist = set(task_ad['CRAB_SiteWhitelist'])
+        if 'CRAB_SiteResubmitWhitelist' in task_ad:
+            whitelist.update(task_ad['CRAB_SiteResubmitWhitelist'])
+        if 'CRAB_SiteResubmitBlacklist' in task_ad:
+            blacklist.update(task_ad['CRAB_SiteResubmitBlacklist'])
+
+        for key, val in site_ad.items():
+            m = self.job_name_re.match(key)
+            if not m:
+                continue
+            nodeid = m.groups()[0]
+            sites = set(val.eval())
+            if whitelist:
+                sites &= whitelist
+            # Never blacklist something on the whitelist
+            sites -= (blacklist-whitelist)
+
+            info = nodes.setdefault(nodeid, {})
+            info['AvailableSites'] = list([i.eval() for i in sites])
+
+
+    def parsePoolAd(self, fp):
+        pool_ad = classad.parse(fp)
 

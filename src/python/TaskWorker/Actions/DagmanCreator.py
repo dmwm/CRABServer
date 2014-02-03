@@ -22,6 +22,8 @@ import TaskWorker.WorkerExceptions
 
 import WMCore.WMSpec.WMTask
 
+import classad
+
 try:
     from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 except ImportError:
@@ -29,13 +31,23 @@ except ImportError:
 
 from ApmonIf import ApmonIf
 
+DAG_HEADER = """
+
+NODE_STATUS_FILE node_state 30
+
+FINAL FinalCleanup final.sub NOOP
+SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT %(restinstance)s %(resturl)s
+
+"""
+
 DAG_FRAGMENT = """
 JOB Job%(count)d Job.%(count)d.submit
 SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %(backend)s
 SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 10 UNLESS-EXIT 2
-VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" +DESIRED_Sites="\\"%(desiredSites)s\\"" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\""
+VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\""
+ABORT-DAG-ON Job%(count)d 3
 
 """
 
@@ -73,14 +85,13 @@ CRAB_Archive = %(cachefilename_flatten)s
 +CRAB_ReqName = %(requestname)s
 #CRAB_ReqName = %(requestname_flatten)s
 CRAB_DBSURL = %(dbsurl_flatten)s
-CRAB_PublishDBSURL = %(publishdbsurl_flatten)s
+#CRAB_PublishDBSURL = %(publishdbsurl_flatten)s
 CRAB_Publish = %(publication)s
 CRAB_Id = $(count)
 +CRAB_Id = $(count)
 +CRAB_Dest = "cms://%(temp_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
 +TaskType = "Job"
-+MaxWallTimeMins = 1315
 +AccountingGroup = %(userhn)s
 
 +JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
@@ -104,8 +115,6 @@ should_transfer_files = YES
 use_x509userproxy = true
 # TODO: Uncomment this when we get out of testing mode
 Requirements = ((target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)) %(opsys_req)s
-#Requirements = ((target.IS_GLIDEIN =!= TRUE) || ((target.GLIDEIN_CMSSite =!= UNDEFINED) && (stringListIMember(target.GLIDEIN_CMSSite, DESIRED_SEs) )))
-#leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
 periodic_remove = (JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)
 queue
@@ -117,6 +126,9 @@ SPLIT_ARG_MAP = { "LumiBased" : "lumis_per_job",
 
 LOGGER = None
 
+
+def getCreateTimestamp(taskname):
+    return "_".join(taskname.split("_")[:2])
 
 def makeLFNPrefixes(task):
     if task['tm_input_dataset']:
@@ -133,8 +145,10 @@ def makeLFNPrefixes(task):
     user = task['tm_username']
     tmp_user = "%s.%s" % (user, hash)
     publish_info = task['tm_publish_name'].rsplit('-', 1)
-    temp_dest = os.path.join("/store/temp/user", tmp_user, primaryds, publish_info[0], publish_info[1])
-    dest = os.path.join("/store/user", user, primaryds, publish_info[0], publish_info[1])
+    timestamp = getCreateTimestamp(task['tm_taskname'])
+    lfn_prefix = task.get('tm_arguments', {}).get('lfnprefix', '')
+    temp_dest = os.path.join("/store/temp/user", tmp_user, lfn_prefix, primaryds, publish_info[0], timestamp)
+    dest = os.path.join("/store/user", user, lfn_prefix, primaryds, publish_info[0], timestamp)
     return temp_dest, dest
 
 
@@ -146,7 +160,8 @@ def transform_strings(input):
     info = {}
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
-           'userdn', 'requestname', 'publication', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group':
+           'userdn', 'requestname', 'publication', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
+           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -219,10 +234,14 @@ def makeJobSubmit(task):
     info['tfileoutfiles'] = task['tm_tfile_outfiles']
     info['edmoutfiles'] = task['tm_edm_outfiles']
     info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
+    info['ASOURL'] = task.get('tm_arguments', {}).get('ASOURL', '')
+
     # TODO: pass through these correctly.
     info['runs'] = []
     info['lumis'] = []
     info = transform_strings(info)
+    info['saveoutput'] = True if task.get('tm_arguments', {}).get('saveoutput', 'T') == 'T' else False
+    info['faillimit'] = task.get('tm_arguments', {}).get('faillimit', 10)
     if info['jobarch_flatten'].startswith("slc6_"):
         info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
     else:
@@ -245,7 +264,7 @@ def makeJobSubmit(task):
 
     return info
 
-def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
+def make_specs(task, sitead, jobgroup, block, availablesites, outfiles, startjobid):
     specs = []
     i = startjobid
     temp_dest, dest = makeLFNPrefixes(task)
@@ -256,8 +275,8 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
         lastEvent = str(job['mask']['LastEvent'])
         firstLumi = str(job['mask']['FirstLumi'])
         firstRun = str(job['mask']['FirstRun'])
-        desiredSites = ", ".join(availablesites)
         i += 1
+        sitead['Job%d'% i] = list(availablesites)
         remoteOutputFiles = []
         localOutputFiles = []
         for origFile in outfiles:
@@ -277,7 +296,7 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
             primaryds = task['tm_publish_name'].rsplit('-', 1)[0]
         counter = "%04d" % (i / 1000)
         specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
-                      'desiredSites': desiredSites, 'remoteOutputFiles': remoteOutputFiles,
+                      'remoteOutputFiles': remoteOutputFiles,
                       'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
                       'firstEvent' : firstEvent, 'lastEvent' : lastEvent,
                       'firstLumi' : firstLumi, 'firstRun' : firstRun,
@@ -287,6 +306,7 @@ def make_specs(task, jobgroup, availablesites, outfiles, startjobid):
                       'tempDest': os.path.join(temp_dest, counter),
                       'outputDest': os.path.join(dest, counter),
                       'restinstance': task['restinstance'], 'resturl': task['resturl'],
+                      'block': block,
                       'backend': os.environ.get('HOSTNAME','')})
 
         LOGGER.debug(specs[-1])
@@ -365,41 +385,61 @@ class DagmanCreator(TaskAction.TaskAction):
         if hasattr(self.config.Sites, 'banned'):
             global_blacklist = set(self.config.Sites.banned)
 
+        sitead = classad.ClassAd()
         for jobgroup in splitter_result:
             jobs = jobgroup.getJobs()
 
+            whitelist = set(kwargs['task']['tm_site_whitelist'])
+
             if not jobs:
                 possiblesites = []
+            elif info.get('tm_arguments', {}).get('ignorelocality', 'F') == 'T':
+                possiblesites = global_whitelist | whitelist
             else:
                 possiblesites = jobs[0]['input_files'][0]['locations']
+            block = jobs[0]['input_files'][0]['block']
+            self.logger.debug("Block name: %s" % block)
             self.logger.debug("Possible sites: %s" % possiblesites)
-            self.logger.debug('Blacklist: %s; whitelist %s' % (kwargs['task']['tm_site_blacklist'], kwargs['task']['tm_site_whitelist']))
-            if kwargs['task']['tm_site_whitelist']:
-                availablesites = set(kwargs['task']['tm_site_whitelist'])
-            else:
-                availablesites = set(possiblesites) - set(kwargs['task']['tm_site_blacklist'])
 
             # Apply globals
-            availablesites = set(availablesites) - global_blacklist
+            availablesites = set(possiblesites) - global_blacklist
             if global_whitelist:
-                availablesites = set(availablesites) & global_whitelist
-
-            availablesites = [str(i) for i in availablesites]
-            self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
+                availablesites &= global_whitelist
 
             if not availablesites:
                 msg = "No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
-            jobgroupspecs, startjobid = make_specs(kwargs['task'], jobgroup, availablesites, outfiles, startjobid)
+            # NOTE: User can still shoot themselves in the foot with the resubmit blacklist
+            # However, this is the last chance we have to warn the users about an impossible task at submit time.
+            blacklist = set(kwargs['task']['tm_site_blacklist'])
+            available = set(availablesites)
+            if whitelist:
+                available &= whitelist
+                if not available:
+                    msg = "Site whitelist (%s) removes only possible sources (%s) of data for task %s" % (", ".join(whitelist), ", ".join(availablesites), kwargs['task']['tm_taskname'])
+                    raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+
+            available -= (blacklist-whitelist)
+            if not available:
+                msg = "Site blacklist (%s) removes only possible sources (%s) of data for task %s" % (", ".join(blacklist), ", ".join(availablesites), kwargs['task']['tm_taskname'])
+                raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+
+            availablesites = [str(i) for i in availablesites]
+            self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
+
+            jobgroupspecs, startjobid = make_specs(kwargs['task'], sitead, jobgroup, block, availablesites, outfiles, startjobid)
             specs += jobgroupspecs
 
-        dag = "\nNODE_STATUS_FILE node_state 30\n"
+        dag = DAG_HEADER % {'restinstance': kwargs['task']['restinstance'], 'resturl': self.resturl}
         for spec in specs:
             dag += DAG_FRAGMENT % spec
 
         with open("RunJobs.dag", "w") as fd:
             fd.write(dag)
+
+        with open("site.ad", "w") as fd:
+            fd.write(str(sitead))
 
         task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
         userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
@@ -414,8 +454,9 @@ class DagmanCreator(TaskAction.TaskAction):
                      'sid': "https://glidein.cern.ch/%d/%s" % (idx, taskid),
                      'broker': os.environ.get('HOSTNAME',''),
                      'bossId': str(idx),
-                     'TargetSE': ("%d_Selected_SE" % len(specs[idx-1]['desiredSites'])),
+                     'TargetSE': ("%d_Selected_SE" % len(availablesites)),
                      'localId' : '',
+                     'StatusValue' : 'pending',
                     }
             ml_info.append(jinfo)
 
