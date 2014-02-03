@@ -786,7 +786,31 @@ class PostJob():
             shutil.copy("postjob.%s" % id, postjob)
             os.chmod(postjob, 0644)
             DashboardAPI.apmonFree()
-        return retval
+        return self.check_abort_dag(retval)
+
+
+    def check_abort_dag(self, rval):
+        """
+        Each fatal error is written into this file; we
+        count the number of failures and abort the DAG if necessary
+        """
+        fname = "task_statistics.FATAL_ERROR"
+        # Return code 3 is reserved to abort the entire DAG.  Don't let the
+        # code otherwise use it.
+        if rval == 3:
+            rval = 1
+        if 'CRAB_FailedNodeLimit' not in self.task_ad:
+            return rval
+        try:
+            limit = int(self.task_ad['CRAB_FailedTaskLimit'])
+            counter = 0
+            with open(fname, "r") as fd:
+                for line in fd.readlines():
+                    counter += 1
+            if counter > limit:
+                logger.error("There are %d failed nodes, greater than the limit of %d. Will abort the whole DAG" % (counter, limit))
+        except:
+            return rval
 
 
     def execute_internal(self, cluster, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):

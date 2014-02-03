@@ -14,6 +14,7 @@ import TaskWorker.Actions.Splitter as Splitter
 import TaskWorker.Actions.DagmanCreator as DagmanCreator
 import TaskWorker.Actions.PostJob as PostJob
 import TaskWorker.Actions.PreJob as PreJob
+import TaskWorker.Actions.Final as Final
 import HTCondorUtils
 
 import WMCore.Configuration as Configuration
@@ -25,6 +26,8 @@ def bootstrap():
         return PostJob.PostJob().execute(*sys.argv[2:])
     elif command == "PREJOB":
         return PreJob.PreJob().execute(*sys.argv[2:])
+    elif command == "FINAL":
+        return Final.Final().execute(*sys.argv[2:])
     elif command == "ASO":
         return ASO.async_stageout(*sys.argv[2:])
 

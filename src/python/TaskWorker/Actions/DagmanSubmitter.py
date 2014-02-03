@@ -101,7 +101,8 @@ SUBMIT_INFO = [ \
             ('RequestCpus', 'tm_numcores'),
             ('MaxWallTimeMins', 'tm_maxjobruntime'),
             ('JobPrio', 'tm_priority'),
-            ("CRAB_ASOURL", "ASOURL")]
+            ("CRAB_ASOURL", "ASOURL"),
+            ("CRAB_FailedNodeLimit", "faillimit")]
 
 def addCRABInfoToClassAd(ad, info):
     """
@@ -131,6 +132,40 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.server.post(self.resturl, data = urllib.urlencode(configreq))
             raise
 
+    def duplicateCheck(self, task):
+        """
+        Look to see if the task we are about to submit is already in the schedd.
+        If so, assume that this task in TaskWorker was run successfully, but killed
+        before it could update the frontend.
+        """
+        workflow = task['tm_taskname']
+
+        loc = HTCondorLocator.HTCondorLocator(self.backendurls)
+        schedd, address = loc.getScheddObj(workflow)
+
+        rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
+
+        results = schedd.query(rootConst, [])
+
+        if not results:
+            # Task not already in schedd
+            return None
+
+        configreq = {'workflow': workflow,
+                     'status': "SUBMITTED",
+                     'jobset': "-1",
+                     'subresource': 'success',
+                    }
+        self.logger.warning("Task %s already submitted to HTCondor; pushing information centrally: %s" % (workflow, str(configreq)))
+        data = urllib.urlencode(configreq)
+        self.server.post(self.resturl, data = data)
+
+        # Note that we don't re-send Dashboard jobs; we assume this is a rare occurrance and
+        # don't want to upset any info already in the Dashboard.
+
+        return Result.Result(task=task, result=(-1))
+
+
     def executeInternal(self, *args, **kw):
 
         if not htcondor:
@@ -141,6 +176,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
         info = args[0][1]
         #self.logger.debug("Task input information: %s" % str(info))
         dashboard_params = args[0][2]
+
+        dup = self.duplicateCheck(task)
+        if dup != None:
+            return dup
 
         cwd = os.getcwd()
         os.chdir(tempDir)
