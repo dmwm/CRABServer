@@ -246,7 +246,7 @@ class ASOServerJob(object):
             try:
                 doc = self.couchDatabase.document( doc_id )
                 doc.update(common_info)
-                logger.info("Will retry LFN %s (id %s)" % (lfn, doc_id)
+                logger.info("Will retry LFN %s (id %s)" % (lfn, doc_id))
             except CMSCouch.CouchNotFoundError:
                 logger.info("LFN %s (id %s) is not yet known to ASO; uploading new stageout job." % (lfn, doc_id))
                 # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
@@ -268,6 +268,7 @@ class ASOServerJob(object):
                         "type" : file_type,
                         "publish" : 1
                     }
+                doc.update(common_info)
             except Exception, ex:
                 msg = "Error loading document from couch. Transfer submission failed."
                 msg += str(ex)
