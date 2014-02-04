@@ -29,7 +29,7 @@ class TaskHandler(object):
         """Initializer
 
         :arg TaskWorker.DataObjects.Task task: the task to work on."""
-        self.logger = logging.getLogger(type(self).__name__)
+        self.logger = logging.getLogger()
         self._work = []
         self._task = task
 

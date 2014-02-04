@@ -1,7 +1,7 @@
 """ This worker can be used for testing purposes. Just run:
          "python SequentialWorker.py /path/to/config"
     and have fun!
-    
+
     More details: it instantiates the MasterWorker with the TEST flag True. This makes the MasterWorker
     sequential (it does not instantiate new threads) and the logging is done at the console and not on
     a file.

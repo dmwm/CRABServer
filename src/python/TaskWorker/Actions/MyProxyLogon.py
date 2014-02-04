@@ -33,7 +33,8 @@ class MyProxyLogon(TaskAction):
                     'server_cert': self.config.MyProxy.serverhostcert,
                     'serverDN': self.config.MyProxy.serverdn,
                     'uisource': self.config.MyProxy.uisource,
-                    'credServerPath': self.config.MyProxy.credpath,}
+                    'credServerPath': self.config.MyProxy.credpath,
+                    'myproxyAccount' : self.config.TaskWorker.resturl}
         proxy = Proxy(proxycfg)
         userproxy = proxy.getProxyFilename(serverRenewer=True)
         proxy.logonRenewMyProxy()

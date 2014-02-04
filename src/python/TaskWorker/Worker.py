@@ -19,7 +19,7 @@ def processWorker(inputs, results, instance, resturl):
        :arg Queue inputs: the queue where the inputs are shared by the master
        :arg Queue results: the queue where this method writes the output
        :return: default returning zero, but not really needed."""
-    logger = logging.getLogger(processWorker.__name__)
+    logger = logging.getLogger()
     procName = multiprocessing.current_process().name
     while True:
         try:
