@@ -16,10 +16,12 @@ from WMCore.Configuration import loadConfigurationFile, Configuration
 #CAFUtilities dependencies
 from RESTInteractions import HTTPRequests
 
+import TaskWorker.Actions.Recurring.BaseRecurringAction
 from TaskWorker.TestWorker import TestWorker
 from TaskWorker.Worker import Worker
 from TaskWorker.WorkerExceptions import *
 from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
+from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
 
 ## NOW placing this here, then to be verified if going into Action.Handler, or TSM
 ## This is a list because we want to preserve the order
@@ -37,6 +39,7 @@ MODEURL = {'cmsweb-dev': {'host': 'cmsweb-dev.cern.ch', 'instance':  'dev'},
            'cmsweb-preprod': {'host': 'cmsweb-testbed.cern.ch', 'instance': 'preprod'},
            'cmsweb-prod': {'host': 'cmsweb.cern.ch', 'instance':  'prod'},
            'private': {'host': None, 'instance':  'dev'},}
+
 
 
 def validateConfig(config):
@@ -115,14 +118,20 @@ class MasterWorker(object):
         else:
             self.slaves = Worker(self.config, restinstance, self.resturl)
         self.slaves.begin()
+        recurringActionsNames = getattr(self.config.TaskWorker, 'recurringActions', [])
+        self.recurringActions = [self.getRecurringActionInst(name) for name in recurringActionsNames]
+
+    def getRecurringActionInst(self, actionName):
+        mod = __import__('TaskWorker.Actions.Recurring.%s' % actionName, fromlist=actionName)
+        return getattr(mod, actionName)()
 
     def _lockWork(self, limit, getstatus, setstatus):
         """Today this is alays returning true, because we do not want the worker to day if
-           the server endpoint is not avaialable. 
+           the server endpoint is not avaialable.
            Prints a log entry if answer is greater then 400:
             * the server call succeeded or
             * the server could not find anything to update or
-            * the server has an internal error"""  
+            * the server has an internal error"""
         configreq = {'subresource': 'process', 'workername': self.config.TaskWorker.name, 'getstatus': getstatus, 'limit': limit, 'status': setstatus}
         try:
             self.server.post(self.resturl, data = urllib.urlencode(configreq))
@@ -140,7 +149,7 @@ class MasterWorker(object):
                 self.logger.error("\tresult: %s\n" %(getattr(hte, 'result', 'unknown')))
         except Exception, exc:
             self.logger.error("Server could not process the request: %s" %(str(exc)))
-            self.logger.error(traceback.format_exc())  
+            self.logger.error(traceback.format_exc())
         return True
 
     def _getWork(self, limit, getstatus):
@@ -180,6 +189,7 @@ class MasterWorker(object):
     def algorithm(self):
         """I'm the intelligent guy taking care of getting the work
            and distribuiting it to the slave processes."""
+
         self.logger.debug("Starting")
         while(True):
             for status, worktype in states():
@@ -192,6 +202,13 @@ class MasterWorker(object):
                 self.slaves.injectWorks([(worktype, work, None) for work in pendingwork])
                 for task in pendingwork:
                     self.updateWork(task['tm_taskname'], 'QUEUED')
+
+            for action in self.recurringActions:
+                if action.isTimeToGo():
+                    #Maybe we should use new slaves and not reuse the ones used for the tasks
+                    self.logger.debug("Injecting recurring action: \n%s" %(str(action.__module__)))
+                    self.slaves.injectWorks([(handleRecurring, {'tm_taskname' : action.__module__}, action.__module__)])
+
             self.logger.info('Worker status:')
             self.logger.info(' - free slaves: %d' % self.slaves.freeSlaves())
             self.logger.info(' - acquired tasks: %d' % self.slaves.queuedTasks())

@@ -258,7 +258,7 @@ class PanDAInjection(PanDAAction):
                                  'subjobdef': jd,
                                  'subuser': kwargs['task']['tm_user_dn'],}
                     self.logger.error("Pushing information centrally %s" %(str(configreq)))
-                    data = urllib.urlencode(configreq) + '' if subblocks is None else subblocks           
+                    data = urllib.urlencode(configreq) + '' if subblocks is None else subblocks
                     self.server.put(self.resturl, data=data)
                 results.append(Result(task=kwargs['task'], result=jobsetdef))
             except HTTPException, hte:
