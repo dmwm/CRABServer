@@ -33,7 +33,7 @@ systems = \
                     'apmon', 'DashboardAPI', 'Logger', 'ProcInfo',
                     'CRABQuality', 'HTCondorUtils', 'HTCondorLocator'],
     'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
-                'taskbuffer']
+                'TaskWorker/Actions/Recurring', 'taskbuffer']
   },
   'UserFileCache':
   {
