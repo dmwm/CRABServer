@@ -93,10 +93,9 @@ CRAB_Id = $(count)
 +CRAB_oneEventMode = %(oneEventMode)s
 +TaskType = "Job"
 +AccountingGroup = %(userhn)s
-+JobAdInformationAttrs = "RemoteSysCpu,RemoteUserCpu"
 
 +JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
-job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite
+job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, RemoteSysCpu, RemoteUserCpu
 
 universe = vanilla
 Executable = gWMS-CMSRunAnalysis.sh
