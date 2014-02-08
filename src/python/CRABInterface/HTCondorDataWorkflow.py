@@ -456,7 +456,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 node = node_map[event['Cluster'], event['Proc']]
                 nodes[node]['StartTimes'].append(eventtime)
                 nodes[node]['State'] = 'running'
-                nodes[node].setdefault('RecordedSite', False)
+                nodes[node]['RecordedSite'] = False
             elif event['MyType'] == 'JobTerminatedEvent':
                 node = node_map[event['Cluster'], event['Proc']]
                 nodes[node]['EndTimes'].append(eventtime)
@@ -482,31 +482,44 @@ class HTCondorDataWorkflow(DataWorkflow):
                             nodes[node]['State'] = 'cooloff'
                     else:
                         nodes[node]['State']  = 'cooloff'
-            elif event['MyType'] == 'ShadowExceptionEvent':
+            elif event['MyType'] == 'ShadowExceptionEvent' or event["MyType"] == "JobReconnectFailedEvent" or event['MyType'] == 'JobEvictedEvent':
                 node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['EndTimes'].append(eventtime)
-                if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
-                    nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
-                nodes[node]['State'] = 'idle'
-                self.insertCpu(event, nodes[node])
-            elif event['MyType'] == 'JobEvictedEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['EndTimes'].append(eventtime)
-                if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
-                    nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
-                nodes[node]['State'] = 'idle'
-                self.insertCpu(event, nodes[node])
+                if nodes[node]['State'] != 'idle':
+                    nodes[node]['EndTimes'].append(eventtime)
+                    if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
+                        nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
+                    nodes[node]['State'] = 'idle'
+                    self.insertCpu(event, nodes[node])
+                    nodes[node]['TotalUserCpuTimeHistory'].append(0)
+                    nodes[node]['TotalSysCpuTimeHistory'].append(0)
+                    nodes[node]['WallDurations'].append(0)
+                    nodes[node]['ResidentSetSize'].append(0)
+                    nodes[node]['SubmitTimes'].append(-1)
+                    nodes[node]['JobIds'].append(nodes[node]['JobIds'][-1])
+                    nodes[node]['Restarts'] += 1
             elif event['MyType'] == 'JobAbortedEvent':
                 node = node_map[event['Cluster'], event['Proc']]
+                if nodes[node]['State'] == "idle" or nodes[node]['State'] == "held":
+                    nodes[node]['StartTimes'].append(-1)
+                    if not nodes[node]['RecordedSite']:
+                        nodes[node]['SiteHistory'].append("Unknown")
                 nodes[node]['State'] = 'killed'
                 self.insertCpu(event, nodes[node])
             elif event['MyType'] == 'JobHeldEvent':
                 node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['EndTimes'].append(eventtime)
-                if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
-                    nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
+                if nodes[node]['State'] == 'running':
+                    nodes[node]['EndTimes'].append(eventtime)
+                    if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
+                        nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
+                    self.insertCpu(event, nodes[node])
+                    nodes[node]['TotalUserCpuTimeHistory'].append(0)
+                    nodes[node]['TotalSysCpuTimeHistory'].append(0)
+                    nodes[node]['WallDurations'].append(0)
+                    nodes[node]['ResidentSetSize'].append(0)
+                    nodes[node]['SubmitTimes'].append(-1)
+                    nodes[node]['JobIds'].append(nodes[node]['JobIds'][-1])
+                    nodes[node]['Restarts'] += 1
                 nodes[node]['State'] = 'held'
-                self.insertCpu(event, nodes[node])
             elif event['MyType'] == 'JobReleaseEvent':
                 node = node_map[event['Cluster'], event['Proc']]
                 nodes[node]['State'] = 'idle'
@@ -521,6 +534,9 @@ class HTCondorDataWorkflow(DataWorkflow):
                 if nodes[node]['StartTimes']:
                     nodes[node]['WallDurations'][-1] = eventtime - nodes[node]['StartTimes'][-1]
                 self.insertCpu(event, nodes[node])
+            elif event["MyType"] == "JobDisconnectedEvent" or event["MyType"] == "JobReconnectedEvent":
+                # These events don't really affect the node status
+                pass
             else:
                 self.logger.warning("Unknown event type: %s" % event['MyType'])
 
