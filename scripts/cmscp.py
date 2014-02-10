@@ -42,7 +42,7 @@ retryPauseTime = 60
 
 def compress(id):
     retval = 0
-    output = "cmsRun_%d.tar.gz" % id
+    output = "cmsRun_%d.log.tar.gz" % id
     tf = tarfile.open(output, "w:gz")
     if os.path.exists("cmsRun-stdout.log"):
         print "Adding cmsRun-stdout.log to tarball %s" % output
@@ -85,6 +85,8 @@ def set_se_name(dest_file, se_name):
     then record it in the top-level of the JSON (hopefully it
     means that it is the log file).
     """
+    print "== Attempting to set SE name of %s for file %s ==" % (se_name, dest_file)
+
     filename, id = get_job_id(dest_file)
 
     with open("jobReport.json.%d" % id) as fd:
@@ -128,19 +130,22 @@ def performTransfer(manager, source, dest, direct_pfn, direct_se):
     fileForTransfer = {'LFN': dest, 'PFN': source}
     signal.signal(signal.SIGALRM, alarmHandler)
     signal.alarm(waitTime)
+    result = 0
     try:
-        result = manager(fileForTransfer)
+        # Throws on any failure
+        manager(fileForTransfer)
     except Alarm:
         print "Indefinite hang during stageOut of %s" % dest
         manager.cleanSuccessfulStageOuts()
         result = 60403
     except Exception, ex:
-        print "Error during stageout: %s" % ex
+        print "== Error during stageout: %s" % ex
         manager.cleanSuccessfulStageOuts()
         result = 60307
     finally:
         signal.alarm(0)
     if result:
+        print "== Local stageout resulted in status %d; attempting direct stageout at %s. ==" % (result, time.ctime())
         try:
             result = performDirectTransfer(source, direct_pfn, direct_se)
         except WMException.WMException, ex:
@@ -149,7 +154,7 @@ def performTransfer(manager, source, dest, direct_pfn, direct_se):
         finally:
             signal.alarm(0)
     else:
-        set_se_name(dest_file, result['SEName'])
+        set_se_name(os.path.split(dest)[-1], result['SEName'])
 
 
 def performDirectTransfer(source, direct_pfn, direct_se):
@@ -163,17 +168,19 @@ def performDirectTransfer(source, direct_pfn, direct_se):
             command,)
         raise StageOutFailure(msg, Command = command,
                               LFN = direct_pfn, ExceptionDetail = str(ex))
-        impl.numRetries = numberOfRetries
-        impl.retryPause = retryPauseTime
+
+    impl.numRetries = numberOfRetries
+    impl.retryPause = retryPauseTime
 
     signal.alarm(waitTime)
+    result = 0
     try:
         impl("srmv2", source, direct_pfn, None, None)
     except Alarm:
-        print "Indefinite hang during stageOut of %s" % dest
+        print "== Indefinite hang during stageOut of %s; setting return code to 60403." % dest
         result = 60403
     except Exception, ex:
-        msg = "Failure for local stage out:\n"
+        msg = "== Failure for local stage out:\n"
         msg += str(ex)
         try:
             msg += traceback.format_exc()
@@ -185,7 +192,10 @@ def performDirectTransfer(source, direct_pfn, direct_se):
     finally:
         signal.alarm(0)
 
-    return 0
+    if not result:
+        set_se_name(os.path.split(direct_pfn)[-1], direct_se)
+
+    return result
 
 
 def main():
@@ -255,8 +265,8 @@ def main():
     counter = "%04d" % (crab_id / 1000)
     dest_dir = os.path.join(dest_dir, counter)
 
-    log_file = "cmsRun_%d.tar.gz" % crab_id
-    dest = os.path.join(dest_dir, log_file)
+    log_file = "cmsRun_%d.log.tar.gz" % crab_id
+    dest = os.path.join(dest_dir, "log", log_file)
     try:
         print "==== Starting compression of user logs at %s ====" % time.ctime()
         std_retval = compress(crab_id)
@@ -273,7 +283,7 @@ def main():
         print "==== Stageout of user logs ended at %s (status %d) ====" % (time.ctime(), std_retval)
 
     out_retval = 0
-    for dest, remote_dest in zip(output_files, dest_files):
+    for dest, remote_dest in zip(output_files, dest_files[1:]):
 
         info = dest.split("=")
         if len(info) != 2:
@@ -303,6 +313,7 @@ def main():
     if std_retval:
         return std_retval
     return out_retval
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)

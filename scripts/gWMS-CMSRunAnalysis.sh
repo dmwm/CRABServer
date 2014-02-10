@@ -113,7 +113,8 @@ fi
 echo "======== python2.6 bootstrap for stageout at $(date) FINISHING ========"
 
 echo "======== Stageout at $(date) STARTING ========"
-./cmscp.py
+# Note we prevent buffering of stdout/err -- this is due to observed issues in mixing of out/err for stageout plugins
+PYTHONUNBUFFERED=1 ./cmscp.py
 STAGEOUT_EXIT_STATUS=$?
 if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
     set -x
