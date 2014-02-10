@@ -133,7 +133,7 @@ def performTransfer(manager, source, dest, direct_pfn, direct_se):
     result = 0
     try:
         # Throws on any failure
-        manager(fileForTransfer)
+        stageout_info = manager(fileForTransfer)
     except Alarm:
         print "Indefinite hang during stageOut of %s" % dest
         manager.cleanSuccessfulStageOuts()
@@ -154,7 +154,7 @@ def performTransfer(manager, source, dest, direct_pfn, direct_se):
         finally:
             signal.alarm(0)
     else:
-        set_se_name(os.path.split(dest)[-1], result['SEName'])
+        set_se_name(os.path.split(dest)[-1], stageout_info['SEName'])
 
 
 def performDirectTransfer(source, direct_pfn, direct_se):
