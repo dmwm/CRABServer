@@ -20,6 +20,7 @@ import TaskWorker.Actions.TaskAction as TaskAction
 import TaskWorker.DataObjects.Result
 import TaskWorker.WorkerExceptions
 
+import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 import WMCore.WMSpec.WMTask
 
 import classad
@@ -46,7 +47,7 @@ SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %
 SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 10 UNLESS-EXIT 2
-VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\""
+VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\"" +CRAB_Destination="\\"%(destination)s\\""
 ABORT-DAG-ON Job%(count)d 3
 
 """
@@ -70,6 +71,7 @@ CRAB_HEADERS = \
 +CRAB_UserDN = %(userdn)s
 +CRAB_UserHN = %(userhn)s
 +CRAB_AsyncDest = %(asyncdest)s
++CRAB_AsyncDestSE = %(asyncdest_se)s
 +CRAB_BlacklistT1 = %(blacklistT1)s
 """
 
@@ -89,7 +91,7 @@ CRAB_DBSURL = %(dbsurl_flatten)s
 CRAB_Publish = %(publication)s
 CRAB_Id = $(count)
 +CRAB_Id = $(count)
-+CRAB_Dest = "cms://%(temp_dest)s"
++CRAB_Dest = "%(temp_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
 +TaskType = "Job"
 +AccountingGroup = %(userhn)s
@@ -124,11 +126,10 @@ SPLIT_ARG_MAP = { "LumiBased" : "lumis_per_job",
                   "EventBased" : "events_per_job",
                   "FileBased" : "files_per_job",}
 
-LOGGER = None
-
 
 def getCreateTimestamp(taskname):
     return "_".join(taskname.split("_")[:2])
+
 
 def makeLFNPrefixes(task):
     if task['tm_input_dataset']:
@@ -161,7 +162,7 @@ def transform_strings(input):
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
            'userdn', 'requestname', 'publication', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL':
+           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL', 'asyncdest_se':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -201,117 +202,6 @@ def transform_strings(input):
 
     return info
 
-# TODO: DagmanCreator started life as a flat module, then the DagmanCreator class
-# was later added.  We need to come back and make the below methods class methods
-
-def makeJobSubmit(task):
-    if os.path.exists("Job.submit"):
-        return
-    # From here on out, we convert from tm_* names to the DataWorkflow names
-    info = dict(task)
-    info['workflow'] = task['tm_taskname']
-    info['jobtype'] = 'analysis'
-    info['jobsw'] = info['tm_job_sw']
-    info['jobarch'] = info['tm_job_arch']
-    info['inputdata'] = info['tm_input_dataset']
-    info['splitalgo'] = info['tm_split_algo']
-    info['algoargs'] = info['tm_split_args']
-    info['cachefilename'] = info['tm_user_sandbox']
-    info['cacheurl'] = info['tm_cache_url']
-    info['userhn'] = info['tm_username']
-    info['publishname'] = info['tm_publish_name']
-    info['asyncdest'] = info['tm_asyncdest']
-    info['dbsurl'] = info['tm_dbs_url']
-    info['publishdbsurl'] = info['tm_publish_dbs_url']
-    info['publication'] = info['tm_publication']
-    info['userdn'] = info['tm_user_dn']
-    info['requestname'] = string.replace(task['tm_taskname'],'"', '')
-    info['savelogsflag'] = 0
-    info['blacklistT1'] = 0
-    info['siteblacklist'] = task['tm_site_blacklist']
-    info['sitewhitelist'] = task['tm_site_whitelist']
-    info['addoutputfiles'] = task['tm_outfiles']
-    info['tfileoutfiles'] = task['tm_tfile_outfiles']
-    info['edmoutfiles'] = task['tm_edm_outfiles']
-    info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
-    info['ASOURL'] = task.get('tm_arguments', {}).get('ASOURL', '')
-
-    # TODO: pass through these correctly.
-    info['runs'] = []
-    info['lumis'] = []
-    info = transform_strings(info)
-    info['saveoutput'] = True if task.get('tm_arguments', {}).get('saveoutput', 'T') == 'T' else False
-    info['faillimit'] = task.get('tm_arguments', {}).get('faillimit', 10)
-    if info['jobarch_flatten'].startswith("slc6_"):
-        info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
-    else:
-        info['opsys_req'] = ''
-    info.setdefault("additional_environment_options", '')
-    info.setdefault("additional_input_file", "")
-    if os.path.exists("CMSRunAnalysis.tar.gz"):
-        info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=local'
-        info['additional_input_file'] += ", CMSRunAnalysis.tar.gz"
-    else:
-        info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=http://hcc-briantest.unl.edu/CMSRunAnalysis-3.3.0-pre1.tar.gz'
-    if os.path.exists("TaskManagerRun.tar.gz"):
-        info['additional_environment_options'] += ';CRAB_TASKMANAGER_TARBALL=local'
-    else:
-        info['additional_environment_options'] += ';CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/TaskManagerRun-3.3.0-pre1.tar.gz'
-    if os.path.exists("sandbox.tar.gz"):
-        info['additional_input_file'] += ", sandbox.tar.gz"
-    with open("Job.submit", "w") as fd:
-        fd.write(JOB_SUBMIT % info)
-
-    return info
-
-def make_specs(task, sitead, jobgroup, block, availablesites, outfiles, startjobid):
-    specs = []
-    i = startjobid
-    temp_dest, dest = makeLFNPrefixes(task)
-    for job in jobgroup.getJobs():
-        inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']]).replace('"', r'\"\"')
-        runAndLumiMask = json.dumps(job['mask']['runAndLumis']).replace('"', r'\"\"')
-        firstEvent = str(job['mask']['FirstEvent'])
-        lastEvent = str(job['mask']['LastEvent'])
-        firstLumi = str(job['mask']['FirstLumi'])
-        firstRun = str(job['mask']['FirstRun'])
-        i += 1
-        sitead['Job%d'% i] = list(availablesites)
-        remoteOutputFiles = []
-        localOutputFiles = []
-        for origFile in outfiles:
-            info = origFile.rsplit(".", 1)
-            if len(info) == 2:
-                fileName = "%s_%d.%s" % (info[0], i, info[1])
-            else:
-                fileName = "%s_%d" % (origFile, i)
-            remoteOutputFiles.append("%s" % fileName)
-            localOutputFiles.append("%s?remoteName=%s" % (origFile, fileName))
-        remoteOutputFiles = " ".join(remoteOutputFiles)
-        localOutputFiles = ", ".join(localOutputFiles)
-        if task['tm_input_dataset']:
-            primaryds = task['tm_input_dataset'].split('/')[1]
-        else:
-            # For MC
-            primaryds = task['tm_publish_name'].rsplit('-', 1)[0]
-        counter = "%04d" % (i / 1000)
-        specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
-                      'remoteOutputFiles': remoteOutputFiles,
-                      'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
-                      'firstEvent' : firstEvent, 'lastEvent' : lastEvent,
-                      'firstLumi' : firstLumi, 'firstRun' : firstRun,
-                      'seeding' : 'AutomaticSeeding', 'lheInputFiles' : None,
-                      'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
-                      'outputData': task['tm_publish_name'],
-                      'tempDest': os.path.join(temp_dest, counter),
-                      'outputDest': os.path.join(dest, counter),
-                      'restinstance': task['restinstance'], 'resturl': task['resturl'],
-                      'block': block,
-                      'backend': os.environ.get('HOSTNAME','')})
-
-        LOGGER.debug(specs[-1])
-    return specs, i
-
 
 def getLocation(default_name, checkout_location):
     loc = default_name
@@ -327,11 +217,18 @@ def getLocation(default_name, checkout_location):
     loc = os.path.abspath(loc)
     return loc
 
+
 class DagmanCreator(TaskAction.TaskAction):
     """
     Given a task definition, create the corresponding DAG files for submission
     into HTCondor
     """
+
+
+    def __init__(self, *args, **kwargs):
+        TaskAction.TaskAction.__init__(self, *args, **kwargs)
+        self.phedex = PhEDEx.PhEDEx()
+
 
     def buildDashboardInfo(self):
 
@@ -364,12 +261,156 @@ class DagmanCreator(TaskAction.TaskAction):
         return params
 
 
+    def resolvePFNs(self, dest_site, dest_dir, filenames):
+        """
+        Given a list of filenames, a directory, destination, and the phedex
+        object, resolve these to PFNs.
+        """
+        lfns = [os.path.join(dest_dir, filename) for filename in filenames]
+        dest_sites_ = [dest_site]
+        if dest_site.startswith("T1_"):
+            dest_sites_.append(dest_site + "_Buffer")
+            dest_sites_.append(dest_site + "_Disk")
+        pfn_info = self.phedex.getPFN(nodes=dest_sites_, lfns=lfns)
+        results = []
+        for lfn in lfns:
+            found_lfn = False
+            for suffix in ["", "_Disk", "_Buffer"]:
+                if (dest_site + suffix, lfn) in pfn_info:
+                    results.append(pfn_info[dest_site + suffix, lfn]) 
+                    found_lfn = True
+                    break
+            if not found_lfn:
+                print "Unable to map LFN %s at site %s" % (lfn, dest_site)
+        return results
+
+
+    def makeJobSubmit(self, task):
+        """
+        Create the submit file.  This is reused by all jobs in the task; differences
+        between the jobs are taken care of in the makeSpecs.
+        """
+
+        if os.path.exists("Job.submit"):
+            return
+        # From here on out, we convert from tm_* names to the DataWorkflow names
+        info = dict(task)
+        info['workflow'] = task['tm_taskname']
+        info['jobtype'] = 'analysis'
+        info['jobsw'] = info['tm_job_sw']
+        info['jobarch'] = info['tm_job_arch']
+        info['inputdata'] = info['tm_input_dataset']
+        info['splitalgo'] = info['tm_split_algo']
+        info['algoargs'] = info['tm_split_args']
+        info['cachefilename'] = info['tm_user_sandbox']
+        info['cacheurl'] = info['tm_cache_url']
+        info['userhn'] = info['tm_username']
+        info['publishname'] = info['tm_publish_name']
+        info['asyncdest'] = info['tm_asyncdest']
+        info['asyncdest_se'] = self.phedex.getNodeSE(info['tm_asyncdest'])
+        info['dbsurl'] = info['tm_dbs_url']
+        info['publishdbsurl'] = info['tm_publish_dbs_url']
+        info['publication'] = info['tm_publication']
+        info['userdn'] = info['tm_user_dn']
+        info['requestname'] = string.replace(task['tm_taskname'],'"', '')
+        info['savelogsflag'] = 0
+        info['blacklistT1'] = 0
+        info['siteblacklist'] = task['tm_site_blacklist']
+        info['sitewhitelist'] = task['tm_site_whitelist']
+        info['addoutputfiles'] = task['tm_outfiles']
+        info['tfileoutfiles'] = task['tm_tfile_outfiles']
+        info['edmoutfiles'] = task['tm_edm_outfiles']
+        info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
+        info['ASOURL'] = task.get('tm_arguments', {}).get('ASOURL', '')
+
+        # TODO: pass through these correctly.
+        info['runs'] = []
+        info['lumis'] = []
+        info = transform_strings(info)
+        info['saveoutput'] = True if task.get('tm_arguments', {}).get('saveoutput', 'T') == 'T' else False
+        info['faillimit'] = task.get('tm_arguments', {}).get('faillimit', 10)
+        if info['jobarch_flatten'].startswith("slc6_"):
+            info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
+        else:
+            info['opsys_req'] = ''
+
+        info.setdefault("additional_environment_options", '')
+        info.setdefault("additional_input_file", "")
+        if os.path.exists("CMSRunAnalysis.tar.gz"):
+            info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=local'
+            info['additional_input_file'] += ", CMSRunAnalysis.tar.gz"
+        else:
+            info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=http://hcc-briantest.unl.edu/CMSRunAnalysis-3.3.0-pre1.tar.gz'
+        if os.path.exists("TaskManagerRun.tar.gz"):
+            info['additional_environment_options'] += ';CRAB_TASKMANAGER_TARBALL=local'
+        else:
+            info['additional_environment_options'] += ';CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/TaskManagerRun-3.3.0-pre1.tar.gz'
+        if os.path.exists("sandbox.tar.gz"):
+            info['additional_input_file'] += ", sandbox.tar.gz"
+        with open("Job.submit", "w") as fd:
+            fd.write(JOB_SUBMIT % info)
+
+        return info
+
+
+    def makeSpecs(self, task, sitead, jobgroup, block, availablesites, outfiles, startjobid):
+        specs = []
+        i = startjobid
+        temp_dest, dest = makeLFNPrefixes(task)
+        for job in jobgroup.getJobs():
+            inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']]).replace('"', r'\"\"')
+            runAndLumiMask = json.dumps(job['mask']['runAndLumis']).replace('"', r'\"\"')
+            firstEvent = str(job['mask']['FirstEvent'])
+            lastEvent = str(job['mask']['LastEvent'])
+            firstLumi = str(job['mask']['FirstLumi'])
+            firstRun = str(job['mask']['FirstRun'])
+            i += 1
+            sitead['Job%d'% i] = list(availablesites)
+            remoteOutputFiles = []
+            localOutputFiles = []
+            for origFile in outfiles:
+                info = origFile.rsplit(".", 1)
+                if len(info) == 2:
+                    fileName = "%s_%d.%s" % (info[0], i, info[1])
+                else:
+                    fileName = "%s_%d" % (origFile, i)
+                remoteOutputFiles.append("%s" % fileName)
+                localOutputFiles.append("%s=%s" % (origFile, fileName))
+            remoteOutputFilesStr = " ".join(remoteOutputFiles)
+            localOutputFiles = ", ".join(localOutputFiles)
+            if task['tm_input_dataset']:
+                primaryds = task['tm_input_dataset'].split('/')[1]
+            else:
+                # For MC
+                primaryds = task['tm_publish_name'].rsplit('-', 1)[0]
+            counter = "%04d" % (i / 1000)
+            tempDest = os.path.join(temp_dest, counter)
+            pfns = self.resolvePFNs(task['tm_asyncdest'], tempDest, ["cmsRun_%d.tar.gz" % i] + remoteOutputFiles)
+            pfns = ", ".join(pfns)
+            specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
+                          'remoteOutputFiles': remoteOutputFilesStr,
+                          'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
+                          'firstEvent' : firstEvent, 'lastEvent' : lastEvent,
+                          'firstLumi' : firstLumi, 'firstRun' : firstRun,
+                          'seeding' : 'AutomaticSeeding', 'lheInputFiles' : None,
+                          'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
+                          'outputData': task['tm_publish_name'],
+                          'tempDest': tempDest,
+                          'outputDest': os.path.join(dest, counter),
+                          'restinstance': task['restinstance'], 'resturl': task['resturl'],
+                          'block': block, 'destination': pfns,
+                          'backend': os.environ.get('HOSTNAME','')})
+
+            self.logger.debug(specs[-1])
+        return specs, i
+
+
     def createSubdag(self, splitter_result, **kwargs):
 
         startjobid = 0
         specs = []
 
-        info = makeJobSubmit(kwargs['task'])
+        info = self.makeJobSubmit(kwargs['task'])
 
         outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
 
@@ -428,7 +469,7 @@ class DagmanCreator(TaskAction.TaskAction):
             availablesites = [str(i) for i in availablesites]
             self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
 
-            jobgroupspecs, startjobid = make_specs(kwargs['task'], sitead, jobgroup, block, availablesites, outfiles, startjobid)
+            jobgroupspecs, startjobid = self.makeSpecs(kwargs['task'], sitead, jobgroup, block, availablesites, outfiles, startjobid)
             specs += jobgroupspecs
 
         dag = DAG_HEADER % {'restinstance': kwargs['task']['restinstance'], 'resturl': self.resturl}
@@ -475,8 +516,6 @@ class DagmanCreator(TaskAction.TaskAction):
 
 
     def executeInternal(self, *args, **kw):
-        global LOGGER
-        LOGGER = self.logger
 
         cwd = None
         if hasattr(self.config, 'TaskWorker') and hasattr(self.config.TaskWorker, 'scratchDir'):
