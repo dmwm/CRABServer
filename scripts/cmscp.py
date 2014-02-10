@@ -334,7 +334,7 @@ def main():
         dest = os.path.join(dest_dir, dest_file)
         try:
             print "==== Starting stageout of %s at %s ====" % (source_file, time.ctime())
-            cur_out_retval = performTransfer(manager, source_file, dest, remote_dest, dest_se)
+            cur_out_retval = performTransfer(manager, stageout_policy, source_file, dest, remote_dest, dest_se)
         except Exception, ex:
             print "== ERROR: Unhandled exception when performing stageout."
             traceback.print_exc()
