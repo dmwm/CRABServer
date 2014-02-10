@@ -6,6 +6,7 @@ with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import os
+import re
 import sys
 import json
 import time
