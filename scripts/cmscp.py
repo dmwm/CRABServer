@@ -8,11 +8,13 @@ with warnings.catch_warnings():
 import os
 import sys
 import json
+import time
 import signal
 import logging
 import tarfile
 import traceback
 
+# Bootstrap the CMS_PATH variable; the StageOutMgr will need it
 if 'CMS_PATH' not in os.environ:
     if 'VO_CMS_SW_DIR' in os.environ:
         os.environ['CMS_PATH'] = os.environ['VO_CMS_SW_DIR']
@@ -21,8 +23,8 @@ if 'CMS_PATH' not in os.environ:
     elif os.path.exists('/cvmfs/cms.cern.ch'):
         os.environ['CMS_PATH'] = '/cvmfs/cms.cern.ch'
 
-if os.path.exists("CRAB3.zip") and "CRAB3.zip" not in sys.path:
-    sys.path.append("CRAB3.zip")
+if os.path.exists("WMCore.zip") and "WMCore.zip" not in sys.path:
+    sys.path.append("WMCore.zip")
 
 if 'http_proxy' in os.environ and not os.environ['http_proxy'].startswith("http://"):
     os.environ['http_proxy'] = "http://%s" % os.environ['http_proxy']
@@ -119,13 +121,6 @@ def set_se_name(dest_file, se_name):
 
     with open("jobReport.json.%d" % id, "w") as fd:
         json.dump(full_report, fd)
-
-
-def getStageoutFiles():
-    if '_CONDOR_JOB_AD' not in os.environ:
-        print "== WARNING: _CONDOR_JOB_AD not in environment =="
-        print "No stageout will be performed."
-        return []
 
 
 def performTransfer(manager, source, dest, direct_pfn, direct_se):
@@ -262,14 +257,19 @@ def main():
     log_file = "cmsRun_%d.tar.gz" % id
     dest = os.path.join(dest_dir, log_file)
     try:
+        print "==== Starting compression of user logs at %s ====" % time.ctime()
         std_retval = compress(crab_id)
+        print "==== Finished compression of user logs at %s (status %d) ====" % (time.ctime(), std_retval)
         if not std_retval:
+            print "==== Starting stageout of user logs at %s ====" % time.ctime()
             std_rtval = performTransfer(manager, log_file, dest, dest_files[0], dest_se)
     except Exception, ex:
         print "== ERROR: Unhandled exception when performing stageout of user logs."
         traceback.print_exc()
         if not std_retval:
             std_retval = 60307
+    finally:
+        print "==== Stageout of user logs ended at %s (status %d) ====" % (time.ctime(), std_retval)
 
     out_retval = 0
     for dest, remote_dest in zip(output_files, dest_files):
@@ -288,12 +288,16 @@ def main():
 
         dest = os.path.join(dest_dir, dest_file)
         try:
-            out_retval = performTransfer(manager, source_file, dest, remote_dest, dest_se)
+            print "==== Starting stageout of %s at %s ====" % (source_file, time.ctime())
+            cur_out_retval = performTransfer(manager, source_file, dest, remote_dest, dest_se)
         except Exception, ex:
             print "== ERROR: Unhandled exception when performing stageout."
             traceback.print_exc()
-            if out_retval != 60307:
-                continue
+            cur_out_retval = 60307
+        finally:
+            print "====  Finished stageout of %s at %s (status %d) ====" % (source_file, time.ctime(), out_retval)
+        if cur_out_retval and not out_retval:
+            out_retval = cur_out_retval
 
     if std_retval:
         return std_retval
