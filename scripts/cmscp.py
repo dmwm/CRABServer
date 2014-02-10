@@ -252,7 +252,7 @@ def main():
     manager.retryPauseTime = retryPauseTime
     manager.numberOfRetries = numberOfRetries
 
-    counter = "%04d" % (fileid / 1000)
+    counter = "%04d" % (crab_id / 1000)
     dest_dir = os.path.join(dest_dir, counter)
 
     log_file = "cmsRun_%d.tar.gz" % id
