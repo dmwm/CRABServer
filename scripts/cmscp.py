@@ -126,7 +126,34 @@ def set_se_name(dest_file, se_name):
         json.dump(full_report, fd)
 
 
-def performTransfer(manager, source, dest, direct_pfn, direct_se):
+def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_se):
+    result = -1
+    for policy in stageout_policy:
+        if policy == "local":
+            print "== Attempting local stageout at %s. ==" % time.ctime()
+            result = performLocalTransfer(manager, source, dest)
+            if result:
+                print "== ERROR: Local stageout resulted in status %d at %s. ==" % (result, time.ctime())
+            else:
+                print "== Local stageout succeeded at %s. ==" % time.ctime()
+                break
+        elif policy == "remote":
+            print "== Attempting remote stageout at %s. ==" % time.ctime()
+            result = performDirectTransfer(source, direct_pfn, direct_se)
+            if result:
+                print "== ERROR: Remote stageout resulted in status %d at %s. =="
+            else:
+                print "== Remote stageout succeeded at %s. ==" % time.ctime()
+                break
+        else:
+            print "== ERROR: Skipping unknown policy named '%s'. ==" % policy
+    if result == -1:
+        print "== FATAL ERROR: No stageout policy was attempted. =="
+        result = 60307
+    return result
+
+
+def performLocalTransfer(manager, source, dest):
     fileForTransfer = {'LFN': dest, 'PFN': source}
     signal.signal(signal.SIGALRM, alarmHandler)
     signal.alarm(waitTime)
@@ -144,20 +171,20 @@ def performTransfer(manager, source, dest, direct_pfn, direct_se):
         result = 60307
     finally:
         signal.alarm(0)
-    if result:
-        print "== Local stageout resulted in status %d; attempting direct stageout at %s. ==" % (result, time.ctime())
-        try:
-            result = performDirectTransfer(source, direct_pfn, direct_se)
-        except WMException.WMException, ex:
-            print "Error during direct stageout: %s" % str(ex)
-            return ex.data.get("ErrorCode", 60307)
-        finally:
-            signal.alarm(0)
-    else:
+    if not result:
         set_se_name(os.path.split(dest)[-1], stageout_info['SEName'])
+    return result
 
 
 def performDirectTransfer(source, direct_pfn, direct_se):
+    try:
+        return performDirectTransferImpl(source, direct_pfn, direct_se)
+    except WMException.WMException, ex:
+        print "Error during direct stageout: %s" % str(ex)
+        return ex.data.get("ErrorCode", 60307)
+
+
+def performDirectTransferImpl(source, direct_pfn, direct_se):
     command = "srmv2-lcg"
     
     try:
@@ -206,6 +233,7 @@ def main():
     dest_se = None
     dest_dir = None
     dest_files = None
+    stageout_policy = None
     if '_CONDOR_JOB_AD' not in os.environ:
         print "== ERROR: _CONDOR_JOB_AD not in environment =="
         print "No stageout will be performed."
@@ -232,6 +260,8 @@ def main():
                     dest_dir = val.replace('"', '')
                 elif name == "CRAB_Destination":
                     dest_files = split_re.split(val.replace('"', ''))
+                elif name == "CRAB_StageoutPolicy":
+                    stageout_policy = split_re.split(val.replace('"', ''))
         if crab_id == -1:
             print "== ERROR: Unable to determine CRAB Job ID."
             print "No stageout will be performed."
@@ -250,6 +280,10 @@ def main():
             return 60307
         if dest_files == None:
             print "== ERROR: Unable to determine remote destinations."
+            print "No stageout will be performed."
+            return 60307
+        if stageout_policy == None:
+            print "== ERROR: Unable to determine stageout policy."
             print "No stageout will be performed."
             return 60307
 
@@ -273,7 +307,7 @@ def main():
         print "==== Finished compression of user logs at %s (status %d) ====" % (time.ctime(), std_retval)
         if not std_retval:
             print "==== Starting stageout of user logs at %s ====" % time.ctime()
-            std_rtval = performTransfer(manager, log_file, dest, dest_files[0], dest_se)
+            std_rtval = performTransfer(manager, stageout_policy, log_file, dest, dest_files[0], dest_se)
     except Exception, ex:
         print "== ERROR: Unhandled exception when performing stageout of user logs."
         traceback.print_exc()

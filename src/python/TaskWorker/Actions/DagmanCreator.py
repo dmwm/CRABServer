@@ -73,6 +73,7 @@ CRAB_HEADERS = \
 +CRAB_AsyncDest = %(asyncdest)s
 +CRAB_AsyncDestSE = %(asyncdest_se)s
 +CRAB_BlacklistT1 = %(blacklistT1)s
++CRAB_StageoutPolicy = %(stageoutpolicy)s
 """
 
 # NOTE: keep Arugments in sync with PanDAInjection.py.  ASO is very picky about argument order.
@@ -162,7 +163,7 @@ def transform_strings(input):
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
            'userdn', 'requestname', 'publication', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL', 'asyncdest_se':
+           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL', 'asyncdest_se', "stageoutpolicy":
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -409,6 +410,11 @@ class DagmanCreator(TaskAction.TaskAction):
 
         startjobid = 0
         specs = []
+
+        if hasattr(self.config.TaskWorker, 'stageoutPolicy'):
+            kwargs['task']['stageoutpolicy'] = ",".join(self.config.TaskWorker.stageoutPolicy)
+        else:
+            kwargs['task']['stageoutpolicy'] = "local,remote"
 
         info = self.makeJobSubmit(kwargs['task'])
 
