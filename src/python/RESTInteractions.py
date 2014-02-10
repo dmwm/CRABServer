@@ -1,6 +1,6 @@
 """
 Handles client interactions with remote REST interface
-"""
+""" 
 
 import urllib
 import os
