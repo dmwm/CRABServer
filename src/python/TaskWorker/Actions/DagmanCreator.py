@@ -31,6 +31,15 @@ except ImportError:
 
 from ApmonIf import ApmonIf
 
+DAG_HEADER = """
+
+NODE_STATUS_FILE node_state 30
+
+FINAL FinalCleanup final.sub NOOP
+SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT %(restinstance)s %(resturl)s
+
+"""
+
 DAG_FRAGMENT = """
 JOB Job%(count)d Job.%(count)d.submit
 SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %(backend)s
@@ -38,6 +47,7 @@ SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RET
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 10 UNLESS-EXIT 2
 VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\""
+ABORT-DAG-ON Job%(count)d 3
 
 """
 
@@ -85,7 +95,7 @@ CRAB_Id = $(count)
 +AccountingGroup = %(userhn)s
 
 +JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
-job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite
+job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, RemoteSysCpu, RemoteUserCpu
 
 universe = vanilla
 Executable = gWMS-CMSRunAnalysis.sh
@@ -231,6 +241,7 @@ def makeJobSubmit(task):
     info['lumis'] = []
     info = transform_strings(info)
     info['saveoutput'] = True if task.get('tm_arguments', {}).get('saveoutput', 'T') == 'T' else False
+    info['faillimit'] = task.get('tm_arguments', {}).get('faillimit', 10)
     if info['jobarch_flatten'].startswith("slc6_"):
         info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
     else:
@@ -420,7 +431,7 @@ class DagmanCreator(TaskAction.TaskAction):
             jobgroupspecs, startjobid = make_specs(kwargs['task'], sitead, jobgroup, block, availablesites, outfiles, startjobid)
             specs += jobgroupspecs
 
-        dag = "\nNODE_STATUS_FILE node_state 30\n"
+        dag = DAG_HEADER % {'restinstance': kwargs['task']['restinstance'], 'resturl': self.resturl}
         for spec in specs:
             dag += DAG_FRAGMENT % spec
 

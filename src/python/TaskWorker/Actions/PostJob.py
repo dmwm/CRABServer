@@ -50,7 +50,9 @@ signal.signal(signal.SIGTERM, sighandler)
 
 REGEX_ID = re.compile("([a-f0-9]{8,8})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]{12,12})")
 
+
 class FTSJob(object):
+
 
     def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, output_metadata, task_ad):
         self._id = None
@@ -65,11 +67,13 @@ class FTSJob(object):
             for source, dest in transfer_list:
                 fd.write("%s %s\n" % (source, dest))
 
+
     def cancel(self):
         if self._id:
             cmd = "glite-transfer-cancel -s %s %s" % (fts_server, self._id)
             print "+", cmd
             os.system(cmd)
+
 
     def submit(self):
         cmd = "glite-transfer-submit -o -s %s -f copyjobfile_%s" % (fts_server, self._count)
@@ -81,6 +85,7 @@ class FTSJob(object):
         print "Resulting transfer ID: %s" % output
         return output
 
+
     def status(self, long_status=False):
         if long_status:
             cmd = "glite-transfer-status -l -s %s %s" % (fts_server, self._id)
@@ -91,6 +96,7 @@ class FTSJob(object):
         if status:
             raise Exception("glite-transfer-status exited with status %s.\n%s" % (status, output))
         return output.strip()
+
 
     def run(self):
         self._id = self.submit()
@@ -113,6 +119,24 @@ class FTSJob(object):
                 print self.status(True)
                 return 1
 
+
+    def getLastFailure(self):
+        return "Unknown"
+
+
+def getUserFromLFN(lfn):
+    if len(lfn.split('/')) > 2:
+        if lfn.split('/')[2] == 'temp':
+            # /store/temp/user/$USER.$HASH/foo
+            user = lfn.split('/')[4].rsplit(".", 1)[0]
+        else: 
+            # /store/user/$USER/foo
+            user = lfn.split('/')[3]
+    else:
+        # Unknown; bail
+        user = ''
+    return user
+
 class ASOServerJob(object):
 
 
@@ -121,7 +145,7 @@ class ASOServerJob(object):
         self.couchServer = None
         self.couchDatabase = None
         self.cancel = False
-        self.sleep = 2
+        self.sleep = 200
         self.count = count
         self.dest_site = dest_site
         self.source_dir = source_dir
@@ -133,6 +157,7 @@ class ASOServerJob(object):
         self.log_size = log_size
         self.publish = outputdata
         self.task_ad = task_ad
+        self.failure = None
         proxy = os.environ.get('X509_USER_PROXY', None)
         aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config")
         if config:
@@ -144,16 +169,16 @@ class ASOServerJob(object):
             authParams = json.loads(f.read())
             self.aso_db_url = authParams['ASO_DB_URL']
         try:
-            print "Got aso %s" % self.aso_db_url
+            logger.info("Will use ASO server at %s" % self.aso_db_url)
             self.couchServer = CMSCouch.CouchServer(dburl=self.aso_db_url, ckey=proxy, cert=proxy)
             self.couchDatabase = self.couchServer.connectDatabase("asynctransfer", create = False)
         except:
-            print traceback.format_exc()
+            logger.exception("Failed to connect to ASO database")
             raise
 
 
     def cancel(self):
-        print "cancelling"
+        logger.info("Cancelling ASO data transfer.")
         if self.id:
             for oneID in self.id:
                 doc = self.couchDatabase.document(oneID)
@@ -161,6 +186,7 @@ class ASOServerJob(object):
                 res = self.couchDatabase.commitOne(doc)
                 if error in res:
                     raise RuntimeError, "Got error killing transfer: %s" % res
+
 
     def submit(self):
         allIDs = []
@@ -185,7 +211,6 @@ class ASOServerJob(object):
         file_index = 0
         for outputModule in self.output_metadata.values():
             for outputFile in outputModule:
-                print outputFile
                 fileInfo = {}
                 fileInfo['checksums'] = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
                 fileInfo['outsize'] = outputFile.get(u"size", 0)
@@ -203,34 +228,27 @@ class ASOServerJob(object):
                 size = self.log_size
                 checksums = {'adler32': 'abc'}
                 found_log = True
-            if len(lfn.split('/')) > 2:
-                if lfn.split('/')[2] == 'temp':
-                    user = lfn.split('/')[4].rsplit(".", 1)[0]
-                else:
-                    user = lfn.split('/')[3]
-            else:
-                user = ''
-            # TODO: need to pass the user params: publish flag, role/group, inputdataset,  publish_dbs_url, dbs_url through
+            user = getUserFromLFN(lfn)
             doc_id = getHashLfn( lfn )
+            # TODO: need to pass the user params: publish flag, role/group, inputdataset,  publish_dbs_url, dbs_url through
+            common_info = { "state":  "new",
+                            "source": oneFile[0],
+                            "destination": self.dest_site,
+                            "checksums": checksums,
+                            "size": size,
+                            "last_update": last_update,
+                            "start_time": now,
+                            "end_time": '',
+                            "job_end_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
+                            "retry_count": [],
+                            "failure_reason": [],
+                          }
             try:
                 doc = self.couchDatabase.document( doc_id )
-                doc['state'] = 'new'
-                doc['source'] = oneFile[0]
-                doc['destination'] = self.dest_site
-                doc['checksums'] = checksums,
-                doc['size'] = size,
-                doc['last_update'] = last_update
-                doc['start_time'] = now
-                doc['end_time'] = ''
-                doc['job_end_time'] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
-                doc['retry_count'] = []
-                doc['failure_reason'] = []
-                print "Updating doc %s for %s" % (doc_id, lfn)
+                doc.update(common_info)
+                logger.info("Will retry LFN %s (id %s)" % (lfn, doc_id))
             except CMSCouch.CouchNotFoundError:
-                msg = "Document %s does not exist in Couch" % doc_id
-                msg += str(traceback.format_exc())
-                print msg
-                print "Uploading new doc for %s" % lfn
+                logger.info("LFN %s (id %s) is not yet known to ASO; uploading new stageout job." % (lfn, doc_id))
                 # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
                 doc = { "_id": doc_id,
                         "inputdataset": input_dataset,
@@ -238,40 +256,32 @@ class ASOServerJob(object):
                         # TODO: Remove this if it is not required
                         "lfn": lfn.replace('/store/user', '/store/temp/user', 1),
                         "checksums": checksums,
-                        "size": size,
                         "user": user,
-                        "source": oneFile[0],
-                        "destination": self.dest_site,
-                        "last_update": last_update,
-                        "state": "new",
                         "role": role,
                         "dbSource_url": "gWMS",
                         "publish_dbs_url": publish_dbs_url,
                         "dbs_url": dbs_url,
                         "workflow": self.reqname,
-                        "start_time": now,
-                        "end_time": '',
-                        "job_end_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
                         "jobid": self.count,
-                        "retry_count": [],
-                        "failure_reason": [],
                         "publication_state": 'not_published',
                         "publication_retry_count": [],
                         "type" : file_type,
                         "publish" : 1
                     }
+                doc.update(common_info)
             except Exception, ex:
                 msg = "Error loading document from couch. Transfer submission failed."
                 msg += str(ex)
                 msg += str(traceback.format_exc())
-                print msg
+                logger.info(msg)
                 return False
-            pprint.pprint(doc)
+            logger.info("Stageout job description: %s" % pprint.pformat(doc))
             allIDs.append(getHashLfn(lfn))
             if 'error' in self.couchDatabase.commitOne(doc)[0]:
-                print "Couldn't add to couch database"
+                logger.info("Couldn't add to ASO database")
                 return False
         return allIDs
+
 
     def status(self, long_status=False):
         statuses = []
@@ -280,6 +290,7 @@ class ASOServerJob(object):
             statuses.append(couchDoc['state'])
         return statuses
 
+
     def run(self):
         self.id = self.submit()
         if self.id == False:
@@ -287,7 +298,7 @@ class ASOServerJob(object):
         while True:
             time.sleep(self.sleep)
             status = self.status()
-            print "Got statuses: %s" % status
+            logger.info("Got statuses: %s" % ", ".join(status))
             allDone = True
             for oneStatus, jobID in zip(status, self.id):
                 # states to wait on
@@ -299,18 +310,35 @@ class ASOServerJob(object):
                     continue
                 # states to stop immediately
                 elif oneStatus in ['failed', 'killed']:
-                    print "Job failed with status %s" % oneStatus
+                    logger.error("Job (internal ID %s) failed with status %s" % (jobID, oneStatus))
                     couchDoc = self.couchDatabase.document(jobID)
                     if "_attachments" in couchDoc:
-                        print "FTS outputs are:"
-                        for log in couchDoc["_attachments"]:
-                            print self.couchDatabase.getAttachment(jobID, log)
+                        logger.info("FTS outputs are:")
+                        bestLog = None
+                        maxRev = 0
+                        for log, loginfo in couchDoc["_attachments"].items():
+                            if bestLog == None:
+                                bestLog = log
+                            else:
+                                rev = loginfo.get(u"revpos", 0)
+                                if rev > maxRev:
+                                    maxRev = rev
+                                    bestLog = log
+                        print self.couchDatabase.getAttachment(jobID, bestLog)
+                    logger.error("Failure reason: %s" % couchDoc['failure_reason'])
+                    self.failure = couchDoc['failure_reason']
                     return 1
                 else:
                     raise RuntimeError, "Got a unknown status: %s" % oneStatus
             if allDone:
                 print "All jobs succeeded"
                 return 0
+
+
+    def getLastFailure(self):
+        if self.failure:
+            return self.failure
+        return "Unknown"
 
 
 def determineSizes(transfer_list):
@@ -357,6 +385,7 @@ def reportResults(job_id, dest_list, sizes):
 
     return retval
 
+
 def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
 
     p = PhEDEx.PhEDEx()
@@ -399,11 +428,28 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
         results.append((dest_info[source_site, slfn], dest_info[dest_site_, dlfn]))
     return results
 
+
 def getHashLfn(lfn):
     """
     stolen from asyncstageout
     """
     return hashlib.sha224(lfn).hexdigest()
+
+
+def isFailurePermanent(reason):
+    reason = str(reason).lower()
+    if re.matches("permission denied", reason):
+        return True
+    return False
+
+
+class PermanentStageoutError(RuntimeError):
+    pass
+
+
+class RecoverableStageoutError(RuntimeError):
+    pass
+
 
 REQUIRED_ATTRS = ['CRAB_ReqName', 'CRAB_Id', 'CRAB_OutputData', 'CRAB_JobSW', 'CRAB_AsyncDest']
 
@@ -613,6 +659,9 @@ class PostJob():
             params['StatusValueReason'] = reason
         if self.logfiles:
             params['StatusLogFile'] = ",".join(self.logfiles)
+        # Unfortunately, Dashboard only has 1-second resolution; we must separate all
+        # updates by at least 1s in order for it to get the correct ordering.
+        time.sleep(1)
         logger.info("Dashboard parameters: %s" % str(params))
         DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
 
@@ -684,6 +733,9 @@ class PostJob():
         if not fts_job_result:
             return fts_job_result
 
+        failureReason = g_Job.getLastFailure()
+        isPermanent = isFailurePermanent(failureReason)
+
         source_list = [i[0] for i in transfer_list]
         print "Source list", source_list
         dest_list = [i[1] for i in transfer_list]
@@ -696,9 +748,17 @@ class PostJob():
 
         failures = len([i for i in sizes if (i[1]<0 or (i[0] != i[1]))])
         if failures:
-            raise RuntimeError("There were %d failed stageout attempts" % failures)
+            msg = "There were %d failed stageout attempts; last failure reason: %s" % (failures, failureReason)
+            if isPermanent:
+                raise PermanentStageoutError(msg)
+            else:
+                raise RecoverableStageoutError(msg)
 
-        return fts_job_result
+        msg = "Stageout failed with code %d; last failure reason: %s" % (fts_job_result, failureReason)
+        if isPermanent:
+            raise PermanentStageoutError(msg)
+        else:
+            raise RecoverableStageoutError(msg)
 
 
     def makeNodeMap(self):
@@ -726,7 +786,31 @@ class PostJob():
             shutil.copy("postjob.%s" % id, postjob)
             os.chmod(postjob, 0644)
             DashboardAPI.apmonFree()
-        return retval
+        return self.check_abort_dag(retval)
+
+
+    def check_abort_dag(self, rval):
+        """
+        Each fatal error is written into this file; we
+        count the number of failures and abort the DAG if necessary
+        """
+        fname = "task_statistics.FATAL_ERROR"
+        # Return code 3 is reserved to abort the entire DAG.  Don't let the
+        # code otherwise use it.
+        if rval == 3:
+            rval = 1
+        if 'CRAB_FailedNodeLimit' not in self.task_ad:
+            return rval
+        try:
+            limit = int(self.task_ad['CRAB_FailedTaskLimit'])
+            counter = 0
+            with open(fname, "r") as fd:
+                for line in fd.readlines():
+                    counter += 1
+            if counter > limit:
+                logger.error("There are %d failed nodes, greater than the limit of %d. Will abort the whole DAG" % (counter, limit))
+        except:
+            return rval
 
 
     def execute_internal(self, cluster, status, retry_count, max_retries, restinstance, resturl, reqname, id, outputdata, sw, async_dest, source_dir, dest_dir, *filenames):
@@ -828,8 +912,16 @@ class PostJob():
                 if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
                         not hte.headers.get('X-Error-Http', -1) == '400':
                     raise
+        except PermanentStageoutError, pse:
+            logger.error("This is a permanent stageout error; user will need to resubmit.")
+            self.uploadState("FAILED")
+            return RetryJob.FATAL_ERROR
+        except RecoverableStageoutError, rse:
+            logger.error("This is a recoverable stageout error; automatic resubmit is possible.")
+            self.uploadState(fail_state)
+            return RetryJob.RECOVERABLE_ERROR
         except:
-            logger.exception("Stageout failed.")
+            logger.exception("Stageout failed due to unknown issue.")
             self.uploadState(fail_state)
             raise
 
@@ -852,6 +944,8 @@ class testServer(unittest.TestCase):
                         "runs" : { 1: [1,2,3],
                                    2: [2,3,4]},
                       }]}}}}
+
+
     def setUp(self):
         self.pj = PostJob()
         #self.job = ASOServerJob()
@@ -861,6 +955,7 @@ class testServer(unittest.TestCase):
                          'reqname', 1234, 'outputdata', 'sw', 'T2_US_Vanderbilt']
         self.jsonName = "jobReport.json.%s" % self.fullArgs[6]
         open(self.jsonName, 'w').write(json.dumps(self.generateJobJson()))
+
 
     def makeTempFile(self, size, pfn):
         fh, path = tempfile.mkstemp()
@@ -876,6 +971,8 @@ class testServer(unittest.TestCase):
         finally:
             if os.path.exists(path):
                 os.unlink(path)
+
+
     def getLevelOneDir(self):
         return datetime.datetime.now().strftime("%Y-%m")
 

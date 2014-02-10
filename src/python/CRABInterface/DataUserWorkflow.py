@@ -111,6 +111,7 @@ class DataUserWorkflow(object):
            :arg int priority: priority of this task
            :arg str lfnprefix: prefix for the output directory inside /store/user.
            :arg int saveoutput: whether to perform ASO on job output.
+           :arg int faillimit: the maximum number of failed jobs allowed before workflow is aborted
            :arg int ignorelocality: ignore data locality.
            :returns: a dict which contaians details of the request"""
 

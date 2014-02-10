@@ -126,7 +126,7 @@ class DataWorkflow(object):
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None,
-               ignorelocality=None, saveoutput=None, userproxy=None):
+               ignorelocality=None, saveoutput=None, faillimit=10, userproxy=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -179,6 +179,7 @@ class DataWorkflow(object):
             'oneEventMode' : 'T' if oneEventMode else 'F',
             'lfnprefix' : lfnprefix if lfnprefix else '',
             'saveoutput' : 'F' if saveoutput == False else 'T',
+            'faillimit' : faillimit,
             'ignorelocality' : 'F' if ignorelocality == False else 'T',
             'ASOURL' : self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", ""),
         }

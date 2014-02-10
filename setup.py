@@ -256,5 +256,6 @@ setup(name = 'crabserver',
       data_files = ['scripts/%s' % x for x in \
                         ['CMSRunAnalysis.sh', 'cmscp.py',
                         'gWMS-CMSRunAnalysis.sh', 'dag_bootstrap_startup.sh',
-                        'dag_bootstrap.sh', 'AdjustSites.py'] ]
+                        'dag_bootstrap.sh', 'AdjustSites.py'] ],
+      scripts = ['scripts/renew_remote_proxies.py'],
 )
