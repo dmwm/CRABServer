@@ -115,7 +115,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("lfnprefix", param, safe, RX_LFNPATH, optional=True)
             #validate_str("userisburl", param, safe, re.compile(r"^[A-Za-z]*$"), optional=False)
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE)
-            validate_strlist("userfiles", param, safe, RX_USERFILE, optional=True)
+            validate_strlist("userfiles", param, safe, RX_USERFILE)
             validate_num("savelogsflag", param, safe, optional=False)
             validate_num("saveoutput", param, safe, optional=True)
             validate_num("faillimit", param, safe, optional=True)
