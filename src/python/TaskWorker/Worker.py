@@ -3,9 +3,12 @@ from Queue import Empty
 import logging
 import time
 import traceback
+from base64 import b64encode
+import urllib
 
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.WorkerExceptions import WorkerHandlerException
+from RESTInteractions import HTTPRequests
 
 
 ## Creating configuration globals to avoid passing these around at every request
@@ -36,16 +39,30 @@ def processWorker(inputs, results, instance, resturl):
         t0 = time.time()
         logger.debug("%s: Starting %s on %s" %(procName, str(work), task['tm_taskname']))
         try:
+            msg = None
             outputs = work(instance, resturl, WORKER_CONFIG, task, inputargs)
         except WorkerHandlerException, we:
             outputs = Result(task=task, err=str(we))
+            msg = str(we)
         except Exception, exc:
             outputs = Result(task=task, err=str(exc))
             msg = "%s: I just had a failure for %s" % (procName, str(exc))
             msg += "\n\tworkid=" + str(workid)
             msg += "\n\ttask=" + str(task['tm_taskname'])
             msg += "\n" + str(traceback.format_exc())
-            logger.error(msg)
+        finally:
+            if msg:
+                try:
+                    server = HTTPRequests(instance, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey)
+                    configreq = {  'workflow': task['tm_taskname'],
+                                   'status': "FAILED",
+                                   'subresource': 'failure',
+                                   'failure': b64encode(msg)}
+
+                    server.post(resturl, data = urllib.urlencode(configreq))
+                    logger.info("Error message successfully uploaded to the REST")
+                except Exception, exc:
+                    logger.warning("Cannot uploaded failure message to the REST for workflow %s.\nReason: %s" (task['tm_taskname'], exc))
         t1 = time.time()
         logger.debug("%s: ...work on %s completed in %d seconds: %s" % (procName, task['tm_taskname'], t1-t0, outputs))
 
@@ -55,6 +72,8 @@ def processWorker(inputs, results, instance, resturl):
                     })
     logger.debug("Slave exiting.")
     return 0
+
+
 
 class Worker(object):
     """Worker class providing all the functionalities to manage all the slaves
@@ -101,17 +120,14 @@ class Worker(object):
         for x in self.pool:
             try:
                 self.logger.debug("Shutting down %s "%str(x))
-                self.inputs.put(('-1', 'STOP', 'control'))
+                self.inputs.put(('-1', 'STOP', 'control', []))
             except Exception, ex:
                 msg =  "Hit some exception in deletion\n"
                 msg += str(ex)
                 self.logger.error(msg)
 
-        for proc in self.pool:
-            proc.terminate()
-
         self.pool = []
-        self.logger.info('Slaves stopped!')
+        self.logger.info('Slaves stop messages sent!')
         return
 
     def injectWorks(self, items):
