@@ -5,6 +5,7 @@ import traceback
 from RESTInteractions import HTTPRequests
 
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
+from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.PanDABrokerage import PanDABrokerage
@@ -87,7 +88,10 @@ def handleNewTask(instance, resturl, config, task, *args, **kwargs):
     handler = TaskHandler(task)
     handler.addWork( MyProxyLogon(config=config, server=server, resturl=resturl, myproxylen=60*60*24) )
     if task['tm_job_type'] == 'Analysis': 
-        handler.addWork( DBSDataDiscovery(config=config, server=server, resturl=resturl) )
+        if task.get('tm_arguments', {}).get('userfiles'):
+            handler.addWork( UserDataDiscovery(config=config, server=server, resturl=resturl) )
+        else:
+            handler.addWork( DBSDataDiscovery(config=config, server=server, resturl=resturl) )
     elif task['tm_job_type'] == 'PrivateMC': 
         handler.addWork( MakeFakeFileSet(config=config, server=server, resturl=resturl) )
     handler.addWork( Splitter(config=config, server=server, resturl=resturl) )
