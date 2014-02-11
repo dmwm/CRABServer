@@ -35,8 +35,9 @@ DAG_HEADER = """
 
 NODE_STATUS_FILE node_state 30
 
-FINAL FinalCleanup final.sub NOOP
-SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT %(restinstance)s %(resturl)s
+# NOTE: a file must be present, but 'noop' makes it not be read.
+#FINAL FinalCleanup Job.1.submit NOOP
+#SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT %(restinstance)s %(resturl)s
 
 """
 
@@ -116,7 +117,18 @@ use_x509userproxy = true
 # TODO: Uncomment this when we get out of testing mode
 Requirements = ((target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)) %(opsys_req)s
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
-periodic_remove = (JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)
+# Remove if we've been in the 'held' status for more than 7 minutes, OR
+# We are running AND
+#  Over memory use OR
+#  Over wall clock limit
+periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) || \
+                  ((JobStatus =?= 2) && ( \
+                     (MemoryUsage > RequestMemory) || \
+                     (MaxWallTimeMins*60 < time() - EnteredCurrentStatus) \
+                  ))
++PeriodicRemoveReason = ifThenElse(MemoryUsage > RequestMemory, "Removed due to memory use", \
+                          ifThenElse(MaxWallTimeMins*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
+                            "Removed due to job being held"))
 queue
 """
 

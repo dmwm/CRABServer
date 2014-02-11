@@ -31,6 +31,8 @@ class RetryJob(object):
     def __init__(self):
         self.count = "-1"
         self.site = None
+        self.ad = {}
+        self.validreport = True
 
     def get_job_ad(self):
         cmd = "condor_q -l -userlog job_log %s" % str(self.cluster)
@@ -60,7 +62,7 @@ class RetryJob(object):
             if site:
                 self.site = site
         except IOError, ioe:
-            raise FatalError("IOError when reading the framework job report JSON: '%s'" % str(ioe))
+            self.validreport = False
 
     def record_site(self, result):
         try:
@@ -77,6 +79,11 @@ class RetryJob(object):
             # Swallow the exception - record_site is advisory only
 
     def check_cpu_report(self):
+
+        # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
+        if self.ad.get("RemoveReason").startswith("Removed due to wall clock limit"):
+            raise FatalError("Not retrying job due to wall clock limit (job killed by CRAB3 watchdog)")
+
         if 'steps' not in self.report: return
         if 'cmsRun' not in self.report['steps']: return
         if 'performance' not in self.report['steps']['cmsRun']['performance']: return
@@ -101,6 +108,11 @@ class RetryJob(object):
             raise FatalError("Not retrying a job because the integrated time (across all retries) is %d hours." % (integratedJobTime / 3600))
 
     def check_memory_report(self):
+
+        # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
+        if self.ad.get("RemoveReason").startswith("Removed due to memory use"):
+            raise FatalError("Not retrying job due to excessive memory use (job killed by CRAB3 watchdog)")
+
         if 'steps' not in self.report: return
         if 'cmsRun' not in self.report['steps']: return
         if 'performance' not in self.report['steps']['cmsRun']['performance']: return
@@ -144,7 +156,7 @@ class RetryJob(object):
             raise FatalError("Job exited with code %d.  Exit message: %s" % (exitCode, exitMsg))
 
     def check_empty_report(self):
-        if not self.report:
+        if not self.report or not self.validreport:
             raise RecoverableError("Job did not produce a usable framework job report.")
 
     def execute_internal(self, status, retry_count, max_retries, count, cluster):
@@ -156,6 +168,10 @@ class RetryJob(object):
 
         self.check_memory_report()
         self.check_cpu_report()
+
+        if self.ad.get("RemoveReason").startswith("Removed due to job being held"):
+            hold_reason = self.ad.get("HoldReason", self.ad.get("LastHoldReason", "Unknown"))
+            raise RecoverableError("Will retry held job; last hold reason: %s" % hold_reason)
 
         self.check_empty_report()
         self.check_exit_code()
