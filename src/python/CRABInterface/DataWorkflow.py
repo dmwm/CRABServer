@@ -126,7 +126,7 @@ class DataWorkflow(object):
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,\
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None,
-               ignorelocality=None, saveoutput=None, faillimit=10, userproxy=None):
+               ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -163,6 +163,7 @@ class DataWorkflow(object):
            :arg int maxmemory: maximum amount of RAM required, in MB
            :arg int priority: priority of this task
            :arg str lfnprefix: prefix for output directory in /store/user
+           :arg str userfiles: The files to process instead of a DBS-based dataset.
            :returns: a dict which contaians details of the request"""
 
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
@@ -182,6 +183,7 @@ class DataWorkflow(object):
             'faillimit' : faillimit,
             'ignorelocality' : 'F' if ignorelocality == False else 'T',
             'ASOURL' : self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", ""),
+            'userfiles' : userfiles,
         }
             
 

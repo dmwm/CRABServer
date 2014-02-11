@@ -113,6 +113,7 @@ class DataUserWorkflow(object):
            :arg int saveoutput: whether to perform ASO on job output.
            :arg int faillimit: the maximum number of failed jobs allowed before workflow is aborted
            :arg int ignorelocality: ignore data locality.
+           :arg str list userfiles: The files to process instead of a DBS-based dataset.
            :returns: a dict which contaians details of the request"""
 
         return self.workflow.submit(*args, **kwargs)
