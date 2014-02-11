@@ -779,8 +779,10 @@ class PostJob():
         logger.debug("The post-job script will be saved to %s" % postjob)
         try:
             retval = self.execute_internal(*args, **kw)
-        finally:
+            logger.info("Post-job finished executing; status code %d." % retval)
+        except:
             logger.exception("Failure during post-job execution.")
+        finally:
             sys.stdout.flush()
             sys.stderr.flush()
             shutil.copy("postjob.%s" % id, postjob)
@@ -924,6 +926,7 @@ class PostJob():
             logger.exception("Stageout failed due to unknown issue.")
             self.uploadState(fail_state)
             raise
+        self.uploadState(state="FINISHED")
 
         return 0
 
