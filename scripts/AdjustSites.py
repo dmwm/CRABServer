@@ -1,10 +1,9 @@
-
 import os
 import re
 import sys
 import shutil
 import traceback
-
+import glob
 import classad
 import htcondor
 
