@@ -216,7 +216,7 @@ class ASOServerJob(object):
                 fileInfo = {}
                 fileInfo['checksums'] = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
                 fileInfo['outsize'] = outputFile.get(u"size", 0)
-                fileInfo['needs_transfer'] = outputFile.get('direct_stageout') != True
+                fileInfo['needs_transfer'] = not outputFile.get('direct_stageout')
                 outputFiles.append(fileInfo)
         for oneFile in zip(self.source_sites, self.filenames):
             if found_log:
@@ -251,6 +251,7 @@ class ASOServerJob(object):
                           }
             # Even if a direct transfer was done, we register in ASO so publication happens.
             if not needs_transfer:
+                logger.debug("File is marked as not needing transfer.")
                 common_info['state'] = 'done'
             try:
                 doc = self.couchDatabase.document( doc_id )
@@ -305,7 +306,7 @@ class ASOServerJob(object):
             couchDoc = self.couchDatabase.document(jobID)
         except:
             log.exception("Failed to retrieve updated document for %s." % jobID)
-            return ""
+            return {}, ""
         if "_attachments" in couchDoc:
             bestLog = None
             maxRev = 0
@@ -318,10 +319,10 @@ class ASOServerJob(object):
                                     maxRev = rev
                                     bestLog = log
             try:
-                return self.couchDatabase.getAttachment(jobID, bestLog)
+                return couchDoc, self.couchDatabase.getAttachment(jobID, bestLog)
             except:
                 log.exception("Failed to retrieve log attachment for %s: %s" % (jobID, bestLog))
-        return ""
+        return couchDoc, ""
 
     def run(self):
         self.id = self.submit()
@@ -342,7 +343,7 @@ class ASOServerJob(object):
                 # states to stop immediately
                 elif oneStatus in ['failed', 'killed']:
                     logger.error("Job (internal ID %s) failed with status %s" % (jobID, oneStatus))
-                    attachment = self.getLatestLog(jobID)
+                    couchDoc, attachment = self.getLatestLog(jobID)
                     if not attachment:
                         logger.warning("WARNING: no FTS logfile available.")
                     else:
@@ -360,7 +361,7 @@ class ASOServerJob(object):
                     raise RuntimeError, "Got a unknown status: %s" % oneStatus
             if allDone:
                 logger.info("All transfers were successful")
-                attachment = self.getLatestLog(jobID)
+                couchDoc, attachment = self.getLatestLog(jobID)
                 if not attachment:
                     logger.warning("WARNING: no FTS logfile available.")
                 else:
@@ -461,7 +462,7 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames, savelo
             print "Unable to map LFN %s at site %s" % (slfn, source_site)
         if ((dest_site_, dlfn) not in dest_info) or (not dest_info[dest_site_, dlfn]):
             print "Unable to map LFN %s at site %s" % (dlfn, dest_site_)
-        if found_log and not savelogs:
+        if not found_log and not savelogs:
             found_log = True
             continue
         results.append((dest_info[source_site, slfn], dest_info[dest_site_, dlfn]))
@@ -538,11 +539,12 @@ class PostJob():
             raise ValueError("Invalid jobReport.json: missing input/output")
         self.output = self.report['output']
         self.log_needs_transfer = not self.report.get("direct_stageout")
+        logger.debug("Log file needs transfer: %s" % str(self.log_needs_transfer))
         self.input = self.report['input']
 
         for outputModule in self.output.values():
             for outputFile in outputModule:
-                print outputFile
+                print "Output file from job:", outputFile
                 # Note incorrect spelling of 'output module' in current WMCore
                 fileInfo = {}
                 if outputFile.get(u"output_module_class") == u'PoolOutputModule' or \
@@ -568,7 +570,8 @@ class PostJob():
                 fileInfo['needs_transfer'] = True
                 if u'SEName' in outputFile and self.node_map.get(str(outputFile['SEName'])):
                     fileInfo['outtmplocation'] = self.node_map[outputFile['SEName']]
-                    if outputFile.get('direct_stageout') == True:
+                    if outputFile.get(u'direct_stageout'):
+                        logger.debug("Output file does not need to be transferred.")
                         fileInfo['needs_transfer'] = False
 
                 if u'runs' not in outputFile:
@@ -904,6 +907,8 @@ class PostJob():
 
         self.server = HTTPRequests(restinstance, os.environ['X509_USER_PROXY'], os.environ['X509_USER_PROXY'])
         self.resturl = resturl
+
+        logger.info("Post-job was asked to transfer up to %d files." % len(filenames))
 
         self.makeAd(reqname, id, outputdata, sw, async_dest)
         self.getTaskAd()
