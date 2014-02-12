@@ -81,7 +81,7 @@ class RetryJob(object):
     def check_cpu_report(self):
 
         # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
-        if self.ad.get("RemoveReason").startswith("Removed due to wall clock limit"):
+        if self.ad.get("RemoveReason", "").startswith("Removed due to wall clock limit"):
             raise FatalError("Not retrying job due to wall clock limit (job killed by CRAB3 watchdog)")
 
         if 'steps' not in self.report: return
@@ -110,7 +110,7 @@ class RetryJob(object):
     def check_memory_report(self):
 
         # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
-        if self.ad.get("RemoveReason").startswith("Removed due to memory use"):
+        if self.ad.get("RemoveReason", "").startswith("Removed due to memory use"):
             raise FatalError("Not retrying job due to excessive memory use (job killed by CRAB3 watchdog)")
 
         if 'steps' not in self.report: return
@@ -169,7 +169,7 @@ class RetryJob(object):
         self.check_memory_report()
         self.check_cpu_report()
 
-        if self.ad.get("RemoveReason").startswith("Removed due to job being held"):
+        if self.ad.get("RemoveReason", "").startswith("Removed due to job being held"):
             hold_reason = self.ad.get("HoldReason", self.ad.get("LastHoldReason", "Unknown"))
             raise RecoverableError("Will retry held job; last hold reason: %s" % hold_reason)
 
