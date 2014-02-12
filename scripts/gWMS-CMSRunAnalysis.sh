@@ -113,65 +113,18 @@ fi
 echo "======== python2.6 bootstrap for stageout at $(date) FINISHING ========"
 
 echo "======== Stageout at $(date) STARTING ========"
-
-echo "==== Compressing stderr STARTING at $(date) ===="
-./cmscp.py "$PWD/cmsRun-stderr.log?compressCount=3&remoteName=cmsRun_$CRAB_Id.log" "$CRAB_Dest/cmsRun-stderr.log?compressCount=3&remoteName=cmsRun_$CRAB_Id.log"
+# Note we prevent buffering of stdout/err -- this is due to observed issues in mixing of out/err for stageout plugins
+PYTHONUNBUFFERED=1 ./cmscp.py
 STAGEOUT_EXIT_STATUS=$?
-  if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
+if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
     set -x
-    if [ $EXIT_STATUS -ne 0 ]; then
-      exit $EXIT_STATUS
-    else
-      exit $STAGEOUT_EXIT_STATUS
-  fi
-fi
-echo "==== Compressing stderr FINISHING at $(date) ===="
-
-echo "==== Compressing stdout STARTING at $(date) ===="
-./cmscp.py "$PWD/cmsRun-stdout.log?compressCount=3&remoteName=cmsRun_$CRAB_Id.log" "$CRAB_Dest/cmsRun-stdout.log?compressCount=3&remoteName=cmsRun_$CRAB_Id.log"
-STAGEOUT_EXIT_STATUS=$?
-  if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
-    set -x
-    if [ $EXIT_STATUS -ne 0 ]; then
-      exit $EXIT_STATUS
-    else
-      exit $STAGEOUT_EXIT_STATUS
-  fi
-fi
-echo "==== Compressing stdout FINISHING at $(date) ===="
-
-echo "==== Compressing FrameworkJobReport.xml and log tarball stageout STARTING at $(date) ===="
-./cmscp.py "$PWD/FrameworkJobReport.xml?compressCount=3&remoteName=cmsRun_$CRAB_Id.log" "$CRAB_Dest/FrameworkJobReport.xml?compressCount=3&remoteName=cmsRun_$CRAB_Id.log"
-STAGEOUT_EXIT_STATUS=$?
-  if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
-    set -x
-    if [ $EXIT_STATUS -ne 0 ]; then
-      exit $EXIT_STATUS
-    else
-      exit $STAGEOUT_EXIT_STATUS
-  fi
-fi
-echo "==== Compressing FrameworkJobReport.xml and log tarball stageout FINISHING at $(date) ===="
-
-OIFS=$IFS
-IFS=" ,"
-for file in $CRAB_localOutputFiles; do
-    echo "==== Stageout of $file STARTING at $(date) ===="
-    ./cmscp.py "$PWD/$file" $CRAB_Dest/$file
-    STAGEOUT_EXIT_STATUS=$?
-    if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
-      set -x
-      if [ $EXIT_STATUS -ne 0 ]; then
-        exit $EXIT_STATUS
-      else
-        exit $STAGEOUT_EXIT_STATUS
-      fi
+    if [ $EXIT_STATUS -eq 0 ]; then
+        EXIT_STATUS=$STAGEOUT_EXIT_STATUS
     fi
-    echo "==== Stageout of $file FINISHING at $(date) ===="
-done
-echo "======== Stageout at $(date) FINISHING ========"
+fi
+echo "======== Stageout at $(date) FINISHING (status $STAGEOUT_EXIT_STATUS) ========"
 
-echo "======== gWMS-CMSRunAnalysis.py FINISHING at $(date) on $(hostname) ========"
+echo "======== gWMS-CMSRunAnalysis.py FINISHING at $(date) on $(hostname) with status $EXIT_STATUS ========"
 set -x
 exit $EXIT_STATUS
 

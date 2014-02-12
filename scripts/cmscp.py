@@ -6,13 +6,16 @@ with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import os
+import re
 import sys
 import json
+import time
 import signal
 import logging
 import tarfile
 import traceback
 
+# Bootstrap the CMS_PATH variable; the StageOutMgr will need it
 if 'CMS_PATH' not in os.environ:
     if 'VO_CMS_SW_DIR' in os.environ:
         os.environ['CMS_PATH'] = os.environ['VO_CMS_SW_DIR']
@@ -21,70 +24,47 @@ if 'CMS_PATH' not in os.environ:
     elif os.path.exists('/cvmfs/cms.cern.ch'):
         os.environ['CMS_PATH'] = '/cvmfs/cms.cern.ch'
 
-if os.path.exists("CRAB3.zip") and "CRAB3.zip" not in sys.path:
-    sys.path.append("CRAB3.zip")
+if os.path.exists("WMCore.zip") and "WMCore.zip" not in sys.path:
+    sys.path.append("WMCore.zip")
 
 if 'http_proxy' in os.environ and not os.environ['http_proxy'].startswith("http://"):
     os.environ['http_proxy'] = "http://%s" % os.environ['http_proxy']
 
-try:
-    import WMCore
-except ImportError, ie:
-    import urllib, tempfile
-    fd = urllib.urlopen("http://hcc-briantest.unl.edu/TaskManagerRun.tar.gz")
-    with tempfile.TemporaryFile() as fd2:
-        fd2.write(fd.read()); fd2.seek(0)
-        tf = tarfile.open(mode='r:gz', fileobj=fd2)
-        fd3 = tf.extractfile("CRAB3.zip")
-        try:
-            name = "CRAB3.zip"
-            fd4 = os.open(name, os.O_EXCL | os.O_RDWR | os.O_CREAT, 0644)
-        except:
-            fd4, name = tempfile.mkstemp()
-        os.fdopen(fd4, 'w').write(fd3.read())
-    sys.path.insert(0, name)
-    import WMCore
-
 import WMCore.Storage.StageOutMgr as StageOutMgr
 
+from WMCore.Storage.Registry import retrieveStageOutImpl
 from WMCore.Algorithms.Alarm import Alarm, alarmHandler
 
-classad_output = """\
-PluginVersion = "0.1"
-PluginType = "FileTransfer"
-SupportedMethods = "cms"\
-"""
-
 waitTime = 60*60
+numberOfRetries = 2
+retryPauseTime = 60
 
-def parseArgs():
-    # ARRRRRGH!  HTCondor's file transfer plugin does completely non-standard
-    # argument passing for Linux.  Great.
-    if '-classad' in sys.argv[1:]:
-        print classad_output
-        sys.exit(0)
 
-    if len(sys.argv) != 3:
-        print "Usage: cmscp.py <source> <dest>"
-        sys.exit(1)
-
-    source, dest = sys.argv[1:]
-    return source, dest, source.startswith('/')
-
-def compress(source, tarball, count):
-    output = tarball + ".tar"
-    tf = tarfile.open(output, "a")
-    names = tf.getnames()
-    curCount = len(names)
-    print "Adding %s to tarball %s" % (source, output)
-    if source not in names:
-        tf.add(source, arcname=os.path.split(source)[-1])
-        curCount += 1
+def compress(id):
+    retval = 0
+    output = "cmsRun_%d.log.tar.gz" % id
+    tf = tarfile.open(output, "w:gz")
+    if os.path.exists("cmsRun-stdout.log"):
+        print "Adding cmsRun-stdout.log to tarball %s" % output
+        tf.add("cmsRun-stdout.log", arcname="cmsRun-stdout-%d.log" % id)
+    else:
+        print "== ERROR: cmsRun-stdout.log is missing.  Will fail stageout."
+        retval = 60307
+    if os.path.exists("cmsRun-stderr.log"):
+        print "Adding cmsRun-stderr.log to tarball %s" % output
+        tf.add("cmsRun-stderr.log", arcname="cmsRun-stderr-%d.log" % id)
+    else:
+        print "== ERROR: cmsRun-stderr.log is missing.  Will fail stageout."
+        retval = 60307
+    if os.path.exists("FrameworkJobReport.xml"):
+        print "Adding FrameworkJobReport.xml to tarball %s" % output
+        tf.add("FrameworkJobReport.xml", arcname="FrameworkJobReport-%d.xml" % id)
+    else:
+        print "== ERROR: FrameworkJobReport.xml is missing.  Will fail stageout."
+        retval = 60307
     tf.close()
-    if curCount >= count:
-        os.system("gzip %s" % output)
-        output += '.gz'
-    return output, curCount
+    return retval
+
 
 def get_job_id(source):
     filename = os.path.split(source)[-1]
@@ -97,6 +77,7 @@ def get_job_id(source):
     
     return left_piece + "." + right_piece, fileid
 
+
 def set_se_name(dest_file, se_name):
     """
     Alter the job report to record where the given file was
@@ -104,18 +85,18 @@ def set_se_name(dest_file, se_name):
     then record it in the top-level of the JSON (hopefully it
     means that it is the log file).
     """
+    print "== Attempting to set SE name of %s for file %s ==" % (se_name, dest_file)
+
     filename, id = get_job_id(dest_file)
 
     with open("jobReport.json.%d" % id) as fd:
         full_report = json.load(fd)
 
     if 'steps' not in full_report or 'cmsRun' not in full_report['steps']:
-        #raise ValueError("Invalid jobReport.json: missing cmsRun")
         return
     report = full_report['steps']['cmsRun']
 
     if 'output' not in report:
-        #raise ValueError("Invalid jobReport.json: missing output")
         return
     output = report['output']
 
@@ -145,72 +126,228 @@ def set_se_name(dest_file, se_name):
         json.dump(full_report, fd)
 
 
-def main():
-    source, dest, stageout = parseArgs()
+def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_se):
+    result = -1
+    for policy in stageout_policy:
+        if policy == "local":
+            print "== Attempting local stageout at %s. ==" % time.ctime()
+            result = performLocalTransfer(manager, source, dest)
+            if result:
+                print "== ERROR: Local stageout resulted in status %d at %s. ==" % (result, time.ctime())
+            else:
+                print "== Local stageout succeeded at %s. ==" % time.ctime()
+                break
+        elif policy == "remote":
+            print "== Attempting remote stageout at %s. ==" % time.ctime()
+            result = performDirectTransfer(source, direct_pfn, direct_se)
+            if result:
+                print "== ERROR: Remote stageout resulted in status %d at %s. =="
+            else:
+                print "== Remote stageout succeeded at %s. ==" % time.ctime()
+                break
+        else:
+            print "== ERROR: Skipping unknown policy named '%s'. ==" % policy
+    if result == -1:
+        print "== FATAL ERROR: No stageout policy was attempted. =="
+        result = 60307
+    return result
 
-    # See WMCore.WMSpec.Steps.Executors.StageOut for more details on extending.
+
+def performLocalTransfer(manager, source, dest):
+    fileForTransfer = {'LFN': dest, 'PFN': source}
+    signal.signal(signal.SIGALRM, alarmHandler)
+    signal.alarm(waitTime)
+    result = 0
+    try:
+        # Throws on any failure
+        stageout_info = manager(fileForTransfer)
+    except Alarm:
+        print "Indefinite hang during stageOut of %s" % dest
+        manager.cleanSuccessfulStageOuts()
+        result = 60403
+    except Exception, ex:
+        print "== Error during stageout: %s" % ex
+        manager.cleanSuccessfulStageOuts()
+        result = 60307
+    finally:
+        signal.alarm(0)
+    if not result:
+        set_se_name(os.path.split(dest)[-1], stageout_info['SEName'])
+    return result
+
+
+def performDirectTransfer(source, direct_pfn, direct_se):
+    try:
+        return performDirectTransferImpl(source, direct_pfn, direct_se)
+    except WMException.WMException, ex:
+        print "Error during direct stageout: %s" % str(ex)
+        return ex.data.get("ErrorCode", 60307)
+
+
+def performDirectTransferImpl(source, direct_pfn, direct_se):
+    command = "srmv2-lcg"
+    
+    try:
+        impl = retrieveStageOutImpl(command)
+    except Exception, ex:
+        msg = "Unable to retrieve impl for local stage out:\n"
+        msg += "Error retrieving StageOutImpl for command named: %s\n" % (
+            command,)
+        raise StageOutFailure(msg, Command = command,
+                              LFN = direct_pfn, ExceptionDetail = str(ex))
+
+    impl.numRetries = numberOfRetries
+    impl.retryPause = retryPauseTime
+
+    signal.alarm(waitTime)
+    result = 0
+    try:
+        impl("srmv2", source, direct_pfn, None, None)
+    except Alarm:
+        print "== Indefinite hang during stageOut of %s; setting return code to 60403." % dest
+        result = 60403
+    except Exception, ex:
+        msg = "== Failure for local stage out:\n"
+        msg += str(ex)
+        try:
+            msg += traceback.format_exc()
+        except AttributeError, ex:
+            msg += "Traceback unavailable\n"
+        raise StageOutFailure(msg, Command = command, Protocol = protocol,
+                              LFN = lfn, InputPFN = localPfn,
+                              TargetPFN = pfn)
+    finally:
+        signal.alarm(0)
+
+    if not result:
+        set_se_name(os.path.split(direct_pfn)[-1], direct_se)
+
+    return result
+
+
+def main():
+
+    # Parse the job ad to get the stageout information.
+    crab_id = -1
+    output_files = None
+    dest_se = None
+    dest_dir = None
+    dest_files = None
+    stageout_policy = None
+    if '_CONDOR_JOB_AD' not in os.environ:
+        print "== ERROR: _CONDOR_JOB_AD not in environment =="
+        print "No stageout will be performed."
+    elif not os.path.exists(os.environ['_CONDOR_JOB_AD']):
+        print "== ERROR: _CONDOR_JOB_AD (%s) does not exist =="
+        print "No stageout will be performed."
+        return 60307
+    else:
+        attr_re = re.compile("([A-Z_a-z0-9]+?) = (.*)")
+        split_re = re.compile(",\s*")
+        with open(os.environ['_CONDOR_JOB_AD']) as fd:
+            for line in fd.readlines():
+                m = attr_re.match(line)
+                if not m:
+                    continue
+                name, val = m.groups()
+                if name == 'CRAB_Id':
+                    crab_id = int(val)
+                elif name == "CRAB_localOutputFiles":
+                    output_files = split_re.split(val.replace('"', ''))
+                elif name == "CRAB_AsyncDestSE":
+                    dest_se = val.replace('"', '')
+                elif name == "CRAB_Dest":
+                    dest_dir = val.replace('"', '')
+                elif name == "CRAB_Destination":
+                    dest_files = split_re.split(val.replace('"', ''))
+                elif name == "CRAB_StageoutPolicy":
+                    stageout_policy = split_re.split(val.replace('"', ''))
+        if crab_id == -1:
+            print "== ERROR: Unable to determine CRAB Job ID."
+            print "No stageout will be performed."
+            return 60307
+        if output_files == None:
+            print "== ERROR: Unable to determine output files."
+            print "No stageout will be performed."
+            return 60307
+        if dest_se == None:
+            print "== ERROR: Unable to determine destination SE."
+            print "No stageout will be performed."
+            return 60307
+        if dest_dir == None:
+            print "== ERROR: Unable to determine local destination directory."
+            print "No stageout will be performed."
+            return 60307
+        if dest_files == None:
+            print "== ERROR: Unable to determine remote destinations."
+            print "No stageout will be performed."
+            return 60307
+        if stageout_policy == None:
+            print "== ERROR: Unable to determine stageout policy."
+            print "No stageout will be performed."
+            return 60307
+
+    # The stageout manager will be used by all attempts
     stageOutCall = {}
     manager = StageOutMgr.StageOutMgr(
         retryPauseTime  = 60,
         numberOfRetries = 2,
         **stageOutCall)
-    manager.retryPauseTime = 60
-    manager.numberOfRetries = 2
+    manager.retryPauseTime = retryPauseTime
+    manager.numberOfRetries = numberOfRetries
 
-    if stageout:
+    counter = "%04d" % (crab_id / 1000)
+    dest_dir = os.path.join(dest_dir, counter)
 
-        if dest.startswith("cms:/"): dest = dest[5:]
+    log_file = "cmsRun_%d.log.tar.gz" % crab_id
+    dest = os.path.join(dest_dir, "log", log_file)
+    try:
+        print "==== Starting compression of user logs at %s ====" % time.ctime()
+        std_retval = compress(crab_id)
+        print "==== Finished compression of user logs at %s (status %d) ====" % (time.ctime(), std_retval)
+        if not std_retval:
+            print "==== Starting stageout of user logs at %s ====" % time.ctime()
+            std_rtval = performTransfer(manager, stageout_policy, log_file, dest, dest_files[0], dest_se)
+    except Exception, ex:
+        print "== ERROR: Unhandled exception when performing stageout of user logs."
+        traceback.print_exc()
+        if not std_retval:
+            std_retval = 60307
+    finally:
+        print "==== Stageout of user logs ended at %s (status %d) ====" % (time.ctime(), std_retval)
 
-        info = dest.split("?")
-        source = source.split("?")[0]
-        if not os.path.exists(source):
-            print "Output file %s does not exist." % source
-            return 60302
+    out_retval = 0
+    for dest, remote_dest in zip(output_files, dest_files[1:]):
 
-        if len(info) == 2:
-            dest = info[0]
-            info = info[1].split("&")
-            info = dict([(i.split("=")[0], i.split("=")[1]) for i in info])
-            dest_dir, dest_file = os.path.split(dest)
-            dest_file = info['remoteName']
-            try:
-                fileid = get_job_id(dest_file)[1]
-            except ValueError:
-                fileid = 0
-            counter = "%04d" % (fileid / 1000)
-            if 'compressCount' in info:
-                try:
-                    count = int(info['compressCount'])
-                except:
-                    count = 1
-                tarball = os.path.join(os.path.split(source)[0], dest_file)
-                source, curCount = compress(source, tarball, count)
-                dest_file += '.tar.gz'
-                if curCount < count:
-                    return 0
-                dest = os.path.join(dest_dir, counter, "log", dest_file)
-            else:
-                dest = os.path.join(dest_dir, counter, dest_file)
-        else:
-            return 0
+        info = dest.split("=")
+        if len(info) != 2:
+            print "== ERROR: Invalid output format (%s)." % dest
+            out_retval = 60307
+            continue
+        source_file, dest_file = info
 
-        fileForTransfer = {'LFN': dest, 'PFN': source}
-        signal.signal(signal.SIGALRM, alarmHandler)
-        signal.alarm(waitTime)
+        if not os.path.exists(source_file):
+            print "== ERROR: Output file %s does not exist." % source
+            out_retval = 60307
+            continue
+
+        dest = os.path.join(dest_dir, dest_file)
         try:
-            result = manager(fileForTransfer)
-        except Alarm:
-            print "Indefinite hang during stageOut of %s" % dest
-            manager.cleanSuccessfulStageOuts()
-            return 60403
+            print "==== Starting stageout of %s at %s ====" % (source_file, time.ctime())
+            cur_out_retval = performTransfer(manager, stageout_policy, source_file, dest, remote_dest, dest_se)
         except Exception, ex:
-            print "Error during stageout: %s" % ex
-            manager.cleanSuccessfulStageOuts()
-            raise
-            return 60307
-        signal.alarm(0)
-        set_se_name(dest_file, result['SEName'])
-    return 0
+            print "== ERROR: Unhandled exception when performing stageout."
+            traceback.print_exc()
+            cur_out_retval = 60307
+        finally:
+            print "====  Finished stageout of %s at %s (status %d) ====" % (source_file, time.ctime(), out_retval)
+        if cur_out_retval and not out_retval:
+            out_retval = cur_out_retval
+
+    if std_retval:
+        return std_retval
+    return out_retval
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
