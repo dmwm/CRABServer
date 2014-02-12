@@ -59,7 +59,8 @@ class FTSJob(object):
         self._cancel = False
         self._sleep = 20
 
-        transfer_list = resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames)
+        savelogs = int(task_ad['CRAB_SaveLogsFlag'])
+        transfer_list = resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames, savelogs)
 
         self._transfer_list = transfer_list
         self._count = count
@@ -217,6 +218,8 @@ class ASOServerJob(object):
                 outputFiles.append(fileInfo)
         for oneFile in zip(self.source_sites, self.filenames):
             if found_log:
+                if not int(self.task_ad['CRAB_SaveLogsFlag']):
+                    continue
                 lfn = "%s/%s" % (self.source_dir, oneFile[1])
                 file_type = "output"
                 size = outputFiles[file_index]['outsize']
@@ -386,7 +389,7 @@ def reportResults(job_id, dest_list, sizes):
     return retval
 
 
-def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
+def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames, savelogs):
 
     p = PhEDEx.PhEDEx()
     found_log = False
@@ -398,9 +401,9 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
         else:
             slfn = os.path.join(source_dir, filename)
             dlfn = os.path.join(dest_dir, filename)
-        found_log = True
         lfns.append(slfn)
         lfns.append(dlfn)
+        found_log = True
     dest_sites_ = [dest_site]
     if dest_site.startswith("T1_"):
         dest_sites_.append(dest_site + "_Buffer")
@@ -415,7 +418,6 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
         else:
             slfn = os.path.join(source_dir, filename)
             dlfn = os.path.join(dest_dir, filename)
-        found_log = True
         dest_site_= dest_site
         if (dest_site + "_Disk", dlfn) in dest_info:
             dest_site_ = dest_site + "_Disk"
@@ -425,7 +427,11 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames):
             print "Unable to map LFN %s at site %s" % (slfn, source_site)
         if ((dest_site_, dlfn) not in dest_info) or (not dest_info[dest_site_, dlfn]):
             print "Unable to map LFN %s at site %s" % (dlfn, dest_site_)
+        if found_log and not savelogs:
+            found_log = True
+            continue
         results.append((dest_info[source_site, slfn], dest_info[dest_site_, dlfn]))
+        found_log = True
     return results
 
 
@@ -704,7 +710,8 @@ class PostJob():
         for filename in filenames:
             source_sites.append(self.getFileSourceSite(filename))
 
-        transfer_list = resolvePFNs(self.dest_site, source_dir, dest_dir, source_sites, filenames)
+        savelogs = int(self.task_ad['CRAB_SaveLogsFlag'])
+        transfer_list = resolvePFNs(self.dest_site, source_dir, dest_dir, source_sites, filenames, savelogs)
         for source, dest in transfer_list:
             logger.info("Copying %s to %s" % (source, dest))
 
