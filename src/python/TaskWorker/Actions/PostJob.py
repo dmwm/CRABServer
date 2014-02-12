@@ -291,6 +291,29 @@ class ASOServerJob(object):
         return statuses
 
 
+    def getLatestLog(self, jobID):
+        try:
+            couchDoc = self.couchDatabase.document(jobID)
+        except:
+            log.exception("Failed to retrieve updated document for %s." % jobID)
+            return ""
+        if "_attachments" in couchDoc:
+            bestLog = None
+            maxRev = 0
+            for log, loginfo in couchDoc["_attachments"].items():
+                if bestLog == None:
+                                bestLog = log
+                else:
+                                rev = loginfo.get(u"revpos", 0)
+                                if rev > maxRev:
+                                    maxRev = rev
+                                    bestLog = log
+            try:
+                return self.couchDatabase.getAttachment(jobID, bestLog)
+            except:
+                log.exception("Failed to retrieve log attachment for %s: %s" % (jobID, bestLog))
+        return ""
+
     def run(self):
         self.id = self.submit()
         if self.id == False:
@@ -311,27 +334,31 @@ class ASOServerJob(object):
                 # states to stop immediately
                 elif oneStatus in ['failed', 'killed']:
                     logger.error("Job (internal ID %s) failed with status %s" % (jobID, oneStatus))
-                    couchDoc = self.couchDatabase.document(jobID)
-                    if "_attachments" in couchDoc:
-                        logger.info("FTS outputs are:")
-                        bestLog = None
-                        maxRev = 0
-                        for log, loginfo in couchDoc["_attachments"].items():
-                            if bestLog == None:
-                                bestLog = log
-                            else:
-                                rev = loginfo.get(u"revpos", 0)
-                                if rev > maxRev:
-                                    maxRev = rev
-                                    bestLog = log
-                        print self.couchDatabase.getAttachment(jobID, bestLog)
-                    logger.error("Failure reason: %s" % couchDoc['failure_reason'])
-                    self.failure = couchDoc['failure_reason']
+                    attachment = self.getLatestLog(jobID)
+                    if not attachment:
+                        logger.warning("WARNING: no FTS logfile available.")
+                    else:
+                        logger.error("== BEGIN FTS interaction log ==")
+                        print attachment
+                        logger.error("== END FTS interaction log ==")
+                    if ('failure_reason' in couchDoc) and couchDoc['failure_reason']:
+                        logger.error("Failure reason: %s" % couchDoc['failure_reason'])
+                        self.failure = couchDoc['failure_reason']
+                    else:
+                        logger.warning("WARNING: no failure reason available.")
+                        self.failure = "Failure reason unavailable."
                     return 1
                 else:
                     raise RuntimeError, "Got a unknown status: %s" % oneStatus
             if allDone:
-                print "All jobs succeeded"
+                logger.info("All transfers were successful")
+                attachment = self.getLatestLog(jobID)
+                if not attachment:
+                    logger.warning("WARNING: no FTS logfile available.")
+                else:
+                    logger.info("== BEGIN FTS interaction log ==")
+                    print attachment
+                    logger.info("== END FTS interaction log ==")
                 return 0
 
 
