@@ -333,6 +333,11 @@ class HTCondorDataWorkflow(DataWorkflow):
                 sys = g[3]*3600 + g[4]*60 + g[5]
                 info['TotalUserCpuTimeHistory'][-1] = user
                 info['TotalSysCpuTimeHistory'][-1] = sys
+        else:
+            if 'RemoteSysCpu' in event:
+                info['TotalSysCpuTimeHistory'][-1] = float(event['RemoteSysCpu'])
+            if 'RemoteUserCpu' in event:
+                info['TotalUserCpuTimeHistory'][-1] = float(event['RemoteUserCpu'])
 
 
     def prepareCurl(self):
