@@ -220,8 +220,6 @@ class ASOServerJob(object):
                 outputFiles.append(fileInfo)
         for oneFile in zip(self.source_sites, self.filenames):
             if found_log:
-                if not int(self.task_ad['CRAB_SaveLogsFlag']):
-                    continue
                 lfn = "%s/%s" % (self.source_dir, oneFile[1])
                 file_type = "output"
                 size = outputFiles[file_index]['outsize']
@@ -235,6 +233,9 @@ class ASOServerJob(object):
                 needs_transfer = self.log_needs_transfer
                 checksums = {'adler32': 'abc'}
                 found_log = True
+                if not int(self.task_ad['CRAB_SaveLogsFlag']):
+                    logger.debug("Save logs flag is false; skipping log stageout.")
+                    continue
             user = getUserFromLFN(lfn)
             doc_id = getHashLfn( lfn )
             common_info = { "state":  "new",
@@ -538,7 +539,7 @@ class PostJob():
         if 'input' not in self.report or 'output' not in self.report:
             raise ValueError("Invalid jobReport.json: missing input/output")
         self.output = self.report['output']
-        self.log_needs_transfer = not self.report.get("direct_stageout")
+        self.log_needs_transfer = not self.full_report.get("direct_stageout")
         logger.debug("Log file needs transfer: %s" % str(self.log_needs_transfer))
         self.input = self.report['input']
 
