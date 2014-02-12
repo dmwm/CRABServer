@@ -78,7 +78,7 @@ def get_job_id(source):
     return left_piece + "." + right_piece, fileid
 
 
-def set_se_name(dest_file, se_name):
+def set_se_name(dest_file, se_name, direct=False):
     """
     Alter the job report to record where the given file was
     staged out to.  If we cannot determine the matching file,
@@ -112,11 +112,13 @@ def set_se_name(dest_file, se_name):
                 continue
 
             outputFile['SEName'] = se_name
+            outputFile['direct_stageout'] = direct
             found_output = True
             break
 
     if not found_output:
         full_report['SEName'] = se_name
+        full_report['direct_stageout'] = direct
         try:
             full_report['log_size'] = os.stat(dest_file).st_size
         except:
@@ -220,7 +222,7 @@ def performDirectTransferImpl(source, direct_pfn, direct_se):
         signal.alarm(0)
 
     if not result:
-        set_se_name(os.path.split(direct_pfn)[-1], direct_se)
+        set_se_name(os.path.split(direct_pfn)[-1], direct_se, direct=True)
 
     return result
 

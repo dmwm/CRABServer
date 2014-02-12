@@ -54,7 +54,7 @@ REGEX_ID = re.compile("([a-f0-9]{8,8})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]
 class FTSJob(object):
 
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, output_metadata, task_ad):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, log_needs_transfer, output_metadata, task_ad):
         self._id = None
         self._cancel = False
         self._sleep = 20
@@ -141,7 +141,7 @@ def getUserFromLFN(lfn):
 class ASOServerJob(object):
 
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, output_metadata, task_ad):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, log_needs_transfer, output_metadata, task_ad):
         self.id = None
         self.couchServer = None
         self.couchDatabase = None
@@ -156,6 +156,7 @@ class ASOServerJob(object):
         self.reqname = reqname
         self.output_metadata = output_metadata
         self.log_size = log_size
+        self.log_needs_transfer = log_needs_transfer
         self.publish = outputdata
         self.task_ad = task_ad
         self.failure = None
@@ -215,6 +216,7 @@ class ASOServerJob(object):
                 fileInfo = {}
                 fileInfo['checksums'] = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
                 fileInfo['outsize'] = outputFile.get(u"size", 0)
+                fileInfo['needs_transfer'] = outputFile.get('direct_stageout') != True
                 outputFiles.append(fileInfo)
         for oneFile in zip(self.source_sites, self.filenames):
             if found_log:
@@ -224,16 +226,17 @@ class ASOServerJob(object):
                 file_type = "output"
                 size = outputFiles[file_index]['outsize']
                 checksums = outputFiles[file_index]['checksums']
+                needs_transfer = outputFiles[file_index]['needs_transfer']
                 file_index += 1
             else:
                 lfn = "%s/log/%s" % (self.source_dir, oneFile[1])
                 file_type = "log"
                 size = self.log_size
+                needs_transfer = self.log_needs_transfer
                 checksums = {'adler32': 'abc'}
                 found_log = True
             user = getUserFromLFN(lfn)
             doc_id = getHashLfn( lfn )
-            # TODO: need to pass the user params: publish flag, role/group, inputdataset,  publish_dbs_url, dbs_url through
             common_info = { "state":  "new",
                             "source": oneFile[0],
                             "destination": self.dest_site,
@@ -246,6 +249,9 @@ class ASOServerJob(object):
                             "retry_count": [],
                             "failure_reason": [],
                           }
+            # Even if a direct transfer was done, we register in ASO so publication happens.
+            if not needs_transfer:
+                common_info['state'] = 'done'
             try:
                 doc = self.couchDatabase.document( doc_id )
                 doc.update(common_info)
@@ -322,7 +328,6 @@ class ASOServerJob(object):
         if self.id == False:
             raise RuntimeError, "Couldn't send to couchdb"
         while True:
-            time.sleep(self.sleep)
             status = self.status()
             logger.info("Got statuses: %s" % ", ".join(status))
             allDone = True
@@ -363,6 +368,8 @@ class ASOServerJob(object):
                     print attachment
                     logger.info("== END FTS interaction log ==")
                 return 0
+            # Sleep is done here in case if the transfer is done immediately (direct stageout case).
+            time.sleep(self.sleep)
 
 
     def getLastFailure(self):
@@ -499,6 +506,7 @@ class PostJob():
         self.outputFiles = []
         self.retry_count = "0"
         self.logfiles = None
+        self.log_needs_transfer = True
 
 
     def getTaskAd(self):
@@ -529,6 +537,7 @@ class PostJob():
         if 'input' not in self.report or 'output' not in self.report:
             raise ValueError("Invalid jobReport.json: missing input/output")
         self.output = self.report['output']
+        self.log_needs_transfer = not self.report.get("direct_stageout")
         self.input = self.report['input']
 
         for outputModule in self.output.values():
@@ -556,8 +565,11 @@ class PostJob():
                 if u'pset_hash' in outputFile:
                     fileInfo['pset_hash'] = outputFile[u'pset_hash']
 
+                fileInfo['needs_transfer'] = True
                 if u'SEName' in outputFile and self.node_map.get(str(outputFile['SEName'])):
                     fileInfo['outtmplocation'] = self.node_map[outputFile['SEName']]
+                    if outputFile.get('direct_stageout') == True:
+                        fileInfo['needs_transfer'] = False
 
                 if u'runs' not in outputFile:
                     continue
@@ -761,7 +773,7 @@ class PostJob():
         else:
             targetClass = FTSJob
 
-        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.output, self.task_ad)
+        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.log_needs_transfer, self.output, self.task_ad)
         fts_job_result = g_Job.run()
         # If no files failed, return success immediately.  Otherwise, see how many files failed.
         if not fts_job_result:

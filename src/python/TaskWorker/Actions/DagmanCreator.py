@@ -398,7 +398,8 @@ class DagmanCreator(TaskAction.TaskAction):
                 primaryds = task['tm_publish_name'].rsplit('-', 1)[0]
             counter = "%04d" % (i / 1000)
             tempDest = os.path.join(temp_dest, counter)
-            pfns = self.resolvePFNs(task['tm_asyncdest'], tempDest, ["log/cmsRun_%d.log.tar.gz" % i] + remoteOutputFiles)
+            directDest = os.path.join(dest, count)
+            pfns = self.resolvePFNs(task['tm_asyncdest'], directDest, ["log/cmsRun_%d.log.tar.gz" % i] + remoteOutputFiles)
             pfns = ", ".join(pfns)
             specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
                           'remoteOutputFiles': remoteOutputFilesStr,
