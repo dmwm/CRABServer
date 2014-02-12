@@ -438,7 +438,7 @@ def getHashLfn(lfn):
 
 def isFailurePermanent(reason):
     reason = str(reason).lower()
-    if re.matches("permission denied", reason):
+    if re.match(".*permission denied.*", reason):
         return True
     return False
 
