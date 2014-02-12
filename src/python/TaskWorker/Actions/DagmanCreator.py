@@ -35,8 +35,8 @@ DAG_HEADER = """
 
 NODE_STATUS_FILE node_state 30
 
-FINAL FinalCleanup final.sub NOOP
-SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT %(restinstance)s %(resturl)s
+#FINAL FinalCleanup final.sub NOOP
+#SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT %(restinstance)s %(resturl)s
 
 """
 
