@@ -68,10 +68,10 @@ class RESTUserWorkflow(RESTEntity):
         try:
             goodReleases = allScramArchsAndVersions()
         except IOError:
-            msg = "Error connecting to https://cmstags.cern.ch/tc/ReleasesXML/?anytype=1 and determine the list of available releases. You may need to contact an operator."
+            msg = "Error connecting to https://cmssdt.cern.ch/SDT/cgi-bin/ReleasesXML and determine the list of available releases. You may need to contact an operator."
 
         if goodReleases == {}:
-            msg = "The list of releases at https://cmstags.cern.ch/tc/ReleasesXML/?anytype=1 is empty. You may need to contact an operator."
+            msg = "The list of releases at https://cmssdt.cern.ch/SDT/cgi-bin/ReleasesXML is empty. You may need to contact an operator."
 
         if jobarch not in goodReleases or jobsw not in goodReleases[jobarch]:
             msg = "ERROR: %s on %s is not among supported releases" % (jobsw, jobarch)

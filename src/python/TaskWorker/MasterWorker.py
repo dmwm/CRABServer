@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #external dependencies
+import signal
 import time
 import logging
 import os
@@ -7,7 +8,6 @@ from logging.handlers import TimedRotatingFileHandler
 import urllib
 from httplib import HTTPException
 import traceback
-from base64 import b64encode
 from MultiProcessingLog import MultiProcessingLog
 
 #WMcore dependencies
@@ -60,6 +60,8 @@ def validateDbConfig(config):
         return False, "Configuration problem: Core Database section is missing. "
     return True, 'Ok'
 
+
+
 class MasterWorker(object):
     """I am the master of the TaskWorker"""
 
@@ -96,6 +98,7 @@ class MasterWorker(object):
             logger.debug("Logging level initialized to %s." %loglevel)
             return logger
 
+        self.STOP = False
         self.TEST = test
         self.logger = getLogging(quiet, debug)
         self.config = config
@@ -171,27 +174,20 @@ class MasterWorker(object):
             self.logger.error(traceback.format_exc())
         return pendingwork
 
+    def quit(self, code, traceback_):
+        self.logger.info("Received kill request. Waiting for the workers...")
+        self.STOP = True
+
     def updateWork(self, task, status):
         configreq = {'workflow': task, 'status': status, 'subresource': 'state'}
         self.server.post(self.resturl, data = urllib.urlencode(configreq))
-
-    def updateFinished(self, finished):
-        for res in finished:
-            if hasattr(res, 'error') and res.error:
-                self.logger.error("Setting %s as failed" % str(res.task['tm_taskname']))
-                configreq = {'workflow': res.task['tm_taskname'],
-                             'status': "FAILED",
-                             'subresource': 'failure',
-                             'failure': b64encode(res.error)}
-                self.logger.error("Issue: %s" % (str(res.error)))
-                self.server.post(self.resturl, data = urllib.urlencode(configreq))
 
     def algorithm(self):
         """I'm the intelligent guy taking care of getting the work
            and distribuiting it to the slave processes."""
 
         self.logger.debug("Starting")
-        while(True):
+        while(not self.STOP):
             for status, worktype in states():
                 limit = self.slaves.queueableTasks()
                 if not self._lockWork(limit=limit, getstatus=status, setstatus='HOLDING'):
@@ -215,7 +211,6 @@ class MasterWorker(object):
             self.logger.info(' - tasks pending in queue: %d' % self.slaves.pendingTasks())
 
             finished = self.slaves.checkFinished()
-            self.updateFinished(finished)
 
             time.sleep(self.config.TaskWorker.polling)
         self.logger.debug("Stopping")
@@ -258,6 +253,8 @@ if __name__ == '__main__':
         raise ConfigException(msg)
 
     mw = MasterWorker(configuration, quiet=options.quiet, debug=options.debug)
+    signal.signal(signal.SIGINT, mw.quit)
+    signal.signal(signal.SIGTERM, mw.quit)
     mw.algorithm()
-    mw.slaves.stop()
+    mw.slaves.end()
     del mw
