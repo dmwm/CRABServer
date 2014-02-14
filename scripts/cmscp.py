@@ -34,6 +34,7 @@ import WMCore.Storage.StageOutMgr as StageOutMgr
 
 from WMCore.Storage.Registry import retrieveStageOutImpl
 from WMCore.Algorithms.Alarm import Alarm, alarmHandler
+import WMCore.WMException as WMException
 
 waitTime = 60*60
 numberOfRetries = 2
