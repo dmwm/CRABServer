@@ -164,12 +164,15 @@ class ASOServerJob(object):
         aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config")
         if config:
             aso_auth_file = getattr(config, "authfile", "auth_aso_plugin.config")
-        if 'CRAB_ASOURL' in self.task_ad and self.task_ad['CRAB_ASOURL']:
-            self.aso_db_url = self.task_ad['CRAB_ASOURL']
-        else:
+        if os.path.isfile(aso_auth_file):
             f = open(aso_auth_file)
             authParams = json.loads(f.read())
             self.aso_db_url = authParams['ASO_DB_URL']
+        elif 'CRAB_ASOURL' in self.task_ad and self.task_ad['CRAB_ASOURL']:
+            self.aso_db_url = self.task_ad['CRAB_ASOURL']
+        else:
+            logger.info("Cannot determine ASO url. Exiting")
+            raise RuntimeError, "Cannot determine ASO url. Please create the auth_aso_plugin.config file"
         try:
             logger.info("Will use ASO server at %s" % self.aso_db_url)
             self.couchServer = CMSCouch.CouchServer(dburl=self.aso_db_url, ckey=proxy, cert=proxy)
