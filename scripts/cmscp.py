@@ -35,6 +35,7 @@ import WMCore.Storage.StageOutMgr as StageOutMgr
 from WMCore.Storage.Registry import retrieveStageOutImpl
 from WMCore.Algorithms.Alarm import Alarm, alarmHandler
 import WMCore.WMException as WMException
+import WMCore.Storage.StageOutError as StageOutError
 
 waitTime = 60*60
 numberOfRetries = 2
@@ -189,6 +190,7 @@ def performDirectTransfer(source, direct_pfn, direct_se):
 
 def performDirectTransferImpl(source, direct_pfn, direct_se):
     command = "srmv2-lcg"
+    protocol = "srmv2"
     
     try:
         impl = retrieveStageOutImpl(command)
@@ -196,7 +198,7 @@ def performDirectTransferImpl(source, direct_pfn, direct_se):
         msg = "Unable to retrieve impl for local stage out:\n"
         msg += "Error retrieving StageOutImpl for command named: %s\n" % (
             command,)
-        raise StageOutFailure(msg, Command = command,
+        raise StageOutErrorStageOutFailure(msg, Command = command,
                               LFN = direct_pfn, ExceptionDetail = str(ex))
 
     impl.numRetries = numberOfRetries
@@ -205,7 +207,7 @@ def performDirectTransferImpl(source, direct_pfn, direct_se):
     signal.alarm(waitTime)
     result = 0
     try:
-        impl("srmv2", source, direct_pfn, None, None)
+        impl(protocol, source, direct_pfn, None, None)
     except Alarm:
         print "== Indefinite hang during stageOut of %s; setting return code to 60403." % dest
         result = 60403
@@ -216,9 +218,9 @@ def performDirectTransferImpl(source, direct_pfn, direct_se):
             msg += traceback.format_exc()
         except AttributeError, ex:
             msg += "Traceback unavailable\n"
-        raise StageOutFailure(msg, Command = command, Protocol = protocol,
-                              LFN = lfn, InputPFN = localPfn,
-                              TargetPFN = pfn)
+        raise StageOutError.StageOutFailure(msg, Command = command, Protocol = protocol,
+                              LFN = direct_pfn, InputPFN = source,
+                              TargetPFN = direct_pfn)
     finally:
         signal.alarm(0)
 
