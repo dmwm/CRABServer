@@ -221,8 +221,6 @@ class ASOServerJob(object):
                 outputFiles.append(fileInfo)
         for oneFile in zip(self.source_sites, self.filenames):
             if found_log:
-                if not int(self.task_ad['CRAB_SaveLogsFlag']):
-                    continue
                 lfn = "%s/%s" % (self.source_dir, oneFile[1])
                 file_type = "output"
                 size = outputFiles[file_index]['outsize']
@@ -234,6 +232,9 @@ class ASOServerJob(object):
                 size = self.log_size
                 checksums = {'adler32': 'abc'}
                 found_log = True
+                if not int(self.task_ad['CRAB_SaveLogsFlag']):
+                    logger.debug("Save logs flag is false; skipping log stageout.")
+                    continue
             user = getUserFromLFN(lfn)
             doc_id = getHashLfn( lfn )
             # TODO: need to pass the user params: publish flag, role/group, inputdataset,  publish_dbs_url, dbs_url through
@@ -430,7 +431,7 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames, savelo
             print "Unable to map LFN %s at site %s" % (slfn, source_site)
         if ((dest_site_, dlfn) not in dest_info) or (not dest_info[dest_site_, dlfn]):
             print "Unable to map LFN %s at site %s" % (dlfn, dest_site_)
-        if found_log and not savelogs:
+        if not found_log and not savelogs:
             found_log = True
             continue
         results.append((dest_info[source_site, slfn], dest_info[dest_site_, dlfn]))
