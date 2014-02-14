@@ -145,7 +145,7 @@ def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_s
             print "== Attempting remote stageout at %s. ==" % time.ctime()
             result = performDirectTransfer(source, direct_pfn, direct_se)
             if result:
-                print "== ERROR: Remote stageout resulted in status %d at %s. =="
+                print "== ERROR: Remote stageout resulted in status %d at %s. ==" %(result, time.ctime())
             else:
                 print "== Remote stageout succeeded at %s. ==" % time.ctime()
                 break
@@ -184,7 +184,13 @@ def performDirectTransfer(source, direct_pfn, direct_se):
     try:
         return performDirectTransferImpl(source, direct_pfn, direct_se)
     except WMException.WMException, ex:
-        print "Error during direct stageout: %s" % str(ex)
+        print "="*79
+        print "==== START DUMP OF TRANSFER ERROR INFO ===="
+        print "="*79
+        print "Error during direct stageout:\n%s" % str(ex)
+        print "="*79
+        print "==== FINISH DUMP OF TRANSFER ERROR INFO ===="
+        print "="*79
         return ex.data.get("ErrorCode", 60307)
 
 
