@@ -48,6 +48,7 @@ except ImportError, ie:
 import WMCore.Storage.StageOutMgr as StageOutMgr
 
 from WMCore.Algorithms.Alarm import Alarm, alarmHandler
+import WMCore.WMException as WMException
 
 classad_output = """\
 PluginVersion = "0.1"
