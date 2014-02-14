@@ -1,7 +1,7 @@
-
 import re
 import urllib
 import traceback
+from base64 import b64encode
 
 import classad
 import htcondor
@@ -77,8 +77,9 @@ class DagmanKiller(TaskAction.TaskAction):
             self.executeInternal(*args, **kw)
         except Exception, exc:
             self.logger.error(str(traceback.format_exc()))
-            # TODO: fail the task.
-        finally:
+            configreq = {'workflow': kw['task']['tm_taskname'], 'status': 'KILLFAILED', 'subresource': 'failure', 'failure': b64encode(str(exc))}
+            self.server.post(self.resturl, data = urllib.urlencode(configreq))
+        else:
             if kw['task']['kill_all']:
                 configreq = {'workflow': kw['task']['tm_taskname'], 'status': "KILLED"}
                 self.server.post(self.resturl, data = urllib.urlencode(configreq))
