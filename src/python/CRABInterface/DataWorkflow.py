@@ -246,7 +246,7 @@ class DataWorkflow(object):
         #if statusRes['failedJobdefs']:
         #    raise ExecutionError("You cannot resubmit a task if not all the jobs have been submitted. The feature will be available in the future")
 
-        if statusRes['status'] in ['SUBMITTED','KILLED','FAILED']:
+        if statusRes['status'] in ['SUBMITTED','KILLED','FAILED','KILLFAILED']:
             resubmitList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus in self.failedList]
             if jobids:
                 #if the user wants to kill specific jobids make the intersection
@@ -312,7 +312,7 @@ class DataWorkflow(object):
         self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        if statusRes['status'] == 'SUBMITTED':
+        if statusRes['status'] in ['SUBMITTED','KILLFAILED']:
             killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus not in self.successList]
             if jobids:
                 #if the user wants to kill specific jobids make the intersection
