@@ -49,12 +49,12 @@ RX_CERT = re.compile(r'^[-]{5}BEGIN CERTIFICATE[-]{5}[\w\W]+[-]{5}END CERTIFICAT
 RX_SUBRESTAT = re.compile(r"^errors|report|logs|data$")
 
 #subresources of the ServerInfo (/info) resource
-RX_SUBRES_SI = re.compile(r"^delegatedn|backendurls$")
+RX_SUBRES_SI = re.compile(r"^delegatedn|backendurls|version$")
 
 #worker workflow
 RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._]{1,100}$")
 ## this can be improved by putting a dependency on CAFUtilities task state machine
-RX_STATUS = re.compile(r"^[A-Za-z_]{1,20}$")
+RX_STATUS = re.compile(r"^[A-Za-z]{1,20}$")
 ## need to be careful with this
 RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s\=\+]{0,10000}$")
 ## user dn
