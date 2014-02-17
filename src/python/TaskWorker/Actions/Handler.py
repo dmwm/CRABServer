@@ -13,7 +13,7 @@ from TaskWorker.Actions.PanDAgetSpecs import PanDAgetSpecs
 from TaskWorker.Actions.PanDAKill import PanDAKill
 from TaskWorker.Actions.PanDASpecs2Jobs import PanDASpecs2Jobs
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
-from TaskWorker.WorkerExceptions import WorkerHandlerException, StopHandler
+from TaskWorker.WorkerExceptions import WorkerHandlerException, StopHandler, TaskWorkerException
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
@@ -59,12 +59,15 @@ class TaskHandler(object):
                 msg = "Controlled stop of handler for %s on %s " % (self._task, str(sh))
                 self.logger.error(msg)
                 nextinput = Result(task=self._task, result='StopHandler exception received, controlled stop')
-                break
+                break #exit normally. Worker will not notice there was an error
+            except TaskWorkerException, twe:
+                self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
+                raise WorkerHandlerException(str(twe)) #TaskWorker error, do not add traceback to the error propagated to the REST
             except Exception, exc:
                 msg = "Problem handling %s because of %s failure, traceback follows\n" % (self._task['tm_taskname'], str(exc))
                 msg += str(traceback.format_exc())
                 self.logger.error(msg)
-                raise WorkerHandlerException(msg)
+                raise WorkerHandlerException(msg) #Errors not foreseen. Print everything!
             t1 = time.time()
             self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1-t0))
             try:

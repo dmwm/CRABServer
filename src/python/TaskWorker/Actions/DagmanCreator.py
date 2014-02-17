@@ -417,12 +417,12 @@ class DagmanCreator(TaskAction.TaskAction):
             if whitelist:
                 available &= whitelist
                 if not available:
-                    msg = "Site whitelist (%s) removes only possible sources (%s) of data for task %s" % (", ".join(whitelist), ", ".join(availablesites), kwargs['task']['tm_taskname'])
+                    msg = "You put (%s) in the site whitelist, but your task %s can only run in (%s)" % (", ".join(whitelist), kwargs['task']['tm_taskname'], ", ".join(availablesites))
                     raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             available -= (blacklist-whitelist)
             if not available:
-                msg = "Site blacklist (%s) removes only possible sources (%s) of data for task %s" % (", ".join(blacklist), ", ".join(availablesites), kwargs['task']['tm_taskname'])
+                msg = "You put (%s) in the site blacklist, but your task %s can only run in (%s)" % (", ".join(blacklist), kwargs['task']['tm_taskname'], ", ".join(availablesites))
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             availablesites = [str(i) for i in availablesites]
