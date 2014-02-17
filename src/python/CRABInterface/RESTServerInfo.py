@@ -38,3 +38,7 @@ class RESTServerInfo(RESTEntity):
     @conn_handler(services=['centralconfig'])
     def backendurls(self):
         yield self.centralcfg.centralconfig['backend-urls']
+
+    @conn_handler(services=['centralconfig'])
+    def version(self):
+        yield self.centralcfg.centralconfig['compatible-version']
