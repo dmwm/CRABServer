@@ -37,9 +37,51 @@ from WMCore.Algorithms.Alarm import Alarm, alarmHandler
 import WMCore.WMException as WMException
 import WMCore.Storage.StageOutError as StageOutError
 
+import DashboardAPI
+
 waitTime = 60*60
 numberOfRetries = 2
 retryPauseTime = 60
+
+
+def parseAd():
+    fd = open(os.environ['_CONDOR_JOB_AD'])
+    jobad = {}
+    for adline in fd.readlines():
+        info = adline.split(" = ", 1)
+        if len(info) != 2:
+            continue
+        if info[1].startswith('"'):
+            val = info[1].strip()[1:-1]
+        else:
+            try:
+                val = int(info[1].strip())
+            except ValueError:
+                continue
+        jobad[info[0]] = val
+    return jobad
+
+
+def reportFailureToDashboard(exitCode):
+    try:
+        ad = parseAd()
+    except:
+        print "==== ERROR: Unable to parse job's HTCondor ClassAd ===="
+        print "Will NOT report stageout failure to Dashboard"
+        print traceback.format_exc()
+        return
+    for attr in ['CRAB_ReqName', 'CRAB_Id', 'CRAB_Retry']:
+        if attr not in myad:
+            print "==== ERROR: HTCondor ClassAd is missing attribute %s. ====" % attr
+            print "Will not report stageout failure to Dashboard"
+    params = {
+        'MonitorID': myad['CRAB_ReqName'],
+        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%d' % (myad['CRAB_Id'], myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":"), myad['CRAB_Retry']),
+        'JobExitCode': exitCode
+    }
+    print "Dashboard stageout failure parameters: %s" % str(params)
+    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+    DashboardAPI.apmonFree()
 
 
 def compress(id):
@@ -367,5 +409,11 @@ if __name__ == '__main__':
     except:
         retval = 60307
         traceback.print_exc()
+    if retval:
+        try:
+            reportFailureToDashboard(retval)
+        except:
+            print "==== ERROR: Unhandled exception when reporting failure to Dashboard. ===="
+            traceback.print_exc()
     sys.exit(retval)
 
