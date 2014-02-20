@@ -196,6 +196,15 @@ class ASOServerJob(object):
     def submit(self):
         allIDs = []
         outputFiles = []
+
+        aso_start_time = None
+        try:
+            with open("jobReport.json.%d" % self.count) as fd:
+                full_report = json.load(fd)
+            aso_start_time = full_report.get("aso_start_time")
+        except:
+            logger.exception("Unable to determine ASO start time from worker node")
+
         input_dataset = str(self.task_ad['CRAB_InputData'])
         if 'CRAB_UserRole' in self.task_ad and str(self.task_ad['CRAB_UserRole']).lower() != 'undefined':
             role = str(self.task_ad['CRAB_UserRole'])
@@ -257,10 +266,18 @@ class ASOServerJob(object):
             if not needs_transfer:
                 logger.debug("File is marked as not needing transfer.")
                 common_info['state'] = 'done'
+            needs_commit = True
             try:
                 doc = self.couchDatabase.document( doc_id )
-                doc.update(common_info)
-                logger.info("Will retry LFN %s (id %s)" % (lfn, doc_id))
+                if doc.get("state") in ["acquired", "new"]:
+                    needs_commit = False
+                    logger.info("LFN %s (id %s) was injected from WN and transfer is ongoing" % (lfn, doc_id))
+                elif doc.get("state") == "done" and doc.get("start_time") == aso_start_time:
+                    needs_commit = False
+                    logger.info("LFN %s (id %s) was injected from WN and transfer has finished" % (lfn, doc_id))
+                else:
+                    doc.update(common_info)
+                    logger.info("Will retry LFN %s (id %s)" % (lfn, doc_id))
             except CMSCouch.CouchNotFoundError:
                 logger.info("LFN %s (id %s) is not yet known to ASO; uploading new stageout job." % (lfn, doc_id))
                 # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
@@ -290,8 +307,8 @@ class ASOServerJob(object):
                 logger.info(msg)
                 return False
             logger.info("Stageout job description: %s" % pprint.pformat(doc))
-            allIDs.append(getHashLfn(lfn))
-            if 'error' in self.couchDatabase.commitOne(doc)[0]:
+            allIDs.append(doc_id)
+            if needs_commit and 'error' in self.couchDatabase.commitOne(doc)[0]:
                 logger.info("Couldn't add to ASO database")
                 return False
         return allIDs

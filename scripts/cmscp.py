@@ -10,9 +10,12 @@ import re
 import sys
 import json
 import time
+import pprint
 import signal
+import hashlib
 import logging
 import tarfile
+import datetime
 import traceback
 
 # Bootstrap the CMS_PATH variable; the StageOutMgr will need it
@@ -219,7 +222,131 @@ def performLocalTransfer(manager, source, dest):
         signal.alarm(0)
     if not result:
         set_se_name(os.path.split(dest)[-1], stageout_info['SEName'])
+        #injectToASO(dest_lfn, stageout_info['SEName'])
     return result
+
+
+def injectToASO(dest_lfn, se_name):
+    ad = parseAd()
+    for attr in ["CRAB_ASOURL", "CRAB_AsyncDest", "CRAB_InputData", "CRAB_UserGroup", "CRAB_UserRole", "CRAB_DBSUrl", "CRAB_PublishDBSUrl", 'CRAB_ReqName', 'CRAB_UserHN']:
+        if attr not in ad:
+            print "==== ERROR: Unable to inject into ASO because %s is missing from job ad" % attr
+            return False
+    if 'X509_USER_PROXY' not in os.environ:
+        print "==== ERROR: X509_USER_PROXY missing from user environment. Unable to inject into ASO. ===="
+        return False
+    if not os.path.exists(os.environ['X509_USER_PROXY']):
+        print "==== ERROR: User proxy %s missing from disk. ====" % os.environ['X509_USER_PROXY']
+        return False
+    source_dir, fname = os.path.split(dest_lfn)
+    local_fname, id = get_job_id(fname)
+    found_logfile = False
+    if re.match("cmsRun_[0-9]+.log.tar.gz", fname):
+        dest_lfn = os.path.join(source_dir, "%04d" % (i / 1000), "log", fname)
+        found_logfile = True
+    else:
+        dest_lfn = os.path.join(source_dir, "%04d" % (i / 1000), fname)
+
+    with open("jobReport.json.%d" % id) as fd:
+        full_report = json.load(fd)
+
+    if not found_logfile:
+        if 'steps' not in full_report or 'cmsRun' not in full_report['steps']:
+            return
+        report = full_report['steps']['cmsRun']
+
+        if 'output' not in report:
+            return
+        output = report['output']
+
+        found_output = False
+        for outputModule in output.values():
+            for outputFile in outputModule:
+                if str(outputFile.get(u"pfn")) != local_fname:
+                    continue
+                checksums = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
+                size = outputFile.get(u"size", 0)
+                found_output = True
+        if not found_output:
+            print "==== ERROR: Unable to find output file in FrameworkJobReport.  Cannot inject to ASO."
+            return 
+    else:
+        size = full_report.get(u'log_size', 0)
+        # Copied from PostJob.py, but not sure if it does anything. BB
+        checksums = {'adler32': 'abc'}
+
+    role = str(ad['CRAB_UserRole'])
+    if str(ad['CRAB_UserRole']).lower() == 'undefined':
+        role = ''
+    group = str(ad['CRAB_UserGroup'])
+    if str(ad['CRAB_UserGroup']).lower() == 'undefined':
+        group = ''
+    dbs_url = str(ad['CRAB_DBSUrl'])
+    publish_dbs_url = str(ad['CRAB_PublishDBSUrl'])
+    if publish_dbs_url.lower() == 'undefined':
+        publish_dbs_url = "https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/"
+
+    last_update = int(time.time())
+    now = str(datetime.datetime.now())
+
+    # NOTE: it's almost certainly a mistake to include dest_lfn in the hash here as it
+    # includes /store/temp/user/foo.$HASH.  We should normalize based on the final LFN (/store/user/...)
+    doc_id = hashlib.sha224(lfn).hexdigest(dest_lfn)
+    info = {"state": "new",
+            "source": se_name,
+            "destination": ad['CRAB_AsyncDest'],
+            "checksums": checksums,
+            "size": size,
+            "last_update": last_update, # The following four times - and how they're calculated - makes no sense to me.  BB
+            "start_time": now,
+            "end_time": '',
+            "job_end_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
+            "retry_count": [],
+            "failure_reason": [],
+           }
+    print "ASO info so far:"
+    print info
+
+    couchServer = CMSCouch.CouchServer(dburl=ad['CRAB_ASOURL'], ckey=os.environ['X509_USER_PROXY'], cert=os.environ['X509_USER_PROXY'])
+    couchDatabase = couchServer.connectDatabase("asynctransfer", create = False)
+    print "Stageout job description: %s" % pprint.pformat(doc)
+
+    try:
+        doc = couchDatabase.document(doc_id)
+        doc.update(info)
+        print ("Will retry LFN %s (id %s)" % (dest_lfn, doc_id))
+    except CMSCouch.CouchNotFoundError:
+        print "LFN %s (id %s) is not yet known to ASO; uploading new stageout job." % (dest_lfn, doc_id)
+        doc = {"_id": doc_id,
+               "inputdataset": ad["CRAB_InputData"],
+               "group": group,
+               "lfn": dest_lfn.replace('/store/user', '/store/temp/user', 1),
+               "checksums": checksums,
+               "user": user,
+               "role": role,
+               "dbSource_url": "gWMS",
+               "publish_dbs_url": publish_dbs_url,
+               "dbs_url": dbs_url,
+               "workflow": ad['CRAB_ReqName'],
+               "jobid": id,
+               "publication_state": 'not_published',
+               "publication_retry_count": [],
+               "type" : file_type,
+               "publish" : 1,
+              }
+        doc.update(info)
+    except Exception, ex:
+        msg = "Error loading document from couch. Transfer submission failed."
+        msg += str(ex)
+        msg += str(traceback.format_exc())
+        print (msg)
+        return False
+    print "Final stageout job description: %s" % pprint.pformat(doc)
+    full_report['aso_start_time'] = now
+    with open("jobReport.json.%d" % id, "w") as fd:
+        json.dump(full_report, fd)
+
+    return True
 
 
 def performDirectTransfer(source, direct_pfn, direct_se):
