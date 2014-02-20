@@ -50,6 +50,10 @@ then
    echo "======== HTCONDOR JOB SUMMARY at $(date) FINISH ========"
 fi
 
+echo "======== PROXY INFORMATION START at $(date) ========"
+voms-proxy-info -all
+echo "======== PROXY INFORMATION FINISH at $(date) ========"
+
 echo "======== CMSRunAnalysis.sh at $(date) STARTING ========"
 time sh ./CMSRunAnalysis.sh "$@" --oneEventMode=$CRAB_oneEventMode
 EXIT_STATUS=$?
