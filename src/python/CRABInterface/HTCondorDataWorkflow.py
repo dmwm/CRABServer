@@ -254,7 +254,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
 
-        
+
         taskStatusCode = int(results[-1]['JobStatus'])
         if 'CRAB_UserWebDir' not in results[-1]:
             if taskStatusCode != 1 and taskStatusCode != 2:
@@ -378,7 +378,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 fp.truncate(0)
                 hbuf.truncate(0)
             else:
-                raise RuntimeError("Failed to parse jobs log")
+                raise ExecutionError("Cannot get jobs log file. Retry in a minute if you just submitted the task")
 
         elif verbose == 2:
             site_url = url + "/site_ad.txt"
@@ -395,7 +395,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 fp.truncate(0)
                 hbuf.truncate(0)
             else:
-                raise RuntimeError("Failed to parse site ad")
+                raise ExecutionError("Cannot get site ad. Retry in a minute if you just submitted the task")
             pool_info_url = self.centralcfg.centralconfig["backend-urls"].get("poolInfo")
             if pool_info_url:
                 fp2 = StringIO.StringIO()
@@ -413,7 +413,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                     self.logger.debug("Finished parse of pool info")
                     hbuf.truncate(0)
                 else:
-                    raise RuntimeError("Failed to retrieve pool info")
+                    raise ExecutionError("Cannot get pool info file. Retry in a minute if you just submitted the task")
 
 
         nodes_url = url + "/node_state.txt"
@@ -428,7 +428,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             self.parseNodeState(fp, nodes)
             self.logger.debug("Finished parse of node state")
         else:
-            raise RuntimeError("Failed to parse node state log")
+            raise ExecutionError("Cannot get node state log. Retry in a minute if you just submitted the task")
 
         return nodes, pool_info
 
