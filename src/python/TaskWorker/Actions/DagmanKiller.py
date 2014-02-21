@@ -1,15 +1,20 @@
 import re
+import time
+import base64
 import urllib
 import traceback
-from base64 import b64encode
+import datetime
 
 import classad
 import htcondor
 
 import TaskWorker.Actions.TaskAction as TaskAction
+import TaskWorker.WorkerExceptions
 
 import HTCondorLocator
 import HTCondorUtils
+
+import WMCore.Database.CMSCouch as CMSCouch
 
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 
@@ -33,6 +38,11 @@ class DagmanKiller(TaskAction.TaskAction):
             raise ValueError("No proxy provided")
         self.proxy = self.task['user_proxy']
 
+        try:
+            self.killTransfers()
+        except:
+            self.logger.exception("Failed to kill transfers; suppressing error until functionality is confirmed")
+
         self.logger.info("About to kill workflow: %s. Getting status first." % self.workflow)
 
         self.workflow = str(self.workflow)
@@ -47,6 +57,58 @@ class DagmanKiller(TaskAction.TaskAction):
         else:
             return self.killJobs(self.task['kill_ids'])
 
+
+    def killTransfers(self):
+        self.logger.info("About to kill transfers from workflow %s." % self.workflow)
+        ASOURL = self.task.get('tm_arguments', {}).get('ASOURL')
+        if not ASOURL:
+            self.logger.info("ASO URL not set; will not kill transfers")
+            return False
+        server = CMSCouch.CouchServer(dburl=ASOURL, ckey=self.proxy, cert=self.proxy)
+        try:
+            db = server.connectDatabase('asynctransfer')
+        except Exception, ex:
+            msg =  "Error while connecting to asynctransfer CouchDB"
+            self.logger.exception(msg)
+            raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+        self.queryKill = {'reduce':False, 'key':self.workflow}
+        try:
+            filesKill = db.loadView('AsyncTransfer', 'forKill', self.queryKill)['rows']
+        except Exception, ex:
+            msg =  "Error while connecting to asynctransfer CouchDB"
+            self.logger.exception(msg)
+            raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+        if len(filesKill) == 0:
+            self.logger.warning('No files to kill found')
+        for idt in filesKill:
+            now = str(datetime.datetime.now())
+            id = idt['value']
+            data = {
+                'end_time': now,
+                'state': 'killed',
+                'last_update': time.time(),
+                'retry': now,
+               }
+            updateUri = "/%s/_design/AsyncTransfer/_update/updateJobs/%s?%s" % (db.name, id, urllib.urlencode(data))
+            if not self.task['kill_all']:
+                try:
+                    doc = db.document( id )
+                except CMSCouch.CouchNotFoundError:
+                    self.logger.exception("Document %d is missing" % id)
+                    continue
+                if doc.get("jobid") not in self.task['kill_ids']:
+                    continue
+            self.logger.info("Killing transfer %s." % id)
+            try:
+                db.makeRequest(uri = updateUri, type = "PUT", decode = False)
+            except Exception, ex:
+                msg =  "Error updating document in couch"
+                msg += str(ex)
+                msg += str(traceback.format_exc())
+                raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+        return True
+
+
     def killJobs(self, ids):
         ad = classad.ClassAd()
         ad['foo'] = ids
@@ -58,11 +120,11 @@ class DagmanKiller(TaskAction.TaskAction):
         if results != "OK":
             raise Exception("Failure when killing jobs [%s]: %s" % (", ".join(ids), results))
 
+
     def killAll(self):
 
         # Search for and hold the DAG
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(self.workflow)
-        rootAttrList = ["ClusterId"]
 
         with HTCondorUtils.AuthenticatedSubprocess(self.proxy) as (parent, rpipe):
             if not parent:
@@ -71,13 +133,14 @@ class DagmanKiller(TaskAction.TaskAction):
         if results != "OK":
             raise Exception("Failure when killing task: %s" % results)
 
+
     def execute(self, *args, **kw):
 
         try:
             self.executeInternal(*args, **kw)
         except Exception, exc:
             self.logger.error(str(traceback.format_exc()))
-            configreq = {'workflow': kw['task']['tm_taskname'], 'status': 'KILLFAILED', 'subresource': 'failure', 'failure': b64encode(str(exc))}
+            configreq = {'workflow': kw['task']['tm_taskname'], 'status': 'KILLFAILED', 'subresource': 'failure', 'failure': base64.b64encode(str(exc))}
             self.server.post(self.resturl, data = urllib.urlencode(configreq))
         else:
             if kw['task']['kill_all']:

@@ -75,9 +75,10 @@ CRAB_HEADERS = \
 +CRAB_AsyncDestSE = %(asyncdest_se)s
 +CRAB_BlacklistT1 = %(blacklistT1)s
 +CRAB_StageoutPolicy = %(stageoutpolicy)s
++CRAB_UserRole = %(tm_user_role)s
++CRAB_UserGroup = %(tm_user_group)s
 """
 
-# NOTE: keep Arugments in sync with PanDAInjection.py.  ASO is very picky about argument order.
 JOB_SUBMIT = CRAB_HEADERS + \
 """
 CRAB_Attempt = %(attempt)d
@@ -88,13 +89,14 @@ CRAB_JobArch = %(jobarch_flatten)s
 CRAB_Archive = %(cachefilename_flatten)s
 +CRAB_ReqName = %(requestname)s
 #CRAB_ReqName = %(requestname_flatten)s
-CRAB_DBSURL = %(dbsurl_flatten)s
-#CRAB_PublishDBSURL = %(publishdbsurl_flatten)s
++CRAB_DBSURL = %(dbsurl)s
++CRAB_PublishDBSURL = %(publishdbsurl)s
 CRAB_Publish = %(publication)s
 CRAB_Id = $(count)
 +CRAB_Id = $(count)
 +CRAB_Dest = "%(temp_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
++CRAB_ASOURL = %(ASOURL)s
 +TaskType = "Job"
 +AccountingGroup = %(userhn)s
 
@@ -200,7 +202,7 @@ def transform_strings(input):
     info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : input['algoargs']}).replace('"', r'\"') + '"'
     info['attempt'] = 0
 
-    for var in ["cacheurl", "jobsw", "jobarch", "cachefilename", "asyncdest", "dbsurl", "publishdbsurl", "requestname"]:
+    for var in ["cacheurl", "jobsw", "jobarch", "cachefilename", "asyncdest", "requestname"]:
         info[var+"_flatten"] = input[var]
 
     # TODO: PanDA wrapper wants some sort of dictionary.

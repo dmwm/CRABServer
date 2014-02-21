@@ -117,6 +117,7 @@ tar xzf nose.tar.gz || exit 2
 
 pushd httplib2-0.8/python2
 zip -rq $STARTDIR/CRAB3.zip httplib2  -x \*.pyc || exit 3
+zip -r $STARTDIR/WMCore.zip httplib2  -x \*.pyc || exit 3
 popd
 
 pushd CherryPy-3.1.2/
@@ -131,7 +132,7 @@ popd
 cp $STARTDIR/CRAB3.zip $ORIGDIR/CRAB3-externals.zip
 
 pushd $WMCORE_PATH/src/python
-zip -r $STARTDIR/WMCore.zip *
+zip -rq $STARTDIR/WMCore.zip * || exit 3
 zip -rq $STARTDIR/CRAB3.zip WMCore PSetTweaks -x \*.pyc || exit 3
 popd
 

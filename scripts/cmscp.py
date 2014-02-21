@@ -10,9 +10,12 @@ import re
 import sys
 import json
 import time
+import pprint
 import signal
+import hashlib
 import logging
 import tarfile
+import datetime
 import traceback
 
 # Bootstrap the CMS_PATH variable; the StageOutMgr will need it
@@ -36,13 +39,15 @@ from WMCore.Storage.Registry import retrieveStageOutImpl
 from WMCore.Algorithms.Alarm import Alarm, alarmHandler
 import WMCore.WMException as WMException
 import WMCore.Storage.StageOutError as StageOutError
+import WMCore.Database.CMSCouch as CMSCouch
+import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 
 import DashboardAPI
 
 waitTime = 60*60
 numberOfRetries = 2
 retryPauseTime = 60
-
+g_now = None
 
 def parseAd():
     fd = open(os.environ['_CONDOR_JOB_AD'])
@@ -51,7 +56,9 @@ def parseAd():
         info = adline.split(" = ", 1)
         if len(info) != 2:
             continue
-        if info[1].startswith('"'):
+        if info[1].startswith('undefined'):
+            val = info[1].strip()
+        elif info[1].startswith('"'):
             val = info[1].strip()[1:-1]
         else:
             try:
@@ -71,12 +78,12 @@ def reportFailureToDashboard(exitCode):
         print traceback.format_exc()
         return
     for attr in ['CRAB_ReqName', 'CRAB_Id', 'CRAB_Retry']:
-        if attr not in myad:
+        if attr not in ad:
             print "==== ERROR: HTCondor ClassAd is missing attribute %s. ====" % attr
             print "Will not report stageout failure to Dashboard"
     params = {
-        'MonitorID': myad['CRAB_ReqName'],
-        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%d' % (myad['CRAB_Id'], myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":"), myad['CRAB_Retry']),
+        'MonitorID': ad['CRAB_ReqName'],
+        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%d' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":"), ad['CRAB_Retry']),
         'JobExitCode': exitCode
     }
     print "Dashboard stageout failure parameters: %s" % str(params)
@@ -187,7 +194,7 @@ def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_s
             print "== Attempting remote stageout at %s. ==" % time.ctime()
             result = performDirectTransfer(source, direct_pfn, direct_se)
             if result:
-                print "== ERROR: Remote stageout resulted in status %d at %s. ==" %(result, time.ctime())
+                print "== ERROR: Remote stageout resulted in status %d at %s. ==" % (result, time.ctime())
             else:
                 print "== Remote stageout succeeded at %s. ==" % time.ctime()
                 break
@@ -219,7 +226,151 @@ def performLocalTransfer(manager, source, dest):
         signal.alarm(0)
     if not result:
         set_se_name(os.path.split(dest)[-1], stageout_info['SEName'])
+        injectToASO(dest, stageout_info['SEName'])
     return result
+
+
+def injectToASO(dest_lfn, se_name):
+    ad = parseAd()
+    for attr in ["CRAB_ASOURL", "CRAB_AsyncDest", "CRAB_InputData", "CRAB_UserGroup", "CRAB_UserRole", "CRAB_DBSURL", "CRAB_PublishDBSURL", 'CRAB_ReqName', 'CRAB_UserHN']:
+        if attr not in ad:
+            print "==== ERROR: Unable to inject into ASO because %s is missing from job ad" % attr
+            return False
+    if 'X509_USER_PROXY' not in os.environ:
+        print "==== ERROR: X509_USER_PROXY missing from user environment. Unable to inject into ASO. ===="
+        return False
+    if not os.path.exists(os.environ['X509_USER_PROXY']):
+        print "==== ERROR: User proxy %s missing from disk. ====" % os.environ['X509_USER_PROXY']
+        return False
+    source_dir, fname = os.path.split(dest_lfn)
+    local_fname, id = get_job_id(fname)
+    found_logfile = False
+    file_type = 'output'
+    if re.match("cmsRun_[0-9]+.log.tar.gz", fname):
+        dest_lfn = os.path.join(source_dir, "log", fname)
+        found_logfile = True
+        file_type = 'log'
+    else:
+        dest_lfn = os.path.join(source_dir, fname)
+
+    with open("jobReport.json.%d" % id) as fd:
+        full_report = json.load(fd)
+
+    if not found_logfile:
+        if 'steps' not in full_report or 'cmsRun' not in full_report['steps']:
+            return
+        report = full_report['steps']['cmsRun']
+
+        if 'output' not in report:
+            return
+        output = report['output']
+
+        found_output = False
+        for outputModule in output.values():
+            for outputFile in outputModule:
+                if str(outputFile.get(u"pfn")) != local_fname:
+                    continue
+                checksums = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
+                size = outputFile.get(u"size", 0)
+                found_output = True
+        if not found_output:
+            print "==== ERROR: Unable to find output file in FrameworkJobReport.  Cannot inject to ASO."
+            return False
+    else:
+        size = full_report.get(u'log_size', 0)
+        # Copied from PostJob.py, but not sure if it does anything. BB
+        checksums = {'adler32': 'abc'}
+
+    p = PhEDEx.PhEDEx()
+    nodes = p.getNodeMap()['phedex']['node']
+    node_name = None
+    for node in nodes:
+        if str(node[u'se']) == str(se_name):
+            node_name = str(node[u'name'])
+            break
+    if not node_name:
+        print "==== ERROR: Unable to determine local node name.  Cannot inject to ASO. ===="
+        return False
+
+    role = str(ad['CRAB_UserRole'])
+    if str(ad['CRAB_UserRole']).lower() == 'undefined':
+        role = ''
+    group = str(ad['CRAB_UserGroup'])
+    if str(ad['CRAB_UserGroup']).lower() == 'undefined':
+        group = ''
+    dbs_url = str(ad['CRAB_DBSURL'])
+    publish_dbs_url = str(ad['CRAB_PublishDBSURL'])
+    if publish_dbs_url.lower() == 'undefined':
+        publish_dbs_url = "https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/"
+
+    last_update = int(time.time())
+    global g_now
+    if g_now == None:
+        g_now = str(datetime.datetime.now())
+
+    # NOTE: it's almost certainly a mistake to include dest_lfn in the hash here as it
+    # includes /store/temp/user/foo.$HASH.  We should normalize based on the final LFN (/store/user/...)
+    doc_id = hashlib.sha224(dest_lfn).hexdigest()
+    info = {"state": "new",
+            "source": node_name,
+            "destination": ad['CRAB_AsyncDest'],
+            "checksums": checksums,
+            "size": size,
+            "last_update": last_update, # The following four times - and how they're calculated - makes no sense to me.  BB
+            "start_time": g_now,
+            "end_time": '',
+            "job_end_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
+            "retry_count": [],
+            "failure_reason": [],
+           }
+    print "ASO info so far:"
+    print info
+
+    couchServer = CMSCouch.CouchServer(dburl=ad['CRAB_ASOURL'], ckey=os.environ['X509_USER_PROXY'], cert=os.environ['X509_USER_PROXY'])
+    couchDatabase = couchServer.connectDatabase("asynctransfer", create = False)
+    print "Stageout job description: %s" % pprint.pformat(info)
+
+    try:
+        doc = couchDatabase.document(doc_id)
+        doc.update(info)
+        print ("Will retry LFN %s (id %s)" % (dest_lfn, doc_id))
+    except CMSCouch.CouchNotFoundError:
+        print "LFN %s (id %s) is not yet known to ASO; uploading new stageout job." % (dest_lfn, doc_id)
+        doc = {"_id": doc_id,
+               "inputdataset": ad["CRAB_InputData"],
+               "group": group,
+               "lfn": dest_lfn.replace('/store/user', '/store/temp/user', 1),
+               "checksums": checksums,
+               "user": ad['CRAB_UserHN'],
+               "role": role,
+               "dbSource_url": "gWMS",
+               "publish_dbs_url": publish_dbs_url,
+               "dbs_url": dbs_url,
+               "workflow": ad['CRAB_ReqName'],
+               "jobid": id,
+               "publication_state": 'not_published',
+               "publication_retry_count": [],
+               "type" : file_type,
+               "publish" : 1,
+              }
+        doc.update(info)
+    except Exception, ex:
+        msg = "Error loading document from couch. Transfer submission failed."
+        msg += str(ex)
+        msg += str(traceback.format_exc())
+        print (msg)
+        return False
+    commit_result = couchDatabase.commitOne(doc)[0]
+    if 'error' in commit_result:
+        print("Couldn't add to ASO database; error follows")
+        print(commit_result)
+        return False
+    print "Final stageout job description: %s" % pprint.pformat(doc)
+    full_report['aso_start_time'] = g_now
+    with open("jobReport.json.%d" % id, "w") as fd:
+        json.dump(full_report, fd)
+
+    return True
 
 
 def performDirectTransfer(source, direct_pfn, direct_se):
@@ -246,7 +397,7 @@ def performDirectTransferImpl(source, direct_pfn, direct_se):
         msg = "Unable to retrieve impl for local stage out:\n"
         msg += "Error retrieving StageOutImpl for command named: %s\n" % (
             command,)
-        raise StageOutErrorStageOutFailure(msg, Command = command,
+        raise StageOutError.StageOutFailure(msg, Command = command,
                               LFN = direct_pfn, ExceptionDetail = str(ex))
 
     impl.numRetries = numberOfRetries
@@ -257,7 +408,7 @@ def performDirectTransferImpl(source, direct_pfn, direct_se):
     try:
         impl(protocol, source, direct_pfn, None, None)
     except Alarm:
-        print "== Indefinite hang during stageOut of %s; setting return code to 60403." % dest
+        print "== Indefinite hang during stageOut of %s; setting return code to 60403." % source
         result = 60403
     except Exception, ex:
         msg = "== Failure for local stage out:\n"
@@ -360,7 +511,7 @@ def main():
         print "==== Finished compression of user logs at %s (status %d) ====" % (time.ctime(), std_retval)
         if not std_retval:
             print "==== Starting stageout of user logs at %s ====" % time.ctime()
-            std_rtval = performTransfer(manager, stageout_policy, log_file, dest, dest_files[0], dest_se)
+            std_retval = performTransfer(manager, stageout_policy, log_file, dest, dest_files[0], dest_se)
     except Exception, ex:
         print "== ERROR: Unhandled exception when performing stageout of user logs."
         traceback.print_exc()
@@ -380,7 +531,7 @@ def main():
         source_file, dest_file = info
 
         if not os.path.exists(source_file):
-            print "== ERROR: Output file %s does not exist." % source
+            print "== ERROR: Output file %s does not exist." % source_file
             out_retval = 60307
             continue
 
