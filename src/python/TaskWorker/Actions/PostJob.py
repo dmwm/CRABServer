@@ -145,7 +145,6 @@ class ASOServerJob(object):
         self.id = None
         self.couchServer = None
         self.couchDatabase = None
-        self.cancel = False
         self.sleep = 200
         self.count = count
         self.dest_site = dest_site
@@ -189,7 +188,7 @@ class ASOServerJob(object):
                 doc = self.couchDatabase.document(oneID)
                 doc['state'] = 'killed'
                 res = self.couchDatabase.commitOne(doc)
-                if error in res:
+                if 'error' in res:
                     raise RuntimeError, "Got error killing transfer: %s" % res
 
 
@@ -327,23 +326,23 @@ class ASOServerJob(object):
         try:
             couchDoc = self.couchDatabase.document(jobID)
         except:
-            log.exception("Failed to retrieve updated document for %s." % jobID)
+            logger.exception("Failed to retrieve updated document for %s." % jobID)
             return {}, ""
         if "_attachments" in couchDoc:
             bestLog = None
             maxRev = 0
             for log, loginfo in couchDoc["_attachments"].items():
                 if bestLog == None:
-                                bestLog = log
+                    bestLog = log
                 else:
-                                rev = loginfo.get(u"revpos", 0)
-                                if rev > maxRev:
-                                    maxRev = rev
-                                    bestLog = log
+                    rev = loginfo.get(u"revpos", 0)
+                    if rev > maxRev:
+                        maxRev = rev
+                        bestLog = log
             try:
                 return couchDoc, self.couchDatabase.getAttachment(jobID, bestLog)
             except:
-                log.exception("Failed to retrieve log attachment for %s: %s" % (jobID, bestLog))
+                logger.exception("Failed to retrieve log attachment for %s: %s" % (jobID, bestLog))
         return couchDoc, ""
 
     def run(self):
@@ -805,6 +804,7 @@ class PostJob():
             return fts_job_result
 
         failureReason = g_Job.getLastFailure()
+        g_Job = None
         isPermanent = isFailurePermanent(failureReason)
 
         source_list = [i[0] for i in transfer_list]
