@@ -96,6 +96,7 @@ CRAB_Id = $(count)
 +CRAB_Id = $(count)
 +CRAB_Dest = "%(temp_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
++CRAB_ASOURL = %(ASOURL)s
 +TaskType = "Job"
 +AccountingGroup = %(userhn)s
 
