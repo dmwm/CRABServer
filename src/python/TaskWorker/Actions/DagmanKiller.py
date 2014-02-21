@@ -1,7 +1,9 @@
 import re
+import time
+import base64
 import urllib
 import traceback
-from base64 import b64encode
+import datetime
 
 import classad
 import htcondor
@@ -56,9 +58,11 @@ class DagmanKiller(TaskAction.TaskAction):
 
 
     def killTransfers(self):
+        self.logger.info("About to kill transfers from workflow %s." % self.workflow)
         ASOURL = self.task.get('tm_arguments', {}).get('ASOURL')
         if not ASOURL:
             self.logger.info("ASO URL not set; will not kill transfers")
+            return False
         server = CMSCouch.CouchServer(dburl=ASOURL, ckey=self.proxy, cert=self.proxy)
         try:
             db = server.connectDatabase('asynctransfer')
@@ -66,9 +70,9 @@ class DagmanKiller(TaskAction.TaskAction):
             msg =  "Error while connecting to asynctransfer CouchDB"
             self.logger.exception(msg)
             raise ExecutionError(msg)
-        self.queryKill = {'reduce':False, 'key':workflow}
+        self.queryKill = {'reduce':False, 'key':self.workflow}
         try:
-            self.filesKill = db.loadView('AsyncTransfer', 'forKill', self.queryKill)['rows']
+            filesKill = db.loadView('AsyncTransfer', 'forKill', self.queryKill)['rows']
         except Exception, ex:
             msg =  "Error while connecting to asynctransfer CouchDB"
             self.logger.exception(msg)
@@ -84,15 +88,16 @@ class DagmanKiller(TaskAction.TaskAction):
                 'last_update': time.time(),
                 'retry': now,
                }
-            updateUri = "/%s/_design/AsyncTransfer/_update/updateJobs/%s?%s" (db.name, id, urllib.urlencode(data))
+            updateUri = "/%s/_design/AsyncTransfer/_update/updateJobs/%s?%s" % (db.name, id, urllib.urlencode(data))
             if not self.task['kill_all']:
                 try:
-                    doc = db.document( doc_id )
+                    doc = db.document( id )
                 except CMSCouch.CouchNotFoundError:
-                    self.logger.exception("Document %d is missing" % doc_id)
+                    self.logger.exception("Document %d is missing" % id)
                     continue
                 if doc.get("jobid") not in self.task['kill_ids']:
                     continue
+            self.logger.info("Killing transfer %s." % id)
             try:
                 db.makeRequest(uri = updateUri, type = "PUT", decode = False)
             except Exception, ex:
@@ -100,6 +105,7 @@ class DagmanKiller(TaskAction.TaskAction):
                 msg += str(ex)
                 msg += str(traceback.format_exc())
                 raise ExecutionError(msg)
+        return True
 
 
     def killJobs(self, ids):
@@ -134,7 +140,7 @@ class DagmanKiller(TaskAction.TaskAction):
             self.executeInternal(*args, **kw)
         except Exception, exc:
             self.logger.error(str(traceback.format_exc()))
-            configreq = {'workflow': kw['task']['tm_taskname'], 'status': 'KILLFAILED', 'subresource': 'failure', 'failure': b64encode(str(exc))}
+            configreq = {'workflow': kw['task']['tm_taskname'], 'status': 'KILLFAILED', 'subresource': 'failure', 'failure': base64.b64encode(str(exc))}
             self.server.post(self.resturl, data = urllib.urlencode(configreq))
         else:
             if kw['task']['kill_all']:
