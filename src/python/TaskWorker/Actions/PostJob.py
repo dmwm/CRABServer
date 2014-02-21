@@ -276,8 +276,9 @@ class ASOServerJob(object):
                     needs_commit = False
                     logger.info("LFN %s (id %s) was injected from WN and transfer has finished" % (lfn, doc_id))
                 else:
-                    doc.update(common_info)
                     logger.info("Will retry LFN %s (id %s)" % (lfn, doc_id))
+                    logger.debug("Previous document: %s" % pprint.pformat(doc))
+                    doc.update(common_info)
             except CMSCouch.CouchNotFoundError:
                 logger.info("LFN %s (id %s) is not yet known to ASO; uploading new stageout job." % (lfn, doc_id))
                 # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
