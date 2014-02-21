@@ -303,6 +303,7 @@ class DataWorkflow(object):
            :return: a workflow status summary document"""
         raise NotImplementedError
 
+    @conn_handler(services=['centralconfig'])
     def kill(self, workflow, force, jobids, userdn, userproxy=None):
         """Request to Abort a workflow.
 
@@ -311,6 +312,10 @@ class DataWorkflow(object):
         retmsg = "ok"
         self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
+
+        args = {'ASOURL' : self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", "")}
+        # Hm...
+        dbSerializer = str
 
         if statusRes['status'] in ['SUBMITTED','KILLFAILED']:
             killList = [jobid for jobstatus,jobid in statusRes['jobList'] if jobstatus not in self.successList]
@@ -324,9 +329,10 @@ class DataWorkflow(object):
                 raise ExecutionError("There are no jobs to kill. Only jobs not in %s states can be killed" % self.successList)
             self.logger.info("Jobs to kill: %s" % killList)
 
+            args.update({"killList": killList, "killAll": jobids==[]})
             self.api.modify(self.Task.SetStatusTask_sql, status = ["KILL"], taskname = [workflow])
             self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow],\
-                            arguments = [str({"killList": killList, "killAll": jobids==[]})])
+                            arguments = [dbSerializer(args)])
         elif statusRes['status'] == 'NEW':
             self.api.modify(self.Task.SetStatusTask_sql, status = ["KILLED"], taskname = [workflow])
         else:
