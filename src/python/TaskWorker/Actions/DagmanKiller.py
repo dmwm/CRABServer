@@ -9,6 +9,7 @@ import classad
 import htcondor
 
 import TaskWorker.Actions.TaskAction as TaskAction
+import TaskWorker.WorkerExceptions
 
 import HTCondorLocator
 import HTCondorUtils
@@ -69,14 +70,14 @@ class DagmanKiller(TaskAction.TaskAction):
         except Exception, ex:
             msg =  "Error while connecting to asynctransfer CouchDB"
             self.logger.exception(msg)
-            raise ExecutionError(msg)
+            raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
         self.queryKill = {'reduce':False, 'key':self.workflow}
         try:
             filesKill = db.loadView('AsyncTransfer', 'forKill', self.queryKill)['rows']
         except Exception, ex:
             msg =  "Error while connecting to asynctransfer CouchDB"
             self.logger.exception(msg)
-            raise ExecutionError(msg)
+            raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
         if len(filesKill) == 0:
             self.logger.warning('No files to kill found')
         for idt in filesKill:
@@ -104,7 +105,7 @@ class DagmanKiller(TaskAction.TaskAction):
                 msg =  "Error updating document in couch"
                 msg += str(ex)
                 msg += str(traceback.format_exc())
-                raise ExecutionError(msg)
+                raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
         return True
 
 
@@ -124,7 +125,6 @@ class DagmanKiller(TaskAction.TaskAction):
 
         # Search for and hold the DAG
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(self.workflow)
-        rootAttrList = ["ClusterId"]
 
         with HTCondorUtils.AuthenticatedSubprocess(self.proxy) as (parent, rpipe):
             if not parent:
