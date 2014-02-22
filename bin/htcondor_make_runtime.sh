@@ -14,7 +14,7 @@ WMCOREVER=0.9.92
 WMCOREREPO=dmwm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
-CRABSERVERVER=3.3.4.rc1
+CRABSERVERVER=3.3.4.runtime_failures2
 CRABSERVERREPO=dmwm
 
 [[ -d $STARTDIR ]] || mkdir -p $STARTDIR
@@ -144,6 +144,7 @@ popd
 mkdir -p bin
 cp $CRABSERVER_PATH/scripts/CMSRunAnalysis.py .
 cp $CRABSERVER_PATH/scripts/TweakPSet.py .
+cp $CRABSERVER_PATH/scripts/DashboardFailure.sh .
 cp $CRABSERVER_PATH/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py} .
 fi
 
@@ -151,7 +152,7 @@ pwd
 echo "Making TaskManagerRun tarball"
 tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip CMSRunAnalysis.py TweakPSet.py libcurl.so.4 ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py || exit 4
 echo "Making CMSRunAnalysis tarball"
-tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py || exit 4
+tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py DashboardFailure.sh || exit 4
 
 popd
 
