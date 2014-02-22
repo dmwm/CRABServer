@@ -11,7 +11,6 @@ import base64
 import shutil
 import string
 import urllib
-import logging
 import commands
 import tempfile
 import hashlib
@@ -327,7 +326,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['publishdbsurl'] = info['tm_publish_dbs_url']
         info['publication'] = info['tm_publication']
         info['userdn'] = info['tm_user_dn']
-        info['requestname'] = string.replace(task['tm_taskname'],'"', '')
+        info['requestname'] = string.replace(task['tm_taskname'], '"', '')
         info['savelogsflag'] = 0
         info['blacklistT1'] = 0
         info['siteblacklist'] = task['tm_site_blacklist']
@@ -380,7 +379,7 @@ class DagmanCreator(TaskAction.TaskAction):
             firstLumi = str(job['mask']['FirstLumi'])
             firstRun = str(job['mask']['FirstRun'])
             i += 1
-            sitead['Job%d'% i] = list(availablesites)
+            sitead['Job%d' % i] = list(availablesites)
             remoteOutputFiles = []
             localOutputFiles = []
             for origFile in outfiles:
