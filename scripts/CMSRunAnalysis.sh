@@ -43,6 +43,7 @@ then
 else
 	echo "Error: neither OSG_APP, CVMFS, nor VO_CMS_SW_DIR environment variables were set" >&2
 	echo "Error: Because of this, we can't load CMSSW. Not good." >&2
+	sleep 20m
 	exit 2
 fi
 set +x
@@ -69,11 +70,22 @@ if [[ $rc != 0 ]]
 then
 	echo "Error: Python2.6 isn't available on this worker node." >&2
 	echo "Error: job execution REQUIRES python2.6" >&2
-	exit
+	sleep 20m
+	exit $rc
 else
 	echo "I found python2.6 at.."
 	echo `which python2.6`
 fi
+python2.6 -c ''
+rc=$?
+if [[ $rc != 0 ]]
+then
+	echo "Error: python2.6 is not functional."
+	sleep 20m
+	./DashboardFailure.sh 10043
+	exit $?
+fi
+
 echo "==== Python2.6 discovery FINISHING at $(date) ===="
 
 echo "======== Current environment dump STARTING ========"

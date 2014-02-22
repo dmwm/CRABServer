@@ -21,6 +21,7 @@ then
     if [ "X$CRAB_Dest" = "X" ];
     then
         print "Unable to determine CRAB output destination directory"
+        sleep 20m
         exit 2
     fi
     ONE_EVENT_TEST=$(grep '^CRAB_oneEventMode =' $_CONDOR_JOB_AD | awk '{print $NF;}')
@@ -35,6 +36,7 @@ then
     if [ "X$CRAB_Id" = "X" ];
     then
         print "Unable to determine CRAB Id."
+        sleep 20m
         exit 2
     fi
    echo "CRAB ID: $CRAB_Id"
@@ -86,6 +88,7 @@ else
 	echo "Error: OSG_APP nor VO_CMS_SW_DIR environment variables were set" >&2
 	echo "Error: CVMFS is not present" >&2
 	echo "Error: Because of this, we can't bootstrap to attempt stageout." >&2
+        sleep 20m
 	exit 2
 fi
 
@@ -109,7 +112,9 @@ if [[ $rc != 0 ]]
 then
 	echo "Error: Python2.6 isn't available on this worker node." >&2
 	echo "Error: job execution REQUIRES python2.6" >&2
-	exit
+	sleep 20m
+        ./DashboardFailure.sh 10043
+	exit $?
 else
 	echo "I found python2.6 at.."
 	echo `which python2.6`
