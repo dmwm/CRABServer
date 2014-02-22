@@ -163,6 +163,7 @@ def stopDashboardMonitoring(myad):
 def logCMSSW():
     if not os.path.exists("cmsRun-stdout.log"):
         print "ERROR: Cannot dump CMSSW stdout; perhaps CMSSW never executed?"
+        return
     print "======== CMSSW OUTPUT STARTING ========"
     fd = open("cmsRun-stdout.log")
     st = os.fstat(fd.fileno())
@@ -185,7 +186,9 @@ def handleException(exitAcronymn, exitCode, exitMsg):
     report['exitCode'] = exitCode
     report['exitMsg'] = exitMsg
     print "ERROR: Exceptional exit at %s (%s): %s" % (time.ctime(), str(exitCode), str(exitMsg))
-    print "ERROR: Traceback follows as applicable:\n", traceback.format_exc()
+    formatted_tb = traceback.format_exc()
+    if not formatted_tb.startswith("None"):
+        print "ERROR: Traceback follows:\n", formatted_tb
     with open('jobReport.json','w') as of:
         json.dump(report, of)
     with open('jobReportExtract.pickle','w') as of:
