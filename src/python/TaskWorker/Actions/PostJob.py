@@ -863,6 +863,7 @@ class PostJob():
             os.rename(fname + ".tmp", fname)
         except:
             return retry_num
+        return retry_num
 
 
     def execute(self, *args, **kw):
