@@ -73,6 +73,7 @@ popd
 mkdir -p bin
 cp $ORIGDIR/scripts/CMSRunAnalysis.py .
 cp $ORIGDIR/scripts/TweakPSet.py .
+cp $ORIGDIR/scripts/DashboardFailure.sh .
 cp $ORIGDIR/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py} .
 
 else
