@@ -19,6 +19,8 @@ export PYTHONPATH=/data/srv/glidecondor/lib/python2.6:$PYTHONPATH
 export LD_LIBRARY_PATH=/opt/glidecondor/lib:/opt/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/data/srv/glidecondor/lib:/data/srv/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 
+mkdir -p retry_info
+
 # Bootstrap the HTCondor environment
 if [ "X$_CONDOR_JOB_AD" == "X" ];
 then
