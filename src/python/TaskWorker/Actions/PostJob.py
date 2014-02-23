@@ -844,7 +844,7 @@ class PostJob():
         """
         Calculate the retry number we're on.  See the notes in pre-job.
         """
-        fname = "retry_info/job.%d.txt" % id
+        fname = "retry_info/job.%s.txt" % id
         if os.path.exists(fname):
             try:
                 with open(fname, "r") as fd:
