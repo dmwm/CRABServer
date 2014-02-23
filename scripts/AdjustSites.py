@@ -10,8 +10,15 @@ import htcondor
 if '_CONDOR_JOB_AD' not in os.environ or not os.path.exists(os.environ["_CONDOR_JOB_AD"]):
     sys.exit(0)
 
+new_stdout = "adjust_out.txt"
+fd = os.open(new_stdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
+if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
+    os.dup2(fd, 1)
+    os.dup2(fd, 2)
+os.close(fd)
+
 terminator_re = re.compile(r"^\.\.\.$")
-event_re = re.compile(r"016 \(\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
+event_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
 term_re = re.compile(r"Normal termination \(return value 2\)")
 node_re = re.compile(r"DAG Node: Job(\d+)")
 def adjustPost(resubmit):
@@ -24,6 +31,7 @@ def adjustPost(resubmit):
     """
     if not resubmit:
         return
+    resubmit_all = resubmit == True
     ra_buffer = []
     alt = None
     output = ''
@@ -54,7 +62,7 @@ def adjustPost(resubmit):
         elif len(ra_buffer) == 3:
             m = node_re.search(line)
             print line, m, m.groups(), resubmit
-            if m and (m.groups()[0] in resubmit):
+            if m and (resubmit_all or (m.groups()[0] in resubmit)):
                 print m.groups()[0], resubmit
                 for l in ra_buffer: output += l
             else:
@@ -73,11 +81,13 @@ def resubmitDag(filename, resubmit):
         return
     retry_re = re.compile(r'RETRY Job([0-9]+) ([0-9]+) ')
     output = ""
+    resubmit_all = resubmit == True
+
     for line in open(filename).readlines():
         m = retry_re.search(line)
         if m:
             job_id = m.groups()[0]
-            if job_id in resubmit:
+            if resubmit_all or (job_id in resubmit):
                 try:
                     retry_count = int(m.groups()[1]) + 10
                 except ValueError:
@@ -154,7 +164,8 @@ def main():
             print "ERROR: %s" % str(reerror)
         # To do this right, we ought to look up how many existing retries were done
         # and adjust the retry account according to that.
-    resubmit = [str(i) for i in resubmit]
+    if resubmit != True:
+        resubmit = [str(i) for i in resubmit]
 
     if resubmit:
         adjustPost(resubmit)

@@ -80,6 +80,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
                 if not parent:
                     schedd.edit(rootConst, "HoldKillSig", 'SIGKILL')
+                    schedd.edit(rootConst, "CRAB_ResubmitList", True)
                     schedd.act(htcondor.JobAction.Hold, rootConst)
                     schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
                     schedd.act(htcondor.JobAction.Release, rootConst)

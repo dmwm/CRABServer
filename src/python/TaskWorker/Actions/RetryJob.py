@@ -35,6 +35,13 @@ class RetryJob(object):
         self.validreport = True
 
     def get_job_ad(self):
+        try:
+            cluster = int(cluster.split(".")[0])
+            if cluster == -1:
+                return
+        except ValueError:
+            pass
+
         cmd = "condor_q -l -userlog job_log %s" % str(self.cluster)
         status, output = commands.getstatusoutput(cmd)
         if status:
@@ -177,6 +184,7 @@ class RetryJob(object):
         self.count = count
         self.retry_count = retry_count
         self.cluster = cluster
+
         self.get_job_ad()
         self.get_report()
 
