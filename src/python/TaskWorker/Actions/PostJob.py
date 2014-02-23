@@ -855,7 +855,7 @@ class PostJob():
             retry_info = {"pre": 0, "post": 0}
         if 'pre' not in retry_info or 'post' not in retry_info:
             return retry_num
-        retry_num = retry_info['post']
+        retry_num = str(retry_info['post'])
         retry_info['post'] += 1
         try:
             with open(fname + ".tmp", "w") as fd:
@@ -874,6 +874,7 @@ class PostJob():
         logpath = os.path.expanduser("~/%s" % reqname)
         postjob = os.path.join(logpath, "postjob.%s.%s.txt" % (id, retry_count))
         logger.debug("The post-job script will be saved to %s" % postjob)
+        retval = 1
         try:
             retval = self.execute_internal(*args, **kw)
             logger.info("Post-job finished executing; status code %d." % retval)
