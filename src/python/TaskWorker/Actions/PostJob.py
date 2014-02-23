@@ -858,8 +858,8 @@ class PostJob():
         retry_num = retry_info['post']
         retry_info['post'] += 1
         try:
-            with open(fname + ".tmp", "r") as fd:
-                json.dump(retry_info)
+            with open(fname + ".tmp", "w") as fd:
+                json.dump(retry_info, fd)
             os.rename(fname + ".tmp", fname)
         except:
             return retry_num

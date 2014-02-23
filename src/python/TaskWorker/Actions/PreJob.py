@@ -1,5 +1,6 @@
 
 import os
+import sys
 import json
 import classad
 
@@ -50,8 +51,8 @@ class PreJob:
         if (retry_info['pre'] <= retry_info['post']) and not os.path.exists(out_fname):
             retry_info['pre'] += retry_info['post'] + 1
         try:
-            with open(fname + ".tmp", "r") as fd:
-                json.dump(retry_info)
+            with open(fname + ".tmp", "w") as fd:
+                json.dump(retry_info, fd)
         except:
             return retry_num
 
