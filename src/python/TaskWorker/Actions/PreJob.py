@@ -3,6 +3,7 @@ import os
 import sys
 import json
 import classad
+import traceback
 
 from ApmonIf import ApmonIf
 
@@ -53,8 +54,10 @@ class PreJob:
         try:
             with open(fname + ".tmp", "w") as fd:
                 json.dump(retry_info, fd)
+            os.rename(fname + ".tmp", fname)
         except:
             return retry_num
+        return retry_num
 
 
     def update_dashboard(self, retry, id, reqname, backend):
