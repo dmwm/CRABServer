@@ -50,7 +50,7 @@ class PreJob:
             if os.path.exists(out_fname):
                 sys.exit(1)
         if (retry_info['pre'] <= retry_info['post']) and not os.path.exists(out_fname):
-            retry_info['pre'] += retry_info['post'] + 1
+            retry_info['pre'] = retry_info['post'] + 1
         try:
             with open(fname + ".tmp", "w") as fd:
                 json.dump(retry_info, fd)
