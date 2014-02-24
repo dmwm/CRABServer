@@ -23,7 +23,7 @@ class PreJob:
                   'scheduler': 'GLIDEIN',
                   'GridName': self.task_ad['CRAB_UserDN'],
                   'ApplicationVersion': self.task_ad['CRAB_JobSW'],
-                  'taskType': 'analysis',
+                  'taskType': self.task_ad.get("CRAB_DashboardTaskType", 'analysis'),
                   'vo': 'cms',
                   'CMSUser': self.task_ad['CRAB_UserHN'],
                   'user': self.task_ad['CRAB_UserHN'],

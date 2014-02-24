@@ -176,7 +176,8 @@ def transform_strings(input):
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
            'userdn', 'requestname', 'publication', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL', 'asyncdest_se', "stageoutpolicy":
+           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL', 'asyncdest_se', "stageoutpolicy",
+           'taskType', 'maxpost':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -246,6 +247,8 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def buildDashboardInfo(self):
 
+        taskType = getattr(self.config.TaskWorker, 'dashboardTaskType', 'analysis')
+
         params = {'tool': 'crab3',
                   'SubmissionType':'direct',
                   'JSToolVersion': '3.3.0',
@@ -253,7 +256,7 @@ class DagmanCreator(TaskAction.TaskAction):
                   'scheduler': 'GLIDEIN',
                   'GridName': self.task['tm_user_dn'],
                   'ApplicationVersion': self.task['tm_job_sw'],
-                  'taskType': 'analysis',
+                  'taskType': taskType,
                   'vo': 'cms',
                   'CMSUser': self.task['tm_username'],
                   'user': self.task['tm_username'],
@@ -336,6 +339,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['edmoutfiles'] = task['tm_edm_outfiles']
         info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
         info['ASOURL'] = task.get('tm_arguments', {}).get('ASOURL', '')
+        info['taskType'] = getattr(self.config.TaskWorker, 'dashboardTaskType', 'analysis')
 
         # TODO: pass through these correctly.
         info['runs'] = []
@@ -505,7 +509,13 @@ class DagmanCreator(TaskAction.TaskAction):
         task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
         userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
 
-        info["jobcount"] = len(jobgroup.getJobs())
+        info["jobcount"] = len(specs)
+        maxpost = getattr(self.config.TaskWorker, 'maxPost', 0)
+        if maxpost == -1:
+            maxpost = info['jobcount']
+        elif maxpost == 0:
+            maxpost = int(max(20, info['jobcount']*.1))
+        info['maxpost'] = maxpost
 
         # Info for ML:
         ml_info = info.setdefault('apmon', [])
@@ -524,7 +534,7 @@ class DagmanCreator(TaskAction.TaskAction):
         # When running in standalone mode, we want to record the number of jobs in the task
         if ('CRAB_ReqName' in kwargs['task']) and ('CRAB_UserDN' in kwargs['task']):
             const = 'TaskType =?= \"ROOT\" && CRAB_ReqName =?= "%s" && CRAB_UserDN =?= "%s"' % (task_name, userdn)
-            cmd = "condor_qedit -const '%s' CRAB_JobCount %d" % (const, len(jobgroup.getJobs()))
+            cmd = "condor_qedit -const '%s' CRAB_JobCount %d" % (const, len(specs))
             self.logger.debug("+ %s" % cmd)
             status, output = commands.getstatusoutput(cmd)
             if status:
