@@ -246,12 +246,10 @@ def injectToASO(dest_lfn, se_name):
     local_fname, id = get_job_id(fname)
     found_logfile = False
     file_type = 'output'
+    dest_lfn = os.path.join(source_dir, fname)
     if re.match("cmsRun_[0-9]+.log.tar.gz", fname):
-        dest_lfn = os.path.join(source_dir, "log", fname)
         found_logfile = True
         file_type = 'log'
-    else:
-        dest_lfn = os.path.join(source_dir, fname)
 
     with open("jobReport.json.%d" % id) as fd:
         full_report = json.load(fd)
