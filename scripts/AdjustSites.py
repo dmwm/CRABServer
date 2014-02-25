@@ -11,7 +11,7 @@ if '_CONDOR_JOB_AD' not in os.environ or not os.path.exists(os.environ["_CONDOR_
     sys.exit(0)
 
 terminator_re = re.compile(r"^\.\.\.$")
-event_re = re.compile(r"016 \(\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
+event_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
 term_re = re.compile(r"Normal termination \(return value 2\)")
 node_re = re.compile(r"DAG Node: Job(\d+)")
 def adjustPost(resubmit):
