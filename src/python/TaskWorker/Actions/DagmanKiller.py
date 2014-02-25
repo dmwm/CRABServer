@@ -52,6 +52,15 @@ class DagmanKiller(TaskAction.TaskAction):
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
         self.schedd, address = loc.getScheddObj(self.workflow)
 
+        # TODO: return to this once ASO transfers know the appropriate crab retry #.
+        #for idx in self.task['kill_ids']:
+        #    jinfo = {'jobId': ("%d_https://glidein.cern.ch/%d/%s_0" % (idx, idx, taskid)),
+        #             'sid': "https://glidein.cern.ch/%d/%s" % (idx, taskid),
+        #             'broker': os.environ.get('HOSTNAME',''),
+        #             'bossId': str(idx),
+        #             'StatusValue' : 'pending',
+        #            }
+
         if self.task['kill_all']:
             return self.killAll()
         else:

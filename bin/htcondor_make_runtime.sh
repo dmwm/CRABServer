@@ -64,6 +64,7 @@ popd
 
 pushd $VO_CMS_SW_DIR/$SCRAM_ARCH/external/py2-httplib2/*/lib/python2.6/site-packages
 zip -rq $STARTDIR/CRAB3.zip httplib2 -x \*.pyc
+zip -r $STARTDIR/WMCore.zip httplib2  -x \*.pyc || exit 3
 popd
 
 pushd $VO_CMS_SW_DIR/$SCRAM_ARCH/external/cherrypy/*/lib/python2.6/site-packages
