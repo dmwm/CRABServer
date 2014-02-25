@@ -77,6 +77,7 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
         self.step.data.application.section_("configuration")
         self.step.data.application.section_("command")
         self.step.data.application.command.configuration = "PSet.py"
+        self.step.data.application.command.oneEventMode = oneEventMode
 #        self.step.data.application.configuration.pickledarguments.globalTag/globalTagTransaction
         self.step.data.section_("input")
         self.job = jobDict(lheInputFiles, seeding)
