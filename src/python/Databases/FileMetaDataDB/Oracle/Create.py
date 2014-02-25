@@ -46,6 +46,7 @@ class Create(DBCreator):
               fmd_parent CLOB,
               fmd_creation_time TIMESTAMP NOT NULL,
               fmd_filestate VARCHAR(20),
+              fmd_direct_stageout VARCHAR(1),
               CONSTRAINT pk_tasklfn PRIMARY KEY(tm_taskname, fmd_lfn),
               CONSTRAINT fk_tm_taskname FOREIGN KEY (tm_taskname) REFERENCES tasks (tm_taskname)
             )
