@@ -232,7 +232,8 @@ def performLocalTransfer(manager, source, dest):
 
 def injectToASO(dest_lfn, se_name):
     ad = parseAd()
-    for attr in ["CRAB_ASOURL", "CRAB_AsyncDest", "CRAB_InputData", "CRAB_UserGroup", "CRAB_UserRole", "CRAB_DBSURL", "CRAB_PublishDBSURL", 'CRAB_ReqName', 'CRAB_UserHN']:
+    for attr in ["CRAB_ASOURL", "CRAB_AsyncDest", "CRAB_InputData", "CRAB_UserGroup", "CRAB_UserRole", "CRAB_DBSURL",\
+             "CRAB_PublishDBSURL", "CRAB_ReqName", "CRAB_UserHN", "CRAB_SaveLogsFlag"]:
         if attr not in ad:
             print "==== ERROR: Unable to inject into ASO because %s is missing from job ad" % attr
             return False
@@ -436,6 +437,7 @@ def main():
     dest_dir = None
     dest_files = None
     stageout_policy = None
+    save_logs = None
     if '_CONDOR_JOB_AD' not in os.environ:
         print "== ERROR: _CONDOR_JOB_AD not in environment =="
         print "No stageout will be performed."
@@ -444,6 +446,7 @@ def main():
         print "No stageout will be performed."
         return 60307
     else:
+        #XXX why don't we use parseAd() ?
         attr_re = re.compile("([A-Z_a-z0-9]+?) = (.*)")
         split_re = re.compile(",\s*")
         with open(os.environ['_CONDOR_JOB_AD']) as fd:
@@ -464,6 +467,8 @@ def main():
                     dest_files = split_re.split(val.replace('"', ''))
                 elif name == "CRAB_StageoutPolicy":
                     stageout_policy = split_re.split(val.replace('"', ''))
+                elif name == "CRAB_SaveLogsFlag":
+                    save_logs = int(val)
         if crab_id == -1:
             print "== ERROR: Unable to determine CRAB Job ID."
             print "No stageout will be performed."
@@ -488,6 +493,10 @@ def main():
             print "== ERROR: Unable to determine stageout policy."
             print "No stageout will be performed."
             return 60307
+        if save_logs == None: #well, actually we might assume saveLogs=False and delete these lines..
+            print "== ERROR: Unable to determine save_logs parameter."
+            print "No stageout will be performed."
+            return 60307
 
     # The stageout manager will be used by all attempts
     stageOutCall = {}
@@ -509,7 +518,9 @@ def main():
         print "==== Finished compression of user logs at %s (status %d) ====" % (time.ctime(), std_retval)
         if not std_retval:
             print "==== Starting stageout of user logs at %s ====" % time.ctime()
-            std_retval = performTransfer(manager, stageout_policy, log_file, dest, dest_files[0], dest_se)
+            if not save_logs:
+                print "Performing only local stageout for log files as the user did not specify saveLogs = True"
+            std_retval = performTransfer(manager, stageout_policy if save_logs else "local", log_file, dest, dest_files[0], dest_se)
     except Exception, ex:
         print "== ERROR: Unhandled exception when performing stageout of user logs."
         traceback.print_exc()
