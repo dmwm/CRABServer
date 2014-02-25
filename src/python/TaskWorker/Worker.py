@@ -62,7 +62,7 @@ def processWorker(inputs, results, instance, resturl):
                     server.post(resturl, data = urllib.urlencode(configreq))
                     logger.info("Error message successfully uploaded to the REST")
                 except Exception, exc:
-                    logger.warning("Cannot uploaded failure message to the REST for workflow %s.\nReason: %s" (task['tm_taskname'], exc))
+                    logger.warning("Cannot uploaded failure message to the REST for workflow %s.\nReason: %s" % (task['tm_taskname'], exc))
         t1 = time.time()
         logger.debug("%s: ...work on %s completed in %d seconds: %s" % (procName, task['tm_taskname'], t1-t0, outputs))
 
