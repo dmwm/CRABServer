@@ -36,7 +36,7 @@ class RetryJob(object):
 
     def get_job_ad(self):
         try:
-            cluster = int(cluster.split(".")[0])
+            cluster = int(self.cluster.split(".")[0])
             if cluster == -1:
                 return
         except ValueError:

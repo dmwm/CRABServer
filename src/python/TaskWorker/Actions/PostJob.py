@@ -248,7 +248,7 @@ class ASOServerJob(object):
                     logger.debug("Save logs flag is false; skipping log stageout.")
                     continue
             user = getUserFromLFN(lfn)
-            doc_id = getHashLfn( lfn )
+            doc_id = getHashLfn(lfn)
             common_info = { "state":  "new",
                             "source": oneFile[0],
                             "destination": self.dest_site,
