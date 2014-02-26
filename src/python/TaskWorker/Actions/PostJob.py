@@ -915,6 +915,8 @@ class PostJob():
             fname = os.path.join(logpath, "job_out."+id+"."+retry_count+".txt")
             logger.debug("Copying job stdout from %s to %s" % (stdout, fname))
             shutil.copy(stdout, fname)
+            stdout_f = open(stdout, 'w').truncate(0)
+            stdout_f.close()
             os.chmod(fname, 0644)
         # NOTE: we now redirect stdout -> stderr; hence, we don't keep stderr in the webdir.
         if os.path.exists(jobreport):
