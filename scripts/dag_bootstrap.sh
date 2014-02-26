@@ -83,9 +83,12 @@ then
 fi
 
 # If at CERN, try to bootstrap the UI:
+if [ "$1" == "POSTJOB" ];
+then
 if [ -e /afs/cern.ch/cms/LCG/LCG-2/UI/cms_ui_env.sh ];
 then
     . /afs/cern.ch/cms/LCG/LCG-2/UI/cms_ui_env.sh
+fi
 fi
 
 export PATH="/opt/glidecondor/bin:/opt/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
