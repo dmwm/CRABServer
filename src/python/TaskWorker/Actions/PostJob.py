@@ -532,8 +532,12 @@ class PostJob():
 
 
     def getTaskAd(self):
+        ad = os.environ.get("_CONDOR_JOB_AD", ".job.ad")
+        if not os.path.exists(ad) or not os.stat(ad).st_size:
+            print "Missing task ad!"
+            return 2
         try:
-            self.task_ad = classad.parseOld(open(os.environ["_CONDOR_JOB_AD"]))
+            self.task_ad = classad.parseOld(open(ad))
         except Exception:
             print traceback.format_exc()
 
@@ -848,6 +852,7 @@ class PostJob():
         logpath = os.path.expanduser("~/%s" % reqname)
         postjob = os.path.join(logpath, "postjob.%s.%s.txt" % (id, retry_count))
         logger.debug("The post-job script will be saved to %s" % postjob)
+        retval = 1
         try:
             retval = self.execute_internal(*args, **kw)
             logger.info("Post-job finished executing; status code %d." % retval)
@@ -936,7 +941,9 @@ class PostJob():
         logger.info("Post-job was asked to transfer up to %d files." % len(filenames))
 
         self.makeAd(reqname, id, outputdata, sw, async_dest)
-        self.getTaskAd()
+        if self.getTaskAd() == 2 or not self.task_ad:
+            self.uploadState("FAILED")
+            return RetryJob.FATAL_ERROR
         if 'CRAB_UserWebDir' in self.task_ad:
             self.logfiles = [("job_out", "txt"), ("job_fjr", "json"), ("postjob", "txt")]
             self.logfiles = ["%s/%s.%s.%s.%s" % (self.task_ad['CRAB_UserWebDir'], i[0], str(id), str(retry_count), i[1]) for i in self.logfiles]
