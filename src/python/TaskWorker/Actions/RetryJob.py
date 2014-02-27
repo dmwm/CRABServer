@@ -93,7 +93,7 @@ class RetryJob(object):
 
         if 'steps' not in self.report: return
         if 'cmsRun' not in self.report['steps']: return
-        if 'performance' not in self.report['steps']['cmsRun']['performance']: return
+        if 'performance' not in self.report['steps']['cmsRun']: return
         if 'cpu' not in self.report['steps']['cmsRun']['performance']: return
         if 'TotalJobTime' not in self.report['steps']['cmsRun']['performance']['cpu']: return
 
@@ -122,7 +122,7 @@ class RetryJob(object):
 
         if 'steps' not in self.report: return
         if 'cmsRun' not in self.report['steps']: return
-        if 'performance' not in self.report['steps']['cmsRun']['performance']: return
+        if 'performance' not in self.report['steps']['cmsRun']: return
         if 'memory' not in self.report['steps']['cmsRun']['performance']: return
         if 'PeakValueRss' not in self.report['steps']['cmsRun']['performance']['memory']: return
 
