@@ -8,6 +8,7 @@ import base64
 import random
 import urllib
 import traceback
+import subprocess
 
 import HTCondorUtils
 import HTCondorLocator
@@ -204,6 +205,18 @@ class DagmanSubmitter(TaskAction.TaskAction):
             info['remote_condor_setup'] = ''
             loc = HTCondorLocator.HTCondorLocator(self.backendurls)
             schedd, address = loc.getScheddObj(task['tm_taskname'])
+
+            #try to gsissh in order to create the home directory (and check if we can connect to the schedd)
+            try:
+               scheddAddress = loc.scheddAd['Machine']
+            except:
+               raise TaskWorkerException("Unable to get schedd address for task %s" % (task['tm_taskname']))
+            #try to connect
+            ret = subprocess.call(["sh","-c","export X509_USER_PROXY=%s; source %s; gsissh -o ConnectTimeout=60 -o PasswordAuthentication=no %s pwd" %\
+                                                (task['user_proxy'], self.config.MyProxy.uisource, scheddAddress)])
+            if ret:
+                raise TaskWorkerException("Canot gsissh to %s. Taskname %s" % (scheddAddress, task['tm_taskname']))
+
             if address:
                 self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
             else:
@@ -221,7 +234,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         self.server.post(self.resturl, data = data)
 
         self.sendDashboardJobs(dashboard_params, info['apmon'])
-    
+
         return Result.Result(task=kw['task'], result=(-1))
 
     def submitDirect(self, schedd, cmd, arg, info): #pylint: disable=R0201
