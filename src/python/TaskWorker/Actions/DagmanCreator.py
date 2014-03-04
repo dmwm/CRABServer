@@ -76,6 +76,7 @@ CRAB_HEADERS = \
 +CRAB_StageoutPolicy = %(stageoutpolicy)s
 +CRAB_UserRole = %(tm_user_role)s
 +CRAB_UserGroup = %(tm_user_group)s
++CRAB_TaskWorker = %(worker_name)s
 """
 
 JOB_SUBMIT = CRAB_HEADERS + \
@@ -177,7 +178,7 @@ def transform_strings(input):
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
            'userdn', 'requestname', 'publication', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
            'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL', 'asyncdest_se', "stageoutpolicy", \
-           'taskType', 'maxpost':
+           'taskType', 'maxpost', 'worker_name':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -340,6 +341,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
         info['ASOURL'] = task.get('tm_arguments', {}).get('ASOURL', '')
         info['taskType'] = getattr(self.config.TaskWorker, 'dashboardTaskType', 'analysis')
+        info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
 
         # TODO: pass through these correctly.
         info['runs'] = []
@@ -510,7 +512,7 @@ class DagmanCreator(TaskAction.TaskAction):
         userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
 
         info["jobcount"] = len(specs)
-        maxpost = getattr(self.config.TaskWorker, 'maxPost', 0)
+        maxpost = getattr(self.config.TaskWorker, 'maxPost', 20)
         if maxpost == -1:
             maxpost = info['jobcount']
         elif maxpost == 0:
