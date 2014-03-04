@@ -156,6 +156,19 @@ class RetryJob(object):
         if exitCode == 50115 or exitCode == 10034 % 256:
             raise RecoverableError("Job did not produce a FJR; will retry.")
 
+        if exitCode == 134:
+            recoverable_signal = False
+            try:
+                with open("job_out.tmp.%s" % str(self.count)) as fd:
+                    for line in fd:
+                        if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
+                            recoverable_signal = True
+                            break
+            except:
+                pass
+            if recoverable_signal:
+                raise RecoverableError("SIGILL; may indicate a worker node issue")
+
         if exitCode == 10034 or exitCode == 10034 % 256:
             raise RecoverableError("Required application version is not found at the site")
 
@@ -169,7 +182,9 @@ class RetryJob(object):
     def execute_internal(self, status, retry_count, max_retries, count, cluster):
 
         self.count = count
+        self.retry_count = retry_count
         self.cluster = cluster
+
         self.get_job_ad()
         self.get_report()
 

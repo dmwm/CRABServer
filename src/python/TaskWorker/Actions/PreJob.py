@@ -1,6 +1,9 @@
 
 import os
+import sys
+import json
 import classad
+import traceback
 
 from ApmonIf import ApmonIf
 
@@ -8,8 +11,54 @@ states = ['OK', 'FATAL_ERROR', 'RECOVERABLE_ERROR']
 
 class PreJob:
 
+
     def __init__(self):
         self.task_ad = classad.ClassAd()
+
+
+    def calculate_retry(self, id, retry_num):
+        """
+        Calculate the retry number we're on.  The DAGMan retry number is not
+        really what we want; it is the number of times the post-job runs until
+        completion.  Rather, we want to report the number of times the pre-job
+        has been run.
+
+        As a second issue, we want the post-job to be run at least once per time
+        the job is submitted.  So, fail the pre-job if need be.  This is useful
+        if the dag was restarted before the post-job was run and after the job
+        completed.
+
+        We determine the job was submitted in a 
+        """
+        fname = "retry_info/job.%d.txt" % id
+        if os.path.exists(fname):
+            try:
+                with open(fname, "r") as fd:
+                    retry_info = json.load(fd)
+            except:
+                return retry_num
+        else:
+            retry_info = {"pre": 0, "post": 0}
+        if 'pre' not in retry_info or 'post' not in retry_info:
+            return retry_num
+        retry_num = retry_info['pre']
+
+        out_fname = "job_out.%d" % id
+        if retry_info['pre'] > retry_info['post']:
+            # If job_out exists, then the job was likely submitted and we
+            # should run post-job.
+            if os.path.exists(out_fname):
+                sys.exit(1)
+        if (retry_info['pre'] <= retry_info['post']) and not os.path.exists(out_fname):
+            retry_info['pre'] = retry_info['post'] + 1
+        try:
+            with open(fname + ".tmp", "w") as fd:
+                json.dump(retry_info, fd)
+            os.rename(fname + ".tmp", fname)
+        except:
+            return retry_num
+        return retry_num
+
 
     def update_dashboard(self, retry, id, reqname, backend):
 
@@ -133,14 +182,18 @@ class PreJob:
         new_submit_file = '+DESIRED_SITES="%s"\n%s' % (",".join(available), new_submit_file)
         return new_submit_file
 
+
     def execute(self, *args):
         retry_num = int(args[0])
         crab_id = int(args[1])
+        retry_num = self.calculate_retry(crab_id, retry_num)
         reqname = args[2]
         backend = args[3]
         self.get_task_ad()
         self.alter_submit(retry_num, crab_id)
         if retry_num != 0:
             self.update_dashboard(retry_num, crab_id, reqname, backend)
+        # Note the cooloff time is based on the number of times the post-job finished
+        # This way, we don't punish users for resubmitting.
         os.execv("/bin/sleep", ["sleep", str(int(args[0])*60)])
 

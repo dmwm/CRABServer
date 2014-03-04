@@ -620,7 +620,7 @@ class PostJob():
         This prevents the user who owns the DAGs from retrieving the job output as they
         are no longer world-readable.
         """
-        for base_file in ["job_err", "job_out"]:
+        for base_file in ["job_err", "job_out.tmp"]:
             try:
                 os.chmod("%s.%d" % (base_file, self.crab_id), 0644)
             except OSError, oe:
@@ -847,6 +847,32 @@ class PostJob():
             self.node_map[str(node[u'se'])] = str(node[u'name'])
 
 
+    def calculateRetry(self, id, retry_num):
+        """
+        Calculate the retry number we're on.  See the notes in pre-job.
+        """
+        fname = "retry_info/job.%s.txt" % id
+        if os.path.exists(fname):
+            try:
+                with open(fname, "r") as fd:
+                    retry_info = json.load(fd)
+            except:
+                return retry_num
+        else:
+            retry_info = {"pre": 0, "post": 0}
+        if 'pre' not in retry_info or 'post' not in retry_info:
+            return retry_num
+        retry_num = str(retry_info['post'])
+        retry_info['post'] += 1
+        try:
+            with open(fname + ".tmp", "w") as fd:
+                json.dump(retry_info, fd)
+            os.rename(fname + ".tmp", fname)
+        except:
+            return retry_num
+        return retry_num
+
+
     def execute(self, *args, **kw):
         retry_count = args[2]
         self.retry_count = retry_count
@@ -899,6 +925,7 @@ class PostJob():
         self.reqname = reqname
         self.outputData = outputdata
         stdout = "job_out.%s" % id
+        stdout_tmp = "job_out.tmp.%s" % id
         stderr = "job_err.%s" % id
         jobreport = "jobReport.json.%s" % id
 
@@ -919,11 +946,13 @@ class PostJob():
                 logger.exception("Failed to create log web-shared directory %s" % logpath)
                 raise
 
+        retry_count = self.calculateRetry(id, retry_count)
         if os.path.exists(stdout):
+            os.rename(stdout, stdout_tmp)
             fname = os.path.join(logpath, "job_out."+id+"."+retry_count+".txt")
             logger.debug("Copying job stdout from %s to %s" % (stdout, fname))
-            shutil.copy(stdout, fname)
-            stdout_f = open(stdout, 'w')
+            shutil.copy(stdout_tmp, fname)
+            stdout_f = open(stdout_tmp, 'w')
             stdout_f.truncate(0)
             stdout_f.close()
             os.chmod(fname, 0644)
