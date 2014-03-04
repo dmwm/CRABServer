@@ -321,6 +321,7 @@ def injectToASO(dest_lfn, se_name):
             "job_end_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
             "retry_count": [],
             "failure_reason": [],
+            "job_retry_count": ad.get("CRAB_Retry", -1)
            }
     print "ASO info so far:"
     print info

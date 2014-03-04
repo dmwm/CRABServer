@@ -54,7 +54,7 @@ REGEX_ID = re.compile("([a-f0-9]{8,8})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]
 class FTSJob(object):
 
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, log_needs_transfer, output_metadata, task_ad):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, log_needs_transfer, output_metadata, task_ad, retry_count):
         self._id = None
         self._cancel = False
         self._sleep = 20
@@ -141,8 +141,9 @@ def getUserFromLFN(lfn):
 class ASOServerJob(object):
 
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, log_needs_transfer, output_metadata, task_ad):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, log_needs_transfer, output_metadata, task_ad, retry_count):
         self.id = None
+        self.retry_count = retry_count
         self.couchServer = None
         self.couchDatabase = None
         self.sleep = 200
@@ -259,6 +260,7 @@ class ASOServerJob(object):
                             "end_time": '',
                             "job_end_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
                             "retry_count": [],
+                            "job_retry_count": self.retry_count,
                             "failure_reason": [],
                           }
             # Even if a direct transfer was done, we register in ASO so publication happens.
@@ -802,7 +804,7 @@ class PostJob():
         else:
             targetClass = FTSJob
 
-        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.log_needs_transfer, self.output, self.task_ad)
+        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.log_needs_transfer, self.output, self.task_ad, self.retry_count)
         fts_job_result = g_Job.run()
         # If no files failed, return success immediately.  Otherwise, see how many files failed.
         if not fts_job_result:
