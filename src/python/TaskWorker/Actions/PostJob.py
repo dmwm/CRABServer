@@ -265,6 +265,7 @@ class ASOServerJob(object):
             if not needs_transfer:
                 logger.debug("File is marked as not needing transfer.")
                 common_info['state'] = 'done'
+                common_info['end_time'] = now
             needs_commit = True
             try:
                 doc = self.couchDatabase.document( doc_id )
