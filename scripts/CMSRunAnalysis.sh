@@ -15,6 +15,7 @@ then
     echo 'LCG style'
     set +x
     .  $VO_CMS_SW_DIR/cmsset_default.sh
+    rc=$?
     set -x
     declare -a VERSIONS
     VERSIONS=($(ls $VO_CMS_SW_DIR/$SCRAM_ARCH/external/python | grep 2.6))
@@ -25,7 +26,8 @@ elif [ "x" != "x$OSG_APP" ]
 then
     echo 'OSG style'  
     set +x
-	. $OSG_APP/cmssoft/cms/cmsset_default.sh
+    . $OSG_APP/cmssoft/cms/cmsset_default.sh
+    rc=$?
     set -x
     declare -a VERSIONS
     VERSIONS=($(ls $OSG_APP/cmssoft/cms/$SCRAM_ARCH/external/python | grep 2.6))
@@ -36,18 +38,24 @@ then
     export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
     set +x
     . $VO_CMS_SW_DIR/cmsset_default.sh
+    rc=$?
     . /cvmfs/cms.cern.ch/slc5_amd64_gcc461/external/python/2.6.4-cms2/etc/profile.d/init.sh
     set -x
-    #. /cvmfs/cms.cern.ch/COMP/slc5_amd64_gcc461/external/python/2.6.4-cms2/etc/profile.d/init.sh
-    #. /cvmfs/cms.cern.ch/COMP/slc5_amd64_gcc434/external/openssl/0.9.8e-comp2/etc/profile.d/init.sh
 else
 	echo "Error: neither OSG_APP, CVMFS, nor VO_CMS_SW_DIR environment variables were set" >&2
 	echo "Error: Because of this, we can't load CMSSW. Not good." >&2
 	sleep 20m
-	exit 2
+	exit ./DashboardFailure.sh 10031
 fi
 set +x
-echo "==== CMSSW pre-execution environment bootstrap FINISHING at $(date) ===="
+if [[ $rc != 0 ]]
+then
+    echo "==== Sourcing cmsset_default.sh failed at $(date).  Sleeping for 20 minutes. ===="
+    sleep 20m
+    exit ./DashboardFailure.sh 10032
+else
+    echo "==== CMSSW pre-execution environment bootstrap FINISHING at $(date) ===="
+fi
 
 echo "==== Python2.6 discovery STARTING ===="
 # check for Python2.6 installation 
