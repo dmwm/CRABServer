@@ -47,9 +47,9 @@ class HTCondorLocator(object):
             schedds = coll.query(htcondor.AdTypes.Schedd, 'regexp(%s, Name)' % HTCondorUtils.quote(info[0]))
             if not schedds:
                 raise Exception("Unable to locate schedd %s" % info[0])
-            scheddAd = schedds[0]
-            address = scheddAd['MyAddress']
-            schedd = htcondor.Schedd(scheddAd)
+            self.scheddAd = schedds[0]
+            address = self.scheddAd['MyAddress']
+            schedd = htcondor.Schedd(self.scheddAd)
         return schedd, address
 
     def getCollector(self, name="localhost"):

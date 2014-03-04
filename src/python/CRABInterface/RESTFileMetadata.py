@@ -48,6 +48,8 @@ class RESTFileMetadata(RESTEntity):
             validate_str("outlfn", param, safe, RX_LFN, optional=False)
             validate_num("events", param, safe, optional=False)
             validate_str("filestate", param, safe, RX_FILESTATE, optional=True)
+            validate_num("directstageout", param, safe, optional=True)
+            safe.kwargs["directstageout"] = 'T' if safe.kwargs["directstageout"] else 'F' #'F' if not provided
         elif method in ['POST']:
             validate_str("taskname", param, safe, RX_WORKFLOW, optional=False)
             validate_str("outlfn", param, safe, RX_LFN, optional=False)
@@ -60,12 +62,12 @@ class RESTFileMetadata(RESTEntity):
 
     @restcall
     def put(self, taskname, outfilelumis, inparentlfns, globalTag, outfileruns, pandajobid, outsize, publishdataname, appver, outtype, checksummd5,\
-                checksumcksum, checksumadler32, outlocation, outtmplocation, outdatasetname, acquisitionera, outlfn, events, filestate):
+                checksumcksum, checksumadler32, outlocation, outtmplocation, outdatasetname, acquisitionera, outlfn, events, filestate, directstageout):
         """Insert a new job metadata information"""
         return self.jobmetadata.inject(taskname=taskname, outfilelumis=outfilelumis, inparentlfns=inparentlfns, globalTag=globalTag, outfileruns=outfileruns,\
                            pandajobid=pandajobid, outsize=outsize, publishdataname=publishdataname, appver=appver, outtype=outtype, checksummd5=checksummd5,\
                            checksumcksum=checksumcksum, checksumadler32=checksumadler32, outlocation=outlocation, outtmplocation=outtmplocation,\
-                           outdatasetname=outdatasetname, acquisitionera=acquisitionera, outlfn=outlfn, events=events, filestate=filestate)
+                           outdatasetname=outdatasetname, acquisitionera=acquisitionera, outlfn=outlfn, events=events, filestate=filestate, directstageout=directstageout)
 
     @restcall
     def post(self, taskname, outlfn, filestate):
