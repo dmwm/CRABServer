@@ -346,6 +346,7 @@ ad = {}
 try:
     ad = parseAd()
 except:
+    print "==== FAILURE WHEN PARSING HTCONDOR CLASSAD AT %s ====" % time.ctime()
     print traceback.format_exc()
     ad = {}
 if ad:
@@ -373,7 +374,15 @@ except:
         earlyDashboardFailure(ad)
     print "==== FAILURE WHEN LOADING WMCORE AT %s ====" % time.ctime()
     print traceback.format_exc()
-    raise
+    mintime()
+    sys.exit(10043)
+
+# At this point, all our dependent libraries have been loaded; it's quite
+# unlikely python will see a segfault.  Drop a marker file in the working
+# directory; if we encounter a python segfault, the wrapper will look to see if
+# this file exists and report to Dashboard accordingly.
+with open("wmcore_initialized", "w") as fd:
+    fd.write("wmcore initialized.\n")
 
 def getProv(filename, opts):
     scram = Scram(

@@ -140,6 +140,14 @@ if [ -e scramOutput.log ]; then
 else
   echo "ERROR: scramOutput.log does not exist."
 fi
+
+if [ ! -e wmcore_initialized ];
+then
+    echo "======== ERROR: Unable to initialize WMCore at $(date) ========"
+    sleep 20m
+    exit ./DashboardFailure.sh 10043
+fi
+
 exit $jobrc
 
 _
