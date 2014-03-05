@@ -54,7 +54,7 @@ REGEX_ID = re.compile("([a-f0-9]{8,8})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]
 class FTSJob(object):
 
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, log_needs_transfer, output_metadata, task_ad, retry_count):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, log_needs_transfer, output_metadata, task_ad, retry_count, retry_timeout):
         self._id = None
         self._cancel = False
         self._sleep = 20
@@ -141,9 +141,10 @@ def getUserFromLFN(lfn):
 class ASOServerJob(object):
 
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, log_needs_transfer, output_metadata, task_ad, retry_count):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, log_needs_transfer, output_metadata, task_ad, retry_count, retry_timeout):
         self.id = None
         self.retry_count = retry_count
+        self.retry_timeout = retry_timeout
         self.couchServer = None
         self.couchDatabase = None
         self.sleep = 200
@@ -352,6 +353,7 @@ class ASOServerJob(object):
         self.id = self.submit()
         if self.id == False:
             raise RuntimeError, "Couldn't send to couchdb"
+        starttime = time.time()
         while True:
             status = self.status()
             logger.info("Got statuses: %s" % ", ".join(status))
@@ -393,8 +395,14 @@ class ASOServerJob(object):
                     print attachment
                     logger.info("== END FTS interaction log ==")
                 return 0
-            # Sleep is done here in case if the transfer is done immediately (direct stageout case).
-            time.sleep(self.sleep)
+            if time.time() - starttime > self.retry_timeout:
+                self.failure = "Killed ASO transfer after timeout of %d." % self.retry_timeout
+                logger.warning("Killing ASO transfer after timeout of %d." % self.retry_timeout)
+                self.cancel()
+                return 1
+            else:
+                # Sleep is done here in case if the transfer is done immediately (direct stageout case).
+                time.sleep(self.sleep + random.randint(60))
 
 
     def getLastFailure(self):
@@ -532,6 +540,7 @@ class PostJob():
         self.retry_count = "0"
         self.logfiles = None
         self.log_needs_transfer = True
+        self.retry_timeout = 2*3600
 
 
     def getTaskAd(self):
@@ -804,7 +813,7 @@ class PostJob():
         else:
             targetClass = FTSJob
 
-        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.log_needs_transfer, self.output, self.task_ad, self.retry_count)
+        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.log_needs_transfer, self.output, self.task_ad, self.retry_count, self.retry_timeout)
         fts_job_result = g_Job.run()
         # If no files failed, return success immediately.  Otherwise, see how many files failed.
         if not fts_job_result:
@@ -1007,6 +1016,8 @@ class PostJob():
                     logger.info("The retry handler indicated this was a recoverable error.  DAGMan will retry")
                 self.uploadState(fail_state)
                 return retval
+
+        self.retry_timeout = retry.get_aso_timeout(self)
 
         self.parseJson()
         self.source_site = self.getSourceSite()

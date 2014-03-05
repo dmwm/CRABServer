@@ -33,6 +33,10 @@ class RetryJob(object):
         self.site = None
         self.ad = {}
         self.validreport = True
+        self.integratedJobTime = 0
+
+    def get_aso_timeout(self):
+        return min(max(self.integratedJobTime/4, 2*3600), 6*3600)
 
     def get_job_ad(self):
         try:
@@ -116,6 +120,8 @@ class RetryJob(object):
         for ad in self.ads:
             if 'RemoteWallClockTime' in ad:
                 integratedJobTime += ad['RemoteWallClockTime']
+
+        self.integratedJobTime = integratedJobTime
 
         # TODO: Compare the job against its requested walltime, not a hardcoded max.
         if totJobTime > MAX_WALLTIME:
