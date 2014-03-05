@@ -45,8 +45,8 @@ class DataWorkflow(object):
 	self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
 	self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
 
-        self.failedList = []
-        self.successList = []
+        #self.failedList = []
+        #self.successList = []
 
     def updateRequest(self, workflow):
         """Provide the implementing class a chance to rename the workflow
