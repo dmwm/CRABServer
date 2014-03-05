@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #
 # We used to rely on HTCondor file transfer plugins to handle output for us
@@ -113,8 +113,7 @@ then
 	echo "Error: Python2.6 isn't available on this worker node." >&2
 	echo "Error: job execution REQUIRES python2.6" >&2
 	sleep 20m
-        ./DashboardFailure.sh 10043
-	exit $?
+        exit $(./DashboardFailure.sh 10043)
 else
 	echo "I found python2.6 at.."
 	echo `which python2.6`

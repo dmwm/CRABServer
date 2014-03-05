@@ -122,8 +122,9 @@ elif [ ! -r $X509_USER_PROXY ]; then
     echo "The proxy is unreadable for some reason"
     EXIT_STATUS=6
 else
-    # There used to be -Suppress_notification here. Why?
-    exec condor_dagman -f -l . -Lockfile $PWD/$1.lock -AutoRescue 1 -DoRescueFrom 0 -MaxPre 100 -MaxIdle 100 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 3 -verbose
+    # Re-nice the process so, even when we churn through lots of processes, we never starve the schedd or shadows for cycles.
+    nice -n 15
+    exec condor_dagman -f -l . -Lockfile $PWD/$1.lock -AutoRescue 1 -DoRescueFrom 0 -MaxPre 20 -MaxIdle 200 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 3 -verbose
     EXIT_STATUS=$?
 fi
 exit $EXIT_STATUS
