@@ -494,6 +494,8 @@ def main():
             print "== ERROR: Unable to determine stageout policy."
             print "No stageout will be performed."
             return 60307
+        else:
+            print "Stageout policy: %s" % ", ".join(stageout_policy)
         if save_logs == None: #well, actually we might assume saveLogs=False and delete these lines..
             print "== ERROR: Unable to determine save_logs parameter."
             print "No stageout will be performed."
@@ -521,7 +523,7 @@ def main():
             print "==== Starting stageout of user logs at %s ====" % time.ctime()
             if not save_logs:
                 print "Performing only local stageout for log files as the user did not specify saveLogs = True"
-            std_retval = performTransfer(manager, stageout_policy if save_logs else "local", log_file, dest, dest_files[0], dest_se)
+            std_retval = performTransfer(manager, stageout_policy if save_logs else ["local"], log_file, dest, dest_files[0], dest_se)
     except Exception, ex:
         print "== ERROR: Unhandled exception when performing stageout of user logs."
         traceback.print_exc()
@@ -529,6 +531,9 @@ def main():
             std_retval = 60307
     finally:
         print "==== Stageout of user logs ended at %s (status %d) ====" % (time.ctime(), std_retval)
+    if not save_logs and std_retval:
+        print "Ignoring log stageout failure because user did not request that they be staged out."
+        std_retval = 0
 
     out_retval = 0
     for dest, remote_dest in zip(output_files, dest_files[1:]):
