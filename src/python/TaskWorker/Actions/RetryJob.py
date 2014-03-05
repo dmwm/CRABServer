@@ -42,8 +42,17 @@ class RetryJob(object):
         except ValueError:
             pass
 
-        cmd = "condor_q -l -userlog job_log %s" % str(self.cluster)
+        shutil.copy("job_log", "job_log.%s" % str(self.cluster))
+
+        cmd = "condor_q -l -userlog job_log.%s %s" % (str(self.cluster), str(self.cluster))
+
         status, output = commands.getstatusoutput(cmd)
+
+        try:
+            os.unlink("job_log.%s" % str(self.cluster))
+        except:
+            pass
+
         if status:
             raise FatalError("Failed to query condor user log:\n%s" % output)
         self.ads = []
