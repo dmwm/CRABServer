@@ -1,9 +1,10 @@
 import re
 import time
 import base64
+import socket
 import urllib
-import traceback
 import datetime
+import traceback
 
 import classad
 import htcondor
@@ -16,6 +17,8 @@ import HTCondorUtils
 
 import WMCore.Database.CMSCouch as CMSCouch
 
+import ApmonIf
+
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 
 class DagmanKiller(TaskAction.TaskAction):
@@ -26,7 +29,7 @@ class DagmanKiller(TaskAction.TaskAction):
     We do not actually "kill" the task off, but put the DAG on hold.
     """
 
-    def executeInternal(self, *args, **kw):
+    def executeInternal(self, apmon, *args, **kw):
 
         if 'task' not in kw:
             raise ValueError("No task specified.")
@@ -39,7 +42,7 @@ class DagmanKiller(TaskAction.TaskAction):
         self.proxy = self.task['user_proxy']
 
         try:
-            self.killTransfers()
+            self.killTransfers(apmon)
         except:
             self.logger.exception("Failed to kill transfers; suppressing error until functionality is confirmed")
 
@@ -49,17 +52,37 @@ class DagmanKiller(TaskAction.TaskAction):
         if not WORKFLOW_RE.match(self.workflow):
             raise Exception("Invalid workflow name.")
 
+        # Query HTCondor for information about running jobs and update Dashboard appropriately
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
         self.schedd, address = loc.getScheddObj(self.workflow)
 
-        # TODO: return to this once ASO transfers know the appropriate crab retry #.
-        #for idx in self.task['kill_ids']:
-        #    jinfo = {'jobId': ("%d_https://glidein.cern.ch/%d/%s_0" % (idx, idx, taskid)),
-        #             'sid': "https://glidein.cern.ch/%d/%s" % (idx, taskid),
-        #             'broker': os.environ.get('HOSTNAME',''),
-        #             'bossId': str(idx),
-        #             'StatusValue' : 'pending',
-        #            }
+        ad = classad.ClassAd()
+        ad['foo'] = self.task['kill_ids']
+        try:
+            hostname = socket.getfqdn()
+        except:
+            hostname = ''
+
+        const = "CRAB_ReqName =?= %s && member(CRAB_Id, %s)" % (HTCondorUtils.quote(self.workflow), ad.lookup("foo").__repr__())
+        try:
+            for ad in self.schedd.query(const, ['CRAB_Id', 'CRAB_Retry']):
+                if ('CRAB_Id' not in ad) or ('CRAB_Retry' not in ad):
+                    continue
+                jobid = str(ad.eval('CRAB_Id'))
+                jobretry = str(ad.eval('CRAB_Retry'))
+                jinfo = {'jobId': ("%s_https://glidein.cern.ch/%s/%s_%s" % (jobid, jobid, self.workflow, jobretry)),
+                         'sid': "https://glidein.cern.ch/%s%s" % (jobid, self.workflow),
+                         'broker': hostname,
+                         'bossId': jobid,
+                         'StatusValue' : 'killed',
+                        }
+                self.logger.info("Sending kill info to Dashboard: %s" % str(jinfo))
+                apmon.sendToML(jinfo)
+        except:
+            self.logger.exception("Failed to notify Dashboard of job kills")
+
+        # Note that we can not send kills for jobs not in queue at this time; we'll need the
+        # DAG FINAL node to be fixed and the node status to include retry number.
 
         if self.task['kill_all']:
             return self.killAll()
@@ -67,12 +90,18 @@ class DagmanKiller(TaskAction.TaskAction):
             return self.killJobs(self.task['kill_ids'])
 
 
-    def killTransfers(self):
+    def killTransfers(self, apmon):
         self.logger.info("About to kill transfers from workflow %s." % self.workflow)
         ASOURL = self.task.get('tm_arguments', {}).get('ASOURL')
         if not ASOURL:
             self.logger.info("ASO URL not set; will not kill transfers")
             return False
+
+        try:
+            hostname = socket.getfqdn()
+        except:
+            hostname = ''
+
         server = CMSCouch.CouchServer(dburl=ASOURL, ckey=self.proxy, cert=self.proxy)
         try:
             db = server.connectDatabase('asynctransfer')
@@ -80,7 +109,7 @@ class DagmanKiller(TaskAction.TaskAction):
             msg =  "Error while connecting to asynctransfer CouchDB"
             self.logger.exception(msg)
             raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
-        self.queryKill = {'reduce':False, 'key':self.workflow}
+        self.queryKill = {'reduce':False, 'key':self.workflow, 'include_docs': True}
         try:
             filesKill = db.loadView('AsyncTransfer', 'forKill', self.queryKill)['rows']
         except Exception, ex:
@@ -99,15 +128,23 @@ class DagmanKiller(TaskAction.TaskAction):
                 'retry': now,
                }
             updateUri = "/%s/_design/AsyncTransfer/_update/updateJobs/%s?%s" % (db.name, id, urllib.urlencode(data))
+            jobid = idt.get('jobid')
+            jobretry = idt.get('job_retry_count')
             if not self.task['kill_all']:
-                try:
-                    doc = db.document( id )
-                except CMSCouch.CouchNotFoundError:
-                    self.logger.exception("Document %d is missing" % id)
+                if idt.get("jobid") not in self.task['kill_ids']:
                     continue
-                if doc.get("jobid") not in self.task['kill_ids']:
-                    continue
-            self.logger.info("Killing transfer %s." % id)
+            self.logger.info("Killing transfer %s (job ID %s; job retry %s)." % (id, str(jobid), str(jobretry)))
+            jobid = str(jobid)
+            jobretry = str(jobretry)
+            if jobid and jobretry != None:
+                jinfo = {'jobId': ("%s_https://glidein.cern.ch/%s/%s_%s" % (jobid, jobid, self.workflow, jobretry)),
+                         'sid': "https://glidein.cern.ch/%s%s" % (jobid, self.workflow),
+                         'broker': hostname,
+                         'bossId': jobid,
+                         'StatusValue' : 'killed',
+                        }
+                self.logger.info("Sending kill info to Dashboard: %s" % str(jinfo))
+                apmon.sendToML(jinfo)
             try:
                 db.makeRequest(uri = updateUri, type = "PUT", decode = False)
             except Exception, ex:
@@ -145,8 +182,9 @@ class DagmanKiller(TaskAction.TaskAction):
 
     def execute(self, *args, **kw):
 
+        apmon = ApmonIf.ApmonIf()
         try:
-            self.executeInternal(*args, **kw)
+            self.executeInternal(apmon, *args, **kw)
         except Exception, exc:
             self.logger.error(str(traceback.format_exc()))
             configreq = {'workflow': kw['task']['tm_taskname'], 'status': 'KILLFAILED', 'subresource': 'failure', 'failure': base64.b64encode(str(exc))}
@@ -158,4 +196,6 @@ class DagmanKiller(TaskAction.TaskAction):
             else:
                 configreq = {'workflow': kw['task']['tm_taskname'], 'status': "SUBMITTED"}
                 self.server.post(self.resturl, data = urllib.urlencode(configreq))
+        finally:
+            apmon.free()
 
