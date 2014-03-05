@@ -50,6 +50,10 @@ def temp_to_lfn(lfn, username):
     return "/" + "/".join(lfn_parts)
 
 
+class MissingNodeStatus(ExecutionError):
+    pass
+
+
 class HTCondorDataWorkflow(DataWorkflow):
     """ HTCondor implementation of the status command.
     """
@@ -214,7 +218,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             verbose = 0
         self.logger.info("Status result for workflow %s: %s (detail level %d)" % (workflow, status, verbose))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
-        if status != 'SUBMITTED':
+        if status not in ['SUBMITTED', 'KILLFAILED', 'KILLED']:
             if isinstance(taskFailure, str):
                 taskFailureMsg = taskFailure
             elif taskFailure == None:
@@ -278,7 +282,18 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
 
-        taskStatus, pool = self.taskWebStatus(results[0], verbose=verbose)
+        try:
+            taskStatus, pool = self.taskWebStatus(results[0], verbose=verbose)
+        except MissingNodeStatus:
+            return [ {"status" : "UNKNOWN",
+                "taskFailureMsg"  : "Node status file not currently available.  Retry in a minute if you just submitted the task",
+                "jobSetID"        : '',
+                "jobsPerStatus"   : {},
+                "failedJobdefs"   : 0,
+                "totalJobdefs"    : 0,
+                "jobdefErrors"    : [],
+                "jobList"         : [],
+                "saveLogs"        : saveLogs }]
 
         jobsPerStatus = {}
         jobList = []
@@ -292,7 +307,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         elif taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 16:
             retval['status'] = 'InTransition'
         elif taskStatusCode == 5:
-            retval['status'] = 'Unknown'
+            retval['status'] = 'FAILED'
 
         for i in range(1, taskJobCount+1):
             i = str(i)
@@ -428,7 +443,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             self.parseNodeState(fp, nodes)
             self.logger.debug("Finished parse of node state")
         else:
-            raise ExecutionError("Cannot get node state log. Retry in a minute if you just submitted the task")
+            raise MissingNodeStatus("Cannot get node state log. Retry in a minute if you just submitted the task")
 
         return nodes, pool_info
 
