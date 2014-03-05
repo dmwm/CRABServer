@@ -6,6 +6,8 @@ from WMCore.REST.Validation import validate_str
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import RX_SUBRES_SI
 from CRABInterface.Utils import conn_handler
+from CRABInterface.__init__ import __version__
+
 
 
 class RESTServerInfo(RESTEntity):
@@ -41,4 +43,4 @@ class RESTServerInfo(RESTEntity):
 
     @conn_handler(services=['centralconfig'])
     def version(self):
-        yield self.centralcfg.centralconfig['compatible-version']
+        yield self.centralcfg.centralconfig['compatible-version']+[__version__]
