@@ -104,4 +104,4 @@ if [ "X$_CONDOR_JOB_AD" != "X" ]; then
   cat $_CONDOR_JOB_AD
 fi
 echo "Now running the job in `pwd`..."
-exec python2.6 -m TaskWorker.TaskManagerBootstrap "$@"
+exec nice -n 19 python2.6 -m TaskWorker.TaskManagerBootstrap "$@"

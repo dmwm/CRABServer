@@ -124,7 +124,7 @@ elif [ ! -r $X509_USER_PROXY ]; then
 else
     # Re-nice the process so, even when we churn through lots of processes, we never starve the schedd or shadows for cycles.
     nice -n 15
-    exec condor_dagman -f -l . -Lockfile $PWD/$1.lock -AutoRescue 1 -DoRescueFrom 0 -MaxPre 20 -MaxIdle 200 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 3 -verbose
+    exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -AutoRescue 1 -DoRescueFrom 0 -MaxPre 20 -MaxIdle 200 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
     EXIT_STATUS=$?
 fi
 exit $EXIT_STATUS
