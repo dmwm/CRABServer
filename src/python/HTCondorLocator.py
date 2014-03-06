@@ -43,7 +43,8 @@ class HTCondorLocator(object):
             pool = "localhost"
             if len(info) == 3:
                 pool = info[1]
-            coll = htcondor.Collector(self.getCollector(pool))
+            htcondor.param['COLLECTOR_HOST'] = self.getCollector(pool)
+            coll = htcondor.Collector()
             schedds = coll.query(htcondor.AdTypes.Schedd, 'regexp(%s, Name)' % HTCondorUtils.quote(info[0]))
             if not schedds:
                 raise Exception("Unable to locate schedd %s" % info[0])
