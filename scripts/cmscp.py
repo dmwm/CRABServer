@@ -217,11 +217,17 @@ def performLocalTransfer(manager, source, dest):
         stageout_info = manager(fileForTransfer)
     except Alarm:
         print "Indefinite hang during stageOut of %s" % dest
-        manager.cleanSuccessfulStageOuts()
+        try:
+            manager.cleanSuccessfulStageOuts()
+        except StageOutError:
+            pass
         result = 60403
     except Exception, ex:
         print "== Error during stageout: %s" % ex
-        manager.cleanSuccessfulStageOuts()
+        try:
+            manager.cleanSuccessfulStageOuts()
+        except StageOutError:
+            pass
         result = 60307
     finally:
         signal.alarm(0)
