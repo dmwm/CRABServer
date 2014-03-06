@@ -1,6 +1,7 @@
 
 import os
 import json
+import shutil
 import commands
 import traceback
 
