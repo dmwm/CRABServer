@@ -48,6 +48,7 @@ waitTime = 60*60
 numberOfRetries = 2
 retryPauseTime = 60
 g_now = None
+g_now_epoch = None
 
 def parseAd():
     fd = open(os.environ['_CONDOR_JOB_AD'])
@@ -306,6 +307,7 @@ def injectToASO(dest_lfn, se_name):
     global g_now
     if g_now == None:
         g_now = str(datetime.datetime.now())
+        g_now_epoch = last_update
 
     # NOTE: it's almost certainly a mistake to include dest_lfn in the hash here as it
     # includes /store/temp/user/foo.$HASH.  We should normalize based on the final LFN (/store/user/...)
@@ -367,6 +369,7 @@ def injectToASO(dest_lfn, se_name):
         return False
     print "Final stageout job description: %s" % pprint.pformat(doc)
     full_report['aso_start_time'] = g_now
+    full_report['aso_start_timestamp'] = g_now_epoch
     with open("jobReport.json.%d" % id, "w") as fd:
         json.dump(full_report, fd)
 

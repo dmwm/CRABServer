@@ -161,6 +161,7 @@ class ASOServerJob(object):
         self.publish = outputdata
         self.task_ad = task_ad
         self.failure = None
+        self.aso_start_timestamp = None
         proxy = os.environ.get('X509_USER_PROXY', None)
         aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config")
         if config:
@@ -203,6 +204,7 @@ class ASOServerJob(object):
             with open("jobReport.json.%d" % self.count) as fd:
                 full_report = json.load(fd)
             aso_start_time = full_report.get("aso_start_time")
+            self.aso_start_timestamp = full_report.get("aso_start_timestamp")
         except:
             logger.exception("Unable to determine ASO start time from worker node")
 
@@ -354,9 +356,11 @@ class ASOServerJob(object):
         if self.id == False:
             raise RuntimeError, "Couldn't send to couchdb"
         starttime = time.time()
+        if self.aso_start_timestamp:
+            starttime = self.aso_start_timestamp
         while True:
             status = self.status()
-            logger.info("Got statuses: %s" % ", ".join(status))
+            logger.info("Got statuses: %s; %.1f hours since transfer submit." % (", ".join(status), (time.time()-starttime)/3600.0))
             allDone = True
             for oneStatus, jobID in zip(status, self.id):
                 # states to wait on
