@@ -311,6 +311,7 @@ def injectToASO(dest_lfn, se_name):
 
     last_update = int(time.time())
     global g_now
+    global g_now_epoch
     if g_now == None:
         g_now = str(datetime.datetime.now())
         g_now_epoch = last_update
