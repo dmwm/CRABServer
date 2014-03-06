@@ -174,13 +174,15 @@ class RetryJob(object):
         if exitCode == 134:
             recoverable_signal = False
             try:
-                with open("job_out.tmp.%s" % str(self.count)) as fd:
+                fname = os.path.expanduser("~/%s/job_out.%s.%s.txt" % (self.reqname, self.count, self.retry_count))
+                with open(fname) as fd:
                     for line in fd:
                         if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
                             recoverable_signal = True
                             break
             except:
-                pass
+                print "Error analyzing abort signal."
+                print str(traceback.format_exc())
             if recoverable_signal:
                 raise RecoverableError("SIGILL; may indicate a worker node issue")
 
@@ -194,8 +196,9 @@ class RetryJob(object):
         if not self.report or not self.validreport:
             raise RecoverableError("Job did not produce a usable framework job report.")
 
-    def execute_internal(self, status, retry_count, max_retries, count, cluster):
+    def execute_internal(self, reqname, status, retry_count, max_retries, count, cluster):
 
+        self.reqname = reqname
         self.count = count
         self.retry_count = retry_count
         self.cluster = cluster

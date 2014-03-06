@@ -1004,7 +1004,7 @@ class PostJob():
         retry = RetryJob.RetryJob()
         retval = None
         if not os.environ.get('TEST_POSTJOB_DISABLE_RETRIES', False):
-            retval = retry.execute(status, retry_count, max_retries, self.crab_id, cluster)
+            retval = retry.execute(reqname, status, retry_count, max_retries, self.crab_id, cluster)
         if retval:
             if retval == RetryJob.FATAL_ERROR:
                 logger.info("The retry handler indicated this was a fatal error.")
