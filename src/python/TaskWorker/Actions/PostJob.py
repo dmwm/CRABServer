@@ -1021,7 +1021,7 @@ class PostJob():
                 self.uploadState(fail_state)
                 return retval
 
-        self.retry_timeout = retry.get_aso_timeout(self)
+        self.retry_timeout = retry.get_aso_timeout()
 
         self.parseJson()
         self.source_site = self.getSourceSite()
