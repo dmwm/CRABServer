@@ -6,6 +6,7 @@ import sys
 import time
 import json
 import errno
+import random
 import shutil
 import signal
 import urllib
@@ -406,7 +407,7 @@ class ASOServerJob(object):
                 return 1
             else:
                 # Sleep is done here in case if the transfer is done immediately (direct stageout case).
-                time.sleep(self.sleep + random.randint(60))
+                time.sleep(self.sleep + random.randint(0, 60))
 
 
     def getLastFailure(self):
