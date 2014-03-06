@@ -315,6 +315,8 @@ def injectToASO(dest_lfn, se_name):
     if g_now == None:
         g_now = str(datetime.datetime.now())
         g_now_epoch = last_update
+    if g_now_epoch == None:
+        g_now_epoch = last_update
 
     # NOTE: it's almost certainly a mistake to include dest_lfn in the hash here as it
     # includes /store/temp/user/foo.$HASH.  We should normalize based on the final LFN (/store/user/...)
