@@ -97,6 +97,7 @@ export PYTHONPATH=/opt/glidecondor/lib/python:$PYTHONPATH
 export PYTHONPATH=/data/srv/glidecondor/lib/python2.6:$PYTHONPATH
 export LD_LIBRARY_PATH=/opt/glidecondor/lib:/opt/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/data/srv/glidecondor/lib:/data/srv/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
+export PYTHONUNBUFFERED=1
 echo "Printing current environment..."
 env
 if [ "X$_CONDOR_JOB_AD" != "X" ]; then

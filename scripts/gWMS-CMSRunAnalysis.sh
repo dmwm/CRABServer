@@ -121,9 +121,18 @@ fi
 echo "======== python2.6 bootstrap for stageout at $(date) FINISHING ========"
 
 echo "======== Stageout at $(date) STARTING ========"
+rm -f wmcore_initialized
 # Note we prevent buffering of stdout/err -- this is due to observed issues in mixing of out/err for stageout plugins
 PYTHONUNBUFFERED=1 ./cmscp.py
 STAGEOUT_EXIT_STATUS=$?
+
+if [ ! -e wmcore_initialized ];
+then
+    echo "======== ERROR: Unable to initialize WMCore at $(date) ========"
+    sleep 20m
+    exit $(./DashboardFailure.sh 10043)
+fi
+
 if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
     set -x
     if [ $EXIT_STATUS -eq 0 ]; then

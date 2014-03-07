@@ -44,6 +44,10 @@ import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 
 import DashboardAPI
 
+# See the explanation of this sentry file in CMSRunAnalysis.py
+with open("wmcore_initialized", "w") as fd:
+    fd.write("wmcore initialized.\n")
+
 waitTime = 60*60
 numberOfRetries = 2
 retryPauseTime = 60
