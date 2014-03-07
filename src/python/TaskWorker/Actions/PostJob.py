@@ -306,6 +306,10 @@ class ASOServerJob(object):
                         "type" : file_type,
                         "publish" : 1
                     }
+                if not needs_transfer:
+                    # The "/store/user" variant of the LFN should be used for files that are marked as 'done'.
+                    # Otherwise, publication may break.
+                    doc["lfn"] = lfn.replace('/store/temp/user', '/store/user', 1)
                 doc.update(common_info)
             except Exception, ex:
                 msg = "Error loading document from couch. Transfer submission failed."
@@ -909,7 +913,7 @@ class PostJob():
         if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             os.dup2(fd, 1)
             os.dup2(fd, 2)
-            logger.info("Post-job started with output redirected to %s." % new_stdout)
+            logger.info("Post-job started with output redirected to %s." % postjob)
         else:
             logger.info("Post-job started with no output redirection.")
 
@@ -957,6 +961,7 @@ class PostJob():
         stderr = "job_err.%s" % id
         jobreport = "jobReport.json.%s" % id
 
+        logpath = os.path.expanduser("~/%s" % reqname)
         retry_count = self.calculateRetry(id, retry_count)
         if os.path.exists(stdout):
             os.rename(stdout, stdout_tmp)
