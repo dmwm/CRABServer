@@ -5,6 +5,7 @@ import urllib
 import logging
 import traceback
 
+import classad
 import htcondor
 
 import CRABInterface.HTCondorUtils as HTCondorUtils
@@ -56,9 +57,9 @@ class CRAB3ProxyRenewer(object):
         role = ''
         if 'CRAB_UserVO' in ad and ad['CRAB_UserVO']:
             vo = ad['CRAB_UserVO']
-        if 'CRAB_UserGroup' in ad and ad['CRAB_UserGroup']:
+        if 'CRAB_UserGroup' in ad and ad['CRAB_UserGroup'] and ad['CRAB_UserGroup'] != classad.Value.Undefined:
             group = ad['CRAB_UserGroup']
-        if 'CRAB_UserRole' in ad and ad['CRAB_UserRole']:
+        if 'CRAB_UserRole' in ad and ad['CRAB_UserRole'] and ad['CRAB_UserRole'] != classad.Value.Undefined:
             role = ad['CRAB_UserRole']
         print vo, group, role
         proxycfg = {'vo': vo,
@@ -119,9 +120,9 @@ class CRAB3ProxyRenewer(object):
             role = ''
             if 'CRAB_UserVO' in ad and ad['CRAB_UserVO']:
                 vo = ad['CRAB_UserVO']
-            if 'CRAB_UserGroup' in ad and ad['CRAB_UserGroup']:
+            if 'CRAB_UserGroup' in ad and ad['CRAB_UserGroup'] and ad['CRAB_UserGroup'] != classad.Value.Undefined:
                 group = ad['CRAB_UserGroup']
-            if 'CRAB_UserRole' in ad and ad['CRAB_UserRole']:
+            if 'CRAB_UserRole' in ad and ad['CRAB_UserRole'] and ad['CRAB_UserRole'] != classad.Value.Undefined:
                 role = ad['CRAB_UserRole']
             key = (user, vo, group, role)
             ad_list = ads.setdefault(key, [])
