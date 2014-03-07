@@ -892,9 +892,27 @@ class PostJob():
         self.retry_count = retry_count
         id = args[7]
         reqname = args[6]
+
         logpath = os.path.expanduser("~/%s" % reqname)
+        try:
+            os.makedirs(logpath)
+        except OSError, oe:
+            if oe.errno != errno.EEXIST:
+                logger.exception("Failed to create log web-shared directory %s" % logpath)
+                raise
+
         postjob = os.path.join(logpath, "postjob.%s.%s.txt" % (id, retry_count))
         logger.debug("The post-job script will be saved to %s" % postjob)
+
+        fd = os.open(postjob, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
+        os.chmod(postjob, 0644)
+        if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
+            os.dup2(fd, 1)
+            os.dup2(fd, 2)
+            logger.info("Post-job started with output redirected to %s." % new_stdout)
+        else:
+            logger.info("Post-job started with no output redirection.")
+
         retval = 1
         try:
             retval = self.execute_internal(*args, **kw)
@@ -902,10 +920,6 @@ class PostJob():
         except:
             logger.exception("Failure during post-job execution.")
         finally:
-            sys.stdout.flush()
-            sys.stderr.flush()
-            shutil.copy("postjob.%s" % id, postjob)
-            os.chmod(postjob, 0644)
             DashboardAPI.apmonFree()
         return self.check_abort_dag(retval)
 
@@ -942,23 +956,6 @@ class PostJob():
         stdout_tmp = "job_out.tmp.%s" % id
         stderr = "job_err.%s" % id
         jobreport = "jobReport.json.%s" % id
-
-        new_stdout = "postjob.%s" % id
-        fd = os.open(new_stdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
-        if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
-            os.dup2(fd, 1)
-            os.dup2(fd, 2)
-            logger.info("Post-job started with output redirected to %s." % new_stdout)
-        else:
-            logger.info("Post-job started with no output redirection.")
-
-        logpath = os.path.expanduser("~/%s" % reqname)
-        try:
-            os.makedirs(logpath)
-        except OSError, oe:
-            if oe.errno != errno.EEXIST:
-                logger.exception("Failed to create log web-shared directory %s" % logpath)
-                raise
 
         retry_count = self.calculateRetry(id, retry_count)
         if os.path.exists(stdout):

@@ -2,6 +2,7 @@
 import os
 import sys
 import json
+import errno
 import classad
 import traceback
 
@@ -183,6 +184,26 @@ class PreJob:
         return new_submit_file
 
 
+    def touch_logs(self, retry_num, id):
+        try:
+            reqname = self.task_ad['CRAB_ReqName']
+            logpath = os.path.expanduser("~/%s" % reqname)
+            try:
+                os.makedirs(logpath)
+            except OSError, oe:
+                if oe.errno != errno.EEXIST:
+                    print "Failed to create log web-shared directory %s" % logpath
+                    return
+            fname = os.path.join(logpath, "job_out.%s.%s.txt" % (id ,retry_num))
+            with open(fname, "w") as fd:
+                fd.write("Job output has not been processed by post-job\n")
+            fname = os.path.join(logpath, "postjob.%s.%s.txt" % (id, retry_num))
+            with open(fname, "w") as fd:
+                fd.write("Post-job is currently queued.\n")
+        except:
+            pass
+
+
     def execute(self, *args):
         retry_num = int(args[0])
         crab_id = int(args[1])
@@ -191,6 +212,7 @@ class PreJob:
         backend = args[3]
         self.get_task_ad()
         self.alter_submit(retry_num, crab_id)
+        self.touch_logs(retry_num, crab_id)
         if retry_num != 0:
             self.update_dashboard(retry_num, crab_id, reqname, backend)
         # Note the cooloff time is based on the number of times the post-job finished
