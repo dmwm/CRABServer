@@ -51,12 +51,9 @@ class RetryJob(object):
 
         shutil.copy("job_log", "job_log.%s" % str(self.cluster))
 
-        cmd = "condor_q -l -debug -userlog job_log.%s %s" % (str(self.cluster), str(self.cluster))
-        p = subprocess.Popen(["condor_q", "-debug", "-userlog", "job_log.%s" % str(self.cluster), str(self.cluster)], stdout=subprocess.PIPE, stderr=sys.stderr)
+        p = subprocess.Popen(["condor_q", "-debug", "-l", "-userlog", "job_log.%s" % str(self.cluster), str(self.cluster)], stdout=subprocess.PIPE, stderr=sys.stderr)
         output, _ = p.communicate()
         status = p.returncode
-
-        status, output = commands.getstatusoutput(cmd)
 
         try:
             os.unlink("job_log.%s" % str(self.cluster))

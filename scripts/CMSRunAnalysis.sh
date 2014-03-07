@@ -28,6 +28,13 @@ then
     set +x
     . $OSG_APP/cmssoft/cms/cmsset_default.sh
     rc=$?
+    if [[ $rc != 0 ]]
+    then
+        echo "==== Sourcing cmsset_default.sh failed at $(date).  Sleeping for 20 minutes. ===="
+        sleep 20m
+        tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
+        exit $(sh ./DashboardFailure.sh 10032)
+    fi
     set -x
     declare -a VERSIONS
     VERSIONS=($(ls $OSG_APP/cmssoft/cms/$SCRAM_ARCH/external/python | grep 2.6))
@@ -45,14 +52,16 @@ else
 	echo "Error: neither OSG_APP, CVMFS, nor VO_CMS_SW_DIR environment variables were set" >&2
 	echo "Error: Because of this, we can't load CMSSW. Not good." >&2
 	sleep 20m
-	exit $(./DashboardFailure.sh 10031)
+        tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
+	exit $(sh ./DashboardFailure.sh 10031)
 fi
 set +x
 if [[ $rc != 0 ]]
 then
     echo "==== Sourcing cmsset_default.sh failed at $(date).  Sleeping for 20 minutes. ===="
     sleep 20m
-    exit $(./DashboardFailure.sh 10032)
+    tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
+    exit $(sh ./DashboardFailure.sh 10032)
 else
     echo "==== CMSSW pre-execution environment bootstrap FINISHING at $(date) ===="
 fi
@@ -90,7 +99,7 @@ if [[ $rc != 0 ]]
 then
 	echo "Error: python2.6 is not functional."
 	sleep 20m
-	exit $(./DashboardFailure.sh 10043)
+	exit $(sh ./DashboardFailure.sh 10043)
 fi
 
 echo "==== Python2.6 discovery FINISHING at $(date) ===="
@@ -144,7 +153,7 @@ if [ ! -e wmcore_initialized ];
 then
     echo "======== ERROR: Unable to initialize WMCore at $(date) ========"
     sleep 20m
-    exit $(./DashboardFailure.sh 10043)
+    exit $(sh ./DashboardFailure.sh 10043)
 fi
 
 exit $jobrc

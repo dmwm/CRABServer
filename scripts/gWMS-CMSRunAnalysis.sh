@@ -113,7 +113,7 @@ then
 	echo "Error: Python2.6 isn't available on this worker node." >&2
 	echo "Error: job execution REQUIRES python2.6" >&2
 	sleep 20m
-        exit $(./DashboardFailure.sh 10043)
+        exit $(sh ./DashboardFailure.sh 10043)
 else
 	echo "I found python2.6 at.."
 	echo `which python2.6`
@@ -130,7 +130,7 @@ if [ ! -e wmcore_initialized ];
 then
     echo "======== ERROR: Unable to initialize WMCore at $(date) ========"
     sleep 20m
-    exit $(./DashboardFailure.sh 10043)
+    exit $(sh ./DashboardFailure.sh 10043)
 fi
 
 if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
