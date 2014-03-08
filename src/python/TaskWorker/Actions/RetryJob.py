@@ -23,6 +23,9 @@ id_to_name = { \
 MAX_WALLTIME = 21*60*60 + 30*60
 MAX_MEMORY = 2*1024
 
+# Without this environment variable set, HTCondor takes a write lock per logfile entry
+os.environ['_condor_ENABLE_USERLOG_LOCKING'] = 'false'
+
 class FatalError(Exception):
     pass
 
