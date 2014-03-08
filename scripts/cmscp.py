@@ -184,12 +184,12 @@ def set_se_name(dest_file, se_name, direct=False):
         json.dump(full_report, fd)
 
 
-def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_se):
+def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_se, inject=True):
     result = -1
     for policy in stageout_policy:
         if policy == "local":
             print "== Attempting local stageout at %s. ==" % time.ctime()
-            result = performLocalTransfer(manager, source, dest)
+            result = performLocalTransfer(manager, source, dest, inject=inject)
             if result:
                 print "== ERROR: Local stageout resulted in status %d at %s. ==" % (result, time.ctime())
             else:
@@ -211,7 +211,7 @@ def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_s
     return result
 
 
-def performLocalTransfer(manager, source, dest):
+def performLocalTransfer(manager, source, dest, inject=True):
     fileForTransfer = {'LFN': dest, 'PFN': source}
     signal.signal(signal.SIGALRM, alarmHandler)
     signal.alarm(waitTime)
@@ -237,7 +237,8 @@ def performLocalTransfer(manager, source, dest):
         signal.alarm(0)
     if not result:
         set_se_name(os.path.split(dest)[-1], stageout_info['SEName'])
-        injectToASO(dest, stageout_info['SEName'])
+        if inject:
+            injectToASO(dest, stageout_info['SEName'])
     return result
 
 
@@ -537,7 +538,7 @@ def main():
             print "==== Starting stageout of user logs at %s ====" % time.ctime()
             if not save_logs:
                 print "Performing only local stageout for log files as the user did not specify saveLogs = True"
-            std_retval = performTransfer(manager, stageout_policy if save_logs else ["local"], log_file, dest, dest_files[0], dest_se)
+            std_retval = performTransfer(manager, stageout_policy if save_logs else ["local"], log_file, dest, dest_files[0], dest_se, inject=save_logs)
     except Exception, ex:
         print "== ERROR: Unhandled exception when performing stageout of user logs."
         traceback.print_exc()
