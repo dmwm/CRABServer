@@ -221,7 +221,7 @@ class PreJob:
         backend = args[3]
         self.get_task_ad()
         self.alter_submit(retry_num, crab_id)
-        self.touch_logs(retry_num, crab_id)
+        old_time = self.touch_logs(retry_num, crab_id)
         sleep_time = int(args[0])*60
         if old_time:
             sleep_time = int(max(1, sleep_time-old_time))
