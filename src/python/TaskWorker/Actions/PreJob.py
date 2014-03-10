@@ -1,6 +1,7 @@
 
 import os
 import sys
+import time
 import json
 import errno
 import classad
@@ -200,6 +201,8 @@ class PreJob:
             fname = os.path.join(logpath, "postjob.%s.%s.txt" % (id, retry_num))
             with open(fname, "w") as fd:
                 fd.write("Post-job is currently queued.\n")
+            if retry_num:
+                return time.time() - os.stat(os.path.join(logpath, "postjob.%s.%s.txt" % (id, int(retry_num)-1))).st_mtime
         except:
             pass
 
@@ -213,9 +216,12 @@ class PreJob:
         self.get_task_ad()
         self.alter_submit(retry_num, crab_id)
         self.touch_logs(retry_num, crab_id)
+        sleep_time = int(args[0])*60
+        if old_time:
+            sleep_time = max(0, sleep_time-old_time)
         if retry_num != 0:
             self.update_dashboard(retry_num, crab_id, reqname, backend)
         # Note the cooloff time is based on the number of times the post-job finished
         # This way, we don't punish users for resubmitting.
-        os.execv("/bin/sleep", ["sleep", str(int(args[0])*60)])
+        os.execv("/bin/sleep", ["sleep", str(sleep_time)])
 
