@@ -302,11 +302,11 @@ class HTCondorDataWorkflow(DataWorkflow):
         task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
         retval = {"status": task_codes.get(taskStatusCode, 'unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
-        if taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 3:
-            retval['status'] = 'FAILED'
+        if status != "KILLED" and taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 3 :
+            retval['status'] = 'KILLED'
         elif taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 16:
             retval['status'] = 'InTransition'
-        elif taskStatusCode == 5:
+        elif status != "KILLED" and taskStatusCode == 5:
             retval['status'] = 'FAILED'
 
         for i in range(1, taskJobCount+1):
