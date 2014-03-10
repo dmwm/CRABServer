@@ -164,12 +164,18 @@ class PreJob:
 
     def redo_sites(self, new_submit_file, id, automatic_blacklist):
 
-        with open("site.ad") as fd:
-            site_ad = classad.parse(fd)
+        if os.path.exists("site.ad.json"):
+            with open("site.ad.json") as fd:
+                site_info = json.load(fd)
+            group = site_info[id]
+            available = set(site_info['group'][group])
+        else:
+            with open("site.ad") as fd:
+                site_ad = classad.parse(fd)
+            available = set(site_ad['Job%d' % id])
 
         blacklist = set(self.task_ad['CRAB_SiteBlacklist'])
         blacklist.update(automatic_blacklist)
-        available = set(site_ad['Job%d' % id])
         whitelist = set(self.task_ad['CRAB_SiteWhitelist'])
         if 'CRAB_SiteResubmitWhitelist' in self.task_ad:
             whitelist.update(self.task_ad['CRAB_SiteResubmitWhitelist'])
@@ -218,7 +224,7 @@ class PreJob:
         self.touch_logs(retry_num, crab_id)
         sleep_time = int(args[0])*60
         if old_time:
-            sleep_time = max(0, sleep_time-old_time)
+            sleep_time = int(max(1, sleep_time-old_time))
         if retry_num != 0:
             self.update_dashboard(retry_num, crab_id, reqname, backend)
         # Note the cooloff time is based on the number of times the post-job finished

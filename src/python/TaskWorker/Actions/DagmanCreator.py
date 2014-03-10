@@ -373,10 +373,12 @@ class DagmanCreator(TaskAction.TaskAction):
         return info
 
 
-    def makeSpecs(self, task, sitead, jobgroup, block, availablesites, outfiles, startjobid):
+    def makeSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid):
         specs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
+        groupid = len(siteinfo['groups'])
+        siteinfo['groups'][groupid] = list(availablesites)
         for job in jobgroup.getJobs():
             inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']]).replace('"', r'\"\"')
             runAndLumiMask = json.dumps(job['mask']['runAndLumis']).replace('"', r'\"\"')
@@ -386,6 +388,7 @@ class DagmanCreator(TaskAction.TaskAction):
             firstRun = str(job['mask']['FirstRun'])
             i += 1
             sitead['Job%d' % i] = list(availablesites)
+            siteinfo[i] = groupid
             remoteOutputFiles = []
             localOutputFiles = []
             for origFile in outfiles:
@@ -453,6 +456,7 @@ class DagmanCreator(TaskAction.TaskAction):
             global_blacklist = set(self.config.Sites.banned)
 
         sitead = classad.ClassAd()
+        siteinfo = {'groups': {}}
         for jobgroup in splitter_result:
             jobs = jobgroup.getJobs()
 
@@ -495,7 +499,7 @@ class DagmanCreator(TaskAction.TaskAction):
             availablesites = [str(i) for i in availablesites]
             self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
 
-            jobgroupspecs, startjobid = self.makeSpecs(kwargs['task'], sitead, jobgroup, block, availablesites, outfiles, startjobid)
+            jobgroupspecs, startjobid = self.makeSpecs(kwargs['task'], sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid)
             specs += jobgroupspecs
 
         dag = DAG_HEADER % {'restinstance': kwargs['task']['restinstance'], 'resturl': self.resturl}
@@ -507,6 +511,9 @@ class DagmanCreator(TaskAction.TaskAction):
 
         with open("site.ad", "w") as fd:
             fd.write(str(sitead))
+
+        with open("site.ad.json", "w") as fd:
+            json.dump(siteinfo, fd)
 
         task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
         userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
