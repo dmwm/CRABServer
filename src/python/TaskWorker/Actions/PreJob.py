@@ -167,8 +167,8 @@ class PreJob:
         if os.path.exists("site.ad.json"):
             with open("site.ad.json") as fd:
                 site_info = json.load(fd)
-            group = site_info[id]
-            available = set(site_info['group'][group])
+            group = site_info[str(id)]
+            available = set(site_info['groups'][str(group)])
         else:
             with open("site.ad") as fd:
                 site_ad = classad.parse(fd)
