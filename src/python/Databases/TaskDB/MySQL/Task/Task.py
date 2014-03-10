@@ -97,4 +97,4 @@ class Task(object):
                 WHERE tm_task_status = %(get_status)s ORDER BY tm_start_time limit %(limit)s) alias_name)"""
 
     SetUpdateOutDataset_sql = """UPDATE tasks SET tm_output_dataset = %(tm_output_dataset)s \
-                                WHERE tm_taskname = %(tm_taskname)s"
+                                WHERE tm_taskname = %(tm_taskname)s"""
