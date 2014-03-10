@@ -520,7 +520,13 @@ def getHashLfn(lfn):
 
 def isFailurePermanent(reason):
     reason = str(reason).lower()
+    if re.match(".*killed aso transfer after timeout.*", reason):
+        return True
+    if re.match(".*failed to get source file size.*", reason):
+        return False
     if re.match(".*permission denied.*", reason):
+        return True
+    if re.match(".*disk quota exceeded.*", reason):
         return True
     return False
 
