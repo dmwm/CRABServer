@@ -42,7 +42,7 @@ class RetryJob(object):
         self.integratedJobTime = 0
 
     def get_aso_timeout(self):
-        return min(max(self.integratedJobTime/4, 2*3600), 6*3600)
+        return min(max(self.integratedJobTime/4, 4*3600), 6*3600)
 
     def get_job_ad(self):
         try:
