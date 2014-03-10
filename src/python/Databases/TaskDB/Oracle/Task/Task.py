@@ -112,3 +112,9 @@ class Task(object):
                          WHERE tm_taskname IN (SELECT tm_taskname FROM (SELECT tm_taskname, rownum as counter \
                          FROM tasks WHERE tm_task_status = :get_status ORDER BY tm_start_time) \
                          WHERE counter <= :limit)"""
+
+    #UpdateOutDataset
+    SetUpdateOutDataset_sql = """UPDATE tasks SET tm_output_dataset = :tm_output_dataset \
+                                WHERE tm_taskname = :tm_taskname"""
+
+

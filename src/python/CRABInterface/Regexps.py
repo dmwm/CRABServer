@@ -41,6 +41,8 @@ RX_OUTTYPES  = re.compile(r'^EDM|LOG|TFILE|FAKE$')
 RX_CHECKSUM  = re.compile(r'^[A-Za-z0-9\-]+$')
 RX_FILESTATE  = re.compile(r'^TRANSFERRING|FINISHED|FAILED|COOLOFF$')
 RX_LFNPATH   = re.compile(r"^(?=.{0,500}$)%(subdir)s(/%(subdir)s)*/?" % lfnParts)
+#TODO!
+RX_OUT_DATASET = re.compile(r"^.*$")
 
 #basic certificate check -- used for proxies retrieved from myproxy
 RX_CERT = re.compile(r'^[-]{5}BEGIN CERTIFICATE[-]{5}[\w\W]+[-]{5}END CERTIFICATE[-]{5}\n$')
@@ -60,7 +62,7 @@ RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s\=\+]{0,10000}$")
 ## user dn
 RX_DN = re.compile(r"^/(?:C|O|DC)=.*/CN=.")
 ## worker subresources
-RX_SUBPOSTWORKER = re.compile(r"^state|start|failure|success|process|lumimask$")
+RX_SUBPOSTWORKER = re.compile(r"^state|start|failure|success|process|lumimask|outputdataset$")
 RX_SUBGETWORKER = re.compile(r"jobgroup")
 
 # Schedulers
