@@ -332,6 +332,7 @@ class ASOServerJob(object):
             query_view = True
         aso_info = {}
         if not query_view:
+            query_view = True
             try:
                 with open("aso_status.json") as fd:
                     aso_info = json.load(fd)
@@ -340,6 +341,11 @@ class ASOServerJob(object):
                 return self.statusFallback()
             if time.time() - aso_info.get("query_timestamp", 0) < 300:
                 query_view = False
+            for oneDoc in self.id:
+                if oneDoc not in aso_info.get("results", {}):
+                    query_view = True
+                    break
+
         if query_view:
             query = {'reduce': False, 'key': self.reqname}
             logger.debug("Querying task view.")
