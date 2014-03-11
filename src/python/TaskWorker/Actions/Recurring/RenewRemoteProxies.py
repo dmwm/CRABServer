@@ -65,6 +65,7 @@ class CRAB3ProxyRenewer(object):
         proxycfg = {'vo': vo,
                     'logger': self.logger,
                     'myProxySvr': self.config.Services.MyProxy,
+                    'myproxyAccount': self.config.TaskWorker.resturl,
                     'proxyValidity' : '144:0',
                     'min_time_left' : MINPROXYLENGTH, ## do we need this ? or should we use self.myproxylen? 
                     'userDN' : ad['CRAB_UserDN'],
