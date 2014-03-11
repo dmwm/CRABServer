@@ -3,7 +3,7 @@ from WMCore.Lexicon import lfnParts
 
 # TODO: we should start replacing most of the regex here with what we have in WMCore.Lexicon
 #       (this probably requires to adapt something on Lexicon)
-wfBase = r"^[a-zA-Z0-9\.\-_:]{1,%s}$"
+wfBase = r"^[a-zA-Z0-9\-_:]{1,%s}$"
 pNameRE      = r"(?=.{0,400}$)[a-zA-Z0-9\-_.]+"
 lfnParts.update( {'publishname' : pNameRE,
                   'psethash'    : '[a-f0-9]+',
@@ -16,7 +16,6 @@ RX_PUBLISH   = re.compile(pNameRE)
 RX_LFN       = re.compile(r'^(?=.{0,500}$)/store/(temp/)?(user|group)/%(hnName)s/' % lfnParts)
 RX_PARENTLFN = re.compile(r'^(/[a-zA-Z0-9\-_\.]+/?)+$')
 RX_OUTDSLFN  = re.compile(r'^(?=.{0,500}$)/%(primDS)s/%(hnName)s-%(publishname)s-%(psethash)s/USER$' % lfnParts)
-RX_CACHENAME = RX_WORKFLOW
 RX_CAMPAIGN  = RX_UNIQUEWF
 RX_JOBTYPE   = re.compile(r"^(?=.{0,255}$)[A-Za-z]*$")
 RX_CMSSW     = re.compile(r"^(?=.{0,255}$)CMSSW(_\d+){3}(_[a-zA-Z0-9_]+)?$") #using a lookahead (?=.{0,255}$) to check maximum size of the regex
@@ -28,6 +27,7 @@ RX_CACHEURL  = re.compile(r"^https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\
 RX_ADDFILE   = re.compile(r"^(?=.{0,255}$)([a-zA-Z0-9\-\._]+)$")
 # Can be a LFN or PFN (anything CMSSW accepts is fine here)
 RX_USERFILE  = re.compile(r"^(?=.{0,255}$)([a-zA-Z0-9\-._:?/=]+)$")
+RX_CACHENAME = RX_USERFILE
 RX_CMSSITE   = re.compile(r"^(?=.{0,255}$)T[0-3](_[A-Z]{2}((_[A-Za-z0-9]+)|\*$)+|\*)$")
 RX_DBSURL    = re.compile(r"^(?=.{0,255}$)https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
 RX_PUBLICATION = re.compile(r"^[TF]")
