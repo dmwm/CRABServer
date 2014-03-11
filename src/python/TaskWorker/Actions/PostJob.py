@@ -326,6 +326,45 @@ class ASOServerJob(object):
 
 
     def status(self, long_status=False):
+
+        query_view = False
+        if not os.path.exists("aso_status.json"):
+            query_view = True
+        aso_info = {}
+        if not query_view:
+            try:
+                with open("aso_status.json") as fd:
+                    aso_info = json.load(fd)
+            except:
+                self.logger.exception("Failed to load common ASO status.")
+                return self.statusFallback()
+            if time.time() - aso_info.get("query_timestamp", 0) < 300:
+                query_view = False
+        if query_view:
+            query = {'reduce': False, 'key': self.reqname}
+            self.logger.debug("Querying task view.")
+            try:
+                states = self.couchDatabase.loadView('AsyncTransfer', 'JobsSatesByWorkflow', query)['rows']
+            except Exception, ex:
+                self.logger.exception("Error while querying the asynctransfer CouchDB")
+                return self.statusFallback()
+            aso_info = {"query_timestamp": time.time(), "results": states}
+            tmp_fname = "aso_status.%d.json" % os.getpid()
+            with open(tmp_fname, "w") as fd:
+                json.dump(aso_info, fd)
+            os.rename(tmp_fname, "aso_status.json")
+        if not aso_info:
+            return self.statusFallback()
+        statuses = []
+        for oneDoc in self.id:
+            if oneDoc not in aso_info.get("results", {}):
+                return self.statusFallback()
+            statuses.append(aso_info['results'][oneDoc]['value'])
+        return statuses
+
+
+    def statusFallback(self):
+        self.logger.debug("Querying transfer status using fallback method.")
         statuses = []
         for oneDoc in self.id:
             couchDoc = self.couchDatabase.document(oneDoc)
