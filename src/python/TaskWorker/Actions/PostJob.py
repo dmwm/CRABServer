@@ -350,7 +350,7 @@ class ASOServerJob(object):
             query = {'reduce': False, 'key': self.reqname}
             logger.debug("Querying task view.")
             try:
-                states = self.couchDatabase.loadView('AsyncTransfer', 'JobsSatesByWorkflow', query)['rows']
+                states = self.couchDatabase.loadView('AsyncTransfer', 'JobsStatesByWorkflow', query)['rows']
                 states_dict = {}
                 for state in states:
                     states_dict[state['id']] = state
