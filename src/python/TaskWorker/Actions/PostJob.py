@@ -995,14 +995,15 @@ class PostJob():
         if 'CRAB_FailedNodeLimit' not in self.task_ad:
             return rval
         try:
-            limit = int(self.task_ad['CRAB_FailedTaskLimit'])
+            limit = int(self.task_ad['CRAB_FailedNodeLimit'])
             counter = 0
             with open(fname, "r") as fd:
                 for line in fd.readlines():
                     counter += 1
             if counter > limit:
                 logger.error("There are %d failed nodes, greater than the limit of %d. Will abort the whole DAG" % (counter, limit))
-        except:
+                rval = 3
+        finally:
             return rval
 
 

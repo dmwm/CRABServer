@@ -348,7 +348,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['lumis'] = []
         info = transform_strings(info)
         info['saveoutput'] = True if task.get('tm_arguments', {}).get('saveoutput', 'T') == 'T' else False
-        info['faillimit'] = task.get('tm_arguments', {}).get('faillimit', 10)
+        info['faillimit'] = task.get('tm_arguments', {}).get('faillimit')
         if info['jobarch_flatten'].startswith("slc6_"):
             info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
         else:
@@ -525,6 +525,9 @@ class DagmanCreator(TaskAction.TaskAction):
         elif maxpost == 0:
             maxpost = int(max(20, info['jobcount']*.1))
         info['maxpost'] = maxpost
+
+        if info.get('faillimit') == None:
+            info['faillimit'] = int(info['jobcount']*.1)
 
         # Info for ML:
         ml_info = info.setdefault('apmon', [])
