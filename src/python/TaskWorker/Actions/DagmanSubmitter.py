@@ -17,6 +17,7 @@ import TaskWorker.Actions.TaskAction as TaskAction
 import TaskWorker.DataObjects.Result as Result
 
 from TaskWorker.Actions.DagmanCreator import CRAB_HEADERS
+from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from ApmonIf import ApmonIf
 
