@@ -77,6 +77,8 @@ CRAB_HEADERS = \
 +CRAB_UserRole = %(tm_user_role)s
 +CRAB_UserGroup = %(tm_user_group)s
 +CRAB_TaskWorker = %(worker_name)s
++CRAB_RetryOnASOFailures = %(retry_aso)s
++CRAB_ASOTimeout = %(aso_timeout)s
 """
 
 JOB_SUBMIT = CRAB_HEADERS + \
@@ -185,7 +187,7 @@ def transform_strings(input):
         else:
             info[var] = json.dumps(val)
 
-    for var in 'savelogsflag', 'blacklistT1':
+    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout':
         info[var] = int(input[var])
 
     for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', \
@@ -342,6 +344,8 @@ class DagmanCreator(TaskAction.TaskAction):
         info['ASOURL'] = task.get('tm_arguments', {}).get('ASOURL', '')
         info['taskType'] = getattr(self.config.TaskWorker, 'dashboardTaskType', 'analysis')
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
+        info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
+        info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
 
         # TODO: pass through these correctly.
         info['runs'] = []

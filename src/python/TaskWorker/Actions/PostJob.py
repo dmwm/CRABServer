@@ -452,7 +452,7 @@ class ASOServerJob(object):
                     print attachment
                     logger.info("== END FTS interaction log ==")
                 return 0
-            if time.time() - starttime > self.retry_timeout:
+            if self.retry_timeout != -1 and time.time() - starttime > self.retry_timeout: #timeout = -1 means it's disabled
                 self.failure = "Killed ASO transfer after timeout of %d." % self.retry_timeout
                 logger.warning("Killing ASO transfer after timeout of %d." % self.retry_timeout)
                 self.cancel()
@@ -566,7 +566,10 @@ def getHashLfn(lfn):
     return hashlib.sha224(lfn).hexdigest()
 
 
-def isFailurePermanent(reason):
+def isFailurePermanent(reason, task_ad):
+    if "CRAB_RetryOnASOFailures" in task_ad and not task_ad["CRAB_RetryOnASOFailures"]:
+        logger.debug("Considering transfer error as a permanent failure because CRAB_RetryOnASOFailures was 0")
+        return True
     reason = str(reason).lower()
     if re.match(".*killed aso transfer after timeout.*", reason):
         return True
@@ -612,7 +615,9 @@ class PostJob():
             print "Missing task ad!"
             return 2
         try:
-            self.task_ad = classad.parseOld(open(ad))
+            adfile = open(ad)
+            self.task_ad = classad.parseOld(adfile)
+            adfile.close()
         except Exception:
             print traceback.format_exc()
 
@@ -884,7 +889,7 @@ class PostJob():
 
         failureReason = g_Job.getLastFailure()
         g_Job = None
-        isPermanent = isFailurePermanent(failureReason)
+        isPermanent = isFailurePermanent(failureReason, self.task_ad)
 
         source_list = [i[0] for i in transfer_list]
         print "Source list", source_list
@@ -1079,7 +1084,10 @@ class PostJob():
                 self.uploadState(fail_state)
                 return retval
 
-        self.retry_timeout = retry.get_aso_timeout()
+        if 'CRAB_ASOTimeout' in self.task_ad and self.task_ad['CRAB_ASOTimeout']:#if it's 0 use default timeout logic
+            self.retry_timeout = self.task_ad['CRAB_ASOTimeout']
+        else:
+            self.retry_timeout = retry.get_aso_timeout()
 
         self.parseJson()
         self.source_site = self.getSourceSite()

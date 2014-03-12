@@ -107,7 +107,9 @@ SUBMIT_INFO = [ \
             ("CRAB_FailedNodeLimit", "faillimit"),
             ("CRAB_DashboardTaskType", "taskType"),
             ("CRAB_MaxPost", "maxpost"),
-            ("CRAB_TaskWorker", "worker_name")]
+            ("CRAB_TaskWorker", "worker_name"),
+            ("CRAB_RetryOnASOFailures", "retry_aso"),
+            ("CRAB_ASOTimeout", "aso_timeout")]
 
 def addCRABInfoToClassAd(ad, info):
     """
