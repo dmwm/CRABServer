@@ -30,7 +30,8 @@ class FileMetaData(object):
                            fmd_lfn AS lfn, \
                            fmd_size AS filesize, \
                            fmd_parent AS parents, \
-                           fmd_filestate AS state \
+                           fmd_filestate AS state, \
+                           fmd_creation_time AS created \
                     FROM filemetadata \
                     WHERE tm_taskname = :taskname \
                     AND fmd_type IN (SELECT REGEXP_SUBSTR(:filetype, '[^,]+', 1, LEVEL) FROM DUAL CONNECT BY LEVEL <= REGEXP_COUNT(:filetype, ',') + 1) \
