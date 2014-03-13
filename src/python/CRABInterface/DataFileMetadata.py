@@ -41,7 +41,9 @@ class DataFileMetadata(object):
                    'md5': row[12],
                    'lfn': row[13],
                    'filesize': row[14],
-                   'parents': literal_eval(row[15].read()),}
+                   'parents': literal_eval(row[15].read()),
+                   'state': row[16],
+                   'created': str(row[17]),}
 
     def inject(self, *args, **kwargs):
         self.logger.debug("Calling jobmetadata inject with parameters %s" % kwargs)
