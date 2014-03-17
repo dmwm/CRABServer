@@ -281,12 +281,11 @@ class DagmanCreator(TaskAction.TaskAction):
         return params
 
 
-    def resolvePFNs(self, dest_site, dest_dir, filenames):
+    def resolvePFNs(self, dest_site, dest_dir):
         """
-        Given a list of filenames, a directory, destination, and the phedex
-        object, resolve these to PFNs.
+        Given a directory and destination, resolve the directory to a srmv2 PFN
         """
-        lfns = [os.path.join(dest_dir, filename) for filename in filenames]
+        lfns = [dest_dir]
         dest_sites_ = [dest_site]
         if dest_site.startswith("T1_"):
             dest_sites_.append(dest_site + "_Buffer")
@@ -301,8 +300,8 @@ class DagmanCreator(TaskAction.TaskAction):
                     found_lfn = True
                     break
             if not found_lfn:
-                print "Unable to map LFN %s at site %s" % (lfn, dest_site)
-        return results
+                raise TaskWorker.WorkerExceptions.NoAvailableSite("Unable to map LFN %s at site %s" % (lfn, dest_site))
+        return results[0]
 
 
     def makeJobSubmit(self, task):
@@ -383,6 +382,8 @@ class DagmanCreator(TaskAction.TaskAction):
         temp_dest, dest = makeLFNPrefixes(task)
         groupid = len(siteinfo['groups'])
         siteinfo['groups'][groupid] = list(availablesites)
+        lastDirectDest = None
+        lastDirectPfn = None
         for job in jobgroup.getJobs():
             inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']]).replace('"', r'\"\"')
             runAndLumiMask = json.dumps(job['mask']['runAndLumis']).replace('"', r'\"\"')
@@ -413,8 +414,11 @@ class DagmanCreator(TaskAction.TaskAction):
             counter = "%04d" % (i / 1000)
             tempDest = os.path.join(temp_dest, counter)
             directDest = os.path.join(dest, counter)
-            pfns = self.resolvePFNs(task['tm_asyncdest'], directDest, ["log/cmsRun_%d.log.tar.gz" % i] + remoteOutputFiles)
-            pfns = ", ".join(pfns)
+            if lastDirectDest != directDest:
+                lastDirectPfn = self.resolvePFNs(task['tm_asyncdest'], directDest)
+                lastDirectDest = directDest
+            pfns = ["log/cmsRun_%d.log.tar.gz" % i] + remoteOutputFiles
+            pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
             specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
                           'remoteOutputFiles': remoteOutputFilesStr,
                           'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
