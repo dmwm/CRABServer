@@ -672,6 +672,9 @@ class PostJob():
                 if u'pset_hash' in outputFile:
                     fileInfo['pset_hash'] = outputFile[u'pset_hash']
 
+                if u'pfn' in outputFile:
+                    fileInfo['pfn'] = str(outputFile[u'pfn'])
+
                 fileInfo['needs_transfer'] = True
                 if u'SEName' in outputFile and self.node_map.get(str(outputFile['SEName'])):
                     fileInfo['outtmplocation'] = self.node_map[outputFile['SEName']]
@@ -838,15 +841,15 @@ class PostJob():
     def getFileSourceSite(self, filename):
         filename = os.path.split(filename)[-1]
         for outfile in self.outputFiles:
-            if (u'pfn' not in outfile) or (u'SEName' not in outfile):
+            if ('pfn' not in outfile) or ('outtmplocation' not in outfile):
                 continue
-            json_pfn = outfile[u'pfn']
+            json_pfn = outfile['pfn']
             pfn = os.path.split(filename)[-1]
             left_piece, fileid = pfn.rsplit("_", 1)
             right_piece = fileid.split(".", 1)[-1]
             pfn = left_piece + "." + right_piece
             if pfn == json_pfn:
-                return self.node_map.get(outfile[u'SEName'], self.source_site)
+                return self.node_map.get(outfile['outtmplocation'], self.source_site)
         return self.node_map.get(self.full_report.get(u"SEName"), self.source_site)
 
 
