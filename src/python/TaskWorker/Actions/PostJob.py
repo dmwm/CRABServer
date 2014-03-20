@@ -849,7 +849,7 @@ class PostJob():
             right_piece = fileid.split(".", 1)[-1]
             pfn = left_piece + "." + right_piece
             if pfn == json_pfn:
-                return self.node_map.get(outfile['outtmplocation'], self.source_site)
+                return outfile['outtmplocation']
         return self.node_map.get(self.full_report.get(u"SEName"), self.source_site)
 
 
