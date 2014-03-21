@@ -48,7 +48,7 @@ class DataUserWorkflow(object):
            :return: a list of errors grouped by exit code, error reason, site"""
         raise NotImplementedError
 
-    def report(self, workflow, userdn, userproxy):
+    def report(self, workflow, userdn, userproxy=None):
         """Retrieves the quality of the workflow in term of what has been processed
            (eg: good lumis). This can call a different function depending on the jobtype.
 
