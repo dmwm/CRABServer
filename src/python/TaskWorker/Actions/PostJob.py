@@ -25,7 +25,6 @@ from httplib import HTTPException
 import hashlib
 import TaskWorker.Actions.RetryJob as RetryJob
 import pprint
-import time, datetime
 
 import DashboardAPI
 
@@ -188,9 +187,11 @@ class ASOServerJob(object):
     def cancel(self):
         logger.info("Cancelling ASO data transfer.")
         if self.id:
+            now = str(datetime.datetime.now())
             for oneID in self.id:
                 doc = self.couchDatabase.document(oneID)
                 doc['state'] = 'killed'
+                doc['end_time'] = now
                 res = self.couchDatabase.commitOne(doc)
                 if 'error' in res:
                     raise RuntimeError, "Got error killing transfer: %s" % res
