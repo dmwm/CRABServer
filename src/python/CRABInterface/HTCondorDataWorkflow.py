@@ -474,7 +474,8 @@ class HTCondorDataWorkflow(DataWorkflow):
             msg =  "Error while querying CouchDB for publication status information"
             self.logger.exception(msg)
             raise ExecutionError(msg)
-        publication_info.update(publicationlist[0]['value'])
+        if publicationlist and ('value' in publicationlist[0]):
+            publication_info.update(publicationlist[0]['value'])
 
 
     node_name_re = re.compile("DAG Node: Job(\d+)")
