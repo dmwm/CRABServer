@@ -124,6 +124,9 @@ def conn_handler(services):
                 args[0].phedex = PhEDEx(responseType='xml', dict=phdict)
             if 'centralconfig' in services and (not args[0].centralcfg.centralconfig or (args[0].centralcfg.cachetime+1800 < mktime(gmtime()))):
                 args[0].centralcfg = ConfigCache(centralconfig=getCentralConfig(extconfigurl=args[0].config.extconfigurl, mode=args[0].config.mode), cachetime=mktime(gmtime()))
+            if 'servercert' in services:
+                args[0].serverCert = serverCert
+                args[0].serverKey = serverKey
             return func(*args, **kwargs)
         return wrapped_func
     return wrap

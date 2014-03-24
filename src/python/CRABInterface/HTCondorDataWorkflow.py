@@ -18,6 +18,7 @@ from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.Utils import conn_handler
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 from WMCore.Services.pycurl_manager import ResponseHeader
+import WMCore.Database.CMSCouch as CMSCouch
 
 import HTCondorUtils
 import HTCondorLocator
@@ -200,7 +201,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         yield res
 
 
-    @conn_handler(services=['centralconfig'])
+    @conn_handler(services=['centralconfig', 'servercert'])
     def status(self, workflow, userdn, userproxy=None, verbose=0):
         """Retrieve the status of the workflow.
 
@@ -283,7 +284,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "saveLogs"        : saveLogs }]
 
         try:
-            taskStatus, pool = self.taskWebStatus(results[0], verbose=verbose)
+            taskStatus, pool, publication_info = self.taskWebStatus(results[0], verbose=verbose)
         except MissingNodeStatus:
             return [ {"status" : "UNKNOWN",
                 "taskFailureMsg"  : "Node status file not currently available.  Retry in a minute if you just submitted the task",
@@ -335,6 +336,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         retval['jobs'] = taskStatus
         retval['pool'] = pool
+        retval['publication'] = publication_info
 
         return [retval]
 
@@ -370,6 +372,7 @@ class HTCondorDataWorkflow(DataWorkflow):
     def taskWebStatus(self, task_ad, verbose):
         nodes = {}
         pool_info = {}
+        publication_info = {}
 
         url = task_ad['CRAB_UserWebDir']
 
@@ -430,6 +433,10 @@ class HTCondorDataWorkflow(DataWorkflow):
                     hbuf.truncate(0)
                 else:
                     raise ExecutionError("Cannot get pool info file. Retry in a minute if you just submitted the task")
+        elif verbose == 3:
+            if 'CRAB_ReqName' not in task_ad:
+                raise ExecutionError("Internal error - task ad is missing workflow name.")
+            self.publicationStatus(task_ad['CRAB_ReqName'], publication_info)
 
 
         nodes_url = url + "/node_state.txt"
@@ -446,7 +453,28 @@ class HTCondorDataWorkflow(DataWorkflow):
         else:
             raise MissingNodeStatus("Cannot get node state log. Retry in a minute if you just submitted the task")
 
-        return nodes, pool_info
+        return nodes, pool_info, publication_info
+
+
+    def publicationStatus(self, workflow, publication_info):
+        ASOURL = self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", "")
+        if not ASOURL:
+            raise ExecutionError("This CRAB server is not configured to publish; no publication status is available.")
+        server = CMSCouch.CouchServer(dburl=ASOURL, ckey=self.serverCert, cert=self.serverKey)
+        try:
+            db = server.connectDatabase('asynctransfer')
+        except Exception, ex:
+            msg =  "Error while connecting to asynctransfer CouchDB"
+            self.logger.exception(msg)
+            raise ExecutionError(msg)
+        query = {'reduce': True, 'key': workflow}
+        try:
+            publicationlist = db.loadView('AsyncTransfer', 'PublicationStateByWorkflow', query)['rows']
+        except Exception, ex:
+            msg =  "Error while querying CouchDB for publication status information"
+            self.logger.exception(msg)
+            raise ExecutionError(msg)
+        publication_info.update(publicationlist[0]['value'])
 
 
     node_name_re = re.compile("DAG Node: Job(\d+)")
