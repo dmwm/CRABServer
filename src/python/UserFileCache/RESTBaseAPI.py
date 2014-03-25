@@ -4,6 +4,7 @@ from WMCore.REST.Format import JSONFormat
 
 # CRABServer dependecies here
 from UserFileCache.RESTFile import RESTFile, RESTFileInfo
+import UserFileCache.RESTExtensions
 
 # external dependecies here
 import os
@@ -20,5 +21,9 @@ class RESTBaseAPI(RESTApi):
         if not os.path.exists(config.cachedir) or not os.path.isdir(config.cachedir):
             raise Exception("Failing to start because of wrong cache directory '%s'" % config.cachedir)
 
+        if hasattr(config, 'powerusers'):
+            UserFileCache.RESTExtensions.POWER_USERS_LIST = config.powerusers
+        if hasattr(config, 'quota_user_limit'):
+            UserFileCache.RESTExtensions.quota_user_limit = config.quota_user_limit * 1024 * 1024
         self._add( {'file': RESTFile(app, self, config, mount),
                     'fileinfo': RESTFileInfo(app, self, config, mount)} )

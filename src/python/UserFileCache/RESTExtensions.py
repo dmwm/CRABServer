@@ -18,10 +18,10 @@ from os import fstat, walk, path
 FILE_SIZE_LIMIT = 104857600
 # 0.5MB is the maximum limit for file completely loaded into memory
 FILE_MEMORY_LIMIT = 512*1024
-# 600MB is the default user quota limit - overwritten if quota_user_limit is set in the config
+# 600MB is the default user quota limit - overwritten in RESTBaseAPI if quota_user_limit is set in the config
 QUOTA_USER_LIMIT = 1024*1024*600
-#
-POWER_USERS_LIST
+#these users have 10* basic user quota - overwritten in RESTBaseAPI if powerusers is set in the config
+POWER_USERS_LIST = []
 
 ###### authz_login_valid is currently duplicatint CRABInterface.RESTExtension . A better solution
 ###### should be found for authz_*
@@ -62,7 +62,8 @@ def quota_user_free(quotadir, infile):
     :return: Nothing"""
     filesize, realfile = file_size(infile.file)
     quota = get_size(quotadir)
-    if filesize + quota > QUOTA_USER_LIMIT:
+    quotaLimit = QUOTA_USER_LIMIT*10 if cherrypy.request.user['login'] in POWER_USERS_LIST else QUOTA_USER_LIMIT
+    if filesize + quota > quotaLimit:
          excquota = ValueError("User %s has reached quota of %dB: additional file of %dB cannot be uploaded." \
                                % (cherrypy.request.user['login'], quota, filesize))
          raise InvalidParameter("User quota limit reached; cannot upload the file", errobj=excquota, trace='')
