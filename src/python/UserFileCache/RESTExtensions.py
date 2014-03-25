@@ -18,8 +18,10 @@ from os import fstat, walk, path
 FILE_SIZE_LIMIT = 104857600
 # 0.5MB is the maximum limit for file completely loaded into memory
 FILE_MEMORY_LIMIT = 512*1024
-# 600MB is the user quota limit - this includes files needed for publication
+# 600MB is the default user quota limit - overwritten if quota_user_limit is set in the config
 QUOTA_USER_LIMIT = 1024*1024*600
+#
+POWER_USERS_LIST
 
 ###### authz_login_valid is currently duplicatint CRABInterface.RESTExtension . A better solution
 ###### should be found for authz_*

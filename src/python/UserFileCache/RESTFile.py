@@ -18,9 +18,6 @@ import shutil
 
 # here go the all regex to be used for validation
 RX_HASH = re.compile(r'^[a-f0-9]{64}$')
-# input file name may correspond to workflowname + _publish.tgz
-#8+1+80+1+6+1+6=103
-RX_FILENAME = re.compile(r'^[a-zA-Z0-9\.\-_]{1,103}_publish\.tgz$')
 
 def touch(filename):
     """Touch the file to keep automated cleanup away
@@ -49,15 +46,11 @@ class RESTFile(RESTEntity):
         if method in ['PUT']:
             validate_str("hashkey", param, safe, RX_HASH, optional=False)
             validate_file("inputfile", param, safe, 'hashkey', optional=False)
-            validate_str("inputfilename", param, safe, RX_FILENAME, optional=True)
         if method in ['GET']:
-            validate_str("hashkey", param, safe, RX_HASH, optional=True)
-            validate_str("inputfilename", param, safe, RX_FILENAME, optional=True)
-            if not safe.kwargs['hashkey'] and not safe.kwargs['inputfilename']:
-                raise InvalidParameter("Missing input parameter")
+            validate_str("hashkey", param, safe, RX_HASH, optional=False)
 
     @restcall
-    def put(self, inputfile, hashkey, inputfilename):
+    def put(self, inputfile, hashkey):
         """Allow to upload a tarball file to be written in the local filesystem.
            Base path of the local filesystem is configurable.
 
@@ -66,21 +59,16 @@ class RESTFile(RESTEntity):
            :arg file inputfile: file object to be uploaded
            :arg str hashkey: the sha256 hexdigest of the file, calculated over the tuple
                              (name, size, mtime, uname) of all the tarball members
-           :arg str inputfilename: in case the file name needs to be specific
            :return: hashkey, name, size of the uploaded file."""
         outfilepath = filepath(self.cachedir)
         outfilename = None
         result = {'hashkey': hashkey}
-        if inputfilename:
-            # setting the subpath with the user name and filename as requested
-            outfilename = os.path.join(outfilepath, inputfilename)
-            result['name'] = inputfilename
-        else:
-            # using the hash of the file to create a subdir and filename
-            outfilepath = os.path.join(outfilepath, hashkey[0:2])
-            outfilename = os.path.join(outfilepath, hashkey)
 
-        if os.path.isfile(outfilename) and not inputfilename:
+        # using the hash of the file to create a subdir and filename
+        outfilepath = os.path.join(outfilepath, hashkey[0:2])
+        outfilename = os.path.join(outfilepath, hashkey)
+
+        if os.path.isfile(outfilename):
             # we do not want to upload again a file that already exists
            touch(outfilename)
            result['size'] = os.path.getsize(outfilename)
@@ -98,7 +86,7 @@ class RESTFile(RESTEntity):
         return [result]
 
     @restcall(formats = [('application/octet-stream', RawFormat())])
-    def get(self, hashkey, inputfilename):
+    def get(self, hashkey):
         """Retrieve a file previously uploaded to the local filesystem.
            The base path on the local filesystem is configurable.
 
@@ -106,17 +94,13 @@ class RESTFile(RESTEntity):
 
            :arg str hashkey: the sha256 hexdigest of the file, calculated over the tuple
                              (name, size, mtime, uname) of all the tarball members
-           :arg str inputfilename: in case its needed to retrieve a file with a specific
-                                   name
            :return: the raw file"""
         filename = None
         infilepath = filepath(self.cachedir)
-        if hashkey:
-            # defining the path/name from the hash of the file
-            filename = os.path.join(infilepath, hashkey[0:2], hashkey)
-        elif inputfilename:
-            # composing the path/name from the user name and the input file
-            filename = os.path.join(infilepath, inputfilename)
+
+        # defining the path/name from the hash of the file
+        filename = os.path.join(infilepath, hashkey[0:2], hashkey)
+
         if not os.path.isfile(filename):
             raise MissingObject("Not such file")
         touch(filename)
@@ -134,37 +118,25 @@ class RESTFileInfo(RESTEntity):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid()
         if method in ['GET']:
-            validate_str("hashkey", param, safe, RX_HASH, optional=True)
-            validate_str("inputfilename", param, safe, RX_FILENAME, optional=True)
-            if not safe.kwargs['hashkey'] and not safe.kwargs['inputfilename']:
-                raise InvalidParameter("Missing input parameter")
+            validate_str("hashkey", param, safe, RX_HASH, optional=False)
 
     @restcall
-    def get(self, hashkey, inputfilename):
+    def get(self, hashkey):
         """Retrieve the file summary information.
 
            The caller needs to be a CMS user with a valid CMS x509 cert/proxy.
 
            :arg str hashkey: the sha256 hexdigest of the file, calculated over the tuple
                              (name, size, mtime, uname) of all the tarball members
-           :arg str inputfilename: in case its needed to retrieve a file with a specific
-                                   name
            :return: hashkey, name, size of the requested file"""
         result = {}
         filename = None
         infilepath = filepath(self.cachedir)
-        if hashkey:
-            # defining the path/name from the hash of the file
-            filename = os.path.join(infilepath, hashkey[0:2], hashkey)
-            result['hashkey'] = hashkey
-        elif inputfilename:
-            # composing the path/name from the user name and the input file
-            filename = os.path.join(infilepath, inputfilename)
-            tar = tarfile.open(filename, mode='r')
-            lsl = [(x.name, int(x.size), int(x.mtime), x.uname) for x in tar.getmembers()]
-            realhashkey = hashlib.sha256(str(lsl)).hexdigest()
-            result['hashkey'] = realhashkey
-            result['name'] = inputfilename
+
+        # defining the path/name from the hash of the file
+        filename = os.path.join(infilepath, hashkey[0:2], hashkey)
+        result['hashkey'] = hashkey
+
         if not os.path.isfile(filename):
             raise MissingObject("Not such file")
         touch(filename)
