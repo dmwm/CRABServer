@@ -1,5 +1,5 @@
 import re
-from WMCore.Lexicon import lfnParts
+from WMCore.Lexicon import lfnParts, SEARCHDATASET_RE
 
 # TODO: we should start replacing most of the regex here with what we have in WMCore.Lexicon
 #       (this probably requires to adapt something on Lexicon)
@@ -20,7 +20,7 @@ RX_CAMPAIGN  = RX_UNIQUEWF
 RX_JOBTYPE   = re.compile(r"^(?=.{0,255}$)[A-Za-z]*$")
 RX_CMSSW     = re.compile(r"^(?=.{0,255}$)CMSSW(_\d+){3}(_[a-zA-Z0-9_]+)?$") #using a lookahead (?=.{0,255}$) to check maximum size of the regex
 RX_ARCH      = re.compile(r"^(?=.{0,255}$)slc[0-9]{1}_[a-z0-9]+_gcc[a-z0-9]+(_[a-z0-9]+)?$")
-RX_DATASET   = re.compile(r"^(?=.{0,500}$)/(\*|[a-zA-Z\*][a-zA-Z0-9_\-\*]{0,100})(/(\*|[a-zA-Z0-9_\.\-\*]{1,100})){0,1}(/(\*|[A-Z\-\*]{1,50})){0,1}$")
+RX_DATASET   = re.compile(SEARCHDATASET_RE)
 RX_BLOCK     = re.compile(r"^(/[a-zA-Z0-9\.\-_]{1,100}){3}#[a-zA-Z0-9\.\-_]{1,100}$")
 RX_SPLIT     = re.compile(r"^FileBased|EventBased|LumiBased$")
 RX_CACHEURL  = re.compile(r"^https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
