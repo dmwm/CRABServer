@@ -37,6 +37,7 @@ systems = \
   },
   'UserFileCache':
   {
+    'py_modules' : [''],
     'python': ['UserFileCache']
   },
   'All':
