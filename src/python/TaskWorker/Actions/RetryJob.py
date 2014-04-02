@@ -192,6 +192,12 @@ class RetryJob(object):
             if recoverable_signal:
                 raise RecoverableError("SIGILL; may indicate a worker node issue")
 
+        # Another difficult case -- so far, SIGKILL has only been observed at T2_CH_CERN, and it has nothing to do
+        # with an issue of the job itself.
+        # We should revisit this issue if we see SIGKILL happening for other cases that are the users' fault.
+        if exitCode == 137:
+            raise RecoverableError("SIGKILL; likely an unrelated batch system kill")
+
         if exitCode == 10034 or exitCode == 10034 % 256:
             raise RecoverableError("Required application version is not found at the site")
 
