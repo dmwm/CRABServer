@@ -42,7 +42,7 @@ class PreJob:
             retry_info = {"pre": 0, "post": 0}
         if 'pre' not in retry_info or 'post' not in retry_info:
             return retry_num
-        retry_num = retry_info['pre']
+        retry_num = retry_info['post']
 
         out_fname = "job_out.%d" % id
         if retry_info['pre'] > retry_info['post']:
