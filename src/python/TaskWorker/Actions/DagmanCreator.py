@@ -102,6 +102,11 @@ CRAB_Id = $(count)
 +TaskType = "Job"
 +AccountingGroup = %(userhn)s
 
+# These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
++DESIRED_OpSyses = %(desired_opsys)s
++DESIRED_OpSysMajorVers = %(desired_opsysvers)s
++DESIRED_Archs = %(desired_arch)s
+
 +JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
 job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, RemoteSysCpu, RemoteUserCpu
 
@@ -180,7 +185,7 @@ def transform_strings(input):
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
            'userdn', 'requestname', 'publication', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
            'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL', 'asyncdest_se', "stageoutpolicy", \
-           'taskType', 'maxpost', 'worker_name':
+           'taskType', 'maxpost', 'worker_name', 'desired_opsys', 'desired_opsysvers', 'desired_arch':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -304,6 +309,27 @@ class DagmanCreator(TaskAction.TaskAction):
         return results[0]
 
 
+    def populateGlideinMatching(self, info):
+        scram_arch = info['tm_job_arch']
+        # Set defaults
+        info['desired_opsys'] = "LINUX"
+        info['desired_opsysvers'] = "5,6"
+        info['desired_arch'] = "X86_64"
+        m = re.match("([a-z]+)(\d+)_(\w+)_(\w+)", scram_arch)
+        # At the time of writing, for opsys and arch, the only supported variant
+        # is the default variant; we actually parse this information so the future maintainer
+        # can see what is needed.  For OpSys version, users can support 5,6 or 6.
+        if m:
+            os, ver, arch, _ = m.groups()
+            if os == "slc":
+                info['desired_opsys'] = "LINUX"
+            if ver == "5":
+                info['desired_opsysvers'] = "5,6"
+            elif ver == "6":
+                info['desired_opsysvers'] = "6"
+            if arch == "amd64":
+                info['desired_arch'] = "X86_64"
+
     def makeJobSubmit(self, task):
         """
         Create the submit file.  This is reused by all jobs in the task; differences
@@ -345,6 +371,8 @@ class DagmanCreator(TaskAction.TaskAction):
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
         info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
+
+        self.populateGlideinMatching(info)
 
         # TODO: pass through these correctly.
         info['runs'] = []
