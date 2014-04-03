@@ -95,3 +95,6 @@ class Task(object):
     UpdateWorker_sql = """UPDATE tasks SET tw_name = %(tw_name)s, tm_task_status = %(set_status)s \
                 WHERE tm_taskname IN (SELECT tm_taskname FROM (SELECT tm_taskname FROM tasks \
                 WHERE tm_task_status = %(get_status)s ORDER BY tm_start_time limit %(limit)s) alias_name)"""
+
+    SetUpdateOutDataset_sql = """UPDATE tasks SET tm_output_dataset = %(tm_output_dataset)s \
+                                WHERE tm_taskname = %(tm_taskname)s"""
