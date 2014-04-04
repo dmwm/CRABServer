@@ -44,3 +44,7 @@ class RESTServerInfo(RESTEntity):
     @conn_handler(services=['centralconfig'])
     def version(self):
         yield self.centralcfg.centralconfig['compatible-version']+[__version__]
+
+    @conn_handler(services=['centralconfig'])
+    def bannedoutdest(self):
+        yield self.centralcfg.centralconfig['banned-out-destinations']

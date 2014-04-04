@@ -21,12 +21,13 @@ import re
 class RESTUserWorkflow(RESTEntity):
     """REST entity for workflows from the user point of view and relative subresources"""
 
-    def __init__(self, app, api, config, mount):
+    def __init__(self, app, api, config, mount, centralcfg):
         RESTEntity.__init__(self, app, api, config, mount)
 
         self.logger = logging.getLogger("CRABLogger.RESTUserWorkflow")
         self.userworkflowmgr = DataUserWorkflow()
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
+        self.centralcfg = centralcfg
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
 
     def _expandSites(self, sites):
@@ -49,6 +50,15 @@ class RESTUserWorkflow(RESTEntity):
                 self._checkSite(site)
                 res.add(site)
         return list(res)
+
+    def _checkASODestination(self, site):
+        self._checkSite(site)
+        if site in self.centralcfg.centralconfig['banned-out-destinations']:
+            excasync = ValueError("Remote output data site is banned")
+            invalidp = InvalidParameter("The output site you specified in the config.Site.storageSite parameter (%s) is blacklisted (banned sites: %s)" %\
+                            (site, self.centralcfg.centralconfig['banned-out-destinations']), errobj = excasync)
+            setattr(invalidp, 'trace', '')
+            raise invalidp
 
     def _checkSite(self, site):
         if site not in self.allCMSNames.sites:
@@ -84,7 +94,7 @@ class RESTUserWorkflow(RESTEntity):
             raise invalidp
 
 
-    @conn_handler(services=['sitedb'])
+    @conn_handler(services=['sitedb', 'centralconfig'])
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid()
@@ -130,7 +140,7 @@ class RESTUserWorkflow(RESTEntity):
                 raise InvalidParameter("You need to set both publishDataName and publishDbsUrl parameters if you need the automatic publication")
             #if one and only one between publishDataName and publishDbsUrl is set raise an error (we need both or none of them)
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
-            self._checkSite(safe.kwargs['asyncdest'])
+            self._checkASODestination(safe.kwargs['asyncdest'])
             # We no longer use this attribute, but keep it around for older client compatibility
             validate_num("blacklistT1", param, safe, optional=True)
             validate_num("oneEventMode", param, safe, optional=True)
