@@ -1,4 +1,3 @@
-
 import re
 import json
 import time
@@ -460,7 +459,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         ASOURL = self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", "")
         if not ASOURL:
             raise ExecutionError("This CRAB server is not configured to publish; no publication status is available.")
-        server = CMSCouch.CouchServer(dburl=ASOURL, ckey=self.serverCert, cert=self.serverKey)
+        server = CMSCouch.CouchServer(dburl=ASOURL, ckey=self.serverKey, cert=self.serverCert)
         try:
             db = server.connectDatabase('asynctransfer')
         except Exception, ex:
