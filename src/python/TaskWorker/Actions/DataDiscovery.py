@@ -32,7 +32,7 @@ class DataDiscovery(TaskAction):
             wmfile['block'] = infos['BlockName']
             wmfile['locations'] = []
             for se in locations[infos['BlockName']]:
-                if se not in secmsmap:
+                if se  and se not in secmsmap:
                     self.logger.debug("Translating SE %s" %se)
                     try:
                         secmsmap[se] = sbj.seToCMSName(se)
@@ -44,7 +44,7 @@ class DataDiscovery(TaskAction):
                         print "Couldn't map SE to site: %s" % se
                         print "got problem: %s" % ex
                         print "got another problem: %s" % ex.__dict__
-                if se in secmsmap:
+                if se and se in secmsmap:
                     if type(secmsmap[se]) == list:
                         wmfile['locations'].extend(secmsmap[se])
                     else:

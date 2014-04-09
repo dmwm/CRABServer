@@ -6,6 +6,8 @@ from httplib import HTTPException
 from base64 import b64encode
 
 from WMCore.WorkQueue.WorkQueueUtils import get_dbs
+from WMCore.Services.DBS.DBSErrors import DBSReaderError
+from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from TaskWorker.WorkerExceptions import StopHandler
@@ -21,9 +23,10 @@ class DBSDataDiscovery(DataDiscovery):
         os.environ['X509_USER_CERT'] = self.config.TaskWorker.cmscert
         os.environ['X509_USER_KEY'] = self.config.TaskWorker.cmskey
         # DBS3 requires X509_USER_CERT to be set - but we don't want to leak that to other modules
-        dbs = get_dbs(self.config.Services.DBSUrl)
+        dbsurl = self.config.Services.DBSUrl
         if kwargs['task']['tm_dbs_url']:
-            dbs = get_dbs(kwargs['task']['tm_dbs_url'])
+            dbsurl = kwargs['task']['tm_dbs_url']
+        dbs = get_dbs(dbsurl)
         #
         if old_cert_val != None:
             os.environ['X509_USER_CERT'] = old_cert_val
@@ -34,29 +37,30 @@ class DBSDataDiscovery(DataDiscovery):
         else:
             del os.environ['X509_USER_KEY']
         self.logger.debug("Data discovery through %s for %s" %(dbs, kwargs['task']['tm_taskname']))
-        # Get the list of blocks for the locations and then call dls.
-        # The WMCore DBS3 implementation makes one call to dls for each block
-        # with locations = True
-        blocks = [ x['Name'] for x in dbs.getFileBlocksInfo(kwargs['task']['tm_input_dataset'], locations=False)]
+        try:
+            # Get the list of blocks for the locations and then call dls.
+            # The WMCore DBS3 implementation makes one call to dls for each block
+            # with locations = True so we are using locations=False and looking up location later
+            blocks = [ x['Name'] for x in dbs.getFileBlocksInfo(kwargs['task']['tm_input_dataset'], locations=False)]
+        except DBSReaderError, dbsexc:
+            #dataset not found in DBS is a known use case
+            if str(dbsexc).find('No matching data'):
+                raise TaskWorkerException("Cannot find dataset %s in this DBS instance: %s" % (kwargs['task']['tm_input_dataset'], dbsurl))
+            raise
         #Create a map for block's locations: for each block get the list of locations
-        ll = dbs.dls.getLocations(list(blocks),  showProd = True)
-        if len(ll) == 0:
-            msg = "No location was found for %s in %s." %(kwargs['task']['tm_input_dataset'],kwargs['task']['tm_dbs_url'])
-            self.logger.error("Setting %s as failed" % str(kwargs['task']['tm_taskname']))
-            configreq = {'workflow': kwargs['task']['tm_taskname'],
-                         'status': "FAILED",
-                         'subresource': 'failure',
-                         'failure': b64encode(msg)}
-            self.server.post(self.resturl, data = urllib.urlencode(configreq))
-            raise StopHandler(msg)
-        locations = map(lambda x: map(lambda y: y.host, x.locations), ll)
-        locationsmap = dict(zip(blocks, locations))
+        locationsMap = dbs.listFileBlockLocation(list(blocks))
+        if len(blocks) != len(locationsMap):
+            msg = "No location was found for %s in %s." %(kwargs['task']['tm_input_dataset'], dbsurl)
+#           You should not need the following if you raise TaskWorkerException
+#            self.logger.error("Setting %s as failed" % str(kwargs['task']['tm_taskname']))
+#            configreq = {'workflow': kwargs['task']['tm_taskname'],
+#                         'status': "FAILED",
+#                         'subresource': 'failure',
+#                         'failure': b64encode(msg)}
+#            self.server.post(self.resturl, data = urllib.urlencode(configreq))
+            raise TaskWorkerException(msg)
         filedetails = dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], True)
-        self.logger.debug("Got blocks: %s" % blocks[1:10])
-        self.logger.debug("Got Locations: %s" % ll)
-        self.logger.debug("Got Locations2: %s" % locations)
-        self.logger.debug("Got locationsmap: %s" % locationsmap)
-        result = self.formatOutput(task=kwargs['task'], requestname=kwargs['task']['tm_taskname'], datasetfiles=filedetails, locations=locationsmap)
+        result = self.formatOutput(task=kwargs['task'], requestname=kwargs['task']['tm_taskname'], datasetfiles=filedetails, locations=locationsMap)
         self.logger.debug("Got result: %s" % result.result)
         return result
 
@@ -73,10 +77,20 @@ if __name__ == '__main__':
     from WMCore.Configuration import Configuration
     config = Configuration()
     config.section_("Services")
-    #config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/dev/global/DBSReader'
+    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'
     #config.Services.DBSUrl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
-    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/'
+    #config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/'
+    config.section_("TaskWorker")
+    #will use X509_USER_PROXY var for this test
+    config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
+    config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
     for dataset in datasets:
         fileset = DBSDataDiscovery(config)
         print fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
+
+    #check local dbs use case
+    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSReader/'
+    fileset = DBSDataDiscovery(config)
+    dataset = '/GenericTTbar/hernan-140317_231446_crab_JH_ASO_test_T2_ES_CIEMAT_5000_100_140318_0014-ea0972193530f531086947d06eb0f121/USER'
+    fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
 

@@ -1,3 +1,5 @@
+from TaskWorker.WorkerExceptions import TaskWorkerException
+
 class Result(object):
     """Result of an action. This can potentially be subclassed."""
 
