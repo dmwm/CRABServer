@@ -16,7 +16,6 @@ class Splitter(TaskAction):
        recevied input and arguments"""
 
     def execute(self, *args, **kwargs):
-
         wmwork = Workflow(name=kwargs['task']['tm_taskname'])
 
         wmsubs = Subscription(fileset=args[0], workflow=wmwork,

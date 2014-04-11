@@ -31,8 +31,12 @@ class DataDiscovery(TaskAction):
             wmfile = File(lfn=lfn, events=infos['NumberOfEvents'], size=infos['Size'], checksums=infos['Checksums'])
             wmfile['block'] = infos['BlockName']
             wmfile['locations'] = []
+            #the block has not been found or has no locations, continue to the next block
+            if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
+                self.logger.error("Skipping %s because its block (%s) has no locations" % (lfn, infos['BlockName']))
+                continue
             for se in locations[infos['BlockName']]:
-                if se not in secmsmap:
+                if se  and se not in secmsmap:
                     self.logger.debug("Translating SE %s" %se)
                     try:
                         secmsmap[se] = sbj.seToCMSName(se)
@@ -44,7 +48,7 @@ class DataDiscovery(TaskAction):
                         print "Couldn't map SE to site: %s" % se
                         print "got problem: %s" % ex
                         print "got another problem: %s" % ex.__dict__
-                if se in secmsmap:
+                if se and se in secmsmap:
                     if type(secmsmap[se]) == list:
                         wmfile['locations'].extend(secmsmap[se])
                     else:

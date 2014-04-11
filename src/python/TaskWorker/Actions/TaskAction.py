@@ -12,7 +12,8 @@ class TaskAction(object):
                                "Generic" : "Generic",}
         self.server = server
         self.resturl = resturl
-        self.backendurls = self.server.get(self.resturl.replace('workflowdb', 'info'), data={'subresource':'backendurls'})[0]['result'][0]
+        if server: #when testing this can be none
+            self.backendurls = self.server.get(self.resturl.replace('workflowdb', 'info'), data={'subresource':'backendurls'})[0]['result'][0]
 
     def execute(self):
         raise NotImplementedError
