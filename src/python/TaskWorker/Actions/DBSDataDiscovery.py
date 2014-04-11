@@ -49,7 +49,7 @@ class DBSDataDiscovery(DataDiscovery):
             raise
         #Create a map for block's locations: for each block get the list of locations
         locationsMap = dbs.listFileBlockLocation(list(blocks))
-        if len(blocks) != len(locationsMap):
+        if not locationsMap:
             msg = "No location was found for %s in %s." %(kwargs['task']['tm_input_dataset'], dbsurl)
 #           You should not need the following if you raise TaskWorkerException
 #            self.logger.error("Setting %s as failed" % str(kwargs['task']['tm_taskname']))
@@ -59,6 +59,8 @@ class DBSDataDiscovery(DataDiscovery):
 #                         'failure': b64encode(msg)}
 #            self.server.post(self.resturl, data = urllib.urlencode(configreq))
             raise TaskWorkerException(msg)
+        if len(blocks) != len(locationsMap):
+            self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
         filedetails = dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], True)
         result = self.formatOutput(task=kwargs['task'], requestname=kwargs['task']['tm_taskname'], datasetfiles=filedetails, locations=locationsMap)
         self.logger.debug("Got result: %s" % result.result)
@@ -78,12 +80,18 @@ if __name__ == '__main__':
     config = Configuration()
     config.section_("Services")
     config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'
+
     #config.Services.DBSUrl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
     #config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/'
     config.section_("TaskWorker")
     #will use X509_USER_PROXY var for this test
     config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
     config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
+
+    fileset = DBSDataDiscovery(config)
+    dataset = '/DoubleMuParked/Run2012B-22Jan2013-v1/AOD'
+    fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
+
     for dataset in datasets:
         fileset = DBSDataDiscovery(config)
         print fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})

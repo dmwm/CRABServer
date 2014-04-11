@@ -31,6 +31,10 @@ class DataDiscovery(TaskAction):
             wmfile = File(lfn=lfn, events=infos['NumberOfEvents'], size=infos['Size'], checksums=infos['Checksums'])
             wmfile['block'] = infos['BlockName']
             wmfile['locations'] = []
+            #the block has not been found or has no locations, continue to the next block
+            if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
+                self.logger.error("Skipping %s because its block (%s) has no locations" % (lfn, infos['BlockName']))
+                continue
             for se in locations[infos['BlockName']]:
                 if se  and se not in secmsmap:
                     self.logger.debug("Translating SE %s" %se)
