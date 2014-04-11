@@ -167,6 +167,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                     continue
 
             yield { 'pfn' : pfn,
+		    'lfn' : lfn,
                     'size' : row[GetFromTaskAndType.SIZE],
                     'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
             }
