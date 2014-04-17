@@ -118,8 +118,7 @@ def startDashboardMonitoring(myad):
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
 
 
-def addReportInfo(params):
-    fjr = json.load(open("jobReport.json"))
+def addReportInfo(params, fjr):
     if 'exitCode' in fjr:
         params['JobExitCode'] = fjr['exitCode']
         params['ExeExitCode'] = fjr['exitCode']
@@ -140,6 +139,83 @@ def addReportInfo(params):
                 params['NEventsProcessed'] = info['events']
 
 
+def reportPopularity(monitorId, monitorJobId, myad, fjr):
+    """
+    Using the FJR and job ad, report popularity information to the dashboard.
+
+    Implementation is based on https://github.com/dmwm/CRAB2/blob/63a7c046e8411ab26d4960ef2ae5bf48642024de/python/parseCrabFjr.py
+
+    Note: Unlike CRAB2, we do not report the runs/lumis processed.
+    """
+
+    if 'CRAB_DataBlock' not in myad:
+        print "Not sending data to popularity service because 'CRAB_DataBlock' is not in job ad."
+    sources = fjr.get('steps', {}).get('cmsRun', {}).get('input', {}).get('source', [])
+    if not sources:
+        print "Not sending data to popularity service because no input sources found."
+
+    # Now, compute the strings about the input files.  Each input file has the following format in the report:
+    #
+    # %(name)s::%(report_type)d::%(file_type)s::%(access_type)s::%(counter)d
+    #
+    # Where each variable has the following values:
+    #  - name: the portion of the LFN after the common prefix
+    #  - report_type: 1 for a file successfully processed, 0 for a failed file with an error message, 2 otherwise
+    #  - file_type: EDM or Unknown
+    #  - access_type: Remote or Local
+    #  - counter: monotonically increasing counter
+
+    # First, pull the LFNs from the FJR.  This will be used to compute the basename.
+    inputInfo = {}
+    parentInputInfo = {}
+    inputCtr = 0
+    parentCtr = 0
+    for source in sources:
+        if 'lfn' not in source:
+            print "Excluding source data from popularity report because no LFN is present. %s" % str(source)
+        if source.get('input_source_class') == 'PoolSource':
+            file_type = 'EDM'
+        else:
+            file_type = 'Unknown'
+        if source.get("input_type", "primaryFiles") == "primaryFiles":
+            inputCtr += 1
+            # Note we hardcode 'Local' here.  In CRAB2, it was assumed any PFN with the string 'xrootd'
+            # in it was a remote access; we feel this is no longer a safe assumption.  CMSSW actually
+            # differentiates the fallback accesses.  See https://github.com/dmwm/WMCore/issues/5087
+            inputInfo[source['lfn']] = (source['lfn'], file_type, 'Local', inputCtr)
+        else:
+            parentCtr += 1
+            parentInputInfo[source['lfn']] = (source['lfn'], file_type, 'Local', parentCtr)
+    baseName = os.path.dirname(os.path.commonprefix(inputInfo.keys()))
+    parentBaseName = os.path.dirname(os.path.commonprefix(parentInputInfo.keys()))
+
+    # Next, go through the sources again to properly record the unique portion of the filename
+    # The dictionary is keyed on the unique portion of the filename after the common prefix.
+    for info in inputInfo.values():
+        lfn = info[0].split(baseName, 1)[-1]
+        info[0] = lfn
+    for info in parentInputInfo.values():
+        lfn = info[0].split(parentBaseName, 1)[-1]
+        info[0] = lfn
+
+    inputString = ';'.join(["%s::1::%s::%s::%d" % key for key in inputInfo.keys()])
+    parentInputString = ';'.join(["%s::1::%s::%s::%d" % key for key in parentInputInfo.keys()])
+
+    # Currently, CRAB3 drops the FJR information for failed files.  Hence, we don't currently do any special
+    # reporting for these like CRAB2 did.  TODO: Revisit once https://github.com/dmwm/CRABServer/issues/4272
+    # is fixed.
+
+    report = {
+        'inputBlocks': myad['CRAB_DataBlock'],
+        'Basename': baseName,
+        'BasenameParent': parentBaseName,
+        'inputFiles': inputString,
+        'parentFiles': parentInputString,
+    }
+    print "Dashboard popularity report: %s" % str(report)
+    DashboardAPI.apmonSend(monitorId, monitorJobId, report)
+
+
 def stopDashboardMonitoring(myad):
     params = {
         'ExeEnd': 'cmsRun',
@@ -147,15 +223,24 @@ def stopDashboardMonitoring(myad):
     populateDashboardMonitorInfo(myad, params)
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
     del params['ExeEnd']
+    fjr = {}
     try:
-        addReportInfo(params)
+        fjr = json.load(open("jobReport.json"))
+    except:
+        print "WARNING: Unable to parse jobReport.json; Dashboard reporting will not be useful.  Traceback follows:\n", traceback.format_exc()
+    try:
+        addReportInfo(params, fjr)
     except:
         if 'ExeExitCode' not in params:
             params['ExeExitCode'] = 50115
         if 'JobExitCode' not in params:
             params['JobExitCode'] = params['ExeExitCode']
-        print traceback.format_exc()
+        print "ERROR: Unable to parse job info from FJR.  Traceback follows:\n", traceback.format_exc()
     print "Dashboard end parameters: %s" % str(params)
+    try:
+        reportPopularity(params['MonitorID'], params['MonitorJobID'], myad, fjr)
+    except:
+        print "ERROR: Failed to report popularity information to Dashboard.  Traceback follows:\n", traceback.format_exc()
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
     DashboardAPI.apmonFree()
 
