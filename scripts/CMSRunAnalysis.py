@@ -624,7 +624,9 @@ def AddPsetHash(report, opts):
                 print "== EDM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % filename
                 continue
             print "==== PSet Hash lookup STARTING at %s ====" % time.ctime()
-            for line in getProv(filename, opts).splitlines():
+            lines = getProv(filename, opts)
+            pset_hash = None
+            for line in lines.splitlines():
                  m = pset_re.match(line)
                  if m:
                      # Note we want the last hash in the file.
@@ -633,6 +635,9 @@ def AddPsetHash(report, opts):
             if pset_hash:
                 print "== edmProvDump pset hash %s" % pset_hash
                 fileInfo['pset_hash'] = pset_hash
+            else:
+                print "ERROR: PSet Hash missing from edmProvDump output.  Full dump below."
+                print lines
 
 try:
     setupLogging('.')
