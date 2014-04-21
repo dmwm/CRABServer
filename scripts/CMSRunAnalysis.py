@@ -267,6 +267,20 @@ def logCMSSW():
 
 def handleException(exitAcronymn, exitCode, exitMsg):
     report = {}
+    try:
+        if os.path.exists("jobReport.json"):
+            report = json.load(open("jobReport.json"))
+        else:
+            print "WARNING: WMCore did not produce a jobReport.json; FJR will not be useful."
+    except: 
+        print "WARNING: Unable to parse WMCore's jobReport.json; FJR will not be useful.  Traceback follows:\n", traceback.format_exc()
+
+    if report.get('steps', {}).get('cmsRun', {}).get('errors'):
+        exitMsg += 'CMSSW error message follows.\n'
+        for error in report['steps']['cmsRun']['errors']:
+            report['exitMsg'] += error['type'] + '\n'
+            report['exitMsg'] += error['details'] + '\n'
+
     report['exitAcronym'] = exitAcronymn
     report['exitCode'] = exitCode
     report['exitMsg'] = exitMsg
@@ -664,8 +678,19 @@ try:
 except WMExecutionFailure, WMex:
     print "ERROR: Caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail)
     exmsg = WMex.name
-    #exmsg += WMex.detail
-    #print "jobExitCode = %s" % jobExitCode
+
+    # Try to recover what we can from the FJR.  handleException will use this if possible.
+    if os.path.exists('FrameworkJobReport.xml'):
+        try:
+            report = Report("cmsRun")
+            report.parse('FrameworkJobReport.xml', "cmsRun")
+            report = report.__to_json__(None)
+            with open('jobReport.json','w') as of:
+                json.dump(report, of)
+        except:
+            print "WARNING: Failure when trying to parse FJR XML after job failure.  Traceback follows."
+            print traceback.format_exc()
+
     handleException("FAILED", WMex.code, exmsg)
     mintime()
     sys.exit(WMex.code)
