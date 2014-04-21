@@ -347,7 +347,7 @@ class ASOServerJob(object):
             # - It is from after we submitted the transfer.
             # Without the second condition, we run the risk of using the previous stageout
             # attempts results.
-            if (time.time() - last_query < 300) and (last_query > aso_start_timestamp):
+            if (time.time() - last_query < 300) and (last_query > self.aso_start_timestamp):
                 query_view = False
             for oneDoc in self.id:
                 if oneDoc not in aso_info.get("results", {}):
