@@ -168,7 +168,15 @@ def main():
         resubmit = [str(i) for i in resubmit]
 
     if resubmit:
-        adjustPost(resubmit)
+        if hasattr(htcondor, 'lock'):
+            # While dagman is not running at this point, the schedd may be writing events to this
+            # file; hence, we only edit the file while holding an appropriate lock.
+            # Note this lock method didn't exist until 8.1.6; prior to this, we simply
+            # run dangerously.
+            with htcondor.lock(open("RunJobs.dag.nodes.log", "a"), htcondor.LockType.WriteLock) as lock:
+                adjustPost(resubmit)
+        else:
+            adjustPost(resubmit)
         resubmitDag("RunJobs.dag", resubmit)
 
     if 'CRAB_SiteAdUpdate' in ad:
