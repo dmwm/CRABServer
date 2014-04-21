@@ -276,7 +276,7 @@ def handleException(exitAcronymn, exitCode, exitMsg):
         print "WARNING: Unable to parse WMCore's jobReport.json; FJR will not be useful.  Traceback follows:\n", traceback.format_exc()
 
     if report.get('steps', {}).get('cmsRun', {}).get('errors'):
-        exitMsg += 'CMSSW error message follows.\n'
+        exitMsg += '\nCMSSW error message follows.\n'
         for error in report['steps']['cmsRun']['errors']:
             if 'exitCode' in error:
                 try:
