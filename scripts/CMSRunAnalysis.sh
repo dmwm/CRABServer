@@ -141,6 +141,12 @@ set +x
 echo "== The job had an exit code of $jobrc "
 echo "======== CMSRunAnalysis.py FINISHING at $(date) ========"
 
+if [[ $jobrc == 68 ]]
+then
+  echo "WARNING: CMSSW encountered a malloc failure.  Logging ulimits:"
+  ulimit -a
+fi
+
 if [ -e scramOutput.log ]; then
   echo "==== SCRAM interaction log contents dump STARTING ===="
   cat scramOutput.log
