@@ -185,7 +185,7 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
             inputInfo[source['lfn']] = [source['lfn'], file_type, 'Local', inputCtr]
         else:
             parentCtr += 1
-            parentInputInfo[source['lfn']] = (source['lfn'], file_type, 'Local', parentCtr)
+            parentInputInfo[source['lfn']] = [source['lfn'], file_type, 'Local', parentCtr]
     baseName = os.path.dirname(os.path.commonprefix(inputInfo.keys()))
     parentBaseName = os.path.dirname(os.path.commonprefix(parentInputInfo.keys()))
 
@@ -198,8 +198,8 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
         lfn = info[0].split(parentBaseName, 1)[-1]
         info[0] = lfn
 
-    inputString = ';'.join(["%s::1::%s::%s::%d" % value for value in inputInfo.values()])
-    parentInputString = ';'.join(["%s::1::%s::%s::%d" % value for value in parentInputInfo.values()])
+    inputString = ';'.join(["%s::1::%s::%s::%d" % tuple(value) for value in inputInfo.values()])
+    parentInputString = ';'.join(["%s::1::%s::%s::%d" % tuple(value) for value in parentInputInfo.values()])
 
     # Currently, CRAB3 drops the FJR information for failed files.  Hence, we don't currently do any special
     # reporting for these like CRAB2 did.  TODO: Revisit once https://github.com/dmwm/CRABServer/issues/4272
