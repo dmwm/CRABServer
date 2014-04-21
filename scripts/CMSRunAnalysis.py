@@ -278,8 +278,8 @@ def handleException(exitAcronymn, exitCode, exitMsg):
     if report.get('steps', {}).get('cmsRun', {}).get('errors'):
         exitMsg += 'CMSSW error message follows.\n'
         for error in report['steps']['cmsRun']['errors']:
-            report['exitMsg'] += error['type'] + '\n'
-            report['exitMsg'] += error['details'] + '\n'
+            exitMsg += error['type'] + '\n'
+            exitMsg += error['details'] + '\n'
 
     report['exitAcronym'] = exitAcronymn
     report['exitCode'] = exitCode
