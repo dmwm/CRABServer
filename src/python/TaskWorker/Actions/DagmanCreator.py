@@ -111,6 +111,12 @@ CRAB_Id = $(count)
 +JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
 job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, RemoteSysCpu, RemoteUserCpu
 
+# Recover job output and logs on eviction events; make sure they aren't spooled
+# This requires 8.1.6 or later (https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=4292)
+# This allows us to return stdout to users when they hit memory limits (which triggers PeriodicRemove).
++WhenToTransferOutput = "ON_EXIT_OR_EVICT"
++SpoolOnEvict = false
+
 universe = vanilla
 Executable = gWMS-CMSRunAnalysis.sh
 Output = job_out.$(CRAB_Id)
