@@ -208,6 +208,7 @@ class ASOServerJob(object):
             aso_start_time = full_report.get("aso_start_time")
             self.aso_start_timestamp = full_report.get("aso_start_timestamp")
         except:
+            self.aso_start_timestamp = int(time.time())
             logger.exception("Unable to determine ASO start time from worker node")
 
         input_dataset = str(self.task_ad['CRAB_InputData'])
@@ -340,7 +341,13 @@ class ASOServerJob(object):
             except:
                 logger.exception("Failed to load common ASO status.")
                 return self.statusFallback()
-            if time.time() - aso_info.get("query_timestamp", 0) < 300:
+            last_query = aso_info.get("query_timestamp", 0)
+            # We can use the cached data if:
+            # - It is from the last 5 minutes, AND
+            # - It is from after we submitted the transfer.
+            # Without the second condition, we run the risk of using the previous stageout
+            # attempts results.
+            if (time.time() - last_query < 300) and (last_query > aso_start_timestamp):
                 query_view = False
             for oneDoc in self.id:
                 if oneDoc not in aso_info.get("results", {}):
