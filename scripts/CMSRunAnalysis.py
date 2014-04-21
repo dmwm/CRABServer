@@ -278,6 +278,15 @@ def handleException(exitAcronymn, exitCode, exitMsg):
     if report.get('steps', {}).get('cmsRun', {}).get('errors'):
         exitMsg += 'CMSSW error message follows.\n'
         for error in report['steps']['cmsRun']['errors']:
+            if 'exitCode' in error:
+                try:
+                    exitCode = int(exitCode)
+                    fjrExitCode = int(error['exitCode'])
+                    if (fjrExitCode % 256 == exitCode) and (fjrExitCode != exitCode):
+                        print "NOTE: FJR has exit code %d and WMCore reports %d; preferring the FJR one." % (fjrExitCode, exitCode)
+                        exitCode = fjrExitCode
+                except ValueError:
+                    pass
             exitMsg += error['type'] + '\n'
             exitMsg += error['details'] + '\n'
 
