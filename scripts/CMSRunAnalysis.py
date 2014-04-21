@@ -182,7 +182,7 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
             # Note we hardcode 'Local' here.  In CRAB2, it was assumed any PFN with the string 'xrootd'
             # in it was a remote access; we feel this is no longer a safe assumption.  CMSSW actually
             # differentiates the fallback accesses.  See https://github.com/dmwm/WMCore/issues/5087
-            inputInfo[source['lfn']] = (source['lfn'], file_type, 'Local', inputCtr)
+            inputInfo[source['lfn']] = [source['lfn'], file_type, 'Local', inputCtr]
         else:
             parentCtr += 1
             parentInputInfo[source['lfn']] = (source['lfn'], file_type, 'Local', parentCtr)
@@ -198,8 +198,8 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
         lfn = info[0].split(parentBaseName, 1)[-1]
         info[0] = lfn
 
-    inputString = ';'.join(["%s::1::%s::%s::%d" % key for key in inputInfo.keys()])
-    parentInputString = ';'.join(["%s::1::%s::%s::%d" % key for key in parentInputInfo.keys()])
+    inputString = ';'.join(["%s::1::%s::%s::%d" % value for value in inputInfo.values()])
+    parentInputString = ';'.join(["%s::1::%s::%s::%d" % value for value in parentInputInfo.values()])
 
     # Currently, CRAB3 drops the FJR information for failed files.  Hence, we don't currently do any special
     # reporting for these like CRAB2 did.  TODO: Revisit once https://github.com/dmwm/CRABServer/issues/4272
