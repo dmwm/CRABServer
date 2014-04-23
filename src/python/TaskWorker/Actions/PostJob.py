@@ -416,6 +416,9 @@ class ASOServerJob(object):
         self.id = self.submit()
         if self.id == False:
             raise RuntimeError, "Couldn't send to couchdb"
+        if not self.id:
+            logger.info("No files to transfer via ASO.  Done!")
+            return 0
         starttime = time.time()
         if self.aso_start_timestamp:
             starttime = self.aso_start_timestamp
