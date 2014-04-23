@@ -434,7 +434,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                     hbuf.truncate(0)
                 else:
                     raise ExecutionError("Cannot get pool info file. Retry in a minute if you just submitted the task")
-        elif verbose == 3:
+        elif verbose == 0:
             if 'CRAB_ReqName' not in task_ad:
                 raise ExecutionError("Internal error - task ad is missing workflow name.")
             self.publicationStatus(task_ad['CRAB_ReqName'], publication_info)
