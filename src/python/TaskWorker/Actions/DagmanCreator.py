@@ -1,4 +1,3 @@
-
 """
 Create a set of files for a DAG submission.
 
@@ -626,7 +625,7 @@ class DagmanCreator(TaskAction.TaskAction):
             shutil.copy(adjust_location, '.')
 
             # Bootstrap the ISB if we are using UFC
-            if UserFileCache and kw['task']['tm_cache_url'].find('/crabcache/')!=-1:
+            if UserFileCache and kw['task']['tm_cache_url'].find('/crabcache')!=-1:
                 ufc = UserFileCache(dict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy']})
                 ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
                 kw['task']['tm_user_sandbox'] = 'sandbox.tar.gz'
