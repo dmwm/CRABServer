@@ -191,12 +191,14 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
 
     # Next, go through the sources again to properly record the unique portion of the filename
     # The dictionary is keyed on the unique portion of the filename after the common prefix.
-    for info in inputInfo.values():
-        lfn = info[0].split(baseName, 1)[-1]
-        info[0] = lfn
-    for info in parentInputInfo.values():
-        lfn = info[0].split(parentBaseName, 1)[-1]
-        info[0] = lfn
+    if baseName:
+        for info in inputInfo.values():
+            lfn = info[0].split(baseName, 1)[-1]
+            info[0] = lfn
+    if parentBaseName:
+        for info in parentInputInfo.values():
+            lfn = info[0].split(parentBaseName, 1)[-1]
+            info[0] = lfn
 
     inputString = ';'.join(["%s::1::%s::%s::%d" % tuple(value) for value in inputInfo.values()])
     parentInputString = ';'.join(["%s::1::%s::%s::%d" % tuple(value) for value in parentInputInfo.values()])
@@ -207,10 +209,10 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
 
     report = {
         'inputBlocks': myad['CRAB_DataBlock'],
-        'Basename': baseName,
-        'BasenameParent': parentBaseName,
-        'inputFiles': inputString,
-        'parentFiles': parentInputString,
+        'Basename': str(baseName),
+        'BasenameParent': str(parentBaseName),
+        'inputFiles': str(inputString,
+        'parentFiles': str(parentInputString),
     }
     print "Dashboard popularity report: %s" % str(report)
     DashboardAPI.apmonSend(monitorId, monitorJobId, report)
