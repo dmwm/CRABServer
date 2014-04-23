@@ -211,7 +211,7 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
         'inputBlocks': myad['CRAB_DataBlock'],
         'Basename': str(baseName),
         'BasenameParent': str(parentBaseName),
-        'inputFiles': str(inputString,
+        'inputFiles': str(inputString),
         'parentFiles': str(parentInputString),
     }
     print "Dashboard popularity report: %s" % str(report)
