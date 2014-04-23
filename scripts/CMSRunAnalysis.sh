@@ -18,7 +18,7 @@ then
     rc=$?
     set -x
     declare -a VERSIONS
-    VERSIONS=($(ls $VO_CMS_SW_DIR/$SCRAM_ARCH/external/python | grep 2.6))
+    VERSIONS=($(ls $VO_CMS_SW_DIR/$SCRAM_ARCH/external/python | egrep '2.[67]'))
     PY_PATH=$VO_CMS_SW_DIR/$SCRAM_ARCH/external/python
     echo 'python version: ' $VERSIONS
 #   OSG style --
@@ -37,7 +37,7 @@ then
     fi
     set -x
     declare -a VERSIONS
-    VERSIONS=($(ls $OSG_APP/cmssoft/cms/$SCRAM_ARCH/external/python | grep 2.6))
+    VERSIONS=($(ls $OSG_APP/cmssoft/cms/$SCRAM_ARCH/external/python | egrep '2.[67]'))
     PY_PATH=$OSG_APP/cmssoft/cms/$SCRAM_ARCH/external/python 
     echo 'python version: ' $VERSIONS
 elif [ -e /cvmfs/cms.cern.ch ]
@@ -46,8 +46,11 @@ then
     set +x
     . $VO_CMS_SW_DIR/cmsset_default.sh
     rc=$?
-    . /cvmfs/cms.cern.ch/slc5_amd64_gcc461/external/python/2.6.4-cms2/etc/profile.d/init.sh
     set -x
+    declare -a VERSIONS
+    VERSIONS=($(ls /cvmfs/cms.cern.ch/$SCRAM_ARCH/external/python | egrep '2.[67]'))
+    PY_PATH=/cvmfs/cms.cern.ch/$SCRAM_ARCH/external/python
+    echo 'python version: ' $VERSIONS
 else
 	echo "Error: neither OSG_APP, CVMFS, nor VO_CMS_SW_DIR environment variables were set" >&2
 	echo "Error: Because of this, we can't load CMSSW. Not good." >&2
@@ -66,43 +69,45 @@ else
     echo "==== CMSSW pre-execution environment bootstrap FINISHING at $(date) ===="
 fi
 
-echo "==== Python2.6 discovery STARTING ===="
-# check for Python2.6 installation 
+echo "==== Python discovery STARTING ===="
+# check for Python installation 
 N_PYTHON26=${#VERSIONS[*]}
 if [ $N_PYTHON26 -lt 1 ]; then
-    # The check later with command is sufficient
-    :
+    echo "Error: Unable to find a CMS version of python."
+    echo "CRAB3 requires the CMS version of python to function."
+    sleep 20m
+    exec sh ./DashboardFailure.sh 10043
 else
     VERSION=${VERSIONS[0]}
-    echo "Python 2.6 found in $PY_PATH/$VERSION";
+    echo "Python found in $PY_PATH/$VERSION";
     PYTHON26=$PY_PATH/$VERSION
-    # Initialize CMS Python 2.6
+    # Initialize CMS Python
     set +x
     source $PY_PATH/$VERSION/etc/profile.d/init.sh
 fi
 
-command -v python2.6 > /dev/null
+command -v python > /dev/null
 rc=$?
 if [[ $rc != 0 ]]
 then
-	echo "Error: Python2.6 isn't available on this worker node." >&2
-	echo "Error: job execution REQUIRES python2.6" >&2
+	echo "Error: Python wasn't found on this worker node after source CMS version." >&2
+	echo "Error: job execution REQUIRES a working python" >&2
 	sleep 20m
-	exit $rc
+	exec sh ./DashboardFailure.sh 10043
 else
-	echo "I found python2.6 at.."
-	echo `which python2.6`
+	echo "I found python at.."
+	echo `which python`
 fi
-python2.6 -c ''
+python -c ''
 rc=$?
 if [[ $rc != 0 ]]
 then
-	echo "Error: python2.6 is not functional."
+	echo "Error: python is not functional."
 	sleep 20m
 	exec sh ./DashboardFailure.sh 10043
 fi
 
-echo "==== Python2.6 discovery FINISHING at $(date) ===="
+echo "==== Python discovery FINISHING at $(date) ===="
 
 echo "======== Current environment dump STARTING ========"
 for i in `env`; do
@@ -135,7 +140,7 @@ echo "==== Local directory contents dump FINISHING ===="
 echo "======== CMSRunAnalysis.py STARTING at $(date) ========"
 echo "Now running the CMSRunAnalysis.py job in `pwd`..."
 set -x
-python2.6 CMSRunAnalysis.py -r "`pwd`" "$@"
+python CMSRunAnalysis.py -r "`pwd`" "$@"
 jobrc=$?
 set +x
 echo "== The job had an exit code of $jobrc "
