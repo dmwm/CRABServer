@@ -194,6 +194,22 @@ class RetryJob(object):
             if recoverable_signal:
                 raise RecoverableError("SIGILL; may indicate a worker node issue")
 
+        if exitCode == 65 or exitCode == 8001:
+            cvmfs_issue = False
+            try:
+                fname = os.path.expanduser("~/%s/job_out.%s.%s.txt" % (self.reqname, self.count, self.retry_count))
+                cvmfs_issue_re = re.compile("== CMSSW:  unable to load /cvmfs/.*file too short")
+                with open(fname) as fd:
+                    for line in fd: 
+                        if cvmfs_issue_re.match(line):
+                            cvmfs_issue = True
+                            break
+            except:         
+                print "Error analyzing output for CVMFS issues."
+                print str(traceback.format_exc())
+            if cvmfs_issue:
+                raise RecoverableError("CVMFS issue detected")
+
         # Another difficult case -- so far, SIGKILL has only been observed at T2_CH_CERN, and it has nothing to do
         # with an issue of the job itself.
         # We should revisit this issue if we see SIGKILL happening for other cases that are the users' fault.
