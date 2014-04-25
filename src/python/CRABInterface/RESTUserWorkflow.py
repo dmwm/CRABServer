@@ -53,7 +53,7 @@ class RESTUserWorkflow(RESTEntity):
 
     def _checkASODestination(self, site):
         self._checkSite(site)
-        if site in self.centralcfg.centralconfig['banned-out-destinations']:
+        if site in self.centralcfg.centralconfig.get('banned-out-destinations', []):
             excasync = ValueError("Remote output data site is banned")
             invalidp = InvalidParameter("The output site you specified in the config.Site.storageSite parameter (%s) is blacklisted (banned sites: %s)" %\
                             (site, self.centralcfg.centralconfig['banned-out-destinations']), errobj = excasync)

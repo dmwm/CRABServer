@@ -274,6 +274,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "saveLogs"        : saveLogs }]
             else:
                 return [ {"status" : "SUBMITTED",
+                      "taskFailureMsg"  : "",
                       "taskWarningMsg"  : "Task has not yet bootstrapped.",
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
