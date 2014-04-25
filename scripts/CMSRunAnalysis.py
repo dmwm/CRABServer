@@ -254,10 +254,10 @@ def logCMSSW():
     print "======== CMSSW OUTPUT STARTING ========"
     fd = open("cmsRun-stdout.log")
     st = os.fstat(fd.fileno())
-    if st.st_size > 10*1024*1024:
-        print "WARNING: CMSSW output is over 10MB; truncating to last 10MB."
+    if st.st_size > 1*1024*1024:
+        print "WARNING: CMSSW output is over 1MB; truncating to last 1MB."
         print "Use 'crab getlog' to retrieve full output of this job from storage."
-        fd.seek(-10*1024*1024, 2)
+        fd.seek(-1*1024*1024, 2)
         it = fd.xreadlines()
         it.next()
     else:
