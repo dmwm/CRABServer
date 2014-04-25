@@ -84,6 +84,12 @@ else
     # Initialize CMS Python
     set +x
     source $PY_PATH/$VERSION/etc/profile.d/init.sh
+    if [[ $? != 0 ]]
+    then
+        echo "Error: Unable to source python environment setup."
+        sleep 20m
+        exec sh ./DashboardFailure.sh 10043
+    fi
 fi
 
 command -v python > /dev/null

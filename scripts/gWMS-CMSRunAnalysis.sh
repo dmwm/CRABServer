@@ -60,6 +60,12 @@ echo "======== CMSRunAnalysis.sh at $(date) STARTING ========"
 time sh ./CMSRunAnalysis.sh "$@" --oneEventMode=$CRAB_oneEventMode
 EXIT_STATUS=$?
 echo "CMSRunAnalysis.sh complete at $(date) with exit status $EXIT_STATUS"
+# Protect against missing *.sh initialization scripts.
+if [[ $EXIT_STATUS == 1 ]]
+then
+  sleep 20m
+fi
+
 echo "======== CMSRunAnalsysis.sh at $(date) FINISHING ========"
 
 mv jobReport.json jobReport.json.$CRAB_Id
