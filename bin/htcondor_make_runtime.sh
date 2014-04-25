@@ -45,7 +45,9 @@ pushd $STARTDIR
 # TODO: resolve this situation.
 #
 if [[ ! -e libcurl.so.4 ]]; then
-    curl -L http://hcc-briantest.unl.edu/libcurl.so.4 > $STARTDIR/libcurl.so.4 || exit 2
+    curl -L https://github.com/dmwm/CRABServer/raw/master/lib/libcurl.so.4 > $STARTDIR/libcurl.so.4 || exit 2
+    curl -L https://github.com/dmwm/CRABServer/raw/master/lib/libcurl.so.4.sha1sum > $STARTDIR/libcurl.so.4.sha1sum || exit 2
+    sha1sum -c $STARTDIR/libcurl.so.4.sha1sum || exit 2
 fi
 chmod +x libcurl.so.4
 
