@@ -170,6 +170,8 @@ class RetryJob(object):
         if exitCode == 8021 or exitCode == 8028 or exitCode == 8020 or exitCode == 60307 or \
            exitCode == (8021%256) or exitCode == (8028%256) or exitCode == (8020%256) or exitCode == (60307%256):
             raise RecoverableError("Job failed to open local and fallback files.")
+        if exitCode == 1:
+            raise RecoverableError("Job failed to bootstrap CMSSW; likely a worker node issue")
         if exitCode == 50513:
             raise RecoverableError("Job did not find functioning CMSSW on worker node.")
         # This is a difficult one -- right now CMSRunAnalysis.py will turn things like

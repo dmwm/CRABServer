@@ -150,6 +150,8 @@ if [[ $jobrc == 68 ]]
 then
   echo "WARNING: CMSSW encountered a malloc failure.  Logging ulimits:"
   ulimit -a
+  echo "Logging free memory info:"
+  free
 fi
 
 if [ -e scramOutput.log ]; then
