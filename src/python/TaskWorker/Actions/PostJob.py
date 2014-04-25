@@ -486,6 +486,7 @@ def determineSizes(transfer_list):
         print "+", cmd
         status, output = commands.getstatusoutput(cmd)
         if status:
+            print "lcg-ls command exited with code %s. Output was: %s" % (status, output)
             sizes.append(-1)
             continue
         info = output.split("\n")[0].split()
