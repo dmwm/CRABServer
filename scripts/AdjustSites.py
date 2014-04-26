@@ -72,9 +72,14 @@ def adjustPost(resubmit):
             ra_buffer = []
         else:
             output += line
-    output_fd = open("RunJobs.dag.nodes.log", "w")
+    output_fd = open("RunJobs.dag.nodes.log.tmp", "w")
     output_fd.write(output)
     output_fd.close()
+    # Doing a rename isn't strictly necessary (no other processes should be
+    # running; HOWEVER, if the user ran out of quota, we don't want to nuke
+    # the original nodes.log.  Would rather have DAGMan startup fail than
+    # blow away their logfile.  Without the logfile, we have no task!
+    os.rename("RunJobs.dag.nodes.log.tmp", "RunJobs.dag.nodes.log")
 
 def resubmitDag(filename, resubmit):
     if not os.path.exists(filename):
@@ -101,10 +106,22 @@ def resubmitDag(filename, resubmit):
 def make_webdir(ad):
     path = os.path.expanduser("~/%s" % ad['CRAB_ReqName'])
     try:
-        os.makedirs(path)
-        os.symlink(os.path.abspath(os.path.join(".", "job_log")), os.path.join(path, "jobs_log.txt"))
-        os.symlink(os.path.abspath(os.path.join(".", "node_state")), os.path.join(path, "node_state.txt"))
-        os.symlink(os.path.abspath(os.path.join(".", "site.ad")), os.path.join(path, "site_ad.txt"))
+        try:
+            os.makedirs(path)
+        except:
+            pass
+        try:
+            os.symlink(os.path.abspath(os.path.join(".", "job_log")), os.path.join(path, "jobs_log.txt"))
+        except:
+            pass
+        try:
+            os.symlink(os.path.abspath(os.path.join(".", "node_state")), os.path.join(path, "node_state.txt"))
+        except:
+            pass
+        try:
+            os.symlink(os.path.abspath(os.path.join(".", "site.ad")), os.path.join(path, "site_ad.txt"))
+        except:
+            pass
     except OSError:
         pass
     try:
