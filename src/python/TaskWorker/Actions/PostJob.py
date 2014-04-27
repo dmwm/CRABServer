@@ -591,6 +591,8 @@ def isFailurePermanent(reason, task_ad):
         return True
     if re.match(".*disk quota exceeded.*", reason):
         return True
+    if re.match(".*operation not permitted*", reason):
+        return True
     return False
 
 
