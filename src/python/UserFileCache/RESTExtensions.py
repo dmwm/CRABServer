@@ -68,14 +68,11 @@ def quota_user_free(quotadir, infile):
                                % (cherrypy.request.user['login'], quota, filesize))
          raise InvalidParameter("User quota limit reached; cannot upload the file", errobj=excquota, trace='')
 
-def _check_file(argname, val, hashkey):
-    """Check that `argname` `val` is a tar file and that provided 'hashkey`
-       matches with the hashkey calculated on the `val`.
+def _check_file(argname, val):
+    """Check that `argname` `val` is a file
 
        :arg str argname: name of the argument
        :arg file val: the file object
-       :arg str hashkey: the sha256 hexdigest of the file, calculated over the tuple
-                         (name, size, mtime, uname) of all the tarball members
        :return: the val if the validation passes."""
     # checking that is a valid file or an input string
     # note: the input string is generated on client side just when the input file is empty
@@ -89,6 +86,22 @@ def _check_file(argname, val, hashkey):
                 raise InvalidParameter('File is bigger then allowed limit of %dB' % FILE_SIZE_LIMIT)
         elif filesize > FILE_MEMORY_LIMIT:
             raise InvalidParameter('File too large to be completely loaded into memory.')
+
+    return val
+
+
+def _check_tarfile(argname, val, hashkey):
+    """Check that `argname` `val` is a tar file and that provided 'hashkey`
+       matches with the hashkey calculated on the `val`.
+
+       :arg str argname: name of the argument
+       :arg file val: the file object
+       :arg str hashkey: the sha256 hexdigest of the file, calculated over the tuple
+                         (name, size, mtime, uname) of all the tarball members
+       :return: the val if the validation passes."""
+    # checking that is a valid file or an input string
+    # note: the input string is generated on client side just when the input file is empty
+    _check_file(argname, val)
 
     digest = None
     try:
@@ -108,6 +121,19 @@ class ChecksumFailed(RESTError):
     app_code = 302
     message = "Input file hashkey mismatch"
 
+def validate_tarfile(argname, param, safe, hashkey, optional=False):
+    """Validates that an argument is a file and matches the hashkey.
+
+    Checks that an argument named `argname` exists in `param.kwargs`
+    and it is a tar file which matches the provided hashkey. If
+    successful the string is copied into `safe.kwargs` and the value
+    is removed from `param.kwargs`.
+
+    If `optional` is True, the argument is not required to exist in
+    `param.kwargs`; None is then inserted into `safe.kwargs`. Otherwise
+    a missing value raises an exception."""
+    _validate_one(argname, param, safe, _check_tarfile, optional, safe.kwargs[hashkey])
+
 def validate_file(argname, param, safe, hashkey, optional=False):
     """Validates that an argument is a file and matches the hashkey.
 
@@ -119,4 +145,4 @@ def validate_file(argname, param, safe, hashkey, optional=False):
     If `optional` is True, the argument is not required to exist in
     `param.kwargs`; None is then inserted into `safe.kwargs`. Otherwise
     a missing value raises an exception."""
-    _validate_one(argname, param, safe, _check_file, optional, safe.kwargs[hashkey])
+    _validate_one(argname, param, safe, _check_file, optional)
