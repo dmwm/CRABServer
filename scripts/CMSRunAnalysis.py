@@ -98,6 +98,8 @@ def earlyDashboardMonitoring(myad):
     populateDashboardMonitorInfo(myad, params)
     print "Dashboard early startup params: %s" % str(params)
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+    return params['MonitorJobID']
+
 
 def earlyDashboardFailure(myad):
     params = {
@@ -460,7 +462,9 @@ except:
     print traceback.format_exc()
     ad = {}
 if ad:
-    earlyDashboardMonitoring(ad)
+    dashboardId = earlyDashboardMonitoring(ad)
+    if dashboardId:
+        os.environ['DashboardJobId'] = dashboardId
 
 try:
     opts = parseArgs()
