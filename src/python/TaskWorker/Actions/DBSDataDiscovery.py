@@ -89,7 +89,12 @@ if __name__ == '__main__':
     config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
 
     fileset = DBSDataDiscovery(config)
-    dataset = '/DoubleMuParked/Run2012B-22Jan2013-v1/AOD'
+    dataset = '/DoubleMuParked/Run2012B-22Jan2013-v1/AOD' #No locations for invalid block /DoubleMuParked/Run2012B-22Jan2013-v1/AOD#945791b2-da34-11e2-b22d-00221959e69e
+    fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
+
+    #dataset = '/DoubleElectron/Run2012C-22Jan2013-v1/RECO' #not in FNAL_DISK
+    fileset = DBSDataDiscovery(config)
+    dataset = '/SingleMu/Run2012D-22Jan2013-v1/AOD' #invalid file: /store/data/Run2012D/SingleMu/AOD/22Jan2013-v1/20001/7200FA02-CC85-E211-9966-001E4F3F165E.root
     fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
 
     for dataset in datasets:

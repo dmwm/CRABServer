@@ -28,13 +28,19 @@ class DataDiscovery(TaskAction):
         wmfiles = []
         lumicounter = evecounter = 0
         for lfn, infos in datasetfiles.iteritems():
+            #the block has not been found or has no locations, continue to the next file
+            if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
+                self.logger.warning("Skipping %s because its block (%s) has no locations" % (lfn, infos['BlockName']))
+                continue
+
+            #if the file is invalid then skip it
+            if not infos['ValidFile']:
+                self.logger.warning("Skipping invalid file %s" % lfn)
+                continue
+
             wmfile = File(lfn=lfn, events=infos['NumberOfEvents'], size=infos['Size'], checksums=infos['Checksums'])
             wmfile['block'] = infos['BlockName']
             wmfile['locations'] = []
-            #the block has not been found or has no locations, continue to the next block
-            if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
-                self.logger.error("Skipping %s because its block (%s) has no locations" % (lfn, infos['BlockName']))
-                continue
             for se in locations[infos['BlockName']]:
                 if se  and se not in secmsmap:
                     self.logger.debug("Translating SE %s" %se)
