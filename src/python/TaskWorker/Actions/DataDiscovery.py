@@ -34,7 +34,7 @@ class DataDiscovery(TaskAction):
                 continue
 
             #if the file is invalid then skip it
-            if not infos['ValidFile']:
+            if not infos.get('ValidFile', True):
                 self.logger.warning("Skipping invalid file %s" % lfn)
                 continue
 
