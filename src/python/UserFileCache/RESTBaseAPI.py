@@ -3,7 +3,7 @@ from WMCore.REST.Server import RESTApi
 from WMCore.REST.Format import JSONFormat
 
 # CRABServer dependecies here
-from UserFileCache.RESTFile import RESTFile, RESTFileInfo
+from UserFileCache.RESTFile import RESTFile, RESTLogFile, RESTFileInfo
 import UserFileCache.RESTExtensions
 
 # external dependecies here
@@ -25,5 +25,6 @@ class RESTBaseAPI(RESTApi):
             UserFileCache.RESTExtensions.POWER_USERS_LIST = config.powerusers
         if hasattr(config, 'quota_user_limit'):
             UserFileCache.RESTExtensions.quota_user_limit = config.quota_user_limit * 1024 * 1024
-        self._add( {'file': RESTFile(app, self, config, mount),
+        self._add( {'logfile': RESTLogFile(app, self, config, mount),
+                    'file': RESTFile(app, self, config, mount),
                     'fileinfo': RESTFileInfo(app, self, config, mount)} )
