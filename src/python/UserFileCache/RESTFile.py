@@ -18,7 +18,7 @@ import shutil
 
 # here go the all regex to be used for validation
 RX_HASH = re.compile(r'^[a-f0-9]{64}$')
-RX_LOGFILENAME = re.compile(r"^[\w\-. ]+$")
+RX_LOGFILENAME = re.compile(r"^[\w\-.: ]+$")
 
 def touch(filename):
     """Touch the file to keep automated cleanup away
