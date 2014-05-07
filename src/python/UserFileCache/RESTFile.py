@@ -5,7 +5,7 @@ from WMCore.REST.Error import RESTError, InvalidParameter, MissingObject
 from WMCore.REST.Format import RawFormat
 
 # CRABServer dependecies here
-from UserFileCache.RESTExtensions import _check_file, ChecksumFailed, validate_file, authz_login_valid, quota_user_free
+from UserFileCache.RESTExtensions import ChecksumFailed, validate_file, validate_tarfile, authz_login_valid, quota_user_free
 
 # external dependecies here
 import cherrypy
@@ -18,6 +18,7 @@ import shutil
 
 # here go the all regex to be used for validation
 RX_HASH = re.compile(r'^[a-f0-9]{64}$')
+RX_LOGFILENAME = re.compile(r"^[\w\-.: ]+$")
 
 def touch(filename):
     """Touch the file to keep automated cleanup away
@@ -38,6 +39,7 @@ class RESTFile(RESTEntity):
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
         self.cachedir = config.cachedir
+        self.overwriteFile = False
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
@@ -45,7 +47,7 @@ class RESTFile(RESTEntity):
 
         if method in ['PUT']:
             validate_str("hashkey", param, safe, RX_HASH, optional=False)
-            validate_file("inputfile", param, safe, 'hashkey', optional=False)
+            validate_tarfile("inputfile", param, safe, 'hashkey', optional=False)
         if method in ['GET']:
             validate_str("hashkey", param, safe, RX_HASH, optional=False)
 
@@ -68,7 +70,7 @@ class RESTFile(RESTEntity):
         outfilepath = os.path.join(outfilepath, hashkey[0:2])
         outfilename = os.path.join(outfilepath, hashkey)
 
-        if os.path.isfile(outfilename):
+        if os.path.isfile(outfilename) and not self.overwriteFile:
             # we do not want to upload again a file that already exists
            touch(outfilename)
            result['size'] = os.path.getsize(outfilename)
@@ -106,6 +108,29 @@ class RESTFile(RESTEntity):
         touch(filename)
         return serve_file(filename, "application/octet-stream", "attachment")
 
+class RESTLogFile(RESTFile):
+    """The RESTEntity for uploaded and downloaded logs"""
+    def __init__(self, app, api, config, mount):
+        RESTFile.__init__(self, app, api, config, mount)
+        self.overwriteFile = True
+
+    def validate(self, apiobj, method, api, param, safe):
+        """Validating all the input parameter as enforced by the WMCore.REST module"""
+        authz_login_valid()
+
+        if method in ['PUT']:
+            validate_file("inputfile", param, safe, 'hashkey', optional=False)
+            validate_str("name", param, safe, RX_LOGFILENAME, optional=False)
+        if method in ['GET']:
+            validate_str("name", param, safe, RX_LOGFILENAME, optional=False)
+
+    @restcall
+    def put(self, inputfile, name):
+        return RESTFile.put(self, inputfile, name)
+
+    @restcall(formats = [('application/octet-stream', RawFormat())])
+    def get(self, name):
+        return RESTFile.get(self, name)
 
 class RESTFileInfo(RESTEntity):
     """The RESTEntity to get information about uploaded files"""

@@ -248,6 +248,12 @@ class HTCondorDataWorkflow(DataWorkflow):
         schedd, address = locator.getScheddObj(workflow)
 
         results = self.getRootTasks(workflow, schedd)
+        #getting publication information 
+        
+        if 'CRAB_ReqName' not in results[0]:
+            raise ExecutionError("Internal error - task ad is missing workflow name.")
+        publication_info={}    
+        self.publicationStatus(results[0]['CRAB_ReqName'], publication_info)
         if not results:
             return [ {"status" : "UNKNOWN",
                       "taskFailureMsg" : "Unable to find root task in HTCondor",
@@ -285,7 +291,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "saveLogs"        : saveLogs }]
 
         try:
-            taskStatus, pool, publication_info = self.taskWebStatus(results[0], verbose=verbose)
+            taskStatus, pool = self.taskWebStatus(results[0], verbose=verbose)
         except MissingNodeStatus:
             return [ {"status" : "UNKNOWN",
                 "taskFailureMsg"  : "Node status file not currently available.  Retry in a minute if you just submitted the task",
@@ -373,7 +379,6 @@ class HTCondorDataWorkflow(DataWorkflow):
     def taskWebStatus(self, task_ad, verbose):
         nodes = {}
         pool_info = {}
-        publication_info = {}
 
         url = task_ad['CRAB_UserWebDir']
 
@@ -434,11 +439,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                     hbuf.truncate(0)
                 else:
                     raise ExecutionError("Cannot get pool info file. Retry in a minute if you just submitted the task")
-        elif verbose == 3:
-            if 'CRAB_ReqName' not in task_ad:
-                raise ExecutionError("Internal error - task ad is missing workflow name.")
-            self.publicationStatus(task_ad['CRAB_ReqName'], publication_info)
-
 
         nodes_url = url + "/node_state.txt"
         curl.setopt(pycurl.URL, nodes_url)
@@ -454,7 +454,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         else:
             raise MissingNodeStatus("Cannot get node state log. Retry in a minute if you just submitted the task")
 
-        return nodes, pool_info, publication_info
+        return nodes, pool_info
 
 
     def publicationStatus(self, workflow, publication_info):
