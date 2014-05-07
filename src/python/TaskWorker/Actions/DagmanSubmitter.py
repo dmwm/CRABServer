@@ -275,6 +275,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd['Args'] = arg
         dagAd["TransferInput"] = str(info['inputFilesString'])
         dagAd["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
+        dagAd["PeriodicRemove"] = classad.ExprTree("(JobStatus == 5) && (time()-EnteredCurrentStatus > 30*86400)")
         dagAd["TransferOutput"] = info['outputFilesString']
         dagAd["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
         dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
@@ -291,6 +292,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 resultAds = []
                 schedd.submit(dagAd, 1, True, resultAds)
                 schedd.spool(resultAds)
+                if resultAds:
+                    id = "%s.%s" % (resultAds[0]['ClusterId'], resultAds[0]['ProcId'])
+                    schedd.edit([id], "LeaveJobInQueue", classad.ExprTree("(JobStatus == 4) && (time()-EnteredCurrentStatus > 30*86400)"))
         results = rpipe.read()
         if results != "OK":
             raise Exception("Failure when submitting HTCondor task: '%s'" % results)
