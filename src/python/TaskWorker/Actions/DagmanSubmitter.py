@@ -294,7 +294,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 schedd.spool(resultAds)
                 if resultAds:
                     id = "%s.%s" % (resultAds[0]['ClusterId'], resultAds[0]['ProcId'])
-                    schedd.edit([id], "LeaveJobInQueue", classad.ExprTree("(JobStatus == 4) && (time()-EnteredCurrentStatus > 30*86400)"))
+                    schedd.edit([id], "LeaveJobInQueue", classad.ExprTree("(JobStatus == 4) && (time()-EnteredCurrentStatus < 30*86400)"))
         results = rpipe.read()
         if results != "OK":
             raise Exception("Failure when submitting HTCondor task: '%s'" % results)
