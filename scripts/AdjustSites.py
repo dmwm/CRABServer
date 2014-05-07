@@ -72,14 +72,21 @@ def adjustPost(resubmit):
             ra_buffer = []
         else:
             output += line
+    # This is a curious dance!  If the user is out of quota, we don't want
+    # to fail halfway into writing the file.  OTOH, we can't write into a temp
+    # file and an atomic rename because the running shadows keep their event log
+    # file descriptors open.  Accordingly, we write the file once (to see if we)
+    # have enough quota space, then rewrite "the real file" after deleting the
+    # temporary one.  There's a huge race condition here, but it seems to be the
+    # best we can do giveen the constraints.  Note that we don't race with the
+    # shadow as we have a write lock on the file itself.
     output_fd = open("RunJobs.dag.nodes.log.tmp", "w")
     output_fd.write(output)
     output_fd.close()
-    # Doing a rename isn't strictly necessary (no other processes should be
-    # running; HOWEVER, if the user ran out of quota, we don't want to nuke
-    # the original nodes.log.  Would rather have DAGMan startup fail than
-    # blow away their logfile.  Without the logfile, we have no task!
-    os.rename("RunJobs.dag.nodes.log.tmp", "RunJobs.dag.nodes.log")
+    os.unlink("RunJobs.dag.nodes.log.tmp")
+    output_fd = open("RunJobs.dag.nodes.log", "w")
+    output_fd.write(output)
+    output_fd.close()
 
 def resubmitDag(filename, resubmit):
     if not os.path.exists(filename):
