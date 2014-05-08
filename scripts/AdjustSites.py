@@ -131,6 +131,10 @@ def make_webdir(ad):
             os.symlink(os.path.abspath(os.path.join(".", "site.ad")), os.path.join(path, "site_ad.txt"))
         except:
             pass
+        try:
+            os.symlink(os.path.abspath(os.path.join(".", "aso_status.json")), os.path.join(path, "aso_status.json"))
+        except:
+            pass
     except OSError:
         pass
     try:
