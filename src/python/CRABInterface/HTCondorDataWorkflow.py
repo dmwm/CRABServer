@@ -247,7 +247,20 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.debug("Schedd name %s." % name)
         schedd, address = locator.getScheddObj(workflow)
 
-        results = self.getRootTasks(workflow, schedd)
+        try:
+            results = self.getRootTasks(workflow, schedd)
+        except Exception, exp:
+            msg = "Failed to contact Schedd: %s" % str(exp)
+            self.logger.exception(msg)
+            return [{"status" : status,
+                      "taskFailureMsg" : str(msg),
+                      "jobSetID"        : '',
+                      "jobsPerStatus"   : {},
+                      "failedJobdefs"   : 0,
+                      "totalJobdefs"    : 0,
+                      "jobdefErrors"    : [],
+                      "jobList"         : [],
+                      "saveLogs"        : saveLogs }]
         #getting publication information 
         
         if 'CRAB_ReqName' not in results[0]:
