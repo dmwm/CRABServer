@@ -72,6 +72,8 @@ def adjustPost(resubmit):
             ra_buffer = []
         else:
             output += line
+    if ra_buffer:
+        for l in ra_buffer: output += l
     # This is a curious dance!  If the user is out of quota, we don't want
     # to fail halfway into writing the file.  OTOH, we can't write into a temp
     # file and an atomic rename because the running shadows keep their event log
