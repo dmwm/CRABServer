@@ -2,7 +2,6 @@ import logging
 import cherrypy
 from commands import getstatusoutput
 from time import mktime, gmtime
-from logging.handlers import TimedRotatingFileHandler
 
 # WMCore dependecies here
 from WMCore.REST.Server import DatabaseRESTApi, rows
@@ -90,7 +89,7 @@ class RESTBaseAPI(DatabaseRESTApi):
 
         logger = logging.getLogger('CRABLogger')
         if loglevel:
-            hdlr = TimedRotatingFileHandler(logfile, when='midnight', backupCount=10, utc=True)
+            hdlr = logging.FileHandler(logfile)
             formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
             hdlr.setFormatter(formatter)
             logger.addHandler(hdlr)
