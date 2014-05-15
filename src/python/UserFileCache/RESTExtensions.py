@@ -42,6 +42,12 @@ def file_size(argfile):
         argfile.seek(0)
         return filesize, False
 
+def list_files(quotapath):
+    for dirpath, dirnames, filenames in walk(quotapath):
+        for f in filenames:
+            fp = path.join(dirpath, f)
+            yield fp
+
 def get_size(quotapath):
     """Check the quotapath directory size; it doesn't include the 4096 bytes taken by each directory
 

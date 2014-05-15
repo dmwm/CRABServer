@@ -1,11 +1,11 @@
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, _validate_one, validate_num
-from WMCore.REST.Error import RESTError, InvalidParameter, MissingObject
+from WMCore.REST.Error import RESTError, InvalidParameter, MissingObject, ExecutionError
 from WMCore.REST.Format import RawFormat
 
 # CRABServer dependecies here
-from UserFileCache.RESTExtensions import ChecksumFailed, validate_file, validate_tarfile, authz_login_valid, quota_user_free
+from UserFileCache.RESTExtensions import ChecksumFailed, validate_file, validate_tarfile, authz_login_valid, quota_user_free, get_size, list_files
 
 # external dependecies here
 import cherrypy
@@ -19,6 +19,8 @@ import shutil
 # here go the all regex to be used for validation
 RX_HASH = re.compile(r'^[a-f0-9]{64}$')
 RX_LOGFILENAME = re.compile(r"^[\w\-.: ]+$")
+RX_SUBRES = re.compile(r"^fileinfo|userinfo|powerusers|basicquota|fileremove$")
+RX_USERNAME = re.compile(r"^\w+$") #TODO use WMCore regex
 
 def touch(filename):
     """Touch the file to keep automated cleanup away
@@ -27,17 +29,19 @@ def touch(filename):
     if os.path.isfile(filename):
         os.utime(filename, None)
 
-def filepath(cachedir):
+def filepath(cachedir, username=None):
     # NOTE: if we need to share a file between users (something we do not really want to make default or too easy...) we can:
     #         - use the group of the user instead of the user name, which can be retrieved from cherrypy.request.user
     #         - have an extra input parameter group=something (but this wouldn't be transparent when downloading it)
-    return os.path.join(cachedir, cherrypy.request.user['login'][0], cherrypy.request.user['login'])
+    username = username if username else cherrypy.request.user['login']
+    return os.path.join(cachedir, username[0], username)
 
 class RESTFile(RESTEntity):
     """The RESTEntity for uploaded and downloaded files"""
 
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
+        self.config = config
         self.cachedir = config.cachedir
         self.overwriteFile = False
 
@@ -132,8 +136,9 @@ class RESTLogFile(RESTFile):
     def get(self, name):
         return RESTFile.get(self, name)
 
-class RESTFileInfo(RESTEntity):
-    """The RESTEntity to get information about uploaded files"""
+
+class RESTInfo(RESTEntity):
+    """REST entity for workflows and relative subresources"""
 
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
@@ -143,10 +148,19 @@ class RESTFileInfo(RESTEntity):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid()
         if method in ['GET']:
-            validate_str("hashkey", param, safe, RX_HASH, optional=False)
+            validate_str('subresource', param, safe, RX_SUBRES, optional=False)
+            validate_str("hashkey", param, safe, RX_HASH, optional=True)
+            validate_str("username", param, safe, RX_USERNAME, optional=True)
 
     @restcall
-    def get(self, hashkey):
+    def get(self, subresource, **kwargs):
+        """Retrieves the server information, like delegateDN, filecacheurls ...
+           :arg str subresource: the specific server information to be accessed;
+        """
+        return getattr(RESTInfo, subresource)(self, **kwargs)
+
+    @restcall
+    def fileinfo(self, **kwargs):
         """Retrieve the file summary information.
 
            The caller needs to be a CMS user with a valid CMS x509 cert/proxy.
@@ -154,6 +168,8 @@ class RESTFileInfo(RESTEntity):
            :arg str hashkey: the sha256 hexdigest of the file, calculated over the tuple
                              (name, size, mtime, uname) of all the tarball members
            :return: hashkey, name, size of the requested file"""
+
+        hashkey = kwargs['hashkey']
         result = {}
         filename = None
         infilepath = filepath(self.cachedir)
@@ -164,7 +180,62 @@ class RESTFileInfo(RESTEntity):
 
         if not os.path.isfile(filename):
             raise MissingObject("Not such file")
-        touch(filename)
         result['exists'] = True
         result['size'] = os.path.getsize(filename)
+        result['created'] = os.path.getctime(filename)
+        result['modified'] = os.path.getmtime(filename)
+        touch(filename)
+
         return [result]
+
+    @restcall
+    def fileremove(self, **kwargs):
+        """Remove the file with the specified hashkey.
+
+           The caller needs to be a CMS user with a valid CMS x509 cert/proxy. Users can only delete their own files
+
+           :arg str hashkey: the sha256 hexdigest of the file, calculated over the tuple
+                             (name, size, mtime, uname) of all the tarball members
+        """
+        hashkey = kwargs['hashkey']
+
+        infilepath = filepath(self.cachedir)
+        # defining the path/name from the hash of the file
+        filename = os.path.join(infilepath, hashkey[0:2], hashkey)
+
+        if not os.path.isfile(filename):
+            raise MissingObject("Not such file")
+
+        try:
+            os.remove(filename)
+        except Exception, ex:
+            raise ExecutionError("Impossible to remove the file: %s" % str(ex))
+
+    @restcall
+    def userinfo(self, **kwargs):
+        """Retrieve the user summary information.
+
+           :arg str username: username for which the informations are retrieved
+
+           :return: quota, list of filenames"""
+        username = kwargs['username']
+        userpath = filepath(self.cachedir, username)
+
+        res = {"file_list" : list(list_files(userpath)),
+               "used_space" : [get_size(userpath)]}
+
+        yield res
+
+    @restcall
+    def powerusers(self, **kwargs):
+        """ Retrieve the list of power users from the config
+        """
+
+        return self.config.powerusers
+
+    @restcall
+    def basicquota(self, **kwargs):
+        """ Retrieve the basic quota space
+        """
+
+        yield {"quota_user_limit" : self.config.quota_user_limit}
