@@ -28,6 +28,7 @@ EC_CMSRunWrapper =      10040
 EC_MoveOutErr =         99999 #TODO define an error code
 EC_ReportHandlingErr =  50115
 EC_WGET =               99998 #TODO define an error code
+EC_PsetHash           = 60453
 
 ad = {}
 
@@ -696,6 +697,7 @@ def AddPsetHash(report, opts):
             else:
                 print "ERROR: PSet Hash missing from edmProvDump output.  Full dump below."
                 print lines
+                raise Exception("PSet hash missing from edmProvDump output.")
 
 try:
     setupLogging('.')
@@ -753,7 +755,12 @@ try:
     #import pdb;pdb.set_trace()
     report = report.__to_json__(None)
     AddChecksums(report)
-    AddPsetHash(report, opts)
+    try:
+        AddPsetHash(report, opts)
+    except:
+        handleException("FAILED", EC_PsetHash, "Unable to compute pset hash for job output")
+        mintime()
+        sys.exit(EC_PsetHash)
     if jobExitCode: #TODO check exitcode from fwjr
         report['exitAcronym'] = "FAILED"
         report['exitCode'] = jobExitCode
