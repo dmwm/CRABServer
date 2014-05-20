@@ -629,6 +629,23 @@ def AddChecksums(report):
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
 def AddPsetHash(report, opts):
+    """
+    Example relevant output from edmProvDump:
+
+    Processing History:
+  LHC '' '"CMSSW_5_2_7_ONLINE"' [1]  (3d65e8b9ad872f46fe020c68d75d79ab)
+    HLT '' '"CMSSW_5_2_7_ONLINE"' [1]  (5b994f2a1c1c3f9dcafe27bcfa8f085f)
+      RECO '' '"CMSSW_5_3_7_patch6"' [1]  (c186b1d0b14a7353cd3d6e46639ccbbc)
+        PAT '' '"CMSSW_5_3_11"' [1]  (8daee065cbf6da0cee1c034eb3f8af28)
+    HLT '' '"CMSSW_5_2_7_ONLINE"' [2]  (d019fbf5930638478d250e8c8d5257cc)
+      RECO '' '"CMSSW_5_3_7_patch6"' [1]  (c186b1d0b14a7353cd3d6e46639ccbbc)
+  LHC '' '"CMSSW_5_2_7_onlpatch3_ONLINE"' [2]  (3d65e8b9ad872f46fe020c68d75d79ab)
+    HLT '' '"CMSSW_5_2_7_onlpatch3_ONLINE"' [1]  (cd9d2672f701d636e7873de078595fcf)
+      RECO '' '"CMSSW_5_3_7_patch6"' [1]  (c186b1d0b14a7353cd3d6e46639ccbbc)
+
+    We want to take the line with the deepest prefix (PAT line above)
+    """
+
     if 'steps' not in report:
         return
     if 'cmsRun' not in report['steps']:
@@ -636,7 +653,8 @@ def AddPsetHash(report, opts):
     if 'output' not in report['steps']['cmsRun']:
         return
 
-    pset_re = re.compile("^ParameterSetID: ([a-f0-9]{32,32})$")
+    pset_re = re.compile("(\s+).*\(([a-f0-9]{32,32})\)$")
+    processing_history_re = re.compile("^Processing History:$")
     for outputMod in report['steps']['cmsRun']['output'].values():
         for fileInfo in outputMod:
             if fileInfo.get('ouput_module_class') != 'PoolOutputModule':
@@ -654,14 +672,25 @@ def AddPsetHash(report, opts):
                 continue
             print "==== PSet Hash lookup STARTING at %s ====" % time.ctime()
             lines = getProv(filename, opts)
-            pset_hash = None
+            found_history = False
+            matches = {}
             for line in lines.splitlines():
+                 if not found_history:
+                     if processing_history_re.match(line):
+                         found_history = True
+                     continue
                  m = pset_re.match(line)
                  if m:
-                     # Note we want the last hash in the file.
-                     pset_hash = m.groups()[0]
+                     # Note we want the deepest entry in the hierarchy
+                     depth, pset_hash = m.groups()
+                     depth = len(depth)
+                     matches[depth] = pset_hash
+                 else:
+                     break
             print "==== PSet Hash lookup FINISHED at %s ====" % time.ctime()
-            if pset_hash:
+            if matches:
+                max_depth = max(matches.keys())
+                pset_hash = matches[max_depth]
                 print "== edmProvDump pset hash %s" % pset_hash
                 fileInfo['pset_hash'] = pset_hash
             else:
