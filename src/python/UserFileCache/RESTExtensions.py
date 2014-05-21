@@ -12,7 +12,7 @@ import tarfile
 import hashlib
 import cStringIO
 import cherrypy
-from os import fstat, walk, path
+from os import fstat, walk, path, listdir
 
 # 100MB is the maximum allowed size of a single file
 FILE_SIZE_LIMIT = 104857600
@@ -42,11 +42,17 @@ def file_size(argfile):
         argfile.seek(0)
         return filesize, False
 
+def list_users(cachedir):
+    #file are stored in directories like u/username
+    for name in listdir(cachedir): #iterate over u ...
+        if path.isdir(path.join(cachedir, name)):
+            for username in listdir(path.join(cachedir, name)): #list all the users under u
+                yield username
+
 def list_files(quotapath):
     for dirpath, dirnames, filenames in walk(quotapath):
         for f in filenames:
-            fp = path.join(dirpath, f)
-            yield fp
+            yield f
 
 def get_size(quotapath):
     """Check the quotapath directory size; it doesn't include the 4096 bytes taken by each directory

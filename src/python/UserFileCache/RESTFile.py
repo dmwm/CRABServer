@@ -5,7 +5,7 @@ from WMCore.REST.Error import RESTError, InvalidParameter, MissingObject, Execut
 from WMCore.REST.Format import RawFormat
 
 # CRABServer dependecies here
-from UserFileCache.RESTExtensions import ChecksumFailed, validate_file, validate_tarfile, authz_login_valid, quota_user_free, get_size, list_files
+from UserFileCache.RESTExtensions import ChecksumFailed, validate_file, validate_tarfile, authz_login_valid, quota_user_free, get_size, list_files, list_users
 
 # external dependecies here
 import cherrypy
@@ -19,7 +19,7 @@ import shutil
 # here go the all regex to be used for validation
 RX_HASH = re.compile(r'^[a-f0-9]{64}$')
 RX_LOGFILENAME = re.compile(r"^[\w\-.: ]+$")
-RX_SUBRES = re.compile(r"^fileinfo|userinfo|powerusers|basicquota|fileremove$")
+RX_SUBRES = re.compile(r"^fileinfo|userinfo|powerusers|basicquota|fileremove|listusers$")
 RX_USERNAME = re.compile(r"^\w+$") #TODO use WMCore regex
 
 def touch(filename):
@@ -182,7 +182,8 @@ class RESTInfo(RESTEntity):
             raise MissingObject("Not such file")
         result['exists'] = True
         result['size'] = os.path.getsize(filename)
-        result['created'] = os.path.getctime(filename)
+        result['accessed'] = os.path.getctime(filename)
+        result['changed'] = os.path.getctime(filename)
         result['modified'] = os.path.getmtime(filename)
         touch(filename)
 
@@ -225,6 +226,13 @@ class RESTInfo(RESTEntity):
                "used_space" : [get_size(userpath)]}
 
         yield res
+
+    @restcall
+    def listusers(self, **kwargs):
+        """ Retrieve the list of power users from the config
+        """
+
+        return list_users(self.cachedir)
 
     @restcall
     def powerusers(self, **kwargs):
