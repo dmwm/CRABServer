@@ -2,7 +2,7 @@
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.REST.Server import RESTEntity, restcall, rows
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
-#from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import allScramArchsAndVersions
+from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import allScramArchsAndVersions, TAG_COLLECTOR_URL
 
 # CRABServer dependecies here
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
@@ -78,10 +78,10 @@ class RESTUserWorkflow(RESTEntity):
         try:
             goodReleases = allScramArchsAndVersions()
         except IOError:
-            msg = "Error connecting to https://cmssdt.cern.ch/SDT/cgi-bin/ReleasesXML and determine the list of available releases. You may need to contact an operator."
+            msg = "Error connecting to %s and determine the list of available releases. You may need to contact an operator." % TAG_COLLECTOR_URL
 
         if goodReleases == {}:
-            msg = "The list of releases at https://cmssdt.cern.ch/SDT/cgi-bin/ReleasesXML is empty. You may need to contact an operator."
+            msg = "The list of releases at %s is empty. You may need to contact an operator." % TAG_COLLECTOR_URL
 
         if jobarch not in goodReleases or jobsw not in goodReleases[jobarch]:
             msg = "ERROR: %s on %s is not among supported releases" % (jobsw, jobarch)
@@ -106,8 +106,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("nonprodsw", param, safe, optional=False)
             validate_str("jobarch", param, safe, RX_ARCH, optional=False)
             if not safe.kwargs["nonprodsw"]: #if the user wants to allow non-production releases
-                #self._checkReleases(safe.kwargs['jobarch'], safe.kwargs['jobsw'])
-                pass
+                self._checkReleases(safe.kwargs['jobarch'], safe.kwargs['jobsw'])
             jobtype = safe.kwargs.get('jobtype', None)
             if jobtype == 'Analysis':
                 validate_str("inputdata", param, safe, RX_DATASET, optional=False)
