@@ -261,12 +261,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobdefErrors"    : [],
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
-        #getting publication information 
-        
-        if 'CRAB_ReqName' not in results[0]:
-            raise ExecutionError("Internal error - task ad is missing workflow name.")
-        publication_info={}    
-        self.publicationStatus(results[0]['CRAB_ReqName'], publication_info)
         if not results:
             return [ {"status" : "UNKNOWN",
                       "taskFailureMsg" : "Unable to find root task in HTCondor",
@@ -277,6 +271,9 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobdefErrors"    : [],
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
+
+        #getting publication information
+        publication_info, outdatasets = self.publicationStatus(workflow)
 
 
         taskStatusCode = int(results[-1]['JobStatus'])
@@ -357,6 +354,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         retval['jobs'] = taskStatus
         retval['pool'] = pool
         retval['publication'] = publication_info
+        retval['outdatasets'] = outdatasets
 
         return [retval]
 
@@ -469,8 +467,20 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         return nodes, pool_info
 
+    def _getOutDatasets(self, workflow):
+        """ Get the output datasets of the workflow.
+            The current implementation queries the filemetadata. However this rotates, we should take this information from the task database at some point.
+            This requires some work on the postjob though: see https://github.com/dmwm/CRABServer/issues/4192
+            When this is done we can probably get rid of this function and propagate the out dataset from the top (we already query the task table)
+        """
+        #well sine I am lazy I am keeping the query here. It's going to be deleted in the future. In principle should go in Database/.. with the other queries
+        rows = self.api.query(None, None, "SELECT DISTINCT(fmd_outdataset) FROM filemetadata WHERE tm_taskname=:taskname and fmd_type='EDM'", taskname = workflow)
+        outdatasets = [row[0] for row in rows]
+        return outdatasets
 
-    def publicationStatus(self, workflow, publication_info):
+    def publicationStatus(self, workflow):
+        publication_info = {}
+        outdatasets = []
         ASOURL = self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", "")
         if not ASOURL:
             raise ExecutionError("This CRAB server is not configured to publish; no publication status is available.")
@@ -490,6 +500,9 @@ class HTCondorDataWorkflow(DataWorkflow):
             raise ExecutionError(msg)
         if publicationlist and ('value' in publicationlist[0]):
             publication_info.update(publicationlist[0]['value'])
+            outdatasets = self._getOutDatasets(workflow)
+
+        return publication_info, outdatasets
 
 
     node_name_re = re.compile("DAG Node: Job(\d+)")
