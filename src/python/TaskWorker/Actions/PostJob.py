@@ -701,9 +701,8 @@ class PostJob():
                 fileInfo['outfileruns'] = []
                 fileInfo['outfilelumis'] = []
                 for run, lumis in outputFile[u'runs'].items():
-                    for lumi in lumis:
-                        fileInfo['outfileruns'].append(str(run))
-                        fileInfo['outfilelumis'].append(str(lumi))
+                    fileInfo['outfileruns'].append(str(run))
+                    fileInfo['outfilelumis'].append(','.join(map(str,lumis)))
 
 
     def fixPerms(self):
