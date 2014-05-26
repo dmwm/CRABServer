@@ -185,7 +185,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.info("Lumi mask was: %s" % res['lumiMask'])
 
         #extract the finished jobs from filemetadata
-        jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'transferring']]
+        jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished']]
         rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM', taskname=workflow)
 
         res['runsAndLumis'] = {}
