@@ -61,3 +61,11 @@ class DataFileMetadata(object):
         self.logger.debug("Changing state of file %(taskname)s in task %(outlfn)s to %(filestate)s" % kwargs)
 
         self.api.modify(self.FileMetaData.ChangeFileState_sql, **dict((k, [v]) for k,v in kwargs.iteritems()))
+
+    def delete(self, taskname, hours):
+        if taskname:
+            self.logger.debug("Deleting all the files associated to task: %s" % taskname)
+            self.api.modifynocheck(self.FileMetaData.DeleteTaskFiles_sql, taskname=[taskname])
+        if hours:
+            self.logger.debug("Deleting all the files older than %s hours" % hours)
+            self.api.modifynocheck(self.FileMetaData.DeleteFilesByTime_sql, hours=[hours])

@@ -45,3 +45,6 @@ class FileMetaData(object):
                VALUES (:taskname, :pandajobid, :outdatasetname, :acquisitionera, :appver, :events, :globalTag,\
                        :publishdataname, :outlocation, :outtmplocation, :runlumi, :checksumadler32, :checksumcksum, :checksummd5, :outlfn, :outsize,\
                        :outtype, :inparentlfns, SYS_EXTRACT_UTC(SYSTIMESTAMP), :filestate, :directstageout)"
+
+    DeleteTaskFiles_sql = "DELETE FROM filemetadata WHERE tm_taskname = :taskname"
+    DeleteFilesByTime_sql = "DELETE FROM filemetadata WHERE fmd_creation_time < sysdate - (:hours/24)"

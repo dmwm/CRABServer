@@ -58,7 +58,11 @@ class RESTFileMetadata(RESTEntity):
             validate_str("taskname", param, safe, RX_WORKFLOW, optional=False)
             validate_str("filetype", param, safe, RX_OUTTYPES, optional=False)
         elif method in ['DELETE']:
-            raise NotImplementedError
+            validate_str("taskname", param, safe, RX_WORKFLOW, optional=True)
+            validate_str("hours", param, safe, RX_HOURS, optional=True)
+            if bool(safe.kwargs["taskname"]) == bool(safe.kwargs["hours"]):
+               raise InvalidParameter("You have to specify a taskname or a number of hours. Files of this task or created before the number of hours"+\
+                                        " will be deleted. Only one of the two parameters can be specified.")
 
     @restcall
     def put(self, taskname, outfilelumis, inparentlfns, globalTag, outfileruns, pandajobid, outsize, publishdataname, appver, outtype, checksummd5,\
@@ -85,7 +89,7 @@ class RESTFileMetadata(RESTEntity):
         return self.jobmetadata.getFiles(taskname, filetype)
 
     @restcall
-    def delete(self):
+    def delete(self, taskname, hours):
         """Deletes an existing job metadata information"""
 
-        raise NotImplementedError
+        return self.jobmetadata.delete(taskname, hours)
