@@ -20,6 +20,7 @@ import TaskWorker.DataObjects.Result
 import TaskWorker.WorkerExceptions
 
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
+import WMCore.Services.SiteDB.SiteDB as SiteDB
 import WMCore.WMSpec.WMTask
 
 import classad
@@ -504,10 +505,13 @@ class DagmanCreator(TaskAction.TaskAction):
 
             whitelist = set(kwargs['task']['tm_site_whitelist'])
 
+            ignorelocality = kwargs['task'].get('tm_arguments', {}).get('ignorelocality', 'F') == 'T'
             if not jobs:
                 possiblesites = []
-            elif info.get('tm_arguments', {}).get('ignorelocality', 'F') == 'T':
+            elif ignorelocality:
                 possiblesites = global_whitelist | whitelist
+                if not possiblesites:
+                    possiblesites = set(SiteDB.SiteDBJSON().getAllCMSNames())
             else:
                 possiblesites = jobs[0]['input_files'][0]['locations']
             block = jobs[0]['input_files'][0]['block']
