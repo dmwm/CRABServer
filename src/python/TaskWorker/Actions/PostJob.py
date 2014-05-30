@@ -130,7 +130,7 @@ def getUserFromLFN(lfn):
         if lfn.split('/')[2] == 'temp':
             # /store/temp/user/$USER.$HASH/foo
             user = lfn.split('/')[4].rsplit(".", 1)[0]
-        else: 
+        else:
             # /store/user/$USER/foo
             user = lfn.split('/')[3]
     else:
@@ -277,7 +277,7 @@ class ASOServerJob(object):
             needs_commit = True
             try:
                 doc = self.couchDatabase.document( doc_id )
-                if doc.get("state") in ["acquired", "new"]:
+                if doc.get("state") in ["acquired", "new", "retry"]:
                     needs_commit = False
                     logger.info("LFN %s (id %s) was injected from WN and transfer is ongoing" % (lfn, doc_id))
                 elif doc.get("state") == "done" and doc.get("start_time") == aso_start_time:
@@ -428,7 +428,7 @@ class ASOServerJob(object):
             allDone = True
             for oneStatus, jobID in zip(status, self.id):
                 # states to wait on
-                if oneStatus in ['new', 'acquired']:
+                if oneStatus in ['new', 'acquired', 'retry']:
                     allDone = False
                     continue
                 # good states
