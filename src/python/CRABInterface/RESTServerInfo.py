@@ -1,14 +1,14 @@
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str
-
+from WMCore.REST.Error import ExecutionError
 # CRABServer dependecies here
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_SUBRES_SI
+from CRABInterface.Regexps import RX_SUBRES_SI , RX_WORKFLOW
 from CRABInterface.Utils import conn_handler
 from CRABInterface.__init__ import __version__
-
-
+import logging 
+import HTCondorLocator
 
 class RESTServerInfo(RESTEntity):
     """REST entity for workflows and relative subresources"""
@@ -17,33 +17,48 @@ class RESTServerInfo(RESTEntity):
         RESTEntity.__init__(self, app, api, config, mount)
         self.centralcfg = centralcfg
         self.serverdn = serverdn
+        self.logger = logging.getLogger("CRABLogger:RESTServerInfo")
         #used by the client to get the url where to update the cache (cacheSSL)
         #and by the taskworker Panda plugin to get panda urls
 
-    def validate(self, apiobj, method, api, param, safe):
+    def validate(self, apiobj, method, api, param, safe ):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid()
         if method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_SI, optional=False)
+            validate_str('workflow', param, safe, RX_WORKFLOW , optional=True)
 
     @restcall
-    def get(self, subresource):
+    def get(self, subresource , **kwargs):
         """Retrieves the server information, like delegateDN, filecacheurls ...
            :arg str subresource: the specific server information to be accessed;
         """
-        return getattr(RESTServerInfo, subresource)(self)
+        return getattr(RESTServerInfo, subresource)(self, **kwargs)
 
     @conn_handler(services=['centralconfig'])
-    def delegatedn(self):
+    def delegatedn(self, **kwargs):
         yield {'services': self.centralcfg.centralconfig['delegate-dn']}
 
     @conn_handler(services=['centralconfig'])
-    def backendurls(self):
+    def backendurls(self , **kwargs):
         yield self.centralcfg.centralconfig['backend-urls']
 
     @conn_handler(services=['centralconfig'])
-    def version(self):
+    def version(self , **kwargs):
         yield self.centralcfg.centralconfig['compatible-version']+[__version__]
+
+    @conn_handler(services=['centralconfig'])
+    def scheddaddress(self, **kwargs):
+
+        backendurl=self.centralcfg.centralconfig['backend-urls']
+        workflow = kwargs['workflow']
+        try:
+            loc = HTCondorLocator.HTCondorLocator(backendurl)
+            schedd, address = loc.getScheddObj(workflow) 
+        except Exception, ex:
+            self.logger.exception(ex)
+            raise ExecutionError("Unable to get schedd address for task %s" % (workflow)), ex
+        yield loc.scheddAd['Machine']
 
     @conn_handler(services=['centralconfig'])
     def bannedoutdest(self):
