@@ -765,7 +765,10 @@ class PostJob():
                     configreq.append(("outfilelumis", lumi))
             if 'inparentlfns' in fileInfo:
                 for lfn in fileInfo['inparentlfns']:
-                    configreq.append(("inparentlfns", lfn))
+                    # If the user specified a PFN as input, then the LFN is an empty string
+                    # and does not pass validation.
+                    if lfn:
+                        configreq.append(("inparentlfns", lfn))
             logger.debug("Uploading output file to %s: %s" % (self.resturl, configreq))
             try:
                 self.server.put(self.resturl, data = urllib.urlencode(configreq))
