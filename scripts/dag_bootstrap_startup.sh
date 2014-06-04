@@ -22,12 +22,22 @@ export LD_LIBRARY_PATH=/data/srv/glidecondor/lib:/data/srv/glidecondor/lib/condo
 mkdir -p retry_info
 
 # Bootstrap the HTCondor environment
-if [ "X$_CONDOR_JOB_AD" == "X" ];
-then
+
+# Note that the scheduler universe does not populate the .job.ad file but the local
+# universe does.  As CRAB3 switched to the scheduler universe, we must do this manually.
+# We encountered transient condor_q failures when many tasks were submitted simultaneously;
+# hence, the while loop was added.
+counter=0
+while [[ (counter -lt 10) && (!(-e .job.ad) || ($(cat .job.ad | wc -l) -lt 3)) ]]; do
     if [ "X$CONDOR_ID" != "X" ]; then
         condor_q $CONDOR_ID -l | grep -v '^$' > .job.ad
-        export _CONDOR_JOB_AD=.job.ad
     fi
+    sleep $((counter*3+1))
+    let counter=counter+1
+done
+if [ "X$_CONDOR_JOB_AD" == "X" ];
+then
+    export _CONDOR_JOB_AD=.job.ad
 fi
 
 if [ "X$_CONDOR_JOB_AD" != "X" ];
