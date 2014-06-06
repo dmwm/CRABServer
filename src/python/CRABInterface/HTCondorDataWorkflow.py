@@ -630,8 +630,12 @@ class HTCondorDataWorkflow(DataWorkflow):
 
 
     job_re = re.compile(r"JOB Job(\d+)\s+([A-Z_]+)\s+\((.*)\)")
-    post_failure_re = re.compile(r"POST script failed with status (\d+)")
+    post_failure_re = re.compile(r"POST [Ss]cript failed with status (\d+)")
     def parseNodeState(self, fp, nodes):
+        first_char = fp.read(1)
+        fp.seek(0)
+        if first_char == "[":
+            return self.parseNodeStateV2(fp, nodes)
         for line in fp.readlines():
             m = self.job_re.match(line)
             if not m:
@@ -662,6 +666,59 @@ class HTCondorDataWorkflow(DataWorkflow):
             elif status == "STATUS_ERROR":
                 info = nodes.setdefault(nodeid, {})
                 m = self.post_failure_re.match(msg)
+                if m:
+                    if m.groups()[0] == '2':
+                        info['State'] = 'failed'
+                    else:
+                        info['State'] = 'cooloff'
+                else:
+                    info['State'] = 'failed'
+
+
+    def parseNodeStateV2(self, fp, nodes):
+        """
+        HTCondor 8.1.6 updated the node state file to be classad-based.
+        This is a more flexible format that allows future extensions but, unfortunately,
+        also requires a separate parser.
+        """
+        for ad in classad.parseAds(fp):
+            if ad['Type'] != "NodeStatus":
+                continue
+            node = ad.get("Node", "")
+            if not node.startswith("Job"):
+                continue
+            nodeid = node[3:]
+            status = ad.get('NodeStatus', -1)
+            retry = ad.get('RetryCount', -1)
+            msg = ad.get("StatusDetails", "")
+            if status == 1: # STATUS_READY
+                info = nodes.setdefault(nodeid, {})
+                if info.get("State") == "transferring":
+                    info["State"] = "cooloff"
+                elif info.get('State') != "cooloff":
+                    info['State'] = 'unsubmitted'
+            elif status == 2: # STATUS_PRERUN
+                info = nodes.setdefault(nodeid, {})
+                if retry == 0:
+                    info['State'] = 'unsubmitted'
+                else:
+                    info['State'] = 'cooloff'
+            elif status == 3: # STATUS_SUBMITTED
+                info = nodes.setdefault(nodeid, {})
+                if msg == 'not_idle':
+                    info.setdefault('State', 'running')
+                else:
+                    info.setdefault('State', 'idle')
+            elif status == 4: # STATUS_POSTRUN 
+                info = nodes.setdefault(nodeid, {})
+                if info.get("State") != "cooloff":
+                    info['State'] = 'transferring'
+            elif status == 5: # STATUS_DONE
+                info = nodes.setdefault(nodeid, {})
+                info['State'] = 'finished'
+            elif status == 6: # STATUS_ERROR
+                info = nodes.setdefault(nodeid, {})
+                m = self.post_failure_re.search(msg)
                 if m:
                     if m.groups()[0] == '2':
                         info['State'] = 'failed'
