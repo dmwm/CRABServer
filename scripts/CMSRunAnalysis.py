@@ -304,6 +304,15 @@ def handleException(exitAcronymn, exitCode, exitMsg):
     formatted_tb = traceback.format_exc()
     if not formatted_tb.startswith("None"):
         print "ERROR: Traceback follows:\n", formatted_tb
+
+    try:
+        slc = SiteLocalConfig.loadSiteLocalConfig()
+        report['executed_site'] = slc.siteName
+        print "== Execution site for failed job from site-local-config.xml: %s" % slc.siteName
+    except:
+        print "ERROR: Failed to record execution site name in the FJR from the site-local-config.xml"
+        print traceback.format_exc()
+
     with open('jobReport.json','w') as of:
         json.dump(report, of)
     with open('jobReportExtract.pickle','w') as of:
@@ -733,6 +742,12 @@ except WMExecutionFailure, WMex:
             report = Report("cmsRun")
             report.parse('FrameworkJobReport.xml', "cmsRun")
             report = report.__to_json__(None)
+            try:
+                jobExitCode = report.getExitCode()
+            except:
+                jobExitCode = WMex.code
+            report['jobExitCode'] = jobExitCode
+
             with open('jobReport.json','w') as of:
                 json.dump(report, of)
         except:
