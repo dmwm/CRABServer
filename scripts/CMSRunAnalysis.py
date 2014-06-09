@@ -129,9 +129,11 @@ def addReportInfo(params, fjr):
         return
     fjr = fjr['steps']['cmsRun']
     if 'performance' in fjr and 'cpu' in fjr['performance']:
-        params['ExeTime'] = int(float(fjr['performance']['cpu']['TotalJobTime']))
-        params['CrabUserCpuTime'] = float(fjr['performance']['cpu']['TotalJobCPU'])
-        if params['ExeTime']:
+        if fjr['performance']['cpu'].get("TotalJobTime"):
+            params['ExeTime'] = int(float(fjr['performance']['cpu']['TotalJobTime']))
+        if fjr['performance']['cpu'].get("TotalJobCPU"):
+            params['CrabUserCpuTime'] = float(fjr['performance']['cpu']['TotalJobCPU'])
+        if params.get('ExeTime') and params.get("CrabUserCpuTime"):
             params['CrabCpuPercentage'] = params['CrabUserCpuTime'] / float(params['ExeTime'])
     inputEvents = 0
     if 'input' in fjr and 'source' in fjr['input']:
@@ -754,6 +756,10 @@ try:
     jobExitCode = report.getExitCode()
     #import pdb;pdb.set_trace()
     report = report.__to_json__(None)
+    # Record the payload process's exit code separately; that way, we can distinguish
+    # cmsRun failures from stageout failures.  The initial use case of this is to
+    # allow us to use a different LFN on job failure.
+    report['jobExitCode'] = jobExitCode
     AddChecksums(report)
     try:
         AddPsetHash(report, opts)

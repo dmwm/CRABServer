@@ -54,7 +54,7 @@ REGEX_ID = re.compile("([a-f0-9]{8,8})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]
 class FTSJob(object):
 
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, log_needs_transfer, output_metadata, task_ad, retry_count, retry_timeout):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, log_needs_transfer, output_metadata, task_ad, retry_count, retry_timeout, cmsRun_failed):
         self._id = None
         self._cancel = False
         self._sleep = 20
@@ -141,7 +141,7 @@ def getUserFromLFN(lfn):
 class ASOServerJob(object):
 
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, log_needs_transfer, output_metadata, task_ad, retry_count, retry_timeout):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, log_needs_transfer, output_metadata, task_ad, retry_count, retry_timeout, cmsRun_failed):
         self.id = None
         self.retry_count = retry_count
         self.retry_timeout = retry_timeout
@@ -152,6 +152,10 @@ class ASOServerJob(object):
         self.dest_site = dest_site
         self.source_dir = source_dir
         self.dest_dir = dest_dir
+        if cmsRun_failed:
+            self.source_dir = os.path.join(source_dir, "failed")
+            self.dest_dir = os.path.join(dest_dir, "failed")
+        self.cmsRun_failed = cmsRun_failed
         self.source_sites = source_sites
         self.filenames = filenames
         self.reqname = reqname
@@ -306,7 +310,7 @@ class ASOServerJob(object):
                         "publication_state": 'not_published',
                         "publication_retry_count": [],
                         "type" : file_type,
-                        "publish" : 1
+                        "publish" : 0 if self.cmsRun_failed else 1,
                     }
                 if not needs_transfer:
                     # The "/store/user" variant of the LFN should be used for files that are marked as 'done'.
@@ -621,6 +625,7 @@ class PostJob():
         self.logfiles = None
         self.log_needs_transfer = True
         self.retry_timeout = 2*3600
+        self.cmsRunFailed = False
 
 
     def getTaskAd(self):
@@ -660,6 +665,9 @@ class PostJob():
         self.log_needs_transfer = not self.full_report.get("direct_stageout")
         logger.debug("Log file needs transfer: %s" % str(self.log_needs_transfer))
         self.input = self.report['input']
+
+        if 'jobExitCode' in self.full_report:
+            self.cmsRunFailed = bool(self.full_report['jobExitCode'])
 
         for outputModule in self.output.values():
             for outputFile in outputModule:
@@ -900,7 +908,7 @@ class PostJob():
         else:
             targetClass = FTSJob
 
-        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.log_needs_transfer, self.output, self.task_ad, self.retry_count, self.retry_timeout)
+        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.log_needs_transfer, self.output, self.task_ad, self.retry_count, self.retry_timeout, self.cmsRunFailed)
         fts_job_result = g_Job.run()
         # If no files failed, return success immediately.  Otherwise, see how many files failed.
         if not fts_job_result:

@@ -53,6 +53,7 @@ numberOfRetries = 2
 retryPauseTime = 60
 g_now = None
 g_now_epoch = None
+g_cmsRunFailed = False
 
 def parseAd():
     fd = open(os.environ['_CONDOR_JOB_AD'])
@@ -365,7 +366,7 @@ def injectToASO(dest_lfn, se_name):
                "publication_state": 'not_published',
                "publication_retry_count": [],
                "type" : file_type,
-               "publish" : 1,
+               "publish" : 0 if g_cmsRunFailed else 1,
               }
         doc.update(info)
     except Exception, ex:
@@ -527,6 +528,23 @@ def main():
 
     counter = "%04d" % (crab_id / 1000)
     dest_dir = os.path.join(dest_dir, counter)
+
+    # Try to determine whether the payload actually succeeded.
+    # If it did not, we place it in a different directory.  This prevents
+    # us from putting failed ROOT files in the same directory as successful
+    # files; we worry that users may simply 'ls' the directory and run on
+    # all files.
+    global g_cmsRunFailed
+    g_cmsRunFailed = False
+    try:    
+        with open("jobReport.json.%d" % id) as fd:
+            full_report = json.load(fd)
+            g_cmsRunFailed = bool(full_report['jobExitCode'])
+    except Exception, ex:
+        print "== WARNING: Unable to determine whether cmsRun succeeded."
+        traceback.print_exc() 
+    if g_cmsRunFailed:
+        dest_dir = os.path.join(dest_dir, "failed")
 
     log_file = "cmsRun_%d.log.tar.gz" % crab_id
     dest = os.path.join(dest_dir, "log", log_file)
