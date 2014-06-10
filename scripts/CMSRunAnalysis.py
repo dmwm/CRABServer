@@ -741,11 +741,11 @@ except WMExecutionFailure, WMex:
         try:
             report = Report("cmsRun")
             report.parse('FrameworkJobReport.xml', "cmsRun")
-            report = report.__to_json__(None)
             try:
                 jobExitCode = report.getExitCode()
             except:
                 jobExitCode = WMex.code
+            report = report.__to_json__(None)
             report['jobExitCode'] = jobExitCode
 
             with open('jobReport.json','w') as of:
