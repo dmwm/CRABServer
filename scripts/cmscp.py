@@ -537,7 +537,7 @@ def main():
     global g_cmsRunFailed
     g_cmsRunFailed = False
     try:    
-        with open("jobReport.json.%d" % id) as fd:
+        with open("jobReport.json.%d" % crab_id) as fd:
             full_report = json.load(fd)
             g_cmsRunFailed = bool(full_report['jobExitCode'])
     except Exception, ex:
