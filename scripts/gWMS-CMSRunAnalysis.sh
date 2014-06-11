@@ -5,7 +5,7 @@
 # We changed this because HTCondor tosses the stdout/err, making the plugins
 # difficult-to-impossible to run.
 #
-echo "======== gWMS-CMSRunAnalysis.py STARTING at $(date) on $(hostname) ========"
+echo "======== gWMS-CMSRunAnalysis.sh STARTING at $(date) on $(hostname) ========"
 echo "Arguments are $@"
 
 exec 2>&1

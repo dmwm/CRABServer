@@ -119,7 +119,7 @@ echo "======== Current environment dump STARTING ========"
 for i in `env`; do
   echo "== ENV: $i"
 done
-echo "======== Current environment dump STARTING ========"
+echo "======== Current environment dump FINISHING ========"
 
 echo "======== Tarball initialization STARTING at $(date) ========"
 set -x
