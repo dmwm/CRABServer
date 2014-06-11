@@ -757,7 +757,7 @@ class PostJob():
                          "checksummd5":     "asda", # Not implemented; garbage value taken from ASO
                          "checksumcksum":   fileInfo['checksums']['cksum'],
                          "checksumadler32": fileInfo['checksums']['adler32'],
-                         "outlocation":     fileInfo['outlocation'],
+                         "outlocation":     self.ad['CRAB_AsyncDest'],
                          "outtmplocation":  fileInfo.get('outtmplocation', self.source_site),
                          "acquisitionera":  "null", # Not implemented
                          "outlfn":          fileInfo['outlfn'],
