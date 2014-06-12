@@ -511,7 +511,9 @@ class DagmanCreator(TaskAction.TaskAction):
             elif ignorelocality:
                 possiblesites = global_whitelist | whitelist
                 if not possiblesites:
-                    possiblesites = set(SiteDB.SiteDBJSON().getAllCMSNames())
+                    sbj = SiteDB.SiteDBJSON({"key":self.config.TaskWorker.cmskey,
+                          "cert":self.config.TaskWorker.cmscert})
+                    possiblesites = set(sbj.getAllCMSNames())
             else:
                 possiblesites = jobs[0]['input_files'][0]['locations']
             block = jobs[0]['input_files'][0]['block']
