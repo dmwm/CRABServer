@@ -26,7 +26,9 @@ class DataDiscovery(TaskAction):
                           "cert":self.config.TaskWorker.cmscert})
 
         wmfiles = []
-        lumicounter = evecounter = 0
+        evecounter = 0
+        lumicounter = 0
+        uniquelumis = set()
         for lfn, infos in datasetfiles.iteritems():
             #the block has not been found or has no locations, continue to the next file
             if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
@@ -64,11 +66,15 @@ class DataDiscovery(TaskAction):
             for run, lumis in infos['Lumis'].iteritems():
                 #self.logger.debug(' - adding run %d and lumis %s' %(run, lumis))
                 wmfile.addRun(Run(run, *lumis))
+                for lumi in lumis:
+                    uniquelumis.add((run, lumi))
                 lumicounter += len(lumis)
             wmfiles.append(wmfile)
 
-        self.logger.debug('Tot events found: %d' %evecounter)
-        self.logger.debug('Tot lumis found: %d' %lumicounter)
-        self.logger.debug('Tot files found: %d' %len(wmfiles))
+        uniquelumis = len(uniquelumis)
+        self.logger.debug('Tot events found: %d' % evecounter)
+        self.logger.debug('Tot lumis found: %d' % uniquelumis)
+        self.logger.debug('Duplicate lumis found: %d' % (lumicounter-uniquelumis))
+        self.logger.debug('Tot files found: %d' % len(wmfiles))
 
         return Result(task=task, result=Fileset(name='FilesToSplit', files = set(wmfiles)))
