@@ -237,15 +237,22 @@ class RetryJob(object):
         self.get_job_ad()
         self.get_report()
 
-        self.check_memory_report()
-        self.check_cpu_report()
-
         if self.ad.get("RemoveReason", "").startswith("Removed due to job being held"):
             hold_reason = self.ad.get("HoldReason", self.ad.get("LastHoldReason", "Unknown"))
             raise RecoverableError("Will retry held job; last hold reason: %s" % hold_reason)
 
         self.check_empty_report()
-        self.check_exit_code()
+        try:
+            self.check_exit_code()
+        except RecoverableError, re:
+            orig_msg = str(re)
+            try:
+                self.check_memory_report()
+                self.check_cpu_report()
+            except:
+                print "Original error: %s" % orig_msg
+                raise
+            raise
 
         if status: # Probably means stageout failed!
             raise RecoverableError("Payload job was successful, but exited wrapper exited non-zero status %d (stageout failure)?" % status)
