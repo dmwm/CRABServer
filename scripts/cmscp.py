@@ -458,6 +458,7 @@ def main():
     if '_CONDOR_JOB_AD' not in os.environ:
         print "== ERROR: _CONDOR_JOB_AD not in environment =="
         print "No stageout will be performed."
+        return 60318
     elif not os.path.exists(os.environ['_CONDOR_JOB_AD']):
         print "== ERROR: _CONDOR_JOB_AD (%s) does not exist =="
         print "No stageout will be performed."
