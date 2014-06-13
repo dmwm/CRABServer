@@ -138,8 +138,8 @@ def getUserFromLFN(lfn):
         user = ''
     return user
 
-class ASOServerJob(object):
 
+class ASOServerJob(object):
 
     def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, log_needs_transfer, output_metadata, task_ad, retry_count, retry_timeout, cmsRun_failed):
         self.id = None

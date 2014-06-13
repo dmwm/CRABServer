@@ -48,13 +48,13 @@ class DataUserWorkflow(object):
            :return: a list of errors grouped by exit code, error reason, site"""
         raise NotImplementedError
 
-    def report(self, workflow, userdn, userproxy=None):
+    def report(self, workflow, userdn, usedbs):
         """Retrieves the quality of the workflow in term of what has been processed
            (eg: good lumis). This can call a different function depending on the jobtype.
 
            :arg str workflow: a workflow name
            :return: what?"""
-        return self.workflow.report(workflow, userdn, userproxy)
+        return self.workflow.report(workflow, userdn, usedbs)
 
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
