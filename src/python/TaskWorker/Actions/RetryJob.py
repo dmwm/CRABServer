@@ -177,7 +177,7 @@ class RetryJob(object):
             raise RecoverableError("Job did not find functioning CMSSW on worker node.")
         # This is a difficult one -- right now CMSRunAnalysis.py will turn things like
         # segfaults into an invalid FJR.  Will revisit this decision later.
-        if exitCode == 50115 or exitCode == 10034 % 256:
+        if exitCode == 50115 or exitCode == 50115 % 256:
             raise RecoverableError("Job did not produce a FJR; will retry.")
 
         if exitCode == 134:
