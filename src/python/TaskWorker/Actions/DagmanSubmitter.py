@@ -297,7 +297,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     schedd.edit([id], "LeaveJobInQueue", classad.ExprTree("(JobStatus == 4) && (time()-EnteredCurrentStatus < 30*86400)"))
         results = rpipe.read()
         if results != "OK":
-            raise Exception("Failure when submitting HTCondor task: '%s'" % results)
+            raise TaskWorkerException("Failure when submitting HTCondor task: '%s'" % results)
 
         schedd.reschedule()
 
