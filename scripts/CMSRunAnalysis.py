@@ -32,7 +32,8 @@ EC_PsetHash           = 60453
 
 ad = {}
 
-print "==== CMSRunAnalysis.py STARTING at %s ====" % time.ctime()
+print "==== CMSRunAnalysis.py STARTING at %s ====" % time.asctime(time.gmtime())
+print "Local time : %s" % time.ctime()
 starttime = time.time()
 
 def mintime():
@@ -40,12 +41,12 @@ def mintime():
     tottime = time.time()-starttime
     remaining = mymin - tottime
     if remaining > 0:
-        print "==== Failure sleep STARTING at %s ====" % time.ctime()
+        print "==== Failure sleep STARTING at %s ====" % time.asctime(time.gmtime())
         print "Sleeping for %d seconds due to failure." % remaining
         sys.stdout.flush()
         sys.stderr.flush()
         time.sleep(remaining)
-        print "==== Failure sleep FINISHING at %s ====" % time.ctime()
+        print "==== Failure sleep FINISHING at %s ====" % time.asctime(time.gmtime())
 
 
 class PassThroughOptionParser(OptionParser):
@@ -300,7 +301,7 @@ def handleException(exitAcronymn, exitCode, exitMsg):
     report['exitAcronym'] = exitAcronymn
     report['exitCode'] = exitCode
     report['exitMsg'] = exitMsg
-    print "ERROR: Exceptional exit at %s (%s): %s" % (time.ctime(), str(exitCode), str(exitMsg))
+    print "ERROR: Exceptional exit at %s (%s): %s" % (time.asctime(time.gmtime()), str(exitCode), str(exitMsg))
     formatted_tb = traceback.format_exc()
     if not formatted_tb.startswith("None"):
         print "ERROR: Traceback follows:\n", formatted_tb
@@ -385,7 +386,7 @@ def parseArgs():
     (opts, args) = parser.parse_args(sys.argv[1:])
 
     try:
-        print "==== Parameters Dump at %s ===" % time.ctime()
+        print "==== Parameters Dump at %s ===" % time.asctime(time.gmtime())
         print "archiveJob:    ", opts.archiveJob
         print "runDir:        ", opts.runDir
         print "sourceURL:     ", opts.sourceURL
@@ -415,7 +416,7 @@ def parseArgs():
 
 
 def prepSandbox(opts):
-    print "==== Sandbox preparation STARTING at %s ====" % time.ctime()
+    print "==== Sandbox preparation STARTING at %s ====" % time.asctime(time.gmtime())
     if opts.archiveJob:
         os.environ['WMAGENTJOBDIR'] = os.getcwd()
         if os.path.exists(opts.archiveJob):
@@ -446,10 +447,10 @@ def prepSandbox(opts):
                     sys.exit(EC_WGET)
                 time.sleep(30)
         print commands.getoutput('tar xvfzm %s' % opts.archiveJob)
-    print "==== Sandbox preparation FINISHING at %s ====" % time.ctime()
+    print "==== Sandbox preparation FINISHING at %s ====" % time.asctime(time.gmtime())
 
     #move the pset in the right place
-    print "==== WMCore filesystem preparation STARTING at %s ====" % time.ctime()
+    print "==== WMCore filesystem preparation STARTING at %s ====" % time.asctime(time.gmtime())
     destDir = 'WMTaskSpace/cmsRun'
     if os.path.isdir(destDir):
         shutil.rmtree(destDir)
@@ -461,7 +462,7 @@ def prepSandbox(opts):
     if opts.userFiles:
         for myfile in opts.userFiles.split(','):
             os.rename(myfile, destDir + '/' + myfile)
-    print "==== WMCore filesystem preparation FINISHING at %s ====" % time.ctime()
+    print "==== WMCore filesystem preparation FINISHING at %s ====" % time.asctime(time.gmtime())
 
 #WMCore import here
 # Note that we may fail in the imports - hence we try to report to Dashboard first
@@ -470,7 +471,7 @@ ad = {}
 try:
     ad = parseAd()
 except:
-    print "==== FAILURE WHEN PARSING HTCONDOR CLASSAD AT %s ====" % time.ctime()
+    print "==== FAILURE WHEN PARSING HTCONDOR CLASSAD AT %s ====" % time.asctime(time.gmtime())
     print traceback.format_exc()
     ad = {}
 if ad:
@@ -498,7 +499,7 @@ except:
     # error and exit.
     if ad:
         earlyDashboardFailure(ad)
-    print "==== FAILURE WHEN LOADING WMCORE AT %s ====" % time.ctime()
+    print "==== FAILURE WHEN LOADING WMCORE AT %s ====" % time.asctime(time.gmtime())
     print traceback.format_exc()
     mintime()
     sys.exit(10043)
@@ -630,13 +631,13 @@ def AddChecksums(report):
                     fileInfo['pfn'] = fileInfo['fileName']
                 else:
                     continue
-            print "==== Checksum cksum STARTING at %s ====" % time.ctime()
+            print "==== Checksum cksum STARTING at %s ====" % time.asctime(time.gmtime())
             print "== Filename: %s" % fileInfo['pfn']
             cksum = FileInfo.readCksum(fileInfo['pfn'])
-            print "==== Checksum finishing FINISHING at %s ====" % time.ctime()
-            print "==== Checksum adler32 STARTING at %s ====" % time.ctime()
+            print "==== Checksum finishing FINISHING at %s ====" % time.asctime(time.gmtime())
+            print "==== Checksum adler32 STARTING at %s ====" % time.asctime(time.gmtime())
             adler32 = FileInfo.readAdler32(fileInfo['pfn'])
-            print "==== Checksum adler32 FINISHING at %s ====" % time.ctime()
+            print "==== Checksum adler32 FINISHING at %s ====" % time.asctime(time.gmtime())
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
@@ -682,7 +683,7 @@ def AddPsetHash(report, opts):
             if not m:
                 print "== EDM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % filename
                 continue
-            print "==== PSet Hash lookup STARTING at %s ====" % time.ctime()
+            print "==== PSet Hash lookup STARTING at %s ====" % time.asctime(time.gmtime())
             lines = getProv(filename, opts)
             found_history = False
             matches = {}
@@ -699,7 +700,7 @@ def AddPsetHash(report, opts):
                      matches[depth] = pset_hash
                  else:
                      break
-            print "==== PSet Hash lookup FINISHED at %s ====" % time.ctime()
+            print "==== PSet Hash lookup FINISHED at %s ====" % time.asctime(time.gmtime())
             if matches:
                 max_depth = max(matches.keys())
                 pset_hash = matches[max_depth]
@@ -716,21 +717,22 @@ try:
     # Also add stdout to the logging
     logHandler = logging.StreamHandler(sys.stdout)
     logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
+    logging.Formatter.converter = time.gmtime
     logHandler.setFormatter(logFormatter)
     logging.getLogger().addHandler(logHandler)
 
     if ad:
         startDashboardMonitoring(ad)
-    print "==== CMSSW Stack Execution STARTING at %s ====" % time.ctime()
+    print "==== CMSSW Stack Execution STARTING at %s ====" % time.asctime(time.gmtime())
     try:
         cmssw = executeCMSSWStack(opts)
     except:
-        print "==== CMSSW Stack Execution FAILED at %s ====" % time.ctime()
+        print "==== CMSSW Stack Execution FAILED at %s ====" % time.asctime(time.gmtime())
         logCMSSW()
         raise
     jobExitCode = cmssw.step.execution.exitStatus
     print "Job exit code: %s" % str(jobExitCode)
-    print "==== CMSSW Stack Execution FINISHING at %s ====" % time.ctime()
+    print "==== CMSSW Stack Execution FINISHING at %s ====" % time.asctime(time.gmtime())
     logCMSSW()
 except WMExecutionFailure, WMex:
     print "ERROR: Caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail)
@@ -765,7 +767,7 @@ except Exception, ex:
 
 #Create the report file
 try:
-    print "==== Report file creation STARTING at %s ====" % time.ctime()
+    print "==== Report file creation STARTING at %s ====" % time.asctime(time.gmtime())
     report = Report("cmsRun")
     report.parse('FrameworkJobReport.xml', "cmsRun")
     jobExitCode = report.getExitCode()
@@ -803,7 +805,7 @@ try:
         pickle.dump(report, of)
     if ad:
         stopDashboardMonitoring(ad)
-    print "==== Report file creation FINISHING at %s ====" % time.ctime()
+    print "==== Report file creation FINISHING at %s ====" % time.asctime(time.gmtime())
 except FwkJobReportException, FJRex:
     msg = "BadFWJRXML"
     handleException("FAILED", EC_ReportHandlingErr, msg)
@@ -828,5 +830,6 @@ if jobExitCode == 0:
         sys.exit(EC_MoveOutErr)
 else:
     mintime()
-print "==== CMSRunAnalysis.py FINISHING at %s ====" % time.ctime()
+print "==== CMSRunAnalysis.py FINISHING at %s ====" % time.asctime(time.gmtime())
+print "Local time : %s" % time.ctime()
 sys.exit(jobExitCode)

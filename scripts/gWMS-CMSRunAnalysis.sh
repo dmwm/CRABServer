@@ -5,7 +5,9 @@
 # We changed this because HTCondor tosses the stdout/err, making the plugins
 # difficult-to-impossible to run.
 #
-echo "======== gWMS-CMSRunAnalysis.sh STARTING at $(date) on $(hostname) ========"
+echo "======== gWMS-CMSRunAnalysis.sh STARTING at $(TZ=GMT date) on $(hostname) ========"
+echo "Local time : $(date)"
+echo "Current system : $(uname -a)"
 echo "Arguments are $@"
 
 exec 2>&1
@@ -15,8 +17,7 @@ echo "SCRAM_ARCH=$SCRAM_ARCH"
 CRAB_oneEventMode=0
 if [ "X$_CONDOR_JOB_AD" != "X" ];
 then
-    echo "======== HTCONDOR JOB SUMMARY START ========"
-    date
+    echo "======== HTCONDOR JOB SUMMARY at $(TZ=GMT date) START ========"
     CRAB_Dest=`grep '^CRAB_Dest =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
     if [ "X$CRAB_Dest" = "X" ];
     then
@@ -49,28 +50,28 @@ then
        echo "== JOB AD: $i"
    done < $_CONDOR_JOB_AD
    echo "==== HTCONDOR JOB AD CONTENTS FINISH ===="
-   echo "======== HTCONDOR JOB SUMMARY at $(date) FINISH ========"
+   echo "======== HTCONDOR JOB SUMMARY at $(TZ=GMT date) FINISH ========"
 fi
 
-echo "======== PROXY INFORMATION START at $(date) ========"
+echo "======== PROXY INFORMATION START at $(TZ=GMT date) ========"
 voms-proxy-info -all
-echo "======== PROXY INFORMATION FINISH at $(date) ========"
+echo "======== PROXY INFORMATION FINISH at $(TZ=GMT date) ========"
 
-echo "======== CMSRunAnalysis.sh at $(date) STARTING ========"
+echo "======== CMSRunAnalysis.sh at $(TZ=GMT date) STARTING ========"
 time sh ./CMSRunAnalysis.sh "$@" --oneEventMode=$CRAB_oneEventMode
 EXIT_STATUS=$?
-echo "CMSRunAnalysis.sh complete at $(date) with exit status $EXIT_STATUS"
+echo "CMSRunAnalysis.sh complete at $(TZ=GMT date) with exit status $EXIT_STATUS"
 # Protect against missing *.sh initialization scripts.
 if [[ $EXIT_STATUS == 1 ]]
 then
   sleep 20m
 fi
 
-echo "======== CMSRunAnalsysis.sh at $(date) FINISHING ========"
+echo "======== CMSRunAnalsysis.sh at $(TZ=GMT date) FINISHING ========"
 
 mv jobReport.json jobReport.json.$CRAB_Id
 
-echo "======== python2.6 bootstrap for stageout at $(date) STARTING ========"
+echo "======== python2.6 bootstrap for stageout at $(TZ=GMT date) STARTING ========"
 set -x
 ### Need python2.6 for stageout also
 if [ "x" != "x$VO_CMS_SW_DIR" ]
@@ -124,9 +125,9 @@ else
 	echo "I found python2.6 at.."
 	echo `which python2.6`
 fi
-echo "======== python2.6 bootstrap for stageout at $(date) FINISHING ========"
+echo "======== python2.6 bootstrap for stageout at $(TZ=GMT date) FINISHING ========"
 
-echo "======== Stageout at $(date) STARTING ========"
+echo "======== Stageout at $(TZ=GMT date) STARTING ========"
 rm -f wmcore_initialized
 # Note we prevent buffering of stdout/err -- this is due to observed issues in mixing of out/err for stageout plugins
 PYTHONUNBUFFERED=1 ./cmscp.py
@@ -134,7 +135,7 @@ STAGEOUT_EXIT_STATUS=$?
 
 if [ ! -e wmcore_initialized ];
 then
-    echo "======== ERROR: Unable to initialize WMCore at $(date) ========"
+    echo "======== ERROR: Unable to initialize WMCore at $(TZ=GMT date) ========"
     sleep 20m
     exec sh ./DashboardFailure.sh 10043
 fi
@@ -145,9 +146,10 @@ if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
         EXIT_STATUS=$STAGEOUT_EXIT_STATUS
     fi
 fi
-echo "======== Stageout at $(date) FINISHING (status $STAGEOUT_EXIT_STATUS) ========"
+echo "======== Stageout at $(TZ=GMT date) FINISHING (status $STAGEOUT_EXIT_STATUS) ========"
 
-echo "======== gWMS-CMSRunAnalysis.py FINISHING at $(date) on $(hostname) with status $EXIT_STATUS ========"
+echo "======== gWMS-CMSRunAnalysis.sh FINISHING at $(TZ=GMT date) on $(hostname) with status $EXIT_STATUS ========"
+echo "Local time : $(date)"
 set -x
 exit $EXIT_STATUS
 
