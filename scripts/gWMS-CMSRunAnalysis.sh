@@ -127,6 +127,9 @@ else
 fi
 echo "======== python2.6 bootstrap for stageout at $(TZ=GMT date) FINISHING ========"
 
+echo "======== Attempting to notify HTCondor of file stageout ========"
+condor_chirp phase output
+
 echo "======== Stageout at $(TZ=GMT date) STARTING ========"
 rm -f wmcore_initialized
 # Note we prevent buffering of stdout/err -- this is due to observed issues in mixing of out/err for stageout plugins
