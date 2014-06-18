@@ -174,11 +174,26 @@ def makeLFNPrefixes(task):
     hash = hashlib.sha1(hash_input).hexdigest()
     user = task['tm_username']
     tmp_user = "%s.%s" % (user, hash)
-    publish_info = task['tm_publish_name'].rsplit('-', 1)
+    publish_info = task['tm_publish_name'].rsplit('-', 1) #publish_info[0] is the publishname or the taskname
     timestamp = getCreateTimestamp(task['tm_taskname'])
     lfn_prefix = task.get('tm_arguments', {}).get('lfnprefix', '')
-    temp_dest = os.path.join("/store/temp/user", tmp_user, lfn_prefix, primaryds, publish_info[0], timestamp)
-    dest = os.path.join("/store/user", user, lfn_prefix, primaryds, publish_info[0], timestamp)
+    lfn = task.get('tm_arguments', {}).get('lfn', '')
+    if lfn_prefix or not lfn: #keeping the lfn_prefix around so new task workers work with old servers (we should delete this soon) #TODO
+        print "Using default lfn. Either we found the lfn_prefix parameter (old server?) or the user did not specify the lfn"
+        #publish_info[0] will either be the unique taskname (stripped by the username) or the publishname
+        temp_dest = os.path.join("/store/temp/user", tmp_user, lfn_prefix, primaryds, publish_info[0], timestamp)
+        dest = os.path.join("/store/user", user, lfn_prefix, primaryds, publish_info[0], timestamp)
+    elif lfn:
+        print "Found lfn parameter %s" % lfn
+        splitlfn = lfn.split('/')
+        #join:                    /       store    /temp      /user  /mmascher.1234    /lfn          /GENSYM    /publishname     /120414_1634
+        temp_dest = os.path.join('/', splitlfn[1], 'temp', splitlfn[2], tmp_user, *( splitlfn[4:] + [primaryds, publish_info[0], timestamp] ))
+        dest = os.path.join(lfn, primaryds, publish_info[0], timestamp)
+    else:
+        raise TaskWorker.WorkerExceptions.TaskWorkerException("Cannot find the lfn parameter inside the tm_arguments."+\
+                                        "The CRAB server probably has a configuration error. Please contact an expert.")
+
+    print "Using temp_dest %s,\n dest %s:" % (temp_dest, dest)
     return temp_dest, dest
 
 

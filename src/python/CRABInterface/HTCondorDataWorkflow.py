@@ -13,6 +13,7 @@ import htcondor
 
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.WMSpec.WMTask import buildLumiMask
+from WMCore.Services.DBS.DBSReader import DBSReader
 from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.Utils import conn_handler
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
@@ -185,14 +186,32 @@ class HTCondorDataWorkflow(DataWorkflow):
             }
 
 
-    def report(self, workflow, userdn, userproxy=None):
+    def report(self, workflow, userdn, usedbs):
+        """ Computes the report for workflow. If usedbs is used also query DBS and return information about the input and output datasets
+        """
+
+        def _compactLumis(datasetInfo):
+            """ Help function that allow to convert from runLumis divided per file (result of listDatasetFileDetails)
+                to an aggregated result.
+            """
+            lumilist = {}
+            for file, info in datasetInfo.iteritems():
+                for run,lumis in info['Lumis'].iteritems():
+                    lumilist.setdefault(str(run), []).extend(lumis)
+            return lumilist
+
         res = {}
-        self.logger.info("About to compute report of workflow: %s. Getting status first." % workflow)
-        statusRes = self.status(workflow, userdn, userproxy)[0]
+        self.logger.info("About to compute report of workflow: %s with usedbs=%s. Getting status first." % (workflow,usedbs))
+        statusRes = self.status(workflow, userdn)[0]
+
+        #get the information we need from the taskdb/initilize variables
+        taskrow = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
+        inputDataset = taskrow[12]
+        outputDataset = self._getOutDatasets(workflow)
+        dbsUrl = taskrow[13]
 
         #load the lumimask
-        rows = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        splitArgs = literal_eval(rows.next()[6].read())
+        splitArgs = literal_eval(taskrow[6].read())
         res['lumiMask'] = buildLumiMask(splitArgs['runs'], splitArgs['lumis'])
         self.logger.info("Lumi mask was: %s" % res['lumiMask'])
 
@@ -210,6 +229,26 @@ class HTCondorDataWorkflow(DataWorkflow):
                 }
         self.logger.info("Got %s edm files for workflow %s" % (len(res['runsAndLumis']), workflow))
 
+        if usedbs:
+            try:
+                #load the input dataset's lumilist
+                dbs = DBSReader(dbsUrl)
+                inputDetails = dbs.listDatasetFileDetails(inputDataset)
+                res['dbsInLumilist'] = _compactLumis(inputDetails)
+                self.logger.info("Aggregated input lumilist: %s" % res['dbsInLumilist'])
+
+                #load the output dataset's lumilist
+                dbs = DBSReader("https://cmsweb.cern.ch/dbs/prod/phys03/DBSReader") #We can only publish here with DBS3
+                outputDetails = dbs.listDatasetFileDetails(outputDataset)
+                res['dbsOutLumilist'] = _compactLumis(outputDetails)
+                res['dbsNumEvents'] = sum(x['NumberOfEvents'] for x in outputDetails.values())
+                res['dbsNumFiles'] = sum(len(['Parents']) for x in outputDetails.values())
+                self.logger.info("Aggregated output lumilist: %s" % res['dbsOutLumilist'])
+            except Exception, ex:
+                msg = "Failed to contact DBS: %s" % str(ex)
+                self.logger.exception(msg)
+                raise ExecutionError("Exception while contacting DBS. Cannot get the input/output lumi lists. You can try to execute 'crab report' with --dbs=no")
+
         yield res
 
 
@@ -222,7 +261,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         # First, verify the task has been submitted by the backend.
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, db_userdn, _ = row.next() #just one row is picked up by the previous query
+        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, db_userdn, _, _, _ = row.next() #just one row is picked up by the previous query
 
         if db_userdn != userdn:
             raise ExecutionError("Your DN, %s, is not the same as the original DN used for task submission" % userdn)
@@ -505,6 +544,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             raise ExecutionError(msg)
         query = {'reduce': True, 'key': workflow, 'stale': 'ok'}
         try:
+            publicationlist = None
             publicationlist = db.loadView('AsyncTransfer', 'PublicationStateByWorkflow', query)['rows']
         except Exception, ex:
             msg =  "Error while querying CouchDB for publication status information"

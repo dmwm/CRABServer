@@ -51,6 +51,19 @@ class RESTUserWorkflow(RESTEntity):
                 res.add(site)
         return list(res)
 
+    def _checkOutLFN(self, kwargs):
+        """ Check the lfn parameter: if it starts with /store/user then the right username should be there. Handle old clients lfnprefix parameter.
+            If lfn is not there default to /store/user/username
+        """
+        #add the username if necessary (lfn=/store/user). Check the username (don't write in other user's directories)
+        username = cherrypy.request.user['login']
+        if kwargs["lfnprefix"]:
+            kwargs["lfn"] = '/store/user/%s/%s' % (username, kwargs["lfnprefix"])
+        elif not kwargs["lfn"]:
+            kwargs["lfn"] = '/store/user/%s/' % username #add the username in case the user did not specify the lfn param
+        elif kwargs["lfn"].startswith('/store/user/') and not re.match('^/store/user/%s/' % username, kwargs["lfn"]):
+            raise InvalidParameter("The parameter Data.lfn should start with /store/user/%s/" % username) #raise if after /store/user/ there is no 'username'
+
     def _checkASODestination(self, site):
         self._checkSite(site)
         if site in self.centralcfg.centralconfig.get('banned-out-destinations', []):
@@ -121,8 +134,9 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("totalunits", param, safe, optional=True)
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
             validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
-            validate_str("lfnprefix", param, safe, RX_LFNPATH, optional=True)
-            #validate_str("userisburl", param, safe, re.compile(r"^[A-Za-z]*$"), optional=False)
+            validate_str("lfnprefix", param, safe, RX_LFNPATH, optional=True) #keeping this for compatibility with old clients. Will be converted into a full lfn
+            validate_str("lfn", param, safe, RX_LFN, optional=True)
+            self._checkOutLFN(safe.kwargs)
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE)
             validate_strlist("userfiles", param, safe, RX_USERFILE)
             validate_num("savelogsflag", param, safe, optional=False)
@@ -186,7 +200,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_num('exitcode', param, safe, optional=True)
             validate_numlist('jobids', param, safe)
 
-            #used by errors
+            #used by errors and report (short format in report means we do not query DBS)
             validate_num('shortformat', param, safe, optional=True)
 
             #validation parameters
@@ -205,7 +219,7 @@ class RESTUserWorkflow(RESTEntity):
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                 savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
-                totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfnprefix, saveoutput,
+                totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfnprefix, lfn, saveoutput,
                 faillimit, ignorelocality, userfiles):
         """Perform the workflow injection
 
@@ -258,7 +272,7 @@ class RESTUserWorkflow(RESTEntity):
                                        publication=publication, publishname=publishname, asyncdest=asyncdest,
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
-                                       maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfnprefix=lfnprefix,
+                                       maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfnprefix=lfnprefix, lfn=lfn,
                                        ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles)
 
     @restcall
@@ -301,7 +315,7 @@ class RESTUserWorkflow(RESTEntity):
             elif subresource == 'errors':
                 result = self.userworkflowmgr.errors(workflow, shortformat)
             elif subresource == 'report':
-                result = self.userworkflowmgr.report(workflow, userdn=userdn)
+                result = self.userworkflowmgr.report(workflow, userdn=userdn, usedbs=shortformat)
             # if here means that no valid subresource has been requested
             # flow should never pass through here since validation restrict this
             else:
