@@ -496,6 +496,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         nodes_url = url + "/node_state.txt"
         curl.setopt(pycurl.URL, nodes_url)
+        fp.seek(0)
         self.logger.debug("Starting download of node state")
         curl.perform()
         self.logger.debug("Finished download of node state")
