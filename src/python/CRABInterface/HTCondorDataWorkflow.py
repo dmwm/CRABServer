@@ -154,33 +154,25 @@ class HTCondorDataWorkflow(DataWorkflow):
         #jobids=','.join(map(str,jobids)), limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
 
         for row in rows:
-            if filetype == ['LOG'] and saveLogs == 'F':
-                lfn = lfn_to_temp(row[GetFromTaskAndType.LFN], userdn, username, role, group)
-                try:
-                    pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
-                except Exception, err:
-                    self.logger.exception(err)
-                    return [{"status" : "FAILED",
-                             "taskFailureMsg" : "Failed to to match lfn2pfn. Retry in a minute %s" %str(err),
-                             "jobSetID" : '',
-                             "jobsPerStatus" : {},
-                             "failedJobdefs" : 0,
-                             "totalJobdefs" : 0,
-                             "jobdefErrors" : [],
-                             "jobList" : [],
-                             "saveLogs" : saveLogs }]
-            else:
-                if row[GetFromTaskAndType.PANDAID] in finishedIds:
-                    lfn = temp_to_lfn(row[GetFromTaskAndType.LFN], username)
-                    pfn = self.phedex.getPFN(row[GetFromTaskAndType.LOCATION], lfn)[(row[GetFromTaskAndType.LOCATION], lfn)]
-                elif row[GetFromTaskAndType.PANDAID] in transferingIds:
+            try:
+                if filetype == ['LOG'] and saveLogs == 'F':
                     lfn = lfn_to_temp(row[GetFromTaskAndType.LFN], userdn, username, role, group)
                     pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
                 else:
-                    continue
+                    if row[GetFromTaskAndType.PANDAID] in finishedIds:
+                        lfn = temp_to_lfn(row[GetFromTaskAndType.LFN], username)
+                        pfn = self.phedex.getPFN(row[GetFromTaskAndType.LOCATION], lfn)[(row[GetFromTaskAndType.LOCATION], lfn)]
+                    elif row[GetFromTaskAndType.PANDAID] in transferingIds:
+                        lfn = lfn_to_temp(row[GetFromTaskAndType.LFN], userdn, username, role, group)
+                        pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
+                    else:
+                        continue
+            except Exception, err:
+                    self.logger.exception(err)
+                    raise ExecutionError("Exception while contacting DBS. Cannot get the input/output lumi lists. You can try to execute 'crab report' with --dbs=no")
 
             yield { 'pfn' : pfn,
-		    'lfn' : lfn,
+        		    'lfn' : lfn,
                     'size' : row[GetFromTaskAndType.SIZE],
                     'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
             }
