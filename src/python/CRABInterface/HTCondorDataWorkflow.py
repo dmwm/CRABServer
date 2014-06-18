@@ -155,7 +155,19 @@ class HTCondorDataWorkflow(DataWorkflow):
         for row in rows:
             if filetype == ['LOG'] and saveLogs == 'F':
                 lfn = lfn_to_temp(row[GetFromTaskAndType.LFN], userdn, username, role, group)
-                pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
+                try:
+                    pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
+                except Exception, err:
+                    self.logger.exception(err)
+                    return [{"status" : "FAILED",
+                             "taskFailureMsg" : "Failed to to match lfn2pfn. Retry in a minute %s" %str(err),
+                             "jobSetID" : '',
+                             "jobsPerStatus" : {},
+                             "failedJobdefs" : 0,
+                             "totalJobdefs" : 0,
+                             "jobdefErrors" : [],
+                             "jobList" : [],
+                             "saveLogs" : saveLogs }]
             else:
                 if row[GetFromTaskAndType.PANDAID] in finishedIds:
                     lfn = temp_to_lfn(row[GetFromTaskAndType.LFN], username)

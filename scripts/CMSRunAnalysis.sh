@@ -3,8 +3,9 @@ exec 2>&1
 #touch Report.pkl
 
 # should be a bit nicer than before
-echo "======== CMSRunAnalysis.sh STARTING at $(date) ========"
-
+echo "======== CMSRunAnalysis.sh STARTING at $(TZ=GMT date) ========"
+echo "Local time : $(date)"
+echo "Current system : $(uname -a)"
 ### source the CMSSW stuff using either OSG or LCG style entry env. variables
 ###    (incantations per oli's instructions)
 #   LCG style --
@@ -30,7 +31,7 @@ then
     rc=$?
     if [[ $rc != 0 ]]
     then
-        echo "==== Sourcing cmsset_default.sh failed at $(date).  Sleeping for 20 minutes. ===="
+        echo "==== Sourcing cmsset_default.sh failed at $(TZ=GMT date).  Sleeping for 20 minutes. ===="
         sleep 20m
         tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
         exec sh ./DashboardFailure.sh 10032
@@ -61,12 +62,12 @@ fi
 set +x
 if [[ $rc != 0 ]]
 then
-    echo "==== Sourcing cmsset_default.sh failed at $(date).  Sleeping for 20 minutes. ===="
+    echo "==== Sourcing cmsset_default.sh failed at $(TZ=GMT date).  Sleeping for 20 minutes. ===="
     sleep 20m
     tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
     exec sh ./DashboardFailure.sh 10032
 else
-    echo "==== CMSSW pre-execution environment bootstrap FINISHING at $(date) ===="
+    echo "==== CMSSW pre-execution environment bootstrap FINISHING at $(TZ=GMT date) ===="
 fi
 
 echo "==== Python discovery STARTING ===="
@@ -113,7 +114,7 @@ then
 	exec sh ./DashboardFailure.sh 10043
 fi
 
-echo "==== Python discovery FINISHING at $(date) ===="
+echo "==== Python discovery FINISHING at $(TZ=GMT date) ===="
 
 echo "======== Current environment dump STARTING ========"
 for i in `env`; do
@@ -121,7 +122,7 @@ for i in `env`; do
 done
 echo "======== Current environment dump FINISHING ========"
 
-echo "======== Tarball initialization STARTING at $(date) ========"
+echo "======== Tarball initialization STARTING at $(TZ=GMT date) ========"
 set -x
 if [[ "X$CRAB_RUNTIME_TARBALL" == "X" ]]; then
     # Didn't ask to bring a tarball with us
@@ -136,21 +137,21 @@ else
 fi
 export PYTHONPATH=`pwd`/CRAB3.zip:`pwd`/WMCore.zip:$PYTHONPATH
 set +x
-echo "======== Tarball initialization FINISHING at $(date) ========"
+echo "======== Tarball initialization FINISHING at $(TZ=GMT date) ========"
 echo "==== Local directory contents dump STARTING ===="
 echo "PWD: `pwd`"
 for i in `ls`; do
   echo "== DIR: $i"
 done
 echo "==== Local directory contents dump FINISHING ===="
-echo "======== CMSRunAnalysis.py STARTING at $(date) ========"
+echo "======== CMSRunAnalysis.py STARTING at $(TZ=GMT date) ========"
 echo "Now running the CMSRunAnalysis.py job in `pwd`..."
 set -x
 python CMSRunAnalysis.py -r "`pwd`" "$@"
 jobrc=$?
 set +x
 echo "== The job had an exit code of $jobrc "
-echo "======== CMSRunAnalysis.py FINISHING at $(date) ========"
+echo "======== CMSRunAnalysis.py FINISHING at $(TZ=GMT date) ========"
 
 if [[ $jobrc == 68 ]]
 then
@@ -170,7 +171,7 @@ fi
 
 if [ ! -e wmcore_initialized ];
 then
-    echo "======== ERROR: Unable to initialize WMCore at $(date) ========"
+    echo "======== ERROR: Unable to initialize WMCore at $(TZ=GMT date) ========"
     sleep 20m
     exec sh ./DashboardFailure.sh 10043
 fi
