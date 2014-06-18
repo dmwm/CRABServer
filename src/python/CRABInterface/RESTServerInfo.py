@@ -7,7 +7,7 @@ from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import RX_SUBRES_SI , RX_WORKFLOW
 from CRABInterface.Utils import conn_handler
 from CRABInterface.__init__ import __version__
-import logging 
+import logging
 import HTCondorLocator
 
 class RESTServerInfo(RESTEntity):
@@ -61,5 +61,5 @@ class RESTServerInfo(RESTEntity):
         yield loc.scheddAd['Machine']
 
     @conn_handler(services=['centralconfig'])
-    def bannedoutdest(self):
+    def bannedoutdest(self, **kwargs):
         yield self.centralcfg.centralconfig['banned-out-destinations']
