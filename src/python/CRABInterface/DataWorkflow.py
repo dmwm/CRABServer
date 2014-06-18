@@ -1,5 +1,6 @@
 import time
 import logging
+import cherrypy
 
 from CRABInterface.Utils import getDBinstance
 # WMCore dependecies here
@@ -7,17 +8,6 @@ from WMCore.REST.Error import ExecutionError
 
 #CRAB dependencies
 from CRABInterface.Utils import CMSSitesCache, conn_handler
-
-def strip_username_from_taskname(workflow):
-    """When auto-generating a destination directory and dataset name for
-       a given task, we want to remove the username (it appears elsewhere) and
-       make sure it doesn't contain ':' (not a valid character in HDFS directory names).
-       """
-    info = workflow.split("_")
-    if len(info) > 3:
-        info = info[:2] + info[3:]
-        return "_".join(info)
-    return workflow.replace(":", "_")
 
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
@@ -123,7 +113,7 @@ class DataWorkflow(object):
     @conn_handler(services=['centralconfig'])
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
-               runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None,
+               runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None):
         """Perform the workflow injection
 
@@ -160,13 +150,15 @@ class DataWorkflow(object):
            :arg int numcores: number of CPU cores required by job
            :arg int maxmemory: maximum amount of RAM required, in MB
            :arg int priority: priority of this task
-           :arg str lfnprefix: prefix for output directory in /store/user
+           :arg str lfnprefix: prefix for output directory in /store/user. Deprecated in favour of the parameter below (lfn)
+           :arg str lfn: lfn used to store output files.
            :arg str userfiles: The files to process instead of a DBS-based dataset.
            :returns: a dict which contaians details of the request"""
 
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         requestname = self.updateRequest('%s_%s_%s' % (timestamp, userhn, workflow))
         splitArgName = self.splitArgMap[splitalgo]
+        username = cherrypy.request.user['login']
         dbSerializer = str
 
         if numcores == None: numcores = 1
@@ -176,14 +168,13 @@ class DataWorkflow(object):
 
         arguments = { \
             'oneEventMode' : 'T' if oneEventMode else 'F',
-            'lfnprefix' : lfnprefix if lfnprefix else '',
+            'lfn' : '/store/user/%s/%s' % (username, lfnprefix) if lfnprefix else lfn,
             'saveoutput' : 'F' if saveoutput == False else 'T',
             'faillimit' : faillimit,
             'ignorelocality' : 'F' if ignorelocality == False else 'T',
             'ASOURL' : self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", ""),
             'userfiles' : userfiles,
         }
-            
 
         self.api.modify(self.Task.New_sql,
                             task_name       = [requestname],
@@ -206,7 +197,9 @@ class DataWorkflow(object):
                             user_vo         = ['cms'],
                             user_role       = [vorole],
                             user_group      = [vogroup],
-                            publish_name    = [(strip_username_from_taskname(requestname) + '-' + publishname) if publishname.find('-')==-1 else publishname],
+                            #a dash in the publishname is there if the user specified the publishname (publishname-isbcheckusm). Otherwise publishname=isbchecksum
+                            #BTW isbchecksum is overwritten later with the psethash for publication
+                            publish_name    = [(workflow.replace(":", "_") + '-' + publishname) if publishname.find('-')==-1 else publishname],
                             asyncdest       = [asyncdest],
                             dbs_url         = [dbsurl],
                             publish_dbs_url = [publishdbsurl],
