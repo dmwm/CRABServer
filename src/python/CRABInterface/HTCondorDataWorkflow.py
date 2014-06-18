@@ -559,7 +559,7 @@ class HTCondorDataWorkflow(DataWorkflow):
     def parseJobLog(self, fp, nodes):
         node_map = {}
         count = 0
-        for event in htcondor.readEvents(fp):
+        for event in HTCondorUtils.readEvents(fp):
             count += 1
             eventtime = time.mktime(time.strptime(event['EventTime'], "%Y-%m-%dT%H:%M:%S"))
             if event['MyType'] == 'SubmitEvent':

@@ -21,6 +21,8 @@ try:
 except:
     pass
 
+readEvents = getattr(htcondor, 'readEvents', htcondor.read_events)
+
 class AuthenticatedSubprocess(object):
 
     def __init__(self, proxy):
