@@ -10,6 +10,7 @@ import HTCondorLocator
 import HTCondorUtils
 
 import TaskWorker.Actions.TaskAction as TaskAction
+from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from httplib import HTTPException
 
@@ -87,32 +88,9 @@ class DagmanResubmitter(TaskAction.TaskAction):
 
         results = rpipe.read()
         if results != "OK":
-            raise Exception("Failure when killing job: %s" % results)
+            raise TaskWorkerException("Failure when killing job: %s" % results)
 
 
     def execute(self, *args, **kwargs):
 
-        try:
-            return self.execute_internal(*args, **kwargs)
-        except Exception, e:
-            msg = "Task %s resubmit failed: %s." % (kwargs['task']['tm_taskname'], str(e))
-            self.logger.error(msg)
-            configreq = {'workflow': kwargs['task']['tm_taskname'],
-                         'status': "FAILED",
-                         'subresource': 'failure',
-                         'failure': base64.b64encode(msg)}
-            try:
-                self.server.post(self.resturl, data = urllib.urlencode(configreq))
-            except HTTPException, hte:
-                self.logger.error(str(hte.headers))
-            raise
-        finally:
-            configreq = {'workflow': kwargs['task']['tm_taskname'],
-                         'status': "SUBMITTED",
-                         'jobset': "-1",
-                         'subresource': 'success',}
-            self.logger.debug("Setting the task as successfully resubmitted with %s " % str(configreq))
-            data = urllib.urlencode(configreq)
-            self.server.post(self.resturl, data = data)
-
-
+        return self.execute_internal(*args, **kwargs)
