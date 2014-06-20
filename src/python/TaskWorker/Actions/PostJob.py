@@ -59,14 +59,16 @@ class FTSJob(object):
         self._cancel = False
         self._sleep = 20
 
-        savelogs = int(task_ad['CRAB_SaveLogsFlag'])
-        transfer_list = resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames, savelogs)
+        transfer_logs = int(task_ad['CRAB_SaveLogsFlag'])
+        transfer_outputs = int(task_ad['CRAB_TransferOutputs'])
+        transfer_list = resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames, transfer_logs, transfer_outputs)
 
         self._transfer_list = transfer_list
         self._count = count
-        with open("copyjobfile_%s" % count, "w") as fd:
-            for source, dest in transfer_list:
-                fd.write("%s %s\n" % (source, dest))
+        if len(transfer_list):
+            with open("copyjobfile_%s" % count, "w") as fd:
+                for source, dest in transfer_list:
+                    fd.write("%s %s\n" % (source, dest))
 
 
     def cancel(self):
@@ -100,6 +102,8 @@ class FTSJob(object):
 
 
     def run(self):
+        if not os.path.exists("copyjobfile_%s" % self._count):
+            return 0
         self._id = self.submit()
         if not REGEX_ID.match(self._id):
             raise Exception("Invalid ID returned from FTS transfer submit")
@@ -162,7 +166,7 @@ class ASOServerJob(object):
         self.output_metadata = output_metadata
         self.log_size = log_size
         self.log_needs_transfer = log_needs_transfer
-        self.publish = outputdata
+        self.outputData = outputdata
         self.task_ad = task_ad
         self.failure = None
         self.aso_start_timestamp = None
@@ -225,39 +229,59 @@ class ASOServerJob(object):
         else:
             group = ''
         dbs_url = str(self.task_ad['CRAB_DBSUrl'])
+        task_publish = int(self.task_ad['CRAB_Publish'])
         publish_dbs_url = str(self.task_ad['CRAB_PublishDBSUrl'])
         if publish_dbs_url.lower() == 'undefined':
             publish_dbs_url = "https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/"
         # TODO: Add a method to resolve a single PFN or use resolvePFNs
         last_update = int(time.time())
         now = str(datetime.datetime.now())
-        found_log = False
-        file_index = 0
         for outputModule in self.output_metadata.values():
             for outputFile in outputModule:
                 fileInfo = {}
                 fileInfo['checksums'] = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
                 fileInfo['outsize'] = outputFile.get(u"size", 0)
                 fileInfo['needs_transfer'] = not outputFile.get('direct_stageout')
+                if outputFile.get(u"output_module_class") == u'PoolOutputModule' or \
+                        outputFile.get(u"ouput_module_class") == u'PoolOutputModule':
+                    fileInfo['filetype'] = "EDM"
+                elif outputFile.get(u"Source"):
+                    fileInfo['filetype'] = "TFILE"
+                else:
+                    fileInfo['filetype'] = "OTHER" # This should actually never happen?
                 outputFiles.append(fileInfo)
+        transfer_outputs = int(self.task_ad['CRAB_TransferOutputs'])
+        if not transfer_outputs:
+            logger.debug("Transfer output flag is false; skipping outputs stageout.")
+        transfer_logs = int(self.task_ad['CRAB_SaveLogsFlag'])
+        if not transfer_logs:
+            logger.debug("Save logs flag is false; skipping logs stageout.")
+        found_log = False
+        file_index = 0
         for oneFile in zip(self.source_sites, self.filenames):
             if found_log:
+                if not transfer_outputs:
+                    continue
                 lfn = "%s/%s" % (self.source_dir, oneFile[1])
                 file_type = "output"
                 size = outputFiles[file_index]['outsize']
                 checksums = outputFiles[file_index]['checksums']
                 needs_transfer = outputFiles[file_index]['needs_transfer']
+                publish = int(task_publish and outputFiles[file_index]['filetype'] == "EDM")
+                if task_publish and outputFiles[file_index]['filetype'] != "EDM":
+                    logger.info("Disabling the publication of the output file since it is not of EDM type.")
                 file_index += 1
             else:
+                found_log = True
+                if not transfer_logs:
+                    continue
                 lfn = "%s/log/%s" % (self.source_dir, oneFile[1])
                 file_type = "log"
                 size = self.log_size
                 needs_transfer = self.log_needs_transfer
                 checksums = {'adler32': 'abc'}
-                found_log = True
-                if not int(self.task_ad['CRAB_SaveLogsFlag']):
-                    logger.debug("Save logs flag is false; skipping log stageout.")
-                    continue
+                publish = 0
+            publish = int(publish and not self.cmsRun_failed)
             user = getUserFromLFN(lfn)
             doc_id = getHashLfn(lfn)
             common_info = { "state":  "new",
@@ -310,7 +334,7 @@ class ASOServerJob(object):
                         "publication_state": 'not_published',
                         "publication_retry_count": [],
                         "type" : file_type,
-                        "publish" : 0 if self.cmsRun_failed else 1,
+                        "publish" : publish,
                     }
                 if not needs_transfer:
                     # The "/store/user" variant of the LFN should be used for files that are marked as 'done'.
@@ -529,7 +553,7 @@ def reportResults(job_id, dest_list, sizes):
     return retval
 
 
-def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames, savelogs):
+def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames, transfer_logs, transfer_outputs):
 
     p = PhEDEx.PhEDEx()
     found_log = False
@@ -544,18 +568,25 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames, savelo
         lfns.append(slfn)
         lfns.append(dlfn)
         found_log = True
+
     dest_sites_ = [dest_site]
     if dest_site.startswith("T1_"):
         dest_sites_.append(dest_site + "_Buffer")
         dest_sites_.append(dest_site + "_Disk")
     dest_info = p.getPFN(nodes=(source_sites + dest_sites_), lfns=lfns)
+
     results = []
     found_log = False
     for source_site, filename in zip(source_sites, filenames):
         if not found_log and filename.startswith("cmsRun") and (filename[-7:] == ".tar.gz"):
+            if not transfer_logs:
+                found_log = True
+                continue
             slfn = os.path.join(source_dir, "log", filename)
             dlfn = os.path.join(dest_dir, "log", filename)
         else:
+            if not transfer_outputs:
+                continue
             slfn = os.path.join(source_dir, filename)
             dlfn = os.path.join(dest_dir, filename)
         dest_site_= dest_site
@@ -567,11 +598,9 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames, savelo
             print "Unable to map LFN %s at site %s" % (slfn, source_site)
         if ((dest_site_, dlfn) not in dest_info) or (not dest_info[dest_site_, dlfn]):
             print "Unable to map LFN %s at site %s" % (dlfn, dest_site_)
-        if not found_log and not savelogs:
-            found_log = True
-            continue
         results.append((dest_info[source_site, slfn], dest_info[dest_site_, dlfn]))
         found_log = True
+
     return results
 
 
@@ -746,7 +775,10 @@ class PostJob():
                 left, right = publishname.rsplit("-", 1)
                 publishname = "%s_%s-%s" % (left, fileInfo['module_label'], right)
             # CMS convention for outdataset: /primarydataset>/<yourHyperNewsusername>-<publish_data_name>-<PSETHASH>/USER
-            outdataset = os.path.join('/' + str(self.task_ad['CRAB_InputData']).split('/')[1], self.task_ad['CRAB_UserHN'] + '-' + publishname, 'USER')
+            if fileInfo['filetype'] == 'EDM':
+                outdataset = os.path.join('/' + str(self.task_ad['CRAB_InputData']).split('/')[1], self.task_ad['CRAB_UserHN'] + '-' + publishname, 'USER')
+            else:
+                outdataset = "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER"
             configreq = {"taskname":        self.ad['CRAB_ReqName'],
                          "globalTag":       "None",
                          "pandajobid":      self.crab_id,
@@ -765,18 +797,19 @@ class PostJob():
                          "outdatasetname":  outdataset,
                     }
             configreq = configreq.items()
-            if 'outfileruns' in fileInfo:
-                for run in fileInfo['outfileruns']:
-                    configreq.append(("outfileruns", run))
-            if 'outfilelumis' in fileInfo:
-                for lumi in fileInfo['outfilelumis']:
-                    configreq.append(("outfilelumis", lumi))
-            if 'inparentlfns' in fileInfo:
-                for lfn in fileInfo['inparentlfns']:
-                    # If the user specified a PFN as input, then the LFN is an empty string
-                    # and does not pass validation.
-                    if lfn:
-                        configreq.append(("inparentlfns", lfn))
+            if fileInfo['filetype'] == "EDM":
+                if 'outfileruns' in fileInfo:
+                    for run in fileInfo['outfileruns']:
+                        configreq.append(("outfileruns", run))
+                if 'outfilelumis' in fileInfo:
+                    for lumi in fileInfo['outfilelumis']:
+                        configreq.append(("outfilelumis", lumi))
+                if 'inparentlfns' in fileInfo:
+                    for lfn in fileInfo['inparentlfns']:
+                        # If the user specified a PFN as input, then the LFN is an empty string
+                        # and does not pass validation.
+                        if lfn:
+                            configreq.append(("inparentlfns", lfn))
             logger.debug("Uploading output file to %s: %s" % (self.resturl, configreq))
             try:
                 self.server.put(self.resturl, data = urllib.urlencode(configreq))
@@ -878,17 +911,13 @@ class PostJob():
 
 
     def stageout(self, source_dir, dest_dir, *filenames):
-        self.dest_site = self.ad['CRAB_AsyncDest']
 
+        self.dest_site = self.ad['CRAB_AsyncDest']
+        transfer_logs = int(self.task_ad['CRAB_SaveLogsFlag'])
+        transfer_outputs = int(self.task_ad['CRAB_TransferOutputs'])
         source_sites = []
         for filename in filenames:
             source_sites.append(self.getFileSourceSite(filename))
-
-        savelogs = int(self.task_ad['CRAB_SaveLogsFlag'])
-        transfer_list = resolvePFNs(self.dest_site, source_dir, dest_dir, source_sites, filenames, savelogs)
-        for source, dest in transfer_list:
-            logger.info("Copying %s to %s" % (source, dest))
-
         # Skip the first file - it's a tarball of the stdout/err
         for outfile in zip(filenames[1:], self.outputFiles, source_sites[1:]):
             outlfn = os.path.join(dest_dir, outfile[0])
@@ -896,6 +925,9 @@ class PostJob():
             if 'outtmplocation' not in outfile[1]:
                 outfile[1]['outtmplocation'] = outfile[2]
             outfile[1]['outlocation'] = self.dest_site
+        transfer_list = resolvePFNs(self.dest_site, source_dir, dest_dir, source_sites, filenames, transfer_logs, transfer_outputs)
+        for source, dest in transfer_list:
+            logger.info("Copying %s to %s" % (source, dest))
 
         global g_Job
         aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config")
@@ -1119,15 +1151,10 @@ class PostJob():
         self.parseJson()
         self.source_site = self.getSourceSite()
 
-        skipASO = False
-        if 'CRAB_SkipASO' in self.task_ad and self.task_ad['CRAB_SkipASO']:
-            skipASO = True
-
         self.fixPerms()
         try:
             self.uploadLog(dest_dir, filenames[0])
-            if not skipASO:
-                self.stageout(source_dir, dest_dir, *filenames)
+            self.stageout(source_dir, dest_dir, *filenames)
             try:
                 self.upload()
             except HTTPException, hte:

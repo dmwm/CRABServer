@@ -65,10 +65,11 @@ CRAB_HEADERS = \
 +CRAB_ISB = %(cacheurl)s
 +CRAB_SiteBlacklist = %(siteblacklist)s
 +CRAB_SiteWhitelist = %(sitewhitelist)s
++CRAB_SaveLogsFlag = %(savelogsflag)s
 +CRAB_AdditionalOutputFiles = %(addoutputfiles)s
 +CRAB_EDMOutputFiles = %(edmoutfiles)s
 +CRAB_TFileOutputFiles = %(tfileoutfiles)s
-+CRAB_SaveLogsFlag = %(savelogsflag)s
++CRAB_TransferOutputs = %(saveoutput)s
 +CRAB_UserDN = %(userdn)s
 +CRAB_UserHN = %(userhn)s
 +CRAB_AsyncDest = %(asyncdest)s
@@ -94,7 +95,7 @@ CRAB_Archive = %(cachefilename_flatten)s
 #CRAB_ReqName = %(requestname_flatten)s
 +CRAB_DBSURL = %(dbsurl)s
 +CRAB_PublishDBSURL = %(publishdbsurl)s
-CRAB_Publish = %(publication)s
++CRAB_Publish = %(publication)s
 CRAB_Id = $(count)
 +CRAB_Id = $(count)
 +CRAB_Dest = "%(temp_dest)s"
@@ -205,7 +206,7 @@ def transform_strings(input):
     info = {}
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
-           'userdn', 'requestname', 'publication', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
+           'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
            'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL', 'asyncdest_se', "stageoutpolicy", \
            'taskType', 'maxpost', 'worker_name', 'desired_opsys', 'desired_opsysvers', 'desired_arch':
         val = input.get(var, None)
@@ -214,7 +215,7 @@ def transform_strings(input):
         else:
             info[var] = json.dumps(val)
 
-    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout':
+    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput':
         info[var] = int(input[var])
 
     for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', \
@@ -377,10 +378,10 @@ class DagmanCreator(TaskAction.TaskAction):
         info['asyncdest_se'] = self.phedex.getNodeSE(info['tm_asyncdest'])
         info['dbsurl'] = info['tm_dbs_url']
         info['publishdbsurl'] = info['tm_publish_dbs_url']
-        info['publication'] = info['tm_publication']
+        info['publication'] = 1 if info['tm_publication'] == 'T' else 0
         info['userdn'] = info['tm_user_dn']
         info['requestname'] = string.replace(task['tm_taskname'], '"', '')
-        info['savelogsflag'] = 0
+        info['savelogsflag'] = 1 if info['tm_save_logs'] == 'T' else 0
         info['blacklistT1'] = 0
         info['siteblacklist'] = task['tm_site_blacklist']
         info['sitewhitelist'] = task['tm_site_whitelist']
@@ -399,8 +400,8 @@ class DagmanCreator(TaskAction.TaskAction):
         # TODO: pass through these correctly.
         info['runs'] = []
         info['lumis'] = []
+        info['saveoutput'] = 1 if task.get('tm_arguments', {}).get('saveoutput', 'T') == 'T' else 0
         info = transform_strings(info)
-        info['saveoutput'] = True if task.get('tm_arguments', {}).get('saveoutput', 'T') == 'T' else False
         info['faillimit'] = task.get('tm_arguments', {}).get('faillimit')
         if info['jobarch_flatten'].startswith("slc6_"):
             info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
