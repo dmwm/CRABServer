@@ -186,8 +186,11 @@ def makeLFNPrefixes(task):
     elif lfn:
         print "Found lfn parameter %s" % lfn
         splitlfn = lfn.split('/')
-        #join:                    /       store    /temp      /user  /mmascher.1234    /lfn          /GENSYM    /publishname     /120414_1634
-        temp_dest = os.path.join('/', splitlfn[1], 'temp', splitlfn[2], tmp_user, *( splitlfn[4:] + [primaryds, publish_info[0], timestamp] ))
+        if splitlfn[2]=='user':
+            #join:                    /       store    /temp      /user  /mmascher.1234    /lfn          /GENSYM    /publishname     /120414_1634
+            temp_dest = os.path.join('/', splitlfn[1], 'temp', splitlfn[2], tmp_user, *( splitlfn[4:] + [primaryds, publish_info[0], timestamp] ))
+        else:
+            temp_dest = os.path.join('/', splitlfn[1], 'temp', splitlfn[2], *( splitlfn[3:] + [primaryds, publish_info[0], timestamp] ))
         dest = os.path.join(lfn, primaryds, publish_info[0], timestamp)
     else:
         raise TaskWorker.WorkerExceptions.TaskWorkerException("Cannot find the lfn parameter inside the tm_arguments."+\
