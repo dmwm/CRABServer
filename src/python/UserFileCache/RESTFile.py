@@ -6,6 +6,7 @@ from WMCore.REST.Format import RawFormat
 
 # CRABServer dependecies here
 from UserFileCache.RESTExtensions import ChecksumFailed, validate_file, validate_tarfile, authz_login_valid, quota_user_free, get_size, list_files, list_users
+from UserFileCache.__init__ import __version__
 
 # external dependecies here
 import cherrypy
@@ -148,7 +149,7 @@ class RESTInfo(RESTEntity):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid()
         if method in ['GET']:
-            validate_str('subresource', param, safe, RX_SUBRES, optional=False)
+            validate_str('subresource', param, safe, RX_SUBRES, optional=True)
             validate_str("hashkey", param, safe, RX_HASH, optional=True)
             validate_str("username", param, safe, RX_USERNAME, optional=True)
 
@@ -157,7 +158,10 @@ class RESTInfo(RESTEntity):
         """Retrieves the server information, like delegateDN, filecacheurls ...
            :arg str subresource: the specific server information to be accessed;
         """
-        return getattr(RESTInfo, subresource)(self, **kwargs)
+        if subresource:
+            return getattr(RESTInfo, subresource)(self, **kwargs)
+        else:
+            return [{"crabcache":"Welcome","version":__version__}]
 
     @restcall
     def fileinfo(self, **kwargs):

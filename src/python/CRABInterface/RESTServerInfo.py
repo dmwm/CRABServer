@@ -25,7 +25,7 @@ class RESTServerInfo(RESTEntity):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid()
         if method in ['GET']:
-            validate_str('subresource', param, safe, RX_SUBRES_SI, optional=False)
+            validate_str('subresource', param, safe, RX_SUBRES_SI, optional=True)
             validate_str('workflow', param, safe, RX_WORKFLOW , optional=True)
 
     @restcall
@@ -33,7 +33,11 @@ class RESTServerInfo(RESTEntity):
         """Retrieves the server information, like delegateDN, filecacheurls ...
            :arg str subresource: the specific server information to be accessed;
         """
-        return getattr(RESTServerInfo, subresource)(self, **kwargs)
+        if subresource:
+            return getattr(RESTServerInfo, subresource)(self, **kwargs)
+        else:
+            self.api.query(None, None, "select NULL from DUAL").next() #Checking database connection
+            return [{"crabserver":"Welcome","version":__version__}]
 
     @conn_handler(services=['centralconfig'])
     def delegatedn(self, **kwargs):
