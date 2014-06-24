@@ -61,8 +61,9 @@ class RESTUserWorkflow(RESTEntity):
             kwargs["lfn"] = '/store/user/%s/%s' % (username, kwargs["lfnprefix"])
         elif not kwargs["lfn"]:
             kwargs["lfn"] = '/store/user/%s/' % username #add the username in case the user did not specify the lfn param
-        elif kwargs["lfn"].startswith('/store/user/') and not re.match('^/store/user/%s/' % username, kwargs["lfn"]):
-            raise InvalidParameter("The parameter Data.lfn should start with /store/user/%s/" % username) #raise if after /store/user/ there is no 'username'
+        elif not kwargs["lfn"].startswith('/store/group/') and not re.match('^/store/user/%s/' % username, kwargs["lfn"]):
+            #raised if lfn does not start with /store/group/ or /store/user/username
+            raise InvalidParameter("The parameter Data.outlfn should start with /store/group/ or /store/user/%s/" % username)
 
     def _checkASODestination(self, site):
         self._checkSite(site)
