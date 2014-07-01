@@ -253,7 +253,11 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         # First, verify the task has been submitted by the backend.
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, db_userdn, _, _, _ = row.next() #just one row is picked up by the previous query
+        try:
+            #just one row is picked up by the previous query
+            _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, db_userdn, _, _, _ = row.next()
+        except StopIteration:
+            raise ExecutionError("Impossible to find task %s in the database." % workflow)
 
         if db_userdn != userdn:
             raise ExecutionError("Your DN, %s, is not the same as the original DN used for task submission" % userdn)
