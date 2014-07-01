@@ -93,7 +93,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
 
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, _ = row.next()
+        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, _, _, _ = row.next()
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
@@ -106,7 +106,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
 
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, tm_arguments = row.next()
+        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, tm_arguments, _, _ = row.next()
         arguments = literal_eval(tm_arguments.read())
         saveoutput = True if arguments.get("saveoutput", "T") == 'T' else False
 
