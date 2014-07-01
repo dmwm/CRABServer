@@ -11,7 +11,7 @@ lfnParts.update( {'publishname' : pNameRE,
 )
 RX_WORKFLOW  = re.compile( wfBase % 232) #232 = column length in the db (255) - username (8) - timestamp (12) - unserscores (3)
 RX_UNIQUEWF  = re.compile( wfBase % 255)
-RX_PUBLISH   = re.compile(pNameRE)
+RX_PUBLISH   = re.compile('^'+pNameRE+'$')
 #RX_LFN       = re.compile(r'^(?=.{0,500}$)/store/(temp/)?(user|group)/%(hnName)s/%(primDS)s/%(publishname)s/%(psethash)s/%(counter)s/(log/)?%(filename)s+$' % lfnParts)
 RX_LFN       = re.compile(r'^(?=[a-zA-Z0-9\-\._/]{0,500}$)/store/(temp/)?(user/%(hnName)s|group)/?' % lfnParts)
 RX_PARENTLFN = re.compile(r'^(/[a-zA-Z0-9\-_\.]+/?)+$')
