@@ -18,6 +18,7 @@ from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.Utils import conn_handler
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 from WMCore.Services.pycurl_manager import ResponseHeader
+from WMCore.DataStructs.LumiList import LumiList
 import WMCore.Database.CMSCouch as CMSCouch
 
 import HTCondorUtils
@@ -199,7 +200,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         #get the information we need from the taskdb/initilize variables
         taskrow = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
         inputDataset = taskrow[12]
-        outputDataset = self._getOutDatasets(workflow)
+        outputDatasets = self._getOutDatasets(workflow)
         dbsUrl = taskrow[13]
 
         #load the lumimask
@@ -228,13 +229,21 @@ class HTCondorDataWorkflow(DataWorkflow):
                 inputDetails = dbs.listDatasetFileDetails(inputDataset)
                 res['dbsInLumilist'] = _compactLumis(inputDetails)
                 self.logger.info("Aggregated input lumilist: %s" % res['dbsInLumilist'])
-
-                #load the output dataset's lumilist
+                #load the output datasets' lumilist
+                res['dbsNumEvents'] = 0
+                res['dbsNumFiles'] = 0
+                res['dbsOutLumilist'] = {}
                 dbs = DBSReader("https://cmsweb.cern.ch/dbs/prod/phys03/DBSReader") #We can only publish here with DBS3
-                outputDetails = dbs.listDatasetFileDetails(outputDataset)
-                res['dbsOutLumilist'] = _compactLumis(outputDetails)
-                res['dbsNumEvents'] = sum(x['NumberOfEvents'] for x in outputDetails.values())
-                res['dbsNumFiles'] = sum(len(['Parents']) for x in outputDetails.values())
+                outLumis = []
+                for outputDataset in outputDatasets:
+                    outputDetails = dbs.listDatasetFileDetails(outputDataset)
+                    outLumis.append(_compactLumis(outputDetails))
+                    res['dbsNumEvents'] += sum(x['NumberOfEvents'] for x in outputDetails.values())
+                    res['dbsNumFiles'] += sum(len(['Parents']) for x in outputDetails.values())
+
+                outLumis = LumiList(runsAndLumis = outLumis).compactList
+                for run,lumis in outLumis.iteritems():
+                    res['dbsOutLumilist'][run] = reduce(lambda x1,x2: x1+x2, map(lambda x: range(x[0], x[1]+1), lumis))
                 self.logger.info("Aggregated output lumilist: %s" % res['dbsOutLumilist'])
             except Exception, ex:
                 msg = "Failed to contact DBS: %s" % str(ex)
