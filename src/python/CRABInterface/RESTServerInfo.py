@@ -53,7 +53,6 @@ class RESTServerInfo(RESTEntity):
 
     @conn_handler(services=['centralconfig'])
     def scheddaddress(self, **kwargs):
-
         backendurl=self.centralcfg.centralconfig['backend-urls']
         workflow = kwargs['workflow']
         try:
@@ -67,3 +66,7 @@ class RESTServerInfo(RESTEntity):
     @conn_handler(services=['centralconfig'])
     def bannedoutdest(self, **kwargs):
         yield self.centralcfg.centralconfig['banned-out-destinations']
+
+    @conn_handler(services=['centralconfig'])
+    def ignlocalityblacklist(self, **kwargs):
+        yield self.centralcfg.centralconfig['ign-locality-blacklist']

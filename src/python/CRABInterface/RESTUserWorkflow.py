@@ -144,6 +144,8 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("saveoutput", param, safe, optional=True)
             validate_num("faillimit", param, safe, optional=True)
             validate_num("ignorelocality", param, safe, optional=True)
+            if safe.kwargs['ignorelocality'] and self.centralcfg.centralconfig.get('ign-locality-blacklist', []):
+                safe.kwargs['siteblacklist'] += self._expandSites(self.centralcfg.centralconfig['ign-locality-blacklist'])
             validate_str("vorole", param, safe, RX_VOPARAMS, optional=True)
             validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
             validate_str("publishname", param, safe, RX_PUBLISH, optional=False)
