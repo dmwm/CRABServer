@@ -185,12 +185,12 @@ def set_se_name(dest_file, se_name, direct=False):
         json.dump(full_report, fd)
 
 
-def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_se, inject=True):
+def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_se, inject = True):
     result = -1
     for policy in stageout_policy:
         if policy == "local":
             print "== Attempting local stageout at %s. ==" % time.ctime()
-            result = performLocalTransfer(manager, source, dest, inject=inject)
+            result = performLocalTransfer(manager, source, dest, inject = inject)
             if result:
                 print "== ERROR: Local stageout resulted in status %d at %s. ==" % (result, time.ctime())
             else:
@@ -212,7 +212,7 @@ def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_s
     return result
 
 
-def performLocalTransfer(manager, source, dest, inject=True):
+def performLocalTransfer(manager, source, dest, inject = True):
     fileForTransfer = {'LFN': dest, 'PFN': source}
     signal.signal(signal.SIGALRM, alarmHandler)
     signal.alarm(waitTime)
@@ -246,7 +246,7 @@ def performLocalTransfer(manager, source, dest, inject=True):
 def injectToASO(dest_lfn, se_name):
     ad = parseAd()
     for attr in ["CRAB_ASOURL", "CRAB_AsyncDest", "CRAB_InputData", "CRAB_UserGroup", "CRAB_UserRole", "CRAB_DBSURL",\
-             "CRAB_PublishDBSURL", "CRAB_ReqName", "CRAB_UserHN", "CRAB_SaveLogsFlag"]:
+                 "CRAB_PublishDBSURL", "CRAB_ReqName", "CRAB_UserHN", "CRAB_Publish"]:
         if attr not in ad:
             print "==== ERROR: Unable to inject into ASO because %s is missing from job ad" % attr
             return False
@@ -284,6 +284,8 @@ def injectToASO(dest_lfn, se_name):
                     continue
                 checksums = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
                 size = outputFile.get(u"size", 0)
+                isEDM = (outputFile.get(u"output_module_class","") == u'PoolOutputModule' or \
+                         outputFile.get(u"ouput_module_class" ,"") == u'PoolOutputModule')
                 found_output = True
         if not found_output:
             print "==== ERROR: Unable to find output file in FrameworkJobReport.  Cannot inject to ASO."
@@ -311,6 +313,11 @@ def injectToASO(dest_lfn, se_name):
     if str(ad['CRAB_UserGroup']).lower() == 'undefined':
         group = ''
     dbs_url = str(ad['CRAB_DBSURL'])
+    task_publish = int(ad['CRAB_Publish'])
+    publish = int(task_publish and file_type == 'output' and isEDM)
+    if task_publish and file_type == 'output' and not isEDM:
+        print "Disabling the publication of the output file since it is not of EDM type."
+    publish = int(publish and not g_cmsRunFailed)
     publish_dbs_url = str(ad['CRAB_PublishDBSURL'])
     if publish_dbs_url.lower() == 'undefined':
         publish_dbs_url = "https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/"
@@ -366,7 +373,7 @@ def injectToASO(dest_lfn, se_name):
                "publication_state": 'not_published',
                "publication_retry_count": [],
                "type" : file_type,
-               "publish" : 0 if g_cmsRunFailed else 1,
+               "publish" : publish,
               }
         doc.update(info)
     except Exception, ex:
@@ -454,7 +461,8 @@ def main():
     dest_dir = None
     dest_files = None
     stageout_policy = None
-    save_logs = None
+    transfer_logs = None
+    transfer_outputs = None
     if '_CONDOR_JOB_AD' not in os.environ:
         print "== ERROR: _CONDOR_JOB_AD not in environment =="
         print "No stageout will be performed."
@@ -486,7 +494,9 @@ def main():
                 elif name == "CRAB_StageoutPolicy":
                     stageout_policy = split_re.split(val.replace('"', ''))
                 elif name == "CRAB_SaveLogsFlag":
-                    save_logs = int(val)
+                    transfer_logs = int(val)
+                elif name == "CRAB_TransferOutputs":
+                    transfer_outputs = int(val)
         if crab_id == -1:
             print "== ERROR: Unable to determine CRAB Job ID."
             print "No stageout will be performed."
@@ -513,8 +523,12 @@ def main():
             return 60307
         else:
             print "Stageout policy: %s" % ", ".join(stageout_policy)
-        if save_logs == None: #well, actually we might assume saveLogs=False and delete these lines..
-            print "== ERROR: Unable to determine save_logs parameter."
+        if transfer_logs == None: #well, actually we might assume saveLogs=False and delete these lines..
+            print "== ERROR: Unable to determine transfer_logs parameter."
+            print "No stageout will be performed."
+            return 60307
+        if transfer_outputs == None:
+            print "== ERROR: Unable to determine transfer_outputs parameter."
             print "No stageout will be performed."
             return 60307
 
@@ -555,9 +569,9 @@ def main():
         print "==== Finished compression of user logs at %s (status %d) ====" % (time.ctime(), std_retval)
         if not std_retval:
             print "==== Starting stageout of user logs at %s ====" % time.ctime()
-            if not save_logs:
+            if not transfer_logs:
                 print "Performing only local stageout for log files as the user did not specify saveLogs = True"
-            std_retval = performTransfer(manager, stageout_policy if save_logs else ["local"], log_file, dest, dest_files[0], dest_se, inject=save_logs)
+            std_retval = performTransfer(manager, stageout_policy if transfer_logs else ["local"], log_file, dest, dest_files[0], dest_se, inject = transfer_logs)
     except Exception, ex:
         print "== ERROR: Unhandled exception when performing stageout of user logs."
         traceback.print_exc()
@@ -565,31 +579,30 @@ def main():
             std_retval = 60307
     finally:
         print "==== Stageout of user logs ended at %s (status %d) ====" % (time.ctime(), std_retval)
-    if not save_logs and std_retval:
-        print "Ignoring log stageout failure because user did not request that they be staged out."
+    if not transfer_logs and std_retval:
+        print "Ignoring log stageout failure, because user did not request the logs to be staged out."
         std_retval = 0
 
     out_retval = 0
     for dest, remote_dest in zip(output_files, dest_files[1:]):
-
         info = dest.split("=")
         if len(info) != 2:
             print "== ERROR: Invalid output format (%s)." % dest
             out_retval = 60307
             continue
         source_file, dest_file = info
-
         if not os.path.exists(source_file):
             print "== ERROR: Output file %s does not exist." % source_file
             out_retval = 60307
             continue
-
         dest = os.path.join(dest_dir, dest_file)
         try:
             print "==== Starting stageout of %s at %s ====" % (source_file, time.ctime())
-            cur_out_retval = performTransfer(manager, stageout_policy, source_file, dest, remote_dest, dest_se)
+            if not transfer_outputs:
+                print "Performing only local stageout for output files as the user specified transferOutput = False"
+            cur_out_retval = performTransfer(manager, stageout_policy if transfer_outputs else ["local"], source_file, dest, remote_dest, dest_se, inject = transfer_outputs)
         except Exception, ex:
-            print "== ERROR: Unhandled exception when performing stageout."
+            print "== ERROR: Unhandled exception when performing stageout of user outputs."
             traceback.print_exc()
             cur_out_retval = 60307
         finally:

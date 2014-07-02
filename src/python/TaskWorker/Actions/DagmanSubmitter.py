@@ -35,10 +35,12 @@ CRAB_META_HEADERS = \
 +CRAB_SplitAlgo = %(splitalgo)s
 +CRAB_AlgoArgs = %(algoargs)s
 +CRAB_ConfigDoc = %(configdoc)s
-+CRAB_PublishName = %(publishname)s
 +CRAB_DBSUrl = %(dbsurl)s
-+CRAB_PublishDBSUrl = %(publishdbsurl)s
 +CRAB_LumiMask = %(lumimask)s
++CRAB_TransferOutputs = %(saveoutput)s
++CRAB_Publish = %(publication)s
++CRAB_PublishName = %(publishname)s
++CRAB_PublishDBSUrl = %(publishdbsurl)s
 """
 
 # NOTE: Changes here must be synchronized with the submitDirect function below
@@ -85,14 +87,16 @@ SUBMIT_INFO = [ \
             ('CRAB_EDMOutputFiles', 'edmoutfiles'),
             ('CRAB_TFileOutputFiles', 'tfileoutfiles'),
             ('CRAB_SaveLogsFlag', 'savelogsflag'),
+            ('CRAB_TransferOutputs', 'saveoutput'),
             ('CRAB_UserDN', 'userdn'),
             ('CRAB_UserHN', 'userhn'),
             ('CRAB_AsyncDest', 'asyncdest'),
             ('CRAB_BlacklistT1', 'blacklistT1'),
             ('CRAB_SplitAlgo', 'splitalgo'),
             ('CRAB_AlgoArgs', 'algoargs'),
-            ('CRAB_PublishName', 'publishname'),
             ('CRAB_DBSUrl', 'dbsurl'),
+            ('CRAB_Publish', 'publication'),
+            ('CRAB_PublishName', 'publishname'),
             ('CRAB_PublishDBSUrl', 'publishdbsurl'),
             ('CRAB_LumiMask', 'lumimask'),
             ('CRAB_JobCount', 'jobcount'),
