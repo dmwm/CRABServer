@@ -16,6 +16,7 @@ import hashlib
 import logging
 import tarfile
 import datetime
+import urlparse
 import traceback
 
 # Bootstrap the CMS_PATH variable; the StageOutMgr will need it
@@ -190,6 +191,8 @@ def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_s
     for policy in stageout_policy:
         if policy == "local":
             print "== Attempting local stageout at %s. ==" % time.ctime()
+            if not urlparse.urlparse(source).scheme:
+                source = "file://" + source
             result = performLocalTransfer(manager, source, dest, inject = inject)
             if result:
                 print "== ERROR: Local stageout resulted in status %d at %s. ==" % (result, time.ctime())
