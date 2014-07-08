@@ -550,7 +550,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             publication_info = {'error' : msg}
             outdatasets = ''
             return  publication_info , outdatasets
-        query = {'reduce': True, 'key': workflow, 'stale': 'ok'}
+        query = {'reduce': True, 'key': workflow, 'stale': 'update_after'}
         try:
             publicationlist = None
             publicationlist = db.loadView('AsyncTransfer', 'PublicationStateByWorkflow', query)['rows']

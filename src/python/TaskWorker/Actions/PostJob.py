@@ -383,7 +383,7 @@ class ASOServerJob(object):
                     break
 
         if query_view:
-            query = {'reduce': False, 'key': self.reqname}
+            query = {'reduce': False, 'key': self.reqname, 'stale': 'update_after'}
             logger.debug("Querying task view.")
             try:
                 states = self.couchDatabase.loadView('AsyncTransfer', 'JobsStatesByWorkflow', query)['rows']
