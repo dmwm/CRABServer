@@ -187,7 +187,23 @@ class MasterWorker(object):
 
     def updateWork(self, task, status):
         configreq = {'workflow': task, 'status': status, 'subresource': 'state'}
-        self.server.post(self.resturl, data = urllib.urlencode(configreq))
+        try:
+            self.server.post(self.resturl, data = urllib.urlencode(configreq))
+        except HTTPException, hte:
+            if not hte.headers.get('X-Error-Detail', '') == 'Required object is missing' or \
+               not hte.headers.get('X-Error-Http', -1) == '400':
+                self.logger.error("Server could not update work to the server: \n" +
+                                  "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown')) +
+                                  "\treason: %s" %(hte.headers.get('X-Error-Detail', 'unknown')))
+                self.logger.error("Probably no task to be updated")
+            if hte.headers.get('X-Error-Http', 'unknown') in ['unknown']:
+                self.logger.error("TW could not update work to the server:")
+                self.logger.error("%s " %(str(traceback.format_exc())))
+                self.logger.error("\turl: %s\n" %(getattr(hte, 'url', 'unknown')))
+                self.logger.error("\tresult: %s\n" %(getattr(hte, 'result', 'unknown')))
+        except Exception, exc:
+            self.logger.error("Server could not process the request: %s" %(str(exc)))
+            self.logger.error(traceback.format_exc())
 
     def algorithm(self):
         """I'm the intelligent guy taking care of getting the work
@@ -205,6 +221,7 @@ class MasterWorker(object):
                 self.slaves.injectWorks([(worktype, work, None) for work in pendingwork])
                 for task in pendingwork:
                     self.updateWork(task['tm_taskname'], 'QUEUED')
+                    # Need to check if it will fail or not
 
             for action in self.recurringActions:
                 if action.isTimeToGo():
