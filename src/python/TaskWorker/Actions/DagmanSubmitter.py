@@ -4,6 +4,7 @@ Submit a DAG directory created by the DagmanCreator component.
 """
 
 import os
+import time
 import base64
 import random
 import urllib
@@ -131,17 +132,39 @@ class DagmanSubmitter(TaskAction.TaskAction):
     """
 
     def execute(self, *args, **kw):
-        try:
-            return self.executeInternal(*args, **kw)
-        except Exception, e:
-            msg = "Failed to submit task %s; '%s'" % (kw['task']['tm_taskname'], str(e))
-            self.logger.error(msg)
-            configreq = {'workflow': kw['task']['tm_taskname'],
-                         'status': "FAILED",
-                         'subresource': 'failure',
-                         'failure': base64.b64encode(msg)}
-            self.server.post(self.resturl, data = urllib.urlencode(configreq))
-            raise
+        if self.config.TaskWorker.max_retry == 0:
+            try:
+                return self.executeInternal(*args, **kw)
+            except Exception, e:
+                msg = "Failed to submit task %s; '%s'" % (kw['task']['tm_taskname'], str(e))
+                self.logger.error(msg)
+                configreq = {'workflow': kw['task']['tm_taskname'],
+                             'status': "FAILED",
+                             'subresource': 'failure',
+                             'failure': base64.b64encode(msg)}
+                self.server.post(self.resturl, data = urllib.urlencode(configreq))
+                raise
+        retry_issues = []
+        for retry in range(self.config.TaskWorker.max_retry):
+            self.logger.debug("Trying to submit task %s %s time." % (kw['task']['tm_taskname'], str(retry)))
+            exec_int = ""
+            try:
+                exec_int = self.executeInternal(*args, **kw)
+                return exec_int
+            except Exception, e:
+                msg = "Failed to submit task %s; '%s'" % (kw['task']['tm_taskname'], str(e))
+                self.logger.error(msg)
+                retry_issues.append(base64.b64encode(msg))
+                self.logger.error("Will retry in %s seconds." % str(self.config.TaskWorker.retry_interval[retry]))
+                time.sleep(self.config.TaskWorker.retry_interval[retry])
+        msg = "All retries have failed. Failures : %s" % str(retry_issues)
+        self.logger.error(msg)
+        configreq = {'workflow': kw['task']['tm_taskname'],
+                     'status': "FAILED",
+                     'subresource': 'failure',
+                     'failure': base64.b64encode(msg)}
+        self.server.post(self.resturl, data = urllib.urlencode(configreq))
+        raise
 
     def duplicateCheck(self, task):
         """
@@ -313,5 +336,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.logger.debug("Dashboard job info: %s" % str(job))
             apmon.sendToML(job)
         apmon.free()
+
 
 
