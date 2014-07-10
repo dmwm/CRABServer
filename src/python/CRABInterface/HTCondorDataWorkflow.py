@@ -239,7 +239,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                     outputDetails = dbs.listDatasetFileDetails(outputDataset)
                     outLumis.append(_compactLumis(outputDetails))
                     res['dbsNumEvents'] += sum(x['NumberOfEvents'] for x in outputDetails.values())
-                    res['dbsNumFiles'] += sum(len(['Parents']) for x in outputDetails.values())
+                    res['dbsNumFiles'] += sum(len(x['Parents']) for x in outputDetails.values())
 
                 outLumis = LumiList(runsAndLumis = outLumis).compactList
                 for run,lumis in outLumis.iteritems():
