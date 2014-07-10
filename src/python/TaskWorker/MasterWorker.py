@@ -117,9 +117,9 @@ class MasterWorker(object):
         self.server = HTTPRequests(restinstance, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey)
         self.logger.debug("Hostcert: %s, hostkey: %s" %(str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey)))
         # Retries for any failures
-        if not self.config.TaskWorker.max_retry:
+        if not hasattr(self.config.TaskWorker, 'max_retry'):
             self.config.TaskWorker.max_retry = 0
-        if not self.config.TaskWorker.retry_interval:
+        if not hasattr(self.config.TaskWorker, 'retry_interval'):
             self.config.TaskWorker.retry_interval = [retry*20*2 for retry in range(self.config.TaskWorker.max_retry)]
         if not len(self.config.TaskWorker.retry_interval) == self.config.TaskWorker.max_retry:
             raise ConfigException("No correct max_retry and retry_interval specified; len of retry_interval must be equal to max_retry.")
