@@ -318,7 +318,7 @@ def handleException(exitAcronymn, exitCode, exitMsg):
         json.dump(report, of)
     with open('jobReportExtract.pickle','w') as of:
         pickle.dump(report, of)
-    if ad:
+    if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         stopDashboardMonitoring(ad)
 
 
@@ -417,8 +417,8 @@ def parseArgs():
 
 def prepSandbox(opts):
     print "==== Sandbox preparation STARTING at %s ====" % time.asctime(time.gmtime())
-    if opts.archiveJob:
-        os.environ['WMAGENTJOBDIR'] = os.getcwd()
+    os.environ['WMAGENTJOBDIR'] = os.getcwd()
+    if opts.archiveJob and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         if os.path.exists(opts.archiveJob):
             print "Sandbox %s already exists, skipping" % opts.archiveJob
         elif opts.sourceURL == 'LOCAL' and not os.path.exists(opts.archiveJob):
@@ -474,7 +474,7 @@ except:
     print "==== FAILURE WHEN PARSING HTCONDOR CLASSAD AT %s ====" % time.asctime(time.gmtime())
     print traceback.format_exc()
     ad = {}
-if ad:
+if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
     dashboardId = earlyDashboardMonitoring(ad)
     if dashboardId:
         os.environ['DashboardJobId'] = dashboardId
@@ -497,7 +497,7 @@ try:
 except:
     # We may not even be able to create a FJR at this point.  Record
     # error and exit.
-    if ad:
+    if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         earlyDashboardFailure(ad)
     print "==== FAILURE WHEN LOADING WMCORE AT %s ====" % time.asctime(time.gmtime())
     print traceback.format_exc()
@@ -586,6 +586,7 @@ def executeCMSSWStack(opts):
     cmssw.step.section_("builder")
     cmssw.step.builder.workingDir = os.getcwd()
     cmssw.step.runtime.invokeCommand = 'python'
+    cmssw.step.runtime.scramPreDir = os.getcwd()
     cmssw.step.runtime.preScripts = []
 
 
@@ -721,7 +722,7 @@ try:
     logHandler.setFormatter(logFormatter)
     logging.getLogger().addHandler(logHandler)
 
-    if ad:
+    if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         startDashboardMonitoring(ad)
     print "==== CMSSW Stack Execution STARTING at %s ====" % time.asctime(time.gmtime())
     try:
@@ -803,7 +804,7 @@ try:
         json.dump(report, of)
     with open('jobReportExtract.pickle','w') as of:
         pickle.dump(report, of)
-    if ad:
+    if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         stopDashboardMonitoring(ad)
     print "==== Report file creation FINISHING at %s ====" % time.asctime(time.gmtime())
 except FwkJobReportException, FJRex:
