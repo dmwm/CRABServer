@@ -95,12 +95,17 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, _, _, _ = row.next()
+        savelogs = True if tm_save_logs == 'T' else False
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
-        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
-        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, tm_user_dn, tm_username, tm_user_role, tm_user_group, saveLogs=tm_save_logs, userproxy=userproxy)
+        if savelogs:
+            transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
+            finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
+        else:
+            transferingIds = []
+            finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferring', 'cooloff', 'held']]
+        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, tm_user_dn, tm_username, tm_user_role, tm_user_group, savelogs, userproxy)
 
 
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
@@ -119,11 +124,11 @@ class HTCondorDataWorkflow(DataWorkflow):
         else:
             transferingIds = []
             finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferring', 'cooloff', 'held']]
-        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE'], transferingIds, finishedIds, tm_user_dn, tm_username, tm_user_role, tm_user_group, userproxy=userproxy)
+        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], transferingIds, finishedIds, tm_user_dn, tm_username, tm_user_role, tm_user_group, saveoutput, userproxy)
 
 
     @conn_handler(services=['phedex'])
-    def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, username, role, group, saveLogs=None, userproxy=None):
+    def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, username, role, group, transfer_files, userproxy = None):
         """
         Retrieves the output PFN aggregating output in final and temporary locations.
 
@@ -131,12 +136,14 @@ class HTCondorDataWorkflow(DataWorkflow):
         :arg int howmany: the limit on the number of PFN to return
         :return: a generator of list of outputs"""
 
-        #check that the jobids passed by the user are finished
+        file_type = 'log' if filetype == ['LOG'] else 'output'
+
+        ## Check that the jobids passed by the user are in a valid state to retrieve files.
         for jobid in jobids:
             if not jobid in transferingIds + finishedIds:
-                raise InvalidParameter("The job with id %s is not finished" % jobid)
+                raise InvalidParameter("The job with id %s is not in a valid state to retrieve %s files" % (file_type, jobid))
 
-        #If the user do not give us jobids set them to all possible ids
+        ## If the user does not give us jobids, set them to all possible ids.
         if not jobids:
             jobids = transferingIds + finishedIds
         else:
@@ -144,22 +151,19 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         #user did not give us ids and no ids available in the task
         if not jobids:
-            self.logger.info("No finished jobs found in the task")
+            self.logger.info("No jobs found in the task with a valid state to retrieve %s files" % file_type)
             return
 
-        self.logger.debug("Retrieving %s output of jobs: %s" % (','.join(filetype), jobids))
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype=','.join(filetype), taskname=workflow)
+        self.logger.debug("Retrieving the %s files of the following jobs: %s" % (file_type, jobids))
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow)
         rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
-        if howmany!=-1:
-            rows=rows[:howmany]
+        if howmany != -1:
+            rows = rows[:howmany]
         #jobids=','.join(map(str,jobids)), limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
 
         for row in rows:
             try:
-                if filetype == ['LOG'] and saveLogs == 'F':
-                    lfn = lfn_to_temp(row[GetFromTaskAndType.LFN], userdn, username, role, group)
-                    pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
-                else:
+                if transfer_files:
                     if row[GetFromTaskAndType.PANDAID] in finishedIds:
                         lfn = temp_to_lfn(row[GetFromTaskAndType.LFN], username)
                         pfn = self.phedex.getPFN(row[GetFromTaskAndType.LOCATION], lfn)[(row[GetFromTaskAndType.LOCATION], lfn)]
@@ -168,19 +172,23 @@ class HTCondorDataWorkflow(DataWorkflow):
                         pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
                     else:
                         continue
+                else:
+                    lfn = lfn_to_temp(row[GetFromTaskAndType.LFN], userdn, username, role, group)
+                    pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
             except Exception, err:
                     self.logger.exception(err)
-                    raise ExecutionError("Exception while contacting DBS. Cannot get the input/output lumi lists. You can try to execute 'crab report' with --dbs=no")
+                    raise ExecutionError("Exception while contacting PhEDEX.")
 
             yield { 'pfn' : pfn,
-        		    'lfn' : lfn,
+                    'lfn' : lfn,
                     'size' : row[GetFromTaskAndType.SIZE],
                     'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
-            }
+                  }
 
 
     def report(self, workflow, userdn, usedbs):
-        """ Computes the report for workflow. If usedbs is used also query DBS and return information about the input and output datasets
+        """
+        Computes the report for workflow. If usedbs is used also query DBS and return information about the input and output datasets
         """
 
         def _compactLumis(datasetInfo):
