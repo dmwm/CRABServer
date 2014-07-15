@@ -181,12 +181,10 @@ def makeLFNPrefixes(task):
     publish_info = task['tm_publish_name'].rsplit('-', 1) #publish_info[0] is the publishname or the taskname
     timestamp = getCreateTimestamp(task['tm_taskname'])
     if lfn_prefix or not lfn: #keeping the lfn_prefix around so new task workers work with old servers (we should delete this soon) #TODO
-        print "Using default lfn. Either we found the lfn_prefix parameter (old server?) or the user did not specify the lfn"
         #publish_info[0] will either be the unique taskname (stripped by the username) or the publishname
         temp_dest = os.path.join("/store/temp/user", tmp_user, lfn_prefix, primaryds, publish_info[0], timestamp)
         dest = os.path.join("/store/user", user, lfn_prefix, primaryds, publish_info[0], timestamp)
     elif lfn:
-        print "Found lfn parameter %s" % lfn
         splitlfn = lfn.split('/')
         if splitlfn[2]=='user':
             #join:                    /       store    /temp      /user  /mmascher.1234    /lfn          /GENSYM    /publishname     /120414_1634
@@ -198,7 +196,6 @@ def makeLFNPrefixes(task):
         raise TaskWorker.WorkerExceptions.TaskWorkerException("Cannot find the lfn parameter inside the tm_arguments."+\
                                         "The CRAB server probably has a configuration error. Please contact an expert.")
 
-    print "Using temp_dest %s,\n dest %s:" % (temp_dest, dest)
     return temp_dest, dest
 
 
@@ -281,11 +278,10 @@ class DagmanCreator(TaskAction.TaskAction):
 
 
     def buildDashboardInfo(self):
-
-        taskType = getattr(self.config.TaskWorker, 'dashboardTaskType', 'analysis')
+        taskType = self.getDashboardTaskType()
 
         params = {'tool': 'crab3',
-                  'SubmissionType':'direct',
+                  'SubmissionType':'crab3',
                   'JSToolVersion': '3.3.0',
                   'tool_ui': os.environ.get('HOSTNAME',''),
                   'scheduler': 'GLIDEIN',
@@ -357,6 +353,16 @@ class DagmanCreator(TaskAction.TaskAction):
             if arch == "amd64":
                 info['desired_arch'] = "X86_64"
 
+    def getDashboardTaskType(self):
+        """ Get the dashboard activity name for the task. We check if tf it is an Hammercloud task by
+            looking at the taskname: if it contains something like "HC_22_CSA14_Test_" then it's HC.
+        """
+        if re.match(r'.*HC_\d\d\d?_CSA14_Test_', self.task['tm_taskname']):
+            return "analysis-crab3-hc"
+        else:
+            return getattr(self.config.TaskWorker, 'dashboardTaskType', 'analysistest')
+
+
     def makeJobSubmit(self, task):
         """
         Create the submit file.  This is reused by all jobs in the task; differences
@@ -394,7 +400,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['edmoutfiles'] = task['tm_edm_outfiles']
         info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
         info['ASOURL'] = task.get('tm_arguments', {}).get('ASOURL', '')
-        info['taskType'] = getattr(self.config.TaskWorker, 'dashboardTaskType', 'analysis')
+        info['taskType'] = self.getDashboardTaskType() 
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
         info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)

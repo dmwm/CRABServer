@@ -69,13 +69,13 @@ class PreJob:
             return
 
         params = {'tool': 'crab3',
-                  'SubmissionType':'direct',
+                  'SubmissionType':'crab3',
                   'JSToolVersion': '3.3.0',
                   'tool_ui': os.environ.get('HOSTNAME',''),
                   'scheduler': 'GLIDEIN',
                   'GridName': self.task_ad['CRAB_UserDN'],
                   'ApplicationVersion': self.task_ad['CRAB_JobSW'],
-                  'taskType': self.task_ad.get("CRAB_DashboardTaskType", 'analysis'),
+                  'taskType': self.task_ad.get("CRAB_DashboardTaskType", 'analysistest'),
                   'vo': 'cms',
                   'CMSUser': self.task_ad['CRAB_UserHN'],
                   'user': self.task_ad['CRAB_UserHN'],
