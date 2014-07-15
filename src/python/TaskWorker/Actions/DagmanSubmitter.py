@@ -285,9 +285,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         if 'JobPrio' not in dagAd:
             dagAd['JobPrio'] = 10
 
-        if not info['saveoutput']:
-            dagAd['CRAB_SkipASO'] = True
-
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
         dagAd["Err"] = str(os.path.join(info['scratch'], "request.err"))
