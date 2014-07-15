@@ -172,13 +172,14 @@ def makeLFNPrefixes(task):
         hash_input += "," + task['tm_user_group']
     if 'tm_user_role' in task and task['tm_user_role']:
         hash_input += "," + task['tm_user_role']
+    lfn = task.get('tm_arguments', {}).get('lfn', '')
+    lfn_prefix = task.get('tm_arguments', {}).get('lfnprefix', '')
     hash = hashlib.sha1(hash_input).hexdigest()
-    user = task['tm_username']
+    #extracting the username for the lfn as long as https://github.com/dmwm/CRABServer/issues/4344 is sorted out. We need to do this because of https://hypernews.cern.ch/HyperNews/CMS/get/crabDevelopment/2076.html
+    user = task['tm_username'] if not lfn else lfn.split('/')[3]
     tmp_user = "%s.%s" % (user, hash)
     publish_info = task['tm_publish_name'].rsplit('-', 1) #publish_info[0] is the publishname or the taskname
     timestamp = getCreateTimestamp(task['tm_taskname'])
-    lfn_prefix = task.get('tm_arguments', {}).get('lfnprefix', '')
-    lfn = task.get('tm_arguments', {}).get('lfn', '')
     if lfn_prefix or not lfn: #keeping the lfn_prefix around so new task workers work with old servers (we should delete this soon) #TODO
         print "Using default lfn. Either we found the lfn_prefix parameter (old server?) or the user did not specify the lfn"
         #publish_info[0] will either be the unique taskname (stripped by the username) or the publishname
