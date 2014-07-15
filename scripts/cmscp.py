@@ -161,14 +161,8 @@ def set_se_name(dest_file, se_name, direct=False):
     found_output = False
     for outputModule in output.values():
         for outputFile in outputModule:
-
-            if outputFile.get(u"output_module_class") != u'PoolOutputModule' and \
-                    outputFile.get(u"ouput_module_class") != u'PoolOutputModule':
+            if os.path.split(str(outputFile.get(u"pfn")))[-1] != filename:
                 continue
-
-            if str(outputFile.get(u"pfn")) != filename:
-                continue
-
             outputFile['SEName'] = se_name
             outputFile['direct_stageout'] = direct
             found_output = True
@@ -283,7 +277,7 @@ def injectToASO(dest_lfn, se_name):
         found_output = False
         for outputModule in output.values():
             for outputFile in outputModule:
-                if str(outputFile.get(u"pfn")) != local_fname:
+                if os.path.split(str(outputFile.get(u"pfn")))[-1] != local_fname:
                     continue
                 checksums = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
                 size = outputFile.get(u"size", 0)
@@ -319,7 +313,7 @@ def injectToASO(dest_lfn, se_name):
     task_publish = int(ad['CRAB_Publish'])
     publish = int(task_publish and file_type == 'output' and isEDM)
     if task_publish and file_type == 'output' and not isEDM:
-        print "Disabling the publication of the output file since it is not of EDM type."
+        print "Disabling publication of output file %s, because it is not of EDM type." % fname
     publish = int(publish and not g_cmsRunFailed)
     publish_dbs_url = str(ad['CRAB_PublishDBSURL'])
     if publish_dbs_url.lower() == 'undefined':
@@ -450,7 +444,7 @@ def performDirectTransferImpl(source, direct_pfn, direct_se):
         signal.alarm(0)
 
     if not result:
-        set_se_name(os.path.split(direct_pfn)[-1], direct_se, direct=True)
+        set_se_name(os.path.split(direct_pfn)[-1], direct_se, direct = True)
 
     return result
 

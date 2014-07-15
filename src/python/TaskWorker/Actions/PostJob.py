@@ -1,5 +1,41 @@
 #!/usr/bin/python
 
+"""
+In the PostJob we read the FrameworkJobReport (FJR) to retrieve information about the output files.
+The FJR contains information for output files produced either via PoolOutputModule or TFileService, 
+which respectively produce files of type EDM and TFile. Below are examples of the output part of a
+FJR for each of these two cases.
+Example FJR['steps']['cmsRun']['output'] for an EDM file produced via PoolOutputModule:
+{
+ u'SEName': u'se1.accre.vanderbilt.edu',
+ u'pfn': u'dumper.root',
+ u'checksums': {u'adler32': u'47d823c0', u'cksum': u'640736586'}, 
+ u'size': 3582626,
+ u'direct_stageout': False,
+ u'ouput_module_class': u'PoolOutputModule',
+ u'runs': {u'1': [666668, 666672, 666675, 666677, ...]},
+ u'branch_hash': u'd41d8cd98f00b204e9800998ecf8427e',
+ u'input': [u'/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0011/404C27A2-22AE-E111-BC20-003048D373AE.root', ...],
+ u'inputpfns': [u'/cms/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0011/404C27A2-22AE-E111-BC20-003048D373AE.root', ...],
+ u'lfn': u'',
+ u'pset_hash': u'eede9f2e261619d27929da51104cf9d7',
+ u'catalog': u'',
+ u'module_label': u'o',
+ u'guid': u'48C5017F-A405-E411-9BE6-00A0D1E70940',
+ u'events': 30650
+}
+Example FJR['steps']['cmsRun']['output'] for a TFile produced via TFileService:
+{
+ u'SEName': u'se1.accre.vanderbilt.edu',
+ u'pfn': u'/tmp/1882789.vmpsched/glide_Paza70/execute/dir_27876/histo.root',
+ u'checksums': {u'adler32': u'e8ed4a12', u'cksum': u'2439186609'},
+ u'size': 360,
+ u'direct_stageout': False,
+ u'fileName': u'/tmp/1882789.vmpsched/glide_Paza70/execute/dir_27876/histo.root',
+ u'Source': u'TFileService'
+}
+"""
+
 import os
 import re
 import sys
@@ -241,14 +277,16 @@ class ASOServerJob(object):
                 fileInfo = {}
                 fileInfo['checksums'] = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
                 fileInfo['outsize'] = outputFile.get(u"size", 0)
-                fileInfo['needs_transfer'] = not outputFile.get('direct_stageout')
+                fileInfo['direct_stageout'] = outputFile.get(u'direct_stageout', False)
                 if outputFile.get(u"output_module_class") == u'PoolOutputModule' or \
-                        outputFile.get(u"ouput_module_class") == u'PoolOutputModule':
-                    fileInfo['filetype'] = "EDM"
+                   outputFile.get(u"ouput_module_class")  == u'PoolOutputModule':
+                    fileInfo['filetype'] = 'EDM'
                 elif outputFile.get(u"Source"):
-                    fileInfo['filetype'] = "TFILE"
-                else:
-                    fileInfo['filetype'] = "OTHER" # This should actually never happen?
+                    fileInfo['filetype'] = 'TFILE'
+                else: ## This should actually never happen, since in the FJR we have only EDM files and TFiles.
+                    fileInfo['filetype'] = 'FAKE'
+                if u'pfn' in outputFile:
+                    fileInfo['pfn'] = str(outputFile[u'pfn'])
                 outputFiles.append(fileInfo)
         transfer_outputs = int(self.task_ad['CRAB_TransferOutputs'])
         if not transfer_outputs:
@@ -257,25 +295,33 @@ class ASOServerJob(object):
         if not transfer_logs:
             logger.debug("Save logs flag is false; skipping logs stageout.")
         found_log = False
-        file_index = 0
-        for oneFile in zip(self.source_sites, self.filenames):
+        for source_site,filename in zip(self.source_sites, self.filenames):
+            ## We assume that the first file in self.filenames is the logs tarball.
+            publication_msg = ''
             if found_log:
                 if not transfer_outputs:
                     continue
-                lfn = "%s/%s" % (self.source_dir, oneFile[1])
+                lfn = "%s/%s" % (self.source_dir, filename)
                 file_type = "output"
-                size = outputFiles[file_index]['outsize']
-                checksums = outputFiles[file_index]['checksums']
-                needs_transfer = outputFiles[file_index]['needs_transfer']
-                publish = int(task_publish and outputFiles[file_index]['filetype'] == "EDM")
-                if task_publish and outputFiles[file_index]['filetype'] != "EDM":
-                    logger.info("Disabling the publication of the output file since it is not of EDM type.")
-                file_index += 1
+                ifile = getFileIndex(filename, outputFiles)
+                if ifile >= 0:
+                    size = outputFiles[ifile]['outsize']
+                    checksums = outputFiles[ifile]['checksums']
+                    needs_transfer = not outputFiles[ifile]['direct_stageout']
+                    publish = int(task_publish and outputFiles[ifile]['filetype'] == "EDM")
+                else:
+                    continue # because we don't know if this file needs transfer or not...
+                    #size = 0
+                    #checksums = {"cksum": "0", "adler32": "0"}
+                    #needs_transfer = True  # actually we don't know if needs transfer...
+                    #publish = 0
+                if task_publish and not publish:
+                    publication_msg = 'Disabling publication of output file %s, because it is not of EDM type.' % filename
             else:
                 found_log = True
                 if not transfer_logs:
                     continue
-                lfn = "%s/log/%s" % (self.source_dir, oneFile[1])
+                lfn = "%s/log/%s" % (self.source_dir, filename)
                 file_type = "log"
                 size = self.log_size
                 needs_transfer = self.log_needs_transfer
@@ -285,7 +331,7 @@ class ASOServerJob(object):
             user = getUserFromLFN(lfn)
             doc_id = getHashLfn(lfn)
             common_info = { "state":  "new",
-                            "source": oneFile[0],
+                            "source": source_site,
                             "destination": self.dest_site,
                             "checksums": checksums,
                             "size": size,
@@ -317,6 +363,8 @@ class ASOServerJob(object):
                     doc.update(common_info)
             except CMSCouch.CouchNotFoundError:
                 logger.info("LFN %s (id %s) is not yet known to ASO; uploading new stageout job." % (lfn, doc_id))
+                if publication_msg:
+                    logger.info(publication_msg)
                 # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
                 doc = { "_id": doc_id,
                         "inputdataset": input_dataset,
@@ -629,6 +677,20 @@ def isFailurePermanent(reason, task_ad):
     return False
 
 
+def getFileIndex(filename, outputFiles):
+    for i,outfile in enumerate(outputFiles):
+        if ('pfn' not in outfile):
+            continue
+        json_pfn = os.path.split(outfile['pfn'])[-1]
+        pfn = os.path.split(filename)[-1]
+        left_piece, fileid = pfn.rsplit("_", 1)
+        right_piece = fileid.split(".", 1)[-1]
+        pfn = left_piece + "." + right_piece
+        if pfn == json_pfn:
+            return i
+    return -1 # means filename not found in self.outputFiles
+
+
 class PermanentStageoutError(RuntimeError):
     pass
 
@@ -646,6 +708,7 @@ class PostJob():
         self.ad = None
         self.task_ad = {}
         self.crab_id = -1
+        self.full_report = None
         self.report = None
         self.output = None
         self.input = None
@@ -683,17 +746,20 @@ class PostJob():
     def parseJson(self):
         with open("jobReport.json.%d" % self.crab_id) as fd:
             self.full_report = json.load(fd)
-
-        if 'steps' not in self.full_report or 'cmsRun' not in self.full_report['steps']:
-            raise ValueError("Invalid jobReport.json: missing cmsRun")
+        if 'steps' not in self.full_report:
+            raise ValueError("Invalid jobReport.json: missing 'steps'")
+        if 'cmsRun' not in self.full_report['steps']:
+            raise ValueError("Invalid jobReport.json: missing 'cmsRun'")
         self.report = self.full_report['steps']['cmsRun']
-
-        if 'input' not in self.report or 'output' not in self.report:
-            raise ValueError("Invalid jobReport.json: missing input/output")
-        self.output = self.report['output']
-        self.log_needs_transfer = not self.full_report.get("direct_stageout")
-        logger.debug("Log file needs transfer: %s" % str(self.log_needs_transfer))
+        if 'input' not in self.report:
+            raise ValueError("Invalid jobReport.json: missing 'input'")
         self.input = self.report['input']
+        if 'output' not in self.report:
+            raise ValueError("Invalid jobReport.json: missing 'output'")
+        self.output = self.report['output']
+
+        self.log_needs_transfer = not self.full_report.get(u'direct_stageout', False)
+        logger.debug("Log file needs transfer: %s" % str(self.log_needs_transfer))
 
         if 'jobExitCode' in self.full_report:
             self.cmsRunFailed = bool(self.full_report['jobExitCode'])
@@ -701,38 +767,30 @@ class PostJob():
         for outputModule in self.output.values():
             for outputFile in outputModule:
                 print "Output file from job:", outputFile
-                # Note incorrect spelling of 'output module' in current WMCore
                 fileInfo = {}
-                if outputFile.get(u"output_module_class") == u'PoolOutputModule' or \
-                        outputFile.get(u"ouput_module_class") == u'PoolOutputModule':
-                    fileInfo['filetype'] = "EDM"
-                elif outputFile.get(u"Source"):
-                    fileInfo['filetype'] = "TFILE"
-                else:
-                    continue
                 self.outputFiles.append(fileInfo)
-
+                ## Note incorrect spelling of 'output module' in current WMCore
+                if outputFile.get(u"output_module_class") == u'PoolOutputModule' or \
+                   outputFile.get(u"ouput_module_class")  == u'PoolOutputModule':
+                    fileInfo['filetype'] = 'EDM'
+                elif outputFile.get(u"Source"):
+                    fileInfo['filetype'] = 'TFILE'
+                else: ## This should actually never happen, since in the FJR we have only EDM files and TFiles.
+                    fileInfo['filetype'] = 'FAKE'
                 fileInfo['module_label'] = outputFile.get(u"module_label", "unknown")
-
                 fileInfo['inparentlfns'] = [str(i) for i in outputFile.get(u"input", [])]
-
-                fileInfo['events'] = outputFile.get(u"events", -1)
+                fileInfo['events'] = outputFile.get(u"events", 0)
                 fileInfo['checksums'] = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
                 fileInfo['outsize'] = outputFile.get(u"size", 0)
-
                 if u'pset_hash' in outputFile:
                     fileInfo['pset_hash'] = outputFile[u'pset_hash']
-
                 if u'pfn' in outputFile:
                     fileInfo['pfn'] = str(outputFile[u'pfn'])
-
-                fileInfo['needs_transfer'] = True
+                fileInfo['direct_stageout'] = outputFile.get(u'direct_stageout', False)
+                if fileInfo['direct_stageout']: 
+                    logger.debug("Output file does not need to be transferred.")
                 if u'SEName' in outputFile and self.node_map.get(str(outputFile['SEName'])):
                     fileInfo['outtmplocation'] = self.node_map[outputFile['SEName']]
-                    if outputFile.get(u'direct_stageout'):
-                        logger.debug("Output file does not need to be transferred.")
-                        fileInfo['needs_transfer'] = False
-
                 if u'runs' not in outputFile:
                     continue
                 fileInfo['outfileruns'] = []
@@ -771,11 +829,11 @@ class PostJob():
             publishname = self.task_ad['CRAB_PublishName']
             if 'pset_hash' in fileInfo:
                 publishname = "%s-%s" % (publishname.rsplit("-", 1)[0], fileInfo['pset_hash'])
-            if multiple_edm and fileInfo.get("module_label"):
-                left, right = publishname.rsplit("-", 1)
-                publishname = "%s_%s-%s" % (left, fileInfo['module_label'], right)
-            # CMS convention for outdataset: /primarydataset>/<yourHyperNewsusername>-<publish_data_name>-<PSETHASH>/USER
+            ## CMS convention for outdataset: /primarydataset>/<yourHyperNewsusername>-<publish_data_name>-<PSETHASH>/USER
             if fileInfo['filetype'] == 'EDM':
+                if multiple_edm and fileInfo.get("module_label"):
+                    left, right = publishname.rsplit("-", 1)
+                    publishname = "%s_%s-%s" % (left, fileInfo['module_label'], right)
                 outdataset = os.path.join('/' + str(self.task_ad['CRAB_InputData']).split('/')[1], self.task_ad['CRAB_UserHN'] + '-' + publishname, 'USER')
             else:
                 outdataset = "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER"
@@ -795,21 +853,21 @@ class PostJob():
                          "outlfn":          fileInfo['outlfn'],
                          "events":          fileInfo['events'],
                          "outdatasetname":  outdataset,
-                    }
+                         "directstageout":  int(fileInfo['direct_stageout'])
+                        }
             configreq = configreq.items()
-            if fileInfo['filetype'] == "EDM":
-                if 'outfileruns' in fileInfo:
-                    for run in fileInfo['outfileruns']:
-                        configreq.append(("outfileruns", run))
-                if 'outfilelumis' in fileInfo:
-                    for lumi in fileInfo['outfilelumis']:
-                        configreq.append(("outfilelumis", lumi))
-                if 'inparentlfns' in fileInfo:
-                    for lfn in fileInfo['inparentlfns']:
-                        # If the user specified a PFN as input, then the LFN is an empty string
-                        # and does not pass validation.
-                        if lfn:
-                            configreq.append(("inparentlfns", lfn))
+            if 'outfileruns' in fileInfo:
+                for run in fileInfo['outfileruns']:
+                    configreq.append(("outfileruns", run))
+            if 'outfilelumis' in fileInfo:
+                for lumi in fileInfo['outfilelumis']:
+                    configreq.append(("outfilelumis", lumi))
+            if 'inparentlfns' in fileInfo:
+                for lfn in fileInfo['inparentlfns']:
+                    # If the user specified a PFN as input, then the LFN is an empty string
+                    # and does not pass validation.
+                    if lfn:
+                        configreq.append(("inparentlfns", lfn))
             logger.debug("Uploading output file to %s: %s" % (self.resturl, configreq))
             try:
                 self.server.put(self.resturl, data = urllib.urlencode(configreq))
@@ -827,6 +885,7 @@ class PostJob():
         if 'SEName' in self.full_report:
             source_site = self.node_map.get(self.full_report['SEName'], source_site)
         self.log_size = self.full_report.get(u'log_size', 0)
+        direct_stageout = int(self.full_report.get(u'direct_stageout', 0))
         configreq = {"taskname":        self.ad['CRAB_ReqName'],
                      "pandajobid":      self.crab_id,
                      "outsize":         self.log_size, # Not implemented
@@ -841,7 +900,8 @@ class PostJob():
                      "acquisitionera":  "null", # Not implemented
                      "events":          "0",
                      "outlfn":          outlfn,
-                     "outdatasetname":  "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER"
+                     "outdatasetname":  "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER",
+                     "directstageout":  direct_stageout
                     }
         logger.debug("Uploading log file record to %s: %s" % (self.resturl, configreq))
         try:
@@ -895,18 +955,11 @@ class PostJob():
         raise ValueError("Unable to determine source side")
 
 
-    def getFileSourceSite(self, filename):
-        filename = os.path.split(filename)[-1]
-        for outfile in self.outputFiles:
-            if ('pfn' not in outfile) or ('outtmplocation' not in outfile):
-                continue
-            json_pfn = outfile['pfn']
-            pfn = os.path.split(filename)[-1]
-            left_piece, fileid = pfn.rsplit("_", 1)
-            right_piece = fileid.split(".", 1)[-1]
-            pfn = left_piece + "." + right_piece
-            if pfn == json_pfn:
-                return outfile['outtmplocation']
+    def getFileSourceSite(self, filename, ifile = None):
+        if ifile is None:
+            ifile = getFileIndex(filename, self.outputFiles)
+        if ifile >= 0 and ('outtmplocation' in self.outputFiles[ifile]):
+            return self.outputFiles[ifile]['outtmplocation']
         return self.node_map.get(self.full_report.get(u"SEName"), self.source_site)
 
 
@@ -916,15 +969,16 @@ class PostJob():
         transfer_logs = int(self.task_ad['CRAB_SaveLogsFlag'])
         transfer_outputs = int(self.task_ad['CRAB_TransferOutputs'])
         source_sites = []
-        for filename in filenames:
-            source_sites.append(self.getFileSourceSite(filename))
-        # Skip the first file - it's a tarball of the stdout/err
-        for outfile in zip(filenames[1:], self.outputFiles, source_sites[1:]):
-            outlfn = os.path.join(dest_dir, outfile[0])
-            outfile[1]['outlfn'] = outlfn
-            if 'outtmplocation' not in outfile[1]:
-                outfile[1]['outtmplocation'] = outfile[2]
-            outfile[1]['outlocation'] = self.dest_site
+        for i,filename in enumerate(filenames):
+            ifile = getFileIndex(filename, self.outputFiles)
+            source_sites.append(self.getFileSourceSite(filename, ifile))
+            if ifile < 0: continue
+            outlfn = os.path.join(dest_dir, filename)
+            self.outputFiles[ifile]['outlfn'] = outlfn
+            if 'outtmplocation' not in self.outputFiles[ifile]:
+                self.outputFiles[ifile]['outtmplocation'] = source_sites[-1]
+            self.outputFiles[ifile]['outlocation'] = self.dest_site
+
         transfer_list = resolvePFNs(self.dest_site, source_dir, dest_dir, source_sites, filenames, transfer_logs, transfer_outputs)
         for source, dest in transfer_list:
             logger.info("Copying %s to %s" % (source, dest))
