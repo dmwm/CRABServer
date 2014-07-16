@@ -15,7 +15,7 @@ from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.WMSpec.WMTask import buildLumiMask
 from WMCore.Services.DBS.DBSReader import DBSReader
 from CRABInterface.DataWorkflow import DataWorkflow
-from CRABInterface.Utils import conn_handler
+from CRABInterface.Utils import conn_handler, global_user_throttle
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.DataStructs.LumiList import LumiList
@@ -253,6 +253,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         yield res
 
 
+    @global_user_throttle.make_throttled()
     @conn_handler(services=['centralconfig', 'servercert'])
     def status(self, workflow, userdn, userproxy=None, verbose=0):
         """Retrieve the status of the workflow.
