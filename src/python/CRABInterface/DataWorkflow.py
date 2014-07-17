@@ -156,7 +156,13 @@ class DataWorkflow(object):
            :returns: a dict which contaians details of the request"""
 
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
-        requestname = self.updateRequest('%s_%s_%s' % (timestamp, userhn, workflow))
+        requestname = ""
+        try:
+            requestname = self.updateRequest('%s_%s_%s' % (timestamp, userhn, workflow))
+        except IOError, err:
+            self.logger.debug("Failed to communicate with components %s. Request name : " % (str(err), str(requestname)))
+            raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")
+
         splitArgName = self.splitArgMap[splitalgo]
         username = cherrypy.request.user['login']
         dbSerializer = str
