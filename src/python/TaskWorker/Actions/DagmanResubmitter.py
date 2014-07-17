@@ -93,4 +93,13 @@ class DagmanResubmitter(TaskAction.TaskAction):
 
     def execute(self, *args, **kwargs):
 
-        return self.execute_internal(*args, **kwargs)
+        try:
+            return self.execute_internal(*args, **kwargs)
+        finally:
+            configreq = {'workflow': kwargs['task']['tm_taskname'],
+                         'status': "SUBMITTED",
+                         'jobset': "-1",
+                         'subresource': 'success',}
+            self.logger.debug("Setting the task as successfully resubmitted with %s " % str(configreq))
+            data = urllib.urlencode(configreq)
+            self.server.post(self.resturl, data = data)
