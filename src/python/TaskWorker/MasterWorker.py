@@ -146,20 +146,24 @@ class MasterWorker(object):
         try:
             self.server.post(self.resturl, data = urllib.urlencode(configreq))
         except HTTPException, hte:
+            #Using a msg variable and only one self.logger.error so that messages do not get shuffled
+            msg = "Task Worker could not update a task status (HTTPException): %s\nConfiguration parameters=%s\n" % (str(hte), configreq)
             if not hte.headers.get('X-Error-Detail', '') == 'Required object is missing' or \
                not hte.headers.get('X-Error-Http', -1) == '400':
-                self.logger.error("Server could not acquire any work from the server: \n" +
-                                  "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown')) +
-                                  "\treason: %s" %(hte.headers.get('X-Error-Detail', 'unknown')))
-                self.logger.error("Probably no task to be processed")
+                msg += "Task Worker could not update work to the server: \n" +\
+                                  "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown')) +\
+                                  "\treason: %s\n" %(hte.headers.get('X-Error-Detail', 'unknown'))
+                msg += "Probably no task to be updated\n"
             if hte.headers.get('X-Error-Http', 'unknown') in ['unknown']:
-                self.logger.error("Server could not acquire any work from the server:")
-                self.logger.error("%s " %(str(traceback.format_exc())))
-                self.logger.error("\turl: %s\n" %(getattr(hte, 'url', 'unknown')))
-                self.logger.error("\tresult: %s\n" %(getattr(hte, 'result', 'unknown')))
+                msg += "TW could not update work to the server:\n"
+                msg += "%s \n" %(str(traceback.format_exc()))
+                msg += "\turl: %s\n" %(getattr(hte, 'url', 'unknown'))
+                msg += "\tresult: %s\n" %(getattr(hte, 'result', 'unknown'))
+            self.logger.error(msg)
         except Exception, exc:
-            self.logger.error("Server could not process the request: %s" %(str(exc)))
-            self.logger.error(traceback.format_exc())
+            msg = "Task Worker could not update a task status: %s\nConfiguration parameters=%s\n" % (str(exc), configreq)
+            self.logger.error(msg + traceback.format_exc())
+
         return True
 
     def _getWork(self, limit, getstatus):
@@ -190,20 +194,17 @@ class MasterWorker(object):
         try:
             self.server.post(self.resturl, data = urllib.urlencode(configreq))
         except HTTPException, hte:
-            if not hte.headers.get('X-Error-Detail', '') == 'Required object is missing' or \
-               not hte.headers.get('X-Error-Http', -1) == '400':
-                self.logger.error("Server could not update work to the server: \n" +
-                                  "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown')) +
-                                  "\treason: %s" %(hte.headers.get('X-Error-Detail', 'unknown')))
-                self.logger.error("Probably no task to be updated")
-            if hte.headers.get('X-Error-Http', 'unknown') in ['unknown']:
-                self.logger.error("TW could not update work to the server:")
-                self.logger.error("%s " %(str(traceback.format_exc())))
-                self.logger.error("\turl: %s\n" %(getattr(hte, 'url', 'unknown')))
-                self.logger.error("\tresult: %s\n" %(getattr(hte, 'result', 'unknown')))
+            #Using a msg variable and only one self.logger.error so that messages do not get shuffled
+            msg = "Task Worker could not update a task status (HTTPException): %s\nConfiguration parameters=%s\n" % (str(hte), configreq)
+            msg += "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown'))
+            msg += "\treason: %s\n" %(hte.headers.get('X-Error-Detail', 'unknown'))
+            msg += "\turl: %s\n" %(getattr(hte, 'url', 'unknown'))
+            msg += "\tresult: %s\n" %(getattr(hte, 'result', 'unknown'))
+            msg += "%s \n" %(str(traceback.format_exc()))
+            self.logger.error(msg)
         except Exception, exc:
-            self.logger.error("Server could not process the request: %s" %(str(exc)))
-            self.logger.error(traceback.format_exc())
+            msg = "Task Worker could not update a task status: %s\nConfiguration parameters=%s\n" % (str(exc), configreq)
+            self.logger.error(msg + traceback.format_exc())
 
     def algorithm(self):
         """I'm the intelligent guy taking care of getting the work
@@ -221,7 +222,6 @@ class MasterWorker(object):
                 self.slaves.injectWorks([(worktype, work, None) for work in pendingwork])
                 for task in pendingwork:
                     self.updateWork(task['tm_taskname'], 'QUEUED')
-                    # Need to check if it will fail or not
 
             for action in self.recurringActions:
                 if action.isTimeToGo():

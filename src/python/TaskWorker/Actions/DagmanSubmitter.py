@@ -164,7 +164,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                      'subresource': 'failure',
                      'failure': base64.b64encode(msg)}
         self.server.post(self.resturl, data = urllib.urlencode(configreq))
-        raise
+        raise Exception(msg)
 
     def duplicateCheck(self, task):
         """
