@@ -262,6 +262,7 @@ class HTCondorDataWorkflow(DataWorkflow):
            :return: a workflow status summary document"""
 
         # First, verify the task has been submitted by the backend.
+        self.logger.info("Got status request for workflow %s" % workflow)
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         try:
             #just one row is picked up by the previous query
@@ -275,7 +276,6 @@ class HTCondorDataWorkflow(DataWorkflow):
         if verbose == None:
             verbose = 0
         self.logger.info("Status result for workflow %s: %s (detail level %d)" % (workflow, status, verbose))
-        self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))
         if status not in ['SUBMITTED', 'KILLFAILED', 'KILLED']:
             if isinstance(taskFailure, str):
                 taskFailureMsg = taskFailure
@@ -292,7 +292,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobdefErrors"    : [],
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
-            self.logger.debug("Detailed result: %s\n" % result)
+            self.logger.debug("Detailed result for workflow %s: %s\n" % (workflow, result))
             return result
 
         name = workflow.split("_")[2].split(":")[0]
@@ -306,8 +306,9 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         try:
             results = self.getRootTasks(workflow, schedd)
+            self.logger.info("Web status for workflow %s done" % workflow)
         except Exception, exp:
-            msg = "Failed to contact Schedd: %s" % str(exp)
+            msg = "%s: Failed to contact Schedd: %s" % (workflow, str(exp))
             self.logger.exception(msg)
             return [{"status" : status,
                       "taskFailureMsg" : str(msg),
@@ -331,6 +332,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         #getting publication information
         publication_info, outdatasets = self.publicationStatus(workflow)
+        self.logger.info("Publiation status for workflow %s done" % workflow)
 
 
         taskStatusCode = int(results[-1]['JobStatus'])
