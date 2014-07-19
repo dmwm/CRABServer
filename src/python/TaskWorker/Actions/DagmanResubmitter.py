@@ -88,18 +88,15 @@ class DagmanResubmitter(TaskAction.TaskAction):
 
         results = rpipe.read()
         if results != "OK":
-            raise TaskWorkerException("Failure when killing job: %s" % results)
+            raise TaskWorkerException("Failure when resubmitting job: %s" % results)
 
 
     def execute(self, *args, **kwargs):
-
-        try:
-            return self.execute_internal(*args, **kwargs)
-        finally:
-            configreq = {'workflow': kwargs['task']['tm_taskname'],
-                         'status': "SUBMITTED",
-                         'jobset': "-1",
-                         'subresource': 'success',}
-            self.logger.debug("Setting the task as successfully resubmitted with %s " % str(configreq))
-            data = urllib.urlencode(configreq)
-            self.server.post(self.resturl, data = data)
+        self.execute_internal(*args, **kwargs)
+        configreq = {'workflow': kwargs['task']['tm_taskname'],
+                     'status': "SUBMITTED",
+                     'jobset': "-1",
+                     'subresource': 'success',}
+        self.logger.debug("Setting the task as successfully resubmitted with %s " % str(configreq))
+        data = urllib.urlencode(configreq)
+        self.server.post(self.resturl, data = data)
