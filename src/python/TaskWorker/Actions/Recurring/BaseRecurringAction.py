@@ -2,7 +2,6 @@ import time
 import logging
 from TaskWorker.DataObjects.Result import Result
 
-#need this because of the "PicklingError: Can't pickle <type 'instancemethod'>"
 def handleRecurring(instance, resturl, config, task, action):
     actionClass = action.split('.')[-1]
     mod = __import__(action, fromlist=actionClass)
@@ -10,8 +9,15 @@ def handleRecurring(instance, resturl, config, task, action):
 
 class BaseRecurringAction:
     def __init__(self):
-        self.logger = logging.getLogger()
         self.lastExecution = time.time()
+        #set the logger
+        self.logger = logging.getLogger(__name__)
+        if not self.logger.handlers:
+            hdlr = logging.FileHandler('recurring.log')
+            formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
+            hdlr.setFormatter(formatter)
+            self.logger.addHandler(hdlr)
+        self.logger.setLevel(logging.DEBUG)
 
     def isTimeToGo(self):
         timetogo = time.time() - self.lastExecution > self.pollingTime * 60
@@ -20,6 +26,11 @@ class BaseRecurringAction:
         return timetogo
 
     def execute(self, instance, resturl, config, task):
-        self.logger.info("Executing %s" % task)
-        self._execute(instance, resturl, config, task)
-        return Result(task=task['tm_taskname'], result="OK")
+        try:
+            self.logger.info("Executing %s" % task)
+            self._execute(instance, resturl, config, task)
+            return Result(task=task['tm_taskname'], result="OK")
+        except Exception, ex:
+            self.logger.error("Error while runnig recurring action.")
+            self.logger.exception(ex)
+            return Result(task=task['tm_taskname'], result="KO")

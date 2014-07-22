@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import json
@@ -8,44 +9,48 @@ import traceback
 import classad
 import htcondor
 
-import CRABInterface.HTCondorUtils as HTCondorUtils
+import HTCondorUtils
 from WMCore.Credential.Proxy import Proxy
 from RESTInteractions import HTTPRequests
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
 class RenewRemoteProxies(BaseRecurringAction):
-    pollingTime = 30 #minutes
+    pollingTime = .1 #minutes
 
     def _execute(self, instance, resturl, config, task):
-       renewer = CRAB3ProxyRenewer(config)
-       #renewer.execute()
+        renewer = CRAB3ProxyRenewer(config, instance, resturl.replace("workflowdb","info"), self.logger)
+        renewer.execute()
 
 MINPROXYLENGTH = 60 * 60 * 24
 QUERY_ATTRS = ['x509userproxyexpiration', 'CRAB_ReqName', 'ClusterId', 'ProcId', 'CRAB_UserDN', 'CRAB_UserVO', 'CRAB_UserGroup', 'CRAB_UserRole', 'JobStatus']
 
 class CRAB3ProxyRenewer(object):
 
-    def __init__(self, config):
-        self.logger = logging.getLogger()
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s")
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-        self.logger.setLevel(logging.DEBUG)
+    def __init__(self, config, instance, resturl, logger=None):
+        if not logger:
+            self.logger = logging.getLogger(__name__)
+            handler = logging.StreamHandler(sys.stdout)
+            formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s")
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.DEBUG)
+        else:
+            self.logger = logger
 
-        self.resturl = config.TaskWorker.resturl
+        self.resturl = resturl
+        self.instance = instance
         self.config = config
         self.pool = ''
         self.schedds = []
 
         htcondor.param['TOOL_DEBUG'] = 'D_FULLDEBUG D_SECURITY'
-        if hasattr(htcondor, 'enable_debug'):
+        if 'CRAB3_DEBUG' in os.environ and hasattr(htcondor, 'enable_debug'):
             htcondor.enable_debug()
 
-    def get_backendurls(self, service="/crabserver/dev/info"):
+    def get_backendurls(self):
         self.logger.info("Querying server %s for HTCondor schedds and pool names." % self.resturl)
-        server = HTTPRequests(self.resturl, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey)
-        result = server.get('/crabserver/dev/info', data={'subresource':'backendurls'})[0]['result'][0]
+        server = HTTPRequests(self.instance, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey)
+        result = server.get(self.resturl, data={'subresource':'backendurls'})[0]['result'][0]
         self.pool = str(result['htcondorPool'])
         self.schedds = [str(i) for i in result['htcondorSchedds']]
         self.logger.info("Resulting pool %s; schedds %s" % (self.pool, ",".join(self.schedds)))
