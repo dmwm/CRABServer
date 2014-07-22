@@ -1,0 +1,25 @@
+<div class="panel panel-default">
+    <!-- Default panel contents -->
+    <div><h4 class = "special-header">{{data.selectedUser.username + "\'s log file(s)"}}</h4>
+        <ul class="pager back-btn">
+            <li class="previous"><a href="#/task-view/{{data.index}}">&larr; Back to summary</a></li>
+        </ul>
+    </div>
+
+    <!-- Table -->
+    <table class="table table-bordered table-striped panel-heading">
+
+        <thead>
+            <tr>
+                <td class = "col-lg-4">Log file</td><td>Date Accessed</td><td>Date Changed</td><td>Exist?</td><td>Size (kB)</td><td>Last time modified</td>
+            </tr>
+        </thead>
+        <tbody>
+            <tr ng-repeat = "file in data.selectedUser.logs">
+                <td class = "truncate" ><a href="" title = {{file.hashkey}}>{{file.hashkey}}</a></td><td>{{file.accessed| date}}</td><td>{{file.changed}}</td><td>{{file.exists}}</td><td>{{file.size}}</td><td>{{file.modified| date}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+</div>
+

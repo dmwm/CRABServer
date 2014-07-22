@@ -1,6 +1,7 @@
 import time
 import logging
 import cherrypy
+from datetime import datetime
 
 from CRABInterface.Utils import getDBinstance
 # WMCore dependecies here
@@ -63,7 +64,8 @@ class DataWorkflow(object):
         #                                          "endkey": user,
         #                                          "limit": limit, })
         #raise NotImplementedError
-        return [{}]
+        mydate = datetime.fromordinal(timestamp).strftime('%d-%b-%Y')
+        return self.api.query(None, None, self.Task.GetTasksFromUser_sql, username=user, timestamp=mydate)
 
     def errors(self, workflow, shortformat):
         """Retrieves the sets of errors for a specific workflow
@@ -162,7 +164,6 @@ class DataWorkflow(object):
         except IOError, err:
             self.logger.debug("Failed to communicate with components %s. Request name : " % (str(err), str(requestname)))
             raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")
-
         splitArgName = self.splitArgMap[splitalgo]
         username = cherrypy.request.user['login']
         dbSerializer = str

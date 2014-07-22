@@ -1,0 +1,29 @@
+<div>
+    <div> <h4 class = "special-header">{{data.selectedUser.username + "\'s task summary"}} </h4></div>
+    <div class="panel-body">
+        <ul class="list-group">
+            <li class="list-group-item">
+                <span class="h4 badge">total number of Sand boxes: {{data.selectedUser.numOfSanboxes}}</span>
+                <a href="#/sandbox-view" ng-click = "getFilesDetails()"><h4>Sand boxes</h4></a>
+            </li>
+            <li class="list-group-item">
+                <span class="h4 badge">total number of log files: {{data.selectedUser.numOfLogs}}</span>
+                <a href="#/log-view"><h4>Log files</h4></a>
+            </li>
+            <li class="list-group-item">                
+            <h4 >Used space: {{data.selectedUser.storage.usedSpace + " KB"}} ===>>
+                <strong>Percentage: {{data.selectedUser.storage.percentUsed + "%"}}
+            </strong></h4>
+                <div class="panel panel-default jumbotron">                    
+                    <div class="progress">
+                        <div ng-class="{'progress-bar progress-bar-success progress-bar-striped': {{data.selectedUser.storage.isGreen}},'progress-bar progress-bar-danger progress-bar-striped': data.selectedUser.storage.isRed}" role ="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100" style="width: {{data.selectedUser.storage.percentUsed}}%; min-width: 20px;">
+                            <span class="sr-only">{{data.selectedUser.storage.percentUsed}}% Used</span>
+                        </div>
+                    </div>
+                </div> 
+            </li>
+        </ul>
+    </div>
+</div>
+
+

@@ -10,7 +10,14 @@ class Task(object):
              tm_task_failure, tm_split_args, panda_resubmitted_jobs, tm_save_logs, tm_username, \
              tm_user_dn, tm_arguments, tm_input_dataset, tm_dbs_url FROM tasks WHERE tm_taskname=:taskname"
    
-    #New
+    IDAll_sql = "SELECT tm_taskname, tm_task_status, tm_user_role, tm_user_group, \
+             tm_save_logs, tm_username, \
+             tm_user_dn FROM tasks WHERE tm_taskname = :taskname"
+
+    #INSERTED BY ERIC SUMMER STUDENT
+    ALLUSER_sql = "SELECT DISTINCT(tm_username) FROM tasks"
+	
+	#New
     New_sql = "INSERT INTO tasks ( \
               tm_taskname,panda_jobset_id, tm_task_status, tm_start_time, tm_task_failure, tm_job_sw, \
               tm_job_arch, tm_input_dataset, tm_site_whitelist, tm_site_blacklist, \
@@ -68,8 +75,10 @@ class Task(object):
    
     #GetUserFromID
     GetUserFromID_sql ="SELECT tm_username FROM tasks WHERE tm_taskname=:taskname"
-   
-   
+
+    #GetTasksFromUser
+    GetTasksFromUser_sql ="SELECT tm_taskname,tm_task_status, tw_name,tm_user_dn tm_spliti_args FROM tasks WHERE tm_username=:username AND tm_start_time<TO_TIMESTAMP(:timestamp, 'DD-Mon-RR')"
+
     #SetArgumentsTask
     SetArgumentsTask_sql = "UPDATE tasks SET tm_arguments = :arguments WHERE tm_taskname = :taskname"
    

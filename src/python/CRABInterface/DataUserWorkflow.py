@@ -37,7 +37,7 @@ class DataUserWorkflow(object):
         # in practice it's convenient that the timestamp is on a fixed format: latest 1 or 3 days, latest 1 week, latest 1 month
         # and that it's a list (probably it can be converted into it): [year, month-num, day, hh, mm, ss]
         # this will allow to query as it's described here: http://guide.couchdb.org/draft/views.html#many
-        raise NotImplementedError
+        return self.workflow.getLatests(user, limit, timestamp)
 
     def errors(self, workflow, shortformat):
         """Retrieves the sets of errors for a specific workflow

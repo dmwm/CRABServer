@@ -5,8 +5,8 @@ from WMCore.REST.Error import RESTError, InvalidParameter, MissingObject, Execut
 from WMCore.REST.Format import RawFormat
 
 # CRABServer dependecies here
-from UserFileCache.RESTExtensions import ChecksumFailed, validate_file, validate_tarfile, authz_login_valid, quota_user_free, get_size, list_files, list_users
 from UserFileCache.__init__ import __version__
+from UserFileCache.RESTExtensions import ChecksumFailed, validate_file, validate_tarfile, authz_login_valid, quota_user_free, get_size, list_files, list_users
 
 # external dependecies here
 import cherrypy
@@ -20,7 +20,7 @@ import shutil
 # here go the all regex to be used for validation
 RX_HASH = re.compile(r'^[a-f0-9]{64}$')
 RX_LOGFILENAME = re.compile(r"^[\w\-.: ]+$")
-RX_SUBRES = re.compile(r"^fileinfo|userinfo|powerusers|basicquota|fileremove|listusers$")
+RX_SUBRES = re.compile(r"^fileinfo|userinfo|powerusers|basicquota|fileremove|listusers|usedspace$")
 RX_USERNAME = re.compile(r"^\w+$") #TODO use WMCore regex
 
 def touch(filename):
@@ -152,6 +152,7 @@ class RESTInfo(RESTEntity):
             validate_str('subresource', param, safe, RX_SUBRES, optional=True)
             validate_str("hashkey", param, safe, RX_HASH, optional=True)
             validate_str("username", param, safe, RX_USERNAME, optional=True)
+            validate_num("verbose", param, safe, optional=True)
 
     @restcall
     def get(self, subresource, **kwargs):
@@ -162,7 +163,6 @@ class RESTInfo(RESTEntity):
             return getattr(RESTInfo, subresource)(self, **kwargs)
         else:
             return [{"crabcache":"Welcome","version":__version__}]
-
     @restcall
     def fileinfo(self, **kwargs):
         """Retrieve the file summary information.
@@ -176,7 +176,7 @@ class RESTInfo(RESTEntity):
         hashkey = kwargs['hashkey']
         result = {}
         filename = None
-        infilepath = filepath(self.cachedir)
+        infilepath = filepath(self.cachedir, kwargs['username'])
 
         # defining the path/name from the hash of the file
         filename = os.path.join(infilepath, hashkey[0:2], hashkey)
@@ -192,6 +192,7 @@ class RESTInfo(RESTEntity):
         touch(filename)
 
         return [result]
+
 
     @restcall
     def fileremove(self, **kwargs):
@@ -226,10 +227,25 @@ class RESTInfo(RESTEntity):
         username = kwargs['username']
         userpath = filepath(self.cachedir, username)
 
-        res = {"file_list" : list(list_files(userpath)),
-               "used_space" : [get_size(userpath)]}
+        res = {}
+        files = list_files(userpath)
+        if kwargs['verbose']:
+            files_dict = {}
+            for file_ in files:
+                files_dict[file_] = self.fileinfo(hashkey=file_,username=username)
+
+        res["file_list"] = files_dict if kwargs['verbose'] else list(files)
+        res["used_space"] = [get_size(userpath)]
 
         yield res
+
+    #inserted by eric obeng summer student
+    @restcall
+    def usedspace(self, **kwargs):
+        """Retrieves only the used space of the user"""
+        username = kwargs["username"]
+        userpath = filepath(self.cachedir, username)
+        yield get_size(userpath)
 
     @restcall
     def listusers(self, **kwargs):

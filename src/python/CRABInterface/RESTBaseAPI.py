@@ -11,6 +11,7 @@ from WMCore.REST.Error import ExecutionError
 # CRABServer dependecies here
 import Utils
 from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
+from CRABInterface.RESTTask import RESTTask
 from CRABInterface.RESTCampaign import RESTCampaign
 from CRABInterface.RESTServerInfo import RESTServerInfo
 from CRABInterface.RESTFileMetadata import RESTFileMetadata
@@ -55,6 +56,7 @@ class RESTBaseAPI(DatabaseRESTApi):
                     'info': RESTServerInfo(app, self, config, mount, serverdn, extconfig),
                     'filemetadata': RESTFileMetadata(app, self, config, mount),
                     'workflowdb': RESTWorkerWorkflow(app, self, config, mount),
+                    'task': RESTTask(app, self, config, mount),
                    } )
 
         self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None) )
