@@ -45,5 +45,6 @@ def authz_owner_match(dbapi, workflows, Task):
     raise cherrypy.HTTPError(403, "You are not allowed to access this resource.")
 
 def authz_login_valid():
+    print cherrypy.request.user['roles']
     if not cherrypy.request.user['login']:
-        raise cherrypy.HTTPError(403, "You are not allowed to access this resource.")
+        raise cherrypy.HTTPError(403, "You are not allowed to access this resource. Please check: https://twiki.cern.ch/twiki/bin/viewauth/CMS/SiteDBForCRAB")
