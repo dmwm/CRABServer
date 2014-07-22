@@ -8,6 +8,7 @@ from distutils.command.build import build
 from distutils.command.install import install
 from distutils.spawn import spawn
 from glob import glob
+import os
 
 
 systems = \
@@ -26,7 +27,7 @@ systems = \
                  'Databases/FileMetaDataDB/Oracle/FileMetaData',
                  'Databases/TaskDB', 'Databases/TaskDB/Oracle',
                  'Databases/TaskDB/Oracle/JobGroup',
-                 'Databases/TaskDB/Oracle/Task'] },
+                 'Databases/TaskDB/Oracle/Task'],},
   'TaskWorker':
   {
     'py_modules' : ['PandaServerInterface', 'RESTInteractions', 'ApmonIf',
@@ -245,6 +246,13 @@ class TestCommand(Command):
         sys.exit(CRABQuality.runTests(mode=mode,
                                       integrationHost=self.integrationHost))
 
+def getWebDir():
+    res = []
+    for dir in ['css','html','script']:
+        for root,dirs,files in os.walk('src/'+dir):
+            res.append((root[4:], [os.path.join(root,x) for x in files]))#4: for removing src
+    return res
+
 setup(name = 'crabserver',
       version = '3.2.0',
       maintainer_email = 'hn-cms-crabdevelopment@cern.ch',
@@ -257,6 +265,5 @@ setup(name = 'crabserver',
       data_files = ['scripts/%s' % x for x in \
                         ['CMSRunAnalysis.sh', 'cmscp.py',
                         'gWMS-CMSRunAnalysis.sh', 'dag_bootstrap_startup.sh',
-                        'dag_bootstrap.sh', 'AdjustSites.py'] ],
-      scripts = ['scripts/renew_remote_proxies.py'],
+                        'dag_bootstrap.sh', 'AdjustSites.py']] + getWebDir(),
 )
