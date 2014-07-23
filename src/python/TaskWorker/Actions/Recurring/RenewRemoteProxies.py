@@ -15,7 +15,7 @@ from RESTInteractions import HTTPRequests
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
 class RenewRemoteProxies(BaseRecurringAction):
-    pollingTime = .1 #minutes
+    pollingTime = 360 #minutes
 
     def _execute(self, instance, resturl, config, task):
         renewer = CRAB3ProxyRenewer(config, instance, resturl.replace("workflowdb","info"), self.logger)
