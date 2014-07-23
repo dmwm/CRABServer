@@ -302,9 +302,9 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.debug("Will talk to %s." % locator.getCollector())
         name = locator.getSchedd()
         self.logger.debug("Schedd name %s." % name)
-        schedd, address = locator.getScheddObj(workflow)
 
         try:
+            schedd, address = locator.getScheddObj(workflow)
             results = self.getRootTasks(workflow, schedd)
             self.logger.info("Web status for workflow %s done" % workflow)
         except Exception, exp:
