@@ -21,7 +21,7 @@ systems = \
   'CRABInterface':
   {
     'py_modules' : ['PandaServerInterface','CRABQuality', 'HTCondorUtils', 'HTCondorLocator'],
-    'python': ['CRABInterface',
+    'python': ['CRABInterface','CRABInterface/Pages',
                'Databases',
                  'Databases/FileMetaDataDB', 'Databases/FileMetaDataDB/Oracle',
                  'Databases/FileMetaDataDB/Oracle/FileMetaData',
