@@ -176,9 +176,9 @@ class DataWorkflow(object):
         arguments = { \
             'oneEventMode' : 'T' if oneEventMode else 'F',
             'lfn' : '/store/user/%s/%s' % (username, lfnprefix) if lfnprefix else lfn,
-            'saveoutput' : 'F' if saveoutput else 'T',
+            'saveoutput' : 'T' if saveoutput else 'F',
             'faillimit' : faillimit,
-            'ignorelocality' : 'F' if ignorelocality else 'T',
+            'ignorelocality' : 'T' if ignorelocality else 'F',
             'ASOURL' : self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", ""),
             'userfiles' : userfiles,
         }
