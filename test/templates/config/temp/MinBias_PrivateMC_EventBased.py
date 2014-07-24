@@ -1,0 +1,30 @@
+from WMCore.Configuration import Configuration
+config = Configuration()
+
+#General Section
+config.section_("General")
+config.General.requestName = 'CHANGE'
+config.General.instance = 'preprod'
+config.General.workArea = 'CHANGE'
+config.General.transferOutput = True
+config.General.saveLogs = True
+config.General.instance = 'preprod'
+
+#Job Type Section
+config.section_("JobType")
+config.JobType.pluginName = 'PrivateMC'
+config.JobType.psetName = 'psets/pset_tutorial_MC_generation.py'
+
+#Data Section
+config.section_("Data")
+config.Data.primaryDataset = 'MinBias'
+config.Data.splitting = 'EventBased'
+config.Data.unitsPerJob = 100 
+config.Data.totalUnits = 1000
+config.Data.publication = True
+config.Data.publishDbsUrl = 'phys03'
+config.Data.publishDataName = 'CHANGE'
+
+#Site Section
+config.section_("Site")
+config.Site.storageSite = 'CHANGE'
