@@ -784,14 +784,12 @@ class HTCondorDataWorkflow(DataWorkflow):
                 info['State'] = 'finished'
             elif status == 6: # STATUS_ERROR
                 info = nodes.setdefault(nodeid, {})
-                m = self.post_failure_re.search(msg)
-                if m:
-                    if m.groups()[0] == '2':
-                        info['State'] = 'failed'
-                    else:
-                        info['State'] = 'cooloff'
-                else:
-                    info['State'] = 'failed'
+                # Older versions of HTCondor would put jobs into STATUS_ERROR
+                # for a short time if the job was to be retried.  Hence, we had
+                # some status parsing logic to try and guess whether the job would
+                # be tried again in the near future.  This behavior is no longer
+                # observed; STATUS_ERROR is terminal.
+                info['State'] = 'failed'
 
 
     job_name_re = re.compile(r"Job(\d+)")
