@@ -397,8 +397,9 @@ class ASOServerJob(object):
                 return False
             logger.info("Stageout job description: %s" % pprint.pformat(doc))
             allIDs.append(doc_id)
-            if needs_commit and 'error' in self.couchDatabase.commitOne(doc)[0]:
-                logger.info("Couldn't add to ASO database")
+            res = self.couchDatabase.commitOne(doc)[0]
+            if needs_commit and 'error' in res:
+                logger.info("Couldn't add to ASO database %s" % res)
                 return False
         return allIDs
 
