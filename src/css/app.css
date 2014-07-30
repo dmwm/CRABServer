@@ -223,6 +223,39 @@ body {
     font-weight: 100; 
 }
 
+.special-header2{
+   font-family: times, Times New Roman, times-roman, georgia, serif;
+    font-size: 22px;
+    line-height: 35px;
+    letter-spacing: 0.5px;
+    color: #008b8b;
+    padding: 0 0 0 5px;
+    display: inline;
+    font-weight: 100; 
+}
+
+.special-header3{
+    font-family: "Times New Roman",georgia, serif;
+    font-size: 18px;
+    color: #008b8b;
+    padding: 0 0 0 0;
+    display: inline;
+    font-weight: 100; 
+}
+table thead tr td{
+   font-family: times, Times New Roman, times-roman, georgia, serif;
+    font-size: 22px;
+    line-height: 35px;
+    letter-spacing: 1px;
+    color: #008b8b;
+    text-align: center;
+    font-weight: 100; 
+}
+
+table tbody tr td{
+    color: #000;
+    text-align: center;
+}
 .back-btn{
     display: inline;
     float: right;

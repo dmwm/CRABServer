@@ -1,32 +1,54 @@
 angular.module("CRABMonitor").
-	controller("CacheCtrl", ["$scope", "CacheData", "CacheFuncs",function($scope,CacheData,CacheFuncs){
+	controller("CacheCtrl", ["$scope", "CacheData", "CacheFuncs","$location",function($scope,CacheData,CacheFuncs,$location){
 		//bind the data services to the scope
-		$scope.data = CacheData;
-		$scope.funcs = CacheFuncs;
+		$scope.cacheData = CacheData;
+		$scope.cacheFuncs = CacheFuncs;
 		//loadUsers: request users if none or nothing
-		$scope.loadUsers = function(){
-			if($scope.data.users.length === 0){
-				$scope.funcs.getAllUsers();
-				$scope.funcs.getPowerUsers();
-				$scope.funcs.getQuota();
+		$scope.loadCacheUsers = function(event, name){
+			if(event.keyCode === 13 && $scope.cacheData.users.length > 0){
+				$scope.cacheFuncs.selectUser(name);
+				$location.path("/task-view/");
+			}
+			else{
+			
+			 if($scope.cacheData.users.length === 0){
+					$scope.cacheFuncs.getAllUsers();
+					$scope.cacheFuncs.getPowerUsers();
+					$scope.cacheFuncs.getQuota();
+				}
 			}
 		};
-
-		//load the user summary when btn clicked: needs new API to be implemented
-		$scope.listAllUsersSummary = function(){
-			//API not implemented
-		};
+		
+		//LIST A SUMMARY OF ALL USERS INFO
+        $scope.userList = function(){
+            if($scope.cacheData.users.length === 0){ 
+                $scope.cacheFuncs.getAllUsers();
+                $scope.cacheFuncs.getQuota();
+            }
+            $scope.cacheFuncs.getSummary();
+            $location.path("/userlist-view");
+            console.log($scope.cacheData);
+        };
 
 		//select a user
-		$scope.selectUser = function(index){
-			if($scope.data.selectedUser.sandBox.length > 0){
-				$scope.funcs.resetUser();
+		$scope.selectUser = function(name, index){
+			if($scope.cacheData.selectedUser.sandBox.length > 0){
+				$scope.cacheFuncs.resetUser();
 			}
-			$scope.data.index = index;
-			$scope.funcs.selectUser($scope.data.users[index]);
-		};
-		$scope.logLink = function(name){
-				return $scope.funcs.logFileLink(name);
+			$scope.selectedRow = index;
+			//$scope.cacheData.index = index;
+			$scope.cacheFuncs.selectUser(name);
 		};
 
+		$scope.logLink = function(name){
+				return $scope.cacheFuncs.logFileLink(name);
+		};
+		
+		//select user with name
+		$scope.selectUserWithName = function(name){
+			if($scope.cacheData.selectedUser.sandBox.length > 0){
+				$scope.cacheFuncs.resetUser();
+			}	
+			$scope.cacheFuncs.selectUser(name);
+		};
 }]);

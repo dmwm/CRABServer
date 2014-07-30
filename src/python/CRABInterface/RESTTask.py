@@ -5,7 +5,7 @@ from WMCore.REST.Error import InvalidParameter
 
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_SUBRES_TASK, RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_OUT_DATASET
+from CRABInterface.Regexps import RX_SUBRES_TASK, RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_OUT_DATASET
 
 # external dependecies here
 import cherrypy
@@ -29,6 +29,8 @@ class RESTTask(RESTEntity):
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
         elif method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
+            validate_str('taskstatus', param, safe, RX_STATUS, optional=True)
+            validate_str('username', param, safe, RX_USERNAME, optional=True)
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
 
     @restcall
@@ -47,11 +49,22 @@ class RESTTask(RESTEntity):
         return rows
 
 	#INSERTED BY ERIC SUMMER STUDENT
-	def summary(self, **kwargs):
-		""" Retrieves the data for list all users"""
-		rows = self.api.query(None, None, self.Task.ALLUSERSUMMARY_sql)
-		return rows
+    def summary(self, **kwargs):
+        """ Retrieves the data for list all users"""
+        rows = self.api.query(None, None, self.Task.TASKSUMMARY_sql)
+        return rows
 
+    #Quick search api
+    def search(self, **kwargs):
+        """Retrieves specific data from task db"""
+        rows = self.api.query(None, None, self.Task.QuickSearch_sql, taskname=kwargs["workflow"])
+        return rows
+
+    #Get all jobs with a specified status
+    def taskbystatus(self, **kwargs):
+        """Retrieves all jobs of the specified user with the specified status"""
+        rows = self.api.query(None, None, self.Task.TaskByStatus_sql, username_=kwargs["username"], taskstatus=kwargs["taskstatus"])
+        return rows
 
     @restcall
     def post(self, workflow):

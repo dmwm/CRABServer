@@ -48,16 +48,16 @@
         <section id  = "main-pane" class = "container-fluid" >
             <aside id = "aside-left" class = "container-fluid">
                 <!--QUICK SEARCH PANEL -->
-                <div class="panel panel-default">
+                <div class="panel panel-default" ng-controller = "SearchCtrl">
                     <div class = "panel-heading">Quick Search</div>
                     <div class = "panel-body">
                         <div class = "row" style="margin-bottom: 10px;">
                             <div class = "col-lg-12">
                                 <span class= "span">Search task by task name:</span>
                                 <div class = "input-group">
-                                    <input type="text" class="form-control">
+                                    <input type="text" class="form-control" autofocus ng-model = "taskname" ng-keyup = "taskSearch(taskname, $event)">
                                     <span class = "input-group-btn">
-                                        <button class="btn btn-default" type="button">Go!</button>
+                                        <button class="btn btn-default" type="button" ng-click = "taskSearch(taskname)">Go!</button>
                                     </span>
                                 </div>
                             </div>
@@ -70,17 +70,17 @@
                 <div class = "panel-body">
                     <!--TO DO GOES HERE -->
                     <ul class = "nav nav-bar">
-                        <li><a href = "http://vocms31.cern.ch:5984/asynctransfer/_design/monitor/index.html">ASO (Production)</a></li>
-                        <li><a href = "http://vocms33.cern.ch:5984/asynctransfer/_design/monitor/index.html">ASO (Pre-production)</a></li>
-                        <li><a href = "http://dashb-cms-jobsmry.cern.ch/dashboard/request.py/dailysummary#button=jobstatus&sites[]=All+T3210&activities[]=analysistest&sitesSort=7&start=null&end=null&timerange=last48&granularity=Hourly&generic=0&sortby=0&series=All">Dashboard Analysis last 48 hours</a></li>
-                        <li><a href = "https://lemonweb.cern.ch/lemon-web/info.php?time=0.2&offset=0&entity=vocms133&detailed=yes">TestBed CouchDB</a></li>
-                        <li><a href = "https://lemonweb.cern.ch/lemon-web/info.php?time=0.2&offset=0&entity=vocms140&detailed=yes">CMWweb CouchDB</a></li>
-                        <li><a href = "https://lemonweb.cern.ch/lemon-web/info.php?time=3&offset=0&entity=vocms20&detailed=yes">vocms20 (schedd: vocms20)</a></li>
-                        <li><a href = "https://lemonweb.cern.ch/lemon-web/info.php?entity=p01001456119982&type=host&detailed=yes">vocms95 (schedd: crab3test-2)</a></li>
-                        <li><a href = "https://lemonweb.cern.ch/lemon-web/info.php?entity=p01001456783585&type=host&detailed=yes">vocms95 (schedd: crab3test-2)</a></li>
-                        <li><a href = "https://lemonweb.cern.ch/lemon-web/info.php?entity=p01001456783585&type=host&detailed=yes">vocms96 (schedd: crab3test-3)</a></li>
-                        <li><a href = "https://sentry.t2.ucsd.edu/cacti/graph_view.php?action=tree&tree_id=15&leaf_id=172">submit5 (schedd: crab3test-1 )</a></li>
-                        <li><a href = "http://submit-3.t2.ucsd.edu/CSstoragePath/UserPrio/UserPrio-dev.html">User Prio-dev</a></li>
+                        <li><a target = "_blank" href = "http://vocms31.cern.ch:5984/asynctransfer/_design/monitor/index.html">ASO (Production)</a></li>
+                        <li><a target = "_blank" href = "http://vocms33.cern.ch:5984/asynctransfer/_design/monitor/index.html">ASO (Pre-production)</a></li>
+                        <li><a target = "_blank"  href = "http://dashb-cms-jobsmry.cern.ch/dashboard/request.py/dailysummary#button=jobstatus&sites[]=All+T3210&activities[]=analysistest&sitesSort=7&start=null&end=null&timerange=last48&granularity=Hourly&generic=0&sortby=0&series=All">Dashboard Analysis last 48 hours</a></li>
+                        <li><a target = "_blank" href = "https://lemonweb.cern.ch/lemon-web/info.php?time=0.2&offset=0&entity=vocms133&detailed=yes">TestBed CouchDB</a></li>
+                        <li><a target = "_blank" href = "https://lemonweb.cern.ch/lemon-web/info.php?time=0.2&offset=0&entity=vocms140&detailed=yes">CMWweb CouchDB</a></li>
+                        <li><a target = "_blank" href = "https://lemonweb.cern.ch/lemon-web/info.php?time=3&offset=0&entity=vocms20&detailed=yes">vocms20 (schedd: vocms20)</a></li>
+                        <li><a target = "_blank" href = "https://lemonweb.cern.ch/lemon-web/info.php?entity=p01001456119982&type=host&detailed=yes">vocms95 (schedd: crab3test-2)</a></li>
+                        <li><a target = "_blank" href = "https://lemonweb.cern.ch/lemon-web/info.php?entity=p01001456783585&type=host&detailed=yes">vocms95 (schedd: crab3test-2)</a></li>
+                        <li><a target = "_blank" href = "https://lemonweb.cern.ch/lemon-web/info.php?entity=p01001456783585&type=host&detailed=yes">vocms96 (schedd: crab3test-3)</a></li>
+                        <li><a target = "_blank" href = "https://sentry.t2.ucsd.edu/cacti/graph_view.php?action=tree&tree_id=15&leaf_id=172">submit5 (schedd: crab3test-1 )</a></li>
+                        <li><a target = "_blank" href = "http://submit-3.t2.ucsd.edu/CSstoragePath/UserPrio/UserPrio-dev.html">User Prio-dev</a></li>
                     </ul>
                 </div>
             </div>
@@ -97,12 +97,15 @@
                     <button class="btn btn-default col-lg-12" ng-click = "userList()">List all users</button>
                 </span>
                 <div style="margin-top: 20px;">
-                    <span><input class="form-control col-lg-12" placeholder="filter" ng-model = svrSearch ng-keyup = "loadUsers()"></span>
+                    <span><input class="form-control col-lg-12" placeholder="filter" list = "users" ng-model = srvSearch ng-keyup = "loadUsers(srvSearch, $event)"></span>
+                    <datalist id = "users">
+                        <option ng-repeat = "user in serverData.users | filter:srvSearch">{{user}}</option>
+                    </datalist>
                 </div>
                 <div class = "user-list">
                     <ul class = "nav nav-sidebar">
-                        <li ng-repeat = "user in data.users| filter: svrSearch"  ng-class='{active: $index === selectedRow}'>
-                            <a href="#">{{user}}</a></li>
+                        <li ng-repeat = "user in serverData.users| filter: svrSearch"  ng-class='{active: $index === selectedRow}'>
+                            <a href="#/user-workflow-view" ng-click = "selectUser(user, $index)">{{user}}</a></li>
                     </ul>
                 </div>
             </div>
@@ -111,13 +114,20 @@
                 <div class="panel panel-default" ng-controller = "CacheCtrl">
                     <div class = "panel-heading">CRAB Cache</div>
                     <div class = "panel-body">
+                    <span class="input-group-btn">
+                        <button class="btn btn-default col-lg-12" ng-click = "userList()">List all users</button>
+                     </span>
+
                         <div style="margin-top: 20px;">
-                            <span><input class="form-control col-lg-12" placeholder="filter" ng-keyup = "loadUsers()" ng-model = "search"></span>
+                            <span><input class="form-control col-lg-12" type = "text" list = "cacheUsers" placeholder="filter" ng-keyup = "loadCacheUsers($event,search)" ng-model = "search"></span>
+                            <datalist id="cacheUsers">
+                                <option ng-repeat = "cacheUser in cacheData.users | filter: search" >{{cacheUser}}</option>
+                            </datalist> 
                         </div>
                         <div class = "user-list">
                             <ul class = "nav nav-sidebar">
-                                <li ng-repeat = "user in data.users| filter: search" ng-click = "selectUser($index)" ng-class='{active: $index === selectedRow}'>
-                                <a href="#/task-view/{{$index}}">{{user}}</a></li>
+                                <li ng-repeat = "cacheUser in cacheData.users| filter: search" ng-click = "selectUser(cacheUser, $index)" ng-class='{active: $index === selectedRow}'>
+                                <a href="#/task-view">{{cacheUser}}</a></li>
                             </ul>
                         </div>
                     </div>
@@ -140,6 +150,9 @@
         <script src="/crabserver/ui/static?script/serverJS/serverUrls.js"></script>
         <script src="/crabserver/ui/static?script/serverJS/serverFuncs.js"></script>
         <script src="/crabserver/ui/static?script/serverJS/serverCtrl.js"></script>
+        <script src="/crabserver/ui/static?script/searchJS/searchData.js"></script>
+        <script src="/crabserver/ui/static?script/searchJS/searchFuncs.js"></script>
+        <script src="/crabserver/ui/static?script/searchJS/searchCtrl.js"></script>
         <script src="/crabserver/ui/static?script/cacheJS/config.js"></script>
     </body>
 </html>

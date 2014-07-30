@@ -16,8 +16,14 @@ class Task(object):
 
     #INSERTED BY ERIC SUMMER STUDENT
     ALLUSER_sql = "SELECT DISTINCT(tm_username) FROM tasks"
-	
-	#New
+    TASKSUMMARY_sql = "select tm_username, tm_task_status, count(*) from tasks group by tm_username, tm_task_status order by tm_username"
+    #get taskname byt user and status
+    GetByUserAndStatus_sql = "select tm_taskname from tasks where tm_username=:username and tm_task_status=:status"
+    #quick search
+    QuickSearch_sql = "SELECT tm_task_status,tm_totalunits,tm_user_sandbox,tm_cache_url,tm_username,tm_publish_name,tm_outfiles,tm_job_type, tm_save_logs, tm_user_infiles FROM tasks WHERE tm_taskname = :taskname"
+    #get all jobs with a specified status
+    TaskByStatus_sql = "SELECT tm_task_status,tm_taskname FROM tasks WHERE tm_task_status = :taskstatus AND tm_username=:username_"
+    #New
     New_sql = "INSERT INTO tasks ( \
               tm_taskname,panda_jobset_id, tm_task_status, tm_start_time, tm_task_failure, tm_job_sw, \
               tm_job_arch, tm_input_dataset, tm_site_whitelist, tm_site_blacklist, \
@@ -77,7 +83,7 @@ class Task(object):
     GetUserFromID_sql ="SELECT tm_username FROM tasks WHERE tm_taskname=:taskname"
 
     #GetTasksFromUser
-    GetTasksFromUser_sql ="SELECT tm_taskname,tm_task_status, tw_name,tm_user_dn tm_spliti_args FROM tasks WHERE tm_username=:username AND tm_start_time<TO_TIMESTAMP(:timestamp, 'DD-Mon-RR')"
+    GetTasksFromUser_sql ="SELECT tm_taskname,tm_task_status, tw_name,tm_user_dn tm_spliti_args FROM tasks WHERE tm_username=:username AND tm_start_time>TO_TIMESTAMP(:timestamp, 'YYYY-MM-DD')"
 
     #SetArgumentsTask
     SetArgumentsTask_sql = "UPDATE tasks SET tm_arguments = :arguments WHERE tm_taskname = :taskname"
