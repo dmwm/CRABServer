@@ -16,7 +16,7 @@ class DataDiscovery(TaskAction):
        possibilities. Implementing only a common method to
        return a properly formatted output."""
 
-    def formatOutput(self, task, requestname, datasetfiles, locations):
+    def formatOutput(self, task, requestname, datasetfiles, locations, splitting = '', total_units = 0):
         """Receives as input the result of the data location
            discovery operations and fill up the WMCore objects."""
         self.logger.debug(" Formatting data discovery output ")
@@ -26,8 +26,9 @@ class DataDiscovery(TaskAction):
                           "cert":self.config.TaskWorker.cmscert})
 
         wmfiles = []
-        evecounter = 0
-        lumicounter = 0
+        event_counter = 0
+        lumi_counter = 0
+        file_counter = 0
         uniquelumis = set()
         for lfn, infos in datasetfiles.iteritems():
             #the block has not been found or has no locations, continue to the next file
@@ -44,7 +45,7 @@ class DataDiscovery(TaskAction):
             wmfile['block'] = infos['BlockName']
             wmfile['locations'] = []
             for se in locations[infos['BlockName']]:
-                if se  and se not in secmsmap:
+                if se and se not in secmsmap:
                     self.logger.debug("Translating SE %s" %se)
                     try:
                         secmsmap[se] = sbj.seToCMSName(se)
@@ -62,19 +63,29 @@ class DataDiscovery(TaskAction):
                     else:
                         wmfile['locations'].append(secmsmap[se])
             wmfile['workflow'] = requestname
-            evecounter += infos['NumberOfEvents']
+            event_counter += infos['NumberOfEvents']
             for run, lumis in infos['Lumis'].iteritems():
                 #self.logger.debug(' - adding run %d and lumis %s' %(run, lumis))
+                if total_units > 0 and splitting == 'LumiBased':
+                    if lumi_counter + len(lumis) > total_units:
+                        num_lumis_to_add = total_units - lumi_counter
+                        lumis = lumis[:num_lumis_to_add]
                 wmfile.addRun(Run(run, *lumis))
                 for lumi in lumis:
                     uniquelumis.add((run, lumi))
-                lumicounter += len(lumis)
+                lumi_counter += len(lumis)
             wmfiles.append(wmfile)
+            file_counter += 1
+            if total_units > 0:
+                if splitting == 'FileBased' and file_counter >= total_units:
+                    break
+                if splitting == 'LumiBased' and lumi_counter >= total_units:
+                    break
 
         uniquelumis = len(uniquelumis)
-        self.logger.debug('Tot events found: %d' % evecounter)
+        self.logger.debug('Tot events found: %d' % event_counter)
         self.logger.debug('Tot lumis found: %d' % uniquelumis)
-        self.logger.debug('Duplicate lumis found: %d' % (lumicounter-uniquelumis))
+        self.logger.debug('Duplicate lumis found: %d' % (lumi_counter - uniquelumis))
         self.logger.debug('Tot files found: %d' % len(wmfiles))
 
         return Result(task=task, result=Fileset(name='FilesToSplit', files = set(wmfiles)))

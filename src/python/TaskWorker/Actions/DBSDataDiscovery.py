@@ -62,7 +62,8 @@ class DBSDataDiscovery(DataDiscovery):
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
         filedetails = dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], True)
-        result = self.formatOutput(task=kwargs['task'], requestname=kwargs['task']['tm_taskname'], datasetfiles=filedetails, locations=locationsMap)
+        result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'], datasetfiles = filedetails, locations = locationsMap, \
+                                   splitting = kwargs['task']['tm_split_algo'], total_units = kwargs['task']['tm_totalunits'])
         self.logger.debug("Got result: %s" % result.result)
         return result
 

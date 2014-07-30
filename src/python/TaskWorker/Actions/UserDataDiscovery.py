@@ -25,10 +25,12 @@ class UserDataDiscovery(DataDiscovery):
         self.logger.info("Data discovery and splitting for %s using user-provided files" % kwargs['task']['tm_taskname'])
 
         userfiles = kwargs['task']['tm_arguments'].get('userfiles')
-        if not userfiles or kwargs['task']['tm_split_algo'] != "FileBased":
+        splitting = kwargs['task']['tm_split_algo']
+        total_units = kwargs['task']['tm_totalunits'] 
+        if not userfiles or splitting != 'FileBased':
             if not userfiles:
                 msg = "No files specified to process for task %s." % kwargs['task']['tm_taskname']
-            if kwargs['task']['tm_split_algo'] != "FileBased":
+            if splitting != 'FileBased':
                 msg = "Data.splitting must be set to 'FileBased' when using a custom set of files."
             self.logger.error("Setting %s as failed: %s" % (kwargs['task']['tm_taskname'], msg))
             configreq = {'workflow': kwargs['task']['tm_taskname'],
@@ -47,6 +49,9 @@ class UserDataDiscovery(DataDiscovery):
 
         userFileset = Fileset(name = kwargs['task']['tm_taskname'])
         self.logger.info("There are %d files specified by the user." % len(userfiles))
+        if total_units > 0:
+            self.logger.info("Will run over the first %d files." % total_units)
+        file_counter = 0
         for userfile, idx in zip(userfiles, range(len(userfiles))):
             newFile = File(userfile, size = 1000, events = 1)
             newFile.setLocation(locations)
@@ -55,6 +60,9 @@ class UserDataDiscovery(DataDiscovery):
             newFile["first_event"] = 1
             newFile["last_event"] = 2
             userFileset.addFile(newFile)
+            file_counter += 1
+            if total_units > 0 and file_counter >= total_units:
+                break
 
         return Result(task=kwargs['task'], result=userFileset)
 
