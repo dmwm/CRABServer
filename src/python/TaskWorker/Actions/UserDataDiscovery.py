@@ -64,6 +64,6 @@ class UserDataDiscovery(DataDiscovery):
             if total_units > 0 and file_counter >= total_units:
                 break
 
-        return Result(task=kwargs['task'], result=userFileset)
+        return Result(task = kwargs['task'], result = userFileset)
 
 
