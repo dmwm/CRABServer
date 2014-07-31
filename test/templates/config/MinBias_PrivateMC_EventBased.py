@@ -21,6 +21,7 @@ config.Data.primaryDataset = 'MinBias'
 config.Data.splitting = 'EventBased'
 config.Data.unitsPerJob = 100 
 config.Data.totalUnits = 1000
+config.Data.ignoreLocality = False
 config.Data.publication = True
 config.Data.publishDbsUrl = 'phys03'
 config.Data.publishDataName = 'CHANGE'

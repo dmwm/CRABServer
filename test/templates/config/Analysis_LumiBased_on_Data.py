@@ -20,6 +20,7 @@ config.Data.inputDataset = '/SingleMu/Run2012B-13Jul2012-v1/AOD'
 config.Data.dbsUrl = 'global'
 config.Data.splitting = 'LumiBased'
 config.Data.unitsPerJob = 20 # 200
+config.Data.ignoreLocality = False
 config.Data.lumiMask = 'https://cms-service-dqm.web.cern.ch/cms-service-dqm/CAF/certification/Collisions12/8TeV/Prompt/Cert_190456-208686_8TeV_PromptReco_Collisions12_JSON.txt'
 #config.Data.lumiMask = 'lumimask/Cert_190456-208686_8TeV_PromptReco_Collisions12_JSON.txt' # if you downloaded the file in the working directory
 config.Data.runRange = '193093-193999' # '193093-194075'

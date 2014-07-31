@@ -20,6 +20,7 @@ config.Data.inputDataset = '/GenericTTbar/HC-CMSSW_5_3_1_START53_V5-v1/GEN-SIM-R
 config.Data.dbsUrl = 'global'
 config.Data.splitting = 'LumiBased'
 config.Data.unitsPerJob = 20
+config.Data.ignoreLocality = False
 config.Data.lumiMask = 'lumimask/GenericTTbar_File1_lumimask.txt'
 config.Data.publication = True
 config.Data.publishDbsUrl = 'phys03'

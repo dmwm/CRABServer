@@ -4,8 +4,8 @@
 
 #Parameters required to change !
 #------------------------------
-TAG='HG1407a'
-VERSION=1
+TAG='HG1408c'
+VERSION=2
 CMSSW='CMSSW_7_0_6'
 WORK_DIR=~/VALIDATION/$TAG
 MAIN_DIR=`pwd`
@@ -17,18 +17,23 @@ source /afs/cern.ch/cms/cmsset_default.sh
 #Specify environment variable, change it if it`s required
 export SCRAM_ARCH=slc6_amd64_gcc481
 
-# out_cond - Output conditions, log_cond - Logs condition, pub_cond - Publication cond
+# out_cond - Output conditions, log_cond - Logs condition, pub_cond - Publication cond, ign_cond - IgnoreLocality
 # Number of possible values should be always equal
 out_cond=(True True True False True False)
 log_cond=(True True False False False True)
 pub_cond=(True False False False True False)
+ign_cond=(True False False False False False)
+
 
 #Get specified CMSSW
-#Need to have a check if directory exists or not, if not do cmsrel
-mkdir -p $WORK_DIR
+if [ ! -d "$WORK_DIR" ]; then
+  mkdir -p $WORK_DIR
+fi
 cd $WORK_DIR
-cmsrel $CMSSW
-cd $WORK_DIR/$CMSSW/src/
+if [ ! -d "$CMSSW" ]; then
+  cmsrel $CMSSW
+  cd $WORK_DIR/$CMSSW/src/
+fi
 
 #Setup CMS environment
 cmsenv
@@ -53,9 +58,10 @@ do
     out_v=${out_cond[$i]:0:1}
     log_v=${log_cond[$i]:0:1}
     pub_v=${pub_cond[$i]:0:1}
+    ign_v=${ign_cond[$i]:0:1}
 
 #Generate new name
-    new_name=$TAG-$VERSION-$file_name_temp-'L-'$log_v'_O-'$out_v'_P-'$pub_v
+    new_name=$TAG-$VERSION-$file_name_temp-'L-'$log_v'_O-'$out_v'_P-'$pub_v'_IL-'$ign_v
     publish_name=$new_name-`date +%s`
     echo $new_name
 #General part
@@ -68,6 +74,8 @@ do
     sed --in-place "s|\.Data\.publishDataName = .*|\.Data\.publishDataName = '$publish_name' |" $file_name
     #Site part
     sed --in-place "s|\.Site\.storageSite = .*|\.Site\.storageSite = '$STORAGE_SITE' |" $file_name
+    #Data part
+    sed --in-place "s|\.Data\.ignoreLocality = .*|\.Data\.ignoreLocality = ${ign_cond[$i]} |" $file_name
     crab submit -c $file_name
   done
 done
