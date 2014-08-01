@@ -45,7 +45,7 @@ class DataWorkflow(object):
            """
         return workflow
 
-    def getLatests(self, user, limit, timestamp):
+    def getLatests(self, username, timestamp):
         """Retrives the latest workflows for the user
 
            :arg str user: a valid user hn login name
@@ -64,10 +64,9 @@ class DataWorkflow(object):
         #                                          "endkey": user,
         #                                          "limit": limit, })
         #raise NotImplementedError
-        mydate = datetime.fromordinal(timestamp).strftime('%d-%b-%Y')
-        return self.api.query(None, None, self.Task.GetTasksFromUser_sql, username=user, timestamp=mydate)
+        return self.api.query(None, None, self.Task.GetTasksFromUser_sql, username=username, timestamp=timestamp)
 
-    def errors(self, workflow, shortformat):
+     def errors(self, workflow, shortformat):
         """Retrieves the sets of errors for a specific workflow
 
            :arg str workflow: a workflow name

@@ -1,18 +1,38 @@
 angular.module("CRABMonitor").
 	controller("ServerCtrl", ["$scope","ServerData","ServerFuncs","$location", function($scope, ServerData,ServerFuncs, $location){
 		//INJECT THE FACTORIES INTO THE CONTROLLER
-		$scope.data = ServerData;
-		$scope.funcs = ServerFuncs;
+		$scope.serverData = ServerData;
+		$scope.serverFuncs = ServerFuncs;
 
 		//LOAD THE USERS IN CRABSERVER THE OPERATOR BEGINS TO TYPE
-		$scope.loadUsers = function(){
-			if($scope.data.users.length === 0){
-				$scope.funcs.getUsers();				
+		$scope.loadUsers = function(name, event){
+			if(event.keyCode === 13 && $scope.serverData.users.length > 0){
+				//select a user
+				$scope.serverData.selectedUser.username = name;
+				$location.path("/latest-tasks");
+			}else{
+				if($scope.serverData.users.length === 0){
+					$scope.serverFuncs.getUsers();
+					$scope.serverFuncs.getQuota();
+				}
 			}
 		};
 
+
 		//LIST A SUMMARY OF ALL USERS INFO
 		$scope.userList = function(){
-			$location.path("/userlist-view");
+			$scope.serverFuncs.getWorkflows();
+			$location.path("/workflows");
 		};
+
+		//select a user
+		$scope.selectUser = function(name, index){
+			$scope.selectedRow = index;
+			$scope.serverData.selectedUser.username = name;
+		};
+		//load latest user tasks
+		$scope.loadLatestTasks = function(date){
+			$scope.serverFuncs.getLatests(date);
+		};
+
 }]);

@@ -190,6 +190,8 @@ class RESTUserWorkflow(RESTEntity):
         elif method in ['GET']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=True)
             validate_str('subresource', param, safe, RX_SUBRESTAT, optional=True)
+            validate_str('username', param, safe, RX_USERNAME, optional=True)
+            validate_str('timestamp', param, safe, RX_DATE, optional=True)  #inserted by eric
 
             # Used to determine how much information to return to the client for status
             validate_num("verbose", param, safe, optional=True)
@@ -292,13 +294,12 @@ class RESTUserWorkflow(RESTEntity):
                                         userdn=cherrypy.request.headers['Cms-Authn-Dn'])
 
     @restcall
-    def get(self, workflow, subresource, age, limit, shortformat, exitcode, jobids, verbose):
+    def get(self, workflow, subresource, username, limit, shortformat, exitcode, jobids, verbose, timestamp):
         """Retrieves the workflow information, like a status summary, in case the workflow unique name is specified.
            Otherwise returns all workflows since (now - age) for which the user is the owner.
            The caller needs to be a valid CMS user.
-
            :arg str workflow: unique name identifier of workflow;
-           :arg int age: max workflow age in days;
+		   :arg str timestamp: max workflow age in hours;
            :arg str subresource: the specific workflow information to be accessed;
            :arg int limit: limit of return entries for some specific subresource;
            :arg int exitcode: exitcode for which the specific subresource is needed (eg log file of a job with that exitcode)
@@ -327,9 +328,9 @@ class RESTUserWorkflow(RESTEntity):
             # retrieve the information about latest worfklows for that user
             # age can have a default: 1 week ?
             cherrypy.log("Found user '%s'" % cherrypy.request.user['login'])
-            result = self.userworkflowmgr.getLatests(cherrypy.request.user['login'], limit, age)
+            result = self.userworkflowmgr.getLatests(username or cherrypy.request.user['login'], timestamp)     #eric added timestamp to match username
 
-        return result
+            return result
 
     @restcall
     def delete(self, workflow, force, jobids):

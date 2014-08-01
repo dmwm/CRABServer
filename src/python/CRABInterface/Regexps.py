@@ -53,12 +53,17 @@ RX_SUBRESTAT = re.compile(r"^errors|report|logs|data$")
 
 #subresources of the ServerInfo (/info) and Task (/task) resources
 RX_SUBRES_SI = re.compile(r"^delegatedn|backendurls|version|bannedoutdest|scheddaddress|ignlocalityblacklist|$")
-RX_SUBRES_TASK = re.compile(r"^allinfo|allusers|summary$")
+RX_SUBRES_TASK = re.compile(r"^allinfo|allusers|summary|search|taskbystatus$")
 
 #worker workflow
 RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._]{1,100}$")
 ## this can be improved by putting a dependency on CAFUtilities task state machine
 RX_STATUS = re.compile(r"^[A-Za-z_]{1,20}$")
+
+##inserted by eric obeng summer student for username validation
+RX_USERNAME = re.compile(r"^[A-Za-z_]{1,20}$")
+RX_DATE = re.compile(r"^(19|20)\d\d[- /.](0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|3[01])$")
+
 ## need to be careful with this
 RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s\=\+]{0,10000}$")
 ## user dn

@@ -1,0 +1,26 @@
+<div class = "panel panel-default">    
+        <div class = "row panel-heading">
+        <h4 class = "special-header">Crab server user list</h4>
+        <div class="col-lg-6 navbar-right">
+            <div class="input-group">
+                <span class="input-group-addon"> show spaces > 70%
+                    <input type="checkbox" ng-model="filter">
+                </span>
+                <input type="text" placeholder = "Filter" class="form-control" ng-model="search">
+            </div><!-- /input-group -->
+        </div>   
+    </div>
+    <div class = "panel-body">
+        <ul class="list-group">
+            <li class="list-group-item" ng-repeat="user in cacheData.userSummary |filter: search">
+                <span class="h4 badge"> <mark>Used space:</mark>{{user.usedSpace}}</span>
+                <a href="#/task-view" ng-click = "selectUserWithName(user.username)"><h4><strong>{{user.username}}</strong></h4></a>
+                <div class="progress">
+                    <div ng-class="{'progress-bar progress-bar-success progress-bar-striped': {{user.isGreen}}, 'progress-bar progress-bar-danger progress-bar-striped': {{user.isRed}}}" role ="progressbar" aria-valuenow="50" aria-valuemin="0"     aria-valuemax="100" style="width: {{user.percentUsed}}%; min-width: 20px;">
+                        <span class="sr-only">{{user.percentUsed}}% Used</span>
+                    </div>
+                </div>
+            </li>
+        </ul>
+    </div>
+</div>

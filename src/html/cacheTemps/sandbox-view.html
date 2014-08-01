@@ -1,8 +1,8 @@
 <div class="panel panel-default">
     <!-- Default panel contents -->
-    <div><h4 class = "special-header">{{data.selectedUser.username+"\'s Sand boxes"}}</h4>
+    <div><h4 class = "special-header">{{cacheData.selectedUser.username+"\'s Sand boxes"}}</h4>
     <ul class="pager back-btn">
-        <li class="previous"><a href="#/task-view/{{data.index}}">&larr; Back to summary</a></li>
+        <li class="previous"><a href="#/task-view">&larr; Back to summary</a></li>
     </ul>
     </div>
 
@@ -15,8 +15,8 @@
             </tr>
         </thead>
         <tbody>
-            <tr ng-repeat = "sandbox in data.selectedUser.sandBox">
-                <td class = "truncate" ><a href="{{'https://hammer-crab3.cern.ch/crabcache/file?hashkey=' + sandbox.hashkey}}" title = {{sandbox.hashkey}}>{{sandbox.hashkey}}</a></td><td>{{sandbox.accessed| date}}</td><td>{{sandbox.changed}}</td><td>{{sandbox.exists}}</td><td>{{sandbox.size}}</td><td>{{sandbox.modified| date}}</td>
+            <tr ng-repeat = "sandbox in cacheData.selectedUser.sandBox">
+                <td class = "truncate" ><a href="{{'https://hammer-crab3.cern.ch/crabcache/file?hashkey=' + sandbox.hashkey}}" title = {{sandbox.hashkey}}>{{sandbox.hashkey}}</a></td><td>{{sandbox.accessed| date}}</td><td>{{sandbox.changed | date}}</td><td>{{sandbox.exists}}</td><td>{{sandbox.size}}</td><td>{{sandbox.modified| date}}</td>
             </tr>
         </tbody>
     </table>

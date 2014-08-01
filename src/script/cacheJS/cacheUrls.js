@@ -5,6 +5,7 @@ angular.module("CRABMonitor").
 		var sandboxUrl = "https://"+location.hostname+"/crabcache/file?hashkey=";
 		return{
 			allUserUrl: {method: "GET", url: baseUrl, params: {subresource: "listusers"}},
+			usedSpacesUrl: {method: "GET", url: baseUrl, params: {subresource: "usedspace"}},
 			allFilesUrl: function(name){
 				return {method: "GET", url: baseUrl, params: {subresource: "userinfo",username:name,verbose:1}};
 			},

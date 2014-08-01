@@ -1,6 +1,7 @@
 angular.module("CRABMonitor").
 	factory("CacheData", function(){
-	return {users: [], basicQuota: 0, powerUsers: [], selectedUser: {
+	return {users: [], basicQuota: 0, powerUsers: [],userSummary: [],
+		selectedUser: {
 		username: "",
 		index: 0,
 		sandBox: [],
