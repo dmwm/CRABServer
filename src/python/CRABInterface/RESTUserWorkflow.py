@@ -196,10 +196,6 @@ class RESTUserWorkflow(RESTEntity):
             # Used to determine how much information to return to the client for status
             validate_num("verbose", param, safe, optional=True)
 
-            #parameters of subresources calls has to be put here
-            #used by get latest
-            validate_num('age', param, safe, optional=True)
-
             #used by get log, get data
             validate_num('limit', param, safe, optional=True)
             validate_num('exitcode', param, safe, optional=True)
@@ -330,7 +326,7 @@ class RESTUserWorkflow(RESTEntity):
             cherrypy.log("Found user '%s'" % cherrypy.request.user['login'])
             result = self.userworkflowmgr.getLatests(username or cherrypy.request.user['login'], timestamp)     #eric added timestamp to match username
 
-            return result
+        return result
 
     @restcall
     def delete(self, workflow, force, jobids):
