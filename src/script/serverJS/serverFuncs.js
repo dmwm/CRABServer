@@ -4,7 +4,6 @@ angular.module("CRABMonitor").
                 var quota = function() {
                     $http(ServerUrls.quotaUrl).then(function(response) {
                         ServerData.basicQuota = response.data.result[0].quota_user_limit*1000;
-                        console.log(ServerData.basicQuota);
                     }, function(response) {
                         console.log("Request for basic quota failed with status: " + response.status);
                     });
@@ -32,12 +31,26 @@ angular.module("CRABMonitor").
 								}
 							}
 						}	
-						console.log(ServerData.workflows);
 					},function(response){
 						console.log("Request for workflows failed with status: "+response.status);
 					});
 				};
 
-                return {getUsers: users, getQuota: quota, getWorkflows: workflows};
+				//load latest user tasks
+				var latestTasks = function(date){
+					$http(ServerUrls.latestTaskUrl(date,ServerData.selectedUser.username)).then(function(response){
+						for(var i = 0; i < response.data.result.length; i++){
+							ServerData.latestData.push({
+								taskname: response.data.result[i][0],
+								status: response.data.result[i][1],
+								tw_name: response.data.result[i][2],
+								spliti_args: response.data.result[i][3]
+							});
+						}
+					}, function(response){
+							console.log("Request for latest task failed with status: "+response.status);
+					});
+				};
+                return {getUsers: users, getQuota: quota, getWorkflows: workflows, getLatests: latestTasks};
             }]);
 

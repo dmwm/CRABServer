@@ -24,16 +24,33 @@ angular.module("CRABMonitor").
                 templateUrl: cacheTmpUrl+"userlist-view.html",
                 controller: "CacheCtrl"
         }).//for crab server routing
-            when("/workflows-view", {
+            when("/workflows", {
                 templateUrl: serverTmpUrl+"workflows-view.html",
                 controller: "ServerCtrl"
         }).
-            when("/user-workflow-view", {
-                templateUrl: serverTmpUrl+"user-workflow-view.html",
+            when("/latest-tasks", {
+                templateUrl: serverTmpUrl+"latest-task.html",
                 controller: "ServerCtrl"
+        }).
+            when("/workflow", {
+                templateUrl: serverTmpUrl+"user-workflow-view.html",
+                controller: "SearchCtrl"
         }).//for quick search routing
-            when("/search-view", {
-                templateUrl: searchTmpUrl+"search-view.html",
+            when("/taskinfo", {
+                templateUrl: searchTmpUrl+"task-info-view.html",
+                controller: "SearchCtrl"
+        }).
+            when("/jobinfo", {
+                templateUrl: searchTmpUrl+"job-info.html",
+                controller: "SearchCtrl"
+		
+        }).
+            when("/pubinfo", {
+                templateUrl: searchTmpUrl+"pub-info.html",
+                controller: "SearchCtrl"
+        }).
+            when("/tasklinks", {
+                templateUrl: searchTmpUrl+"task-links.html",
                 controller: "SearchCtrl"
 		})
 	});

@@ -6,6 +6,7 @@ angular.module("CRABMonitor").
 				workflows: {},
 				selectedUser:{
 					username: ""
-				}
+				},
+				latestData: []	//array of obj [{taskname, status,tw_name, spliti_args}]
 			};
 });

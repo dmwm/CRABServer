@@ -105,7 +105,7 @@
                 <div class = "user-list">
                     <ul class = "nav nav-sidebar">
                         <li ng-repeat = "user in serverData.users| filter: svrSearch"  ng-class='{active: $index === selectedRow}'>
-                            <a href="#/user-workflow-view" ng-click = "selectUser(user, $index)">{{user}}</a></li>
+                            <a href="#/latest-tasks" ng-click = "selectUser(user, $index)">{{user}}</a></li>
                     </ul>
                 </div>
             </div>
