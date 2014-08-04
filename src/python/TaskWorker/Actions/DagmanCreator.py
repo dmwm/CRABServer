@@ -684,16 +684,6 @@ class DagmanCreator(TaskAction.TaskAction):
         return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(temp_dir, info, params))
 
     def execute(self, *args, **kw):
-        try:
-            return self.executeInternal(*args, **kw)
-        except Exception, e:
-            configreq = {'workflow': kw['task']['tm_taskname'],
-                             'substatus': "FAILED",
-                             'subjobdef': -1,
-                             'subuser': kw['task']['tm_user_dn'],
-                             'subfailure': base64.b64encode(str(e)),}
-            self.logger.error("Pushing information centrally %s" %(str(configreq)))
-            data = urllib.urlencode(configreq)
-            self.server.put(self.resturl, data=data)
-            raise
+        return self.executeInternal(*args, **kw)
+
 
