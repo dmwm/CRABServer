@@ -1,0 +1,18 @@
+<div class = "panel panel-default">
+    <div class = "row panel-heading">
+        <div></div> <h4 class = "special-header">{{searchData.user.name}}</h4></div>
+        <h4 class = "special-header2">{{searchData.taskname + " :: links"}}</h4>
+        </div>   
+    </div> 
+    <ul class="list-group">
+        <li class="list-group-item">
+            <span class="h4 badge">ext</span>
+            <a href= "{{searchData.taskLinks.glidein}}" target = "_blank"><span class = "special-header2">View task in glidein</a></span>
+        </li>
+        <li class="list-group-item">
+            <span class="h4 badge">ext</span>
+            <a href={{searchData.taskLinks.dashboard}}" target="_blank"><span class = "special-header2">View task in dashboard</span></a>
+        </li>
+    </ul>
+</div>
+

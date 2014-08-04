@@ -326,7 +326,7 @@ class RESTUserWorkflow(RESTEntity):
             cherrypy.log("Found user '%s'" % cherrypy.request.user['login'])
             result = self.userworkflowmgr.getLatests(username or cherrypy.request.user['login'], timestamp)     #eric added timestamp to match username
 
-        return result
+            return result
 
     @restcall
     def delete(self, workflow, force, jobids):

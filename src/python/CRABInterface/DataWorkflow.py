@@ -66,7 +66,7 @@ class DataWorkflow(object):
         #raise NotImplementedError
         return self.api.query(None, None, self.Task.GetTasksFromUser_sql, username=username, timestamp=timestamp)
 
-    def errors(self, workflow, shortformat):
+     def errors(self, workflow, shortformat):
         """Retrieves the sets of errors for a specific workflow
 
            :arg str workflow: a workflow name
