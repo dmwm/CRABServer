@@ -1,0 +1,17 @@
+<div class = "panel panel-default">
+<div class = "row panel-heading">
+    <h4 class = "special-header">CRABServer Work-flow Summary</h4>
+    <div class="col-lg-4 navbar-right">
+        <div class="input-group">
+            <input type="text" class="form-control" placeholder= "Filter" ng-model="search">
+        </div><!-- /input-group -->
+    </div>   
+</div> <table class="table table-bordered table-striped table-hover">
+<thead><tr ><td>Users</td><td>Submitted</td><td>Success</td><td>Queued</td><td>Failed</td><td>Killed</td></tr></thead>
+      <tbody>
+          <tr ng-repeat = "(key,value) in serverData.workflows | filter:search">
+              <td><a href = "#/latest-tasks" ng-click = "selectUser(key,$index)">{{key}}</a></td><td>{{value.SUBMITTED || 0}}</td><td>{{value.SUCCESS || 0}}</td><td>{{value.QUEUED || 0}}</td><td>{{value.FAILED || 0}}</td><td>{{value.KILLED || 0}}</td>
+          </tr>
+      </tbody>
+  </table>
+</div>

@@ -1,0 +1,18 @@
+<div class = "panel panel-default">
+    <div class = "row panel-heading">
+        <h5 class = "special-header2">{{"Task " + searchData.taskname + "\'s Details"}}</h5>
+    </div>
+    <div class ="panel-body">        
+        <ul class="list-group">
+            <li class="list-group-item">
+                <div class="h5"><span class="special-header3"> Username :&nbsp;&nbsp;&Colon;&nbsp;&nbsp;</span><a ng-click = "checkUserTasks(searchData.user.name)" href="{{searchData.user.href}}">{{searchData.user.name}}</a></div>               
+            </li>
+            <li class="list-group-item" >
+                <div class="h5"><span class = "special-header3"> sandbox &nbsp;&nbsp;&Colon;&nbsp;&nbsp;</span><a href="{{searchData.sandbox.href}}" target = "_blank">{{searchData.sandbox.file}}</a></div>               
+            </li>
+            <li class="list-group-item" ng-repeat="(key,value) in searchData.data">
+                <div class="h5"><span class="special-header3"> {{key}} &nbsp;&nbsp;&Colon;&nbsp;&nbsp;</span><span>{{value}}</span></div>               
+            </li>
+        </ul>
+    </div>
+</div>
