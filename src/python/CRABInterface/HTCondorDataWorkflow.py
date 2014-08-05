@@ -310,7 +310,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         except Exception, exp:
             msg = "%s: Failed to contact Schedd: %s" % (workflow, str(exp))
             self.logger.exception(msg)
-            return [{"status" : status,
+            return [{"status" : "UNKNOWN",
                       "taskFailureMsg" : str(msg),
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
