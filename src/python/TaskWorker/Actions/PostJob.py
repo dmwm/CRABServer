@@ -34,6 +34,13 @@ Example FJR['steps']['cmsRun']['output'] for a TFile produced via TFileService:
  u'fileName': u'/tmp/1882789.vmpsched/glide_Paza70/execute/dir_27876/histo.root',
  u'Source': u'TFileService'
 }
+For other type of output files, we add in cmscp.py the basic necessary information about the file 
+to the FJR. The information is:
+{
+ u'SEName': u'se1.accre.vanderbilt.edu',
+ u'pfn': u'out.root',
+ u'direct_stageout': False
+}
 """
 
 import os
@@ -90,7 +97,7 @@ REGEX_ID = re.compile("([a-f0-9]{8,8})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]
 class FTSJob(object):
 
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, log_needs_transfer, output_metadata, task_ad, retry_count, retry_timeout, cmsRun_failed):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, log_needs_transfer, job_report_output, task_ad, retry_count, retry_timeout, cmsRun_failed):
         self._id = None
         self._cancel = False
         self._sleep = 20
@@ -181,7 +188,7 @@ def getUserFromLFN(lfn):
 
 class ASOServerJob(object):
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, log_needs_transfer, output_metadata, task_ad, retry_count, retry_timeout, cmsRun_failed):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, log_needs_transfer, job_report_output, task_ad, retry_count, retry_timeout, cmsRun_failed):
         self.id = None
         self.retry_count = retry_count
         self.retry_timeout = retry_timeout
@@ -199,7 +206,7 @@ class ASOServerJob(object):
         self.source_sites = source_sites
         self.filenames = filenames
         self.reqname = reqname
-        self.output_metadata = output_metadata
+        self.job_report_output = job_report_output
         self.log_size = log_size
         self.log_needs_transfer = log_needs_transfer
         self.outputData = outputdata
@@ -248,9 +255,9 @@ class ASOServerJob(object):
         aso_start_time = None
         try:
             with open("jobReport.json.%d" % self.count) as fd:
-                full_report = json.load(fd)
-            aso_start_time = full_report.get("aso_start_time")
-            self.aso_start_timestamp = full_report.get("aso_start_timestamp")
+                job_report = json.load(fd)
+            aso_start_time = job_report.get("aso_start_time")
+            self.aso_start_timestamp = job_report.get("aso_start_timestamp")
         except:
             self.aso_start_timestamp = int(time.time())
             logger.exception("Unable to determine ASO start time from worker node")
@@ -272,22 +279,22 @@ class ASOServerJob(object):
         # TODO: Add a method to resolve a single PFN or use resolvePFNs
         last_update = int(time.time())
         now = str(datetime.datetime.now())
-        for outputModule in self.output_metadata.values():
-            for outputFile in outputModule:
-                fileInfo = {}
-                fileInfo['checksums'] = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
-                fileInfo['outsize'] = outputFile.get(u"size", 0)
-                fileInfo['direct_stageout'] = outputFile.get(u'direct_stageout', False)
-                if outputFile.get(u"output_module_class") == u'PoolOutputModule' or \
-                   outputFile.get(u"ouput_module_class")  == u'PoolOutputModule':
-                    fileInfo['filetype'] = 'EDM'
-                elif outputFile.get(u"Source"):
-                    fileInfo['filetype'] = 'TFILE'
-                else: ## This should actually never happen, since in the FJR we have only EDM files and TFiles.
-                    fileInfo['filetype'] = 'FAKE'
-                if u'pfn' in outputFile:
-                    fileInfo['pfn'] = str(outputFile[u'pfn'])
-                outputFiles.append(fileInfo)
+        for output_module in self.job_report_output.values():
+            for output_file_info in output_module:
+                file_info = {}
+                file_info['checksums'] = output_file_info.get(u'checksums', {'cksum': '0', 'adler32': '0'})
+                file_info['outsize'] = output_file_info.get(u'size', 0)
+                file_info['direct_stageout'] = output_file_info.get(u'direct_stageout', False)
+                if output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
+                   output_file_info.get(u'ouput_module_class', '')  == u'PoolOutputModule':
+                    file_info['filetype'] = 'EDM'
+                elif output_file_info.get(u'Source', '') == u'TFileService':
+                    file_info['filetype'] = 'TFILE'
+                else:
+                    file_info['filetype'] = 'FAKE'
+                if u'pfn' in output_file_info:
+                    file_info['pfn'] = str(output_file_info[u'pfn'])
+                outputFiles.append(file_info)
         transfer_outputs = int(self.task_ad['CRAB_TransferOutputs'])
         if not transfer_outputs:
             logger.debug("Transfer output flag is false; skipping outputs stageout.")
@@ -295,112 +302,122 @@ class ASOServerJob(object):
         if not transfer_logs:
             logger.debug("Save logs flag is false; skipping logs stageout.")
         found_log = False
-        for source_site,filename in zip(self.source_sites, self.filenames):
+        for source_site, filename in zip(self.source_sites, self.filenames):
             ## We assume that the first file in self.filenames is the logs tarball.
-            publication_msg = ''
             if found_log:
                 if not transfer_outputs:
                     continue
                 lfn = "%s/%s" % (self.source_dir, filename)
-                file_type = "output"
+                file_type = 'output'
                 ifile = getFileIndex(filename, outputFiles)
-                if ifile >= 0:
-                    size = outputFiles[ifile]['outsize']
-                    checksums = outputFiles[ifile]['checksums']
-                    needs_transfer = not outputFiles[ifile]['direct_stageout']
-                    publish = int(task_publish and outputFiles[ifile]['filetype'] == "EDM")
-                else:
-                    continue # because we don't know if this file needs transfer or not...
-                    #size = 0
-                    #checksums = {"cksum": "0", "adler32": "0"}
-                    #needs_transfer = True  # actually we don't know if needs transfer...
-                    #publish = 0
-                if task_publish and not publish:
-                    publication_msg = 'Disabling publication of output file %s, because it is not of EDM type.' % filename
+                if ifile is None:
+                    continue
+                size = outputFiles[ifile]['outsize']
+                checksums = outputFiles[ifile]['checksums']
+                needs_transfer = not outputFiles[ifile]['direct_stageout']
+                file_output_type = outputFiles[ifile]['filetype']
             else:
                 found_log = True
                 if not transfer_logs:
                     continue
                 lfn = "%s/log/%s" % (self.source_dir, filename)
-                file_type = "log"
+                file_type = 'log'
                 size = self.log_size
-                needs_transfer = self.log_needs_transfer
                 checksums = {'adler32': 'abc'}
-                publish = 0
-            publish = int(publish and not self.cmsRun_failed)
+                needs_transfer = self.log_needs_transfer
             user = getUserFromLFN(lfn)
             doc_id = getHashLfn(lfn)
-            common_info = { "state":  "new",
-                            "source": source_site,
-                            "destination": self.dest_site,
-                            "checksums": checksums,
-                            "size": size,
-                            "last_update": last_update,
-                            "start_time": now,
-                            "end_time": '',
-                            "job_end_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
-                            "retry_count": [],
-                            "job_retry_count": self.retry_count,
-                            "failure_reason": [],
+            common_info = {"state": 'new',
+                           "source": source_site,
+                           "destination": self.dest_site,
+                           "checksums": checksums,
+                           "size": size,
+                           "last_update": last_update,
+                           "start_time": now,
+                           "end_time": '',
+                           "job_end_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
+                           "retry_count": [],
+                           "job_retry_count": self.retry_count,
+                           "failure_reason": [],
                           }
-            # Even if a direct transfer was done, we register in ASO so publication happens.
             if not needs_transfer:
-                logger.debug("File is marked as not needing transfer.")
+                logger.debug("File %s is marked as not needing transfer." % filename)
                 common_info['state'] = 'done'
                 common_info['end_time'] = now
             needs_commit = True
             try:
-                doc = self.couchDatabase.document( doc_id )
-                if doc.get("state") in ["acquired", "new", "retry"]:
+                doc = self.couchDatabase.document(doc_id)
+                ## The document was already uploaded to Couch from the WN. If the transfer is done or ongoing,
+                ## there is no need to commit the document again. Otherwise we "reset" the document in Couch
+                ## so that ASO retries the transfer.
+                if doc.get("state") in ['acquired', 'new', 'retry']:
+                    logger.info("LFN %s (id %s) was injected from WN and transfer is ongoing." % (lfn, doc_id))
                     needs_commit = False
-                    logger.info("LFN %s (id %s) was injected from WN and transfer is ongoing" % (lfn, doc_id))
-                elif doc.get("state") == "done" and doc.get("start_time") == aso_start_time:
+                elif doc.get("state") == 'done' and doc.get("start_time") == aso_start_time:
+                    logger.info("LFN %s (id %s) was injected from WN and transfer has finished." % (lfn, doc_id))
                     needs_commit = False
-                    logger.info("LFN %s (id %s) was injected from WN and transfer has finished" % (lfn, doc_id))
                 else:
                     logger.info("Will retry LFN %s (id %s)" % (lfn, doc_id))
                     logger.debug("Previous document: %s" % pprint.pformat(doc))
+                if needs_commit:
                     doc.update(common_info)
+                allIDs.append(doc_id)
             except CMSCouch.CouchNotFoundError:
-                logger.info("LFN %s (id %s) is not yet known to ASO; uploading new stageout job." % (lfn, doc_id))
-                if publication_msg:
-                    logger.info(publication_msg)
-                # FIXME: need to pass publish flag, checksums, role/group, size, inputdataset,  publish_dbs_url, dbs_url through
-                doc = { "_id": doc_id,
-                        "inputdataset": input_dataset,
-                        "group": group,
-                        # TODO: Remove this if it is not required
-                        "lfn": lfn.replace('/store/user', '/store/temp/user', 1),
-                        "checksums": checksums,
-                        "user": user,
-                        "role": role,
-                        "dbSource_url": "gWMS",
-                        "publish_dbs_url": publish_dbs_url,
-                        "dbs_url": dbs_url,
-                        "workflow": self.reqname,
-                        "jobid": self.count,
-                        "publication_state": 'not_published',
-                        "publication_retry_count": [],
-                        "type" : file_type,
-                        "publish" : publish,
-                    }
-                if not needs_transfer:
-                    # The "/store/user" variant of the LFN should be used for files that are marked as 'done'.
-                    # Otherwise, publication may break.
-                    doc["lfn"] = lfn.replace('/store/temp/user', '/store/user', 1)
-                doc.update(common_info)
+                ## Set the publication flag.
+                if file_type == 'output':
+                    publish = task_publish
+                    if publish and self.cmsRun_failed:
+                        logger.info("Disabling publication of output file %s, because it is marked as failed job." % filename)
+                        publish = 0
+                    if publish and file_output_type != 'EDM':
+                        logger.info("Disabling publication of output file %s, because it is not of EDM type." % filename)
+                        publish = 0
+                else:
+                    publish = 0
+                ## If the file doesn't need transfer nor publication, we don't upload the document to Couch.
+                if not needs_transfer and not publish:
+                    logger.info("File %s is marked as not needing transfer nor publication; skipping upload to ASO database." % filename)
+                    needs_commit = False
+                if needs_commit:
+                    logger.info("LFN %s (id %s) is not yet known to ASO; uploading new document to ASO database." % (lfn, doc_id))
+                    # FIXME: need to pass checksums, role/group, size, inputdataset, publish_dbs_url, dbs_url through
+                    doc = {"_id": doc_id,
+                           "inputdataset": input_dataset,
+                           "group": group,
+                           # TODO: Remove this if it is not required
+                           "lfn": lfn.replace('/store/user', '/store/temp/user', 1),
+                           "checksums": checksums,
+                           "user": user,
+                           "role": role,
+                           "dbSource_url": 'gWMS',
+                           "publish_dbs_url": publish_dbs_url,
+                           "dbs_url": dbs_url,
+                           "workflow": self.reqname,
+                           "jobid": self.count,
+                           "publication_state": 'not_published',
+                           "publication_retry_count": [],
+                           "type": file_type,
+                           "publish": publish,
+                          }
+                    if not needs_transfer:
+                        # The "/store/user" variant of the LFN should be used for files that are marked as 'done'.
+                        # Otherwise, publication may break.
+                        doc['lfn'] = lfn.replace('/store/temp/user', '/store/user', 1)
+                    doc.update(common_info)
+                    allIDs.append(doc_id)
             except Exception, ex:
                 msg = "Error loading document from couch. Transfer submission failed."
                 msg += str(ex)
                 msg += str(traceback.format_exc())
                 logger.info(msg)
                 return False
-            logger.info("Stageout job description: %s" % pprint.pformat(doc))
-            allIDs.append(doc_id)
-            res = self.couchDatabase.commitOne(doc)[0]
-            if needs_commit and 'error' in res:
-                logger.info("Couldn't add to ASO database %s" % res)
-                return False
+            if needs_commit:
+                logger.info("Stageout job description: %s" % pprint.pformat(doc))
+                commit_result_msg = self.couchDatabase.commitOne(doc)[0]
+                if 'error' in commit_result_msg:
+                    logger.info("Couldn't add to ASO database: %s" % commit_result_msg)
+                    return False
+
         return allIDs
 
 
@@ -489,12 +506,13 @@ class ASOServerJob(object):
                 logger.exception("Failed to retrieve log attachment for %s: %s" % (jobID, bestLog))
         return couchDoc, ""
 
+
     def run(self):
         self.id = self.submit()
         if self.id == False:
             raise RuntimeError, "Couldn't send to couchdb"
         if not self.id:
-            logger.info("No files to transfer via ASO.  Done!")
+            logger.info("No files to transfer via ASO. Done!")
             return 0
         starttime = time.time()
         if self.aso_start_timestamp:
@@ -678,18 +696,18 @@ def isFailurePermanent(reason, task_ad):
     return False
 
 
-def getFileIndex(filename, outputFiles):
-    for i,outfile in enumerate(outputFiles):
+def getFileIndex(file_name, output_files):
+    for i, outfile in enumerate(output_files):
         if ('pfn' not in outfile):
             continue
         json_pfn = os.path.split(outfile['pfn'])[-1]
-        pfn = os.path.split(filename)[-1]
+        pfn = os.path.split(file_name)[-1]
         left_piece, fileid = pfn.rsplit("_", 1)
         right_piece = fileid.split(".", 1)[-1]
         pfn = left_piece + "." + right_piece
         if pfn == json_pfn:
             return i
-    return -1 # means filename not found in self.outputFiles
+    return None
 
 
 class PermanentStageoutError(RuntimeError):
@@ -702,6 +720,7 @@ class RecoverableStageoutError(RuntimeError):
 
 REQUIRED_ATTRS = ['CRAB_ReqName', 'CRAB_Id', 'CRAB_OutputData', 'CRAB_JobSW', 'CRAB_AsyncDest']
 
+
 class PostJob():
 
 
@@ -709,11 +728,11 @@ class PostJob():
         self.ad = None
         self.task_ad = {}
         self.crab_id = -1
-        self.full_report = None
+        self.job_report = None
         self.report = None
-        self.output = None
+        self.job_report_output = None
         self.input = None
-        self.outputFiles = []
+        self.output_files_info = []
         self.retry_count = "0"
         self.logfiles = None
         self.log_needs_transfer = True
@@ -746,59 +765,60 @@ class PostJob():
 
     def parseJson(self):
         with open("jobReport.json.%d" % self.crab_id) as fd:
-            self.full_report = json.load(fd)
-        if 'steps' not in self.full_report:
+            self.job_report = json.load(fd)
+        if 'steps' not in self.job_report:
             raise ValueError("Invalid jobReport.json: missing 'steps'")
-        if 'cmsRun' not in self.full_report['steps']:
+        if 'cmsRun' not in self.job_report['steps']:
             raise ValueError("Invalid jobReport.json: missing 'cmsRun'")
-        self.report = self.full_report['steps']['cmsRun']
+        self.report = self.job_report['steps']['cmsRun']
         if 'input' not in self.report:
             raise ValueError("Invalid jobReport.json: missing 'input'")
         self.input = self.report['input']
         if 'output' not in self.report:
             raise ValueError("Invalid jobReport.json: missing 'output'")
-        self.output = self.report['output']
+        self.job_report_output = self.report['output']
 
-        self.log_needs_transfer = not self.full_report.get(u'direct_stageout', False)
-        logger.debug("Log file needs transfer: %s" % str(self.log_needs_transfer))
+        self.log_needs_transfer = not self.job_report.get(u'direct_stageout', False)
+        if not self.log_needs_transfer:
+            logger.debug("Log file is marked as directly transferred from WN.")
 
-        if 'jobExitCode' in self.full_report:
-            self.cmsRunFailed = bool(self.full_report['jobExitCode'])
+        if 'jobExitCode' in self.job_report:
+            self.cmsRunFailed = bool(self.job_report['jobExitCode'])
 
-        for outputModule in self.output.values():
-            for outputFile in outputModule:
-                print "Output file from job:", outputFile
-                fileInfo = {}
-                self.outputFiles.append(fileInfo)
+        for output_module in self.job_report_output.values():
+            for output_file_info in output_module:
+                print "Output file from job:", output_file_info
+                file_info = {}
+                self.output_files_info.append(file_info)
                 ## Note incorrect spelling of 'output module' in current WMCore
-                if outputFile.get(u"output_module_class") == u'PoolOutputModule' or \
-                   outputFile.get(u"ouput_module_class")  == u'PoolOutputModule':
-                    fileInfo['filetype'] = 'EDM'
-                elif outputFile.get(u"Source"):
-                    fileInfo['filetype'] = 'TFILE'
-                else: ## This should actually never happen, since in the FJR we have only EDM files and TFiles.
-                    fileInfo['filetype'] = 'FAKE'
-                fileInfo['module_label'] = outputFile.get(u"module_label", "unknown")
-                fileInfo['inparentlfns'] = [str(i) for i in outputFile.get(u"input", [])]
-                fileInfo['events'] = outputFile.get(u"events", 0)
-                fileInfo['checksums'] = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
-                fileInfo['outsize'] = outputFile.get(u"size", 0)
-                if u'pset_hash' in outputFile:
-                    fileInfo['pset_hash'] = outputFile[u'pset_hash']
-                if u'pfn' in outputFile:
-                    fileInfo['pfn'] = str(outputFile[u'pfn'])
-                fileInfo['direct_stageout'] = outputFile.get(u'direct_stageout', False)
-                if fileInfo['direct_stageout']: 
+                if output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
+                   output_file_info.get(u'ouput_module_class', '')  == u'PoolOutputModule':
+                    file_info['filetype'] = 'EDM'
+                elif output_file_info.get(u'Source', '') == u'TFileService':
+                    file_info['filetype'] = 'TFILE'
+                else:
+                    file_info['filetype'] = 'FAKE'
+                file_info['module_label'] = output_file_info.get(u'module_label', 'unknown')
+                file_info['inparentlfns'] = [str(i) for i in output_file_info.get(u'input', [])]
+                file_info['events'] = output_file_info.get(u'events', 0)
+                file_info['checksums'] = output_file_info.get(u'checksums', {'cksum': '0', 'adler32': '0'})
+                file_info['outsize'] = output_file_info.get(u'size', 0)
+                if u'pset_hash' in output_file_info:
+                    file_info['pset_hash'] = output_file_info[u'pset_hash']
+                if u'pfn' in output_file_info:
+                    file_info['pfn'] = str(output_file_info[u'pfn'])
+                file_info['direct_stageout'] = output_file_info.get(u'direct_stageout', False)
+                if file_info['direct_stageout']: 
                     logger.debug("Output file does not need to be transferred.")
-                if u'SEName' in outputFile and self.node_map.get(str(outputFile['SEName'])):
-                    fileInfo['outtmplocation'] = self.node_map[outputFile['SEName']]
-                if u'runs' not in outputFile:
+                if u'SEName' in output_file_info and self.node_map.get(str(output_file_info['SEName'])):
+                    file_info['outtmplocation'] = self.node_map[output_file_info['SEName']]
+                if u'runs' not in output_file_info:
                     continue
-                fileInfo['outfileruns'] = []
-                fileInfo['outfilelumis'] = []
-                for run, lumis in outputFile[u'runs'].items():
-                    fileInfo['outfileruns'].append(str(run))
-                    fileInfo['outfilelumis'].append(','.join(map(str,lumis)))
+                file_info['outfileruns'] = []
+                file_info['outfilelumis'] = []
+                for run, lumis in output_file_info[u'runs'].items():
+                    file_info['outfileruns'].append(str(run))
+                    file_info['outfilelumis'].append(','.join(map(str,lumis)))
 
 
     def fixPerms(self):
@@ -822,49 +842,49 @@ class PostJob():
             return
 
         edm_file_count = 0
-        for fileInfo in self.outputFiles:
-            if fileInfo['filetype'] == 'EDM':
+        for file_info in self.output_files_info:
+            if file_info['filetype'] == 'EDM':
                 edm_file_count += 1
         multiple_edm = edm_file_count > 1
-        for fileInfo in self.outputFiles:
+        for file_info in self.output_files_info:
             publishname = self.task_ad['CRAB_PublishName']
-            if 'pset_hash' in fileInfo:
-                publishname = "%s-%s" % (publishname.rsplit("-", 1)[0], fileInfo['pset_hash'])
+            if 'pset_hash' in file_info:
+                publishname = "%s-%s" % (publishname.rsplit("-", 1)[0], file_info['pset_hash'])
             ## CMS convention for outdataset: /primarydataset>/<yourHyperNewsusername>-<publish_data_name>-<PSETHASH>/USER
-            if fileInfo['filetype'] == 'EDM':
-                if multiple_edm and fileInfo.get("module_label"):
+            if file_info['filetype'] == 'EDM':
+                if multiple_edm and file_info.get("module_label"):
                     left, right = publishname.rsplit("-", 1)
-                    publishname = "%s_%s-%s" % (left, fileInfo['module_label'], right)
+                    publishname = "%s_%s-%s" % (left, file_info['module_label'], right)
                 outdataset = os.path.join('/' + str(self.task_ad['CRAB_InputData']).split('/')[1], self.task_ad['CRAB_UserHN'] + '-' + publishname, 'USER')
             else:
                 outdataset = "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER"
             configreq = {"taskname":        self.ad['CRAB_ReqName'],
                          "globalTag":       "None",
                          "pandajobid":      self.crab_id,
-                         "outsize":         fileInfo['outsize'],
+                         "outsize":         file_info['outsize'],
                          "publishdataname": publishname,
                          "appver":          self.ad['CRAB_JobSW'],
-                         "outtype":         fileInfo['filetype'],
+                         "outtype":         file_info['filetype'],
                          "checksummd5":     "asda", # Not implemented; garbage value taken from ASO
-                         "checksumcksum":   fileInfo['checksums']['cksum'],
-                         "checksumadler32": fileInfo['checksums']['adler32'],
+                         "checksumcksum":   file_info['checksums']['cksum'],
+                         "checksumadler32": file_info['checksums']['adler32'],
                          "outlocation":     self.ad['CRAB_AsyncDest'],
-                         "outtmplocation":  fileInfo.get('outtmplocation', self.source_site),
+                         "outtmplocation":  file_info.get('outtmplocation', self.source_site),
                          "acquisitionera":  "null", # Not implemented
-                         "outlfn":          fileInfo['outlfn'],
-                         "events":          fileInfo['events'],
+                         "outlfn":          file_info['outlfn'],
+                         "events":          file_info.get('events', 0),
                          "outdatasetname":  outdataset,
-                         "directstageout":  int(fileInfo['direct_stageout'])
+                         "directstageout":  int(file_info['direct_stageout'])
                         }
             configreq = configreq.items()
-            if 'outfileruns' in fileInfo:
-                for run in fileInfo['outfileruns']:
+            if 'outfileruns' in file_info:
+                for run in file_info['outfileruns']:
                     configreq.append(("outfileruns", run))
-            if 'outfilelumis' in fileInfo:
-                for lumi in fileInfo['outfilelumis']:
+            if 'outfilelumis' in file_info:
+                for lumi in file_info['outfilelumis']:
                     configreq.append(("outfilelumis", lumi))
-            if 'inparentlfns' in fileInfo:
-                for lfn in fileInfo['inparentlfns']:
+            if 'inparentlfns' in file_info:
+                for lfn in file_info['inparentlfns']:
                     # If the user specified a PFN as input, then the LFN is an empty string
                     # and does not pass validation.
                     if lfn:
@@ -883,10 +903,10 @@ class PostJob():
 
         outlfn = os.path.join(dest_dir, "log", filename)
         source_site = self.source_site
-        if 'SEName' in self.full_report:
-            source_site = self.node_map.get(self.full_report['SEName'], source_site)
-        self.log_size = self.full_report.get(u'log_size', 0)
-        direct_stageout = int(self.full_report.get(u'direct_stageout', 0))
+        if 'SEName' in self.job_report:
+            source_site = self.node_map.get(self.job_report['SEName'], source_site)
+        self.log_size = self.job_report.get(u'log_size', 0)
+        direct_stageout = int(self.job_report.get(u'direct_stageout', 0))
         configreq = {"taskname":        self.ad['CRAB_ReqName'],
                      "pandajobid":      self.crab_id,
                      "outsize":         self.log_size, # Not implemented
@@ -943,25 +963,23 @@ class PostJob():
     def uploadState(self, state):
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
-
         self.setDashboardState(state)
         return 2
 
 
     def getSourceSite(self):
-        if self.full_report.get('executed_site', None):
-            print "Getting source_site from jobReport"
-            return self.full_report['executed_site']
+        if self.job_report.get('executed_site', None):
+            print "Getting source site from jobReport"
+            return self.job_report['executed_site']
+        raise ValueError("Unable to determine source site")
 
-        raise ValueError("Unable to determine source side")
 
-
-    def getFileSourceSite(self, filename, ifile = None):
+    def getFileSourceSite(self, file_name, ifile = None):
         if ifile is None:
-            ifile = getFileIndex(filename, self.outputFiles)
-        if ifile >= 0 and ('outtmplocation' in self.outputFiles[ifile]):
-            return self.outputFiles[ifile]['outtmplocation']
-        return self.node_map.get(self.full_report.get(u"SEName"), self.source_site)
+            ifile = getFileIndex(file_name, self.output_files_info)
+        if ifile is not None and ('outtmplocation' in self.output_files_info[ifile]):
+            return self.output_files_info[ifile]['outtmplocation']
+        return self.node_map.get(self.job_report.get(u"SEName"), self.source_site)
 
 
     def stageout(self, source_dir, dest_dir, *filenames):
@@ -970,15 +988,16 @@ class PostJob():
         transfer_logs = int(self.task_ad['CRAB_SaveLogsFlag'])
         transfer_outputs = int(self.task_ad['CRAB_TransferOutputs'])
         source_sites = []
-        for i,filename in enumerate(filenames):
-            ifile = getFileIndex(filename, self.outputFiles)
+        for i, filename in enumerate(filenames):
+            ifile = getFileIndex(filename, self.output_files_info)
             source_sites.append(self.getFileSourceSite(filename, ifile))
-            if ifile < 0: continue
+            if ifile is None:
+                continue
             outlfn = os.path.join(dest_dir, filename)
-            self.outputFiles[ifile]['outlfn'] = outlfn
-            if 'outtmplocation' not in self.outputFiles[ifile]:
-                self.outputFiles[ifile]['outtmplocation'] = source_sites[-1]
-            self.outputFiles[ifile]['outlocation'] = self.dest_site
+            self.output_files_info[ifile]['outlfn'] = outlfn
+            if 'outtmplocation' not in self.output_files_info[ifile]:
+                self.output_files_info[ifile]['outtmplocation'] = source_sites[-1]
+            self.output_files_info[ifile]['outlocation'] = self.dest_site
 
         transfer_list = resolvePFNs(self.dest_site, source_dir, dest_dir, source_sites, filenames, transfer_logs, transfer_outputs)
         for source, dest in transfer_list:
@@ -995,7 +1014,7 @@ class PostJob():
         else:
             targetClass = FTSJob
 
-        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.log_needs_transfer, self.output, self.task_ad, self.retry_count, self.retry_timeout, self.cmsRunFailed)
+        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.log_needs_transfer, self.job_report_output, self.task_ad, self.retry_count, self.retry_timeout, self.cmsRunFailed)
         fts_job_result = g_Job.run()
         # If no files failed, return success immediately.  Otherwise, see how many files failed.
         if not fts_job_result:
@@ -1133,7 +1152,7 @@ class PostJob():
         stdout = "job_out.%s" % id
         stdout_tmp = "job_out.tmp.%s" % id
         stderr = "job_err.%s" % id
-        jobreport = "jobReport.json.%s" % id
+        job_report = "jobReport.json.%s" % id
 
         logpath = os.path.expanduser("~/%s" % reqname)
         retry_count = self.calculateRetry(id, retry_count)
@@ -1147,10 +1166,10 @@ class PostJob():
             stdout_f.close()
             os.chmod(fname, 0644)
         # NOTE: we now redirect stdout -> stderr; hence, we don't keep stderr in the webdir.
-        if os.path.exists(jobreport):
+        if os.path.exists(job_report):
             fname = os.path.join(logpath, "job_fjr."+id+"."+retry_count+".json")
-            logger.debug("Copying job FJR from %s to %s" % (jobreport, fname))
-            shutil.copy(jobreport, fname)
+            logger.debug("Copying job FJR from %s to %s" % (job_report, fname))
+            shutil.copy(job_report, fname)
             os.chmod(fname, 0644)
 
         if 'X509_USER_PROXY' not in os.environ:
