@@ -63,7 +63,7 @@ class DBSDataDiscovery(DataDiscovery):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
         filedetails = dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], True)
         result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'], datasetfiles = filedetails, locations = locationsMap)
-        self.logger.debug("Got result: %s" % result.result)
+        self.logger.debug("Got %s files" % len(result.result.getFiles()))
         return result
 
 if __name__ == '__main__':
