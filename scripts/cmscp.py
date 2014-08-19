@@ -53,7 +53,10 @@ numberOfRetries = 2
 retryPauseTime = 60
 g_now = None
 g_now_epoch = None
-g_cmsRunFailed = False
+g_job_exit_code = 0
+g_job_report_name = None
+g_job_id = None
+
 
 def parseAd():
     fd = open(os.environ['_CONDOR_JOB_AD'])
@@ -106,85 +109,219 @@ def compress(id):
         tf.add("cmsRun-stdout.log", arcname="cmsRun-stdout-%d.log" % id)
     else:
         print "== ERROR: cmsRun-stdout.log is missing.  Will fail stageout."
-        retval = 60307
+        retval = 80000
     if os.path.exists("cmsRun-stderr.log"):
         print "Adding cmsRun-stderr.log to tarball %s" % output
         tf.add("cmsRun-stderr.log", arcname="cmsRun-stderr-%d.log" % id)
     else:
         print "== ERROR: cmsRun-stderr.log is missing.  Will fail stageout."
-        retval = 60307
+        retval = 80000
     if os.path.exists("FrameworkJobReport.xml"):
         print "Adding FrameworkJobReport.xml to tarball %s" % output
         tf.add("FrameworkJobReport.xml", arcname="FrameworkJobReport-%d.xml" % id)
     else:
         print "== ERROR: FrameworkJobReport.xml is missing.  Will fail stageout."
-        retval = 60307
+        retval = 80000
     tf.close()
     return retval
 
 
-def get_job_id(source):
-    filename = os.path.split(source)[-1]
-    left_piece, fileid = filename.rsplit("_", 1)
-    fileid, right_piece = fileid.split(".", 1)
+def getJobId(source):
+    file_basename = os.path.split(source)[-1]
+    left_piece, right_piece = file_basename.rsplit("_", 1)
+    job_id, file_extension = right_piece.split(".", 1)
     try:
-        fileid = int(fileid)
+        job_id = int(job_id)
     except ValueError:
-        fileid = -1
-    
-    return left_piece + "." + right_piece, fileid
+        job_id = -1
+    orig_file_name = left_piece + "." + file_extension
+    return orig_file_name, job_id
 
 
-def set_se_name(dest_file, se_name, direct=False):
+def getFromJR(key, default = None, location = []):
     """
-    Alter the job report to record where the given file was
-    staged out to.  If we cannot determine the matching file,
-    then record it in the top-level of the JSON (hopefully it
-    means that it is the log file).
+    ------------------------------------------------------------------------------------------
+    Extract and return from the JR section specified by the keys given in the 'location' list
+    (which is expected to be a dictionary) the value corresponding to the given key ('key').
+    If not found, return 'default'.
+    ------------------------------------------------------------------------------------------
     """
-    print "== Attempting to set SE name of %s for file %s ==" % (se_name, dest_file)
 
-    filename, id = get_job_id(dest_file)
+    with open(g_job_report_name) as fd:
+        job_report = json.load(fd)
 
-    with open("jobReport.json.%d" % id) as fd:
-        full_report = json.load(fd)
+    subreport = job_report
+    subreport_name = ''
 
-    if 'steps' not in full_report or 'cmsRun' not in full_report['steps']:
-        return
-    report = full_report['steps']['cmsRun']
+    for loc in location:
+        if loc in subreport:
+            subreport = subreport[loc]
+            subreport_name += "['%s']" % loc
+        else:
+            print "WARNING: Job report doesn't contain section %s['%s']." % (subreport_name, loc)
+            return default
 
-    if 'output' not in report:
-        return
-    output = report['output']
+    if type(subreport) != dict:
+        if subreport_name:
+            print "WARNING: Job report section %s is not a dict." % subreport_name
+        else:
+            print "WARNING: Job report is not a dict."
+        return default
 
-    found_output = False
-    for outputModule in output.values():
-        for outputFile in outputModule:
-            if os.path.split(str(outputFile.get(u"pfn")))[-1] != filename:
-                continue
-            outputFile['SEName'] = se_name
-            outputFile['direct_stageout'] = direct
-            found_output = True
-            break
+    return subreport.get(key, default)
 
-    if not found_output:
-        full_report['SEName'] = se_name
-        full_report['direct_stageout'] = direct
+
+def getOutputFileFromJR(file_name, job_report = None):
+    """
+    ------------------------------------------------------------------------------------------
+    Extract and return from the JR ('job_report') section ['steps']['cmsRun']['output'] the 
+    part corresponding to the given output file ('file_name'). If not found, return None.
+    ------------------------------------------------------------------------------------------
+    """
+
+    if job_report is None:
+        with open(g_job_report_name) as fd:
+            job_report = json.load(fd)
+
+    job_report_output = job_report['steps']['cmsRun']['output']
+    for output_module in job_report_output.values():
+        for output_file_info in output_module:
+            if os.path.split(str(output_file_info.get(u'pfn')))[-1] == file_name:
+                return output_file_info
+
+    return None
+
+
+def addToJR(key_value_pairs, location = [], mode = 'new'):
+    """
+    ------------------------------------------------------------------------------------------
+    Add pairs of (key, value) given in the 'key_value_pairs' list (a list of 2-tuples) to the
+    JR in the section specified by the keys given in the 'location' list. This JR section
+    is expected to be a dictionary. For example, if location = ['steps', 'cmsRun', 'output'],
+    add each (key, value) pair in 'key_value_pairs' to JR['steps']['cmsRun']['output'] (for
+    short JR[location]). There are three different modes ('mode') of adding the information
+    to the JR: 'override' (does a direct assignment: JR[location][key] = value), 'new'
+    (same as 'override', but the given key must not exist in JR[location]; if it exists,
+    don't modify the JR and return False) and 'update' (JR[location][key] is a list and so
+    append the value into that list; if the key doesn't exist in JR[location], add it). In 
+    case of an identified problem, don't modify the JR, print a warning message and return
+    False. Return True otherwise.
+    ------------------------------------------------------------------------------------------
+    """
+
+    with open(g_job_report_name) as fd:
+        job_report = json.load(fd)
+
+    subreport = job_report
+    subreport_name = ''
+
+    for loc in location:
+        if loc in subreport:
+            subreport = subreport[loc]
+            subreport_name += "['%s']" % loc
+        else:
+            print "WARNING: Job report doesn't contain section %s['%s']." % (subreport_name, loc)
+            return False
+
+    if type(subreport) != dict:
+        if subreport_name:
+            print "WARNING: Job report section %s is not a dict." % subreport_name
+        else:
+            print "WARNING: Job report is not a dict."
+        return False
+
+    if mode in ['new', 'override']:
+        for key, value in key_value_pairs:
+            if mode == 'new' and key in subreport:
+                print "WARNING: Key '%s' already exists in job report section %s." % (key, subreport_name)
+                return False
+            subreport[key] = value
+    elif mode == 'update':
+        for key, value in key_value_pairs:
+            subreport.setdefault(key, []).append(value)
+    else:
+        print "WARNING: Unknown mode '%s'." % mode
+        return False
+
+    with open(g_job_report_name, "w") as fd:
+        json.dump(job_report, fd)
+
+    return True
+
+
+def addOutputFileToJR(file_name, key = 'addoutput'):
+    """
+    ------------------------------------------------------------------------------------------
+    Add the given output file ('file_name') to the JR section ['steps']['cmsRun']['output']
+    under the given key ('key'). The value to add is a dictionary {'pfn': file_name}.
+    ------------------------------------------------------------------------------------------
+    """
+
+    print "==== Attempting to add file %s to job report. ====" % file_name
+
+    output_file_info = {}
+    output_file_info['pfn'] = file_name
+
+    is_ok = addToJR([(key, output_file_info)], location = ['steps', 'cmsRun', 'output'], mode = 'update')
+
+    if not is_ok:
+        print "==== Failed to add file %s to job report. ====" % file_name
+    else:
+        print "==== Successfully added file %s to job report. ====" % file_name
+
+    return is_ok
+
+
+def addSEToJR(file_name, se_name, direct_stageout, is_log):
+    """
+    ------------------------------------------------------------------------------------------
+    Alter the JR to record where the given file ('file_name') was staged out to ('se_name')
+    and whether it was a direct stageout or not ('direct_stageout'). If the given file is
+    the log ('is_log' = True), record in the top-level of the JR. 
+    ------------------------------------------------------------------------------------------
+    """
+
+    print "== Attempting to set SE name to %s for file %s in job report. ==" % (se_name, file_name)
+
+    is_ok = True
+
+    if is_log:
+        pairs_to_add_to_job_report = [('SEname', se_name), ('direct_stageout', direct_stageout)]
         try:
-            full_report['log_size'] = os.stat(dest_file).st_size
+            log_size = os.stat(file_name).st_size
         except:
             pass
+        else:
+            pairs_to_add_to_job_report.append(('log_size', log_size))
+        is_ok = addToJR(pairs_to_add_to_job_report)
+    else:
+        orig_file_name, _ = getJobId(file_name)
+        with open(g_job_report_name) as fd:
+            job_report = json.load(fd)
+        output_file_info = getOutputFileFromJR(orig_file_name, job_report)
+        if not output_file_info:
+            print "WARNING: Metadata for file %s not found in job report." % file_name
+            is_ok = False
+        output_file_info['SEName'] = se_name
+        output_file_info['direct_stageout'] = direct_stageout
+        with open(g_job_report_name, "w") as fd:
+            json.dump(job_report, fd)
 
-    with open("jobReport.json.%d" % id, "w") as fd:
-        json.dump(full_report, fd)
+    if not is_ok:
+        print "== Failed to set SE name for file %s in job report. ==" % file_name
+    else:
+        print "== Successfully set SE name for file %s in job report. ==" % file_name
+
+    return is_ok
 
 
-def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_se, inject = True):
+def performTransfer(manager, stageout_policy, source_file, dest_temp_lfn, dest_pfn, dest_se, is_log, inject = True):
+
     result = -1
     for policy in stageout_policy:
         if policy == "local":
             print "== Attempting local stageout at %s. ==" % time.ctime()
-            result = performLocalTransfer(manager, source, dest, inject = inject)
+            result = performLocalTransfer(manager, source_file, dest_temp_lfn, is_log, inject)
             if result:
                 print "== ERROR: Local stageout resulted in status %d at %s. ==" % (result, time.ctime())
             else:
@@ -192,7 +329,7 @@ def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_s
                 break
         elif policy == "remote":
             print "== Attempting remote stageout at %s. ==" % time.ctime()
-            result = performDirectTransfer(source, direct_pfn, direct_se)
+            result = performDirectTransfer(source_file, dest_pfn, dest_se, is_log)
             if result:
                 print "== ERROR: Remote stageout resulted in status %d at %s. ==" % (result, time.ctime())
             else:
@@ -200,22 +337,26 @@ def performTransfer(manager, stageout_policy, source, dest, direct_pfn, direct_s
                 break
         else:
             print "== ERROR: Skipping unknown policy named '%s'. ==" % policy
+
     if result == -1:
         print "== FATAL ERROR: No stageout policy was attempted. =="
-        result = 60307
+        result = 80000
+
     return result
 
 
-def performLocalTransfer(manager, source, dest, inject = True):
-    fileForTransfer = {'LFN': dest, 'PFN': source}
+def performLocalTransfer(manager, source_file, dest_temp_lfn, is_log, inject = True):
+
+    fileForTransfer = {'LFN': dest_temp_lfn, 'PFN': source_file}
     signal.signal(signal.SIGALRM, alarmHandler)
     signal.alarm(waitTime)
     result = 0
+
     try:
         # Throws on any failure
         stageout_info = manager(fileForTransfer)
     except Alarm:
-        print "Indefinite hang during stageOut of %s" % dest
+        print "== Timeout reached during stageOut of %s; setting return code to 60403. ==" % dest_temp_lfn
         try:
             manager.cleanSuccessfulStageOuts()
         except StageOutError:
@@ -230,14 +371,18 @@ def performLocalTransfer(manager, source, dest, inject = True):
         result = 60307
     finally:
         signal.alarm(0)
+
     if not result:
-        set_se_name(os.path.split(dest)[-1], stageout_info['SEName'])
+        dest_temp_file_name = os.path.split(dest_temp_lfn)[-1]
+        se_name = stageout_info['SEName']
+        addSEToJR(dest_temp_file_name, se_name, direct_stageout = False, is_log = is_log)
         if inject:
-            injectToASO(dest, stageout_info['SEName'])
+            injectToASO(dest_temp_lfn, stageout_info['SEName'], is_log)
+
     return result
 
 
-def injectToASO(dest_lfn, se_name):
+def injectToASO(source_lfn, se_name, is_log):
     ad = parseAd()
     for attr in ["CRAB_ASOURL", "CRAB_AsyncDest", "CRAB_InputData", "CRAB_UserGroup", "CRAB_UserRole", "CRAB_DBSURL",\
                  "CRAB_PublishDBSURL", "CRAB_ReqName", "CRAB_UserHN", "CRAB_Publish"]:
@@ -250,44 +395,27 @@ def injectToASO(dest_lfn, se_name):
     if not os.path.exists(os.environ['X509_USER_PROXY']):
         print "==== ERROR: User proxy %s missing from disk. ====" % os.environ['X509_USER_PROXY']
         return False
-    source_dir, fname = os.path.split(dest_lfn)
-    local_fname, id = get_job_id(fname)
-    found_logfile = False
-    file_type = 'output'
-    dest_lfn = os.path.join(source_dir, fname)
-    if re.match("cmsRun_[0-9]+.log.tar.gz", fname):
-        found_logfile = True
-        file_type = 'log'
+    source_dir, file_name = os.path.split(source_lfn)
+    file_type = 'log' if is_log else 'output'
+    source_lfn = os.path.join(source_dir, file_name)
 
-    with open("jobReport.json.%d" % id) as fd:
-        full_report = json.load(fd)
+    orig_file_name, id = getJobId(file_name)
 
-    if not found_logfile:
-        if 'steps' not in full_report or 'cmsRun' not in full_report['steps']:
-            return
-        report = full_report['steps']['cmsRun']
-
-        if 'output' not in report:
-            return
-        output = report['output']
-
-        found_output = False
-        for outputModule in output.values():
-            for outputFile in outputModule:
-                if os.path.split(str(outputFile.get(u"pfn")))[-1] != local_fname:
-                    continue
-                checksums = outputFile.get(u"checksums", {"cksum": "0", "adler32": "0"})
-                size = outputFile.get(u"size", 0)
-                isEDM = (outputFile.get(u"output_module_class","") == u'PoolOutputModule' or \
-                         outputFile.get(u"ouput_module_class" ,"") == u'PoolOutputModule')
-                found_output = True
-        if not found_output:
-            print "==== ERROR: Unable to find output file in FrameworkJobReport.  Cannot inject to ASO."
-            return False
-    else:
-        size = full_report.get(u'log_size', 0)
+    if is_log:
+        size = getFromJR(u'log_size', 0)
         # Copied from PostJob.py, but not sure if it does anything. BB
         checksums = {'adler32': 'abc'}
+    else:
+        output_file_info = getOutputFileFromJR(orig_file_name)
+        if output_file_info:
+            checksums = output_file_info.get(u'checksums', {'cksum': '0', 'adler32': '0'})
+            size = output_file_info.get(u'size', 0)
+            isEDM = (output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
+                     output_file_info.get(u'ouput_module_class' , '') == u'PoolOutputModule')
+        else:
+            checksums = {'cksum': '0', 'adler32': '0'}
+            size = 0
+            isEDM = False
 
     p = PhEDEx.PhEDEx()
     nodes = p.getNodeMap()['phedex']['node']
@@ -297,7 +425,7 @@ def injectToASO(dest_lfn, se_name):
             node_name = str(node[u'name'])
             break
     if not node_name:
-        print "==== ERROR: Unable to determine local node name.  Cannot inject to ASO. ===="
+        print "==== ERROR: Unable to determine local node name. Cannot inject to ASO. ===="
         return False
 
     role = str(ad['CRAB_UserRole'])
@@ -310,8 +438,8 @@ def injectToASO(dest_lfn, se_name):
     task_publish = int(ad['CRAB_Publish'])
     publish = int(task_publish and file_type == 'output' and isEDM)
     if task_publish and file_type == 'output' and not isEDM:
-        print "Disabling publication of output file %s, because it is not of EDM type." % fname
-    publish = int(publish and not g_cmsRunFailed)
+        print "Disabling publication of output file %s, because it is not of EDM type." % file_name
+    publish = int(publish and not g_job_exit_code)
     publish_dbs_url = str(ad['CRAB_PublishDBSURL'])
     if publish_dbs_url.lower() == 'undefined':
         publish_dbs_url = "https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/"
@@ -323,9 +451,9 @@ def injectToASO(dest_lfn, se_name):
         g_now = str(datetime.datetime.now())
         g_now_epoch = last_update
 
-    # NOTE: it's almost certainly a mistake to include dest_lfn in the hash here as it
-    # includes /store/temp/user/foo.$HASH.  We should normalize based on the final LFN (/store/user/...)
-    doc_id = hashlib.sha224(dest_lfn).hexdigest()
+    ## NOTE: it's almost certainly a mistake to include source_lfn in the hash here as it
+    ## includes /store/temp/user/foo.$HASH. We should normalize based on the final LFN (/store/user/...)
+    doc_id = hashlib.sha224(source_lfn).hexdigest()
     info = {"state": "new",
             "source": node_name,
             "destination": ad['CRAB_AsyncDest'],
@@ -342,21 +470,20 @@ def injectToASO(dest_lfn, se_name):
     print "ASO info so far:"
     print info
 
-    couchServer = CMSCouch.CouchServer(dburl=ad['CRAB_ASOURL'], ckey=os.environ['X509_USER_PROXY'], cert=os.environ['X509_USER_PROXY'])
+    couchServer = CMSCouch.CouchServer(dburl = ad['CRAB_ASOURL'], ckey = os.environ['X509_USER_PROXY'], cert = os.environ['X509_USER_PROXY'])
     couchDatabase = couchServer.connectDatabase("asynctransfer", create = False)
     print "Stageout job description: %s" % pprint.pformat(info)
 
     try:
         doc = couchDatabase.document(doc_id)
         doc.update(info)
-        print ("Will retry LFN %s (id %s)" % (dest_lfn, doc_id))
+        print ("Will retry LFN %s (id %s)" % (source_lfn, doc_id))
     except CMSCouch.CouchNotFoundError:
-        print "LFN %s (id %s) is not yet known to ASO; uploading new stageout job." % (dest_lfn, doc_id)
+        print "LFN %s (id %s) is not yet known to ASO; uploading new stageout job." % (source_lfn, doc_id)
         doc = {"_id": doc_id,
                "inputdataset": ad["CRAB_InputData"],
                "group": group,
-               "lfn": dest_lfn.replace('/store/user', '/store/temp/user', 1),
-               "checksums": checksums,
+               "lfn": source_lfn,
                "user": ad['CRAB_UserHN'],
                "role": role,
                "dbSource_url": "gWMS",
@@ -366,8 +493,8 @@ def injectToASO(dest_lfn, se_name):
                "jobid": id,
                "publication_state": 'not_published',
                "publication_retry_count": [],
-               "type" : file_type,
-               "publish" : publish,
+               "type": file_type,
+               "publish": publish,
               }
         doc.update(info)
     except Exception, ex:
@@ -382,17 +509,15 @@ def injectToASO(dest_lfn, se_name):
         print(commit_result)
         return False
     print "Final stageout job description: %s" % pprint.pformat(doc)
-    full_report['aso_start_time'] = g_now
-    full_report['aso_start_timestamp'] = g_now_epoch
-    with open("jobReport.json.%d" % id, "w") as fd:
-        json.dump(full_report, fd)
+
+    addToJR([('aso_start_time', g_now), ('aso_start_timestamp', g_now_epoch)], location = [], mode = 'override')
 
     return True
 
 
-def performDirectTransfer(source, direct_pfn, direct_se):
+def performDirectTransfer(source_file, dest_pfn, dest_se, is_log):
     try:
-        return performDirectTransferImpl(source, direct_pfn, direct_se)
+        return performDirectTransferImpl(source_file, dest_pfn, dest_se, is_log)
     except WMException.WMException, ex:
         print "="*79
         print "==== START DUMP OF TRANSFER ERROR INFO ===="
@@ -404,18 +529,16 @@ def performDirectTransfer(source, direct_pfn, direct_se):
         return ex.data.get("ErrorCode", 60307)
 
 
-def performDirectTransferImpl(source, direct_pfn, direct_se):
+def performDirectTransferImpl(source_file, dest_pfn, dest_se, is_log):
     command = "srmv2-lcg"
     protocol = "srmv2"
     
     try:
         impl = retrieveStageOutImpl(command)
     except Exception, ex:
-        msg = "Unable to retrieve impl for local stage out:\n"
-        msg += "Error retrieving StageOutImpl for command named: %s\n" % (
-            command,)
-        raise StageOutError.StageOutFailure(msg, Command = command,
-                              LFN = direct_pfn, ExceptionDetail = str(ex))
+        msg  = "Unable to retrieve impl for local stage out:\n"
+        msg += "Error retrieving StageOutImpl for command named: %s\n" % (command,)
+        raise StageOutError.StageOutFailure(msg, Command = command, LFN = dest_pfn, ExceptionDetail = str(ex))
 
     impl.numRetries = numberOfRetries
     impl.retryPause = retryPauseTime
@@ -423,9 +546,9 @@ def performDirectTransferImpl(source, direct_pfn, direct_se):
     signal.alarm(waitTime)
     result = 0
     try:
-        impl(protocol, source, direct_pfn, None, None)
+        impl(protocol, source_file, dest_pfn, None, None)
     except Alarm:
-        print "== Indefinite hang during stageOut of %s; setting return code to 60403." % source
+        print "== Timeout reached during stageOut of %s; setting return code to 60403. ==" % source_file
         result = 60403
     except Exception, ex:
         msg = "== Failure for local stage out:\n"
@@ -434,14 +557,13 @@ def performDirectTransferImpl(source, direct_pfn, direct_se):
             msg += traceback.format_exc()
         except AttributeError, ex:
             msg += "Traceback unavailable\n"
-        raise StageOutError.StageOutFailure(msg, Command = command, Protocol = protocol,
-                              LFN = direct_pfn, InputPFN = source,
-                              TargetPFN = direct_pfn)
+        raise StageOutError.StageOutFailure(msg, Command = command, Protocol = protocol, LFN = dest_pfn, InputPFN = source_file, TargetPFN = dest_pfn)
     finally:
         signal.alarm(0)
 
     if not result:
-        set_se_name(os.path.split(direct_pfn)[-1], direct_se, direct = True)
+        dest_file_name = os.path.split(dest_pfn)[-1]
+        addSEToJR(dest_file_name, dest_se, direct_stageout = True, is_log = is_log)
 
     return result
 
@@ -449,10 +571,9 @@ def performDirectTransferImpl(source, direct_pfn, direct_se):
 def main():
 
     # Parse the job ad to get the stageout information.
-    crab_id = -1
     output_files = None
     dest_se = None
-    dest_dir = None
+    dest_temp_dir = None
     dest_files = None
     stageout_policy = None
     transfer_logs = None
@@ -460,11 +581,11 @@ def main():
     if '_CONDOR_JOB_AD' not in os.environ:
         print "== ERROR: _CONDOR_JOB_AD not in environment =="
         print "No stageout will be performed."
-        return 60318
+        return 80000
     elif not os.path.exists(os.environ['_CONDOR_JOB_AD']):
         print "== ERROR: _CONDOR_JOB_AD (%s) does not exist =="
         print "No stageout will be performed."
-        return 60307
+        return 80000
     else:
         #XXX why don't we use parseAd() ?
         attr_re = re.compile("([A-Z_a-z0-9]+?) = (.*)")
@@ -476,13 +597,14 @@ def main():
                     continue
                 name, val = m.groups()
                 if name == 'CRAB_Id':
-                    crab_id = int(val)
+                    global g_job_id
+                    g_job_id = int(val)
                 elif name == "CRAB_localOutputFiles":
                     output_files = split_re.split(val.replace('"', ''))
                 elif name == "CRAB_AsyncDestSE":
                     dest_se = val.replace('"', '')
                 elif name == "CRAB_Dest":
-                    dest_dir = val.replace('"', '')
+                    dest_temp_dir = val.replace('"', '')
                 elif name == "CRAB_Destination":
                     dest_files = split_re.split(val.replace('"', ''))
                 elif name == "CRAB_StageoutPolicy":
@@ -491,40 +613,64 @@ def main():
                     transfer_logs = int(val)
                 elif name == "CRAB_TransferOutputs":
                     transfer_outputs = int(val)
-        if crab_id == -1:
+        if g_job_id == None:
             print "== ERROR: Unable to determine CRAB Job ID."
             print "No stageout will be performed."
-            return 60307
+            return 80000
         if output_files == None:
             print "== ERROR: Unable to determine output files."
             print "No stageout will be performed."
-            return 60307
+            return 80000
         if dest_se == None:
             print "== ERROR: Unable to determine destination SE."
             print "No stageout will be performed."
-            return 60307
-        if dest_dir == None:
+            return 80000
+        if dest_temp_dir == None:
             print "== ERROR: Unable to determine local destination directory."
             print "No stageout will be performed."
-            return 60307
+            return 80000
         if dest_files == None:
             print "== ERROR: Unable to determine remote destinations."
             print "No stageout will be performed."
-            return 60307
+            return 80000
         if stageout_policy == None:
             print "== ERROR: Unable to determine stageout policy."
             print "No stageout will be performed."
-            return 60307
+            return 80000
         else:
             print "Stageout policy: %s" % ", ".join(stageout_policy)
         if transfer_logs == None: #well, actually we might assume saveLogs=False and delete these lines..
             print "== ERROR: Unable to determine transfer_logs parameter."
             print "No stageout will be performed."
-            return 60307
+            return 80000
         if transfer_outputs == None:
             print "== ERROR: Unable to determine transfer_outputs parameter."
             print "No stageout will be performed."
-            return 60307
+            return 80000
+
+    ## Set the JR name.
+    global g_job_report_name
+    g_job_report_name = 'jobReport.json.%d' % g_job_id
+
+    ## Retrive the JR.
+    try:
+        with open(g_job_report_name) as fd:
+            job_report = json.load(fd)
+    except Exception, ex:
+        print "== ERROR: Unable to retrieve %s." % g_job_report_name
+        traceback.print_exc()
+        return 80000
+
+    ## Sanity check of the JR.
+    if 'steps'  not in job_report:
+        print "== ERROR: Invalid job report: missing 'steps'."
+        return 80000
+    if 'cmsRun' not in job_report['steps']:
+        print "== ERROR: Invalid job report: missing 'cmsRun'."
+        return 80000
+    if 'output' not in job_report['steps']['cmsRun']:
+        print "== ERROR: Invalid job report: missing 'output'."
+        return 80000
 
     # The stageout manager will be used by all attempts
     stageOutCall = {}
@@ -535,77 +681,85 @@ def main():
     manager.retryPauseTime = retryPauseTime
     manager.numberOfRetries = numberOfRetries
 
-    counter = "%04d" % (crab_id / 1000)
-    dest_dir = os.path.join(dest_dir, counter)
+    counter = "%04d" % (g_job_id / 1000)
+    dest_temp_dir = os.path.join(dest_temp_dir, counter)
 
     # Try to determine whether the payload actually succeeded.
-    # If it did not, we place it in a different directory.  This prevents
+    # If it did not, we place it in a different directory. This prevents
     # us from putting failed ROOT files in the same directory as successful
     # files; we worry that users may simply 'ls' the directory and run on
     # all files.
-    global g_cmsRunFailed
-    g_cmsRunFailed = False
-    try:    
-        with open("jobReport.json.%d" % crab_id) as fd:
-            full_report = json.load(fd)
-            g_cmsRunFailed = bool(full_report['jobExitCode'])
+    global g_job_exit_code
+    g_job_exit_code = 0
+    try: 
+        g_job_exit_code = job_report['jobExitCode']
     except Exception, ex:
-        print "== WARNING: Unable to determine whether cmsRun succeeded."
-        traceback.print_exc() 
-    if g_cmsRunFailed:
-        dest_dir = os.path.join(dest_dir, "failed")
+        print "== WARNING: Unable to retrieve cmsRun exit code from job report."
+        traceback.print_exc()
+    if g_job_exit_code:
+        dest_temp_dir = os.path.join(dest_temp_dir, "failed")
 
-    log_file = "cmsRun_%d.log.tar.gz" % crab_id
-    dest = os.path.join(dest_dir, "log", log_file)
+    ## Transfer of log tarball.
+    logfile_name = 'cmsRun_%d.log.tar.gz' % g_job_id
+    dest_temp_lfn = os.path.join(dest_temp_dir, "log", logfile_name)
     try:
         print "==== Starting compression of user logs at %s ====" % time.ctime()
-        std_retval = compress(crab_id)
+        std_retval = compress(g_job_id)
         print "==== Finished compression of user logs at %s (status %d) ====" % (time.ctime(), std_retval)
         if not std_retval:
             print "==== Starting stageout of user logs at %s ====" % time.ctime()
             if not transfer_logs:
-                print "Performing only local stageout for log files as the user did not specify saveLogs = True"
-            std_retval = performTransfer(manager, stageout_policy if transfer_logs else ["local"], log_file, dest, dest_files[0], dest_se, inject = transfer_logs)
+                print "Performing only local stageout of user logs since the user did not specify General.saveLogs = True"
+            dest_pfn = dest_files.pop(0)
+            std_retval = performTransfer(manager, stageout_policy if transfer_logs else ["local"], \
+                                         logfile_name, dest_temp_lfn, dest_pfn, dest_se, is_log = True, inject = transfer_logs)
     except Exception, ex:
         print "== ERROR: Unhandled exception when performing stageout of user logs."
         traceback.print_exc()
         if not std_retval:
-            std_retval = 60307
+            std_retval = 60318
     finally:
-        print "==== Stageout of user logs ended at %s (status %d) ====" % (time.ctime(), std_retval)
+        print "==== Finished stageout of user logs at %s (status %d) ====" % (time.ctime(), std_retval)
     if not transfer_logs and std_retval:
-        print "Ignoring log stageout failure, because user did not request the logs to be staged out."
+        print "Ignoring stageout failure of user logs, because the user did not request the logs to be staged out."
         std_retval = 0
 
+    ## Transfer of output files.
     out_retval = 0
-    for dest, remote_dest in zip(output_files, dest_files[1:]):
-        info = dest.split("=")
-        if len(info) != 2:
-            print "== ERROR: Invalid output format (%s)." % dest
-            out_retval = 60307
+    for outfile_name_info, dest_pfn in zip(output_files, dest_files):
+        if len(outfile_name_info.split("=")) != 2:
+            print "== ERROR: Invalid output format (%s)." % outfile_name_info
+            out_retval = 80000
             continue
-        source_file, dest_file = info
-        if not os.path.exists(source_file):
-            print "== ERROR: Output file %s does not exist." % source_file
-            out_retval = 60307
+        outfile_name, dest_outfile_name = outfile_name_info.split("=")
+        if not os.path.exists(outfile_name):
+            print "== ERROR: Output file %s does not exist." % outfile_name
+            out_retval = 60302
             continue
-        dest = os.path.join(dest_dir, dest_file)
+        ## Check if the file is in the JR. If it is not, add it.
+        is_file_in_job_report = bool(getOutputFileFromJR(outfile_name))
+        if not is_file_in_job_report:
+            addOutputFileToJR(outfile_name)
+        ## Try to do the transfer.
+        dest_temp_lfn = os.path.join(dest_temp_dir, dest_outfile_name)
         try:
-            print "==== Starting stageout of %s at %s ====" % (source_file, time.ctime())
+            print "==== Starting stageout of %s at %s ====" % (outfile_name, time.ctime())
             if not transfer_outputs:
-                print "Performing only local stageout for output files as the user specified transferOutput = False"
-            cur_out_retval = performTransfer(manager, stageout_policy if transfer_outputs else ["local"], source_file, dest, remote_dest, dest_se, inject = transfer_outputs)
+                print "Performing only local stageout of output files since the user specified General.transferOutput = False"
+            cur_out_retval = performTransfer(manager, stageout_policy if transfer_outputs else ["local"], \
+                                             outfile_name, dest_temp_lfn, dest_pfn, dest_se, is_log = False, inject = transfer_outputs)
         except Exception, ex:
             print "== ERROR: Unhandled exception when performing stageout of user outputs."
             traceback.print_exc()
-            cur_out_retval = 60307
+            cur_out_retval = 60318
         finally:
-            print "====  Finished stageout of %s at %s (status %d) ====" % (source_file, time.ctime(), out_retval)
+            print "==== Finished stageout of %s at %s (status %d) ====" % (outfile_name, time.ctime(), out_retval)
         if cur_out_retval and not out_retval:
             out_retval = cur_out_retval
 
     if std_retval:
         return std_retval
+
     return out_retval
 
 
@@ -614,8 +768,11 @@ if __name__ == '__main__':
     try:
         retval = main()
     except:
-        retval = 60307
+        print "==== ERROR: Unhandled exception."
         traceback.print_exc()
+        retval = 60307
+    if g_job_exit_code:
+        retval = g_job_exit_code
     if retval:
         try:
             reportFailureToDashboard(retval)
