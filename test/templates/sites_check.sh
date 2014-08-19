@@ -25,8 +25,9 @@ fi
 cd $WORK_DIR
 if [ ! -d "$CMSSW" ]; then
   cmsrel $CMSSW
-  cd $WORK_DIR/$CMSSW/src/
 fi
+cd $WORK_DIR/$CMSSW/src/
+
 
 #Setup CMS environment
 cmsenv
@@ -45,7 +46,7 @@ do
   file_name_temp=${file_name:2:(${#file_name})-5};
 
 #Generate new name
-    new_name=$TAG-$VERSION-$file_name_temp-'_Site-'$site_name
+    new_name='site_'$TAG-$VERSION-$file_name_temp-$site_name
     publish_name=$new_name-`date +%s`
     echo $new_name
 #General part

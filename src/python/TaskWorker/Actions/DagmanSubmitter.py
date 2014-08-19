@@ -154,7 +154,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             except Exception, e:
                 msg = "Failed to submit task %s; '%s'" % (kw['task']['tm_taskname'], str(e))
                 self.logger.error(msg)
-                retry_issues.append(base64.b64encode(msg))
+                retry_issues.append(msg)
                 self.logger.error("Will retry in %s seconds." % str(self.config.TaskWorker.retry_interval[retry]))
                 time.sleep(self.config.TaskWorker.retry_interval[retry])
         msg = "All retries have failed. Failures : %s" % str(retry_issues)

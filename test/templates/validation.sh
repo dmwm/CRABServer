@@ -32,8 +32,8 @@ fi
 cd $WORK_DIR
 if [ ! -d "$CMSSW" ]; then
   cmsrel $CMSSW
-  cd $WORK_DIR/$CMSSW/src/
 fi
+cd $WORK_DIR/$CMSSW/src/
 
 #Setup CMS environment
 cmsenv
