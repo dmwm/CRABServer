@@ -162,7 +162,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         configreq = {'workflow': kw['task']['tm_taskname'],
                      'status': "FAILED",
                      'subresource': 'failure',
-                     'failure': base64.b64encode(msg)}
+                     'failure': str(msg)}
         self.server.post(self.resturl, data = urllib.urlencode(configreq))
         raise Exception(msg)
 
