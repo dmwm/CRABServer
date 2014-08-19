@@ -25,14 +25,15 @@ class Splitter(TaskAction):
         jobfactory = splitter(subscription=wmsubs)
         splitparam = kwargs['task']['tm_split_args']
         splitparam['algorithm'] = kwargs['task']['tm_split_algo']
+        if kwargs['task']['tm_job_type'] == 'Analysis':
+            if kwargs['task']['tm_split_algo'] == 'FileBased':
+                splitparam['total_files'] = kwargs['task']['tm_totalunits']
+            elif kwargs['task']['tm_split_algo'] == 'LumiBased':
+                splitparam['total_lumis'] = kwargs['task']['tm_totalunits']
         factory = jobfactory(**splitparam)
         if len(factory) == 0:
-            # Understanding that no jobs could be created given the splitting arguments
-            # with the given input dataset information: NO IDEA WHY.
-            # NB: we assume that split can't happen, then task is failed
-            msg = "Splitting %s on %s with %s does not generate any job" %(kwargs['task']['tm_taskname'],
-                                                                           kwargs['task']['tm_input_dataset'],
-                                                                           kwargs['task']['tm_split_algo'])
+            msg = "Splitting task %s on dataset %s with %s method does not generate any job" \
+                  % (kwargs['task']['tm_taskname'], kwargs['task']['tm_input_dataset'], kwargs['task']['tm_split_algo'])
             self.logger.error("Setting %s as failed" % str(kwargs['task']['tm_taskname']))
             configreq = {'workflow': kwargs['task']['tm_taskname'],
                          'status': "FAILED",
@@ -40,7 +41,7 @@ class Splitter(TaskAction):
                          'failure': b64encode(msg)}
             self.server.post(self.resturl, data = urllib.urlencode(configreq))
             raise StopHandler(msg)
-        return Result(task=kwargs['task'], result=factory)
+        return Result(task = kwargs['task'], result = factory)
 
 
 if __name__ == '__main__':
