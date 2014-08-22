@@ -53,6 +53,7 @@ numberOfRetries = 2
 retryPauseTime = 60
 g_now = None
 g_now_epoch = None
+g_cmsRun_exit_code = 0
 g_job_exit_code = 0
 g_job_report_name = None
 g_job_id = None
@@ -146,13 +147,12 @@ def getFromJR(key, default = None, location = []):
     If not found, return 'default'.
     ------------------------------------------------------------------------------------------
     """
-
+    if g_job_report_name is None:
+        return default
     with open(g_job_report_name) as fd:
         job_report = json.load(fd)
-
     subreport = job_report
     subreport_name = ''
-
     for loc in location:
         if loc in subreport:
             subreport = subreport[loc]
@@ -160,14 +160,12 @@ def getFromJR(key, default = None, location = []):
         else:
             print "WARNING: Job report doesn't contain section %s['%s']." % (subreport_name, loc)
             return default
-
     if type(subreport) != dict:
         if subreport_name:
             print "WARNING: Job report section %s is not a dict." % subreport_name
         else:
             print "WARNING: Job report is not a dict."
         return default
-
     return subreport.get(key, default)
 
 
@@ -178,21 +176,20 @@ def getOutputFileFromJR(file_name, job_report = None):
     part corresponding to the given output file ('file_name'). If not found, return None.
     ------------------------------------------------------------------------------------------
     """
-
     if job_report is None:
+        if g_job_report_name is None:
+            return None
         with open(g_job_report_name) as fd:
             job_report = json.load(fd)
-
     job_report_output = job_report['steps']['cmsRun']['output']
     for output_module in job_report_output.values():
         for output_file_info in output_module:
             if os.path.split(str(output_file_info.get(u'pfn')))[-1] == file_name:
                 return output_file_info
-
     return None
 
 
-def addToJR(key_value_pairs, location = [], mode = 'new'):
+def addToJR(key_value_pairs, location = [], mode = 'overwrite'):
     """
     ------------------------------------------------------------------------------------------
     Add pairs of (key, value) given in the 'key_value_pairs' list (a list of 2-tuples) to the
@@ -200,21 +197,20 @@ def addToJR(key_value_pairs, location = [], mode = 'new'):
     is expected to be a dictionary. For example, if location = ['steps', 'cmsRun', 'output'],
     add each (key, value) pair in 'key_value_pairs' to JR['steps']['cmsRun']['output'] (for
     short JR[location]). There are three different modes ('mode') of adding the information
-    to the JR: 'override' (does a direct assignment: JR[location][key] = value), 'new'
-    (same as 'override', but the given key must not exist in JR[location]; if it exists,
+    to the JR: 'overwrite' (does a direct assignment: JR[location][key] = value), 'new'
+    (same as 'overwrite', but the given key must not exist in JR[location]; if it exists,
     don't modify the JR and return False) and 'update' (JR[location][key] is a list and so
     append the value into that list; if the key doesn't exist in JR[location], add it). In 
     case of an identified problem, don't modify the JR, print a warning message and return
     False. Return True otherwise.
     ------------------------------------------------------------------------------------------
     """
-
+    if g_job_report_name is None:
+        return False
     with open(g_job_report_name) as fd:
         job_report = json.load(fd)
-
     subreport = job_report
     subreport_name = ''
-
     for loc in location:
         if loc in subreport:
             subreport = subreport[loc]
@@ -222,15 +218,13 @@ def addToJR(key_value_pairs, location = [], mode = 'new'):
         else:
             print "WARNING: Job report doesn't contain section %s['%s']." % (subreport_name, loc)
             return False
-
     if type(subreport) != dict:
         if subreport_name:
             print "WARNING: Job report section %s is not a dict." % subreport_name
         else:
             print "WARNING: Job report is not a dict."
         return False
-
-    if mode in ['new', 'override']:
+    if mode in ['new', 'overwrite']:
         for key, value in key_value_pairs:
             if mode == 'new' and key in subreport:
                 print "WARNING: Key '%s' already exists in job report section %s." % (key, subreport_name)
@@ -242,10 +236,8 @@ def addToJR(key_value_pairs, location = [], mode = 'new'):
     else:
         print "WARNING: Unknown mode '%s'." % mode
         return False
-
     with open(g_job_report_name, "w") as fd:
         json.dump(job_report, fd)
-
     return True
 
 
@@ -256,63 +248,66 @@ def addOutputFileToJR(file_name, key = 'addoutput'):
     under the given key ('key'). The value to add is a dictionary {'pfn': file_name}.
     ------------------------------------------------------------------------------------------
     """
-
     print "==== Attempting to add file %s to job report. ====" % file_name
-
     output_file_info = {}
     output_file_info['pfn'] = file_name
+    try:
+        file_size = os.stat(file_name).st_size
+    except:
+        pass
+    else:
+        output_file_info['size'] = file_size
 
     is_ok = addToJR([(key, output_file_info)], location = ['steps', 'cmsRun', 'output'], mode = 'update')
-
     if not is_ok:
         print "==== Failed to add file %s to job report. ====" % file_name
     else:
         print "==== Successfully added file %s to job report. ====" % file_name
-
     return is_ok
 
 
-def addSEToJR(file_name, se_name, direct_stageout, is_log):
+def addSEToJR(file_name, is_log, se_name, direct_stageout):
     """
     ------------------------------------------------------------------------------------------
     Alter the JR to record where the given file ('file_name') was staged out to ('se_name')
-    and whether it was a direct stageout or not ('direct_stageout'). If the given file is
-    the log ('is_log' = True), record in the top-level of the JR. 
+    and whether it was a direct stageout or not ('direct_stageout').
     ------------------------------------------------------------------------------------------
     """
-
     print "== Attempting to set SE name to %s for file %s in job report. ==" % (se_name, file_name)
-
     is_ok = True
-
-    if is_log:
-        pairs_to_add_to_job_report = [('SEname', se_name), ('direct_stageout', direct_stageout)]
-        try:
-            log_size = os.stat(file_name).st_size
-        except:
-            pass
-        else:
-            pairs_to_add_to_job_report.append(('log_size', log_size))
-        is_ok = addToJR(pairs_to_add_to_job_report)
-    else:
-        orig_file_name, _ = getJobId(file_name)
-        with open(g_job_report_name) as fd:
-            job_report = json.load(fd)
-        output_file_info = getOutputFileFromJR(orig_file_name, job_report)
-        if not output_file_info:
-            print "WARNING: Metadata for file %s not found in job report." % file_name
-            is_ok = False
-        output_file_info['SEName'] = se_name
-        output_file_info['direct_stageout'] = direct_stageout
-        with open(g_job_report_name, "w") as fd:
-            json.dump(job_report, fd)
-
+    key_value_pairs = [('SEName', se_name), ('direct_stageout', direct_stageout)]
+    is_ok = addToFileInJR(file_name, is_log, key_value_pairs)
     if not is_ok:
         print "== Failed to set SE name for file %s in job report. ==" % file_name
     else:
         print "== Successfully set SE name for file %s in job report. ==" % file_name
-
     return is_ok
+
+
+def addToFileInJR(file_name, is_log, key_value_pairs):
+    """
+    ------------------------------------------------------------------------------------------
+    Alter the JR for the given file ('file_name') with the given key and value pairs
+    ('key_value_pairs'). If the given file is the log, record in the top-level of the JR.
+    ------------------------------------------------------------------------------------------
+    """
+    if is_log:
+        is_ok = addToJR(key_value_pairs)
+        return is_ok
+    if g_job_report_name is None:
+        return False
+    orig_file_name, _ = getJobId(file_name)
+    with open(g_job_report_name) as fd:
+        job_report = json.load(fd)
+    output_file_info = getOutputFileFromJR(orig_file_name, job_report)
+    if output_file_info is None:
+        print "WARNING: Metadata for file %s not found in job report." % file_name
+        return False
+    for key, value in key_value_pairs:
+        output_file_info[key] = value
+    with open(g_job_report_name, "w") as fd:
+        json.dump(job_report, fd)
+    return True
 
 
 def performTransfer(manager, stageout_policy, source_file, dest_temp_lfn, dest_pfn, dest_se, is_log, inject = True):
@@ -375,9 +370,9 @@ def performLocalTransfer(manager, source_file, dest_temp_lfn, is_log, inject = T
     if not result:
         dest_temp_file_name = os.path.split(dest_temp_lfn)[-1]
         se_name = stageout_info['SEName']
-        addSEToJR(dest_temp_file_name, se_name, direct_stageout = False, is_log = is_log)
+        addSEToJR(dest_temp_file_name, is_log, se_name, False)
         if inject:
-            injectToASO(dest_temp_lfn, stageout_info['SEName'], is_log)
+            injectToASO(dest_temp_lfn, se_name, is_log)
 
     return result
 
@@ -439,7 +434,7 @@ def injectToASO(source_lfn, se_name, is_log):
     publish = int(task_publish and file_type == 'output' and isEDM)
     if task_publish and file_type == 'output' and not isEDM:
         print "Disabling publication of output file %s, because it is not of EDM type." % file_name
-    publish = int(publish and not g_job_exit_code)
+    publish = int(publish and not g_cmsRun_exit_code)
     publish_dbs_url = str(ad['CRAB_PublishDBSURL'])
     if publish_dbs_url.lower() == 'undefined':
         publish_dbs_url = "https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/"
@@ -474,12 +469,34 @@ def injectToASO(source_lfn, se_name, is_log):
     couchDatabase = couchServer.connectDatabase("asynctransfer", create = False)
     print "Stageout job description: %s" % pprint.pformat(info)
 
+    needs_commit = True
     try:
         doc = couchDatabase.document(doc_id)
-        doc.update(info)
-        print ("Will retry LFN %s (id %s)" % (source_lfn, doc_id))
+        msg = "LFN %s (id %s) is already in ASO database." % (source_lfn, doc_id)
+        ## The document is already in ASO database. This means we are retrying the job and the 
+        ## document was injected by a previous job retry. The transfer status must be a terminal
+        ## one ('done', 'failed' or 'killed'), since the PostJob doesn't exit until all transfers
+        ## are finished. Depending on the transfer status we may not need to commit a new document.
+        transfer_status = doc.get('state')
+        if transfer_status in ['new', 'acquired', 'retry']:
+            msg += "\nWARNING: File transfer status is '%s'. This is an unexpected situation. Will not upload a new stageout request." % transfer_status
+            needs_commit = False
+        elif transfer_status in ['done']:
+            ## The transfer is done ...
+            print "LFN %s (id %s) is already in ASO database and transfer status is '%s'." % (source_lfn, doc_id, transfer_status)
+            if not g_cmsRun_exit_code:
+                ## ... and corresponds to a successful job, so we don't commit a new document.
+                print "Since this was a successful job, will not upload a new stageout request."
+                needs_commit = False
+            else:
+                ## ... but corresponds to a failed job, so we commit a new document.
+                print "Since this was a failed job, will upload a new stageout request."
+        else:
+            msg += "\nFile transfer status is '%s'. Uploading new stageout request for the current job." % transfer_status
+        print msg
     except CMSCouch.CouchNotFoundError:
-        print "LFN %s (id %s) is not yet known to ASO; uploading new stageout job." % (source_lfn, doc_id)
+        ## The document is not yet in ASO database. We commit a new document.
+        print "LFN %s (id %s) is not yet in ASO database. Uploading new transfer request." % (source_lfn, doc_id)
         doc = {"_id": doc_id,
                "inputdataset": ad["CRAB_InputData"],
                "group": group,
@@ -496,21 +513,22 @@ def injectToASO(source_lfn, se_name, is_log):
                "type": file_type,
                "publish": publish,
               }
-        doc.update(info)
     except Exception, ex:
-        msg = "Error loading document from couch. Transfer submission failed."
+        msg = "Error loading document from ASO database. Transfer submission failed."
         msg += str(ex)
         msg += str(traceback.format_exc())
         print (msg)
         return False
-    commit_result = couchDatabase.commitOne(doc)[0]
-    if 'error' in commit_result:
-        print("Couldn't add to ASO database; error follows")
-        print(commit_result)
-        return False
-    print "Final stageout job description: %s" % pprint.pformat(doc)
-
-    addToJR([('aso_start_time', g_now), ('aso_start_timestamp', g_now_epoch)], location = [], mode = 'override')
+    if needs_commit:
+        doc.update(info)
+        commit_result = couchDatabase.commitOne(doc)[0]
+        if 'error' in commit_result:
+            print("Couldn't add to ASO database; error follows:")
+            print(commit_result)
+            return False
+        print "Final stageout job description: %s" % pprint.pformat(doc)
+        print "==== Setting ASO start time to %s (%s) in job report. ====" % (g_now, g_now_epoch)
+        addToJR([('aso_start_time', g_now), ('aso_start_timestamp', g_now_epoch)])
 
     return True
 
@@ -563,8 +581,7 @@ def performDirectTransferImpl(source_file, dest_pfn, dest_se, is_log):
 
     if not result:
         dest_file_name = os.path.split(dest_pfn)[-1]
-        addSEToJR(dest_file_name, dest_se, direct_stageout = True, is_log = is_log)
-
+        addSEToJR(dest_file_name, is_log, dest_se, True)
     return result
 
 
@@ -684,23 +701,27 @@ def main():
     counter = "%04d" % (g_job_id / 1000)
     dest_temp_dir = os.path.join(dest_temp_dir, counter)
 
-    # Try to determine whether the payload actually succeeded.
-    # If it did not, we place it in a different directory. This prevents
-    # us from putting failed ROOT files in the same directory as successful
-    # files; we worry that users may simply 'ls' the directory and run on
-    # all files.
-    global g_job_exit_code
-    g_job_exit_code = 0
-    try: 
-        g_job_exit_code = job_report['jobExitCode']
+    ## Try to determine whether the payload actually succeeded.
+    ## If the payload didn't succeed, we put it in a different directory. This prevents us from
+    ## putting failed output files in the same directory as successful output files; we worry 
+    ## that users may simply 'ls' the directory and run on all listed files.
+    global g_cmsRun_exit_code
+    try:
+        g_cmsRun_exit_code = job_report['jobExitCode']
     except Exception, ex:
         print "== WARNING: Unable to retrieve cmsRun exit code from job report."
         traceback.print_exc()
-    if g_job_exit_code:
+    if g_cmsRun_exit_code:
         dest_temp_dir = os.path.join(dest_temp_dir, "failed")
 
     ## Transfer of log tarball.
     logfile_name = 'cmsRun_%d.log.tar.gz' % g_job_id
+    try:
+        log_size = os.stat(logfile_name).st_size
+    except:
+        pass
+    else:
+        addToJR([('log_size', log_size)])
     dest_temp_lfn = os.path.join(dest_temp_dir, "log", logfile_name)
     try:
         print "==== Starting compression of user logs at %s ====" % time.ctime()
@@ -766,6 +787,13 @@ def main():
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     try:
+        for arg in sys.argv:
+            if 'JOB_EXIT_CODE=' in arg and len(arg.split("=")) == 2:
+                global g_job_exit_code
+                g_job_exit_code = int(arg.split("=")[1])
+    except:
+        pass
+    try:
         retval = main()
     except:
         print "==== ERROR: Unhandled exception."
@@ -780,4 +808,3 @@ if __name__ == '__main__':
             print "==== ERROR: Unhandled exception when reporting failure to Dashboard. ===="
             traceback.print_exc()
     sys.exit(retval)
-
