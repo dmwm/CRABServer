@@ -82,6 +82,8 @@ fts_server = 'https://fts3-pilot.cern.ch:8443'
 
 g_Job = None
 config = None
+g_job_report_name = None
+
 
 def sighandler(*args):
     if g_Job:
@@ -97,7 +99,7 @@ REGEX_ID = re.compile("([a-f0-9]{8,8})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]
 class FTSJob(object):
 
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, log_needs_transfer, job_report_output, task_ad, retry_count, retry_timeout, cmsRun_failed):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, log_needs_transfer, job_report_output, task_ad, retry_count, retry_timeout, job_failed):
         self._id = None
         self._cancel = False
         self._sleep = 20
@@ -188,7 +190,7 @@ def getUserFromLFN(lfn):
 
 class ASOServerJob(object):
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, log_needs_transfer, job_report_output, task_ad, retry_count, retry_timeout, cmsRun_failed):
+    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, outputdata, log_size, log_needs_transfer, job_report_output, task_ad, retry_count, retry_timeout, job_failed):
         self.id = None
         self.retry_count = retry_count
         self.retry_timeout = retry_timeout
@@ -199,10 +201,10 @@ class ASOServerJob(object):
         self.dest_site = dest_site
         self.source_dir = source_dir
         self.dest_dir = dest_dir
-        if cmsRun_failed:
+        if job_failed:
             self.source_dir = os.path.join(source_dir, "failed")
             self.dest_dir = os.path.join(dest_dir, "failed")
-        self.cmsRun_failed = cmsRun_failed
+        self.job_failed = job_failed
         self.source_sites = source_sites
         self.filenames = filenames
         self.reqname = reqname
@@ -236,7 +238,7 @@ class ASOServerJob(object):
 
 
     def cancel(self):
-        logger.info("Cancelling ASO data transfer.")
+        logger.info("Cancelling ASO data transfers.")
         if self.id:
             now = str(datetime.datetime.now())
             for oneID in self.id:
@@ -253,14 +255,20 @@ class ASOServerJob(object):
         outputFiles = []
 
         aso_start_time = None
+        now = str(datetime.datetime.now())
+        last_update = int(time.time())
         try:
-            with open("jobReport.json.%d" % self.count) as fd:
+            with open(g_job_report_name) as fd:
                 job_report = json.load(fd)
-            aso_start_time = job_report.get("aso_start_time")
             self.aso_start_timestamp = job_report.get("aso_start_timestamp")
+            aso_start_time = job_report.get("aso_start_time")
         except:
-            self.aso_start_timestamp = int(time.time())
-            logger.exception("Unable to determine ASO start time from worker node")
+            self.aso_start_timestamp = last_update
+            aso_start_time = now
+            msg  = "Unable to determine ASO start time from job report."
+            msg += " This means that no transfer requests were injected from the worker node."
+            msg += " Will use ASO start time %s (%s)." % (aso_start_time, self.aso_start_timestamp)
+            logger.info(msg)
 
         input_dataset = str(self.task_ad['CRAB_InputData'])
         if 'CRAB_UserRole' in self.task_ad and str(self.task_ad['CRAB_UserRole']).lower() != 'undefined':
@@ -277,8 +285,6 @@ class ASOServerJob(object):
         if publish_dbs_url.lower() == 'undefined':
             publish_dbs_url = "https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/"
         # TODO: Add a method to resolve a single PFN or use resolvePFNs
-        last_update = int(time.time())
-        now = str(datetime.datetime.now())
         for output_module in self.job_report_output.values():
             for output_file_info in output_module:
                 file_info = {}
@@ -347,17 +353,50 @@ class ASOServerJob(object):
             needs_commit = True
             try:
                 doc = self.couchDatabase.document(doc_id)
-                ## The document was already uploaded to Couch from the WN. If the transfer is done or ongoing,
-                ## there is no need to commit the document again. Otherwise we "reset" the document in Couch
-                ## so that ASO retries the transfer.
-                if doc.get("state") in ['acquired', 'new', 'retry']:
-                    logger.info("LFN %s (id %s) was injected from WN and transfer is ongoing." % (lfn, doc_id))
+                ## The document was already uploaded to CouchDB. It could have been uploaded from the WN
+                ## of the current job retry, from the WN of a previous job retry, or by the postjob of a
+                ## previous job retry. Currently, when a transfer fails, the postjob exits without killing
+                ## any other ongoing transfers. We might want to revisit this in the future. So far we let
+                ## the transfers go on, because we assume that the files from a new retry are anyhow the 
+                ## same as the files from a previous retry. This is certainly true if the jobs succeeded,
+                ## but may not be true if the jobs failed (because there are many failure modes).
+                ## (Remember: files from failed jobs go into a different directory, so they have different 
+                ## documents than files from successful jobs.)
+                transfer_status = doc.get('state')
+                if transfer_status in ['acquired', 'new', 'retry']:
+                    ## The transfer is in an ongoing state. We decided to not commit a new document for ongoing
+                    ## transfers. This is the right thing to do if the transfer corresponds to the last job 
+                    ## retry. But what if it corresponds to a previous job retry?
+                    ## So, here we could check whether the transfer corresponds to the last job retry or not.
+                    ## Notice that if this transfer will fail (or be killed), the whole job will be retried. So
+                    ## the only really interesting case here is when the transfer will succeed. In that case we
+                    ## may end up with a file (output or log) that correspnds to a previous job retry. Is this
+                    ## acceptable? For successful jobs, yes, because all successfull job retries produce the 
+                    ## same files. But for failed jobs we would like to have the files from the last job retry.
+                    ## So by not retrying those transfers we are accepting to have (a small number of) cases in
+                    ## which failed jobs have files that are not from the lastest job retry.
+                    logger.info("LFN %s (id %s) is already in ASO database and transfer status is '%s'." % (lfn, doc_id, transfer_status))
                     needs_commit = False
-                elif doc.get("state") == 'done' and doc.get("start_time") == aso_start_time:
-                    logger.info("LFN %s (id %s) was injected from WN and transfer has finished." % (lfn, doc_id))
+                elif doc.get('start_time') == aso_start_time:
+                    ## The transfer is in a terminal state. The transfer corresponds to the last job retry, so
+                    ## we don't commit a new document. (If the transfer is done, then of course we don't want
+                    ## to repeat the transfer. OTOH, if the transfer has failed, it should not be retried by
+                    ## the postjob; instead the postjob will exit and the whole job will be retried).
+                    logger.info("LFN %s (id %s) is already in ASO database (was injected from WN) and transfer status is '%s'." % (lfn, doc_id, transfer_status))
+                    needs_commit = False
+                elif transfer_status in ['done'] and not self.job_failed:
+                    ## The transfer was already done in a previous job retry. If the transfer corresponds to a
+                    ## failed job we commit a new document, because for failed jobs we want to have the files
+                    ## from the latest job retry. If the transfer corresponds to a successful job we don't
+                    ## commit a new document, because all successfull job retries produce the same files.
+                    logger.info("LFN %s (id %s) is already in ASO database and transfer status is '%s'." % (lfn, doc_id, transfer_status))
                     needs_commit = False
                 else:
-                    logger.info("Will retry LFN %s (id %s)" % (lfn, doc_id))
+                    ## For all other cases (transfer is in a terminal state, but it doesn't correspond to the
+                    ## last job retry) we commit a new document (except for the case above of done transfers
+                    ## of successful jobs).
+                    logger.info("LFN %s (id %s) is already in ASO database and transfer status is '%s'." % (lfn, doc_id, transfer_status))
+                    logger.info("The document corresponds to a previous job retry, so will retry the transfer.")
                     logger.debug("Previous document: %s" % pprint.pformat(doc))
                 if needs_commit:
                     doc.update(common_info)
@@ -366,7 +405,7 @@ class ASOServerJob(object):
                 ## Set the publication flag.
                 if file_type == 'output':
                     publish = task_publish
-                    if publish and self.cmsRun_failed:
+                    if publish and self.job_failed:
                         logger.info("Disabling publication of output file %s, because it is marked as failed job." % filename)
                         publish = 0
                     if publish and file_output_type != 'EDM':
@@ -374,7 +413,7 @@ class ASOServerJob(object):
                         publish = 0
                 else:
                     publish = 0
-                ## If the file doesn't need transfer nor publication, we don't upload the document to Couch.
+                ## If the file doesn't need transfer nor publication, we don't upload the document to CouchDB.
                 if not needs_transfer and not publish:
                     logger.info("File %s is marked as not needing transfer nor publication; skipping upload to ASO database." % filename)
                     needs_commit = False
@@ -406,7 +445,7 @@ class ASOServerJob(object):
                     doc.update(common_info)
                     allIDs.append(doc_id)
             except Exception, ex:
-                msg = "Error loading document from couch. Transfer submission failed."
+                msg = "Error loading document from couch. Transfer submission failed. "
                 msg += str(ex)
                 msg += str(traceback.format_exc())
                 logger.info(msg)
@@ -737,7 +776,7 @@ class PostJob():
         self.logfiles = None
         self.log_needs_transfer = True
         self.retry_timeout = 2*3600
-        self.cmsRunFailed = False
+        self.job_failed = False
 
 
     def getTaskAd(self):
@@ -764,7 +803,7 @@ class PostJob():
 
 
     def parseJson(self):
-        with open("jobReport.json.%d" % self.crab_id) as fd:
+        with open(g_job_report_name) as fd:
             self.job_report = json.load(fd)
         if 'steps' not in self.job_report:
             raise ValueError("Invalid jobReport.json: missing 'steps'")
@@ -783,7 +822,7 @@ class PostJob():
             logger.debug("Log file is marked as directly transferred from WN.")
 
         if 'jobExitCode' in self.job_report:
-            self.cmsRunFailed = bool(self.job_report['jobExitCode'])
+            self.job_failed = bool(self.job_report['jobExitCode'])
 
         for output_module in self.job_report_output.values():
             for output_file_info in output_module:
@@ -1014,7 +1053,7 @@ class PostJob():
         else:
             targetClass = FTSJob
 
-        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.log_needs_transfer, self.job_report_output, self.task_ad, self.retry_count, self.retry_timeout, self.cmsRunFailed)
+        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.log_needs_transfer, self.job_report_output, self.task_ad, self.retry_count, self.retry_timeout, self.job_failed)
         fts_job_result = g_Job.run()
         # If no files failed, return success immediately.  Otherwise, see how many files failed.
         if not fts_job_result:
@@ -1152,7 +1191,8 @@ class PostJob():
         stdout = "job_out.%s" % id
         stdout_tmp = "job_out.tmp.%s" % id
         stderr = "job_err.%s" % id
-        job_report = "jobReport.json.%s" % id
+        global g_job_report_name
+        g_job_report_name = "jobReport.json.%s" % id
 
         logpath = os.path.expanduser("~/%s" % reqname)
         retry_count = self.calculateRetry(id, retry_count)
@@ -1166,10 +1206,10 @@ class PostJob():
             stdout_f.close()
             os.chmod(fname, 0644)
         # NOTE: we now redirect stdout -> stderr; hence, we don't keep stderr in the webdir.
-        if os.path.exists(job_report):
+        if os.path.exists(g_job_report_name):
             fname = os.path.join(logpath, "job_fjr."+id+"."+retry_count+".json")
-            logger.debug("Copying job FJR from %s to %s" % (job_report, fname))
-            shutil.copy(job_report, fname)
+            logger.debug("Copying job FJR from %s to %s" % (g_job_report_name, fname))
+            shutil.copy(g_job_report_name, fname)
             os.chmod(fname, 0644)
 
         if 'X509_USER_PROXY' not in os.environ:
