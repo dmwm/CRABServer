@@ -38,7 +38,7 @@ class FileMetaData(object):
                     ORDER BY fmd_creation_time DESC
              """
 
-    New_sql = "INSERT INTO filemetadata ( \
+    New_sql = "INSERT /*+ IGNORE_ROW_ON_DUPKEY_INDEX(filemetadata, PK_TASKLFN) */ INTO filemetadata ( \
                tm_taskname, panda_job_id, fmd_outdataset, fmd_acq_era, fmd_sw_ver, fmd_in_events, fmd_global_tag,\
                fmd_publish_name, fmd_location, fmd_tmp_location, fmd_runlumi, fmd_adler32, fmd_cksum, fmd_md5, fmd_lfn, fmd_size,\
                fmd_type, fmd_parent, fmd_creation_time, fmd_filestate, fmd_direct_stageout) \
