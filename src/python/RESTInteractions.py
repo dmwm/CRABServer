@@ -2,6 +2,7 @@
     RESTInteractions.py - Wrap WMCore's request API. Needed to support caching 
                      values.
 """
+import os
 import os.path
 from WMCore.Services.Requests import JSONRequests
 
@@ -9,7 +10,8 @@ class RESTWrapper(JSONRequests):
     def __init__(self, url='localhost', localcert=None, localkey=None, version=None):
         if not url.startswith('https://'):
             url = "https://%s" % url
-        cachePath = os.path.expanduser("~/.crab3_cache")
+        cachePath = os.getenv('CMS_CRAB_CACHE_DIR', \
+                                os.path.expanduser("~/.crab3_cache"))
         extraDict = {'cachepath' : cachePath,
                 'serice_name' : 'https://github.com/dmwm/CRABServer'}
         JSONRequests.__init__(self, url, idict = extraDict)
