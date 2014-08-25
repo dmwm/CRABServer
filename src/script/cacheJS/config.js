@@ -52,5 +52,17 @@ angular.module("CRABMonitor").
             when("/tasklinks", {
                 templateUrl: searchTmpUrl+"task-links.html",
                 controller: "SearchCtrl"
+		}).
+            when("/job/:id/info", {
+                templateUrl: searchTmpUrl+"selected-job-info.html",
+                controller: "SearchCtrl"
+		}).
+            when("/available-sites/:id", {
+                templateUrl: searchTmpUrl+"available-sites.html",
+                controller: "SearchCtrl"
+		}).
+			when("/", {
+				templateUrl: serverTmpUrl+"welcome.html",
+				controller: "ServerCtrl"
 		})
 	});

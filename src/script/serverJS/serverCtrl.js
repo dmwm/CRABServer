@@ -1,8 +1,9 @@
 angular.module("CRABMonitor").
-	controller("ServerCtrl", ["$scope","ServerData","ServerFuncs","$location", function($scope, ServerData,ServerFuncs, $location){
+	controller("ServerCtrl", ["$scope","ServerData","ServerFuncs","SearchFuncs","$location", function($scope, ServerData,ServerFuncs,SearchFuncs, $location){
 		//INJECT THE FACTORIES INTO THE CONTROLLER
 		$scope.serverData = ServerData;
 		$scope.serverFuncs = ServerFuncs;
+		$scope.searchFuncs = SearchFuncs;
 
 		//LOAD THE USERS IN CRABSERVER THE OPERATOR BEGINS TO TYPE
 		$scope.loadUsers = function(name, event){
@@ -18,7 +19,13 @@ angular.module("CRABMonitor").
 			}
 		};
 
-
+		//when a task in clicked in a server's display
+		$scope.followTaskLink = function(taskname){
+			$scope.searchFuncs.setTask(taskname);
+			$scope.searchFuncs.search();
+			$location.path("/workflow");
+			$scope.searchFuncs.getNumOfJobs(taskname);
+		};	
 		//LIST A SUMMARY OF ALL USERS INFO
 		$scope.userList = function(){
 			$scope.serverFuncs.getWorkflows();
@@ -29,6 +36,7 @@ angular.module("CRABMonitor").
 		$scope.selectUser = function(name, index){
 			$scope.selectedRow = index;
 			$scope.serverData.selectedUser.username = name;
+			$scope.serverFuncs.getLatests();
 		};
 		//load latest user tasks
 		$scope.loadLatestTasks = function(date){

@@ -272,8 +272,9 @@ class HTCondorDataWorkflow(DataWorkflow):
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % workflow)
 
-        if db_userdn != userdn:
-            raise ExecutionError("Your DN, %s, is not the same as the original DN used for task submission" % userdn)
+        #TODO this has to move to a better place. Commenting now so we remember
+#        if db_userdn != userdn:
+#            raise ExecutionError("Your DN, %s, is not the same as the original DN used for task submission" % userdn)
 
         if verbose == None:
             verbose = 0

@@ -8,6 +8,16 @@ angular.module("CRABMonitor").
                         console.log("Request for basic quota failed with status: " + response.status);
                     });
                 };
+                //compute date for oneweek backwards if no date is given
+				function getLastWeek(){
+					var today = new Date();
+					var yyyy = today.getFullYear().toString();
+					var mm = (today.getMonth()).toString(); // getMonth() is zero-based
+					var dd  = Math.abs((today.getDate() === 7)? 1:(today.getDate()-7))+"";
+					return yyyy +"-"+ (mm.length===2?mm:"0"+mm) +"-"+ (dd.length===2?dd:"0"+dd); // padding
+				}	
+
+
                 //LOAD ALL USERS
                 var users = function() {
                     $http(ServerUrls.allUsersUrl).then(function(response) {
@@ -38,6 +48,9 @@ angular.module("CRABMonitor").
 
 				//load latest user tasks
 				var latestTasks = function(date){
+					if(date === undefined){
+						date = getLastWeek();
+					}
 					$http(ServerUrls.latestTaskUrl(date,ServerData.selectedUser.username)).then(function(response){
 						for(var i = 0; i < response.data.result.length; i++){
 							ServerData.latestData.push({

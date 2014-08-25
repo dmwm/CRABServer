@@ -5,20 +5,46 @@
     <div class="panel-body">
         <ul class="list-group">
             <li class="list-group-item navbar-btn navbar-bar">
-                <span class="h4 badge">No.: {{}}</span>
+            <!-- <span class="h4 badge">No.: {{}}</span> -->
                 <a href="#/taskinfo"><h4>TASK INFO</h4></a>
-            <li class="list-group-item navbar-btn navbar-bar">
+            <!--<li class="list-group-item navbar-btn navbar-bar">
                 <span class="h4 badge">No.: {{}}</span>
                 <a href="#/jobinfo"><h4>JOBS INFO</h4></a>
+                </li> -->
+            <li class="list-group-item navbar-btn navbar-bar">
+                <h4 class = "special-header2">PUBLICATION INFO</h4>
+                <ul>
+                    <li class = "list-group-item h4" ng-repeat = "(key, value) in searchData.pubInfo">{{key+" :: "+value}}</li>
+                </ul>
+
             </li>
             <li class="list-group-item navbar-btn navbar-bar">
-                <a href="#/pubinfo"><h4>PUBLICATION INFO</h4></a>
+                <h4 class = "special-header2">JOB STATUS</h4>
+                <ul>
+                    <li class = "list-group-item h4" ng-repeat = "(key, value) in searchData.jobStatus">{{key+" :: "+value}}</li>
+                </ul>
+
             </li>
             <li class="list-group-item navbar-btn navbar-bar">
                 <a href="#/tasklinks" ng-click = "getLinks()"><h4>TASK LINKS</h4></a>
             </li>
+         </ul>
             
-        </ul>
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="input-group">
+                        <h4 class="special-header2">Get info about job #</h4>
+                     </div>
+                 </div>
+                <div class="col-lg-6">
+                    <div class="input-group">
+                        <input type="number" placeholder="Enter job number" ng-model = "value" class="form-control" min = "0" max = "{{searchData.numOfJobs}}">
+                         <span class="input-group-btn">
+                             <button class="btn btn-default" ng-click = "loadJobInfo(value)" type="button">Go!</button>
+                        </span>
+                     </div>
+                </div>
+            </div>
     </div>
 </div>
 

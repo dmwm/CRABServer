@@ -25,7 +25,7 @@ class DataUserWorkflow(object):
         mod = __import__('CRABInterface.%s' % self.workflowManager, fromlist=self.workflowManager)
         self.workflow = getattr(mod, self.workflowManager)(DataUserWorkflow.config)
 
-    def getLatests(self, user, limit, timestamp):
+    def getLatests(self, username, timestamp):
         """Retrives the latest workflows for the user
 
            :arg str user: a valid user hn login name

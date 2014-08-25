@@ -30,7 +30,7 @@
             </thead>
             <tbody>
                 <tr ng-repeat = "task in serverData.latestData| filter: search">
-                    <td class = "wordwrap">{{task.taskname}}</td><td>{{task.status}}</td><td>{{task.tw_name}}</td><td class = "wordwrap">{{task.spliti_args}}</td>
+                    <td class = "wordwrap"><a href = ""class = "special-heading-url" ng-click = "followTaskLink(task.taskname)">{{task.taskname}}</a></td><td>{{task.status}}</td><td>{{task.tw_name}}</td><td class = "wordwrap">{{task.spliti_args}}</td>
                 </tr>
             </tbody>
         </table>

@@ -111,7 +111,7 @@ class RESTUserWorkflow(RESTEntity):
     @conn_handler(services=['sitedb', 'centralconfig'])
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
-        authz_login_valid()
+        #authz_login_valid()
 
         if method in ['PUT']:
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)

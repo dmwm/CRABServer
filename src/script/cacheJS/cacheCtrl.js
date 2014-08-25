@@ -1,3 +1,10 @@
+/*
+	This is the controller for the CRAB Cache panel.  Every activity performed
+	on the CRABCache panel is coordinated here!. The functions, Data, and Urls
+	are all defined in the cacheData,js, cacheFuncs.js, cacheUrls.js and are
+	injected into this controller at runtime.  The functions defined in this script
+	file are functions that are directly called from the html view.
+*/
 angular.module("CRABMonitor").
 	controller("CacheCtrl", ["$scope", "CacheData", "CacheFuncs","$location",function($scope,CacheData,CacheFuncs,$location){
 		//bind the data services to the scope
