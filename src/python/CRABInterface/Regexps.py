@@ -32,7 +32,7 @@ RX_CMSSITE   = re.compile(r"^(?=.{0,255}$)T[0-3](_[A-Z]{2}((_[A-Za-z0-9]+)|\*$)+
 RX_DBSURL    = re.compile(r"^(?=.{0,255}$)https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
 RX_PUBLICATION = re.compile(r"^[TF]")
 RX_VOPARAMS  = re.compile(r"^(?=.{0,255}$)[A-Za-z0-9]*$")
-RX_OUTFILES  = re.compile(r"^(?=.{0,255}$)[A-Za-z0-9\.\-_]*\.root$")
+RX_OUTFILES  = re.compile(r"^(?=.{0,255}$)%s$"%lfnParts['root'])
 RX_RUNS      = re.compile(r"^\d+$")
 RX_LUMIRANGE = re.compile(r"^\d+,\d+(,\d+,\d+)*$")
 RX_LUMILIST  = re.compile(r"^\d+(,\d+)*$")
