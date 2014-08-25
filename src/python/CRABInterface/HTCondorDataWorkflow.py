@@ -223,6 +223,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.info("Got %s edm files for workflow %s" % (len(res['runsAndLumis']), workflow))
 
         if usedbs:
+            if not outputDatasets:
+                raise ExecutionError("Cannot find any information about the output datasets names. You can try to execute 'crab report' with --dbs=no")
             try:
                 #load the input dataset's lumilist
                 dbs = DBSReader(dbsUrl)
