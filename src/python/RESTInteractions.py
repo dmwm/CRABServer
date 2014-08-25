@@ -6,7 +6,7 @@ import os
 import os.path
 from WMCore.Services.Requests import JSONRequests
 
-class RESTWrapper(JSONRequests):
+class HTTPRequests(JSONRequests):
     def __init__(self, url='localhost', localcert=None, localkey=None, version=None):
         if not url.startswith('https://'):
             url = "https://%s" % url
