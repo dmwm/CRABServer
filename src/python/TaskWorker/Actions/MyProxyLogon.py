@@ -32,9 +32,11 @@ class MyProxyLogon(TaskAction):
                     'server_key': self.config.MyProxy.serverhostkey,
                     'server_cert': self.config.MyProxy.serverhostcert,
                     'serverDN': self.config.MyProxy.serverdn,
-                    'uisource': self.config.MyProxy.uisource,
+                    'uisource': getattr(self.config.MyProxy, 'uisource', ''),
                     'credServerPath': self.config.MyProxy.credpath,
-                    'myproxyAccount' : self.server['host']}
+                    'myproxyAccount' : self.server['host'],
+                    'cleanEnvironment' : getattr(self.config.MyProxy, 'cleanEnvironment', False)
+                   }
         proxy = Proxy(proxycfg)
         userproxy = proxy.getProxyFilename(serverRenewer=True)
         proxy.logonRenewMyProxy()
