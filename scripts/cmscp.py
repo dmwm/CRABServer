@@ -286,7 +286,7 @@ def addSEToJR(file_name, se_name, direct_stageout, is_log):
     is_ok = True
 
     if is_log:
-        pairs_to_add_to_job_report = [('SEname', se_name), ('direct_stageout', direct_stageout)]
+        pairs_to_add_to_job_report = [('SEName', se_name), ('direct_stageout', direct_stageout)]
         try:
             log_size = os.stat(file_name).st_size
         except:
