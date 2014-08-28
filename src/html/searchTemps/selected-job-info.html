@@ -1,0 +1,23 @@
+<div class = "panel panel-default ">
+    <div class = "panel-heading">
+        <h4 class = "special-header">{{searchData.user.name}} </h4>
+    </div>
+    <div class="panel-body">
+        <ul class="list-group">
+            <li class = "list-group-item navbar-btn navbar-bar">
+            <h4 class = "special-header2">Taskname ::&nbsp;&nbsp;</h4>{{searchData.taskname}}
+            </li>
+            <li class = "list-group-item navbar-btn navbar-bar">
+            <h4 class = "special-header2">Job number ::&nbsp;&nbsp;</h4>{{searchData.jobNum}}
+            </li>
+            <li class = "list-group-item navbar-btn navbar-bar wordwrap">
+            <h4 class = "special-header2">Available sites ::&nbsp;&nbsp;</h4><a href = "#/available-sites/{{searchData.jobNum}}" class = "special-header-url">Show all available sites</a>
+            </li>
+            <li class="list-group-item navbar-btn navbar-bar" ng-repeat = "(key,value) in searchData.selectedJobInfo">
+                 <h4 class = "special-header2">{{key}}</h4>{{" :: "+value}}
+            </li>
+         </ul>
+    </div>
+</div>
+
+
