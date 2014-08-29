@@ -151,6 +151,8 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
     if 'CRAB_DataBlock' not in myad:
         print "Not sending data to popularity service because 'CRAB_DataBlock' is not in job ad."
     sources = fjr.get('steps', {}).get('cmsRun', {}).get('input', {}).get('source', [])
+    skippedFiles = fjr.get('skippedFiles', [])
+    fallbackFiles = fjr.get('fallbackFiles', [])
     if not sources:
         print "Not sending data to popularity service because no input sources found."
 
@@ -177,15 +179,20 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
             file_type = 'EDM'
         else:
             file_type = 'Unknown'
+        if source['lfn'] in fallbackFiles:
+            access_type = "Remote"
+        else:
+            access_type = "Local"
+
         if source.get("input_type", "primaryFiles") == "primaryFiles":
             inputCtr += 1
             # Note we hardcode 'Local' here.  In CRAB2, it was assumed any PFN with the string 'xrootd'
             # in it was a remote access; we feel this is no longer a safe assumption.  CMSSW actually
             # differentiates the fallback accesses.  See https://github.com/dmwm/WMCore/issues/5087
-            inputInfo[source['lfn']] = [source['lfn'], file_type, 'Local', inputCtr]
+            inputInfo[source['lfn']] = [source['lfn'], file_type, access_type, inputCtr]
         else:
             parentCtr += 1
-            parentInputInfo[source['lfn']] = [source['lfn'], file_type, 'Local', parentCtr]
+            parentInputInfo[source['lfn']] = [source['lfn'], file_type, access_type, parentCtr]
     baseName = os.path.dirname(os.path.commonprefix(inputInfo.keys()))
     parentBaseName = os.path.dirname(os.path.commonprefix(parentInputInfo.keys()))
 
