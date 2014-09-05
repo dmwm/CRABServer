@@ -93,9 +93,9 @@ class HTCondorDataWorkflow(DataWorkflow):
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
 
-        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, _, _, _ = row.next()
-        savelogs = True if tm_save_logs == 'T' else False
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
+        row = self.Task.ID_tuple(*row)
+        savelogs = True if row.save_logs == 'T' else False
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
@@ -105,15 +105,16 @@ class HTCondorDataWorkflow(DataWorkflow):
         else:
             transferingIds = []
             finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferring', 'cooloff', 'held']]
-        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, tm_user_dn, tm_username, tm_user_role, tm_user_group, savelogs, userproxy)
+        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, row.user_dn, row.username, row.user_role, row.user_group, savelogs, userproxy)
 
 
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
 
-        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, tm_arguments, _, _ = row.next()
-        arguments = literal_eval(tm_arguments.read())
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
+        row = self.Task.ID_tuple(*row)
+
+        arguments = literal_eval(row.arguments.read())
         saveoutput = True if arguments.get("saveoutput", "T") == 'T' else False
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
@@ -124,7 +125,9 @@ class HTCondorDataWorkflow(DataWorkflow):
         else:
             transferingIds = []
             finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferring', 'cooloff', 'held']]
-        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], transferingIds, finishedIds, tm_user_dn, tm_username, tm_user_role, tm_user_group, saveoutput, userproxy)
+
+        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], transferingIds, finishedIds, row.user_dn, row.username, row.user_role,\
+                               row.user_group, saveoutput, userproxy=userproxy)
 
 
     @conn_handler(services=['phedex'])
@@ -206,13 +209,14 @@ class HTCondorDataWorkflow(DataWorkflow):
         statusRes = self.status(workflow, userdn)[0]
 
         #get the information we need from the taskdb/initilize variables
-        taskrow = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
-        inputDataset = taskrow[12]
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
+        row = self.Task.ID_tuple(*row)
+        inputDataset = row.input_dataset
         outputDatasets = self._getOutDatasets(workflow)
-        dbsUrl = taskrow[13]
+        dbsUrl = row.dbs_url
 
         #load the lumimask
-        splitArgs = literal_eval(taskrow[6].read())
+        splitArgs = literal_eval(row.split_args.read())
         res['lumiMask'] = buildLumiMask(splitArgs['runs'], splitArgs['lumis'])
         self.logger.info("Lumi mask was: %s" % res['lumiMask'])
 
@@ -276,7 +280,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         try:
             #just one row is picked up by the previous query
-            _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, db_userdn, _, _, _ = row.next()
+            row = self.Task.ID_tuple(*row.next())
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % workflow)
 
@@ -286,15 +290,15 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         if verbose == None:
             verbose = 0
-        self.logger.info("Status result for workflow %s: %s (detail level %d)" % (workflow, status, verbose))
-        if status not in ['SUBMITTED', 'KILLFAILED', 'KILLED']:
-            if isinstance(taskFailure, str):
-                taskFailureMsg = taskFailure
+        self.logger.info("Status result for workflow %s: %s (detail level %d)" % (workflow, row.task_status, verbose))
+        if row.task_status not in ['SUBMITTED', 'KILLFAILED', 'KILLED']:
+            if isinstance(row.task_failure, str):
+                taskFailureMsg = row.task_failure
             elif taskFailure == None:
                 taskFailureMsg = ""
             else:
-                taskFailureMsg = taskFailure.read()
-            result = [ {"status" : status,
+                taskFailureMsg = row.task_failure.read()
+            result = [ {"status" : row.task_status,
                       "taskFailureMsg" : taskFailureMsg,
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
@@ -302,7 +306,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "totalJobdefs"    : 0,
                       "jobdefErrors"    : [],
                       "jobList"         : [],
-                      "saveLogs"        : saveLogs }]
+                      "saveLogs"        : row.save_logs }]
             self.logger.debug("Detailed result for workflow %s: %s\n" % (workflow, result))
             return result
 
@@ -329,7 +333,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "totalJobdefs"    : 0,
                       "jobdefErrors"    : [],
                       "jobList"         : [],
-                      "saveLogs"        : saveLogs }]
+                      "saveLogs"        : row.save_logs }]
         if not results:
             return [ {"status" : "UNKNOWN",
                       "taskFailureMsg" : "Unable to find root task in HTCondor",
@@ -339,7 +343,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "totalJobdefs"    : 0,
                       "jobdefErrors"    : [],
                       "jobList"         : [],
-                      "saveLogs"        : saveLogs }]
+                      "saveLogs"        : row.save_logs }]
 
         #getting publication information
         publication_info, outdatasets = self.publicationStatus(workflow)
@@ -357,7 +361,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "totalJobdefs"    : 0,
                       "jobdefErrors"    : [],
                       "jobList"         : [],
-                      "saveLogs"        : saveLogs }]
+                      "saveLogs"        : row.save_logs }]
             else:
                 return [ {"status" : "SUBMITTED",
                       "taskFailureMsg"  : "",
@@ -368,7 +372,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "totalJobdefs"    : 0,
                       "jobdefErrors"    : [],
                       "jobList"         : [],
-                      "saveLogs"        : saveLogs }]
+                      "saveLogs"        : row.save_logs }]
 
         try:
             taskStatus, pool = self.taskWebStatus(results[0], verbose=verbose)
@@ -381,7 +385,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 "totalJobdefs"    : 0,
                 "jobdefErrors"    : [],
                 "jobList"         : [],
-                "saveLogs"        : saveLogs }]
+                "saveLogs"        : row.save_logs }]
 
         jobsPerStatus = {}
         jobList = []
@@ -391,11 +395,11 @@ class HTCondorDataWorkflow(DataWorkflow):
         retval = {"status": task_codes.get(taskStatusCode, 'unknown'), "taskFailureMsg": "", "jobSetID": workflow,
             "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
         # HoldReasonCode == 1 indicates that the TW killed the task; perhaps the DB was not properly updated afterward?
-        if status != "KILLED" and taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 1:
+        if row.task_status != "KILLED" and taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 1:
             retval['status'] = 'KILLED'
         elif taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 16:
             retval['status'] = 'InTransition'
-        elif status != "KILLED" and taskStatusCode == 5:
+        elif row.task_status != "KILLED" and taskStatusCode == 5:
             retval['status'] = 'FAILED'
 
         for i in range(1, taskJobCount+1):
@@ -794,7 +798,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                 info = nodes.setdefault(nodeid, {})
                 info['State'] = 'finished'
             elif status == 6: # STATUS_ERROR
-                info = nodes.setdefault(nodeid, {})
                 # Older versions of HTCondor would put jobs into STATUS_ERROR
                 # for a short time if the job was to be retried.  Hence, we had
                 # some status parsing logic to try and guess whether the job would

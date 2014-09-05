@@ -73,6 +73,7 @@ class Create(DBCreator):
         tm_maxmemory BIGINT,
         tm_priority BIGINT,
         tm_output_dataset LONGTEXT,
+        tm_task_warnings LONGTEXT,
         CONSTRAINT taskname_pk PRIMARY KEY(tm_taskname),
         CONSTRAINT check_tm_publication CHECK (tm_publication IN ('T', 'F')),
         CONSTRAINT check_tm_save_logs CHECK (tm_save_logs IN ('T', 'F'))

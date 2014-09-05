@@ -150,7 +150,8 @@ class RESTWorkerWorkflow(RESTEntity):
         """
         #load the task
         task = self.api.query(None, None, self.Task.ID_sql, taskname=binds['taskname'][0]).next()
-        splitargs = literal_eval(task[6].read())
+        task = self.Task.ID_tuple(*task)
+        splitargs = literal_eval(task.split_args.read())
         #update the tm_splitargs
         splitargs['runs'] = runs
         splitargs['lumis'] = lumis

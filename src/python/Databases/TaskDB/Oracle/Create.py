@@ -74,6 +74,7 @@ class Create(DBCreator):
         tm_maxmemory NUMBER(38),
         tm_priority NUMBER(38),
         tm_output_dataset CLOB,
+        tm_task_warnings CLOB,
         CONSTRAINT taskname_pk PRIMARY KEY(tm_taskname),
         CONSTRAINT check_tm_publication CHECK (tm_publication IN ('T', 'F')),
         CONSTRAINT check_tm_save_logs CHECK (tm_save_logs IN ('T', 'F'))

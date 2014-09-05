@@ -1,15 +1,19 @@
 #!/usr/bin/env python
 
 import logging
+from collections import namedtuple
 
 class Task(object):
     """
     """
      #ID
+    ID_tuple = namedtuple("ID", ["taskname", "panda_jobset_id", "task_status", "user_role", "user_group", \
+             "task_failure", "split_args", "panda_resubmitted_jobs", "save_logs", "username", \
+             "user_dn", "arguments", "input_dataset", "dbs_url", "task_warnings"])
     ID_sql = "SELECT tm_taskname, panda_jobset_id, tm_task_status, tm_user_role, tm_user_group, \
              tm_task_failure, tm_split_args, panda_resubmitted_jobs, tm_save_logs, tm_username, \
-             tm_user_dn, tm_arguments, tm_input_dataset, tm_dbs_url FROM tasks WHERE tm_taskname=:taskname"
-   
+             tm_user_dn, tm_arguments, tm_input_dataset, tm_dbs_url, tm_task_warnings FROM tasks WHERE tm_taskname=:taskname"
+
     IDAll_sql = "SELECT tm_taskname, tm_task_status, tm_user_role, tm_user_group, \
              tm_save_logs, tm_username, \
              tm_user_dn FROM tasks WHERE tm_taskname = :taskname"
@@ -132,4 +136,6 @@ class Task(object):
     SetUpdateOutDataset_sql = """UPDATE tasks SET tm_output_dataset = :tm_output_dataset \
                                 WHERE tm_taskname = :tm_taskname"""
 
+    #UpdateWarnings
+    SetWarnings_sql = """UPDATE tasks SET tm_task_warnings=:warnings WHERE tm_taskname=:workflow"""
 
