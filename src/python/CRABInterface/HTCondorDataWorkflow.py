@@ -94,7 +94,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
 
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, _, _, _ = row.next()
+        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, _, _, _, _ = row.next()
         savelogs = True if tm_save_logs == 'T' else False
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
@@ -112,7 +112,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
 
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, tm_arguments, _, _ = row.next()
+        _, _, _, tm_user_role, tm_user_group, _, _, _, tm_save_logs, tm_username, tm_user_dn, tm_arguments, _, _, _, _ = row.next()
         arguments = literal_eval(tm_arguments.read())
         saveoutput = True if arguments.get("saveoutput", "T") == 'T' else False
 
@@ -180,7 +180,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                     raise ExecutionError("Exception while contacting PhEDEX.")
 
             yield { 'pfn' : pfn,
-                    'lfn' : lfn,
+		     'lfn' : lfn,
                     'size' : row[GetFromTaskAndType.SIZE],
                     'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
                   }
@@ -276,7 +276,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         try:
             #just one row is picked up by the previous query
-            _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, db_userdn, _, _, _ = row.next()
+            _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, username, db_userdn, arguments, _, _, publication_flag = row.next()
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % workflow)
 
@@ -340,11 +340,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobdefErrors"    : [],
                       "jobList"         : [],
                       "saveLogs"        : saveLogs }]
-
-        #getting publication information
-        publication_info, outdatasets = self.publicationStatus(workflow)
-        self.logger.info("Publiation status for workflow %s done" % workflow)
-
 
         taskStatusCode = int(results[-1]['JobStatus'])
         if 'CRAB_UserWebDir' not in results[-1]:
@@ -416,6 +411,20 @@ class HTCondorDataWorkflow(DataWorkflow):
         retval["failedJobdefs"] = 0
         retval["totalJobdefs"] = 0
 
+        #getting publication information
+        publication_info = {}
+        outdatasets = []
+        arguments = literal_eval(arguments.read())
+        #Always returning ASOURL also, it is required for kill, resubmit
+        self.logger.info("ASO: %s" % arguments)
+        retval['ASOURL'] = arguments['ASOURL']
+
+        if (publication_flag == 'T' and 'finished' in retval['jobsPerStatus']):
+            publication_info, outdatasets = self.publicationStatus(workflow, arguments['ASOURL'])
+            self.logger.info("Publiation status for workflow %s done" % workflow)
+        else:
+            self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (publication_flag, retval['jobsPerStatus'].get('finished', 0)))
+
         if len(taskStatus) == 0 and results[0]['JobStatus'] == 2:
             retval['status'] = 'Running (jobs not submitted)'
 
@@ -468,25 +477,32 @@ class HTCondorDataWorkflow(DataWorkflow):
         curl.setopt(pycurl.WRITEFUNCTION, fp.write)
         hbuf = StringIO.StringIO()
         curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
-        self.logger.debug("Retrieving task status from web with verbosity %d." % verbose)
-        if verbose == 1:
-            jobs_url = url + "/jobs_log.txt"
-            curl.setopt(pycurl.URL, jobs_url)
-            self.logger.info("Starting download of job log")
-            curl.perform()
-            self.logger.info("Finished download of job log")
-            header = ResponseHeader(hbuf.getvalue())
-            if header.status == 200:
-                fp.seek(0)
-                self.logger.debug("Starting parse of job log")
-                self.parseJobLog(fp, nodes)
-                self.logger.debug("Finished parse of job log")
-                fp.truncate(0)
-                hbuf.truncate(0)
-            else:
-                raise ExecutionError("Cannot get jobs log file. Retry in a minute if you just submitted the task")
+	self.logger.debug("Retrieving task status from web with verbosity %d." % verbose)
 
-        elif verbose == 2:
+        #Always retrieve jobs_log file, it gives all required information correctly
+        jobs_url = url + "/jobs_log.txt"
+        curl.setopt(pycurl.URL, jobs_url)
+        self.logger.info("Starting download of job log")
+        curl.perform()
+        self.logger.info("Finished download of job log")
+        header = ResponseHeader(hbuf.getvalue())
+        if header.status == 200:
+            fp.seek(0)
+            self.logger.debug("Starting parse of job log")
+            self.parseJobLog(fp, nodes)
+            self.logger.debug("Finished parse of job log")
+            fp.truncate(0)
+            hbuf.truncate(0)
+        else:
+            raise ExecutionError("Cannot get jobs log file. Retry in a minute if you just submitted the task")
+
+        if verbose == 2:
+            curl = self.prepareCurl()
+            fp = tempfile.TemporaryFile()
+            curl.setopt(pycurl.WRITEFUNCTION, fp.write)
+            hbuf = StringIO.StringIO()
+            curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
+
             site_url = url + "/site_ad.txt"
             curl.setopt(pycurl.URL, site_url)
             self.logger.debug("Starting download of site ad")
@@ -549,10 +565,9 @@ class HTCondorDataWorkflow(DataWorkflow):
         outdatasets = [row[0] for row in rows]
         return outdatasets
 
-    def publicationStatus(self, workflow):
+    def publicationStatus(self, workflow, ASOURL):
         publication_info = {}
         outdatasets = []
-        ASOURL = self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", "")
         if not ASOURL:
             raise ExecutionError("This CRAB server is not configured to publish; no publication status is available.")
         server = CMSCouch.CouchServer(dburl=ASOURL, ckey=self.serverKey, cert=self.serverCert)

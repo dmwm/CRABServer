@@ -115,7 +115,7 @@ class DataWorkflow(object):
     def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None, lfn=None,
-               ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None):
+               ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, ASOURL=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -154,6 +154,7 @@ class DataWorkflow(object):
            :arg str lfnprefix: prefix for output directory in /store/user. Deprecated in favour of the parameter below (lfn)
            :arg str lfn: lfn used to store output files.
            :arg str userfiles: The files to process instead of a DBS-based dataset.
+           :arg str ASOURL: Specify which ASO to use for transfers and publishing.
            :returns: a dict which contaians details of the request"""
 
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
@@ -172,13 +173,16 @@ class DataWorkflow(object):
         if maxmemory == None: maxmemory = 2000
         if priority == None: priority = 10
 
+        if not ASOURL:
+            ASOURL = self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", "")
+
         arguments = { \
             'oneEventMode' : 'T' if oneEventMode else 'F',
             'lfn' : '/store/user/%s/%s' % (username, lfnprefix) if lfnprefix else lfn,
             'saveoutput' : 'T' if saveoutput else 'F',
             'faillimit' : faillimit,
             'ignorelocality' : 'T' if ignorelocality else 'F',
-            'ASOURL' : self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", ""),
+            'ASOURL' : ASOURL,
             'userfiles' : userfiles,
         }
 
@@ -255,7 +259,7 @@ class DataWorkflow(object):
             #if not resubmitList:
             #    raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
             self.logger.info("Jobs to resubmit: %s" % resubmitList)
-            args = {"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList}
+            args = {"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList, 'ASOURL' : statusRes.get("ASOURL", "")}
             if maxjobruntime != None:
                 args['maxjobruntime'] = maxjobruntime
             if numcores != None:
@@ -310,7 +314,7 @@ class DataWorkflow(object):
         self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        args = {'ASOURL' : self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", "")}
+        args = {'ASOURL' : statusRes.get("ASOURL", "")}
         # Hm...
         dbSerializer = str
 
