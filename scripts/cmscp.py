@@ -192,7 +192,7 @@ def getOutputFileFromJR(file_name, job_report = None):
     return None
 
 
-def addToJR(key_value_pairs, location = [], mode = 'new'):
+def addToJR(key_value_pairs, location = [], mode = 'overwrite'):
     """
     ------------------------------------------------------------------------------------------
     Add pairs of (key, value) given in the 'key_value_pairs' list (a list of 2-tuples) to the
@@ -200,8 +200,8 @@ def addToJR(key_value_pairs, location = [], mode = 'new'):
     is expected to be a dictionary. For example, if location = ['steps', 'cmsRun', 'output'],
     add each (key, value) pair in 'key_value_pairs' to JR['steps']['cmsRun']['output'] (for
     short JR[location]). There are three different modes ('mode') of adding the information
-    to the JR: 'override' (does a direct assignment: JR[location][key] = value), 'new'
-    (same as 'override', but the given key must not exist in JR[location]; if it exists,
+    to the JR: 'overwrite' (does a direct assignment: JR[location][key] = value), 'new'
+    (same as 'overwrite', but the given key must not exist in JR[location]; if it exists,
     don't modify the JR and return False) and 'update' (JR[location][key] is a list and so
     append the value into that list; if the key doesn't exist in JR[location], add it). In 
     case of an identified problem, don't modify the JR, print a warning message and return
@@ -230,7 +230,7 @@ def addToJR(key_value_pairs, location = [], mode = 'new'):
             print "WARNING: Job report is not a dict."
         return False
 
-    if mode in ['new', 'override']:
+    if mode in ['new', 'overwrite']:
         for key, value in key_value_pairs:
             if mode == 'new' and key in subreport:
                 print "WARNING: Key '%s' already exists in job report section %s." % (key, subreport_name)
@@ -261,6 +261,12 @@ def addOutputFileToJR(file_name, key = 'addoutput'):
 
     output_file_info = {}
     output_file_info['pfn'] = file_name
+    try:
+        file_size = os.stat(file_name).st_size
+    except:
+        pass
+    else:
+        output_file_info['size'] = file_size
 
     is_ok = addToJR([(key, output_file_info)], location = ['steps', 'cmsRun', 'output'], mode = 'update')
 
@@ -287,12 +293,6 @@ def addSEToJR(file_name, se_name, direct_stageout, is_log):
 
     if is_log:
         pairs_to_add_to_job_report = [('SEName', se_name), ('direct_stageout', direct_stageout)]
-        try:
-            log_size = os.stat(file_name).st_size
-        except:
-            pass
-        else:
-            pairs_to_add_to_job_report.append(('log_size', log_size))
         is_ok = addToJR(pairs_to_add_to_job_report)
     else:
         orig_file_name, _ = getJobId(file_name)
@@ -377,7 +377,7 @@ def performLocalTransfer(manager, source_file, dest_temp_lfn, is_log, inject = T
         se_name = stageout_info['SEName']
         addSEToJR(dest_temp_file_name, se_name, direct_stageout = False, is_log = is_log)
         if inject:
-            injectToASO(dest_temp_lfn, stageout_info['SEName'], is_log)
+            injectToASO(dest_temp_lfn, se_name, is_log)
 
     return result
 
@@ -510,7 +510,7 @@ def injectToASO(source_lfn, se_name, is_log):
         return False
     print "Final stageout job description: %s" % pprint.pformat(doc)
 
-    addToJR([('aso_start_time', g_now), ('aso_start_timestamp', g_now_epoch)], location = [], mode = 'override')
+    addToJR([('aso_start_time', g_now), ('aso_start_timestamp', g_now_epoch)])
 
     return True
 
@@ -701,6 +701,12 @@ def main():
 
     ## Transfer of log tarball.
     logfile_name = 'cmsRun_%d.log.tar.gz' % g_job_id
+    try:
+        log_size = os.stat(logfile_name).st_size
+    except:
+        pass
+    else:
+        addToJR([('log_size', log_size)])
     dest_temp_lfn = os.path.join(dest_temp_dir, "log", logfile_name)
     try:
         print "==== Starting compression of user logs at %s ====" % time.ctime()

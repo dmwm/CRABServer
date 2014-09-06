@@ -39,6 +39,7 @@ to the FJR. The information is:
 {
  u'SEName': u'se1.accre.vanderbilt.edu',
  u'pfn': u'out.root',
+ u'size': 45124,
  u'direct_stageout': False
 }
 """
