@@ -42,6 +42,7 @@ RX_CHECKSUM  = re.compile(r'^[A-Za-z0-9\-]+$')
 RX_FILESTATE  = re.compile(r'^TRANSFERRING|FINISHED|FAILED|COOLOFF$')
 RX_LFNPATH   = re.compile(r"^(?=.{0,500}$)%(subdir)s(/%(subdir)s)*/?$" % lfnParts)
 RX_HOURS   = re.compile(r"^\d{0,6}$") #should be able to erase the last 100 years with 6 digits
+RX_ASOURL = RX_DBSURL
 #TODO!
 RX_OUT_DATASET = re.compile(r"^.*$")
 

@@ -171,7 +171,7 @@ class DagmanKiller(TaskAction.TaskAction):
 
         # Search for and hold the DAG
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(self.workflow)
-
+        self.logger.info("About to put on Hold task: %s" % self.workflow)
         with HTCondorUtils.AuthenticatedSubprocess(self.proxy) as (parent, rpipe):
             if not parent:
                self.schedd.act(htcondor.JobAction.Hold, rootConst)

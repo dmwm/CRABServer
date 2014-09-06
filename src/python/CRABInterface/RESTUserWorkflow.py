@@ -173,6 +173,7 @@ class RESTUserWorkflow(RESTEntity):
             if len(safe.kwargs["runs"]) != len(safe.kwargs["lumis"]):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
             validate_strlist("adduserfiles", param, safe, RX_ADDFILE)
+            validate_str("ASOURL", param, safe, RX_ASOURL, optional=True)
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
@@ -221,7 +222,7 @@ class RESTUserWorkflow(RESTEntity):
     def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                 savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfnprefix, lfn, saveoutput,
-                faillimit, ignorelocality, userfiles):
+                faillimit, ignorelocality, userfiles, ASOURL):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -262,6 +263,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg int faillimit: the maximum number of failed jobs which triggers a workflow abort.
            :arg int ignorelocality: whether to ignore file locality in favor of the whitelist.
            :arg str userfiles: The files to process instead of a DBS-based dataset.
+           :arg str ASOURL: ASO url for transfers and pulishing.
            :returns: a dict which contaians details of the request"""
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
@@ -274,7 +276,7 @@ class RESTUserWorkflow(RESTEntity):
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfnprefix=lfnprefix, lfn=lfn,
-                                       ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles)
+                                       ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, ASOURL=ASOURL)
 
     @restcall
     def post(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority):
