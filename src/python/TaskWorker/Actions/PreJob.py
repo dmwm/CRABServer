@@ -159,11 +159,6 @@ class PreJob:
 
         new_submit_text = self.redo_sites(new_submit_text, id, blacklist)
 
-        asoauth = self.get_asoauth() #get the aso URL from the auth aso file if any
-        if asoauth:
-            #substitute the URL (matches everything preceeded bye 'CRAB_ASOURL = "' and followed by '"')
-            new_submit_text = re.sub(r'(?<=CRAB_ASOURL = ")(.*)(?=")', asoauth, new_submit_text)
-
         with open("Job.%d.submit" % id, "w") as fd:
             fd.write(new_submit_text)
 
@@ -217,19 +212,6 @@ class PreJob:
                 return time.time() - os.stat(os.path.join(logpath, "postjob.%s.%s.txt" % (id, int(retry_num)-1))).st_mtime
         except:
             pass
-
-    def get_asoauth(self):
-        """ If the auth ASO file exist on the schedd return the asourl found there. Otherwise return None
-        """
-        aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config")
-        if os.path.isfile(aso_auth_file):
-            f = open(aso_auth_file)
-            authParams = json.loads(f.read())
-            f.close()
-            return authParams['ASO_DB_URL']
-
-        return ''
-
 
     def execute(self, *args):
         retry_num = int(args[0])
