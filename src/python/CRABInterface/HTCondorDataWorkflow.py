@@ -771,7 +771,6 @@ class HTCondorDataWorkflow(DataWorkflow):
         This is a more flexible format that allows future extensions but, unfortunately,
         also requires a separate parser.
         """
-        info = {}
         for ad in classad.parseAds(fp):
             if ad['Type'] != "NodeStatus":
                 continue
@@ -808,6 +807,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 info = nodes.setdefault(nodeid, {})
                 info['State'] = 'finished'
             elif status == 6: # STATUS_ERROR
+                info = nodes.setdefault(nodeid, {})
                 # Older versions of HTCondor would put jobs into STATUS_ERROR
                 # for a short time if the job was to be retried.  Hence, we had
                 # some status parsing logic to try and guess whether the job would
