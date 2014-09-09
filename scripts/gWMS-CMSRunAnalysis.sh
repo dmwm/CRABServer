@@ -133,7 +133,7 @@ condor_chirp phase output
 echo "======== Stageout at $(TZ=GMT date) STARTING ========"
 rm -f wmcore_initialized
 # Note we prevent buffering of stdout/err -- this is due to observed issues in mixing of out/err for stageout plugins
-PYTHONUNBUFFERED=1 ./cmscp.py
+PYTHONUNBUFFERED=1 ./cmscp.py "JOB_EXIT_CODE=$EXIT_STATUS"
 STAGEOUT_EXIT_STATUS=$?
 
 if [ ! -e wmcore_initialized ];

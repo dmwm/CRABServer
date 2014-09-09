@@ -53,6 +53,7 @@ numberOfRetries = 2
 retryPauseTime = 60
 g_now = None
 g_now_epoch = None
+g_cmsRun_exit_code = 0
 g_job_exit_code = 0
 g_job_report_name = None
 g_job_id = None
@@ -439,7 +440,7 @@ def injectToASO(source_lfn, se_name, is_log):
     publish = int(task_publish and file_type == 'output' and isEDM)
     if task_publish and file_type == 'output' and not isEDM:
         print "Disabling publication of output file %s, because it is not of EDM type." % file_name
-    publish = int(publish and not g_job_exit_code)
+    publish = int(publish and not g_cmsRun_exit_code)
     publish_dbs_url = str(ad['CRAB_PublishDBSURL'])
     if publish_dbs_url.lower() == 'undefined':
         publish_dbs_url = "https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/"
@@ -684,19 +685,17 @@ def main():
     counter = "%04d" % (g_job_id / 1000)
     dest_temp_dir = os.path.join(dest_temp_dir, counter)
 
-    # Try to determine whether the payload actually succeeded.
-    # If it did not, we place it in a different directory. This prevents
-    # us from putting failed ROOT files in the same directory as successful
-    # files; we worry that users may simply 'ls' the directory and run on
-    # all files.
-    global g_job_exit_code
-    g_job_exit_code = 0
-    try: 
-        g_job_exit_code = job_report['jobExitCode']
+    ## Try to determine whether the payload actually succeeded.
+    ## If the payload didn't succeed, we put it in a different directory. This prevents us from
+    ## putting failed output files in the same directory as successful output files; we worry 
+    ## that users may simply 'ls' the directory and run on all listed files.
+    global g_cmsRun_exit_code
+    try:
+        g_cmsRun_exit_code = job_report['jobExitCode']
     except Exception, ex:
         print "== WARNING: Unable to retrieve cmsRun exit code from job report."
         traceback.print_exc()
-    if g_job_exit_code:
+    if g_cmsRun_exit_code:
         dest_temp_dir = os.path.join(dest_temp_dir, "failed")
 
     ## Transfer of log tarball.
@@ -771,6 +770,13 @@ def main():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
+    try:
+        for arg in sys.argv:
+            if 'JOB_EXIT_CODE=' in arg and len(arg.split("=")) == 2:
+                global g_job_exit_code
+                g_job_exit_code = int(arg.split("=")[1])
+    except:
+        pass
     try:
         retval = main()
     except:
