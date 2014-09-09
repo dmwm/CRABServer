@@ -294,7 +294,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         if row.task_status not in ['SUBMITTED', 'KILLFAILED', 'KILLED']:
             if isinstance(row.task_failure, str):
                 taskFailureMsg = row.task_failure
-            elif taskFailure == None:
+            elif row.task_failure == None:
                 taskFailureMsg = ""
             else:
                 taskFailureMsg = row.task_failure.read()
@@ -344,11 +344,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "jobdefErrors"    : [],
                       "jobList"         : [],
                       "saveLogs"        : row.save_logs }]
-
-        #getting publication information
-        publication_info, outdatasets = self.publicationStatus(workflow)
-        self.logger.info("Publiation status for workflow %s done" % workflow)
-
 
         taskStatusCode = int(results[-1]['JobStatus'])
         if 'CRAB_UserWebDir' not in results[-1]:
@@ -419,6 +414,21 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         retval["failedJobdefs"] = 0
         retval["totalJobdefs"] = 0
+
+        #getting publication information
+        publication_info = {}
+        outdatasets = []
+        arguments = literal_eval(row.arguments.read())
+
+        #Always returning ASOURL also, it is required for kill, resubmit
+        self.logger.info("ASO: %s" % arguments)
+        retval['ASOURL'] = arguments['ASOURL']
+
+        if (row.tm_publication == 'T' and 'finished' in retval['jobsPerStatus']):
+            publication_info, outdatasets = self.publicationStatus(workflow, arguments['ASOURL'])
+            self.logger.info("Publiation status for workflow %s done" % workflow)
+        else:
+            self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.tm_publication, retval['jobsPerStatus'].get('finished', 0)))
 
         if len(taskStatus) == 0 and results[0]['JobStatus'] == 2:
             retval['status'] = 'Running (jobs not submitted)'
@@ -553,13 +563,12 @@ class HTCondorDataWorkflow(DataWorkflow):
         outdatasets = [row[0] for row in rows]
         return outdatasets
 
-    def publicationStatus(self, workflow):
+    def publicationStatus(self, workflow, asourl):
         publication_info = {}
         outdatasets = []
-        ASOURL = self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", "")
-        if not ASOURL:
+        if not asourl:
             raise ExecutionError("This CRAB server is not configured to publish; no publication status is available.")
-        server = CMSCouch.CouchServer(dburl=ASOURL, ckey=self.serverKey, cert=self.serverCert)
+        server = CMSCouch.CouchServer(dburl=asourl, ckey=self.serverKey, cert=self.serverCert)
         try:
             db = server.connectDatabase('asynctransfer')
         except Exception, ex:
@@ -798,6 +807,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 info = nodes.setdefault(nodeid, {})
                 info['State'] = 'finished'
             elif status == 6: # STATUS_ERROR
+                info = nodes.setdefault(nodeid, {})
                 # Older versions of HTCondor would put jobs into STATUS_ERROR
                 # for a short time if the job was to be retried.  Hence, we had
                 # some status parsing logic to try and guess whether the job would
