@@ -135,6 +135,14 @@ def make_webdir(ad):
             os.symlink(os.path.abspath(os.path.join(".", "aso_status.json")), os.path.join(path, "aso_status.json"))
         except:
             pass
+        try:
+            os.symlink(os.path.abspath(os.path.join(".", ".job.ad")), os.path.join(path, "job_ad.txt"))
+        except:
+            pass
+        try:
+            shutil.copy2(os.path.join(".", "sandbox.tar.gz"), os.path.join(path, "sandbox.tar.gz"))
+        except:
+            pass
     except OSError:
         pass
     try:
@@ -168,10 +176,36 @@ def clear_automatic_blacklist(ad):
         except Exception, e:
             print "ERROR when clearing statistics: %s" % str(e)
 
+def updatewebdir(ad):
+    data = {'subresource' : 'addwebdir'}
+    url = ad['CRAB_RestTaskUrl']
+    instance = ad['CRAB_RestTaskInstance'] + "task"
+    data['workflow'] = ad['CRAB_ReqName']
+    data['webdirurl'] = ad['CRAB_UserWebDir']
+    cert = ad['X509UserProxy']
+    try:
+        from RESTInteractions import HTTPRequests
+        from httplib import HTTPException
+        import urllib
+        server = HTTPRequests(url, cert, cert)
+        server.post(instance, data=urllib.urlencode(data))
+        return 0
+    except:
+        print traceback.format_exc()
+        return 1
+
 def main():
     ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
     make_webdir(ad)
     make_job_submit(ad)
+
+    retries = 0
+    exit_code = 1
+    while retries < 3 and exit_code != 0:
+        exit_code = updatewebdir(ad)
+        if exit_code != 0:
+            time.sleep(retries*20)
+        retries += 1
 
     clear_automatic_blacklist(ad)
 
