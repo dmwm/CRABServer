@@ -289,6 +289,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         if 'JobPrio' not in dagAd:
             dagAd['JobPrio'] = 10
 
+        dagAd["CRAB_RestTaskUrl"] = self.config.TaskWorker.resturl
+        dagAd["CRAB_RestTaskInstance"] = self.resturl.replace('workflowdb', '')
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
         dagAd["Err"] = str(os.path.join(info['scratch'], "request.err"))

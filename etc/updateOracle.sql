@@ -1,1 +1,1 @@
-alter table tasks add (tm_task_warnings CLOB);
+alter table tasks add (tm_user_webdir VARCHAR(1000));

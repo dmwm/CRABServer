@@ -48,7 +48,7 @@ class Task(object):
 
     ID_sql = "SELECT tm_taskname, panda_jobset_id, tm_task_status, tm_user_role, \
              tm_user_group, tm_task_failure, tm_split_args, panda_resubmitted_jobs, \
-             tm_save_logs, tm_username, tm_user_dn, tm_arguments, tm_input_dataset, tm_dbs_url, tm_publication \
+             tm_save_logs, tm_username, tm_user_dn, tm_arguments, tm_input_dataset, tm_dbs_url, tm_publication, tm_user_webdir \
              FROM tasks WHERE tm_taskname=%(taskname)s"
 
     New_sql = "INSERT INTO tasks ( \
@@ -98,3 +98,6 @@ class Task(object):
 
     SetUpdateOutDataset_sql = """UPDATE tasks SET tm_output_dataset = %(tm_output_dataset)s \
                                 WHERE tm_taskname = %(tm_taskname)s"""
+
+    UpdateWebUrl_sql = """UPDATE tasks SET tm_user_webdir = %(webdirurl)s \
+                              WHERE tm_taskname = %(workflow)s"""

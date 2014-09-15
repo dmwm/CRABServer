@@ -60,12 +60,6 @@ then
     fi
 fi
 
-# Recalculate the black / whitelist
-if [ -e AdjustSites.py ];
-then
-  python2.6 AdjustSites.py
-fi
-
 # Bootstrap the runtime - we want to do this before DAG is submitted
 # so all the children don't try this at once.
 if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]
@@ -116,6 +110,12 @@ then
 	ls -lah
 
         export TASKWORKER_ENV="1"
+fi
+
+# Recalculate the black / whitelist
+if [ -e AdjustSites.py ];
+then
+  python2.6 AdjustSites.py
 fi
 
 export _CONDOR_DAGMAN_LOG=$PWD/$1.dagman.out

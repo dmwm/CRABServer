@@ -5,7 +5,7 @@ from WMCore.REST.Error import InvalidParameter,ExecutionError
 
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
-from CRABInterface.Regexps import RX_SUBRES_TASK, RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_OUT_DATASET
+from CRABInterface.Regexps import RX_SUBRES_TASK, RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_OUT_DATASET, RX_URL
 
 # external dependecies here
 import cherrypy
@@ -28,6 +28,7 @@ class RESTTask(RESTEntity):
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
             validate_str("warning", param, safe, RX_WORKFLOW, optional=True)
+            validate_str("webdirurl", param, safe, RX_URL, optional=True)
         elif method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
@@ -105,5 +106,23 @@ class RESTTask(RESTEntity):
         warnings.append(warning)
 
         self.api.modify(self.Task.SetWarnings_sql, warnings=[str(warnings)], workflow=[workflow])
+
+        return []
+
+    def addwebdir(self, **kwargs):
+        """ Add web directory to web_dir column in the database. Can be tested with:
+            curl -X POST https://balcas-crab.cern.ch/crabserver/dev/task -k --key $X509_USER_PROXY --cert $X509_USER_PROXY \
+                    -d 'subresource=addwebdir&workflow=140710_233424_crab3test-5:mmascher_crab_HCprivate12&webdirurl=http://cmsweb.cern.ch/crabserver/testtask' -v
+        """
+        #check if the parameters are there
+        if 'webdirurl' not in kwargs or not kwargs['webdirurl']:
+            raise InvalidParameter("Web directory url not found in the input parameters")
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+
+        workflow = kwargs['workflow']
+        authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
+
+        self.api.modify(self.Task.UpdateWebUrl_sql, webdirurl=[str(kwargs['webdirurl'])], workflow=[workflow])
 
         return []
