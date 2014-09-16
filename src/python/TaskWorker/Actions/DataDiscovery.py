@@ -25,7 +25,7 @@ class DataDiscovery(TaskAction):
         """
         self.logger.debug(" Formatting data discovery output ")
         # TEMPORARY
-        secmsmap = {}
+        pnn_psn_map = {}
         sbj = SiteDBJSON({"key": self.config.TaskWorker.cmskey, "cert": self.config.TaskWorker.cmscert})
 
         wmfiles = []
@@ -47,24 +47,24 @@ class DataDiscovery(TaskAction):
             wmfile = File(lfn = lfn, events = infos['NumberOfEvents'], size = infos['Size'], checksums = infos['Checksums'])
             wmfile['block'] = infos['BlockName']
             wmfile['locations'] = []
-            for se in locations[infos['BlockName']]:
-                if se and se not in secmsmap:
-                    self.logger.debug("Translating SE %s" %se)
+            for pnn in locations[infos['BlockName']]:
+                if pnn and pnn not in pnn_psn_map:
+                    self.logger.debug("Translating PNN %s" %pnn)
                     try:
-                        secmsmap[se] = sbj.seToCMSName(se)
+                        pnn_psn_map[pnn] = sbj.PNNtoPSN(pnn)
                     except KeyError, ke:
-                        self.logger.error("Impossible translating %s to a CMS name through SiteDB" %se)
-                        secmsmap[se] = ''
+                        self.logger.error("Impossible translating %s to a CMS name through SiteDB" %pnn)
+                        pnn_psn_map[pnn] = ''
                     except httplib.HTTPException, ex:
-                        self.logger.error("Couldn't map SE to site: %s" % se)
-                        print "Couldn't map SE to site: %s" % se
+                        self.logger.error("Couldn't map SE to site: %s" % pnn)
+                        print "Couldn't map SE to site: %s" % pnn
                         print "got problem: %s" % ex
                         print "got another problem: %s" % ex.__dict__
-                if se and se in secmsmap:
-                    if type(secmsmap[se]) == list:
-                        wmfile['locations'].extend(secmsmap[se])
+                if pnn and pnn in pnn_psn_map:
+                    if type(pnn_psn_map[pnn]) == list:
+                        wmfile['locations'].extend(pnn_psn_map[pnn])
                     else:
-                        wmfile['locations'].append(secmsmap[se])
+                        wmfile['locations'].append(pnn_psn_map[pnn])
             wmfile['workflow'] = requestname
             event_counter += infos['NumberOfEvents']
             for run, lumis in infos['Lumis'].iteritems():

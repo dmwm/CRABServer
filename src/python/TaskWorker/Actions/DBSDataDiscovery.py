@@ -48,7 +48,7 @@ class DBSDataDiscovery(DataDiscovery):
                 raise TaskWorkerException("Cannot find dataset %s in this DBS instance: %s" % (kwargs['task']['tm_input_dataset'], dbsurl))
             raise
         #Create a map for block's locations: for each block get the list of locations
-        locationsMap = dbs.listFileBlockLocation(list(blocks))
+        locationsMap = dbs.listFileBlockLocation(list(blocks), phedexNodes=True)
         if not locationsMap:
             msg = "No location was found for %s in %s." %(kwargs['task']['tm_input_dataset'], dbsurl)
 #           You should not need the following if you raise TaskWorkerException
