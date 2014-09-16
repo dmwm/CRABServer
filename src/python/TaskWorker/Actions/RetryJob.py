@@ -241,8 +241,8 @@ class RetryJob(object):
             hold_reason = self.ad.get("HoldReason", self.ad.get("LastHoldReason", "Unknown"))
             raise RecoverableError("Will retry held job; last hold reason: %s" % hold_reason)
 
-        self.check_empty_report()
         try:
+            self.check_empty_report()
             self.check_exit_code()
         except RecoverableError, re:
             orig_msg = str(re)
