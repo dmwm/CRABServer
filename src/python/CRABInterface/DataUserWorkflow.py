@@ -77,6 +77,7 @@ class DataUserWorkflow(object):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
+           :arg str activity: workflow activity type, usually analysis;
            :arg str jobtype: job type of the workflow, usually Analysis;
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);

@@ -30,13 +30,13 @@ class Task(object):
     TaskByStatus_sql = "SELECT tm_task_status,tm_taskname FROM tasks WHERE tm_task_status = :taskstatus AND tm_username=:username_"
     #New
     New_sql = "INSERT INTO tasks ( \
-              tm_taskname,panda_jobset_id, tm_task_status, tm_start_time, tm_task_failure, tm_job_sw, \
+              tm_taskname,tm_activity, panda_jobset_id, tm_task_status, tm_start_time, tm_task_failure, tm_job_sw, \
               tm_job_arch, tm_input_dataset, tm_site_whitelist, tm_site_blacklist, \
               tm_split_algo, tm_split_args, tm_totalunits, tm_user_sandbox, tm_cache_url, tm_username, tm_user_dn, \
               tm_user_vo, tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, tm_publish_dbs_url, \
               tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, tm_transformation, tm_job_type, tm_arguments,\
               panda_resubmitted_jobs, tm_save_logs, tm_user_infiles, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority) \
-              VALUES (:task_name, :jobset_id, upper(:task_status), SYS_EXTRACT_UTC(SYSTIMESTAMP), :task_failure, :job_sw, \
+              VALUES (:task_name, :task_activity, :jobset_id, upper(:task_status), SYS_EXTRACT_UTC(SYSTIMESTAMP), :task_failure, :job_sw, \
               :job_arch, :input_dataset, :site_whitelist, :site_blacklist, :split_algo, :split_args, :total_units, :user_sandbox, \
               :cache_url, :username, :user_dn, \
               :user_vo, :user_role, :user_group, :publish_name, :asyncdest, :dbs_url, :publish_dbs_url, \
@@ -81,7 +81,7 @@ class Task(object):
                        tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \
                        tm_publish_dbs_url, tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
                        tm_transformation, tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, \
-                       tm_user_infiles, tw_name, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority \
+                       tm_user_infiles, tw_name, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority, tm_activity \
                        FROM tasks WHERE tm_task_status = :get_status AND ROWNUM <= :limit AND tw_name = :tw_name"""
    
     #GetUserFromID

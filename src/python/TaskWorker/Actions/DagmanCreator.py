@@ -354,14 +354,11 @@ class DagmanCreator(TaskAction.TaskAction):
                 info['desired_arch'] = "X86_64"
 
     def getDashboardTaskType(self):
-        """ Get the dashboard activity name for the task. We check if tf it is an Hammercloud task by
-            looking at the taskname: if it contains something like "HC_22_CSA14_Test_" then it's HC.
+        """ Get the dashboard activity name for the task.
         """
-        if re.match(r'.*HC_\d\d\d?_CSA14_Test_', self.task['tm_taskname']):
-            return "analysis-crab3-hc"
-        else:
+        if self.task['tm_activity'] in (None, ''):
             return getattr(self.config.TaskWorker, 'dashboardTaskType', 'analysistest')
-
+        return self.task['tm_activity']
 
     def makeJobSubmit(self, task):
         """
