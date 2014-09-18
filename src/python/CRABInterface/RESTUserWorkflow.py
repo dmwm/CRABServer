@@ -175,6 +175,8 @@ class RESTUserWorkflow(RESTEntity):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
             validate_strlist("adduserfiles", param, safe, RX_ADDFILE)
             validate_str("asourl", param, safe, RX_ASOURL, optional=True)
+            validate_str("scriptexe", param, safe, RX_ADDFILE, optional=True)
+            validate_strlist("scriptargs", param, safe, RX_SCRIPTARGS)
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
@@ -223,7 +225,7 @@ class RESTUserWorkflow(RESTEntity):
     def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                 savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfnprefix, lfn, saveoutput,
-                faillimit, ignorelocality, userfiles, asourl):
+                faillimit, ignorelocality, userfiles, asourl, scriptexe, scriptargs):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -265,6 +267,9 @@ class RESTUserWorkflow(RESTEntity):
            :arg int faillimit: the maximum number of failed jobs which triggers a workflow abort.
            :arg int ignorelocality: whether to ignore file locality in favor of the whitelist.
            :arg str userfiles: The files to process instead of a DBS-based dataset.
+           :arg str asourl: ASO url to be used in place of the one in the ext configuration.
+           :arg str scriptexe: script to execute in place of cmsrun.
+           :arg str scriptargs: arguments to be passed to the scriptexe script.
            :returns: a dict which contaians details of the request"""
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
@@ -277,7 +282,8 @@ class RESTUserWorkflow(RESTEntity):
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfnprefix=lfnprefix, lfn=lfn,
-                                       ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, asourl=asourl)
+                                       ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, asourl=asourl,
+                                       scriptexe=scriptexe, scriptargs=scriptargs)
 
     @restcall
     def post(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority):

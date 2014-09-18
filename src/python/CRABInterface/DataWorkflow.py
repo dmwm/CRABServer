@@ -115,7 +115,7 @@ class DataWorkflow(object):
     def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None, lfn=None,
-               ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None):
+               ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, scriptexe=None, scriptargs=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -230,6 +230,8 @@ class DataWorkflow(object):
                             numcores        = [numcores],
                             maxmemory       = [maxmemory],
                             priority        = [priority],
+                            scriptexe       = [scriptexe],
+                            scriptargs      = [dbSerializer(scriptargs)]
         )
 
         return [{'RequestName': requestname}]

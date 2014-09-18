@@ -256,7 +256,7 @@ def stopDashboardMonitoring(myad):
 
 def logCMSSW():
     if not os.path.exists("cmsRun-stdout.log"):
-        print "ERROR: Cannot dump CMSSW stdout; perhaps CMSSW never executed?"
+        print "ERROR: Cannot dump CMSSW stdout; perhaps CMSSW never executed (e.g.: scriptExe was set)?"
         return
     print "======== CMSSW OUTPUT STARTING ========"
     fd = open("cmsRun-stdout.log")
@@ -383,6 +383,12 @@ def parseArgs():
     parser.add_option('--oneEventMode',
                       dest='oneEventMode',
                       default=0)
+    parser.add_option('--scriptExe',
+                      dest='scriptExe',
+                      type='string')
+    parser.add_option('--scriptArgs',
+                      dest='scriptArgs',
+                      type='string')
 
     (opts, args) = parser.parse_args(sys.argv[1:])
 
@@ -405,6 +411,8 @@ def parseArgs():
         print "seeding:       ", opts.seeding
         print "userFiles:     ", opts.userFiles
         print "oneEventMode:  ", opts.oneEventMode
+        print "scriptExe:     ", opts.scriptExe
+        print "scriptArgs:    ", opts.scriptArgs
         print "==================="
     except:
         type, value, traceBack = sys.exc_info()
@@ -463,6 +471,9 @@ def prepSandbox(opts):
     if opts.userFiles:
         for myfile in opts.userFiles.split(','):
             os.rename(myfile, destDir + '/' + myfile)
+    #move also scriptExe in the working directory (if present)
+    if opts.scriptExe:
+        os.rename(opts.scriptExe, destDir + '/' + opts.scriptExe)
     print "==== WMCore filesystem preparation FINISHING at %s ====" % time.asctime(time.gmtime())
 
 
@@ -487,6 +498,27 @@ def getProv(filename, opts):
     with open("edmProvDumpOutput.log", "r") as fd:
         output = fd.read()
     return output
+
+
+def executeScriptExe(opts):
+    scram = Scram(
+        version = opts.cmsswVersion,
+        directory = "WMTaskSpace/cmsRun",
+        architecture = opts.scramArch,
+    )
+    if scram.project() or scram.runtime(): #if any of the two commands fail...
+        msg = scram.diagnostic()
+        handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
+        mintime()
+        sys.exit(EC_CMSMissingSoftware)
+    command_ = "%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(opts.scriptArgs))
+    ret = scram(command_, runtimeDir="WMTaskSpace/cmsRun", logName=subprocess.PIPE)
+    if ret > 0:
+        msg = scram.diagnostic()
+        handleException("FAILED", EC_CMSRunWrapper, 'Error executing scriptExe.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
+        mintime()
+        sys.exit(EC_CMSRunWrapper)
+    return ret
 
 
 def executeCMSSWStack(opts):
@@ -736,12 +768,16 @@ if __name__ == "__main__":
             startDashboardMonitoring(ad)
         print "==== CMSSW Stack Execution STARTING at %s ====" % time.asctime(time.gmtime())
         try:
-            cmssw = executeCMSSWStack(opts)
+            jobExitCode = None
+            if not opts.scriptExe:
+                cmssw = executeCMSSWStack(opts)
+                jobExitCode = cmssw.step.execution.exitStatus
+            else:
+                jobExitCode = executeScriptExe(opts)
         except:
             print "==== CMSSW Stack Execution FAILED at %s ====" % time.asctime(time.gmtime())
             logCMSSW()
             raise
-        jobExitCode = cmssw.step.execution.exitStatus
         print "Job exit code: %s" % str(jobExitCode)
         print "==== CMSSW Stack Execution FINISHING at %s ====" % time.asctime(time.gmtime())
         logCMSSW()

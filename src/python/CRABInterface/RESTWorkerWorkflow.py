@@ -230,4 +230,6 @@ class Task(dict):
         self['tm_maxmemory'] = task[39]
         self['tm_priority'] = task[40]
         self['tm_activity'] = task[41]
+        self['tm_scriptexe'] = task[42]
+        self['tm_scriptargs'] = literal_eval(task[43] if ( task[43] is None or isinstance(task[43],str) ) else task[43].read())
 
