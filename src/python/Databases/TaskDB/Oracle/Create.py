@@ -77,6 +77,8 @@ class Create(DBCreator):
         tm_output_dataset CLOB,
         tm_task_warnings CLOB,
         tm_user_webdir VARCHAR(1000),
+        tm_scriptexe VARCHAR(255),
+        tm_scriptargs VARCHAR(4000),
         CONSTRAINT taskname_pk PRIMARY KEY(tm_taskname),
         CONSTRAINT check_tm_publication CHECK (tm_publication IN ('T', 'F')),
         CONSTRAINT check_tm_save_logs CHECK (tm_save_logs IN ('T', 'F'))
