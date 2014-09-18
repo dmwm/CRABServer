@@ -102,7 +102,7 @@ CRAB_Id = $(count)
 +CRAB_oneEventMode = %(oneEventMode)s
 +CRAB_ASOURL = %(ASOURL)s
 +TaskType = "Job"
-+AccountingGroup = %(accounting_group)s 
++AccountingGroup = %(accounting_group)s
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
 +DESIRED_OpSyses = %(desired_opsys)s
