@@ -68,7 +68,7 @@ class Create(DBCreator):
         panda_resubmitted_jobs CLOB,
         tm_save_logs VARCHAR(1) NOT NULL,
         tw_name VARCHAR(255),
-        tm_user_infiles VARCHAR(255),
+        tm_user_infiles VARCHAR(4000),
         tm_maxjobruntime NUMBER(38),
         tm_numcores NUMBER(38),
         tm_maxmemory NUMBER(38),
