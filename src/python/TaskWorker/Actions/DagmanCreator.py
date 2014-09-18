@@ -102,7 +102,7 @@ CRAB_Id = $(count)
 +CRAB_oneEventMode = %(oneEventMode)s
 +CRAB_ASOURL = %(ASOURL)s
 +TaskType = "Job"
-+AccountingGroup = analysis.%(userhn)s
++AccountingGroup = %(accounting_group)s
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
 +DESIRED_OpSyses = %(desired_opsys)s
@@ -209,7 +209,7 @@ def transform_strings(input):
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
            'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
            'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL', 'asyncdest_se', "stageoutpolicy", \
-           'taskType', 'maxpost', 'worker_name', 'desired_opsys', 'desired_opsysvers', 'desired_arch':
+           'taskType', 'maxpost', 'worker_name', 'desired_opsys', 'desired_opsysvers', 'desired_arch', "accounting_group":
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -411,6 +411,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['runs'] = []
         info['lumis'] = []
         info['saveoutput'] = 1 if task.get('tm_arguments', {}).get('saveoutput', 'T') == 'T' else 0
+        info['accounting_group'] = 'analysis.%s' % info['userhn']
         info = transform_strings(info)
         info['faillimit'] = task.get('tm_arguments', {}).get('faillimit')
         if info['jobarch_flatten'].startswith("slc6_"):
