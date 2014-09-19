@@ -229,4 +229,5 @@ class Task(dict):
         self['tm_numcores'] = task[38]
         self['tm_maxmemory'] = task[39]
         self['tm_priority'] = task[40]
+        self['tm_activity'] = task[41]
 

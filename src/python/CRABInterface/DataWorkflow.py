@@ -112,13 +112,14 @@ class DataWorkflow(object):
         raise NotImplementedError
 
     @conn_handler(services=['centralconfig'])
-    def submit(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
+    def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
+           :arg str activity: workflow activity type, usually analysis;
            :arg str jobtype: job type of the workflow, usually Analysis;
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
@@ -189,6 +190,7 @@ class DataWorkflow(object):
 
         self.api.modify(self.Task.New_sql,
                             task_name       = [requestname],
+                            task_activity   = [activity],
                             jobset_id       = [None],
                             task_status     = ['NEW'],
                             task_failure    = [''],

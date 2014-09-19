@@ -115,6 +115,7 @@ class RESTUserWorkflow(RESTEntity):
 
         if method in ['PUT']:
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
+            validate_str("activity", param, safe, RX_ACTIVITY, optional=False)
             validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
             validate_str("jobsw", param, safe, RX_CMSSW, optional=False)
             validate_num("nonprodsw", param, safe, optional=False)
@@ -219,13 +220,14 @@ class RESTUserWorkflow(RESTEntity):
 
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
-    def put(self, workflow, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
+    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                 savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfnprefix, lfn, saveoutput,
                 faillimit, ignorelocality, userfiles, asourl):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
+           :arg str activity: workflow activity type, usually analysis;
            :arg str jobtype: job type of the workflow, usually Analysis;
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
@@ -266,7 +268,7 @@ class RESTUserWorkflow(RESTEntity):
            :returns: a dict which contaians details of the request"""
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
-        return self.userworkflowmgr.submit(workflow=workflow, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata,
+        return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata,
                                        siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, splitalgo=splitalgo, algoargs=algoargs,
                                        cachefilename=cachefilename, cacheurl=cacheurl,
                                        addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
