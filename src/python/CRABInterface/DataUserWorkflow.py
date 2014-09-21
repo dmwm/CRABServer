@@ -116,6 +116,7 @@ class DataUserWorkflow(object):
            :arg int faillimit: the maximum number of failed jobs allowed before workflow is aborted
            :arg int ignorelocality: ignore data locality.
            :arg str list userfiles: The files to process instead of a DBS-based dataset.
+           :arg str scheddname: Schedd name used for debugging.
            :returns: a dict which contaians details of the request"""
 
         return self.workflow.submit(*args, **kwargs)
