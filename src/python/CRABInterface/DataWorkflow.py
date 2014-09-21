@@ -115,7 +115,7 @@ class DataWorkflow(object):
     def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None, lfn=None,
-               ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None):
+               ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, scheddname=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -156,12 +156,13 @@ class DataWorkflow(object):
            :arg str lfn: lfn used to store output files.
            :arg str userfiles: The files to process instead of a DBS-based dataset.
            :arg str asourl: Specify which ASO to use for transfers and publishing.
+           :arg str scheddname: Schedd Name used for debugging.
            :returns: a dict which contaians details of the request"""
 
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         requestname = ""
         try:
-            requestname = self.updateRequest('%s_%s_%s' % (timestamp, userhn, workflow))
+            requestname = self.updateRequest('%s_%s_%s' % (timestamp, userhn, workflow), scheddname)
         except IOError, err:
             self.logger.debug("Failed to communicate with components %s. Request name : " % (str(err), str(requestname)))
             raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")
