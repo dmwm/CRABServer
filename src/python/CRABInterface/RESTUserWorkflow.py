@@ -115,7 +115,7 @@ class RESTUserWorkflow(RESTEntity):
 
         if method in ['PUT']:
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
-            validate_str("activity", param, safe, RX_ACTIVITY, optional=False)
+            validate_str("activity", param, safe, RX_ACTIVITY, optional=True)
             validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
             validate_str("jobsw", param, safe, RX_CMSSW, optional=False)
             validate_num("nonprodsw", param, safe, optional=False)
@@ -227,7 +227,7 @@ class RESTUserWorkflow(RESTEntity):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
-           :arg str activity: workflow activity type, usually analysis;
+           :arg str activity: workflow activity type, default None;
            :arg str jobtype: job type of the workflow, usually Analysis;
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
