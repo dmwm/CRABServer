@@ -471,23 +471,10 @@ def prepSandbox(opts):
     if opts.userFiles:
         for myfile in opts.userFiles.split(','):
             os.rename(myfile, destDir + '/' + myfile)
-    #move also scriptExe in the working directory (if present)
-    if opts.scriptExe:
-        os.rename(opts.scriptExe, destDir + '/' + opts.scriptExe)
     print "==== WMCore filesystem preparation FINISHING at %s ====" % time.asctime(time.gmtime())
 
 
-def getProv(filename, opts):
-    scram = Scram(
-        version = opts.cmsswVersion,
-        directory = os.getcwd(),
-        architecture = opts.scramArch,
-    )
-    if scram.project() or scram.runtime(): #if any of the two commands fail...
-        msg = scram.diagnostic()
-        handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
-        mintime()
-        sys.exit(EC_CMSMissingSoftware)
+def getProv(filename, scram):
     ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd(), logName="edmProvDumpOutput.log")
     if ret > 0:
         msg = scram.diagnostic()
@@ -500,19 +487,36 @@ def getProv(filename, opts):
     return output
 
 
-def executeScriptExe(opts):
-    scram = Scram(
-        version = opts.cmsswVersion,
-        directory = "WMTaskSpace/cmsRun",
-        architecture = opts.scramArch,
-    )
-    if scram.project() or scram.runtime(): #if any of the two commands fail...
+def executeScriptExe(opts, scram):
+    command_ = ('python %s/TweakPSet.py --location=%s '+
+                                                          '--inputFile=\'%s\' '+
+                                                          '--runAndLumis=\'%s\' '+
+                                                          '--firstEvent=%s '+
+                                                          '--lastEvent=%s '+
+                                                          '--firstLumi=%s '+
+                                                          '--firstRun=%s '+
+                                                          '--seeding=%s '+
+                                                          '--lheInputFiles=%s '+
+                                                          '--oneEventMode=%s') %\
+                                             (os.getcwd(), os.getcwd(),
+                                                           opts.inputFile,
+                                                           opts.runAndLumis,
+                                                           opts.firstEvent,
+                                                           opts.lastEvent,
+                                                           opts.firstLumi,
+                                                           opts.firstRun,
+                                                           opts.seeding,
+                                                           opts.lheInputFiles,
+                                                           opts.oneEventMode)
+    ret = scram(command_, runtimeDir = os.getcwd(), logName='scramOutput.log')
+    if ret > 0:
         msg = scram.diagnostic()
-        handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
+        handleException("FAILED", EC_CMSRunWrapper, 'Error executing TeakPSet.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
         mintime()
-        sys.exit(EC_CMSMissingSoftware)
-    command_ = "%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(opts.scriptArgs))
-    ret = scram(command_, runtimeDir="WMTaskSpace/cmsRun", logName=subprocess.PIPE)
+        sys.exit(EC_CMSRunWrapper)
+
+    command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
+    ret = scram(command_, runtimeDir = os.getcwd(), logName='cmsRun-stdout.log')#subprocess.PIPE) for printing to the stdout
     if ret > 0:
         msg = scram.diagnostic()
         handleException("FAILED", EC_CMSRunWrapper, 'Error executing scriptExe.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
@@ -521,25 +525,13 @@ def executeScriptExe(opts):
     return ret
 
 
-def executeCMSSWStack(opts):
+def executeCMSSWStack(opts, scram):
 
     def getOutputModules():
-        scram = Scram(
-            command = cmssw.step.application.setup.scramCommand,
-            version = opts.cmsswVersion,
-            initialise = cmssw.step.application.setup.softwareEnvironment,
-            directory = os.getcwd(),
-            architecture = opts.scramArch,
-            )
         pythonScript = "from PSetTweaks.WMTweak import makeTweak;"+\
                        "config = __import__(\"WMTaskSpace.cmsRun.PSet\", globals(), locals(), [\"process\"], -1);"+\
                        "tweakJson = makeTweak(config.process).jsondictionary();"+\
                        "print tweakJson[\"process\"][\"outputModules_\"]"
-        if scram.project() or scram.runtime(): #if any of the two commands fail...
-            msg = scram.diagnostic()
-            handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
-            mintime()
-            sys.exit(EC_CMSMissingSoftware)
         ret = scram("python -c '%s'" % pythonScript, logName=subprocess.PIPE, runtimeDir=os.getcwd())
         if ret > 0:
             msg = scram.diagnostic()
@@ -634,7 +626,7 @@ def AddChecksums(report):
             fileInfo['size'] = os.stat(file_pfn).st_size
 
 
-def AddPsetHash(report, opts):
+def AddPsetHash(report, scram):
     """
     Example relevant output from edmProvDump:
 
@@ -677,7 +669,7 @@ def AddPsetHash(report, opts):
                 print "== EDM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % filename
                 continue
             print "==== PSet Hash lookup STARTING at %s ====" % time.asctime(time.gmtime())
-            lines = getProv(filename, opts)
+            lines = getProv(filename, scram)
             found_history = False
             matches = {}
             for line in lines.splitlines():
@@ -769,13 +761,24 @@ if __name__ == "__main__":
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             startDashboardMonitoring(ad)
         print "==== CMSSW Stack Execution STARTING at %s ====" % time.asctime(time.gmtime())
+        scram = Scram(
+            version = opts.cmsswVersion,
+            directory = os.getcwd(),
+            architecture = opts.scramArch,
+            )
+        if scram.project() or scram.runtime(): #if any of the two commands fail...
+            msg = scram.diagnostic()
+            handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
+            mintime()
+            sys.exit(EC_CMSMissingSoftware)
+
         try:
             jobExitCode = None
             if not opts.scriptExe:
-                cmssw = executeCMSSWStack(opts)
+                cmssw = executeCMSSWStack(opts, scram)
                 jobExitCode = cmssw.step.execution.exitStatus
             else:
-                jobExitCode = executeScriptExe(opts)
+                jobExitCode = executeScriptExe(opts, scram)
         except:
             print "==== CMSSW Stack Execution FAILED at %s ====" % time.asctime(time.gmtime())
             logCMSSW()
@@ -820,7 +823,6 @@ if __name__ == "__main__":
         report = Report("cmsRun")
         report.parse('FrameworkJobReport.xml', "cmsRun")
         jobExitCode = report.getExitCode()
-        #import pdb;pdb.set_trace()
         report = report.__to_json__(None)
         # Record the payload process's exit code separately; that way, we can distinguish
         # cmsRun failures from stageout failures.  The initial use case of this is to
@@ -828,7 +830,7 @@ if __name__ == "__main__":
         report['jobExitCode'] = jobExitCode
         AddChecksums(report)
         try:
-            AddPsetHash(report, opts)
+            AddPsetHash(report, scram)
         except:
             handleException("FAILED", EC_PsetHash, "Unable to compute pset hash for job output")
             mintime()
