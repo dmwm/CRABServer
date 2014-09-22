@@ -621,15 +621,17 @@ def AddChecksums(report):
                     fileInfo['pfn'] = fileInfo['fileName']
                 else:
                     continue
+            file_pfn = fileInfo['pfn'].lstrip('file:')
             print "==== Checksum cksum STARTING at %s ====" % time.asctime(time.gmtime())
             print "== Filename: %s" % fileInfo['pfn']
-            cksum = FileInfo.readCksum(fileInfo['pfn'])
+            print "== Stripped filename: %s" % file_pfn
+            cksum = FileInfo.readCksum(file_pfn)
             print "==== Checksum finishing FINISHING at %s ====" % time.asctime(time.gmtime())
             print "==== Checksum adler32 STARTING at %s ====" % time.asctime(time.gmtime())
-            adler32 = FileInfo.readAdler32(fileInfo['pfn'])
+            adler32 = FileInfo.readAdler32(file_pfn)
             print "==== Checksum adler32 FINISHING at %s ====" % time.asctime(time.gmtime())
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
-            fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
+            fileInfo['size'] = os.stat(file_pfn).st_size
 
 
 def AddPsetHash(report, opts):
