@@ -64,13 +64,16 @@ class HTCondorDataWorkflow(DataWorkflow):
     failedList = ['held', 'failed', 'cooloff']
 
     @conn_handler(services=['centralconfig'])
-    def updateRequest(self, workflow):
+    def updateRequest(self, workflow, scheddname=None):
         info = workflow.split("_", 3)
         if len(info) < 4:
             return workflow
         hn_name = info[2]
-        locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
-        name = locator.getSchedd().split("@")[0].split(".")[0]
+        if not scheddname:
+            locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
+            name = locator.getSchedd().split("@")[0].split(".")[0]
+        else:
+            name = scheddname.split("@")[0].split(".")[0]
         info[2] = "%s:%s" % (name, hn_name)
         return "_".join(info)
 
