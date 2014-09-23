@@ -275,6 +275,9 @@ def logCMSSW():
 
 
 def handleException(exitAcronymn, exitCode, exitMsg):
+    #first save the traceback before it gets overwritten by other tracebacks (e.g.: wrong jobReport)
+    formatted_tb = traceback.format_exc()
+
     report = {}
     try:
         if os.path.exists("jobReport.json"):
@@ -303,7 +306,6 @@ def handleException(exitAcronymn, exitCode, exitMsg):
     report['exitCode'] = exitCode
     report['exitMsg'] = exitMsg
     print "ERROR: Exceptional exit at %s (%s): %s" % (time.asctime(time.gmtime()), str(exitCode), str(exitMsg))
-    formatted_tb = traceback.format_exc()
     if not formatted_tb.startswith("None"):
         print "ERROR: Traceback follows:\n", formatted_tb
 
@@ -774,7 +776,7 @@ if __name__ == "__main__":
 
         try:
             jobExitCode = None
-            if not opts.scriptExe:
+            if opts.scriptExe=='None':
                 cmssw = executeCMSSWStack(opts, scram)
                 jobExitCode = cmssw.step.execution.exitStatus
             else:
