@@ -773,7 +773,6 @@ if __name__ == '__main__':
     try:
         for arg in sys.argv:
             if 'JOB_EXIT_CODE=' in arg and len(arg.split("=")) == 2:
-                global g_job_exit_code
                 g_job_exit_code = int(arg.split("=")[1])
     except:
         pass
