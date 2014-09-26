@@ -23,6 +23,24 @@ mkdir -p retry_info
 
 # Bootstrap the HTCondor environment
 
+# If we wrote out the .job.ad ourselves previously
+# (we determine this by looking if the .job.ad is in
+# the local directory and is more than 30s old), then
+# we are also responsible for cleaning things up.
+# This way, we get the most up-to-date .job.ad for
+# AdjustSites.py (essential for resubmit!).
+
+# Once HTCondor writes .job.ad for us, this code block
+# should never be used!
+if [ -e .job.ad ]; then
+  now=`date '+%s'`
+  age=`stat -c '%Z' .job.ad`
+  maxage=$(($age+30))
+  if [ $now -gt $maxage ]; then
+    rm .job.ad
+  fi
+fi
+
 if [ "X$_CONDOR_JOB_AD" == "X" ];
 then
     export _CONDOR_JOB_AD=.job.ad
