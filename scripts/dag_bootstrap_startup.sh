@@ -136,6 +136,19 @@ then
   python2.6 AdjustSites.py
 fi
 
+# Fix for issues with condor_rm.  See https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=4615
+# This can be removed after all schedds are upgraded to 8.3.2
+cat > condor_rm_fix << EOF
+#!/bin/sh
+set -x
+condor_qedit "\$@" JobStatusOnRelease 3
+exec condor_rm "\$@"
+EOF
+
+chmod +x condor_rm_fix
+
+export _condor_DAGMAN_CONDOR_RM_EXE=$PWD/condor_rm_fix
+
 export _CONDOR_DAGMAN_LOG=$PWD/$1.dagman.out
 export _CONDOR_MAX_DAGMAN_LOG=0
 
