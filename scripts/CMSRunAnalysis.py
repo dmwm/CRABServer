@@ -4,6 +4,7 @@ CMSRunAnalysis.py - the runtime python portions to launch a CRAB3 / cmsRun job.
 """
 
 import os
+import stat
 import shutil
 import socket
 import os.path
@@ -284,7 +285,7 @@ def handleException(exitAcronymn, exitCode, exitMsg):
             report = json.load(open("jobReport.json"))
         else:
             print "WARNING: WMCore did not produce a jobReport.json; FJR will not be useful."
-    except: 
+    except:
         print "WARNING: Unable to parse WMCore's jobReport.json; FJR will not be useful.  Traceback follows:\n", traceback.format_exc()
 
     if report.get('steps', {}).get('cmsRun', {}).get('errors'):
@@ -490,6 +491,10 @@ def getProv(filename, scram):
 
 
 def executeScriptExe(opts, scram):
+    #make scriptexe executable
+    st = os.stat(opts.scriptExe)
+    os.chmod(opts.scriptExe, st.st_mode | stat.S_IEXEC)
+
     command_ = ('python %s/TweakPSet.py --location=%s '+
                                                           '--inputFile=\'%s\' '+
                                                           '--runAndLumis=\'%s\' '+
@@ -519,6 +524,7 @@ def executeScriptExe(opts, scram):
 
     command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
     ret = scram(command_, runtimeDir = os.getcwd(), logName='cmsRun-stdout.log')#subprocess.PIPE) for printing to the stdout
+    with open('cmsRun-stderr.log','w'): pass #cmscp fails without stderr. Would be better to modify Scram.py to get the real stderr (now added to cmsRun-stdout.log)
     if ret > 0:
         msg = scram.diagnostic()
         handleException("FAILED", EC_CMSRunWrapper, 'Error executing scriptExe.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
