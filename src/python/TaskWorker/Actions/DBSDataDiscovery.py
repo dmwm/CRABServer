@@ -7,14 +7,21 @@ from base64 import b64encode
 
 from WMCore.WorkQueue.WorkQueueUtils import get_dbs
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
+from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from TaskWorker.WorkerExceptions import StopHandler
 
-
 class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service."""
+
+    def keepOnlyDisks(self, locationsMap):
+        phedex = PhEDEx()
+        #get all the PNN that are of kind disk
+        diskLocations = set([pnn['name'] for pnn in phedex.getNodeMap()['phedex']['node'] if pnn['kind']=='Disk'])
+        for block, locations in locationsMap.iteritems():
+            locationsMap[block] = set(locations) & diskLocations
 
     def execute(self, *args, **kwargs):
         self.logger.info("Data discovery with DBS") ## to be changed into debug
@@ -49,6 +56,7 @@ class DBSDataDiscovery(DataDiscovery):
             raise
         #Create a map for block's locations: for each block get the list of locations
         locationsMap = dbs.listFileBlockLocation(list(blocks), phedexNodes=True)
+        self.keepOnlyDisks(locationsMap)
         if not locationsMap:
             msg = "No location was found for %s in %s." %(kwargs['task']['tm_input_dataset'], dbsurl)
 #           You should not need the following if you raise TaskWorkerException
