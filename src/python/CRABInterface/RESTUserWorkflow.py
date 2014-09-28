@@ -178,6 +178,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("scriptexe", param, safe, RX_ADDFILE, optional=True)
             validate_strlist("scriptargs", param, safe, RX_SCRIPTARGS)
             validate_str("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
+            validate_strlist("extrajdl", param, safe, RX_SCRIPTARGS)
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
@@ -226,7 +227,7 @@ class RESTUserWorkflow(RESTEntity):
     def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                 savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfnprefix, lfn, saveoutput,
-                faillimit, ignorelocality, userfiles, asourl, scriptexe, scriptargs, scheddname):
+                faillimit, ignorelocality, userfiles, asourl, scriptexe, scriptargs, scheddname, extrajdl):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -272,6 +273,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str scriptexe: script to execute in place of cmsrun.
            :arg str scriptargs: arguments to be passed to the scriptexe script.
            :arg str scheddname: Schedd Name used for debugging.
+           :arg str extrajdl: extra Job Description Language parameters to be added.
            :returns: a dict which contaians details of the request"""
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
@@ -285,7 +287,7 @@ class RESTUserWorkflow(RESTEntity):
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfnprefix=lfnprefix, lfn=lfn,
                                        ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, asourl=asourl,
-                                       scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname)
+                                       scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl)
 
     @restcall
     def post(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority):

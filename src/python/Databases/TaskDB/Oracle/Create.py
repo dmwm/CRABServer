@@ -79,6 +79,7 @@ class Create(DBCreator):
         tm_user_webdir VARCHAR(1000),
         tm_scriptexe VARCHAR(255),
         tm_scriptargs VARCHAR(4000),
+        tm_extrajdl VARCHAR(1000),
         CONSTRAINT taskname_pk PRIMARY KEY(tm_taskname),
         CONSTRAINT check_tm_publication CHECK (tm_publication IN ('T', 'F')),
         CONSTRAINT check_tm_save_logs CHECK (tm_save_logs IN ('T', 'F'))

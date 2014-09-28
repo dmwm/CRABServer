@@ -11,9 +11,10 @@ import base64
 import shutil
 import string
 import urllib
+import hashlib
 import commands
 import tempfile
-import hashlib
+from ast import literal_eval
 
 import TaskWorker.Actions.TaskAction as TaskAction
 import TaskWorker.DataObjects.Result
@@ -149,6 +150,7 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
 +PeriodicRemoveReason = ifThenElse(MemoryUsage > RequestMemory, "Removed due to memory use", \
                           ifThenElse(MaxWallTimeMins*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
                             "Removed due to job being held"))
+%(extra_jdl)s
 queue
 """
 
@@ -397,7 +399,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['edmoutfiles'] = task['tm_edm_outfiles']
         info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
         info['ASOURL'] = task.get('tm_arguments', {}).get('ASOURL', '')
-        info['taskType'] = self.getDashboardTaskType() 
+        info['taskType'] = self.getDashboardTaskType()
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
         info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
@@ -411,6 +413,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['accounting_group'] = 'analysis.%s' % info['userhn']
         info = transform_strings(info)
         info['faillimit'] = task.get('tm_arguments', {}).get('faillimit')
+        info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
         if info['jobarch_flatten'].startswith("slc6_"):
             info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
         else:
@@ -429,6 +432,7 @@ class DagmanCreator(TaskAction.TaskAction):
             info['additional_environment_options'] += ';CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/TaskManagerRun-3.3.0-pre1.tar.gz'
         if os.path.exists("sandbox.tar.gz"):
             info['additional_input_file'] += ", sandbox.tar.gz"
+
         with open("Job.submit", "w") as fd:
             fd.write(JOB_SUBMIT % info)
 
