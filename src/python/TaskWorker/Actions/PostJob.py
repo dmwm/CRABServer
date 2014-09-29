@@ -2,14 +2,14 @@
 
 """
 In the PostJob we read the FrameworkJobReport (FJR) to retrieve information about the output files.
-The FJR contains information for output files produced either via PoolOutputModule or TFileService, 
+The FJR contains information for output files produced either via PoolOutputModule or TFileService,
 which respectively produce files of type EDM and TFile. Below are examples of the output part of a
 FJR for each of these two cases.
 Example FJR['steps']['cmsRun']['output'] for an EDM file produced via PoolOutputModule:
 {
  u'SEName': u'se1.accre.vanderbilt.edu',
  u'pfn': u'dumper.root',
- u'checksums': {u'adler32': u'47d823c0', u'cksum': u'640736586'}, 
+ u'checksums': {u'adler32': u'47d823c0', u'cksum': u'640736586'},
  u'size': 3582626,
  u'direct_stageout': False,
  u'ouput_module_class': u'PoolOutputModule',
@@ -34,7 +34,7 @@ Example FJR['steps']['cmsRun']['output'] for a TFile produced via TFileService:
  u'fileName': u'/tmp/1882789.vmpsched/glide_Paza70/execute/dir_27876/histo.root',
  u'Source': u'TFileService'
 }
-For other type of output files, we add in cmscp.py the basic necessary information about the file 
+For other type of output files, we add in cmscp.py the basic necessary information about the file
 to the FJR. The information is:
 {
  u'SEName': u'se1.accre.vanderbilt.edu',
@@ -383,8 +383,6 @@ class ASOServerJob(object):
                            "checksums": checksums,
                            "user": user,
                            "role": role,
-                           "dbSource_url": 'gWMS',
-                           "publish_dbs_url": publish_dbs_url,
                            "dbs_url": dbs_url,
                            "workflow": self.reqname,
                            "jobid": self.count,
@@ -802,7 +800,7 @@ class PostJob():
                 if u'pfn' in output_file_info:
                     file_info['pfn'] = str(output_file_info[u'pfn'])
                 file_info['direct_stageout'] = output_file_info.get(u'direct_stageout', False)
-                if file_info['direct_stageout']: 
+                if file_info['direct_stageout']:
                     logger.debug("Output file does not need to be transferred.")
                 if u'SEName' in output_file_info and self.node_map.get(str(output_file_info['SEName'])):
                     file_info['outtmplocation'] = self.node_map[output_file_info['SEName']]
