@@ -147,13 +147,12 @@ def getFromJR(key, default = None, location = []):
     If not found, return 'default'.
     ------------------------------------------------------------------------------------------
     """
-
+    if g_job_report_name is None:
+        return default
     with open(g_job_report_name) as fd:
         job_report = json.load(fd)
-
     subreport = job_report
     subreport_name = ''
-
     for loc in location:
         if loc in subreport:
             subreport = subreport[loc]
@@ -161,14 +160,12 @@ def getFromJR(key, default = None, location = []):
         else:
             print "WARNING: Job report doesn't contain section %s['%s']." % (subreport_name, loc)
             return default
-
     if type(subreport) != dict:
         if subreport_name:
             print "WARNING: Job report section %s is not a dict." % subreport_name
         else:
             print "WARNING: Job report is not a dict."
         return default
-
     return subreport.get(key, default)
 
 
@@ -179,17 +176,16 @@ def getOutputFileFromJR(file_name, job_report = None):
     part corresponding to the given output file ('file_name'). If not found, return None.
     ------------------------------------------------------------------------------------------
     """
-
     if job_report is None:
+        if g_job_report_name is None:
+            return None
         with open(g_job_report_name) as fd:
             job_report = json.load(fd)
-
     job_report_output = job_report['steps']['cmsRun']['output']
     for output_module in job_report_output.values():
         for output_file_info in output_module:
             if os.path.split(str(output_file_info.get(u'pfn')))[-1] == file_name:
                 return output_file_info
-
     return None
 
 
@@ -209,13 +205,12 @@ def addToJR(key_value_pairs, location = [], mode = 'overwrite'):
     False. Return True otherwise.
     ------------------------------------------------------------------------------------------
     """
-
+    if g_job_report_name is None:
+        return False
     with open(g_job_report_name) as fd:
         job_report = json.load(fd)
-
     subreport = job_report
     subreport_name = ''
-
     for loc in location:
         if loc in subreport:
             subreport = subreport[loc]
@@ -223,14 +218,12 @@ def addToJR(key_value_pairs, location = [], mode = 'overwrite'):
         else:
             print "WARNING: Job report doesn't contain section %s['%s']." % (subreport_name, loc)
             return False
-
     if type(subreport) != dict:
         if subreport_name:
             print "WARNING: Job report section %s is not a dict." % subreport_name
         else:
             print "WARNING: Job report is not a dict."
         return False
-
     if mode in ['new', 'overwrite']:
         for key, value in key_value_pairs:
             if mode == 'new' and key in subreport:
@@ -243,10 +236,8 @@ def addToJR(key_value_pairs, location = [], mode = 'overwrite'):
     else:
         print "WARNING: Unknown mode '%s'." % mode
         return False
-
     with open(g_job_report_name, "w") as fd:
         json.dump(job_report, fd)
-
     return True
 
 
@@ -257,9 +248,7 @@ def addOutputFileToJR(file_name, key = 'addoutput'):
     under the given key ('key'). The value to add is a dictionary {'pfn': file_name}.
     ------------------------------------------------------------------------------------------
     """
-
     print "==== Attempting to add file %s to job report. ====" % file_name
-
     output_file_info = {}
     output_file_info['pfn'] = file_name
     try:
@@ -268,52 +257,56 @@ def addOutputFileToJR(file_name, key = 'addoutput'):
         pass
     else:
         output_file_info['size'] = file_size
-
     is_ok = addToJR([(key, output_file_info)], location = ['steps', 'cmsRun', 'output'], mode = 'update')
-
     if not is_ok:
         print "==== Failed to add file %s to job report. ====" % file_name
     else:
         print "==== Successfully added file %s to job report. ====" % file_name
-
     return is_ok
 
 
-def addSEToJR(file_name, se_name, direct_stageout, is_log):
+def addSEToJR(file_name, is_log, se_name, direct_stageout):
     """
     ------------------------------------------------------------------------------------------
     Alter the JR to record where the given file ('file_name') was staged out to ('se_name')
-    and whether it was a direct stageout or not ('direct_stageout'). If the given file is
-    the log ('is_log' = True), record in the top-level of the JR. 
+    and whether it was a direct stageout or not ('direct_stageout').
     ------------------------------------------------------------------------------------------
     """
-
     print "== Attempting to set SE name to %s for file %s in job report. ==" % (se_name, file_name)
-
     is_ok = True
-
-    if is_log:
-        pairs_to_add_to_job_report = [('SEName', se_name), ('direct_stageout', direct_stageout)]
-        is_ok = addToJR(pairs_to_add_to_job_report)
-    else:
-        orig_file_name, _ = getJobId(file_name)
-        with open(g_job_report_name) as fd:
-            job_report = json.load(fd)
-        output_file_info = getOutputFileFromJR(orig_file_name, job_report)
-        if not output_file_info:
-            print "WARNING: Metadata for file %s not found in job report." % file_name
-            is_ok = False
-        output_file_info['SEName'] = se_name
-        output_file_info['direct_stageout'] = direct_stageout
-        with open(g_job_report_name, "w") as fd:
-            json.dump(job_report, fd)
-
+    key_value_pairs = [('SEName', se_name), ('direct_stageout', direct_stageout)]
+    is_ok = addToFileInJR(file_name, is_log, key_value_pairs)
     if not is_ok:
         print "== Failed to set SE name for file %s in job report. ==" % file_name
     else:
         print "== Successfully set SE name for file %s in job report. ==" % file_name
-
     return is_ok
+
+
+def addToFileInJR(file_name, is_log, key_value_pairs):
+    """
+    ------------------------------------------------------------------------------------------
+    Alter the JR for the given file ('file_name') with the given key and value pairs
+    ('key_value_pairs'). If the given file is the log, record in the top-level of the JR.
+    ------------------------------------------------------------------------------------------
+    """
+    if is_log:
+        is_ok = addToJR(key_value_pairs)
+        return is_ok
+    if g_job_report_name is None:
+        return False
+    orig_file_name, _ = getJobId(file_name)
+    with open(g_job_report_name) as fd:
+        job_report = json.load(fd)
+    output_file_info = getOutputFileFromJR(orig_file_name, job_report)
+    if output_file_info is None:
+        print "WARNING: Metadata for file %s not found in job report." % file_name
+        return False
+    for key, value in key_value_pairs:
+        output_file_info[key] = value
+    with open(g_job_report_name, "w") as fd:
+        json.dump(job_report, fd)
+    return True
 
 
 def performTransfer(manager, stageout_policy, source_file, dest_temp_lfn, dest_pfn, dest_se, is_log, inject = True):
@@ -376,7 +369,7 @@ def performLocalTransfer(manager, source_file, dest_temp_lfn, is_log, inject = T
     if not result:
         dest_temp_file_name = os.path.split(dest_temp_lfn)[-1]
         se_name = stageout_info['SEName']
-        addSEToJR(dest_temp_file_name, se_name, direct_stageout = False, is_log = is_log)
+        addSEToJR(dest_temp_file_name, is_log, se_name, False)
         if inject:
             injectToASO(dest_temp_lfn, se_name, is_log)
 
@@ -564,8 +557,7 @@ def performDirectTransferImpl(source_file, dest_pfn, dest_se, is_log):
 
     if not result:
         dest_file_name = os.path.split(dest_pfn)[-1]
-        addSEToJR(dest_file_name, dest_se, direct_stageout = True, is_log = is_log)
-
+        addSEToJR(dest_file_name, is_log, dest_se, True)
     return result
 
 
