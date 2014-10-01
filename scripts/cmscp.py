@@ -57,6 +57,7 @@ g_cmsRun_exit_code = 0
 g_job_exit_code = 0
 g_job_report_name = None
 g_job_id = None
+g_aso_start_time_set_in_JR = False
 
 
 def parseAd():
@@ -468,12 +469,25 @@ def injectToASO(source_lfn, se_name, is_log):
     couchDatabase = couchServer.connectDatabase("asynctransfer", create = False)
     print "Stageout job description: %s" % pprint.pformat(info)
 
+    needs_commit = True
     try:
         doc = couchDatabase.document(doc_id)
-        doc.update(info)
-        print ("Will retry LFN %s (id %s)" % (source_lfn, doc_id))
+        ## The document is already in ASO database. This means we are retrying the job and the
+        ## document was injected by a previous job retry. The transfer status must be terminal
+        ## ('done', 'failed' or 'killed'), since the PostJob doesn't exit until all transfers
+        ## are finished.
+        transfer_status = doc.get('state')
+        msg = "LFN %s (id %s) is already in ASO database (file transfer status is '%s')." % (source_lfn, doc_id, transfer_status)
+        if transfer_status in ['new', 'acquired', 'retry']:
+            msg += "\nWARNING: File transfer status expected to be terminal ('done', 'failed' or 'killed')."
+            msg += " Will not upload a new stageout request for the current job."
+            needs_commit = False
+        else:
+            msg += " Uploading new stageout request for the current job."
+        print msg
     except CMSCouch.CouchNotFoundError:
-        print "LFN %s (id %s) is not yet known to ASO; uploading new stageout job." % (source_lfn, doc_id)
+        ## The document is not yet in ASO database. We commit a new document.
+        print "LFN %s (id %s) is not yet in ASO database. Uploading new stageout request." % (source_lfn, doc_id)
         doc = {"_id": doc_id,
                "inputdataset": ad["CRAB_InputData"],
                "group": group,
@@ -490,21 +504,26 @@ def injectToASO(source_lfn, se_name, is_log):
                "type": file_type,
                "publish": publish,
               }
-        doc.update(info)
     except Exception, ex:
-        msg = "Error loading document from couch. Transfer submission failed."
+        msg = "Error loading document from ASO database. Transfer submission failed."
         msg += str(ex)
         msg += str(traceback.format_exc())
         print (msg)
         return False
-    commit_result = couchDatabase.commitOne(doc)[0]
-    if 'error' in commit_result:
-        print("Couldn't add to ASO database; error follows")
-        print(commit_result)
-        return False
-    print "Final stageout job description: %s" % pprint.pformat(doc)
-
-    addToJR([('aso_start_time', g_now), ('aso_start_timestamp', g_now_epoch)])
+    if needs_commit:
+        doc.update(info)
+        commit_result = couchDatabase.commitOne(doc)[0]
+        if 'error' in commit_result:
+            print("Couldn't add to ASO database; error follows:")
+            print(commit_result)
+            return False
+        print "Final stageout job description: %s" % pprint.pformat(doc)
+        if not g_aso_start_time_set_in_JR:
+            print "==== Setting ASO start time to %s (%s) in job report. ====" % (g_now, g_now_epoch)
+            if not addToJR([('aso_start_time', g_now), ('aso_start_timestamp', g_now_epoch)]):
+                print "WARNING: Failed to set ASO start time in job report."
+            else:
+                g_aso_start_time_set_in_JR = True
 
     return True
 
