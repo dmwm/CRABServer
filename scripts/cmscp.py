@@ -173,7 +173,7 @@ def getFromJR(key, default = None, location = []):
 def getOutputFileFromJR(file_name, job_report = None):
     """
     ------------------------------------------------------------------------------------------
-    Extract and return from the JR ('job_report') section ['steps']['cmsRun']['output'] the 
+    Extract and return from the JR ('job_report') section ['steps']['cmsRun']['output'] the
     part corresponding to the given output file ('file_name'). If not found, return None.
     ------------------------------------------------------------------------------------------
     """
@@ -201,7 +201,7 @@ def addToJR(key_value_pairs, location = [], mode = 'overwrite'):
     to the JR: 'overwrite' (does a direct assignment: JR[location][key] = value), 'new'
     (same as 'overwrite', but the given key must not exist in JR[location]; if it exists,
     don't modify the JR and return False) and 'update' (JR[location][key] is a list and so
-    append the value into that list; if the key doesn't exist in JR[location], add it). In 
+    append the value into that list; if the key doesn't exist in JR[location], add it). In
     case of an identified problem, don't modify the JR, print a warning message and return
     False. Return True otherwise.
     ------------------------------------------------------------------------------------------
@@ -435,9 +435,6 @@ def injectToASO(source_lfn, se_name, is_log):
     if task_publish and file_type == 'output' and not isEDM:
         print "Disabling publication of output file %s, because it is not of EDM type." % file_name
     publish = int(publish and not g_cmsRun_exit_code)
-    publish_dbs_url = str(ad['CRAB_PublishDBSURL'])
-    if publish_dbs_url.lower() == 'undefined':
-        publish_dbs_url = "https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/"
 
     last_update = int(time.time())
     global g_now
@@ -494,8 +491,6 @@ def injectToASO(source_lfn, se_name, is_log):
                "lfn": source_lfn,
                "user": ad['CRAB_UserHN'],
                "role": role,
-               "dbSource_url": "gWMS",
-               "publish_dbs_url": publish_dbs_url,
                "dbs_url": dbs_url,
                "workflow": ad['CRAB_ReqName'],
                "jobid": id,
@@ -545,7 +540,7 @@ def performDirectTransfer(source_file, dest_pfn, dest_se, is_log):
 def performDirectTransferImpl(source_file, dest_pfn, dest_se, is_log):
     command = "srmv2-lcg"
     protocol = "srmv2"
-    
+
     try:
         impl = retrieveStageOutImpl(command)
     except Exception, ex:
@@ -698,7 +693,7 @@ def main():
 
     ## Try to determine whether the payload actually succeeded.
     ## If the payload didn't succeed, we put it in a different directory. This prevents us from
-    ## putting failed output files in the same directory as successful output files; we worry 
+    ## putting failed output files in the same directory as successful output files; we worry
     ## that users may simply 'ls' the directory and run on all listed files.
     global g_cmsRun_exit_code
     try:
