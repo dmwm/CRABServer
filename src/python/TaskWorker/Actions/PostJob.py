@@ -2,14 +2,14 @@
 
 """
 In the PostJob we read the FrameworkJobReport (FJR) to retrieve information about the output files.
-The FJR contains information for output files produced either via PoolOutputModule or TFileService, 
+The FJR contains information for output files produced either via PoolOutputModule or TFileService,
 which respectively produce files of type EDM and TFile. Below are examples of the output part of a
 FJR for each of these two cases.
 Example FJR['steps']['cmsRun']['output'] for an EDM file produced via PoolOutputModule:
 {
  u'SEName': u'se1.accre.vanderbilt.edu',
  u'pfn': u'dumper.root',
- u'checksums': {u'adler32': u'47d823c0', u'cksum': u'640736586'}, 
+ u'checksums': {u'adler32': u'47d823c0', u'cksum': u'640736586'},
  u'size': 3582626,
  u'direct_stageout': False,
  u'ouput_module_class': u'PoolOutputModule',
@@ -34,7 +34,7 @@ Example FJR['steps']['cmsRun']['output'] for a TFile produced via TFileService:
  u'fileName': u'/tmp/1882789.vmpsched/glide_Paza70/execute/dir_27876/histo.root',
  u'Source': u'TFileService'
 }
-For other type of output files, we add in cmscp.py the basic necessary information about the file 
+For other type of output files, we add in cmscp.py the basic necessary information about the file
 to the FJR. The information is:
 {
  u'SEName': u'se1.accre.vanderbilt.edu',
@@ -482,23 +482,8 @@ class ASOServerJob(object):
             couchDoc = self.couchDatabase.document(jobID)
         except:
             logger.exception("Failed to retrieve updated document for %s." % jobID)
-            return {}, ""
-        if "_attachments" in couchDoc:
-            bestLog = None
-            maxRev = 0
-            for log, loginfo in couchDoc["_attachments"].items():
-                if bestLog == None:
-                    bestLog = log
-                else:
-                    rev = loginfo.get(u"revpos", 0)
-                    if rev > maxRev:
-                        maxRev = rev
-                        bestLog = log
-            try:
-                return couchDoc, self.couchDatabase.getAttachment(jobID, bestLog)
-            except:
-                logger.exception("Failed to retrieve log attachment for %s: %s" % (jobID, bestLog))
-        return couchDoc, ""
+            return {}
+        return couchDoc
 
 
     def run(self):
@@ -526,13 +511,7 @@ class ASOServerJob(object):
                 # states to stop immediately
                 elif oneStatus in ['failed', 'killed']:
                     logger.error("Job (internal ID %s) failed with status %s" % (jobID, oneStatus))
-                    couchDoc, attachment = self.getLatestLog(jobID)
-                    if not attachment:
-                        logger.warning("WARNING: no FTS logfile available.")
-                    else:
-                        logger.error("== BEGIN FTS interaction log ==")
-                        print attachment
-                        logger.error("== END FTS interaction log ==")
+                    couchDoc = self.getLatestLog(jobID)
                     if ('failure_reason' in couchDoc) and couchDoc['failure_reason']:
                         logger.error("Failure reason: %s" % couchDoc['failure_reason'])
                         self.failure = couchDoc['failure_reason']
@@ -544,13 +523,6 @@ class ASOServerJob(object):
                     raise RuntimeError, "Got a unknown status: %s" % oneStatus
             if allDone:
                 logger.info("All transfers were successful")
-                couchDoc, attachment = self.getLatestLog(jobID)
-                if not attachment:
-                    logger.warning("WARNING: no FTS logfile available.")
-                else:
-                    logger.info("== BEGIN FTS interaction log ==")
-                    print attachment
-                    logger.info("== END FTS interaction log ==")
                 return 0
             if self.retry_timeout != -1 and time.time() - starttime > self.retry_timeout: #timeout = -1 means it's disabled
                 self.failure = "Killed ASO transfer after timeout of %d." % self.retry_timeout
@@ -802,7 +774,7 @@ class PostJob():
                 if u'pfn' in output_file_info:
                     file_info['pfn'] = str(output_file_info[u'pfn'])
                 file_info['direct_stageout'] = output_file_info.get(u'direct_stageout', False)
-                if file_info['direct_stageout']: 
+                if file_info['direct_stageout']:
                     logger.debug("Output file does not need to be transferred.")
                 if u'SEName' in output_file_info and self.node_map.get(str(output_file_info['SEName'])):
                     file_info['outtmplocation'] = self.node_map[output_file_info['SEName']]
