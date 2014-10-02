@@ -267,9 +267,6 @@ class ASOServerJob(object):
             group = ''
         dbs_url = str(self.task_ad['CRAB_DBSUrl'])
         task_publish = int(self.task_ad['CRAB_Publish'])
-        publish_dbs_url = str(self.task_ad['CRAB_PublishDBSUrl'])
-        if publish_dbs_url.lower() == 'undefined':
-            publish_dbs_url = "https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/"
         # TODO: Add a method to resolve a single PFN or use resolvePFNs
         last_update = int(time.time())
         now = str(datetime.datetime.now())
@@ -374,7 +371,6 @@ class ASOServerJob(object):
                     needs_commit = False
                 if needs_commit:
                     logger.info("LFN %s (id %s) is not yet known to ASO; uploading new document to ASO database." % (lfn, doc_id))
-                    # FIXME: need to pass checksums, role/group, size, inputdataset, publish_dbs_url, dbs_url through
                     doc = {"_id": doc_id,
                            "inputdataset": input_dataset,
                            "group": group,
@@ -383,8 +379,6 @@ class ASOServerJob(object):
                            "checksums": checksums,
                            "user": user,
                            "role": role,
-                           "dbSource_url": 'gWMS',
-                           "publish_dbs_url": publish_dbs_url,
                            "dbs_url": dbs_url,
                            "workflow": self.reqname,
                            "jobid": self.count,
