@@ -79,7 +79,7 @@ class CRAB3ProxyRenewer(object):
                     'server_key': self.config.MyProxy.serverhostkey,
                     'server_cert': self.config.MyProxy.serverhostcert,
                     'serverDN': self.config.MyProxy.serverdn,
-                    'uisource': self.config.MyProxy.uisource,
+                    'uisource': getattr(self.config.MyProxy, 'uisource', ''),
                     'credServerPath': self.config.MyProxy.credpath,}
         proxy = Proxy(proxycfg)
         userproxy = proxy.getProxyFilename(serverRenewer=True)
@@ -160,3 +160,17 @@ class CRAB3ProxyRenewer(object):
                 raise
             except Exception:
                 self.logger.exception("Unable to update all proxies for schedd %s" % schedd_name)
+
+if __name__ == '__main__':
+    logger = logging.getLogger()
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
+    from WMCore.Configuration import loadConfigurationFile
+    config = loadConfigurationFile('/data/srv/TaskWorkerConfig.py')
+
+    pr = CRAB3ProxyRenewer(config, 'mmascher-poc.cern.ch', '/crabserver/dev/info', logger)
+    pr.execute()
