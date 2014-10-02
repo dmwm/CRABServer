@@ -533,7 +533,7 @@ def performDirectTransfer(source_file, dest_pfn, dest_se, is_log):
 def performDirectTransferImpl(source_file, dest_pfn, dest_se, is_log):
     command = "srmv2-lcg"
     protocol = "srmv2"
-    
+
     try:
         impl = retrieveStageOutImpl(command)
     except Exception, ex:
@@ -614,6 +614,8 @@ def main():
                     transfer_logs = int(val)
                 elif name == "CRAB_TransferOutputs":
                     transfer_outputs = int(val)
+                elif name == "CRAB_NoWNStageout":
+                    no_stageout = int(val)
         if g_job_id == None:
             print "== ERROR: Unable to determine CRAB Job ID."
             print "No stageout will be performed."
@@ -648,6 +650,11 @@ def main():
             print "== ERROR: Unable to determine transfer_outputs parameter."
             print "No stageout will be performed."
             return 80000
+
+    ## If CRAB_NoStageout has been set to an integer value >0 (maybe with extraJDL from the client) then we don't do the stageout
+    if no_stageout:
+        print "==== NOT PERFORMING STAGEOUT AS CRAB_NoWNStageout is 1 ===="
+        return 0
 
     ## Set the JR name.
     global g_job_report_name
@@ -687,7 +694,7 @@ def main():
 
     ## Try to determine whether the payload actually succeeded.
     ## If the payload didn't succeed, we put it in a different directory. This prevents us from
-    ## putting failed output files in the same directory as successful output files; we worry 
+    ## putting failed output files in the same directory as successful output files; we worry
     ## that users may simply 'ls' the directory and run on all listed files.
     global g_cmsRun_exit_code
     try:
