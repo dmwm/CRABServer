@@ -476,8 +476,7 @@ def injectToASO(source_lfn, se_name, is_log):
         transfer_status = doc.get('state')
         msg = "LFN %s (id %s) is already in ASO database (file transfer status is '%s')." % (source_lfn, doc_id, transfer_status)
         if transfer_status in ['new', 'acquired', 'retry']:
-            msg += "\nWARNING: File transfer status expected to be terminal ('done', 'failed' or 'killed')."
-            msg += " Will not upload a new stageout request for the current job."
+            msg += "\nFile transfer status is not terminal ('done', 'failed' or 'killed'). Will not upload a new stageout request for the current job."
             needs_commit = False
         else:
             msg += " Uploading new stageout request for the current job."
