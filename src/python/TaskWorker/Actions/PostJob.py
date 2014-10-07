@@ -299,10 +299,10 @@ class ASOServerJob(object):
                 outputFiles.append(file_info)
         transfer_outputs = int(self.task_ad['CRAB_TransferOutputs'])
         if not transfer_outputs:
-            logger.debug("Transfer output flag is false; skipping outputs stageout.")
+            logger.debug("Transfer outputs flag is false; skipping outputs stageout.")
         transfer_logs = int(self.task_ad['CRAB_SaveLogsFlag'])
         if not transfer_logs:
-            logger.debug("Save logs flag is false; skipping logs stageout.")
+            logger.debug("Transfer logs flag is false; skipping logs stageout.")
         found_log = False
         for source_site, filename in zip(self.source_sites, self.filenames):
             ## We assume that the first file in self.filenames is the logs tarball.
@@ -327,6 +327,7 @@ class ASOServerJob(object):
                 size = self.log_size
                 checksums = {'adler32': 'abc'}
                 needs_transfer = self.log_needs_transfer
+            logger.info(" ==== Working on file %s ====" % filename)
             user = getUserFromLFN(lfn)
             docID = getHashLfn(lfn)
             common_info = {"state": 'new',
@@ -343,45 +344,72 @@ class ASOServerJob(object):
                            "failure_reason": [],
                           }
             if not needs_transfer:
-                logger.debug("File %s is marked as not needing transfer." % filename)
+                logger.info("File %s is marked as having been directly staged out from the worker node." % filename)
                 common_info['state'] = 'done'
                 common_info['end_time'] = now
-            needs_commit = True
-            try:
-                doc = self.couchDatabase.document(docID)
-                ## The document was already uploaded to Couch from the WN. If the transfer is done or ongoing,
-                ## there is no need to commit the document again. Otherwise we "reset" the document in Couch
-                ## so that ASO retries the transfer.
-                if doc.get("state") in ['acquired', 'new', 'retry']:
-                    logger.info("LFN %s (id %s) was injected from WN and transfer is ongoing." % (lfn, docID))
-                    needs_commit = False
-                elif doc.get("state") == 'done' and doc.get("start_time") == aso_start_time:
-                    logger.info("LFN %s (id %s) was injected from WN and transfer has finished." % (lfn, docID))
-                    needs_commit = False
-                else:
-                    logger.info("Will retry LFN %s (id %s)" % (lfn, docID))
-                    logger.debug("Previous document: %s" % pprint.pformat(doc))
-                if needs_commit:
-                    doc.update(common_info)
-                allIDs.append(docID)
-            except CMSCouch.CouchNotFoundError:
-                ## Set the publication flag.
-                if file_type == 'output':
-                    publish = task_publish
-                    if publish and self.cmsRun_failed:
-                        logger.info("Disabling publication of output file %s, because it is marked as failed job." % filename)
-                        publish = 0
-                    if publish and file_output_type != 'EDM':
-                        logger.info("Disabling publication of output file %s, because it is not of EDM type." % filename)
-                        publish = 0
-                else:
+            ## Set the publication flag.
+            if file_type == 'output':
+                publish = task_publish
+                if publish and self.cmsRun_failed:
+                    logger.info("Disabling publication of output file %s, because job is marked as failed." % filename)
                     publish = 0
-                ## If the file doesn't need transfer nor publication, we don't upload the document to ASO database.
-                if not needs_transfer and not publish:
-                    logger.info("File %s is marked as not needing transfer nor publication; skipping upload to ASO database." % filename)
-                    needs_commit = False
-                if needs_commit:
-                    logger.info("LFN %s (id %s) is not yet known to ASO; uploading new document to ASO database." % (lfn, docID))
+                if publish and file_output_type != 'EDM':
+                    logger.info("Disabling publication of output file %s, because it is not of EDM type." % filename)
+                    publish = 0
+            else:
+                ## This is the log file, so obviously publication should be turned off.
+                publish = 0
+            ## What does ASO needs to do for this file?
+            aso_tasks = []
+            if needs_transfer:
+                aso_tasks.append("transfer")
+            if publish:
+                aso_tasks.append("publication")
+            if not aso_tasks:
+                ## This file doesn't need transfer nor publication, so we don't need to upload a document
+                ## to ASO database.
+                msg  = "File %s doesn't need neither %s." % (filename, ' nor '.join(aso_tasks))
+                msg += " No need to upload a document to ASO database for the current job retry."
+                logger.info(msg)
+            else:
+                ## This file needs transfer and/or publication. If a document (for the current job retry)
+                ## is not yet in ASO database, we need to do the upload.
+                needs_commit = True
+                try:
+                    doc = self.couchDatabase.document(docID)
+                    ## The document was already uploaded to ASO database. It could have been uploaded from the
+                    ## WN in the current job retry or in a previous job retry, or by the postjob in a previous
+                    ## job retry.
+                    transfer_status = doc.get('state')
+                    if doc.get('start_time') == aso_start_time:
+                        ## The document was uploaded from the WN in the current job retry, so we don't upload a new
+                        ## document. (If the transfer is done or ongoing, then of course we don't want to re-inject
+                        ## the transfer request. OTOH, if the transfer has failed, we don't want the postjob to
+                        ## retry it; instead the postjob will exit and the whole job will be retried).
+                        msg = "LFN %s (id %s) is already in ASO database (it was uploaded from the worker node in the current job retry) and file transfer status is '%s'." \
+                              % (lfn, docID, transfer_status)
+                        logger.info(msg)
+                        needs_commit = False
+                    else:
+                        ## The document was uploaded in a previous job retry. This means that in the current job
+                        ## retry the injection from the WN has failed or cmscp did a direct stageout. We upload a
+                        ## new stageout request, unless the transfer is still ongoing (which should actually not
+                        ## happen, unless the postjob for the previous job retry didn't run).
+                        msg = "LFN %s (id %s) is already in ASO database (file transfer status is '%s'), but does not correspond to the current job retry." \
+                              % (lfn, docID, transfer_status)
+                        if transfer_status in ['acquired', 'new', 'retry']:
+                            msg += "\nFile transfer status is not terminal ('done', 'failed' or 'killed'). Will not upload a new document for the current job retry."
+                            logger.info(msg)
+                            needs_commit = False
+                        else:
+                            msg += " Will upload a new %s request." % ' and '.join(aso_tasks)
+                            logger.info(msg)
+                            logger.debug("Previous document: %s" % pprint.pformat(doc))
+                except CMSCouch.CouchNotFoundError:
+                    ## The document was not yet uploaded to ASO database (if this is the first job retry, then
+                    ## either the upload from the WN failed, or cmscp did a direct stageout and here we need to
+                    ## inject for publication only). In any case we have to inject a new document.
+                    logger.info("LFN %s (id %s) is not in ASO database. Will upload a new %s request." % (lfn, docID, ' and '.join(aso_tasks)))
                     doc = {"_id": docID,
                            "inputdataset": input_dataset,
                            "group": group,
@@ -402,20 +430,22 @@ class ASOServerJob(object):
                         # The "/store/user" variant of the LFN should be used for files that are marked as 'done'.
                         # Otherwise, publication may break.
                         doc['lfn'] = lfn.replace('/store/temp/user', '/store/user', 1)
-                    doc.update(common_info)
-                    allIDs.append(docID)
-            except Exception, ex:
-                msg = "Error loading document from couch. Transfer submission failed. "
-                msg += str(ex)
-                msg += str(traceback.format_exc())
-                logger.info(msg)
-                return False
-            if needs_commit:
-                logger.info("Stageout job description: %s" % pprint.pformat(doc))
-                commit_result_msg = self.couchDatabase.commitOne(doc)[0]
-                if 'error' in commit_result_msg:
-                    logger.info("Couldn't add to ASO database: %s" % commit_result_msg)
+                except Exception, ex:
+                    msg  = "Got exception loading document from ASO database. Can not upload a new document. Exception follows:"
+                    msg += str(ex)
+                    msg += str(traceback.format_exc())
+                    logger.info(msg)
                     return False
+                ## If after all we need to upload a new document to ASO database, let's do it.
+                if needs_commit:
+                    doc.update(common_info)
+                    logger.info("ASO job description: %s" % pprint.pformat(doc))
+                    commit_result_msg = self.couchDatabase.commitOne(doc)[0]
+                    if 'error' in commit_result_msg:
+                        logger.info("Couldn't add to ASO database: %s" % commit_result_msg)
+                        return False
+                ## Record all files for which we want the postjob to monitor their transfer status.
+                allIDs.append(docID)
 
         return allIDs
 
