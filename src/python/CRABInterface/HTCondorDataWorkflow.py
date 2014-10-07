@@ -169,11 +169,12 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         for row in rows:
             try:
+                jobid = row[GetFromTaskAndType.PANDAID]
                 if transfer_files:
-                    if row[GetFromTaskAndType.PANDAID] in finishedIds:
+                    if jobid in finishedIds:
                         lfn = temp_to_lfn(row[GetFromTaskAndType.LFN], username)
                         pfn = self.phedex.getPFN(row[GetFromTaskAndType.LOCATION], lfn)[(row[GetFromTaskAndType.LOCATION], lfn)]
-                    elif row[GetFromTaskAndType.PANDAID] in transferingIds:
+                    elif jobid in transferingIds:
                         lfn = lfn_to_temp(row[GetFromTaskAndType.LFN], userdn, username, role, group)
                         pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
                     else:
@@ -185,10 +186,11 @@ class HTCondorDataWorkflow(DataWorkflow):
                     self.logger.exception(err)
                     raise ExecutionError("Exception while contacting PhEDEX.")
 
-            yield { 'pfn' : pfn,
-                    'lfn' : lfn,
-                    'size' : row[GetFromTaskAndType.SIZE],
-                    'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
+            yield {'jobid': jobid,
+                   'pfn': pfn,
+                   'lfn': lfn,
+                   'size': row[GetFromTaskAndType.SIZE],
+                   'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
                   }
 
 
