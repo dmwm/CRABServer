@@ -83,6 +83,7 @@ fts_server = 'https://fts3-pilot.cern.ch:8443'
 
 g_Job = None
 config = None
+g_job_report_name = None
 
 def sighandler(*args):
     if g_Job:
@@ -169,8 +170,8 @@ class FTSJob(object):
                 return 1
 
 
-    def getLastFailure(self):
-        return "Unknown"
+    def getFailures(self):
+        return {}
 
 
 def getUserFromLFN(lfn):
@@ -212,14 +213,14 @@ class ASOServerJob(object):
         self.log_needs_transfer = log_needs_transfer
         self.outputData = outputdata
         self.task_ad = task_ad
-        self.failure = None
+        self.failures = {}
         self.aso_start_timestamp = None
         proxy = os.environ.get('X509_USER_PROXY', None)
         if 'CRAB_ASOURL' in self.task_ad and self.task_ad['CRAB_ASOURL']:
             self.aso_db_url = self.task_ad['CRAB_ASOURL']
         else:
             logger.info("Cannot determine ASO url. Exiting")
-            raise RuntimeError, "Cannot determine ASO url."
+            raise RuntimeError, "Cannot determine ASO URL."
         try:
             logger.info("Will use ASO server at %s" % self.aso_db_url)
             self.couchServer = CMSCouch.CouchServer(dburl=self.aso_db_url, ckey=proxy, cert=proxy)
@@ -229,17 +230,24 @@ class ASOServerJob(object):
             raise
 
 
-    def cancel(self):
-        logger.info("Cancelling ASO data transfer.")
-        if self.id:
-            now = str(datetime.datetime.now())
-            for oneID in self.id:
-                doc = self.couchDatabase.document(oneID)
-                doc['state'] = 'killed'
-                doc['end_time'] = now
-                res = self.couchDatabase.commitOne(doc)
-                if 'error' in res:
-                    raise RuntimeError, "Got error killing transfer: %s" % res
+    def cancel(self, docIDs_reasons = {}):
+        now = str(datetime.datetime.now())
+        if not docIDs_reasons:
+            for docID in self.id:
+                docIDs_reasons[docID] = ''
+        for docID, reason in docIDs_reasons.iteritems():
+            msg = "Cancelling ASO data transfer %s" % docID
+            if reason:
+                msg += " with following reason: %s" % reason
+            logger.info(msg)
+            doc = self.couchDatabase.document(docID)
+            doc['state'] = 'killed'
+            doc['end_time'] = now
+            if reason:
+                doc['failure_reason'] = reason
+            res = self.couchDatabase.commitOne(doc)
+            if 'error' in res:
+                raise RuntimeError, "Got error killing ASO data transfer %s: %s" % (docID, res)
 
 
     def submit(self):
@@ -247,14 +255,19 @@ class ASOServerJob(object):
         outputFiles = []
 
         aso_start_time = None
+        now = str(datetime.datetime.now())
+        last_update = int(time.time())
         try:
-            with open("jobReport.json.%d" % self.count) as fd:
+            with open(g_job_report_name) as fd:
                 job_report = json.load(fd)
-            aso_start_time = job_report.get("aso_start_time")
             self.aso_start_timestamp = job_report.get("aso_start_timestamp")
+            aso_start_time = job_report.get("aso_start_time")
         except:
-            self.aso_start_timestamp = int(time.time())
-            logger.exception("Unable to determine ASO start time from worker node")
+            self.aso_start_timestamp = last_update
+            aso_start_time = now
+            msg  = "Unable to determine ASO start time from job report."
+            msg += " Will use ASO start time %s (%s)." % (aso_start_time, self.aso_start_timestamp)
+            logger.exception(msg)
 
         input_dataset = str(self.task_ad['CRAB_InputData'])
         if 'CRAB_UserRole' in self.task_ad and str(self.task_ad['CRAB_UserRole']).lower() != 'undefined':
@@ -268,8 +281,6 @@ class ASOServerJob(object):
         dbs_url = str(self.task_ad['CRAB_DBSUrl'])
         task_publish = int(self.task_ad['CRAB_Publish'])
         # TODO: Add a method to resolve a single PFN or use resolvePFNs
-        last_update = int(time.time())
-        now = str(datetime.datetime.now())
         for output_module in self.job_report_output.values():
             for output_file_info in output_module:
                 file_info = {}
@@ -317,7 +328,7 @@ class ASOServerJob(object):
                 checksums = {'adler32': 'abc'}
                 needs_transfer = self.log_needs_transfer
             user = getUserFromLFN(lfn)
-            doc_id = getHashLfn(lfn)
+            docID = getHashLfn(lfn)
             common_info = {"state": 'new',
                            "source": source_site,
                            "destination": self.dest_site,
@@ -337,22 +348,22 @@ class ASOServerJob(object):
                 common_info['end_time'] = now
             needs_commit = True
             try:
-                doc = self.couchDatabase.document(doc_id)
+                doc = self.couchDatabase.document(docID)
                 ## The document was already uploaded to Couch from the WN. If the transfer is done or ongoing,
                 ## there is no need to commit the document again. Otherwise we "reset" the document in Couch
                 ## so that ASO retries the transfer.
                 if doc.get("state") in ['acquired', 'new', 'retry']:
-                    logger.info("LFN %s (id %s) was injected from WN and transfer is ongoing." % (lfn, doc_id))
+                    logger.info("LFN %s (id %s) was injected from WN and transfer is ongoing." % (lfn, docID))
                     needs_commit = False
                 elif doc.get("state") == 'done' and doc.get("start_time") == aso_start_time:
-                    logger.info("LFN %s (id %s) was injected from WN and transfer has finished." % (lfn, doc_id))
+                    logger.info("LFN %s (id %s) was injected from WN and transfer has finished." % (lfn, docID))
                     needs_commit = False
                 else:
-                    logger.info("Will retry LFN %s (id %s)" % (lfn, doc_id))
+                    logger.info("Will retry LFN %s (id %s)" % (lfn, docID))
                     logger.debug("Previous document: %s" % pprint.pformat(doc))
                 if needs_commit:
                     doc.update(common_info)
-                allIDs.append(doc_id)
+                allIDs.append(docID)
             except CMSCouch.CouchNotFoundError:
                 ## Set the publication flag.
                 if file_type == 'output':
@@ -365,13 +376,13 @@ class ASOServerJob(object):
                         publish = 0
                 else:
                     publish = 0
-                ## If the file doesn't need transfer nor publication, we don't upload the document to Couch.
+                ## If the file doesn't need transfer nor publication, we don't upload the document to ASO database.
                 if not needs_transfer and not publish:
                     logger.info("File %s is marked as not needing transfer nor publication; skipping upload to ASO database." % filename)
                     needs_commit = False
                 if needs_commit:
-                    logger.info("LFN %s (id %s) is not yet known to ASO; uploading new document to ASO database." % (lfn, doc_id))
-                    doc = {"_id": doc_id,
+                    logger.info("LFN %s (id %s) is not yet known to ASO; uploading new document to ASO database." % (lfn, docID))
+                    doc = {"_id": docID,
                            "inputdataset": input_dataset,
                            "group": group,
                            # TODO: Remove this if it is not required
@@ -392,9 +403,9 @@ class ASOServerJob(object):
                         # Otherwise, publication may break.
                         doc['lfn'] = lfn.replace('/store/temp/user', '/store/user', 1)
                     doc.update(common_info)
-                    allIDs.append(doc_id)
+                    allIDs.append(docID)
             except Exception, ex:
-                msg = "Error loading document from couch. Transfer submission failed."
+                msg = "Error loading document from couch. Transfer submission failed. "
                 msg += str(ex)
                 msg += str(traceback.format_exc())
                 logger.info(msg)
@@ -471,11 +482,11 @@ class ASOServerJob(object):
         return statuses
 
 
-    def getLatestLog(self, jobID):
+    def getLatestLog(self, docID):
         try:
-            couchDoc = self.couchDatabase.document(jobID)
+            couchDoc = self.couchDatabase.document(docID)
         except:
-            logger.exception("Failed to retrieve updated document for %s." % jobID)
+            logger.exception("Failed to retrieve updated document for %s." % docID)
             return {}
         return couchDoc
 
@@ -487,51 +498,63 @@ class ASOServerJob(object):
         if not self.id:
             logger.info("No files to transfer via ASO. Done!")
             return 0
+        failed_killed_transfers = []
+        done_transfers = []
         starttime = time.time()
         if self.aso_start_timestamp:
             starttime = self.aso_start_timestamp
         while True:
             status = self.status()
             logger.info("Got statuses: %s; %.1f hours since transfer submit." % (", ".join(status), (time.time()-starttime)/3600.0))
-            allDone = True
-            for oneStatus, jobID in zip(status, self.id):
-                # states to wait on
+            all_transfers_finished = True
+            for oneStatus, docID in zip(status, self.id):
+                ## States to wait on.
                 if oneStatus in ['new', 'acquired', 'retry']:
-                    allDone = False
+                    all_transfers_finished = False
                     continue
-                # good states
+                ## Good states.
                 elif oneStatus in ['done']:
+                    if docID not in done_transfers:
+                        done_transfers.append(docID)
                     continue
-                # states to stop immediately
+                ## Bad states.
                 elif oneStatus in ['failed', 'killed']:
-                    logger.error("Job (internal ID %s) failed with status %s" % (jobID, oneStatus))
-                    couchDoc = self.getLatestLog(jobID)
-                    if ('failure_reason' in couchDoc) and couchDoc['failure_reason']:
-                        logger.error("Failure reason: %s" % couchDoc['failure_reason'])
-                        self.failure = couchDoc['failure_reason']
-                    else:
-                        logger.warning("WARNING: no failure reason available.")
-                        self.failure = "Failure reason unavailable."
+                    if docID not in failed_killed_transfers:
+                        failed_killed_transfers.append(docID)
+                        logger.error("Job (internal ID %s) failed with status '%s'" % (docID, oneStatus))
+                        couchDoc = self.getLatestLog(docID)
+                        if ('failure_reason' in couchDoc) and couchDoc['failure_reason']:
+                            logger.error("Failure reasons: %s" % couchDoc['failure_reason'])
+                            self.failures[docID] = couchDoc['failure_reason']
+                        else:
+                            logger.warning("WARNING: no failure reason available.")
+                            self.failures[docID] = "Failure reason unavailable."
+                else:
+                    raise RuntimeError, "Got an unknown status: %s" % oneStatus
+            if all_transfers_finished:
+                msg = "All transfers finished. There were %s failed/killed transfers" % len(failed_killed_transfers)
+                if failed_killed_transfers:
+                    msg += " (%s)" % ', '.join(failed_killed_transfers)
+                    logger.info(msg)
                     return 1
                 else:
-                    raise RuntimeError, "Got a unknown status: %s" % oneStatus
-            if allDone:
-                logger.info("All transfers were successful")
-                return 0
+                    logger.info(msg)
+                    return 0
             if self.retry_timeout != -1 and time.time() - starttime > self.retry_timeout: #timeout = -1 means it's disabled
-                self.failure = "Killed ASO transfer after timeout of %d." % self.retry_timeout
-                logger.warning("Killing ASO transfer after timeout of %d." % self.retry_timeout)
-                self.cancel()
+                logger.warning("Killing ongoing ASO transfers after timeout of %d." % self.retry_timeout)
+                reason = "Killed ASO transfer after timeout of %d." % self.retry_timeout
+                for docID in self.id:
+                    if docID not in done_transfers + failed_killed_transfers:
+                        self.failures[docID] = reason
+                        self.cancel({docID: reason})
                 return 1
             else:
                 # Sleep is done here in case if the transfer is done immediately (direct stageout case).
                 time.sleep(self.sleep + random.randint(0, 60))
 
 
-    def getLastFailure(self):
-        if self.failure:
-            return self.failure
-        return "Unknown"
+    def getFailures(self):
+        return self.failures
 
 
 def determineSizes(transfer_list):
@@ -724,7 +747,7 @@ class PostJob():
 
 
     def parseJson(self):
-        with open("jobReport.json.%d" % self.crab_id) as fd:
+        with open(g_job_report_name) as fd:
             self.job_report = json.load(fd)
         if 'steps' not in self.job_report:
             raise ValueError("Invalid jobReport.json: missing 'steps'")
@@ -869,7 +892,7 @@ class PostJob():
         direct_stageout = int(self.job_report.get(u'direct_stageout', 0))
         configreq = {"taskname":        self.ad['CRAB_ReqName'],
                      "pandajobid":      self.crab_id,
-                     "outsize":         self.log_size, # Not implemented
+                     "outsize":         self.log_size,
                      "publishdataname": self.ad['CRAB_OutputData'],
                      "appver":          self.ad['CRAB_JobSW'],
                      "outtype":         "LOG",
@@ -976,14 +999,43 @@ class PostJob():
 
         g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.log_needs_transfer, self.job_report_output, self.task_ad, self.retry_count, self.retry_timeout, self.cmsRunFailed)
         fts_job_result = g_Job.run()
-        # If no files failed, return success immediately.  Otherwise, see how many files failed.
+        ## If no files failed, return success immediately. Otherwise, see how many files failed.
         if not fts_job_result:
             return fts_job_result
 
-        failureReason = g_Job.getLastFailure()
+        ## Retrieve the stageout failures. Determine which failures are permament stageout errors
+        ## and which ones are recoverable stageout errors.
+        failures = g_Job.getFailures()
         g_Job = None
-        isPermanent = isFailurePermanent(failureReason, self.task_ad)
+        num_failures = len(failures)
+        num_permanent_failures = 0
+        for docID, failure_reasons in failures.iteritems():
+            if type(failure_reasons) == list:
+                last_failure_reason = failure_reasons[-1]
+            elif type(failure_reasons) == str:
+                last_failure_reason = failure_reasons
+            else:
+                last_failure_reason = "Unknown"
+            if isFailurePermanent(last_failure_reason, self.task_ad):
+                num_permanent_failures += 1
+                if last_failure_reason != "Unknown":
+                    last_failure_reason += " This is a permanent failure."
+            else:
+                if last_failure_reason != "Unknown":
+                    last_failure_reason += " This is a recoverable failure."
+            if type(failure_reasons) == list:
+                failures[docID][-1] = last_failure_reason
+            elif type(failure_reasons) == str:
+                failures[docID] = last_failure_reason
 
+        ## Prepare message for stageout error exception.
+        msg = "Stageout failed with code %d.\nThere were %d failed/killed stageout jobs." % (fts_job_result, num_failures)
+        if num_permanent_failures:
+            msg += " %d of those jobs had a permanent failure." % num_permanent_failures
+        msg += "\nFailure reasons follow:%s" % ''.join(['\n- ' + docID + ': ' + failure_reasons for docID, failure_reasons in failures.iteritems()])
+
+        ## Determine the number of failed transfers by comparing the size of source and destination
+        ## files.
         source_list = [i[0] for i in transfer_list]
         print "Source list", source_list
         dest_list = [i[1] for i in transfer_list]
@@ -993,17 +1045,18 @@ class PostJob():
         dest_sizes = determineSizes(dest_list)
         print "Dest sizes", dest_sizes
         sizes = zip(source_sizes, dest_sizes)
+        num_size_mismatches = 0
+        for source_size, dest_size in sizes:
+            if (dest_size < 0 or (source_size != dest_size)):
+                num_size_mismatches += 1
+        ## Expand the stageout error exception message if the number of failed transfers is not the
+        ## same as the number of failed/killed stageout jobs.
+        if num_size_mismatches != num_failures:
+            msg += "\nComparing source and destination file sizes there were %d failed transfers." % num_size_mismatches
 
-        failures = len([i for i in sizes if (i[1]<0 or (i[0] != i[1]))])
-        if failures:
-            msg = "There were %d failed stageout attempts; last failure reason: %s" % (failures, failureReason)
-            if isPermanent:
-                raise PermanentStageoutError(msg)
-            else:
-                raise RecoverableStageoutError(msg)
-
-        msg = "Stageout failed with code %d; last failure reason: %s" % (fts_job_result, failureReason)
-        if isPermanent:
+        ## Rely on the number of permanent failed/killed stageout jobs for choosing the stageout
+        ## error exception.
+        if num_permanent_failures:
             raise PermanentStageoutError(msg)
         else:
             raise RecoverableStageoutError(msg)
@@ -1112,7 +1165,8 @@ class PostJob():
         stdout = "job_out.%s" % id
         stdout_tmp = "job_out.tmp.%s" % id
         stderr = "job_err.%s" % id
-        job_report = "jobReport.json.%s" % id
+        global g_job_report_name
+        g_job_report_name = "jobReport.json.%s" % id
 
         logpath = os.path.expanduser("~/%s" % reqname)
         retry_count = self.calculateRetry(id, retry_count)
@@ -1126,10 +1180,10 @@ class PostJob():
             stdout_f.close()
             os.chmod(fname, 0644)
         # NOTE: we now redirect stdout -> stderr; hence, we don't keep stderr in the webdir.
-        if os.path.exists(job_report):
+        if os.path.exists(g_job_report_name):
             fname = os.path.join(logpath, "job_fjr."+id+"."+retry_count+".json")
-            logger.debug("Copying job FJR from %s to %s" % (job_report, fname))
-            shutil.copy(job_report, fname)
+            logger.debug("Copying job FJR from %s to %s" % (g_job_report_name, fname))
+            shutil.copy(g_job_report_name, fname)
             os.chmod(fname, 0644)
 
         if 'X509_USER_PROXY' not in os.environ:
@@ -1199,11 +1253,11 @@ class PostJob():
                         not hte.headers.get('X-Error-Http', -1) == '400':
                     raise
         except PermanentStageoutError, pse:
-            logger.error("This is a permanent stageout error; user will need to resubmit.")
+            logger.error(pse + "\n== There was at least one permanent stageout error; user will need to resubmit.")
             self.uploadState("FAILED")
             return RetryJob.FATAL_ERROR
         except RecoverableStageoutError, rse:
-            logger.error("This is a recoverable stageout error; automatic resubmit is possible.")
+            logger.error(rse + "\n== These are all recoverable stageout errors; automatic resubmit is possible.")
             self.uploadState(fail_state)
             return RetryJob.RECOVERABLE_ERROR
         except:
