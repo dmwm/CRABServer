@@ -96,84 +96,6 @@ signal.signal(signal.SIGTERM, sighandler)
 REGEX_ID = re.compile("([a-f0-9]{8,8})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]{4,4})-([a-f0-9]{12,12})")
 
 
-class FTSJob(object):
-
-
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, filenames, reqname, output, log_size, log_needs_transfer, job_report_output, task_ad, retry_count, retry_timeout, cmsRun_failed):
-        self._id = None
-        self._cancel = False
-        self._sleep = 20
-
-        transfer_logs = int(task_ad['CRAB_SaveLogsFlag'])
-        transfer_outputs = int(task_ad['CRAB_TransferOutputs'])
-        transfer_list = resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames, transfer_logs, transfer_outputs)
-
-        self._transfer_list = transfer_list
-        self._count = count
-        if len(transfer_list):
-            with open("copyjobfile_%s" % count, "w") as fd:
-                for source, dest in transfer_list:
-                    fd.write("%s %s\n" % (source, dest))
-
-
-    def cancel(self):
-        if self._id:
-            cmd = "glite-transfer-cancel -s %s %s" % (fts_server, self._id)
-            print "+", cmd
-            os.system(cmd)
-
-
-    def submit(self):
-        cmd = "glite-transfer-submit -o -s %s -f copyjobfile_%s" % (fts_server, self._count)
-        print "+", cmd
-        status, output = commands.getstatusoutput(cmd)
-        if status:
-            raise Exception("glite-transfer-submit exited with status %s.\n%s" % (status, output))
-        output = output.strip()
-        print "Resulting transfer ID: %s" % output
-        return output
-
-
-    def status(self, long_status=False):
-        if long_status:
-            cmd = "glite-transfer-status -l -s %s %s" % (fts_server, self._id)
-        else:
-            cmd = "glite-transfer-status -s %s %s" % (fts_server, self._id)
-        print "+", cmd
-        status, output = commands.getstatusoutput(cmd)
-        if status:
-            raise Exception("glite-transfer-status exited with status %s.\n%s" % (status, output))
-        return output.strip()
-
-
-    def run(self):
-        if not os.path.exists("copyjobfile_%s" % self._count):
-            return 0
-        self._id = self.submit()
-        if not REGEX_ID.match(self._id):
-            raise Exception("Invalid ID returned from FTS transfer submit")
-        while True:
-            time.sleep(self._sleep)
-            status = self.status()
-            print status
-
-            if status in ['Submitted', 'Pending', 'Ready', 'Active', 'Canceling', 'Hold']:
-                continue
-
-            #if status in ['Done', 'Finished', 'FinishedDirty', 'Failed', 'Canceled']:
-            #TODO: Do parsing of "-l"
-            if status in ['Done', 'Finished', 'Finishing']:
-                return 0
-
-            if status in ['FinishedDirty', 'Failed', 'Canceled']:
-                print self.status(True)
-                return 1
-
-
-    def getFailures(self):
-        return {}
-
-
 def getUserFromLFN(lfn):
     if len(lfn.split('/')) > 2:
         if lfn.split('/')[2] == 'temp':
@@ -450,7 +372,7 @@ class ASOServerJob(object):
         return allIDs
 
 
-    def status(self, long_status=False):
+    def status(self):
 
         query_view = False
         if not os.path.exists("aso_status.json"):
@@ -485,7 +407,7 @@ class ASOServerJob(object):
                 states_dict = {}
                 for state in states:
                     states_dict[state['id']] = state
-            except Exception, ex:
+            except Exception:
                 logger.exception("Error while querying the asynctransfer CouchDB")
                 return self.statusFallback()
             aso_info = {"query_timestamp": time.time(), "results": states_dict}
@@ -669,7 +591,7 @@ def resolvePFNs(dest_site, source_dir, dest_dir, source_sites, filenames, transf
                 continue
             slfn = os.path.join(source_dir, filename)
             dlfn = os.path.join(dest_dir, filename)
-        dest_site_= dest_site
+        dest_site_ = dest_site
         if (dest_site + "_Disk", dlfn) in dest_info:
             dest_site_ = dest_site + "_Disk"
         elif (dest_site + "_Buffer", dlfn) in dest_info:
@@ -831,7 +753,7 @@ class PostJob():
                 file_info['outfilelumis'] = []
                 for run, lumis in output_file_info[u'runs'].items():
                     file_info['outfileruns'].append(str(run))
-                    file_info['outfilelumis'].append(','.join(map(str,lumis)))
+                    file_info['outfilelumis'].append(','.join(map(str, lumis)))
 
 
     def fixPerms(self):
@@ -1017,21 +939,12 @@ class PostJob():
             logger.info("Copying %s to %s" % (source, dest))
 
         global g_Job
-        aso_auth_file = os.path.expanduser("~/auth_aso_plugin.config")
-        if config:
-            aso_auth_file = getattr(config, "authfile", "auth_aso_plugin.config")
-        if os.path.isfile(aso_auth_file) or os.environ.get("TEST_POSTJOB_ENABLE_ASOSERVER", False):
-            targetClass = ASOServerJob
-        elif 'CRAB_ASOURL' in self.task_ad and self.task_ad['CRAB_ASOURL']:
-            targetClass = ASOServerJob
-        else:
-            targetClass = FTSJob
-
-        g_Job = targetClass(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, self.log_needs_transfer, self.job_report_output, self.task_ad, self.retry_count, self.retry_timeout, self.cmsRunFailed)
-        fts_job_result = g_Job.run()
+        g_Job = ASOServerJob(self.dest_site, source_dir, dest_dir, source_sites, self.crab_id, filenames, self.reqname, self.outputData, self.log_size, \
+                             self.log_needs_transfer, self.job_report_output, self.task_ad, self.retry_count, self.retry_timeout, self.cmsRunFailed)
+        job_result = g_Job.run()
         ## If no files failed, return success immediately. Otherwise, see how many files failed.
-        if not fts_job_result:
-            return fts_job_result
+        if not job_result:
+            return job_result
 
         ## Retrieve the stageout failures. Determine which failures are permament stageout errors
         ## and which ones are recoverable stageout errors.
@@ -1059,7 +972,7 @@ class PostJob():
                 failures[docID] = last_failure_reason
 
         ## Prepare message for stageout error exception.
-        msg = "Stageout failed with code %d.\nThere were %d failed/killed stageout jobs." % (fts_job_result, num_failures)
+        msg = "Stageout failed with code %d.\nThere were %d failed/killed stageout jobs." % (job_result, num_failures)
         if num_permanent_failures:
             msg += " %d of those jobs had a permanent failure." % num_permanent_failures
         msg += "\nFailure reasons follow:%s" % ''.join(['\n- ' + docID + ': ' + failure_reasons for docID, failure_reasons in failures.iteritems()])
@@ -1194,7 +1107,6 @@ class PostJob():
         self.outputData = outputdata
         stdout = "job_out.%s" % id
         stdout_tmp = "job_out.tmp.%s" % id
-        stderr = "job_err.%s" % id
         global g_job_report_name
         g_job_report_name = "jobReport.json.%s" % id
 
