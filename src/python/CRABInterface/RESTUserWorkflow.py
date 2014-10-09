@@ -89,6 +89,7 @@ class RESTUserWorkflow(RESTEntity):
         """
 
         msg = False
+        goodReleases = {}
         try:
             goodReleases = allScramArchsAndVersions()
         except IOError:
