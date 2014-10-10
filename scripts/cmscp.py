@@ -686,11 +686,7 @@ def main():
         return 80000
 
     # The stageout manager will be used by all attempts
-    stageOutCall = {}
-    manager = StageOutMgr.StageOutMgr(
-        retryPauseTime  = 60,
-        numberOfRetries = 2,
-        **stageOutCall)
+    manager = StageOutMgr.StageOutMgr()
     manager.retryPauseTime = retryPauseTime
     manager.numberOfRetries = numberOfRetries
 
