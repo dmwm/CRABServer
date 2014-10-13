@@ -1224,7 +1224,8 @@ class PostJob():
             self.uploadLog(dest_dir, filenames[0])
             self.stageout(source_dir, dest_dir, *filenames)
             try:
-                self.upload()
+                if 'CRAB_NoWNStageout' not in self.task_ad:
+                    self.upload()
             except HTTPException, hte:
                 # Suppressing this exception is a tough decision.  If the file made it back alright,
                 # I suppose we can proceed.

@@ -572,6 +572,7 @@ def performDirectTransferImpl(source_file, dest_pfn, dest_se, is_log):
 def main():
 
     # Parse the job ad to get the stageout information.
+    no_stageout = None
     output_files = None
     dest_se = None
     dest_temp_dir = None
@@ -651,7 +652,7 @@ def main():
             print "No stageout will be performed."
             return 80000
 
-    ## If CRAB_NoStageout has been set to an integer value >0 (maybe with extraJDL from the client) then we don't do the stageout
+    ## If CRAB_NoWNStageout has been set to an integer value >0 (maybe with extraJDL from the client) then we don't do the stageout
     if no_stageout:
         print "==== NOT PERFORMING STAGEOUT AS CRAB_NoWNStageout is 1 ===="
         return 0
