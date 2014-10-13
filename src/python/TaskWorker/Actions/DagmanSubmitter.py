@@ -250,7 +250,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 ret = subprocess.call(["sh","-c","export X509_USER_PROXY=%s; gsissh -o ConnectTimeout=60 -o PasswordAuthentication=no %s pwd" %\
                                                     (task['user_proxy'], scheddAddress)])
             if ret:
-                raise TaskWorkerException("Canot gsissh to %s. Taskname %s" % (scheddAddress, task['tm_taskname']))
+                raise TaskWorkerException("Cannot gsissh to %s. Taskname %s" % (scheddAddress, task['tm_taskname']))
 
             if address:
                 self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
