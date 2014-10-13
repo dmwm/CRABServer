@@ -124,6 +124,10 @@ def addCRABInfoToClassAd(ad, info):
     for adName, dictName in SUBMIT_INFO:
         if dictName in info and (info[dictName] != None):
             ad[adName] = classad.ExprTree(str(info[dictName]))
+    if 'extra_jdl' in info and info['extra_jdl']:
+        for jdl in info['extra_jdl'].split('\n'):
+            adName, adVal = jdl.lstrip('+').split('=')
+            ad[adName] = adVal
 
 class DagmanSubmitter(TaskAction.TaskAction):
 
