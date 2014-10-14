@@ -607,6 +607,15 @@ class DagmanCreator(TaskAction.TaskAction):
             info['faillimit'] = int(info['jobcount']*.1)
 
         # Info for ML:
+        target_se = ''
+        max_len_target_se = 900
+        for site in map(str, availablesites):
+            if len(target_se) > max_len_target_se:
+                target_se += ',Many_More'
+                break
+            if len(target_se):
+                target_se += ','
+            target_se += site
         ml_info = info.setdefault('apmon', [])
         for idx in range(1, info['jobcount']+1):
             taskid = kwargs['task']['tm_taskname'].replace("_", ":")
@@ -614,7 +623,7 @@ class DagmanCreator(TaskAction.TaskAction):
                      'sid': "https://glidein.cern.ch/%d/%s" % (idx, taskid),
                      'broker': os.environ.get('HOSTNAME',''),
                      'bossId': str(idx),
-                     'TargetSE': ("%d_Selected_SE" % len(availablesites)),
+                     'TargetSE': target_se,
                      'localId' : '',
                      'StatusValue' : 'pending',
                     }
