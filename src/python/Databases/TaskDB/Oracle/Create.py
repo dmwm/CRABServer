@@ -33,7 +33,7 @@ class Create(DBCreator):
         self.create['b_tasks'] = """
         CREATE TABLE tasks(
         tm_taskname VARCHAR(255) NOT NULL,
-        tm_activity VARCHAR(255) NOT NULL,
+        tm_activity VARCHAR(255),
         panda_jobset_id NUMBER(11),
         tm_task_status VARCHAR(255) NOT NULL,
         tm_start_time TIMESTAMP,
