@@ -550,6 +550,12 @@ def isFailurePermanent(reason, task_ad):
         return True
     if re.match(".*operation not permitted*", reason):
         return True
+    if re.match(".*mkdir\(\) fail.*", reason):
+        return True
+    if re.match(".*open/create error.*", reason):
+        return True
+    if re.match(".*no free space on storage area.*", reason):
+        return True
     return False
 
 
