@@ -512,6 +512,7 @@ def injectToASO(source_lfn, se_name, is_log):
             print(commit_result)
             return False
         print "Final stageout job description: %s" % pprint.pformat(doc)
+        global g_aso_start_time_set_in_JR
         if not g_aso_start_time_set_in_JR:
             print "==== Setting ASO start time to %s (%s) in job report. ====" % (g_now, g_now_epoch)
             if not addToJR([('aso_start_time', g_now), ('aso_start_timestamp', g_now_epoch)]):
@@ -576,7 +577,7 @@ def performDirectTransferImpl(source_file, dest_pfn, dest_se, is_log):
 
 def main():
 
-    # Parse the job ad to get the stageout information.
+    ## Parse the job ad to get the stageout information.
     output_files = None
     dest_se = None
     dest_temp_dir = None
@@ -584,6 +585,7 @@ def main():
     stageout_policy = None
     transfer_logs = None
     transfer_outputs = None
+    no_stageout = None
     if '_CONDOR_JOB_AD' not in os.environ:
         print "== ERROR: _CONDOR_JOB_AD not in environment =="
         print "No stageout will be performed."
@@ -656,7 +658,8 @@ def main():
             print "No stageout will be performed."
             return 80000
 
-    ## If CRAB_NoStageout has been set to an integer value >0 (maybe with extraJDL from the client) then we don't do the stageout
+    ## If CRAB_NoWNStageout has been set to an integer value > 0 (maybe with
+    ## extraJDL from the client) then we don't do the stageout.
     if no_stageout:
         print "==== NOT PERFORMING STAGEOUT AS CRAB_NoWNStageout is 1 ===="
         return 0
@@ -708,18 +711,18 @@ def main():
 
     ## Transfer of log tarball.
     logfile_name = 'cmsRun_%d.log.tar.gz' % g_job_id
-    try:
-        log_size = os.stat(logfile_name).st_size
-    except:
-        pass
-    else:
-        addToJR([('log_size', log_size)])
     dest_temp_lfn = os.path.join(dest_temp_dir, "log", logfile_name)
     try:
         print "==== Starting compression of user logs at %s ====" % time.ctime()
         std_retval = compress(g_job_id)
         print "==== Finished compression of user logs at %s (status %d) ====" % (time.ctime(), std_retval)
         if not std_retval:
+            try:
+                log_size = os.stat(logfile_name).st_size
+            except:
+                pass
+            else:
+                addToJR([('log_size', log_size)])
             print "==== Starting stageout of user logs at %s ====" % time.ctime()
             if not transfer_logs:
                 print "Performing only local stageout of user logs since the user did not specify General.saveLogs = True"
