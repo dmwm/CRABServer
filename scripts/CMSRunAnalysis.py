@@ -85,12 +85,24 @@ def populateDashboardMonitorInfo(myad, params):
     params['MonitorJobID'] = '%d_https://glidein.cern.ch/%d/%s_%d' % (myad['CRAB_Id'], myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":"), myad['CRAB_Retry'])
 
 
+def calcOverflowFlag(myad):
+    overflowflag = 0
+    if 'DESIRED_Sites' in myad and 'JOB_CMSSite' in myad:
+        overflowflag = 1
+        job_exec_site = myad['JOB_CMSSite']
+        desired_sites = myad['DESIRED_Sites'].split(',')
+        if job_exec_site in desired_sites:
+            overflowflag = 0
+    return overflowflag
+
+
 def earlyDashboardMonitoring(myad):
     params = {
         'WNHostName': socket.getfqdn(),
         'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":")),
         'SyncSite': myad['JOB_CMSSite'],
         'SyncCE': myad['Used_Gatekeeper'].split(":")[0],
+        'OverflowFlag': calcOverflowFlag(myad),
     }
     populateDashboardMonitorInfo(myad, params)
     print "Dashboard early startup params: %s" % str(params)
