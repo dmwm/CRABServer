@@ -403,7 +403,7 @@ class ASOServerJob(object):
             query = {'reduce': False, 'key': self.reqname, 'stale': 'update_after'}
             logger.debug("Querying task view.")
             try:
-                states = self.couch_database.loadView('AsyncTransfer', 'JobsStatesByWorkflow', query)['rows']
+                states = self.couch_database.loadView('AsyncTransfer', 'JobsIdsStatesByWorkflow', query)['rows']
                 states_dict = {}
                 for state in states:
                     states_dict[state['id']] = state
@@ -421,7 +421,7 @@ class ASOServerJob(object):
         for doc_id in self.doc_ids:
             if doc_id not in aso_info.get("results", {}):
                 return self.statusFallback()
-            statuses.append(aso_info['results'][doc_id]['value'])
+            statuses.append(aso_info['results'][doc_id]['value']['state'])
         return statuses
 
 
