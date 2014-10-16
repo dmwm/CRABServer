@@ -55,6 +55,8 @@ def temp_to_lfn(lfn, username):
 class MissingNodeStatus(ExecutionError):
     pass
 
+class MissingAsoStatus(ExecutionError):
+    pass
 
 class HTCondorDataWorkflow(DataWorkflow):
     """ HTCondor implementation of the status command.
@@ -555,6 +557,21 @@ class HTCondorDataWorkflow(DataWorkflow):
         else:
             raise MissingNodeStatus("Cannot get node state log. Retry in a minute if you just submitted the task")
 
+        aso_url = url + "/aso_status.json"
+        curl.setopt(pycurl.URL, aso_url)
+        fp.seek(0)
+        self.logger.debug("Starting download of aso state")
+        curl.perform()
+        self.logger.debug("Finished download of aso state")
+        header = ResponseHeader(hbuf.getvalue())
+        if header.status == 200:
+            fp.seek(0)
+            self.logger.debug("Starting parsing of aso state")
+            self.parseASOState(fp, nodes)
+            self.logger.debug("Finished parsing of aso state")
+        else:
+            raise MissingAsoStatus("Cannot get aso state log. Retry later.")
+
         return nodes, pool_info
 
     def _getOutDatasets(self, workflow):
@@ -720,6 +737,16 @@ class HTCondorDataWorkflow(DataWorkflow):
                 info['WallDurations'].append(now - last_start)
             while len(info['WallDurations']) > len(info['SiteHistory']):
                 info['SiteHistory'].append("Unknown")
+
+
+    def parseASOState(self, fp, nodes):
+        fp.seek(0)
+        data = json.load(fp)
+        for _, result in data['results'].items():
+            state = result['value']['state']
+            jobid = str(result['value']['jobid'])
+            if nodes[jobid]['State'] == 'transferring' and state == 'done':
+                nodes[jobid]['State'] = 'transferred'
 
 
     job_re = re.compile(r"JOB Job(\d+)\s+([A-Z_]+)\s+\((.*)\)")
