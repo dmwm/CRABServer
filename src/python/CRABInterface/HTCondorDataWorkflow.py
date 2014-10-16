@@ -574,13 +574,13 @@ class HTCondorDataWorkflow(DataWorkflow):
         if not asourl:
             raise ExecutionError("This CRAB server is not configured to publish; no publication status is available.")
         server = CMSCouch.CouchServer(dburl=asourl, ckey=self.serverKey, cert=self.serverCert)
+        outdatasets = self._getOutDatasets(workflow)
         try:
             db = server.connectDatabase('asynctransfer')
         except Exception, ex:
             msg =  "Error while connecting to asynctransfer CouchDB"
             self.logger.exception(msg)
             publication_info = {'error' : msg}
-            outdatasets = ''
             return  publication_info , outdatasets
         query = {'reduce': True, 'key': workflow, 'stale': 'update_after'}
         try:
@@ -590,12 +590,10 @@ class HTCondorDataWorkflow(DataWorkflow):
             msg =  "Error while querying CouchDB for publication status information"
             self.logger.exception(msg)
             publication_info = {'error' : msg}
-            outdatasets = ''
             return  publication_info , outdatasets
 
         if publicationlist and ('value' in publicationlist[0]):
             publication_info.update(publicationlist[0]['value'])
-            outdatasets = self._getOutDatasets(workflow)
 
         return publication_info, outdatasets
 
