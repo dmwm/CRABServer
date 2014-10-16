@@ -55,9 +55,6 @@ def temp_to_lfn(lfn, username):
 class MissingNodeStatus(ExecutionError):
     pass
 
-class MissingAsoStatus(ExecutionError):
-    pass
-
 class HTCondorDataWorkflow(DataWorkflow):
     """ HTCondor implementation of the status command.
     """
@@ -570,7 +567,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             self.parseASOState(fp, nodes)
             self.logger.debug("Finished parsing of aso state")
         else:
-            raise MissingAsoStatus("Cannot get aso state log. Retry later.")
+            self.logger.debug("No aso state file available")
 
         return nodes, pool_info
 
