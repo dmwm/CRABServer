@@ -65,6 +65,7 @@ class Create(DBCreator):
         tm_edm_outfiles VARCHAR(255),
         tm_transformation VARCHAR(255) NOT NULL,
         tm_job_type VARCHAR(255) NOT NULL,
+        tm_generator VARCHAR(255),
         tm_arguments CLOB,
         panda_resubmitted_jobs CLOB,
         tm_save_logs VARCHAR(1) NOT NULL,
