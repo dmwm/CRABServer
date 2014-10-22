@@ -760,6 +760,7 @@ class HTCondorDataWorkflow(DataWorkflow):
     def parseASOState(self, fp, nodes):
         fp.seek(0)
         data = json.load(fp)
+        fp.truncate()
         for _, result in data['results'].items():
             state = result['value']['state']
             jobid = str(result['value']['jobid'])

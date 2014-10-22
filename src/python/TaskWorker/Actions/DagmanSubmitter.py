@@ -161,14 +161,15 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 retry_issues.append(msg)
                 self.logger.error("Will retry in %s seconds." % str(self.config.TaskWorker.retry_interval[retry]))
                 time.sleep(self.config.TaskWorker.retry_interval[retry])
-        msg = "All retries have failed. Failures : %s" % str(retry_issues)
+        msg = "The CRAB3 server backend could not submit your jobs to the Grid scheduler. This could be a temporary glitch, please retry again later and contact"+\
+              "the experts if the error persist. The submission was retried %s times, these are the failures: %s" % (len(retry_issues),str(retry_issues))
         self.logger.error(msg)
-        configreq = {'workflow': kw['task']['tm_taskname'],
-                     'status': "FAILED",
-                     'subresource': 'failure',
-                     'failure': base64.b64encode(msg)}
-        self.server.post(self.resturl, data = urllib.urlencode(configreq))
-        raise Exception(msg)
+#        configreq = {'workflow': kw['task']['tm_taskname'],
+#                     'status': "FAILED",
+#                     'subresource': 'failure',
+#                     'failure': base64.b64encode(msg)}
+#        self.server.post(self.resturl, data = urllib.urlencode(configreq))
+        raise TaskWorkerException(msg)
 
     def duplicateCheck(self, task):
         """
@@ -243,9 +244,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
             #try to gsissh in order to create the home directory (and check if we can connect to the schedd)
             try:
-               scheddAddress = loc.scheddAd['Machine']
+                scheddAddress = loc.scheddAd['Machine']
             except:
-               raise TaskWorkerException("Unable to get schedd address for task %s" % (task['tm_taskname']))
+                raise TaskWorkerException("Unable to get schedd address for task %s" % (task['tm_taskname']))
             #try to connect
             if hasattr(self.config.MyProxy, 'uisource'):
                 ret = subprocess.call(["sh","-c","export X509_USER_PROXY=%s; source %s; gsissh -o ConnectTimeout=60 -o PasswordAuthentication=no %s pwd" %\

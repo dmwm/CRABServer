@@ -1,6 +1,5 @@
 import re
 import time
-import base64
 import socket
 import urllib
 import datetime
@@ -9,8 +8,9 @@ import traceback
 import classad
 import htcondor
 
-import TaskWorker.Actions.TaskAction as TaskAction
 import TaskWorker.WorkerExceptions
+from TaskWorker.Actions.TaskAction import TaskAction
+from TaskWorker.WorkerExceptions import TaskWorkerException
 
 import HTCondorLocator
 import HTCondorUtils
@@ -21,7 +21,7 @@ import ApmonIf
 
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 
-class DagmanKiller(TaskAction.TaskAction):
+class DagmanKiller(TaskAction):
 
     """
     Given a task name, kill the corresponding task in HTCondor.
@@ -30,7 +30,7 @@ class DagmanKiller(TaskAction.TaskAction):
     """
 
     def executeInternal(self, apmon, *args, **kw):
-
+        #Marco: I guess these value errors only happens for development instances
         if 'task' not in kw:
             raise ValueError("No task specified.")
         self.task = kw['task']
@@ -44,9 +44,9 @@ class DagmanKiller(TaskAction.TaskAction):
         try:
             self.killTransfers(apmon)
         except:
-            self.logger.exception("Failed to kill transfers; suppressing error until functionality is confirmed")
+            self.logger.exception("Failed to kill transfers; suppressing error until functionality is confirmed") #TODO send a warning?
 
-        self.logger.info("About to kill workflow: %s. Getting status first." % self.workflow)
+        self.logger.info("About to kill workflow: %s." % self.workflow)
 
         self.workflow = str(self.workflow)
         if not WORKFLOW_RE.match(self.workflow):
@@ -54,7 +54,7 @@ class DagmanKiller(TaskAction.TaskAction):
 
         # Query HTCondor for information about running jobs and update Dashboard appropriately
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
-        self.schedd, address = loc.getScheddObj(self.workflow)
+        self.schedd, address = loc.getScheddObj(self.workflow) #TODO wrap this with a try/except. Copy from HTCondorDataWf
 
         ad = classad.ClassAd()
         ad['foo'] = self.task['kill_ids']
@@ -79,7 +79,7 @@ class DagmanKiller(TaskAction.TaskAction):
                 self.logger.info("Sending kill info to Dashboard: %s" % str(jinfo))
                 apmon.sendToML(jinfo)
         except:
-            self.logger.exception("Failed to notify Dashboard of job kills")
+            self.logger.exception("Failed to notify Dashboard of job kills") #warning
 
         # Note that we can not send kills for jobs not in queue at this time; we'll need the
         # DAG FINAL node to be fixed and the node status to include retry number.
@@ -108,14 +108,14 @@ class DagmanKiller(TaskAction.TaskAction):
         except Exception, ex:
             msg =  "Error while connecting to asynctransfer CouchDB"
             self.logger.exception(msg)
-            raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+            raise TaskWorkerException(msg)
         self.queryKill = {'reduce':False, 'key':self.workflow, 'include_docs': True}
         try:
             filesKill = db.loadView('AsyncTransfer', 'forKill', self.queryKill)['rows']
         except Exception, ex:
             msg =  "Error while connecting to asynctransfer CouchDB"
             self.logger.exception(msg)
-            raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+            raise TaskWorkerException(msg)
         if len(filesKill) == 0:
             self.logger.warning('No files to kill found')
         for idt in filesKill:
@@ -151,7 +151,7 @@ class DagmanKiller(TaskAction.TaskAction):
                 msg =  "Error updating document in couch"
                 msg += str(ex)
                 msg += str(traceback.format_exc())
-                raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+                raise TaskWorkerException(msg)
         return True
 
 
@@ -161,10 +161,12 @@ class DagmanKiller(TaskAction.TaskAction):
         const = "CRAB_ReqName =?= %s && member(CRAB_Id, %s)" % (HTCondorUtils.quote(self.workflow), ad.lookup("foo").__repr__())
         with HTCondorUtils.AuthenticatedSubprocess(self.proxy) as (parent, rpipe):
             if not parent:
-               self.schedd.act(htcondor.JobAction.Remove, const)
+                self.schedd.act(htcondor.JobAction.Remove, const)
         results = rpipe.read()
         if results != "OK":
-            raise Exception("Failure when killing jobs [%s]: %s" % (", ".join(ids), results))
+            raise TaskWorkerException("The CRAB3 server backend could not kill jobs [%s]. because the Grid scheduler answered with an error\n" % ", ".join(ids)+\
+                                      "This is probably a temporary glitch, please try it again and contact an expert if the error persist\n"+\
+                                      "Error reason %s" % results)
 
 
     def killAll(self):
@@ -174,10 +176,12 @@ class DagmanKiller(TaskAction.TaskAction):
 
         with HTCondorUtils.AuthenticatedSubprocess(self.proxy) as (parent, rpipe):
             if not parent:
-               self.schedd.act(htcondor.JobAction.Hold, rootConst)
+                self.schedd.act(htcondor.JobAction.Hold, rootConst)
         results = rpipe.read()
         if results != "OK":
-            raise Exception("Failure when killing task: %s" % results)
+            raise TaskWorkerException("The CRAB3 server backend could not kill the task because the Grid scheduler answered with an error\n"\
+                                      "This is probably a temporary glitch, please try it again and contact an expert if the error persist\n"+\
+                                      "Error reason %s" % results)
 
 
     def execute(self, *args, **kw):
@@ -185,11 +189,7 @@ class DagmanKiller(TaskAction.TaskAction):
         apmon = ApmonIf.ApmonIf()
         try:
             self.executeInternal(apmon, *args, **kw)
-        except Exception, exc:
-            self.logger.error(str(traceback.format_exc()))
-            configreq = {'workflow': kw['task']['tm_taskname'], 'status': 'KILLFAILED', 'subresource': 'failure', 'failure': base64.b64encode(str(exc))}
-            self.server.post(self.resturl, data = urllib.urlencode(configreq))
-        else:
+            #XXX what's the difference of outting this here or in the else?
             if kw['task']['kill_all']:
                 configreq = {'workflow': kw['task']['tm_taskname'], 'status': "KILLED"}
                 self.server.post(self.resturl, data = urllib.urlencode(configreq))

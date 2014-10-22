@@ -23,7 +23,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
     """
 
     def execute_internal(self, *args, **kw):
-
+        #Marco: I guess these value errors only happens for development instances
         if 'task' not in kw:
             raise ValueError("No task specified.")
         task = kw['task']
@@ -38,7 +38,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
         self.logger.info("Task info: %s" % str(task))
 
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
-        schedd, address = loc.getScheddObj(workflow)
+        schedd, address = loc.getScheddObj(workflow) #TODO wrap
 
         # Release the DAG
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(workflow)
@@ -88,7 +88,9 @@ class DagmanResubmitter(TaskAction.TaskAction):
 
         results = rpipe.read()
         if results != "OK":
-            raise TaskWorkerException("Failure when resubmitting job: %s" % results)
+            raise TaskWorkerException("The CRAB3 server backend could not reubmit your task because the Grid scheduler answered with an error\n" % ", ".join(ids)+\
+                                      "This is probably a temporary glitch, please try it again and contact an expert if the error persist\n"+\
+                                      "Error reason %s" % results)
 
 
     def execute(self, *args, **kwargs):

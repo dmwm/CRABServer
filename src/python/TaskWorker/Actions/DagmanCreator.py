@@ -188,7 +188,7 @@ def makeLFNPrefixes(task):
         dest = os.path.join("/store/user", user, lfn_prefix, primaryds, publish_info[0], timestamp)
     elif lfn:
         splitlfn = lfn.split('/')
-        if splitlfn[2]=='user':
+        if splitlfn[2] == 'user':
             #join:                    /       store    /temp      /user  /mmascher.1234    /lfn          /GENSYM    /publishname     /120414_1634
             temp_dest = os.path.join('/', splitlfn[1], 'temp', splitlfn[2], tmp_user, *( splitlfn[4:] + [primaryds, publish_info[0], timestamp] ))
         else:
@@ -229,7 +229,6 @@ def transform_strings(input):
         else:
             info[var] = "{" + json.dumps(val)[1:-1] + "}"
 
-    #TODO: We don't handle user-specified lumi masks correctly.
     info['lumimask'] = '"' + json.dumps(WMCore.WMSpec.WMTask.buildLumiMask(input['runs'], input['lumis'])).replace(r'"', r'\"') + '"'
 
     splitArgName = SPLIT_ARG_MAP[input['splitalgo']]
@@ -276,7 +275,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def __init__(self, *args, **kwargs):
         TaskAction.TaskAction.__init__(self, *args, **kwargs)
-        self.phedex = PhEDEx.PhEDEx()
+        self.phedex = PhEDEx.PhEDEx() #TODO use config certs!
 
 
     def buildDashboardInfo(self):
@@ -320,7 +319,13 @@ class DagmanCreator(TaskAction.TaskAction):
         if dest_site.startswith("T1_"):
             dest_sites_.append(dest_site + "_Buffer")
             dest_sites_.append(dest_site + "_Disk")
-        pfn_info = self.phedex.getPFN(nodes=dest_sites_, lfns=lfns)
+        try:
+            pfn_info = self.phedex.getPFN(nodes=dest_sites_, lfns=lfns)
+        except Exception, ex: #TODO should we catch HttpException instead?
+            self.logger.exception(ex)
+            raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not contact phedex to do the site+lfn=>pfn translation.\n"+\
+                                "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
+                                " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the lfn2pfn phedex so the user can check themselves
         results = []
         for lfn in lfns:
             found_lfn = False
@@ -330,7 +335,8 @@ class DagmanCreator(TaskAction.TaskAction):
                     found_lfn = True
                     break
             if not found_lfn:
-                raise TaskWorker.WorkerExceptions.NoAvailableSite("Unable to map LFN %s at site %s" % (lfn, dest_site))
+                raise TaskWorker.WorkerExceptions.NoAvailableSite("The CRAB3 server backend could not map LFN %s at site %s" % (lfn, dest_site)+\
+                                "This is a fatal error. Please, contact the experts")
         return results[0]
 
 
@@ -384,7 +390,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['userhn'] = info['tm_username']
         info['publishname'] = info['tm_publish_name']
         info['asyncdest'] = info['tm_asyncdest']
-        info['asyncdest_se'] = self.phedex.getNodeSE(info['tm_asyncdest'])
+        info['asyncdest_se'] = self.phedex.getNodeSE(info['tm_asyncdest']) #is this really needed?? #TODO remove it or at least try/excpet
         info['dbsurl'] = info['tm_dbs_url']
         info['publishdbsurl'] = info['tm_publish_dbs_url']
         info['publication'] = 1 if info['tm_publication'] == 'T' else 0
@@ -487,7 +493,7 @@ class DagmanCreator(TaskAction.TaskAction):
                           'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
                           'firstEvent' : firstEvent, 'lastEvent' : lastEvent,
                           'firstLumi' : firstLumi, 'firstRun' : firstRun,
-                          'seeding' : 'AutomaticSeeding', 'lheInputFiles' : task['tm_generator'] == 'lhe',
+                          'seeding' : 'AutomaticSeeding', 'lheInputFiles' : 'tm_generator' in task and task['tm_generator'] == 'lhe',
                           'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                           'outputData': task['tm_publish_name'],
                           'tempDest': tempDest,
@@ -517,8 +523,6 @@ class DagmanCreator(TaskAction.TaskAction):
 
         os.chmod("CMSRunAnalysis.sh", 0755)
 
-        server_data = []
-
         # This config setting acts as a global black / white list
         global_whitelist = set()
         global_blacklist = set()
@@ -542,7 +546,12 @@ class DagmanCreator(TaskAction.TaskAction):
                 if not possiblesites:
                     sbj = SiteDB.SiteDBJSON({"key":self.config.TaskWorker.cmskey,
                           "cert":self.config.TaskWorker.cmscert})
-                    possiblesites = set(sbj.getAllCMSNames())
+                    try:
+                        possiblesites = set(sbj.getAllCMSNames())
+                    except Exception, ex:
+                        raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not contact sitedb to get the list of all CMS sites.\n"+\
+                            "This is could be a temporary sitedb glitch, please try to submit a new task (resubmit will not work)"+\
+                            " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO add the sitedb url so the user can check themselves!
             else:
                 possiblesites = jobs[0]['input_files'][0]['locations']
             block = jobs[0]['input_files'][0]['block']
@@ -555,7 +564,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 availablesites &= global_whitelist
 
             if not availablesites:
-                msg = "No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
+                msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             # NOTE: User can still shoot themselves in the foot with the resubmit blacklist
@@ -565,12 +574,16 @@ class DagmanCreator(TaskAction.TaskAction):
             if whitelist:
                 available &= whitelist
                 if not available:
-                    msg = "You put (%s) in the site whitelist, but your task %s can only run in (%s)" % (", ".join(whitelist), kwargs['task']['tm_taskname'], ", ".join(availablesites))
+                    msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. You put (%s) in the site whitelist, but your task %s can only run in "+\
+                          "(%s). Please check in das the locations of your datasets. Hint: the ignoreLocality option might help" % (", ".join(whitelist),\
+                          kwargs['task']['tm_taskname'], ", ".join(availablesites))
                     raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             available -= (blacklist-whitelist)
             if not available:
-                msg = "You put (%s) in the site blacklist, but your task %s can only run in (%s)" % (", ".join(blacklist), kwargs['task']['tm_taskname'], ", ".join(availablesites))
+                msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. You put (%s) in the site blacklist, but your task %s can only run in "\
+                      "(%s). Please check in das the locations of your datasets. Hint: the ignoreLocality option might help" % (", ".join(blacklist),\
+                      kwargs['task']['tm_taskname'], ", ".join(availablesites))
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             availablesites = [str(i) for i in availablesites]
@@ -675,7 +688,13 @@ class DagmanCreator(TaskAction.TaskAction):
             # Bootstrap the ISB if we are using UFC
             if UserFileCache and kw['task']['tm_cache_url'].find('/crabcache')!=-1:
                 ufc = UserFileCache(dict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint' : kw['task']['tm_cache_url']})
-                ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
+                try:
+                    ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
+                except Exception, ex:
+                    self.logger.exception(ex)
+                    raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not download the input sandbox with your code "+\
+                                        "from the frontend (crabcache component).\nThis is could be a temporary glitch, please try to submit a new task later"+\
+                                        "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO url!?
                 kw['task']['tm_user_sandbox'] = 'sandbox.tar.gz'
 
             # Bootstrap the runtime if it is available.

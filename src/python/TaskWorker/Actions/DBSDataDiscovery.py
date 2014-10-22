@@ -1,25 +1,26 @@
-
 import os
-import urllib
 import logging
-from httplib import HTTPException
-from base64 import b64encode
 
+from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.WorkQueue.WorkQueueUtils import get_dbs
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
-from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
-from TaskWorker.WorkerExceptions import StopHandler
 
 class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service."""
 
     def keepOnlyDisks(self, locationsMap):
-        phedex = PhEDEx()
+        phedex = PhEDEx() #TODO use certs from the config!
         #get all the PNN that are of kind disk
-        diskLocations = set([pnn['name'] for pnn in phedex.getNodeMap()['phedex']['node'] if pnn['kind']=='Disk'])
+        try:
+            diskLocations = set([pnn['name'] for pnn in phedex.getNodeMap()['phedex']['node'] if pnn['kind']=='Disk'])
+        except Exception, ex: #TODO should we catch HttpException instead?
+            self.logger.exception(ex)
+            raise TaskWorkerException("The CRAB3 server backend could not contact phedex to get the list of site storages.\n"+\
+                                "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
+                                " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
         for block, locations in locationsMap.iteritems():
             locationsMap[block] = set(locations) & diskLocations
 
@@ -52,13 +53,19 @@ class DBSDataDiscovery(DataDiscovery):
         except DBSReaderError, dbsexc:
             #dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
-                raise TaskWorkerException("Cannot find dataset %s in this DBS instance: %s" % (kwargs['task']['tm_input_dataset'], dbsurl))
+                raise TaskWorkerException("The CRAB3 server backend could not could not find dataset %s in this DBS instance: %s" % (kwargs['task']['tm_input_dataset'], dbsurl))
             raise
         #Create a map for block's locations: for each block get the list of locations
-        locationsMap = dbs.listFileBlockLocation(list(blocks), phedexNodes=True)
+        try:
+            locationsMap = dbs.listFileBlockLocation(list(blocks), phedexNodes=True)
+        except Exception, ex: #TODO should we catch HttpException instead?
+            self.logger.exception(ex)
+            raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
+                                "This is could be a temporary phedex/dbs glitch, please try to submit a new task (resubmit will not work)"+\
+                                " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
-            msg = "No location was found for %s in %s." %(kwargs['task']['tm_input_dataset'], dbsurl)
+            msg = "The CRAB3 server backend could not find any location for dataset %s in %s." % (kwargs['task']['tm_input_dataset'], dbsurl)
 #           You should not need the following if you raise TaskWorkerException
 #            self.logger.error("Setting %s as failed" % str(kwargs['task']['tm_taskname']))
 #            configreq = {'workflow': kwargs['task']['tm_taskname'],
@@ -69,7 +76,13 @@ class DBSDataDiscovery(DataDiscovery):
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
-        filedetails = dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], True)
+        try:
+            filedetails = dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], True)
+        except Exception, ex: #TODO should we catch HttpException instead?
+            self.logger.exception(ex)
+            raise TaskWorkerException("The CRAB3 server backend could not contact DBS to get the files deteails (Lumis, events, etc).\n"+\
+                                "This is could be a temporary DBS glitch, please try to submit a new task (resubmit will not work)"+\
+                                " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
         result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'], datasetfiles = filedetails, locations = locationsMap)
         self.logger.debug("Got %s files" % len(result.result.getFiles()))
         return result
