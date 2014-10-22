@@ -182,8 +182,8 @@ class HTCondorDataWorkflow(DataWorkflow):
                     lfn = lfn_to_temp(row[GetFromTaskAndType.LFN], userdn, username, role, group)
                     pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
             except Exception, err:
-                    self.logger.exception(err)
-                    raise ExecutionError("Exception while contacting PhEDEX.")
+                self.logger.exception(err)
+                raise ExecutionError("Exception while contacting PhEDEX.")
 
             yield {'jobid': jobid,
                    'pfn': pfn,
@@ -538,7 +538,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                     hbuf.truncate(0)
                 else:
                     raise ExecutionError("Cannot get pool info file. Retry in a minute if you just submitted the task")
-
         nodes_url = url + "/node_state.txt"
         curl.setopt(pycurl.URL, nodes_url)
         fp.seek(0)
@@ -551,8 +550,30 @@ class HTCondorDataWorkflow(DataWorkflow):
             self.logger.debug("Starting parse of node state")
             self.parseNodeState(fp, nodes)
             self.logger.debug("Finished parse of node state")
+            fp.truncate(0)
+            hbuf.truncate(0)
         else:
             raise MissingNodeStatus("Cannot get node state log. Retry in a minute if you just submitted the task")
+
+        site_url = url + "/error_summary.json"
+        fp2 = StringIO.StringIO()
+        curl.setopt(pycurl.WRITEFUNCTION, fp2.write)
+        curl.setopt(pycurl.URL, site_url)
+        self.logger.debug("Starting download of error summary file")
+        curl.perform()
+        self.logger.debug("Finished download of error summary file")
+        header = ResponseHeader(hbuf.getvalue())
+        if header.status == 200:
+            fp2.seek(0)
+            self.logger.debug("Starting parse of summary file")
+            self.parseErrorReport(fp2, nodes)
+            self.logger.debug("Finished parse of summary file")
+        else:
+            self.logger.debug("No error summary available")
+        fp.truncate(0)
+        hbuf.truncate(0)
+
+
 
         aso_url = url + "/aso_status.json"
         curl.setopt(pycurl.URL, aso_url)
@@ -648,9 +669,9 @@ class HTCondorDataWorkflow(DataWorkflow):
                 self.insertCpu(event, nodes[node])
                 if event['TerminatedNormally']:
                     if event['ReturnValue'] == 0:
-                            nodes[node]['State'] = 'transferring'
+                        nodes[node]['State'] = 'transferring'
                     else:
-                            nodes[node]['State'] = 'cooloff'
+                        nodes[node]['State'] = 'cooloff'
                 else:
                     nodes[node]['State']  = 'cooloff'
             elif event['MyType'] == 'PostScriptTerminatedEvent':
@@ -739,12 +760,22 @@ class HTCondorDataWorkflow(DataWorkflow):
     def parseASOState(self, fp, nodes):
         fp.seek(0)
         data = json.load(fp)
-        fp.truncate()
         for _, result in data['results'].items():
             state = result['value']['state']
             jobid = str(result['value']['jobid'])
             if nodes[jobid]['State'] == 'transferring' and state == 'done':
                 nodes[jobid]['State'] = 'transferred'
+
+
+    def parseErrorReport(self, fp, nodes):
+        def last(joberrors):
+            return joberrors[max(joberrors, key=int)]
+        fp.seek(0)
+        data = json.load(fp)
+        #iterate over the jobs and set the error dict for those which are failed
+        for jobid, statedict in nodes.iteritems():
+            if statedict['State'] == 'failed' and jobid in data:
+                statedict['Error'] = last(data[jobid]) #data[jobid] contains all retries. take the last one
 
 
     job_re = re.compile(r"JOB Job(\d+)\s+([A-Z_]+)\s+\((.*)\)")
