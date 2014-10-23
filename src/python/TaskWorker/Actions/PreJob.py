@@ -193,6 +193,11 @@ class PreJob:
 
 
     def touch_logs(self, retry_num, id):
+        """
+        Create the log web-shared directory for the task and create the
+        job_out.<jobid>.<retry>.txt and postjob.<jobid>.<retry>.txt files
+        with default messages.
+        """
         try:
             reqname = self.task_ad['CRAB_ReqName']
             logpath = os.path.expanduser("~/%s" % reqname)

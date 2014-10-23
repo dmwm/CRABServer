@@ -40,14 +40,14 @@ NODE_STATUS_FILE node_state 30
 
 # NOTE: a file must be present, but 'noop' makes it not be read.
 #FINAL FinalCleanup Job.1.submit NOOP
-#SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT %(restinstance)s %(resturl)s
+#SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT %(resthost)s %(resturiwfdb)s
 
 """
 
 DAG_FRAGMENT = """
 JOB Job%(count)d Job.%(count)d.submit
 SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %(backend)s
-SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
+SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(taskname)s %(count)d %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 2 UNLESS-EXIT 2
 VARS Job%(count)d count="%(count)d" runAndLumiMask="job_lumis_%(count)d.json" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" eventsPerLumi="%(eventsPerLumi)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" scriptExe="%(scriptExe)s" scriptArgs="%(scriptArgs)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\"" +CRAB_Destination="\\"%(destination)s\\""
@@ -63,7 +63,7 @@ CRAB_HEADERS = \
 +CRAB_JobSW = %(jobsw)s
 +CRAB_JobArch = %(jobarch)s
 +CRAB_InputData = %(inputdata)s
-+CRAB_OutputData = %(publishname)s
++CRAB_PublishName = %(publishname)s
 +CRAB_ISB = %(cacheurl)s
 +CRAB_SiteBlacklist = %(siteblacklist)s
 +CRAB_SiteWhitelist = %(sitewhitelist)s
@@ -83,6 +83,8 @@ CRAB_HEADERS = \
 +CRAB_TaskWorker = %(worker_name)s
 +CRAB_RetryOnASOFailures = %(retry_aso)s
 +CRAB_ASOTimeout = %(aso_timeout)s
++CRAB_RestHost = %(resthost)s
++CRAB_RestURInoAPI = %(resturinoapi)s
 """
 
 JOB_SUBMIT = CRAB_HEADERS + \
@@ -209,10 +211,11 @@ def transform_strings(input):
     """
     info = {}
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
-           'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
-           'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'asyncdest_se', "stageoutpolicy", \
-           'taskType', 'maxpost', 'worker_name', 'desired_opsys', 'desired_opsysvers', 'desired_arch', "accounting_group":
+               'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
+               'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
+               'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'asyncdest_se', \
+               'stageoutpolicy', 'taskType', 'maxpost', 'worker_name', 'desired_opsys', 'desired_opsysvers', \
+               'desired_arch', 'accounting_group', 'resthost', 'resturinoapi':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -222,8 +225,7 @@ def transform_strings(input):
     for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput':
         info[var] = int(input[var])
 
-    for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', \
-           'tfileoutfiles', 'edmoutfiles':
+    for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', 'tfileoutfiles', 'edmoutfiles':
         val = input[var]
         if val == None:
             info[var] = "{}"
@@ -502,7 +504,6 @@ class DagmanCreator(TaskAction.TaskAction):
                           'outputData': task['tm_publish_name'],
                           'tempDest': tempDest,
                           'outputDest': os.path.join(dest, counter),
-                          'restinstance': task['restinstance'], 'resturl': task['resturl'],
                           'block': block, 'destination': pfns,
                           'scriptExe' : task['tm_scriptexe'], 'scriptArgs' : json.dumps(task['tm_scriptargs']).replace('"', r'\"\"'),
                           'backend': os.environ.get('HOSTNAME','')})
@@ -603,7 +604,7 @@ class DagmanCreator(TaskAction.TaskAction):
             jobgroupspecs, startjobid = self.makeSpecs(kwargs['task'], sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid)
             specs += jobgroupspecs
 
-        dag = DAG_HEADER % {'restinstance': kwargs['task']['restinstance'], 'resturl': self.resturl}
+        dag = DAG_HEADER % {'resthost': kwargs['task']['resthost'], 'resturiwfdb': kwargs['task']['resturinoapi'] + '/workflowdb'}
         run_and_lumis_tar = tarfile.open("run_and_lumis.tar.gz", "w:gz")
         for spec in specs:
             dag += DAG_FRAGMENT % spec
@@ -713,7 +714,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 except Exception, ex:
                     self.logger.exception(ex)
                     raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not download the input sandbox with your code "+\
-                                        "from the frontend (crabcache component).\nThis is could be a temporary glitch, please try to submit a new task later"+\
+                                        "from the frontend (crabcache component).\nThis could be a temporary glitch; please try to submit a new task later "+\
                                         "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO url!?
                 kw['task']['tm_user_sandbox'] = 'sandbox.tar.gz'
 
@@ -725,8 +726,8 @@ class DagmanCreator(TaskAction.TaskAction):
 
             kw['task']['scratch'] = temp_dir
 
-        kw['task']['restinstance'] = self.server['host']
-        kw['task']['resturl'] = self.resturl.replace("/workflowdb", "/filemetadata")
+        kw['task']['resthost'] = self.server['host']
+        kw['task']['resturinoapi'] = self.rest_uri_no_api
         self.task = kw['task']
         params = self.sendDashboardTask()
 
@@ -736,7 +737,7 @@ class DagmanCreator(TaskAction.TaskAction):
             if cwd:
                 os.chdir(cwd)
 
-        return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(temp_dir, info, params))
+        return TaskWorker.DataObjects.Result.Result(task = kw['task'], result = (temp_dir, info, params))
 
     def execute(self, *args, **kw):
         return self.executeInternal(*args, **kw)

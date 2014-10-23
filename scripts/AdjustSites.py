@@ -182,8 +182,8 @@ def clear_automatic_blacklist(ad):
 
 def updatewebdir(ad):
     data = {'subresource' : 'addwebdir'}
-    url = ad['CRAB_RestTaskUrl']
-    instance = ad['CRAB_RestTaskInstance'] + "task"
+    host = ad['CRAB_RestHost']
+    uri = ad['CRAB_RestURInoAPI'] + '/task'
     data['workflow'] = ad['CRAB_ReqName']
     data['webdirurl'] = ad['CRAB_UserWebDir']
     cert = ad['X509UserProxy']
@@ -191,8 +191,8 @@ def updatewebdir(ad):
         from RESTInteractions import HTTPRequests
         from httplib import HTTPException
         import urllib
-        server = HTTPRequests(url, cert, cert)
-        server.post(instance, data=urllib.urlencode(data))
+        server = HTTPRequests(host, cert, cert)
+        server.post(uri, data = urllib.urlencode(data))
         return 0
     except:
         print traceback.format_exc()

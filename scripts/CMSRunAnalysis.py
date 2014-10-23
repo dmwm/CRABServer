@@ -249,7 +249,7 @@ def stopDashboardMonitoring(myad):
     try:
         fjr = json.load(open("jobReport.json"))
     except:
-        print "WARNING: Unable to parse jobReport.json; Dashboard reporting will not be useful.  Traceback follows:\n", traceback.format_exc()
+        print "WARNING: Unable to parse jobReport.json; Dashboard reporting will not be useful.\n", traceback.format_exc()
     try:
         addReportInfo(params, fjr)
     except:
@@ -257,12 +257,12 @@ def stopDashboardMonitoring(myad):
             params['ExeExitCode'] = 50115
         if 'JobExitCode' not in params:
             params['JobExitCode'] = params['ExeExitCode']
-        print "ERROR: Unable to parse job info from FJR.  Traceback follows:\n", traceback.format_exc()
+        print "ERROR: Unable to parse job info from FJR.\n", traceback.format_exc()
     print "Dashboard end parameters: %s" % str(params)
     try:
         reportPopularity(params['MonitorID'], params['MonitorJobID'], myad, fjr)
     except:
-        print "ERROR: Failed to report popularity information to Dashboard.  Traceback follows:\n", traceback.format_exc()
+        print "ERROR: Failed to report popularity information to Dashboard.\n", traceback.format_exc()
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
     DashboardAPI.apmonFree()
 
@@ -313,7 +313,7 @@ def handleException(exitAcronymn, exitCode, exitMsg):
         else:
             print "WARNING: WMCore did not produce a jobReport.json; FJR will not be useful."
     except:
-        print "WARNING: Unable to parse WMCore's jobReport.json; FJR will not be useful.  Traceback follows:\n", traceback.format_exc()
+        print "WARNING: Unable to parse WMCore's jobReport.json; FJR will not be useful.\n", traceback.format_exc()
 
     if report.get('steps', {}).get('cmsRun', {}).get('errors'):
         exitMsg += '\nCMSSW error message follows.\n'
@@ -467,7 +467,7 @@ def prepSandbox(opts):
             print "Sandbox %s already exists, skipping" % opts.archiveJob
         elif opts.sourceURL == 'LOCAL' and not os.path.exists(opts.archiveJob):
             print "ERROR: Requested for condor to transfer the tarball, but it didn't show up"
-            handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: cound not get jobO files from panda server')
+            handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: could not get jobO files from panda server')
             sys.exit(EC_WGET)
         else:
             print "--- wget for jobO ---"
@@ -487,7 +487,7 @@ def prepSandbox(opts):
                     break
                 if iTry+1 == nTry:
                     print "ERROR : cound not get jobO files from panda server"
-                    handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: cound not get jobO files from panda server')
+                    handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: could not get jobO files from panda server')
                     sys.exit(EC_WGET)
                 time.sleep(30)
         print commands.getoutput('tar xvfzm %s' % opts.archiveJob)
