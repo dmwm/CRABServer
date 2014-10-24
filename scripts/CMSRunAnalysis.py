@@ -633,17 +633,15 @@ def AddChecksums(report):
                     fileInfo['pfn'] = fileInfo['fileName']
                 else:
                     continue
-            file_pfn = fileInfo['pfn'].lstrip('file:')
             print "==== Checksum cksum STARTING at %s ====" % time.asctime(time.gmtime())
             print "== Filename: %s" % fileInfo['pfn']
-            print "== Stripped filename: %s" % file_pfn
-            cksum = FileInfo.readCksum(file_pfn)
+            cksum = FileInfo.readCksum(fileInfo['pfn'])
             print "==== Checksum finishing FINISHING at %s ====" % time.asctime(time.gmtime())
             print "==== Checksum adler32 STARTING at %s ====" % time.asctime(time.gmtime())
-            adler32 = FileInfo.readAdler32(file_pfn)
+            adler32 = FileInfo.readAdler32(fileInfo['pfn'])
             print "==== Checksum adler32 FINISHING at %s ====" % time.asctime(time.gmtime())
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
-            fileInfo['size'] = os.stat(file_pfn).st_size
+            fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
 
 def AddPsetHash(report, scram):
@@ -675,7 +673,8 @@ def AddPsetHash(report, scram):
     processing_history_re = re.compile("^Processing History:$")
     for outputMod in report['steps']['cmsRun']['output'].values():
         for fileInfo in outputMod:
-            if fileInfo.get('ouput_module_class') != 'PoolOutputModule':
+            if not (fileInfo.get('output_module_class', '') == 'PoolOutputModule' or \
+                    fileInfo.get('ouput_module_class',  '') == 'PoolOutputModule'):
                 continue
             if 'pfn' not in fileInfo:
                 continue
@@ -683,13 +682,12 @@ def AddPsetHash(report, scram):
             if not os.path.exists(fileInfo['pfn']):
                 print "== Output file missing!"
                 continue
-            filename = fileInfo['pfn']
-            m = re.match(r"^[A-Za-z0-9\-._]+$", filename)
+            m = re.match(r"^[A-Za-z0-9\-._]+$", fileInfo['pfn'])
             if not m:
-                print "== EDM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % filename
+                print "== EDM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % fileInfo['pfn']
                 continue
             print "==== PSet Hash lookup STARTING at %s ====" % time.asctime(time.gmtime())
-            lines = getProv(filename, scram)
+            lines = getProv(fileInfo['pfn'], scram)
             found_history = False
             matches = {}
             for line in lines.splitlines():
@@ -715,6 +713,25 @@ def AddPsetHash(report, scram):
                 print "ERROR: PSet Hash missing from edmProvDump output.  Full dump below."
                 print lines
                 raise Exception("PSet hash missing from edmProvDump output.")
+
+
+def StripReport(report):
+    if 'steps' not in report:
+        return
+    if 'cmsRun' not in report['steps']:
+        return
+    if 'output' not in report['steps']['cmsRun']:
+        return
+    for outputMod in report['steps']['cmsRun']['output'].values():
+        for fileInfo in outputMod:
+            ## Stripping 'file:' from each output module pfn value is needed so that cmscp
+            ## and PostJob are able to find the output file in the jobReport.json.
+            if 'pfn' in fileInfo:
+                fileInfo['pfn'] = fileInfo['pfn'].lstrip('file:')
+            ## Stripping 'file:' from each output module fileName value is needed because the
+            ## function AddChecksums() uses fileName as the pfn if the last is not defined.
+            if 'fileName' in fileInfo:
+                fileInfo['fileName'] = fileInfo['fileName'].lstrip('file:')
 
 
 if __name__ == "__main__":
@@ -820,8 +837,8 @@ if __name__ == "__main__":
                 except:
                     jobExitCode = WMex.code
                 report = report.__to_json__(None)
+                StripReport(report)
                 report['jobExitCode'] = jobExitCode
-
                 with open('jobReport.json','w') as of:
                     json.dump(report, of)
             except:
@@ -844,6 +861,7 @@ if __name__ == "__main__":
         report.parse('FrameworkJobReport.xml', "cmsRun")
         jobExitCode = report.getExitCode()
         report = report.__to_json__(None)
+        StripReport(report)
         # Record the payload process's exit code separately; that way, we can distinguish
         # cmsRun failures from stageout failures.  The initial use case of this is to
         # allow us to use a different LFN on job failure.

@@ -220,8 +220,8 @@ class ASOServerJob(object):
                 file_info['checksums'] = output_file_info.get(u'checksums', {'cksum': '0', 'adler32': '0'})
                 file_info['outsize'] = output_file_info.get(u'size', 0)
                 file_info['direct_stageout'] = output_file_info.get(u'direct_stageout', False)
-                if output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
-                   output_file_info.get(u'ouput_module_class', '')  == u'PoolOutputModule':
+                if (output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
+                    output_file_info.get(u'ouput_module_class',  '') == u'PoolOutputModule'):
                     file_info['filetype'] = 'EDM'
                 elif output_file_info.get(u'Source', '') == u'TFileService':
                     file_info['filetype'] = 'TFILE'
@@ -281,13 +281,14 @@ class ASOServerJob(object):
                 common_info['state'] = 'done'
                 common_info['end_time'] = now
             ## Set the publication flag.
+            publication_msg = None
             if file_type == 'output':
                 publish = task_publish
                 if publish and self.cmsrun_failed:
-                    logger.info("Disabling publication of output file %s, because job is marked as failed." % filename)
+                    publication_msg = "Disabling publication of output file %s, because job is marked as failed." % filename
                     publish = 0
                 if publish and file_output_type != 'EDM':
-                    logger.info("Disabling publication of output file %s, because it is not of EDM type." % filename)
+                    publication_msg = "Disabling publication of output file %s, because it is not of EDM type." % filename
                     publish = 0
             else:
                 ## This is the log file, so obviously publication should be turned off.
@@ -301,6 +302,8 @@ class ASOServerJob(object):
             if not (needs_transfer or publish):
                 ## This file doesn't need transfer nor publication, so we don't need to upload a document
                 ## to ASO database.
+                if publication_msg:
+                    logger.info(publication_msg)
                 msg  = "File %s doesn't need transfer nor publication." % filename
                 msg += " No need to upload a document to ASO database."
                 logger.info(msg)
@@ -343,6 +346,8 @@ class ASOServerJob(object):
                     ## either the upload from the WN failed, or cmscp did a direct stageout and here we need to
                     ## inject for publication only). In any case we have to inject a new document.
                     logger.info("LFN %s (id %s) is not in ASO database. Will upload a new %s request." % (lfn, doc_id, ' and '.join(aso_tasks)))
+                    if publication_msg:
+                        logger.info(publication_msg)
                     doc = {"_id": doc_id,
                            "inputdataset": input_dataset,
                            "group": group,
@@ -491,6 +496,14 @@ class ASOServerJob(object):
                         msg = "Job (internal ID %s) failed with status '%s'." % (doc_id, transfer_status)
                         couch_doc = self.getLatestLog(doc_id)
                         if ('failure_reason' in couch_doc) and couch_doc['failure_reason']:
+                            ## reasons:  The transfer failure reason(s).
+                            ## app:      The application that gave the transfer failure reason(s).
+                            ##           E.g. 'aso' or '' (meaning the postjob). When printing the transfer
+                            ##           failure reasons (e.g. below), print also that the failures come from
+                            ##           the given app (if app != '').
+                            ## severity: Either 'permanent' or 'recoverable'.
+                            ##           It is set in the stageout() function, when isFailurePermanent() is
+                            ##           called to determine if a failure is permanent or not.
                             reasons, app, severity = couch_doc['failure_reason'], 'aso', ''
                             msg += " Failure reasons follow:"
                             if app:
@@ -688,12 +701,12 @@ class PostJob():
             self.cmsrun_failed = bool(self.job_report['jobExitCode'])
         for output_module in self.job_report_output.values():
             for output_file_info in output_module:
-                logger.debug("Output file info for %s: %s" % (output_file_info.get(u'pfn', "(unknown 'pfn')"), output_file_info))
+                logger.debug("Output file info for %s: %s" % (output_file_info.get(u'pfn', "(unknown 'pfn')").split('/')[-1], output_file_info))
                 file_info = {}
                 self.output_files_info.append(file_info)
                 ## Note incorrect spelling of 'output module' in current WMCore
-                if output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
-                   output_file_info.get(u'ouput_module_class', '')  == u'PoolOutputModule':
+                if (output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
+                    output_file_info.get(u'ouput_module_class',  '') == u'PoolOutputModule'):
                     file_info['filetype'] = 'EDM'
                 elif output_file_info.get(u'Source', '') == u'TFileService':
                     file_info['filetype'] = 'TFILE'
@@ -789,7 +802,8 @@ class PostJob():
                     # and does not pass validation.
                     if lfn:
                         configreq.append(("inparentlfns", lfn))
-            logger.debug("Uploading output file to %s: %s" % (self.resturl, configreq))
+            filename = file_info['pfn'].split('/')[-1]
+            logger.debug("Uploading file metadata for %s to %s: %s" % (filename, self.resturl, configreq))
             try:
                 self.server.put(self.resturl, data = urllib.urlencode(configreq))
             except HTTPException, hte:
@@ -826,7 +840,7 @@ class PostJob():
                      "outdatasetname":  "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER",
                      "directstageout":  direct_stageout
                     }
-        logger.debug("Uploading log file metadata to %s: %s" % (self.resturl, configreq))
+        logger.debug("Uploading file metadata for %s to %s: %s" % (filename, self.resturl, configreq))
         try:
             self.server.put(self.resturl, data = urllib.urlencode(configreq))
         except HTTPException, hte:
