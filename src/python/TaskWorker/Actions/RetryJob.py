@@ -78,6 +78,7 @@ class RetryJob(object):
         if 'JOBGLIDEIN_CMSSite' in self.ad:
             self.site = self.ad['JOBGLIDEIN_CMSSite']
 
+
     def get_report(self):
         try:
             with open('jobReport.json.%s' % self.count, 'r') as fd:
@@ -90,6 +91,7 @@ class RetryJob(object):
                 self.site = site
         except IOError, ioe:
             self.validreport = False
+
 
     def record_site(self, result):
         try:
@@ -104,6 +106,7 @@ class RetryJob(object):
         except Exception, e:
             print "ERROR: %s" % str(e)
             # Swallow the exception - record_site is advisory only
+
 
     def check_cpu_report(self):
 
@@ -136,6 +139,7 @@ class RetryJob(object):
         if integratedJobTime > 1.5*MAX_WALLTIME:
             raise FatalError("Not retrying a job because the integrated time (across all retries) is %d hours." % (integratedJobTime / 3600))
 
+
     def check_memory_report(self):
 
         # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
@@ -157,6 +161,7 @@ class RetryJob(object):
         # TODO: Compare the job against its requested memory, not a hardcoded max.
         if totJobMemory > MAX_MEMORY:
             raise FatalError("Not retrying job due to excessive memory use (%d MB)" % totJobMemory)
+
 
     def check_exit_code(self):
         if 'exitCode' not in self.report: return
@@ -223,9 +228,11 @@ class RetryJob(object):
         if exitCode:
             raise FatalError("Job exited with code %d.  Exit message: %s" % (exitCode, exitMsg))
 
+
     def check_empty_report(self):
         if not self.report or not self.validreport:
             raise RecoverableError("Job did not produce a usable framework job report.")
+
 
     def execute_internal(self, reqname, status, retry_count, max_retries, count, cluster):
 
@@ -243,6 +250,8 @@ class RetryJob(object):
 
         try:
             self.check_empty_report()
+            ## Raises a RecoverableError or FatalError exception depending on the exitCode
+            ## saved in the job report.
             self.check_exit_code()
         except RecoverableError, re:
             orig_msg = str(re)
@@ -255,9 +264,10 @@ class RetryJob(object):
             raise
 
         if status: # Probably means stageout failed!
-            raise RecoverableError("Payload job was successful, but exited wrapper exited non-zero status %d (stageout failure)?" % status)
+            raise RecoverableError("Payload job was successful, but wrapper exited with non-zero status %d (stageout failure)?" % status)
 
         return OK
+
 
     def execute(self, *args, **kw):
         try:

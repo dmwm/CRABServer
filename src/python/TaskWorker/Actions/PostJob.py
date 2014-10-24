@@ -1025,25 +1025,42 @@ class PostJob():
 
     def check_abort_dag(self, rval):
         """
-        Each fatal error is written into this file; we
-        count the number of failures and abort the DAG if necessary
+        For each job that failed with a fatal error, its id is written into the file
+        task_statistics.FATAL_ERROR. For each job that didn't fail with a fatal or
+        recoverable error, its id is written into the file task_statistics.OK. Notice
+        that these files may contain repeated job ids. Besed on these statistics, we
+        may decide to abort the whole DAG.
         """
-        fname = "task_statistics.FATAL_ERROR"
-        # Return code 3 is reserved to abort the entire DAG.  Don't let the
-        # code otherwise use it.
+        file_name_jobs_fatal = "task_statistics.FATAL_ERROR"
+        file_name_jobs_ok    = "task_statistics.OK"
+        ## Return code 3 is reserved to abort the entire DAG. Don't let the code
+        ## otherwise use it.
         if rval == 3:
             rval = 1
-        if 'CRAB_FailedNodeLimit' not in self.task_ad:
+        if 'CRAB_FailedNodeLimit' not in self.task_ad or self.task_ad['CRAB_FailedNodeLimit'] == -1:
             return rval
         try:
             limit = int(self.task_ad['CRAB_FailedNodeLimit'])
-            counter = 0
-            with open(fname, "r") as fd:
-                for _ in fd.readlines():
-                    counter += 1
-            if counter > limit:
-                logger.error("There are %d failed nodes, greater than the limit of %d. Will abort the whole DAG" % (counter, limit))
-                rval = 3
+            fatal_failed_jobs = []
+            with open(file_name_jobs_fatal, "r") as fd:
+                for job_id in fd.readlines():
+                    if job_id not in fatal_failed_jobs:
+                        fatal_failed_jobs.append(job_id)
+            num_fatal_failed_jobs = len(fatal_failed_jobs)
+            successful_jobs = []
+            with open(file_name_jobs_ok, "r") as fd:
+                for job_id in fd.readlines():
+                    if job_id not in successful_jobs:
+                        successful_jobs.append(job_id)
+            num_successful_jobs = len(successful_jobs)
+            if (num_successful_jobs + num_fatal_failed_jobs) > limit:
+                if num_fatal_failed_jobs > num_successful_jobs:
+                    msg  = "There are %d (fatal) failed nodes and %d successful nodes," % (num_fatal_failed_jobs, num_successful_jobs)
+                    msg += " adding up to a total of %d (more than the limit of %d)." % (num_successful_jobs + num_fatal_failed_jobs, limit)
+                    msg += " The ratio of failed to successful is greater than 1."
+                    msg += " Will abort the whole DAG"
+                    logger.error(msg)
+                    rval = 3
         finally:
             return rval
 

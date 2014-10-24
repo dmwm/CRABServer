@@ -604,7 +604,11 @@ class DagmanCreator(TaskAction.TaskAction):
         info['maxpost'] = maxpost
 
         if info.get('faillimit') == None:
-            info['faillimit'] = int(info['jobcount']*.1)
+            info['faillimit'] = -1
+            #if info['jobcount'] > 200
+            #    info['faillimit'] = 100
+            #else:
+            #    info['faillimit'] = -1
 
         # Info for ML:
         target_se = ''
