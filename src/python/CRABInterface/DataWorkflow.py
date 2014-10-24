@@ -113,7 +113,7 @@ class DataWorkflow(object):
         raise NotImplementedError
 
     @conn_handler(services=['centralconfig'])
-    def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
+    def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, generator, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, scriptexe=None, scriptargs=None, scheddname=None,
@@ -126,6 +126,7 @@ class DataWorkflow(object):
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
            :arg str inputdata: input dataset;
+           :arg str generator: event generator for MC production;
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name;
            :arg str splitalgo: algorithm to be used for the workflow splitting;
@@ -201,6 +202,7 @@ class DataWorkflow(object):
                             job_sw          = [jobsw],
                             job_arch        = [jobarch],
                             input_dataset   = [inputdata],
+                            generator       = [generator],
                             site_whitelist  = [dbSerializer(sitewhitelist)],
                             site_blacklist  = [dbSerializer(siteblacklist)],
                             split_algo      = [splitalgo],

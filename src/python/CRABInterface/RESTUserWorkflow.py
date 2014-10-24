@@ -118,6 +118,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
             validate_str("activity", param, safe, RX_ACTIVITY, optional=True)
             validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
+            validate_str("generator", param, safe, RX_GENERATOR, optional=True)
             validate_str("jobsw", param, safe, RX_CMSSW, optional=False)
             validate_num("nonprodsw", param, safe, optional=False)
             validate_str("jobarch", param, safe, RX_ARCH, optional=False)
@@ -225,7 +226,7 @@ class RESTUserWorkflow(RESTEntity):
 
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
-    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
+    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, generator, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                 savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfnprefix, lfn, saveoutput,
                 faillimit, ignorelocality, userfiles, asourl, scriptexe, scriptargs, scheddname, extrajdl):
@@ -237,6 +238,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
            :arg str inputdata: input dataset;
+           :arg str generator: event generator for MC production;
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name;
            :arg str splitalgo: algorithm to be used for the workflow splitting;
@@ -278,7 +280,7 @@ class RESTUserWorkflow(RESTEntity):
            :returns: a dict which contaians details of the request"""
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
-        return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata,
+        return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata, generator=generator,
                                        siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, splitalgo=splitalgo, algoargs=algoargs,
                                        cachefilename=cachefilename, cacheurl=cacheurl,
                                        addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],

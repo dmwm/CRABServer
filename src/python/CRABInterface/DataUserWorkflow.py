@@ -82,6 +82,7 @@ class DataUserWorkflow(object):
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
            :arg str inputdata: input dataset;
+           :arg str generator: event generator for MC production;
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name;
            :arg str splitalgo: algorithm to be used for the workflow splitting;

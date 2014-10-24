@@ -19,6 +19,7 @@ RX_PARENTLFN = re.compile(r'^(/[a-zA-Z0-9\-_\.]+/?)+$')
 RX_OUTDSLFN  = re.compile(r'^(?=.{0,500}$)/%(primDS)s/%(hnName)s-%(publishname)s-%(psethash)s/USER$' % lfnParts)
 RX_CAMPAIGN  = RX_UNIQUEWF
 RX_JOBTYPE   = re.compile(r"^(?=.{0,255}$)[A-Za-z]*$")
+RX_GENERATOR = re.compile(r'^lhe$')
 RX_CMSSW     = re.compile(r"^(?=.{0,255}$)CMSSW(_\d+){3}(_[a-zA-Z0-9_]+)?$") #using a lookahead (?=.{0,255}$) to check maximum size of the regex
 RX_ARCH      = re.compile(r"^(?=.{0,255}$)slc[0-9]{1}_[a-z0-9]+_gcc[a-z0-9]+(_[a-z0-9]+)?$")
 RX_DATASET   = re.compile(SEARCHDATASET_RE)

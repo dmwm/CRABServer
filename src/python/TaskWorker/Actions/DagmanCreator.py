@@ -487,7 +487,7 @@ class DagmanCreator(TaskAction.TaskAction):
                           'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
                           'firstEvent' : firstEvent, 'lastEvent' : lastEvent,
                           'firstLumi' : firstLumi, 'firstRun' : firstRun,
-                          'seeding' : 'AutomaticSeeding', 'lheInputFiles' : None,
+                          'seeding' : 'AutomaticSeeding', 'lheInputFiles' : task['tm_generator'] == 'lhe',
                           'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                           'outputData': task['tm_publish_name'],
                           'tempDest': tempDest,
