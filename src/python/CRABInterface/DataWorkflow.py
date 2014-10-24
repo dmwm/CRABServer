@@ -1,4 +1,5 @@
 import time
+import random
 import logging
 import cherrypy
 from datetime import datetime
@@ -178,7 +179,8 @@ class DataWorkflow(object):
 
         if not asourl:
             asourl = self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", "")
-
+            if type(asourl)==list:
+                asourl = random.choice(asourl)
 
         arguments = { \
             'oneEventMode' : 'T' if oneEventMode else 'F',
