@@ -327,7 +327,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             results = self.getRootTasks(workflow, schedd)
             self.logger.info("Web status for workflow %s done" % workflow)
         except Exception, exp:
-            msg = "%s: Failed to contact Schedd: %s" % (workflow, str(exp))
+            msg = "%s: The CRAB3 server frontend is not able to contact the Grid scheduler. This could be a temporary glicth, please, retry later or contact the esperts if the problem persist: %s" % (workflow, str(exp))
             self.logger.exception(msg)
             return [{"status" : "UNKNOWN",
                       "taskFailureMsg" : str(msg),
@@ -340,7 +340,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "saveLogs"        : row.save_logs }]
         if not results:
             return [ {"status" : "UNKNOWN",
-                      "taskFailureMsg" : "Unable to find root task in HTCondor",
+                      "taskFailureMsg" : "The CRAB3 server frontend cannot find any information about your jobs in the Grid scheduler. Remember, jobs are only kept for a limited amount of time on the scheduler (one month usually)",
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
@@ -353,7 +353,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         if 'CRAB_UserWebDir' not in results[-1]:
             if taskStatusCode != 1 and taskStatusCode != 2:
                 return [ {"status" : "UNKNOWN",
-                      "taskFailureMsg"  : "Task failed to bootstrap on schedd %s." % address,
+                      "taskFailureMsg"  : "Your task failed to bootstrap on the Grid scheduler %s." % address,
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
