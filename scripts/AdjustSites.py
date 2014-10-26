@@ -140,6 +140,10 @@ def make_webdir(ad):
         except:
             pass
         try:
+            os.symlink(os.path.abspath(os.path.join(".", "error_summary.json")), os.path.join(path, "error_summary.json"))
+        except:
+            pass
+        try:
             shutil.copy2(os.path.join(".", "sandbox.tar.gz"), os.path.join(path, "sandbox.tar.gz"))
         except:
             pass

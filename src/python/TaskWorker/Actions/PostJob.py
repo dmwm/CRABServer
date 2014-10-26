@@ -51,19 +51,20 @@ import re
 import sys
 import time
 import json
+import uuid
+import glob
 import errno
 import random
 import shutil
 import signal
 import urllib
 import logging
+import classad
 import commands
 import unittest
-import classad
 import datetime
-import traceback
-import uuid
 import tempfile
+import traceback
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 import WMCore.Database.CMSCouch as CMSCouch
 from RESTInteractions import HTTPRequests
@@ -109,6 +110,72 @@ def getUserFromLFN(lfn):
         user = ''
     return user
 
+def prepareErrorSummary(reqname):#, job_id, crab_retry):
+    """ Load the current error_summary.json and do the equivalent of an 'ls job_fjr.*.json' to get the completed jobs.
+        Then, add the error reason of the job that are not in errorReport.json
+    """
+
+    logger.info("==== Start preparing error report ====")
+    #open and load an already existing error summary
+    error_summary = {}
+    try:
+        with open('error_summary.json') as fsummary:
+            error_summary = json.load(fsummary)
+    except (IOError, ValueError):
+        #there is nothing to do if the errorSummary file does not exist or is invalid. Just recreate it
+        logger.info("error_summary.json is empty, wrong, or does not exist")
+
+#    asosummary = {}
+#    try:
+#        transferSummary = {}
+#        with open('aso_status.json') as asosummary:
+#            asoTmp = json.load(asosummary)
+#        for _, state_id in asoTmp["results"].iteritems():
+#            transferSummary[state_id["value"]["jobid"]] = state_id["value"]["state"]
+#    except (IOError, ValueError):
+#        #there is nothing to do it the aso_status.json file does not exist or is invalid.
+#        print "aso_status.json is empty or does not exist"
+
+    #iterate over the job reports in the task directory
+    logpath = os.path.expanduser("~/%s" % reqname)
+    for report in glob.glob(logpath+'/job_fjr.*.json'):
+        split_rep = report.split('.')
+        job_id, crab_retry = split_rep[-3], split_rep[-2]
+        if job_id in error_summary and crab_retry in error_summary[job_id]:
+            #the report has already been processed
+            continue
+        fname = os.path.join(logpath, "job_fjr."+job_id+"."+crab_retry+".json")
+        with open(fname) as frep:
+            try:
+                rep = None
+                exit_code = -1
+                rep = json.load(frep)
+                if not 'exitCode' in rep:                    logger.info("'exitCode' key not found in the report");              raise
+                exit_code = rep['exitCode']
+                if not 'steps'    in rep:                    logger.info("'steps' key not found in the report");                 raise
+                if not 'cmsRun'   in rep['steps']:           logger.info("'cmsRun' key not found in report['steps']");           raise
+                if not 'errors'   in rep['steps']['cmsRun']: logger.info("'errors' key not found in report['steps']['errors']"); raise
+                if rep['steps']['cmsRun']['errors']:
+                    if len(rep['steps']['cmsRun']['errors']) != 1:
+                        #this should never happen because the report has just one step, but just in case print a message
+                        logger.info("more than one error found in the job, just considering the first one")
+                    error_summary.setdefault(job_id, {})[crab_retry] = (exit_code, rep['exitMsg'], rep['steps']['cmsRun']['errors'][0])
+                else:
+                    error_summary.setdefault(job_id, {})[crab_retry] = (exit_code, rep['exitMsg'], {})
+            except Exception, ex:
+                logger.info(str(ex))
+                if not rep:
+                    msg = 'Invalid framework job report. The framework job report exists, but it cannot be loaded.'# % (job_id, crab_retry)
+                else:
+                    msg = rep['exitMsg'] if 'exitMsg' in rep else 'The framework job report could be loaded but no error message found there'
+                error_summary.setdefault(job_id, {})[crab_retry] = (exit_code, msg, {})
+
+    #write the file. Use a temporary file and rename to avoid concurrent writing of the file
+    tmp_fname = "error_summary.%d.json" % os.getpid()
+    with open(tmp_fname, "w") as fd:
+        json.dump(error_summary, fd)
+    os.rename(tmp_fname, "error_summary.json")
+    logger.info("==== Finished preparing error report ====")
 
 class ASOServerJob(object):
 
@@ -1034,6 +1101,13 @@ class PostJob():
             logger.exception("Failure during post-job execution.")
         finally:
             DashboardAPI.apmonFree()
+
+        #Now preparing the error report. Enclosing it in a try except as we don't want to fail jobs because this fails
+        try:
+            prepareErrorSummary(reqname)
+        except:
+            logger.exception("Unknown error while preparing the error report")
+
         return self.check_abort_dag(retval)
 
 
