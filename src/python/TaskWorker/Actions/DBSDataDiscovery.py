@@ -83,7 +83,6 @@ if __name__ == '__main__':
                 '/DYJetsToLL_M-50_TuneZ2Star_8TeV-madgraph-tarball/Summer12_DR53X-PU_S10_START53_V7A-v1/AODSIM',
                 '/WJetsToLNu_TuneZ2Star_8TeV-madgraph-tarball/Summer12_DR53X-PU_S10_START53_V7A-v2/AODSIM',
                 '/TauPlusX/Run2012D-PromptReco-v1/AOD']
-    datasets = [ '/MuOnia/Run2010A-v1/RAW' ]
     from WMCore.Configuration import Configuration
     config = Configuration()
     config.section_("Services")
@@ -96,14 +95,14 @@ if __name__ == '__main__':
     config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
     config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
 
-    fileset = DBSDataDiscovery(config)
-    dataset = '/DoubleMuParked/Run2012B-22Jan2013-v1/AOD' #No locations for invalid block /DoubleMuParked/Run2012B-22Jan2013-v1/AOD#945791b2-da34-11e2-b22d-00221959e69e
-    fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
+#    fileset = DBSDataDiscovery(config)
+#    dataset = '/DoubleMuParked/Run2012B-22Jan2013-v1/AOD' #No locations for invalid block /DoubleMuParked/Run2012B-22Jan2013-v1/AOD#945791b2-da34-11e2-b22d-00221959e69e
+#    fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
 
     #dataset = '/DoubleElectron/Run2012C-22Jan2013-v1/RECO' #not in FNAL_DISK
-    fileset = DBSDataDiscovery(config)
-    dataset = '/SingleMu/Run2012D-22Jan2013-v1/AOD' #invalid file: /store/data/Run2012D/SingleMu/AOD/22Jan2013-v1/20001/7200FA02-CC85-E211-9966-001E4F3F165E.root
-    fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
+#    fileset = DBSDataDiscovery(config)
+#    dataset = '/SingleMu/Run2012D-22Jan2013-v1/AOD' #invalid file: /store/data/Run2012D/SingleMu/AOD/22Jan2013-v1/20001/7200FA02-CC85-E211-9966-001E4F3F165E.root
+#    fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
 
     for dataset in datasets:
         fileset = DBSDataDiscovery(config)
