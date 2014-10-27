@@ -622,6 +622,8 @@ class DagmanCreator(TaskAction.TaskAction):
             #    info['faillimit'] = 100
             #else:
             #    info['faillimit'] = -1
+        elif info.get('faillimit') < 0:
+            info['faillimit'] = -1
 
         # Info for ML:
         target_se = ''
