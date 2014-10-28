@@ -10,7 +10,8 @@ lfnParts.update( {'publishname' : pNameRE,
                   'filename'    : '[a-zA-Z0-9\-_\.]'}
 )
 RX_WORKFLOW  = re.compile( wfBase % 232) #232 = column length in the db (255) - username (8) - timestamp (12) - unserscores (3)
-RX_ACTIVITY  = re.compile(r'^analysis(test|-crab3(-hc)?)|hctest$')
+#analysis-crab3=prod jobs; analysistest=preprod jobs; analysis-crab3-hc=special HC tests (CSA14, AAA, ...); hctest=site readiness; test=middlewere validation
+RX_ACTIVITY  = re.compile(r'^analysis(test|-crab3(-hc)?)|hctest|test$')
 RX_UNIQUEWF  = re.compile( wfBase % 255)
 RX_PUBLISH   = re.compile('^'+pNameRE+'$')
 #RX_LFN       = re.compile(r'^(?=.{0,500}$)/store/(temp/)?(user|group)/%(hnName)s/%(primDS)s/%(publishname)s/%(psethash)s/%(counter)s/(log/)?%(filename)s+$' % lfnParts)
