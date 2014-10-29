@@ -570,22 +570,18 @@ class HTCondorDataWorkflow(DataWorkflow):
             self.logger.debug("Finished parse of summary file")
         else:
             self.logger.debug("No error summary available")
-        fp.truncate(0)
-        hbuf.truncate(0)
 
-
-
+        fp3 = StringIO.StringIO();
+        curl.setopt(pycurl.WRITEFUNCTION, fp3.write)
         aso_url = url + "/aso_status.json"
         curl.setopt(pycurl.URL, aso_url)
-        fp.seek(0)
         self.logger.debug("Starting download of aso state")
         curl.perform()
         self.logger.debug("Finished download of aso state")
         header = ResponseHeader(hbuf.getvalue())
         if header.status == 200:
-            fp.seek(0)
             self.logger.debug("Starting parsing of aso state")
-            self.parseASOState(fp, nodes)
+            self.parseASOState(fp3, nodes)
             self.logger.debug("Finished parsing of aso state")
         else:
             self.logger.debug("No aso state file available")
@@ -760,7 +756,6 @@ class HTCondorDataWorkflow(DataWorkflow):
     def parseASOState(self, fp, nodes):
         fp.seek(0)
         data = json.load(fp)
-        fp.truncate()
         for _, result in data['results'].items():
             state = result['value']['state']
             jobid = str(result['value']['jobid'])
