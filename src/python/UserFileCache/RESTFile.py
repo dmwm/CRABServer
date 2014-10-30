@@ -1,27 +1,28 @@
 # WMCore dependecies here
+from WMCore.REST.Format import RawFormat
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, _validate_one, validate_num
 from WMCore.REST.Error import RESTError, InvalidParameter, MissingObject, ExecutionError
-from WMCore.REST.Format import RawFormat
 
 # CRABServer dependecies here
 from UserFileCache.__init__ import __version__
-from UserFileCache.RESTExtensions import ChecksumFailed, validate_file, validate_tarfile, authz_login_valid, quota_user_free, get_size, list_files, list_users
+from UserFileCache.RESTExtensions import ChecksumFailed, validate_file, validate_tarfile, authz_login_valid, authz_operator,\
+                                                         quota_user_free, get_size, list_files, list_users
 
 # external dependecies here
-import cherrypy
-from cherrypy.lib.static import serve_file
 import re
-import tarfile
-import hashlib
 import os
 import shutil
+import tarfile
+import hashlib
+import cherrypy
+from cherrypy.lib.static import serve_file
 
 # here go the all regex to be used for validation
+RX_USERNAME = re.compile(r"^\w+$") #TODO use WMCore regex
 RX_HASH = re.compile(r'^[a-f0-9]{64}$')
 RX_LOGFILENAME = re.compile(r"^[\w\-.: ]+$")
 RX_SUBRES = re.compile(r"^fileinfo|userinfo|powerusers|basicquota|fileremove|listusers|usedspace$")
-RX_USERNAME = re.compile(r"^\w+$") #TODO use WMCore regex
 
 def touch(filename):
     """Touch the file to keep automated cleanup away
@@ -55,6 +56,9 @@ class RESTFile(RESTEntity):
             validate_tarfile("inputfile", param, safe, 'hashkey', optional=False)
         if method in ['GET']:
             validate_str("hashkey", param, safe, RX_HASH, optional=False)
+            validate_str("username", param, safe, RX_USERNAME, optional=True)
+            if safe.kwargs['username']:
+                authz_operator(safe.kwargs['username'])
 
     @restcall
     def put(self, inputfile, hashkey):
@@ -93,7 +97,7 @@ class RESTFile(RESTEntity):
         return [result]
 
     @restcall(formats = [('application/octet-stream', RawFormat())])
-    def get(self, hashkey):
+    def get(self, hashkey, username):
         """Retrieve a file previously uploaded to the local filesystem.
            The base path on the local filesystem is configurable.
 
@@ -103,7 +107,7 @@ class RESTFile(RESTEntity):
                              (name, size, mtime, uname) of all the tarball members
            :return: the raw file"""
         filename = None
-        infilepath = filepath(self.cachedir)
+        infilepath = filepath(self.cachedir, username)
 
         # defining the path/name from the hash of the file
         filename = os.path.join(infilepath, hashkey[0:2], hashkey)
@@ -128,14 +132,17 @@ class RESTLogFile(RESTFile):
             validate_str("name", param, safe, RX_LOGFILENAME, optional=False)
         if method in ['GET']:
             validate_str("name", param, safe, RX_LOGFILENAME, optional=False)
+            validate_str("username", param, safe, RX_USERNAME, optional=True)
+            if safe.kwargs['username']:
+                authz_operator(safe.kwargs['username'])
 
     @restcall
     def put(self, inputfile, name):
         return RESTFile.put(self, inputfile, name)
 
     @restcall(formats = [('application/octet-stream', RawFormat())])
-    def get(self, name):
-        return RESTFile.get(self, name)
+    def get(self, name, username):
+        return RESTFile.get(self, name, username)
 
 
 class RESTInfo(RESTEntity):
@@ -151,8 +158,10 @@ class RESTInfo(RESTEntity):
         if method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES, optional=True)
             validate_str("hashkey", param, safe, RX_HASH, optional=True)
-            validate_str("username", param, safe, RX_USERNAME, optional=True)
             validate_num("verbose", param, safe, optional=True)
+            validate_str("username", param, safe, RX_USERNAME, optional=True)
+            if safe.kwargs['username']:
+                authz_operator(safe.kwargs['username'])
 
     @restcall
     def get(self, subresource, **kwargs):
