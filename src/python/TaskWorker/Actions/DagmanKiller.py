@@ -65,7 +65,7 @@ class DagmanKiller(TaskAction):
 
         const = "CRAB_ReqName =?= %s && member(CRAB_Id, %s)" % (HTCondorUtils.quote(self.workflow), ad.lookup("foo").__repr__())
         try:
-            for ad in self.schedd.query(const, ['CRAB_Id', 'CRAB_Retry']):
+            for ad in list(self.schedd.xquery(const, ['CRAB_Id', 'CRAB_Retry'])):
                 if ('CRAB_Id' not in ad) or ('CRAB_Retry' not in ad):
                     continue
                 jobid = str(ad.eval('CRAB_Id'))

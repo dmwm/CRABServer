@@ -184,7 +184,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
 
-        results = schedd.query(rootConst, [])
+        results = list(schedd.xquery(rootConst, []))
 
         if not results:
             # Task not already in schedd

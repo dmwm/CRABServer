@@ -84,7 +84,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         # Note: may throw if the schedd is down.  We may want to think about wrapping the
         # status function and have it catch / translate HTCondor errors.
-        results = schedd.query(rootConst, rootAttrList)
+        results = list(schedd.xquery(rootConst, rootAttrList))
 
         if not results:
             self.logger.info("An invalid workflow name was requested: %s" % workflow)
