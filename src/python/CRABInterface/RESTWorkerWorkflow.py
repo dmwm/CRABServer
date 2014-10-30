@@ -206,9 +206,9 @@ class Task(dict):
         self['tm_dbs_url'] = task[24]
         self['tm_publish_dbs_url'] = task[25]
         self['tm_publication'] = task[26]
-        self['tm_outfiles'] = literal_eval(task[27])
-        self['tm_tfile_outfiles'] = literal_eval(task[28])
-        self['tm_edm_outfiles'] = literal_eval(task[29])
+        self['tm_outfiles'] = literal_eval(task[27] if ( task[27] is None or isinstance(task[27], str) ) else task[27].read())
+        self['tm_tfile_outfiles'] = literal_eval(task[28] if ( task[28] is None or isinstance(task[28], str) ) else task[28].read())
+        self['tm_edm_outfiles'] = literal_eval(task[29] if ( task[29] is None or isinstance(task[29], str) ) else task[29].read())
         self['tm_transformation'] = task[30]
         self['tm_job_type'] = task[31]
         extraargs = literal_eval(task[32] if ( task[32] is None or isinstance(task[32],str) ) else task[32].read())
@@ -235,4 +235,5 @@ class Task(dict):
         self['tm_scriptargs'] = literal_eval(task[43] if ( task[43] is None or isinstance(task[43],str) ) else task[43].read())
         self['tm_extrajdl'] = task[44]
         self['tm_generator'] = task[45]
+        self['tm_asourl'] = task[46]
 

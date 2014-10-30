@@ -189,7 +189,6 @@ class DataWorkflow(object):
             'saveoutput' : 'T' if saveoutput else 'F',
             'faillimit' : faillimit,
             'ignorelocality' : 'T' if ignorelocality else 'F',
-            'ASOURL' : asourl,
             'userfiles' : userfiles,
         }
 
@@ -238,7 +237,8 @@ class DataWorkflow(object):
                             priority        = [priority],
                             scriptexe       = [scriptexe],
                             scriptargs      = [dbSerializer(scriptargs)],
-                            extrajdl        = [dbSerializer(extrajdl)]
+                            extrajdl        = [dbSerializer(extrajdl)],
+                            asourl          = [asourl]
         )
 
         return [{'RequestName': requestname}]
@@ -271,7 +271,7 @@ class DataWorkflow(object):
             #if not resubmitList:
             #    raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
             self.logger.info("Jobs to resubmit: %s" % resubmitList)
-            args = {"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList, 'ASOURL' : statusRes.get("ASOURL", "")}
+            args = {"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList}
             if maxjobruntime != None:
                 args['maxjobruntime'] = maxjobruntime
             if numcores != None:
