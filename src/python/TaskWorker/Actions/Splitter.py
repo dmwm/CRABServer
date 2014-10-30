@@ -32,7 +32,7 @@ class Splitter(TaskAction):
             elif kwargs['task']['tm_split_algo'] == 'LumiBased':
                 splitparam['total_lumis'] = kwargs['task']['tm_totalunits']
         elif kwargs['task']['tm_job_type'] == 'PrivateMC':
-            if kwargs['task']['tm_generator'] == 'lhe':
+            if 'tm_generator' in kwargs['task'] and kwargs['task']['tm_generator'] == 'lhe':
                 splitparam['lheInputFiles'] = True
         factory = jobfactory(**splitparam)
         if len(factory) == 0:
