@@ -101,7 +101,7 @@ CRAB_Id = $(count)
 +CRAB_Id = $(count)
 +CRAB_Dest = "%(temp_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
-+CRAB_ASOURL = %(ASOURL)s
++CRAB_ASOURL = %(tm_asourl)s
 +TaskType = "Job"
 +AccountingGroup = %(accounting_group)s
 
@@ -210,7 +210,7 @@ def transform_strings(input):
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
            'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL', 'asyncdest_se', "stageoutpolicy", \
+           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'asyncdest_se', "stageoutpolicy", \
            'taskType', 'maxpost', 'worker_name', 'desired_opsys', 'desired_opsysvers', 'desired_arch', "accounting_group":
         val = input.get(var, None)
         if val == None:
@@ -404,7 +404,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['tfileoutfiles'] = task['tm_tfile_outfiles']
         info['edmoutfiles'] = task['tm_edm_outfiles']
         info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
-        info['ASOURL'] = task.get('tm_arguments', {}).get('ASOURL', '')
+        info['ASOURL'] = task['tm_asourl']
         info['taskType'] = self.getDashboardTaskType()
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0

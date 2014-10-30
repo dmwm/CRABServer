@@ -425,8 +425,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         arguments = literal_eval(row.arguments.read())
 
         #Always returning ASOURL also, it is required for kill, resubmit
-        self.logger.info("ASO: %s" % arguments)
-        retval['ASOURL'] = arguments['ASOURL']
+        self.logger.info("ASO: %s" % row.tm_asourl)
+        retval['ASOURL'] = row.tm_asourl
 
         if (row.tm_publication == 'T' and 'finished' in retval['jobsPerStatus']):
             publication_info, outdatasets = self.publicationStatus(workflow, arguments['ASOURL'])

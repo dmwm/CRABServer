@@ -92,7 +92,7 @@ class DagmanKiller(TaskAction):
 
     def killTransfers(self, apmon):
         self.logger.info("About to kill transfers from workflow %s." % self.workflow)
-        ASOURL = self.task.get('tm_arguments', {}).get('ASOURL')
+        ASOURL = self.task.get('tm_asourl', None)
         if not ASOURL:
             self.logger.info("ASO URL not set; will not kill transfers")
             return False
