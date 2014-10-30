@@ -44,7 +44,8 @@ class FileMetaData(object):
                fmd_type, fmd_parent, fmd_creation_time, fmd_filestate, fmd_direct_stageout) \
                VALUES (:taskname, :pandajobid, :outdatasetname, :acquisitionera, :appver, :events, :globalTag,\
                        :publishdataname, :outlocation, :outtmplocation, :runlumi, :checksumadler32, :checksumcksum, :checksummd5, :outlfn, :outsize,\
-                       :outtype, :inparentlfns, SYS_EXTRACT_UTC(SYSTIMESTAMP), :filestate, :directstageout)"
+                       :outtype, :inparentlfns, SYS_EXTRACT_UTC(SYSTIMESTAMP), :filestate, :directstageout) \
+               ON DUPLICATE KEY UPDATE fmd_tmp_location = :outtmplocation, fmd_size = :outsize, fmd_creation_time = SYS_EXTRACT_UTC(SYSTIMESTAMP)"
 
     DeleteTaskFiles_sql = "DELETE FROM filemetadata WHERE tm_taskname = :taskname"
     DeleteFilesByTime_sql = "DELETE FROM filemetadata WHERE fmd_creation_time < sysdate - (:hours/24)"
