@@ -757,10 +757,14 @@ class HTCondorDataWorkflow(DataWorkflow):
         fp.seek(0)
         data = json.load(fp)
         for _, result in data['results'].items():
-            state = result['value']['state']
-            jobid = str(result['value']['jobid'])
-            if nodes[jobid]['State'] == 'transferring' and state == 'done':
-                nodes[jobid]['State'] = 'transferred'
+            if 'state' in result['value']: #this if is for backward compatibility with old postjobs
+                state = result['value']['state']
+                jobid = str(result['value']['jobid'])
+                if nodes[jobid]['State'] == 'transferring' and state == 'done':
+                    nodes[jobid]['State'] = 'transferred'
+            else:
+                self.logger.warning("It seems that the aso_status file has been generated with an old version of the postjob")
+                break
 
 
     def parseErrorReport(self, fp, nodes):
