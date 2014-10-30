@@ -317,12 +317,12 @@ class HTCondorDataWorkflow(DataWorkflow):
         name = workflow.split("_")[2].split(":")[0]
         self.logger.info("Getting status for workflow %s, looking for schedd %s" %\
                                 (workflow, name))
-        locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
-        self.logger.debug("Will talk to %s." % locator.getCollector())
-        name = locator.getSchedd()
-        self.logger.debug("Schedd name %s." % name)
 
         try:
+            locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
+            self.logger.debug("Will talk to %s." % locator.getCollector())
+            name = locator.getSchedd()
+            self.logger.debug("Schedd name %s." % name)
             schedd, address = locator.getScheddObj(workflow)
             results = self.getRootTasks(workflow, schedd)
             self.logger.info("Web status for workflow %s done" % workflow)
