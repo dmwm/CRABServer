@@ -382,7 +382,7 @@ def parseArgs():
     parser.add_option('--runAndLumis',
                       dest='runAndLumis',
                       type='string',
-                      default='{}')
+                      default=None)
     parser.add_option('--lheInputFiles',
                       dest='lheInputFiles',
                       type='string',

@@ -1,6 +1,10 @@
 """
 Can be tested with something like:
-python /afs/cern.ch/user/m/mmascher/transformation/tmp/TweakPSet.py --location=/afs/cern.ch/user/m/mmascher/transformation/tmp --inputFile='["/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0010/EA00B1E8-F8AD-E111-90C5-5404A6388697.root"]' --runAndLumis='{"1": [[669684, 669684]]}' --firstEvent=0 --lastEvent=-1 --firstLumi=None --firstRun=None --seeding=None --lheInputFiles=False --oneEventMode=0
+python /afs/cern.ch/user/m/mmascher/transformation/tmp/TweakPSet.py --location=/afs/cern.ch/user/m/mmascher/transformation/tmp --inputFile='["/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0010/EA00B1E8-F8AD-E111-90C5-5404A6388697.root"]' --runAndLumis='job_lumis_1.json' --firstEvent=0 --lastEvent=-1 --firstLumi=None --firstRun=None --seeding=None --lheInputFiles=False --oneEventMode=0
+
+job_lumis_1.json content:
+'{"1": [[669684, 669684]]}'
+On Worker nodes it has a tarball with all files. but for debugging purpose it is also available to read directly from file
 """
 
 from optparse import OptionParser
@@ -98,7 +102,33 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
 import os
 import sys
 import json
+import tarfile
 from ast import literal_eval
+
+def readFileFromTarball(file, tarball):
+    content = '{}'
+    if os.path.isfile(file):
+        #This is only for Debugging
+        print 'DEBUGGING MODE!'
+        with open(file, 'r') as f:
+            content = f.read()
+        return literal_eval(content)
+    elif not os.path.exists(tarball):
+        handleException("FAILED", EC_CMSRunWrapper, 'Error getting %s file location.' % tarball)
+        mintime()
+        sys.exit(EC_CMSRunWrapper)
+    tar_file = tarfile.open(tarball)
+    for member in tar_file.getmembers():
+        try:
+            f = tar_file.extractfile(file)
+            content = f.read()
+            break
+        except KeyError, er:
+            #Don`t exit due to KeyError, print error. EventBased and FileBased does not have run and lumis
+            print 'Failed to get information from tarball %s and file %s. Error : %s' %(tarball, file, er)
+            break
+    tar_file.close()
+    return literal_eval(content)
 
 print "Beginning TweakPSet"
 print " arguments: %s" % sys.argv
@@ -125,7 +155,11 @@ if opts.oneEventMode:
     print "One event mode disabled until we can put together a decent version of WMCore."
     print "TweakPSet.py is going to force one event mode"
 
-pset = SetupCMSSWPsetCore( opts.location, map(str, literal_eval(opts.inputFile)), literal_eval(opts.runAndLumis), agentNumber, lfnBase, outputMods,\
+runAndLumis = {}
+if opts.runAndLumis:
+    readFileFromTarball(opts.runAndLumis, 'run_and_lumis.tar.gz')
+
+pset = SetupCMSSWPsetCore( opts.location, map(str, literal_eval(opts.inputFile)), runAndLumis, agentNumber, lfnBase, outputMods,\
                            literal_eval(opts.firstEvent), literal_eval(opts.lastEvent), literal_eval(opts.firstLumi),\
                            literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode)
 
