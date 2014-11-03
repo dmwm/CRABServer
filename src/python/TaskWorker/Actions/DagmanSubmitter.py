@@ -108,7 +108,7 @@ SUBMIT_INFO = [ \
             ('RequestCpus', 'tm_numcores'),
             ('MaxWallTimeMins', 'tm_maxjobruntime'),
             ('JobPrio', 'tm_priority'),
-            ("CRAB_ASOURL", "ASOURL"),
+            ("CRAB_ASOURL", "tm_asourl"),
             ("CRAB_FailedNodeLimit", "faillimit"),
             ("CRAB_DashboardTaskType", "taskType"),
             ("CRAB_MaxPost", "maxpost"),
