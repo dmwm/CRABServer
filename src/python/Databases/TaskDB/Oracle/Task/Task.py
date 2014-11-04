@@ -139,8 +139,6 @@ class Task(object):
     SetUpdateOutDataset_sql = """UPDATE tasks SET tm_output_dataset = :tm_output_dataset \
                                 WHERE tm_taskname = :tm_taskname"""
 
-    GetOutDataset_sql = "SELECT tm_output_dataset FROM tasks WHERE tm_taskname = :tm_taskname"
-
     #UpdateWarnings
     SetWarnings_sql = """UPDATE tasks SET tm_task_warnings=:warnings WHERE tm_taskname=:workflow"""
 

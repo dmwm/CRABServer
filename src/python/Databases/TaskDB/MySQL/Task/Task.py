@@ -99,7 +99,5 @@ class Task(object):
     SetUpdateOutDataset_sql = """UPDATE tasks SET tm_output_dataset = %(tm_output_dataset)s \
                                 WHERE tm_taskname = %(tm_taskname)s"""
 
-    GetOutDataset_sql = "SELECT tm_output_dataset FROM tasks WHERE tm_taskname=%(tm_taskname)s"
-
     UpdateWebUrl_sql = """UPDATE tasks SET tm_user_webdir = %(webdirurl)s \
                               WHERE tm_taskname = %(workflow)s"""
