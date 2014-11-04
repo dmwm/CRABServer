@@ -886,11 +886,11 @@ class PostJob():
             logger.debug("Uploading output datasets to %s: %s" % (self.resturl.replace('filemetadata', 'task'), configreq))
             try:
                 self.server.post(self.resturl.replace('filemetadata', 'task'), data = urllib.urlencode(configreq))
+                with open('output_datasets', 'w') as f:
+                    f.write(' '.join(output_datasets))
             except HTTPException, hte:
-                print hte.headers
-                raise
-            with open('output_datasets', 'w') as f:
-                f.write(' '.join(output_datasets))
+                info = (self.resturl.replace('filemetadata', 'task'), str(hte.headers))
+                logger.exception("Error uploading output dataset to %s: %s" % info)
 
 
     def uploadLog(self, dest_dir, filename):
