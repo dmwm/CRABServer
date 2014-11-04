@@ -9,7 +9,6 @@ from CRABInterface.Regexps import RX_SUBRES_TASK, RX_WORKFLOW, RX_BLOCK, RX_WORK
 
 # external dependecies here
 import cherrypy
-import json
 from ast import literal_eval
 from base64 import b64decode
 
@@ -139,11 +138,9 @@ class RESTTask(RESTEntity):
         workflow = kwargs['workflow']
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
 
-        outputdatasets = set(kwargs['outputdatasets'])
-        current_value = self.api.query(None, None, self.Task.GetOutDataset_sql, tm_taskname=workflow).next()[0]
-        if current_value:
-            outputdatasets |= set(json.loads(str(current_value)))
-        outputdatasets = json.dumps(list(outputdatasets))
+        row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
+        outputdatasets = literal_eval(row.tm_output_dataset.read() if row.tm_output_dataset else '[]')
+        outputdatasets = str(list(set(outputdatasets + kwargs['outputdatasets'])))
 
         self.api.modify(self.Task.SetUpdateOutDataset_sql, tm_output_dataset=[outputdatasets], tm_taskname=[workflow])
 

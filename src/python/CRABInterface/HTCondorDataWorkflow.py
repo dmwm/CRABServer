@@ -216,9 +216,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
         row = self.Task.ID_tuple(*row)
         inputDataset = row.input_dataset
-        outputDatasets = row.tm_output_dataset
-        if outputDatasets:
-            outputDatasets = json.loads(outputDatasets)
+        outputDatasets = literal_eval(row.tm_output_dataset.read() if row.tm_output_dataset else 'None')
         dbsUrl = row.dbs_url
 
         #load the lumimask
@@ -423,7 +421,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         #getting publication information
         publication_info = {}
-        outdatasets = json.loads(row.tm_output_dataset.read())
+        outdatasets = literal_eval(row.tm_output_dataset.read() if row.tm_output_dataset else 'None')
         arguments = literal_eval(row.arguments.read())
 
         #Always returning ASOURL also, it is required for kill, resubmit
