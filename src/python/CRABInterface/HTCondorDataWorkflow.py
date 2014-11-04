@@ -429,7 +429,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         retval['ASOURL'] = row.tm_asourl
 
         if (row.tm_publication == 'T' and 'finished' in retval['jobsPerStatus']):
-            publication_info, outdatasets = self.publicationStatus(workflow, arguments['ASOURL'])
+            publication_info, outdatasets = self.publicationStatus(workflow, row.tm_asourl)
             self.logger.info("Publiation status for workflow %s done" % workflow)
         else:
             self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.tm_publication, retval['jobsPerStatus'].get('finished', 0)))

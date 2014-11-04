@@ -88,7 +88,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
 
         results = rpipe.read()
         if results != "OK":
-            raise TaskWorkerException("The CRAB3 server backend could not reubmit your task because the Grid scheduler answered with an error\n" % ", ".join(ids)+\
+            raise TaskWorkerException("The CRAB3 server backend could not reubmit your task because the Grid scheduler answered with an error\n"+\
                                       "This is probably a temporary glitch, please try it again and contact an expert if the error persist\n"+\
                                       "Error reason %s" % results)
 
