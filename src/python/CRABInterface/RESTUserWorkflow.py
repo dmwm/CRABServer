@@ -103,7 +103,7 @@ class RESTUserWorkflow(RESTEntity):
             msg += "\nUse config.JobType.allowNonProductionCMSSW = True if you are sure of what you are doing"
 
         if msg:
-            excasync = ValueError("A site name you specified is not valid")
+            excasync = "ERROR: %s on %s is not among supported releases" % (jobsw, jobarch)
             invalidp = InvalidParameter(msg, errobj = excasync)
             setattr(invalidp, 'trace', '')
             raise invalidp
