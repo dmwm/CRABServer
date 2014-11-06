@@ -276,21 +276,27 @@ def logCMSSW():
     outfile = "cmsRun-stdout.log"
     
     # check size of outfile
-    cmd = "test `head -4000 %s|wc -l` -le 4000" % outfile
-    tooBig = subprocess.call(cmd, shell=True)  # shell rc is 1 when test is false
+    keepAtStart = 10
+    keepAtEnd   = 30
+    maxLines    = keepAtStart + keepAtEnd
+    numLines = sum(1 for line in open(outfile))
+    tooBig = numLines > maxLines
     if tooBig :
-        print "WARNING: CMSSW output more then 4klines; truncating to first 1k and last 3k"
+        print "WARNING: CMSSW output more then %d lines; truncating to first %d and last %d" % (maxLines, keepAtStart, keepAtEnd)
         print "Use 'crab getlog' to retrieve full output of this job from storage."
         print "======================================="
-        trimfile = outfile + '.trimmed'
-        cmd = "head -1000 %s > %s; echo '' >> %s; echo '[...BIG SNIP...]'>>%s;echo ''>>%s;tail -3000 %s >> %s" % (outfile, trimfile, trimfile, trimfile, trimfile, outfile, trimfile)
-        rc = subprocess.call(cmd, shell=True)
-        outfile = trimfile
+        nl=0
+        for line in open(outfile):
+            nl += 1
+            if nl <= keepAtStart: print "== CMSSW: ", line,
+            if nl == keepAtStart+1:
+                print "== CMSSW: "
+                print "== CMSSW: [...BIG SNIP...]"
+                print "== CMSSW: "
+            if numLines-nl <= keepAtEnd: print "== CMSSW: ", line,
+    else:
+        for line in open(outfile): print "== CMSSW: ", line,
 
-    fd = open(outfile)
-    for line in fd:
-        print "== CMSSW: ", line,
-    fd.close()
     print "======== CMSSW OUTPUT FINSHING ========"
 
 
