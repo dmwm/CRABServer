@@ -272,18 +272,31 @@ def logCMSSW():
         print "ERROR: Cannot dump CMSSW stdout; perhaps CMSSW never executed (e.g.: scriptExe was set)?"
         return
     print "======== CMSSW OUTPUT STARTING ========"
-    fd = open("cmsRun-stdout.log")
-    st = os.fstat(fd.fileno())
-    if st.st_size > 1*1024*1024:
-        print "WARNING: CMSSW output is over 1MB; truncating to last 1MB."
+    
+    outfile = "cmsRun-stdout.log"
+    
+    # check size of outfile
+    keepAtStart = 10
+    keepAtEnd   = 30
+    maxLines    = keepAtStart + keepAtEnd
+    numLines = sum(1 for line in open(outfile))
+    tooBig = numLines > maxLines
+    if tooBig :
+        print "WARNING: CMSSW output more then %d lines; truncating to first %d and last %d" % (maxLines, keepAtStart, keepAtEnd)
         print "Use 'crab getlog' to retrieve full output of this job from storage."
-        fd.seek(-1*1024*1024, 2)
-        it = fd.xreadlines()
-        it.next()
+        print "======================================="
+        nl=0
+        for line in open(outfile):
+            nl += 1
+            if nl <= keepAtStart: print "== CMSSW: ", line,
+            if nl == keepAtStart+1:
+                print "== CMSSW: "
+                print "== CMSSW: [...BIG SNIP...]"
+                print "== CMSSW: "
+            if numLines-nl <= keepAtEnd: print "== CMSSW: ", line,
     else:
-        it = fd.xreadlines()
-    for line in it:
-        print "== CMSSW: ", line,
+        for line in open(outfile): print "== CMSSW: ", line,
+
     print "======== CMSSW OUTPUT FINSHING ========"
 
 
