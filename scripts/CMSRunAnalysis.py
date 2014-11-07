@@ -276,8 +276,8 @@ def logCMSSW():
     outfile = "cmsRun-stdout.log"
     
     # check size of outfile
-    keepAtStart = 10
-    keepAtEnd   = 30
+    keepAtStart = 1000
+    keepAtEnd   = 3000
     maxLines    = keepAtStart + keepAtEnd
     numLines = sum(1 for line in open(outfile))
     tooBig = numLines > maxLines
@@ -285,17 +285,19 @@ def logCMSSW():
         print "WARNING: CMSSW output more then %d lines; truncating to first %d and last %d" % (maxLines, keepAtStart, keepAtEnd)
         print "Use 'crab getlog' to retrieve full output of this job from storage."
         print "======================================="
-        nl=0
-        for line in open(outfile):
-            nl += 1
-            if nl <= keepAtStart: print "== CMSSW: ", line,
-            if nl == keepAtStart+1:
-                print "== CMSSW: "
-                print "== CMSSW: [...BIG SNIP...]"
-                print "== CMSSW: "
-            if numLines-nl <= keepAtEnd: print "== CMSSW: ", line,
+        with open(outfile) as fp:
+            for nl, line in enumerate(fp):
+                if nl < keepAtStart:
+                    print nl, "== CMSSW: ", line,
+                if nl == keepAtStart+1:
+                    print "== CMSSW: "
+                    print "== CMSSW: [...BIG SNIP...]"
+                    print "== CMSSW: "
+                if numLines-nl <= keepAtEnd:
+                    print nl, "== CMSSW: ", line,
     else:
-        for line in open(outfile): print "== CMSSW: ", line,
+        for line in open(outfile):
+            print "== CMSSW: ", line,
 
     print "======== CMSSW OUTPUT FINSHING ========"
 
