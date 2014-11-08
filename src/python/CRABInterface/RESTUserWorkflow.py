@@ -52,18 +52,34 @@ class RESTUserWorkflow(RESTEntity):
         return list(res)
 
     def _checkOutLFN(self, kwargs):
-        """ Check the lfn parameter: if it starts with /store/user then the right username should be there. Handle old clients lfnprefix parameter.
-            If lfn is not there default to /store/user/username
+        """Check the lfn parameter: it must start with '/store/user/username/' or '/store/group/groupname/username/'
+           where username is the one registered in SiteDB (i.e. the one used in the CERN primary account).
+           If lfn is not there, default to '/store/user/username/'.
+           Handle old clients lfnprefix parameter.
         """
-        #add the username if necessary (lfn=/store/user). Check the username (don't write in other user's directories)
         username = cherrypy.request.user['login']
-        if kwargs["lfnprefix"]:
-            kwargs["lfn"] = '/store/user/%s/%s' % (username, kwargs["lfnprefix"])
-        elif not kwargs["lfn"]:
-            kwargs["lfn"] = '/store/user/%s/' % username #add the username in case the user did not specify the lfn param
-        elif not kwargs["lfn"].startswith('/store/group') and not kwargs["lfn"].startswith('/store/user'):#re.match('^/store/user/%s/' % username, kwargs["lfn"]): may use this later once #4327 is there
-            #raised if lfn does not start with /store/group or /store/user
-            raise InvalidParameter("The parameter Data.outlfn should start with /store/group or /store/user")#/%s/" % username)
+        if kwargs['lfnprefix']:
+            kwargs['lfn'] = '/store/user/%s/%s' % (username, kwargs["lfnprefix"])
+        elif not kwargs['lfn']:
+            ## Default to '/store/user/username/' in case the user did not specify the lfn parameter.
+            kwargs['lfn'] = '/store/user/%s/' % (username)
+        else:
+            msg  = "The parameter Data.outLFN in the CRAB configuration file must start with either"
+            msg += " '/store/user/<username>/' or '/store/group/<groupname>/<username>/'"
+            msg += " (or '/store/local/' if publication is off),"
+            msg += " where username is your username as registered in SiteDB"
+            msg += " (i.e. the username of your CERN primary account)."
+            if kwargs['lfn'].startswith('/store/group/'):
+                if len(kwargs['lfn'].split('/')) < 5 or kwargs['lfn'].split('/')[4] != username:
+                    raise InvalidParameter(msg)
+            elif kwargs['lfn'].startswith('/store/user/'):
+                if len(kwargs['lfn'].split('/')) < 4 or kwargs['lfn'].split('/')[3] != username:
+                    raise InvalidParameter(msg)
+            elif kwargs['lfn'].startswith('/store/local/'):
+                if kwargs['publication']:
+                    raise InvalidParameter(msg)
+            else:
+                raise InvalidParameter(msg)
 
     def _checkASODestination(self, site):
         self._checkSite(site)
