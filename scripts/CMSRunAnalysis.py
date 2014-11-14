@@ -406,7 +406,7 @@ def parseArgs():
                       type='string')
     parser.add_option('--eventsPerLumi',
                       dest='eventsPerLumi',
-                      type='int',
+                      type='string',
                       default=None)
 
     (opts, args) = parser.parse_args(sys.argv[1:])
