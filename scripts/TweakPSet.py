@@ -76,9 +76,11 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
         self.step.data.section_("application")
         self.step.data.application.section_("configuration")
         self.step.data.application.section_("command")
+        self.step.data.application.section_("multicore")
         self.step.data.application.command.configuration = "PSet.py"
         self.step.data.application.command.oneEventMode = oneEventMode in ["1", "True", True]
 #        self.step.data.application.configuration.pickledarguments.globalTag/globalTagTransaction
+        self.step.data.application.multicore.enabled = False
         self.step.data.section_("input")
         self.job = jobDict(lheInputFiles, seeding)
         self.job["input_files"] = []
