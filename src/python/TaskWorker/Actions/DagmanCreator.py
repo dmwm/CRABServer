@@ -581,7 +581,7 @@ class DagmanCreator(TaskAction.TaskAction):
             if whitelist:
                 available &= whitelist
                 if not available:
-                    msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. You put (%s) in the site whitelist, but your task %s can only run in "+\
+                    msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. You put (%s) in the site whitelist, but your task %s can only run in "\
                           "(%s). Please check in das the locations of your datasets. Hint: the ignoreLocality option might help" % (", ".join(whitelist),\
                           kwargs['task']['tm_taskname'], ", ".join(availablesites))
                     raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
