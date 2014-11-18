@@ -530,6 +530,13 @@ class DagmanCreator(TaskAction.TaskAction):
             global_whitelist = set(self.config.Sites.available)
         if hasattr(self.config.Sites, 'banned'):
             global_blacklist = set(self.config.Sites.banned)
+        # This is needed for Site Metrics
+        # It should not block any site for Site Metrics and if needed for other activities
+        # self.config.TaskWorker.NonBlockActivities = ['hctest', 'hcdev']
+        if hasattr(self.config.TaskWorker, 'NonBlockActivities') and \
+                   kwargs['task']['tm_activity'] in self.config.TaskWorker.NonBlockActivities:
+            global_whitelist = set()
+            global_blacklist = set()
 
         sitead = classad.ClassAd()
         siteinfo = {'groups': {}}
@@ -574,7 +581,7 @@ class DagmanCreator(TaskAction.TaskAction):
             if whitelist:
                 available &= whitelist
                 if not available:
-                    msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. You put (%s) in the site whitelist, but your task %s can only run in "+\
+                    msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. You put (%s) in the site whitelist, but your task %s can only run in "\
                           "(%s). Please check in das the locations of your datasets. Hint: the ignoreLocality option might help" % (", ".join(whitelist),\
                           kwargs['task']['tm_taskname'], ", ".join(availablesites))
                     raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
