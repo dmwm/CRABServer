@@ -530,6 +530,13 @@ class DagmanCreator(TaskAction.TaskAction):
             global_whitelist = set(self.config.Sites.available)
         if hasattr(self.config.Sites, 'banned'):
             global_blacklist = set(self.config.Sites.banned)
+        # This is needed for Site Metrics
+        # It should not block any site for Site Metrics and if needed for other activities
+        # self.config.TaskWorker.NonBlockActivities = ['hctest', 'hcdev']
+        if hasattr(self.config.TaskWorker, 'NonBlockActivities') and \
+                   kwargs['task']['tm_activity'] in self.config.TaskWorker.NonBlockActivities:
+            global_whitelist = set()
+            global_blacklist = set()
 
         sitead = classad.ClassAd()
         siteinfo = {'groups': {}}
