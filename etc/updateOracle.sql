@@ -26,3 +26,4 @@ ALTER TABLE tasks DROP column tm_edm_outfiles;
 ALTER TABLE tasks RENAME column tm_edm_outfiles1 TO tm_edm_outfiles;
 
 ALTER TABLE tasks ADD tm_asourl VARCHAR(4000);
+ALTER TABLE tasks ADD tm_events_per_lumi NUMBER(38);

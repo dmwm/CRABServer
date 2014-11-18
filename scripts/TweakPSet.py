@@ -64,9 +64,10 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
     firstRun:       used to tweak process.source.firstRun. Set to 1 if it's None
     seeding:        used in handleSeeding
     oneEventMode:   toggles one event mode
+    eventsPerLumi:  start a new lumi section after the specified amount of events.  None disables this.
     """
     def __init__(self, location, inputFiles, runAndLumis, agentNumber, lfnBase, outputMods, firstEvent=0, lastEvent=-1, firstLumi=None,\
-                    firstRun=None, seeding=None, lheInputFiles=False, oneEventMode=False):
+                    firstRun=None, seeding=None, lheInputFiles=False, oneEventMode=False, eventsPerLumi=None):
         ScriptInterface.__init__(self)
         self.stepSpace = ConfigSection()
         self.stepSpace.location = location
@@ -80,6 +81,8 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
         self.step.data.application.command.configuration = "PSet.py"
         self.step.data.application.command.oneEventMode = oneEventMode in ["1", "True", True]
 #        self.step.data.application.configuration.pickledarguments.globalTag/globalTagTransaction
+        if eventsPerLumi:
+            self.step.data.application.configuration.eventsPerLumi = eventsPerLumi
         self.step.data.application.multicore.enabled = False
         self.step.data.section_("input")
         self.job = jobDict(lheInputFiles, seeding)
@@ -121,6 +124,7 @@ parser.add_option('--firstRun', dest='firstRun')
 parser.add_option('--seeding', dest='seeding')
 parser.add_option('--lheInputFiles', dest='lheInputFiles')
 parser.add_option('--oneEventMode', dest='oneEventMode', default=False)
+parser.add_option('--eventsPerLumi', dest='eventsPerLumi', default=None)
 opts, args = parser.parse_args()
 
 if opts.oneEventMode:
@@ -129,6 +133,6 @@ if opts.oneEventMode:
 
 pset = SetupCMSSWPsetCore( opts.location, map(str, literal_eval(opts.inputFile)), literal_eval(opts.runAndLumis), agentNumber, lfnBase, outputMods,\
                            literal_eval(opts.firstEvent), literal_eval(opts.lastEvent), literal_eval(opts.firstLumi),\
-                           literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode)
+                           literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode, literal_eval(opts.eventsPerLumi))
 
 pset()
