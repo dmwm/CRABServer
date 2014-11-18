@@ -11,6 +11,7 @@ import base64
 import shutil
 import string
 import urllib
+import tarfile
 import hashlib
 import commands
 import tempfile
@@ -49,7 +50,7 @@ SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %
 SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 2 UNLESS-EXIT 2
-VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" scriptExe="%(scriptExe)s" scriptArgs="%(scriptArgs)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\"" +CRAB_Destination="\\"%(destination)s\\""
+VARS Job%(count)d count="%(count)d" runAndLumiMask="job_lumis_%(count)d.json" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" scriptExe="%(scriptExe)s" scriptArgs="%(scriptArgs)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\"" +CRAB_Destination="\\"%(destination)s\\""
 ABORT-DAG-ON Job%(count)d 3
 
 """
@@ -438,6 +439,7 @@ class DagmanCreator(TaskAction.TaskAction):
             info['additional_environment_options'] += ';CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/TaskManagerRun-3.3.0-pre1.tar.gz'
         if os.path.exists("sandbox.tar.gz"):
             info['additional_input_file'] += ", sandbox.tar.gz"
+        info['additional_input_file'] += ", run_and_lumis.tar.gz"
 
         with open("Job.submit", "w") as fd:
             fd.write(JOB_SUBMIT % info)
@@ -455,7 +457,7 @@ class DagmanCreator(TaskAction.TaskAction):
         lastDirectPfn = None
         for job in jobgroup.getJobs():
             inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']]).replace('"', r'\"\"')
-            runAndLumiMask = json.dumps(job['mask']['runAndLumis']).replace('"', r'\"\"')
+            runAndLumiMask = '\'' + json.dumps(job['mask']['runAndLumis']) + '\''
             firstEvent = str(job['mask']['FirstEvent'])
             lastEvent = str(job['mask']['LastEvent'])
             firstLumi = str(job['mask']['FirstLumi'])
@@ -600,8 +602,15 @@ class DagmanCreator(TaskAction.TaskAction):
             specs += jobgroupspecs
 
         dag = DAG_HEADER % {'restinstance': kwargs['task']['restinstance'], 'resturl': self.resturl}
+        run_and_lumis_tar = tarfile.open("run_and_lumis.tar.gz", "w:gz")
         for spec in specs:
             dag += DAG_FRAGMENT % spec
+            job_lumis_file = 'job_lumis_'+ str(spec['count']) +'.json'
+            with open(job_lumis_file, "w") as fd:
+                fd.write(str(spec['runAndLumiMask']))
+            run_and_lumis_tar.add(job_lumis_file)
+            os.remove(job_lumis_file)
+        run_and_lumis_tar.close()
 
         with open("RunJobs.dag", "w") as fd:
             fd.write(dag)
