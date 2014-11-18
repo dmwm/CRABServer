@@ -61,7 +61,7 @@ RX_SUBRESTAT = re.compile(r"^errors|report|logs|data$")
 
 #subresources of the ServerInfo (/info) and Task (/task) resources
 RX_SUBRES_SI = re.compile(r"^delegatedn|backendurls|version|bannedoutdest|scheddaddress|ignlocalityblacklist|$")
-RX_SUBRES_TASK = re.compile(r"^allinfo|allusers|summary|search|taskbystatus|addwarning|addwebdir$")
+RX_SUBRES_TASK = re.compile(r"^allinfo|allusers|summary|search|taskbystatus|addwarning|addwebdir|addoutputdatasets$")
 
 #worker workflow
 RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._]{1,100}$")
@@ -77,7 +77,7 @@ RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s\=\+]{0,10000}$")
 ## user dn
 RX_DN = re.compile(r"^/(?:C|O|DC)=.*/CN=.")
 ## worker subresources
-RX_SUBPOSTWORKER = re.compile(r"^state|start|failure|success|process|lumimask|outputdataset$")
+RX_SUBPOSTWORKER = re.compile(r"^state|start|failure|success|process|lumimask$")
 RX_SUBGETWORKER = re.compile(r"jobgroup")
 
 # Schedulers

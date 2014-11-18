@@ -826,6 +826,7 @@ class PostJob():
             if file_info['filetype'] == 'EDM':
                 edm_file_count += 1
         multiple_edm = edm_file_count > 1
+        output_datasets = set()
         for file_info in self.output_files_info:
             publishname = self.task_ad['CRAB_PublishName']
             if 'pset_hash' in file_info:
@@ -838,6 +839,7 @@ class PostJob():
                 outdataset = os.path.join('/' + str(self.task_ad['CRAB_InputData']).split('/')[1], self.task_ad['CRAB_UserHN'] + '-' + publishname, 'USER')
             else:
                 outdataset = "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER"
+            output_datasets.add(outdataset)
             configreq = {"taskname":        self.ad['CRAB_ReqName'],
                          "globalTag":       "None",
                          "pandajobid":      self.crab_id,
@@ -876,6 +878,19 @@ class PostJob():
             except HTTPException, hte:
                 print hte.headers
                 raise
+        if not os.path.exists('output_datasets'):
+            configreq = [('subresource', 'addoutputdatasets'),
+                         ('workflow', self.ad['CRAB_ReqName'])]
+            for dset in output_datasets:
+                configreq.append(('outputdatasets', dset))
+            logger.debug("Uploading output datasets to %s: %s" % (self.resturl.replace('filemetadata', 'task'), configreq))
+            try:
+                self.server.post(self.resturl.replace('filemetadata', 'task'), data = urllib.urlencode(configreq))
+                with open('output_datasets', 'w') as f:
+                    f.write(' '.join(output_datasets))
+            except HTTPException, hte:
+                info = (self.resturl.replace('filemetadata', 'task'), str(hte.headers))
+                logger.exception("Error uploading output dataset to %s: %s" % info)
 
 
     def uploadLog(self, dest_dir, filename):

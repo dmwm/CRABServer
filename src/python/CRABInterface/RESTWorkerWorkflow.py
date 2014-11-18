@@ -6,7 +6,7 @@ from WMCore.REST.Error import InvalidParameter
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, \
-                                  RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_OUT_DATASET
+                                  RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE
 
 # external dependecies here
 import cherrypy
@@ -45,7 +45,6 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_num("limit", param, safe, optional=True)
             validate_strlist("runs", param, safe, RX_RUNS)
             validate_strlist("lumis", param, safe, RX_LUMIRANGE)
-            validate_strlist("outputdataset", param, safe, RX_OUT_DATASET)
             # possible combinations to check
             # 1) taskname + status
             # 2) taskname + status + failure
@@ -80,7 +79,7 @@ class RESTWorkerWorkflow(RESTEntity):
         return []
 
     @restcall
-    def post(self, workflow, status, subresource, jobset, failure, resubmittedjobs, getstatus, workername, limit, runs, lumis, outputdataset):
+    def post(self, workflow, status, subresource, jobset, failure, resubmittedjobs, getstatus, workername, limit, runs, lumis):
         """ Updates task information """
         if failure is not None:
             try:
@@ -102,9 +101,7 @@ class RESTWorkerWorkflow(RESTEntity):
                                                                                                    "get_status": [getstatus],
                                                                                                    "limit": [limit],
                                                                                                    "set_status": [status]}},
-                  "lumimask": {"args": (runs, lumis,), "method": self.setLumiMask, "kwargs": {"taskname": [workflow],}},
-                  "outputdataset" :  {"args": (self.Task.SetUpdateOutDataset_sql,), "method": self.api.modify, "kwargs": {"tm_output_dataset": [str(outputdataset)],
-                                                                                                                          "tm_taskname": [workflow]}},
+                  "lumimask": {"args": (runs, lumis,), "method": self.setLumiMask, "kwargs": {"taskname": [workflow]}}
 
         }
 

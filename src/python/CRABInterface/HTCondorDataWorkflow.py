@@ -216,7 +216,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
         row = self.Task.ID_tuple(*row)
         inputDataset = row.input_dataset
-        outputDatasets = self._getOutDatasets(workflow)
+        outputDatasets = literal_eval(row.tm_output_dataset.read() if row.tm_output_dataset else 'None')
         dbsUrl = row.dbs_url
 
         #load the lumimask
@@ -421,7 +421,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         #getting publication information
         publication_info = {}
-        outdatasets = []
+        outdatasets = literal_eval(row.tm_output_dataset.read() if row.tm_output_dataset else 'None')
         arguments = literal_eval(row.arguments.read())
 
         #Always returning ASOURL also, it is required for kill, resubmit
@@ -429,7 +429,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         retval['ASOURL'] = row.tm_asourl
 
         if (row.tm_publication == 'T' and 'finished' in retval['jobsPerStatus']):
-            publication_info, outdatasets = self.publicationStatus(workflow, row.tm_asourl)
+            publication_info = self.publicationStatus(workflow, row.tm_asourl)
             self.logger.info("Publiation status for workflow %s done" % workflow)
         else:
             self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.tm_publication, retval['jobsPerStatus'].get('finished', 0)))
@@ -588,31 +588,18 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         return nodes, pool_info
 
-    def _getOutDatasets(self, workflow):
-        """ Get the output datasets of the workflow.
-            The current implementation queries the filemetadata. However this rotates, we should take this information from the task database at some point.
-            This requires some work on the postjob though: see https://github.com/dmwm/CRABServer/issues/4192
-            When this is done we can probably get rid of this function and propagate the out dataset from the top (we already query the task table)
-        """
-        #well sine I am lazy I am keeping the query here. It's going to be deleted in the future. In principle should go in Database/.. with the other queries
-        rows = self.api.query(None, None, "SELECT DISTINCT(fmd_outdataset) FROM filemetadata WHERE tm_taskname=:taskname and fmd_type='EDM'", taskname = workflow)
-        outdatasets = [row[0] for row in rows]
-        return outdatasets
-
     def publicationStatus(self, workflow, asourl):
         publication_info = {}
-        outdatasets = []
         if not asourl:
             raise ExecutionError("This CRAB server is not configured to publish; no publication status is available.")
         server = CMSCouch.CouchServer(dburl=asourl, ckey=self.serverKey, cert=self.serverCert)
-        outdatasets = self._getOutDatasets(workflow)
         try:
             db = server.connectDatabase('asynctransfer')
         except Exception, ex:
             msg =  "Error while connecting to asynctransfer CouchDB"
             self.logger.exception(msg)
             publication_info = {'error' : msg}
-            return  publication_info , outdatasets
+            return  publication_info
         query = {'reduce': True, 'key': workflow, 'stale': 'update_after'}
         try:
             publicationlist = None
@@ -621,12 +608,12 @@ class HTCondorDataWorkflow(DataWorkflow):
             msg =  "Error while querying CouchDB for publication status information"
             self.logger.exception(msg)
             publication_info = {'error' : msg}
-            return  publication_info , outdatasets
+            return  publication_info
 
         if publicationlist and ('value' in publicationlist[0]):
             publication_info.update(publicationlist[0]['value'])
 
-        return publication_info, outdatasets
+        return publication_info
 
 
     node_name_re = re.compile("DAG Node: Job(\d+)")

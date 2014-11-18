@@ -5,7 +5,7 @@ from WMCore.REST.Error import InvalidParameter,ExecutionError
 
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
-from CRABInterface.Regexps import RX_SUBRES_TASK, RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_OUT_DATASET, RX_URL
+from CRABInterface.Regexps import RX_SUBRES_TASK, RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_OUT_DATASET, RX_URL, RX_OUT_DATASET
 
 # external dependecies here
 import cherrypy
@@ -29,6 +29,7 @@ class RESTTask(RESTEntity):
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
             validate_str("warning", param, safe, RX_WORKFLOW, optional=True)
             validate_str("webdirurl", param, safe, RX_URL, optional=True)
+            validate_strlist("outputdatasets", param, safe, RX_OUT_DATASET)
         elif method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
@@ -66,6 +67,7 @@ class RESTTask(RESTEntity):
     def taskbystatus(self, **kwargs):
         """Retrieves all jobs of the specified user with the specified status"""
         rows = self.api.query(None, None, self.Task.TaskByStatus_sql, username_=kwargs["username"], taskstatus=kwargs["taskstatus"])
+
         return rows
 
     @restcall
@@ -124,5 +126,22 @@ class RESTTask(RESTEntity):
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
 
         self.api.modify(self.Task.UpdateWebUrl_sql, webdirurl=[str(kwargs['webdirurl'])], workflow=[workflow])
+
+        return []
+
+    def addoutputdatasets(self, **kwargs):
+        if 'outputdatasets' not in kwargs or not kwargs['outputdatasets']:
+            raise InvalidParameter("Output datasets not found in the input parameters")
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+
+        workflow = kwargs['workflow']
+        authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
+
+        row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
+        outputdatasets = literal_eval(row.tm_output_dataset.read() if row.tm_output_dataset else '[]')
+        outputdatasets = str(list(set(outputdatasets + kwargs['outputdatasets'])))
+
+        self.api.modify(self.Task.SetUpdateOutDataset_sql, tm_output_dataset=[outputdatasets], tm_taskname=[workflow])
 
         return []
