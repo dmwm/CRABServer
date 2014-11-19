@@ -114,9 +114,7 @@ def readFileFromTarball(file, tarball):
             content = f.read()
         return literal_eval(content)
     elif not os.path.exists(tarball):
-        handleException("FAILED", EC_CMSRunWrapper, 'Error getting %s file location.' % tarball)
-        mintime()
-        sys.exit(EC_CMSRunWrapper)
+        raise RuntimeError("Error getting %s file location" % tarball)
     tar_file = tarfile.open(tarball)
     for member in tar_file.getmembers():
         try:
