@@ -497,7 +497,7 @@ class DagmanCreator(TaskAction.TaskAction):
                           'firstLumi' : firstLumi, 'firstRun' : firstRun,
                           'seeding' : 'AutomaticSeeding',
                           'lheInputFiles' : 'tm_generator' in task and task['tm_generator'] == 'lhe',
-                          'eventsPerLumi' : task['tm_events_per_lumi'],
+                          'eventsPerLumi' : task['tm_events_per_lumi'] if 'tm_events_per_lumi' in task else 100,,
                           'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                           'outputData': task['tm_publish_name'],
                           'tempDest': tempDest,
