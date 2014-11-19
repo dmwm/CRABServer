@@ -26,7 +26,7 @@ class MakeFakeFileSet(TaskAction):
         # Set a default of 100 events per lumi.  This is set as a task
         # property, as the splitting considers it independently of the file
         # information provided by the fake dataset.
-        if not kwargs['task']['tm_events_per_lumi']:
+        if 'tm_events_per_lumi' not in kwargs['task']:
             kwargs['task']['tm_events_per_lumi'] = 100
 
         #MC comes with only one MCFakeFile
