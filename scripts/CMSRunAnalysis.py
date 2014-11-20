@@ -288,13 +288,13 @@ def logCMSSW():
         with open(outfile) as fp:
             for nl, line in enumerate(fp):
                 if nl < keepAtStart:
-                    print nl, "== CMSSW: ", line,
+                    print "== CMSSW: ", line,
                 if nl == keepAtStart+1:
                     print "== CMSSW: "
                     print "== CMSSW: [...BIG SNIP...]"
                     print "== CMSSW: "
                 if numLines-nl <= keepAtEnd:
-                    print nl, "== CMSSW: ", line,
+                    print "== CMSSW: ", line,
     else:
         for line in open(outfile):
             print "== CMSSW: ", line,
