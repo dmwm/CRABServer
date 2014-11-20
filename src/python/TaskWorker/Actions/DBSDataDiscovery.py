@@ -23,6 +23,10 @@ class DBSDataDiscovery(DataDiscovery):
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
         for block, locations in locationsMap.iteritems():
             locationsMap[block] = set(locations) & diskLocations
+        #remove any key with value that has set([])
+        for key, value in locationsMap.items():
+            if value == set([]):
+                locationsMap.pop(key)
 
     def execute(self, *args, **kwargs):
         self.logger.info("Data discovery with DBS") ## to be changed into debug
@@ -101,18 +105,19 @@ if __name__ == '__main__':
     config.section_("Services")
     config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'
 
-    #config.Services.DBSUrl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
-    #config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/'
+#    config.Services.DBSUrl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
+#    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/'
     config.section_("TaskWorker")
     #will use X509_USER_PROXY var for this test
     config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
     config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
 
-#    fileset = DBSDataDiscovery(config)
-#    dataset = '/DoubleMuParked/Run2012B-22Jan2013-v1/AOD' #No locations for invalid block /DoubleMuParked/Run2012B-22Jan2013-v1/AOD#945791b2-da34-11e2-b22d-00221959e69e
-#    fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
+    fileset = DBSDataDiscovery(config)
+#    dataset = '/QCD_Pt-1800_Tune4C_13TeV_pythia8/Spring14dr-castor_PU_S14_POSTLS170_V6-v1/GEN-SIM-RECODEBUG'
+    dataset = '/MB8TeVEtanoCasHFShoLib/Summer12-EflowHpu_NoPileUp_START53_V16-v1/RECODEBUG'
+    fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
 
-    #dataset = '/DoubleElectron/Run2012C-22Jan2013-v1/RECO' #not in FNAL_DISK
+#    dataset = '/DoubleElectron/Run2012C-22Jan2013-v1/RECO' #not in FNAL_DISK
 #    fileset = DBSDataDiscovery(config)
 #    dataset = '/SingleMu/Run2012D-22Jan2013-v1/AOD' #invalid file: /store/data/Run2012D/SingleMu/AOD/22Jan2013-v1/20001/7200FA02-CC85-E211-9966-001E4F3F165E.root
 #    fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})

@@ -5,7 +5,8 @@ from WMCore.REST.Error import InvalidParameter
 
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_OUT_DATASET
+from CRABInterface.Regexps import RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, \
+                                  RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE
 
 # external dependecies here
 import cherrypy
@@ -44,7 +45,6 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_num("limit", param, safe, optional=True)
             validate_strlist("runs", param, safe, RX_RUNS)
             validate_strlist("lumis", param, safe, RX_LUMIRANGE)
-            validate_strlist("outputdataset", param, safe, RX_OUT_DATASET)
             # possible combinations to check
             # 1) taskname + status
             # 2) taskname + status + failure
@@ -79,7 +79,7 @@ class RESTWorkerWorkflow(RESTEntity):
         return []
 
     @restcall
-    def post(self, workflow, status, subresource, jobset, failure, resubmittedjobs, getstatus, workername, limit, runs, lumis, outputdataset):
+    def post(self, workflow, status, subresource, jobset, failure, resubmittedjobs, getstatus, workername, limit, runs, lumis):
         """ Updates task information """
         if failure is not None:
             try:
@@ -101,9 +101,7 @@ class RESTWorkerWorkflow(RESTEntity):
                                                                                                    "get_status": [getstatus],
                                                                                                    "limit": [limit],
                                                                                                    "set_status": [status]}},
-                  "lumimask": {"args": (runs, lumis,), "method": self.setLumiMask, "kwargs": {"taskname": [workflow],}},
-                  "outputdataset" :  {"args": (self.Task.SetUpdateOutDataset_sql,), "method": self.api.modify, "kwargs": {"tm_output_dataset": [str(outputdataset)],
-                                                                                                                          "tm_taskname": [workflow]}},
+                  "lumimask": {"args": (runs, lumis,), "method": self.setLumiMask, "kwargs": {"taskname": [workflow]}}
 
         }
 
@@ -205,9 +203,9 @@ class Task(dict):
         self['tm_dbs_url'] = task[24]
         self['tm_publish_dbs_url'] = task[25]
         self['tm_publication'] = task[26]
-        self['tm_outfiles'] = literal_eval(task[27])
-        self['tm_tfile_outfiles'] = literal_eval(task[28])
-        self['tm_edm_outfiles'] = literal_eval(task[29])
+        self['tm_outfiles'] = literal_eval(task[27] if ( task[27] is None or isinstance(task[27], str) ) else task[27].read())
+        self['tm_tfile_outfiles'] = literal_eval(task[28] if ( task[28] is None or isinstance(task[28], str) ) else task[28].read())
+        self['tm_edm_outfiles'] = literal_eval(task[29] if ( task[29] is None or isinstance(task[29], str) ) else task[29].read())
         self['tm_transformation'] = task[30]
         self['tm_job_type'] = task[31]
         extraargs = literal_eval(task[32] if ( task[32] is None or isinstance(task[32],str) ) else task[32].read())
@@ -234,4 +232,6 @@ class Task(dict):
         self['tm_scriptargs'] = literal_eval(task[43] if ( task[43] is None or isinstance(task[43],str) ) else task[43].read())
         self['tm_extrajdl'] = task[44]
         self['tm_generator'] = task[45]
+        self['tm_asourl'] = task[46]
+        self['tm_events_per_lumi'] = task[47]
 

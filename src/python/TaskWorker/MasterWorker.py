@@ -2,6 +2,7 @@
 #external dependencies
 import signal
 import time
+import random
 import logging
 import os
 from logging.handlers import TimedRotatingFileHandler
@@ -191,20 +192,31 @@ class MasterWorker(object):
 
     def updateWork(self, task, status):
         configreq = {'workflow': task, 'status': status, 'subresource': 'state'}
-        try:
-            self.server.post(self.resturl, data = urllib.urlencode(configreq))
-        except HTTPException, hte:
-            #Using a msg variable and only one self.logger.error so that messages do not get shuffled
-            msg = "Task Worker could not update a task status (HTTPException): %s\nConfiguration parameters=%s\n" % (str(hte), configreq)
-            msg += "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown'))
-            msg += "\treason: %s\n" %(hte.headers.get('X-Error-Detail', 'unknown'))
-            msg += "\turl: %s\n" %(getattr(hte, 'url', 'unknown'))
-            msg += "\tresult: %s\n" %(getattr(hte, 'result', 'unknown'))
-            msg += "%s \n" %(str(traceback.format_exc()))
-            self.logger.error(msg)
-        except Exception, exc:
-            msg = "Task Worker could not update a task status: %s\nConfiguration parameters=%s\n" % (str(exc), configreq)
-            self.logger.error(msg + traceback.format_exc())
+        retry = True
+        while retry:
+            try:
+                self.server.post(self.resturl, data = urllib.urlencode(configreq))
+                retry = False
+            except HTTPException, hte:
+                #Using a msg variable and only one self.logger.error so that messages do not get shuffled
+                msg = "Task Worker could not update a task status (HTTPException): %s\nConfiguration parameters=%s\n" % (str(hte), configreq)
+                msg += "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown'))
+                msg += "\treason: %s\n" %(hte.headers.get('X-Error-Detail', 'unknown'))
+                msg += "\turl: %s\n" %(getattr(hte, 'url', 'unknown'))
+                msg += "\tresult: %s\n" %(getattr(hte, 'result', 'unknown'))
+                msg += "%s \n" %(str(traceback.format_exc()))
+                self.logger.error(msg)
+                retry = False
+                if int(hte.headers.get('X-Error-Http', '0')) == 503:
+                    #503 - Database/Service unavailable. Maybe Intervention of CMSWEB ongoing?
+                    retry = True
+                    time_sleep = 30 + random.randint(10,30)
+                    self.logger.info("Sleeping %s seconds and will try to update again." % str(time_sleep))
+                    time.sleep(time_sleep)
+            except Exception, exc:
+                msg = "Task Worker could not update a task status: %s\nConfiguration parameters=%s\n" % (str(exc), configreq)
+                self.logger.error(msg + traceback.format_exc())
+                retry = False
 
     def algorithm(self):
         """I'm the intelligent guy taking care of getting the work

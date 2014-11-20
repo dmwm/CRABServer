@@ -52,18 +52,34 @@ class RESTUserWorkflow(RESTEntity):
         return list(res)
 
     def _checkOutLFN(self, kwargs):
-        """ Check the lfn parameter: if it starts with /store/user then the right username should be there. Handle old clients lfnprefix parameter.
-            If lfn is not there default to /store/user/username
+        """Check the lfn parameter: it must start with '/store/user/username/' or '/store/group/groupname/username/'
+           where username is the one registered in SiteDB (i.e. the one used in the CERN primary account).
+           If lfn is not there, default to '/store/user/username/'.
+           Handle old clients lfnprefix parameter.
         """
-        #add the username if necessary (lfn=/store/user). Check the username (don't write in other user's directories)
         username = cherrypy.request.user['login']
-        if kwargs["lfnprefix"]:
-            kwargs["lfn"] = '/store/user/%s/%s' % (username, kwargs["lfnprefix"])
-        elif not kwargs["lfn"]:
-            kwargs["lfn"] = '/store/user/%s/' % username #add the username in case the user did not specify the lfn param
-        elif not kwargs["lfn"].startswith('/store/group') and not kwargs["lfn"].startswith('/store/user'):#re.match('^/store/user/%s/' % username, kwargs["lfn"]): may use this later once #4327 is there
-            #raised if lfn does not start with /store/group or /store/user
-            raise InvalidParameter("The parameter Data.outlfn should start with /store/group or /store/user")#/%s/" % username)
+        if kwargs['lfnprefix']:
+            kwargs['lfn'] = '/store/user/%s/%s' % (username, kwargs["lfnprefix"])
+        elif not kwargs['lfn']:
+            ## Default to '/store/user/username/' in case the user did not specify the lfn parameter.
+            kwargs['lfn'] = '/store/user/%s/' % (username)
+        else:
+            msg  = "The parameter Data.outLFN in the CRAB configuration file must start with either"
+            msg += " '/store/user/<username>/' or '/store/group/<groupname>/<username>/'"
+            msg += " (or '/store/local/' if publication is off),"
+            msg += " where username is your username as registered in SiteDB"
+            msg += " (i.e. the username of your CERN primary account)."
+            if kwargs['lfn'].startswith('/store/group/'):
+                if len(kwargs['lfn'].split('/')) < 5 or kwargs['lfn'].split('/')[4] != username:
+                    raise InvalidParameter(msg)
+            elif kwargs['lfn'].startswith('/store/user/'):
+                if len(kwargs['lfn'].split('/')) < 4 or kwargs['lfn'].split('/')[3] != username:
+                    raise InvalidParameter(msg)
+            elif kwargs['lfn'].startswith('/store/local/'):
+                if kwargs['publication']:
+                    raise InvalidParameter(msg)
+            else:
+                raise InvalidParameter(msg)
 
     def _checkASODestination(self, site):
         self._checkSite(site)
@@ -103,7 +119,7 @@ class RESTUserWorkflow(RESTEntity):
             msg += "\nUse config.JobType.allowNonProductionCMSSW = True if you are sure of what you are doing"
 
         if msg:
-            excasync = ValueError("A site name you specified is not valid")
+            excasync = "ERROR: %s on %s is not among supported releases" % (jobsw, jobarch)
             invalidp = InvalidParameter(msg, errobj = excasync)
             setattr(invalidp, 'trace', '')
             raise invalidp
@@ -119,6 +135,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("activity", param, safe, RX_ACTIVITY, optional=True)
             validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
             validate_str("generator", param, safe, RX_GENERATOR, optional=True)
+            validate_str("eventsperlumi", param, safe, RX_LUMIEVENTS, optional=True)
             validate_str("jobsw", param, safe, RX_CMSSW, optional=False)
             validate_num("nonprodsw", param, safe, optional=False)
             validate_str("jobarch", param, safe, RX_ARCH, optional=False)
@@ -226,7 +243,7 @@ class RESTUserWorkflow(RESTEntity):
 
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
-    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, generator, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
+    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, generator, eventsperlumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                 savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfnprefix, lfn, saveoutput,
                 faillimit, ignorelocality, userfiles, asourl, scriptexe, scriptargs, scheddname, extrajdl):
@@ -239,6 +256,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str jobarch: software architecture (=SCRAM_ARCH);
            :arg str inputdata: input dataset;
            :arg str generator: event generator for MC production;
+           :arg str eventsperlumi: how many events to generate per lumi;
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name;
            :arg str splitalgo: algorithm to be used for the workflow splitting;
@@ -280,7 +298,7 @@ class RESTUserWorkflow(RESTEntity):
            :returns: a dict which contaians details of the request"""
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
-        return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata, generator=generator,
+        return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch, inputdata=inputdata, generator=generator, events_per_lumi=eventsperlumi,
                                        siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, splitalgo=splitalgo, algoargs=algoargs,
                                        cachefilename=cachefilename, cacheurl=cacheurl,
                                        addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],

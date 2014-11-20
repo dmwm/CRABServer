@@ -84,7 +84,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         # Note: may throw if the schedd is down.  We may want to think about wrapping the
         # status function and have it catch / translate HTCondor errors.
-        results = schedd.query(rootConst, rootAttrList)
+        results = list(schedd.xquery(rootConst, rootAttrList))
 
         if not results:
             self.logger.info("An invalid workflow name was requested: %s" % workflow)
@@ -216,7 +216,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
         row = self.Task.ID_tuple(*row)
         inputDataset = row.input_dataset
-        outputDatasets = self._getOutDatasets(workflow)
+        outputDatasets = literal_eval(row.tm_output_dataset.read() if row.tm_output_dataset else 'None')
         dbsUrl = row.dbs_url
 
         #load the lumimask
@@ -317,17 +317,17 @@ class HTCondorDataWorkflow(DataWorkflow):
         name = workflow.split("_")[2].split(":")[0]
         self.logger.info("Getting status for workflow %s, looking for schedd %s" %\
                                 (workflow, name))
-        locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
-        self.logger.debug("Will talk to %s." % locator.getCollector())
-        name = locator.getSchedd()
-        self.logger.debug("Schedd name %s." % name)
 
         try:
+            locator = HTCondorLocator.HTCondorLocator(self.centralcfg.centralconfig["backend-urls"])
+            self.logger.debug("Will talk to %s." % locator.getCollector())
+            name = locator.getSchedd()
+            self.logger.debug("Schedd name %s." % name)
             schedd, address = locator.getScheddObj(workflow)
             results = self.getRootTasks(workflow, schedd)
             self.logger.info("Web status for workflow %s done" % workflow)
         except Exception, exp:
-            msg = "%s: The CRAB3 server frontend is not able to contact the Grid scheduler. This could be a temporary glicth, please, retry later or contact the esperts if the problem persist: %s" % (workflow, str(exp))
+            msg = "%s: The CRAB3 server frontend is not able to contact the Grid scheduler. This could be a temporary glicth, please, retry later or contact the experts if the problem persist: %s" % (workflow, str(exp))
             self.logger.exception(msg)
             return [{"status" : "UNKNOWN",
                       "taskFailureMsg" : str(msg),
@@ -421,15 +421,15 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         #getting publication information
         publication_info = {}
-        outdatasets = []
+        outdatasets = literal_eval(row.tm_output_dataset.read() if row.tm_output_dataset else 'None')
         arguments = literal_eval(row.arguments.read())
 
         #Always returning ASOURL also, it is required for kill, resubmit
-        self.logger.info("ASO: %s" % arguments)
-        retval['ASOURL'] = arguments['ASOURL']
+        self.logger.info("ASO: %s" % row.tm_asourl)
+        retval['ASOURL'] = row.tm_asourl
 
         if (row.tm_publication == 'T' and 'finished' in retval['jobsPerStatus']):
-            publication_info, outdatasets = self.publicationStatus(workflow, arguments['ASOURL'])
+            publication_info = self.publicationStatus(workflow, row.tm_asourl)
             self.logger.info("Publiation status for workflow %s done" % workflow)
         else:
             self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.tm_publication, retval['jobsPerStatus'].get('finished', 0)))
@@ -570,53 +570,36 @@ class HTCondorDataWorkflow(DataWorkflow):
             self.logger.debug("Finished parse of summary file")
         else:
             self.logger.debug("No error summary available")
-        fp.truncate(0)
-        hbuf.truncate(0)
 
-
-
+        fp3 = StringIO.StringIO();
+        curl.setopt(pycurl.WRITEFUNCTION, fp3.write)
         aso_url = url + "/aso_status.json"
         curl.setopt(pycurl.URL, aso_url)
-        fp.seek(0)
         self.logger.debug("Starting download of aso state")
         curl.perform()
         self.logger.debug("Finished download of aso state")
         header = ResponseHeader(hbuf.getvalue())
         if header.status == 200:
-            fp.seek(0)
             self.logger.debug("Starting parsing of aso state")
-            self.parseASOState(fp, nodes)
+            self.parseASOState(fp3, nodes)
             self.logger.debug("Finished parsing of aso state")
         else:
             self.logger.debug("No aso state file available")
 
         return nodes, pool_info
 
-    def _getOutDatasets(self, workflow):
-        """ Get the output datasets of the workflow.
-            The current implementation queries the filemetadata. However this rotates, we should take this information from the task database at some point.
-            This requires some work on the postjob though: see https://github.com/dmwm/CRABServer/issues/4192
-            When this is done we can probably get rid of this function and propagate the out dataset from the top (we already query the task table)
-        """
-        #well sine I am lazy I am keeping the query here. It's going to be deleted in the future. In principle should go in Database/.. with the other queries
-        rows = self.api.query(None, None, "SELECT DISTINCT(fmd_outdataset) FROM filemetadata WHERE tm_taskname=:taskname and fmd_type='EDM'", taskname = workflow)
-        outdatasets = [row[0] for row in rows]
-        return outdatasets
-
     def publicationStatus(self, workflow, asourl):
         publication_info = {}
-        outdatasets = []
         if not asourl:
             raise ExecutionError("This CRAB server is not configured to publish; no publication status is available.")
         server = CMSCouch.CouchServer(dburl=asourl, ckey=self.serverKey, cert=self.serverCert)
-        outdatasets = self._getOutDatasets(workflow)
         try:
             db = server.connectDatabase('asynctransfer')
         except Exception, ex:
             msg =  "Error while connecting to asynctransfer CouchDB"
             self.logger.exception(msg)
             publication_info = {'error' : msg}
-            return  publication_info , outdatasets
+            return  publication_info
         query = {'reduce': True, 'key': workflow, 'stale': 'update_after'}
         try:
             publicationlist = None
@@ -625,12 +608,12 @@ class HTCondorDataWorkflow(DataWorkflow):
             msg =  "Error while querying CouchDB for publication status information"
             self.logger.exception(msg)
             publication_info = {'error' : msg}
-            return  publication_info , outdatasets
+            return  publication_info
 
         if publicationlist and ('value' in publicationlist[0]):
             publication_info.update(publicationlist[0]['value'])
 
-        return publication_info, outdatasets
+        return publication_info
 
 
     node_name_re = re.compile("DAG Node: Job(\d+)")
@@ -760,12 +743,15 @@ class HTCondorDataWorkflow(DataWorkflow):
     def parseASOState(self, fp, nodes):
         fp.seek(0)
         data = json.load(fp)
-        fp.truncate()
         for _, result in data['results'].items():
-            state = result['value']['state']
-            jobid = str(result['value']['jobid'])
-            if nodes[jobid]['State'] == 'transferring' and state == 'done':
-                nodes[jobid]['State'] = 'transferred'
+            if 'state' in result['value']: #this if is for backward compatibility with old postjobs
+                state = result['value']['state']
+                jobid = str(result['value']['jobid'])
+                if nodes[jobid]['State'] == 'transferring' and state == 'done':
+                    nodes[jobid]['State'] = 'transferred'
+            else:
+                self.logger.warning("It seems that the aso_status file has been generated with an old version of the postjob")
+                break
 
 
     def parseErrorReport(self, fp, nodes):

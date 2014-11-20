@@ -1,6 +1,10 @@
 """
 Can be tested with something like:
-python /afs/cern.ch/user/m/mmascher/transformation/tmp/TweakPSet.py --location=/afs/cern.ch/user/m/mmascher/transformation/tmp --inputFile='["/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0010/EA00B1E8-F8AD-E111-90C5-5404A6388697.root"]' --runAndLumis='{"1": [[669684, 669684]]}' --firstEvent=0 --lastEvent=-1 --firstLumi=None --firstRun=None --seeding=None --lheInputFiles=False --oneEventMode=0
+python /afs/cern.ch/user/m/mmascher/transformation/tmp/TweakPSet.py --location=/afs/cern.ch/user/m/mmascher/transformation/tmp --inputFile='["/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0010/EA00B1E8-F8AD-E111-90C5-5404A6388697.root"]' --runAndLumis='job_lumis_1.json' --firstEvent=0 --lastEvent=-1 --firstLumi=None --firstRun=None --seeding=None --lheInputFiles=False --oneEventMode=0
+
+job_lumis_1.json content:
+'{"1": [[669684, 669684]]}'
+On Worker nodes it has a tarball with all files. but for debugging purpose it is also available to read directly from file
 """
 
 from optparse import OptionParser
@@ -64,9 +68,10 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
     firstRun:       used to tweak process.source.firstRun. Set to 1 if it's None
     seeding:        used in handleSeeding
     oneEventMode:   toggles one event mode
+    eventsPerLumi:  start a new lumi section after the specified amount of events.  None disables this.
     """
     def __init__(self, location, inputFiles, runAndLumis, agentNumber, lfnBase, outputMods, firstEvent=0, lastEvent=-1, firstLumi=None,\
-                    firstRun=None, seeding=None, lheInputFiles=False, oneEventMode=False):
+                    firstRun=None, seeding=None, lheInputFiles=False, oneEventMode=False, eventsPerLumi=None):
         ScriptInterface.__init__(self)
         self.stepSpace = ConfigSection()
         self.stepSpace.location = location
@@ -76,9 +81,13 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
         self.step.data.section_("application")
         self.step.data.application.section_("configuration")
         self.step.data.application.section_("command")
+        self.step.data.application.section_("multicore")
         self.step.data.application.command.configuration = "PSet.py"
         self.step.data.application.command.oneEventMode = oneEventMode in ["1", "True", True]
 #        self.step.data.application.configuration.pickledarguments.globalTag/globalTagTransaction
+        if eventsPerLumi:
+            self.step.data.application.configuration.eventsPerLumi = eventsPerLumi
+        self.step.data.application.multicore.enabled = False
         self.step.data.section_("input")
         self.job = jobDict(lheInputFiles, seeding)
         self.job["input_files"] = []
@@ -98,7 +107,31 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
 import os
 import sys
 import json
+import tarfile
 from ast import literal_eval
+
+def readFileFromTarball(file, tarball):
+    content = '{}'
+    if os.path.isfile(file):
+        #This is only for Debugging
+        print 'DEBUGGING MODE!'
+        with open(file, 'r') as f:
+            content = f.read()
+        return literal_eval(content)
+    elif not os.path.exists(tarball):
+        raise RuntimeError("Error getting %s file location" % tarball)
+    tar_file = tarfile.open(tarball)
+    for member in tar_file.getmembers():
+        try:
+            f = tar_file.extractfile(file)
+            content = f.read()
+            break
+        except KeyError, er:
+            #Don`t exit due to KeyError, print error. EventBased and FileBased does not have run and lumis
+            print 'Failed to get information from tarball %s and file %s. Error : %s' %(tarball, file, er)
+            break
+    tar_file.close()
+    return literal_eval(content)
 
 print "Beginning TweakPSet"
 print " arguments: %s" % sys.argv
@@ -119,14 +152,19 @@ parser.add_option('--firstRun', dest='firstRun')
 parser.add_option('--seeding', dest='seeding')
 parser.add_option('--lheInputFiles', dest='lheInputFiles')
 parser.add_option('--oneEventMode', dest='oneEventMode', default=False)
+parser.add_option('--eventsPerLumi', dest='eventsPerLumi', default=None)
 opts, args = parser.parse_args()
 
 if opts.oneEventMode:
     print "One event mode disabled until we can put together a decent version of WMCore."
     print "TweakPSet.py is going to force one event mode"
 
-pset = SetupCMSSWPsetCore( opts.location, map(str, literal_eval(opts.inputFile)), literal_eval(opts.runAndLumis), agentNumber, lfnBase, outputMods,\
+runAndLumis = {}
+if opts.runAndLumis:
+    readFileFromTarball(opts.runAndLumis, 'run_and_lumis.tar.gz')
+
+pset = SetupCMSSWPsetCore( opts.location, map(str, literal_eval(opts.inputFile)), runAndLumis, agentNumber, lfnBase, outputMods,\
                            literal_eval(opts.firstEvent), literal_eval(opts.lastEvent), literal_eval(opts.firstLumi),\
-                           literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode)
+                           literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode, literal_eval(opts.eventsPerLumi))
 
 pset()

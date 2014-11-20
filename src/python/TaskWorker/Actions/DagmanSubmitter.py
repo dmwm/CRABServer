@@ -108,7 +108,7 @@ SUBMIT_INFO = [ \
             ('RequestCpus', 'tm_numcores'),
             ('MaxWallTimeMins', 'tm_maxjobruntime'),
             ('JobPrio', 'tm_priority'),
-            ("CRAB_ASOURL", "ASOURL"),
+            ("CRAB_ASOURL", "tm_asourl"),
             ("CRAB_FailedNodeLimit", "faillimit"),
             ("CRAB_DashboardTaskType", "taskType"),
             ("CRAB_MaxPost", "maxpost"),
@@ -184,7 +184,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
 
-        results = schedd.query(rootConst, [])
+        results = list(schedd.xquery(rootConst, []))
 
         if not results:
             # Task not already in schedd
@@ -225,7 +225,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         #FIXME: hardcoding the transform name for now.
         #inputFiles = ['gWMS-CMSRunAnalysis.sh', task['tm_transformation'], 'cmscp.py', 'RunJobs.dag']
-        inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', 'AdjustSites.py', 'site.ad', 'site.ad.json']
+        inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', 'AdjustSites.py', 'site.ad', 'site.ad.json', 'run_and_lumis.tar.gz']
         if task.get('tm_user_sandbox') == 'sandbox.tar.gz':
             inputFiles.append('sandbox.tar.gz')
         if os.path.exists("CMSRunAnalysis.tar.gz"):
@@ -332,7 +332,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     schedd.edit([id], "LeaveJobInQueue", classad.ExprTree("(JobStatus == 4) && (time()-EnteredCurrentStatus < 30*86400)"))
         results = rpipe.read()
         if results != "OK":
-            raise Exception("Failure when submitting HTCondor task: '%s'" % results)
+            raise TaskWorkerException("Failure when submitting task to scheduler. Error reason: '%s'" % results)
 
         schedd.reschedule()
 

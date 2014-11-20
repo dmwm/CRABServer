@@ -11,6 +11,7 @@ import base64
 import shutil
 import string
 import urllib
+import tarfile
 import hashlib
 import commands
 import tempfile
@@ -49,7 +50,7 @@ SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %
 SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(restinstance)s %(resturl)s %(taskname)s %(count)d %(outputData)s %(sw)s %(asyncDest)s %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d 2 UNLESS-EXIT 2
-VARS Job%(count)d count="%(count)d" runAndLumiMask="%(runAndLumiMask)s" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" scriptExe="%(scriptExe)s" scriptArgs="%(scriptArgs)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\"" +CRAB_Destination="\\"%(destination)s\\""
+VARS Job%(count)d count="%(count)d" runAndLumiMask="job_lumis_%(count)d.json" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" eventsPerLumi="%(eventsPerLumi)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" scriptExe="%(scriptExe)s" scriptArgs="%(scriptArgs)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\"" +CRAB_Destination="\\"%(destination)s\\""
 ABORT-DAG-ON Job%(count)d 3
 
 """
@@ -101,7 +102,7 @@ CRAB_Id = $(count)
 +CRAB_Id = $(count)
 +CRAB_Dest = "%(temp_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
-+CRAB_ASOURL = %(ASOURL)s
++CRAB_ASOURL = %(tm_asourl)s
 +TaskType = "Job"
 +AccountingGroup = %(accounting_group)s
 
@@ -126,7 +127,7 @@ Error = job_err.$(CRAB_Id)
 Log = job_log
 # args changed...
 
-Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) '--inputFile=$(inputFiles)' '--runAndLumis=$(runAndLumiMask)' --lheInputFiles=$(lheInputFiles) --firstEvent=$(firstEvent) --firstLumi=$(firstLumi) --lastEvent=$(lastEvent) --firstRun=$(firstRun) --seeding=$(seeding) --scriptExe=$(scriptExe) '--scriptArgs=$(scriptArgs)' -o $(CRAB_AdditionalOutputFiles)"
+Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) '--inputFile=$(inputFiles)' '--runAndLumis=$(runAndLumiMask)' --lheInputFiles=$(lheInputFiles) --firstEvent=$(firstEvent) --firstLumi=$(firstLumi) --lastEvent=$(lastEvent) --firstRun=$(firstRun) --seeding=$(seeding) --scriptExe=$(scriptExe) --eventsPerLumi=$(eventsPerLumi) '--scriptArgs=$(scriptArgs)' -o $(CRAB_AdditionalOutputFiles)"
 
 transfer_input_files = CMSRunAnalysis.sh, cmscp.py%(additional_input_file)s
 transfer_output_files = jobReport.json.$(count)
@@ -210,7 +211,7 @@ def transform_strings(input):
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
            'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
            'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'ASOURL', 'asyncdest_se', "stageoutpolicy", \
+           'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'asyncdest_se', "stageoutpolicy", \
            'taskType', 'maxpost', 'worker_name', 'desired_opsys', 'desired_opsysvers', 'desired_arch', "accounting_group":
         val = input.get(var, None)
         if val == None:
@@ -404,7 +405,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['tfileoutfiles'] = task['tm_tfile_outfiles']
         info['edmoutfiles'] = task['tm_edm_outfiles']
         info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
-        info['ASOURL'] = task.get('tm_arguments', {}).get('ASOURL', '')
+        info['ASOURL'] = task['tm_asourl']
         info['taskType'] = self.getDashboardTaskType()
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
@@ -438,6 +439,7 @@ class DagmanCreator(TaskAction.TaskAction):
             info['additional_environment_options'] += ';CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/TaskManagerRun-3.3.0-pre1.tar.gz'
         if os.path.exists("sandbox.tar.gz"):
             info['additional_input_file'] += ", sandbox.tar.gz"
+        info['additional_input_file'] += ", run_and_lumis.tar.gz"
 
         with open("Job.submit", "w") as fd:
             fd.write(JOB_SUBMIT % info)
@@ -455,7 +457,7 @@ class DagmanCreator(TaskAction.TaskAction):
         lastDirectPfn = None
         for job in jobgroup.getJobs():
             inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']]).replace('"', r'\"\"')
-            runAndLumiMask = json.dumps(job['mask']['runAndLumis']).replace('"', r'\"\"')
+            runAndLumiMask = '\'' + json.dumps(job['mask']['runAndLumis']) + '\''
             firstEvent = str(job['mask']['FirstEvent'])
             lastEvent = str(job['mask']['LastEvent'])
             firstLumi = str(job['mask']['FirstLumi'])
@@ -493,7 +495,9 @@ class DagmanCreator(TaskAction.TaskAction):
                           'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
                           'firstEvent' : firstEvent, 'lastEvent' : lastEvent,
                           'firstLumi' : firstLumi, 'firstRun' : firstRun,
-                          'seeding' : 'AutomaticSeeding', 'lheInputFiles' : 'tm_generator' in task and task['tm_generator'] == 'lhe',
+                          'seeding' : 'AutomaticSeeding',
+                          'lheInputFiles' : 'tm_generator' in task and task['tm_generator'] == 'lhe',
+                          'eventsPerLumi' : task['tm_events_per_lumi'],
                           'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
                           'outputData': task['tm_publish_name'],
                           'tempDest': tempDest,
@@ -530,6 +534,13 @@ class DagmanCreator(TaskAction.TaskAction):
             global_whitelist = set(self.config.Sites.available)
         if hasattr(self.config.Sites, 'banned'):
             global_blacklist = set(self.config.Sites.banned)
+        # This is needed for Site Metrics
+        # It should not block any site for Site Metrics and if needed for other activities
+        # self.config.TaskWorker.ActivitiesToRunEverywhere = ['hctest', 'hcdev']
+        if hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere') and \
+                   kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere:
+            global_whitelist = set()
+            global_blacklist = set()
 
         sitead = classad.ClassAd()
         siteinfo = {'groups': {}}
@@ -574,9 +585,9 @@ class DagmanCreator(TaskAction.TaskAction):
             if whitelist:
                 available &= whitelist
                 if not available:
-                    msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. You put (%s) in the site whitelist, but your task %s can only run in "+\
-                          "(%s). Please check in das the locations of your datasets. Hint: the ignoreLocality option might help" % (", ".join(whitelist),\
-                          kwargs['task']['tm_taskname'], ", ".join(availablesites))
+                    msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. You put (%s) as site whitelist, but the input dataset %s can only be " \
+                          "accessed at these sites: %s. Please check your whitelist." % (", ".join(whitelist), \
+                          kwargs['task']['tm_input_dataset'], ", ".join(availablesites))
                     raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             available -= (blacklist-whitelist)
@@ -593,8 +604,15 @@ class DagmanCreator(TaskAction.TaskAction):
             specs += jobgroupspecs
 
         dag = DAG_HEADER % {'restinstance': kwargs['task']['restinstance'], 'resturl': self.resturl}
+        run_and_lumis_tar = tarfile.open("run_and_lumis.tar.gz", "w:gz")
         for spec in specs:
             dag += DAG_FRAGMENT % spec
+            job_lumis_file = 'job_lumis_'+ str(spec['count']) +'.json'
+            with open(job_lumis_file, "w") as fd:
+                fd.write(str(spec['runAndLumiMask']))
+            run_and_lumis_tar.add(job_lumis_file)
+            os.remove(job_lumis_file)
+        run_and_lumis_tar.close()
 
         with open("RunJobs.dag", "w") as fd:
             fd.write(dag)

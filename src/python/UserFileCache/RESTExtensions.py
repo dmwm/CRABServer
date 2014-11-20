@@ -29,6 +29,15 @@ def authz_login_valid():
     if not cherrypy.request.user['login']:
         raise cherrypy.HTTPError(403, "You are not allowed to access this resource.")
 
+def authz_operator(username):
+    """ Check if the the user who is trying to access this resource (i.e.: cherrypy.request.user['login'], the cert username) is the
+        same as username. If not check if the user is a CRAB3 operator. {... 'operator': {'group': set(['crab3']) ... in the cherrypy roles}
+        If the user is not an operator and is trying to access a file owned by another user than raise
+    """
+    if cherrypy.request.user['login'] != username and\
+       'crab3' not in cherrypy.request.user.get('roles', {}).get('operator', {}).get('group', set()):
+        raise cherrypy.HTTPError(403, "You are not allowed to access this resource. You need to be a CRAB3 operator in sitedb to access other user's files")
+
 def file_size(argfile):
     """Return the file or cStringIO.StringIO size
 

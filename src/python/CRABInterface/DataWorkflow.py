@@ -113,7 +113,7 @@ class DataWorkflow(object):
         raise NotImplementedError
 
     @conn_handler(services=['centralconfig'])
-    def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, generator, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
+    def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, generator, events_per_lumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, scriptexe=None, scriptargs=None, scheddname=None,
@@ -127,6 +127,7 @@ class DataWorkflow(object):
            :arg str jobarch: software architecture (=SCRAM_ARCH);
            :arg str inputdata: input dataset;
            :arg str generator: event generator for MC production;
+           :arg int events_per_lumi: number of events per lumi to generate
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name;
            :arg str splitalgo: algorithm to be used for the workflow splitting;
@@ -167,7 +168,7 @@ class DataWorkflow(object):
         try:
             requestname = self.updateRequest('%s_%s_%s' % (timestamp, userhn, workflow), scheddname)
         except IOError, err:
-            self.logger.debug("Failed to communicate with components %s. Request name : " % (str(err), str(requestname)))
+            self.logger.debug("Failed to communicate with components %s. Request name %s: " % (str(err), str(requestname)))
             raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")
         splitArgName = self.splitArgMap[splitalgo]
         username = cherrypy.request.user['login']
@@ -189,7 +190,6 @@ class DataWorkflow(object):
             'saveoutput' : 'T' if saveoutput else 'F',
             'faillimit' : faillimit,
             'ignorelocality' : 'T' if ignorelocality else 'F',
-            'ASOURL' : asourl,
             'userfiles' : userfiles,
         }
 
@@ -203,6 +203,7 @@ class DataWorkflow(object):
                             job_arch        = [jobarch],
                             input_dataset   = [inputdata],
                             generator       = [generator],
+                            events_per_lumi = [events_per_lumi],
                             site_whitelist  = [dbSerializer(sitewhitelist)],
                             site_blacklist  = [dbSerializer(siteblacklist)],
                             split_algo      = [splitalgo],
@@ -238,7 +239,8 @@ class DataWorkflow(object):
                             priority        = [priority],
                             scriptexe       = [scriptexe],
                             scriptargs      = [dbSerializer(scriptargs)],
-                            extrajdl        = [dbSerializer(extrajdl)]
+                            extrajdl        = [dbSerializer(extrajdl)],
+                            asourl          = [asourl]
         )
 
         return [{'RequestName': requestname}]
@@ -271,7 +273,7 @@ class DataWorkflow(object):
             #if not resubmitList:
             #    raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
             self.logger.info("Jobs to resubmit: %s" % resubmitList)
-            args = {"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList, 'ASOURL' : statusRes.get("ASOURL", "")}
+            args = {"siteBlackList":siteblacklist, "siteWhiteList":sitewhitelist, "resubmitList":resubmitList}
             if maxjobruntime != None:
                 args['maxjobruntime'] = maxjobruntime
             if numcores != None:

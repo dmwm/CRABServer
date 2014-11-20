@@ -382,7 +382,7 @@ def parseArgs():
     parser.add_option('--runAndLumis',
                       dest='runAndLumis',
                       type='string',
-                      default='{}')
+                      default=None)
     parser.add_option('--lheInputFiles',
                       dest='lheInputFiles',
                       type='string',
@@ -419,6 +419,10 @@ def parseArgs():
     parser.add_option('--scriptArgs',
                       dest='scriptArgs',
                       type='string')
+    parser.add_option('--eventsPerLumi',
+                      dest='eventsPerLumi',
+                      type='string',
+                      default=None)
 
     (opts, args) = parser.parse_args(sys.argv[1:])
 
@@ -436,6 +440,7 @@ def parseArgs():
         print "lheInputFiles: ", opts.lheInputFiles
         print "firstEvent:    ", opts.firstEvent
         print "firstLumi:     ", opts.firstLumi
+        print "eventsPerLumi: ", opts.eventsPerLumi
         print "lastEvent:     ", opts.lastEvent
         print "firstRun:      ", opts.firstRun
         print "seeding:       ", opts.seeding
@@ -531,7 +536,8 @@ def executeScriptExe(opts, scram):
                                                           '--firstRun=%s '+
                                                           '--seeding=%s '+
                                                           '--lheInputFiles=%s '+
-                                                          '--oneEventMode=%s') %\
+                                                          '--oneEventMode=%s ' +
+                                                          '--eventsPerLumi=%s') %\
                                              (os.getcwd(), os.getcwd(),
                                                            opts.inputFile,
                                                            opts.runAndLumis,
@@ -541,7 +547,8 @@ def executeScriptExe(opts, scram):
                                                            opts.firstRun,
                                                            opts.seeding,
                                                            opts.lheInputFiles,
-                                                           opts.oneEventMode)
+                                                           opts.oneEventMode,
+                                                           opts.eventsPerLumi)
     ret = scram(command_, runtimeDir = os.getcwd(), logName='scramOutput.log')
     if ret > 0:
         msg = scram.diagnostic()
@@ -614,7 +621,8 @@ def executeCMSSWStack(opts, scram):
                                                           '--firstRun=%s '+
                                                           '--seeding=%s '+
                                                           '--lheInputFiles=%s '+
-                                                          '--oneEventMode=%s') %
+                                                          '--oneEventMode=%s ' +
+                                                          '--eventsPerLumi=%s') %
                                              (os.getcwd(), os.getcwd(),
                                                            opts.inputFile,
                                                            opts.runAndLumis,
@@ -624,7 +632,8 @@ def executeCMSSWStack(opts, scram):
                                                            opts.firstRun,
                                                            opts.seeding,
                                                            opts.lheInputFiles,
-                                                           opts.oneEventMode)]
+                                                           opts.oneEventMode,
+                                                           opts.eventsPerLumi)]
     cmssw.step.section_("execution") #exitStatus of cmsRun is set here
     cmssw.report = Report("cmsRun") #report is loaded and put here
     cmssw.execute()
