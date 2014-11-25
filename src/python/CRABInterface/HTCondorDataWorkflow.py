@@ -204,7 +204,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
         row = self.Task.ID_tuple(*row)
         inputDataset = row.input_dataset
-        outputDatasets = literal_eval(row.tm_output_dataset.read() if row.tm_output_dataset else 'None')
+        outputDatasets = literal_eval(row.output_dataset.read() if row.output_dataset else 'None')
         dbsUrl = row.dbs_url
 
         #load the lumimask
@@ -415,18 +415,18 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         #getting publication information
         publication_info = {}
-        outdatasets = literal_eval(row.tm_output_dataset.read() if row.tm_output_dataset else 'None')
+        outdatasets = literal_eval(row.output_dataset.read() if row.output_dataset else 'None')
         arguments = literal_eval(row.arguments.read())
 
         #Always returning ASOURL also, it is required for kill, resubmit
-        self.logger.info("ASO: %s" % row.tm_asourl)
-        retval['ASOURL'] = row.tm_asourl
+        self.logger.info("ASO: %s" % row.asourl)
+        retval['ASOURL'] = row.asourl
 
-        if (row.tm_publication == 'T' and 'finished' in retval['jobsPerStatus']):
-            publication_info = self.publicationStatus(workflow, row.tm_asourl)
+        if (row.publication == 'T' and 'finished' in retval['jobsPerStatus']):
+            publication_info = self.publicationStatus(workflow, row.asourl)
             self.logger.info("Publiation status for workflow %s done" % workflow)
         else:
-            self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.tm_publication, retval['jobsPerStatus'].get('finished', 0)))
+            self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.publication, retval['jobsPerStatus'].get('finished', 0)))
 
         if len(taskStatus) == 0 and results[0]['JobStatus'] == 2:
             retval['status'] = 'Running (jobs not submitted)'

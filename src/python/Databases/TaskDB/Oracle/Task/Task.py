@@ -9,7 +9,7 @@ class Task(object):
      #ID
     ID_tuple = namedtuple("ID", ["taskname", "panda_jobset_id", "task_status", "user_role", "user_group", \
              "task_failure", "split_args", "panda_resubmitted_jobs", "save_logs", "username", \
-             "user_dn", "arguments", "input_dataset", "dbs_url", "task_warnings", "tm_publication", "tm_user_webdir", "tm_asourl", "tm_output_dataset"])
+             "user_dn", "arguments", "input_dataset", "dbs_url", "task_warnings", "publication", "user_webdir", "asourl", "output_dataset"])
     ID_sql = "SELECT tm_taskname, panda_jobset_id, tm_task_status, tm_user_role, tm_user_group, \
              tm_task_failure, tm_split_args, panda_resubmitted_jobs, tm_save_logs, tm_username, \
              tm_user_dn, tm_arguments, tm_input_dataset, tm_dbs_url, tm_task_warnings, tm_publication, tm_user_webdir, tm_asourl, tm_output_dataset \
