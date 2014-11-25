@@ -347,8 +347,6 @@ def handleException(exitAcronym, exitCode, exitMsg):
 
     with open('jobReport.json','w') as of:
         json.dump(report, of)
-    with open('jobReportExtract.pickle','w') as of:
-        pickle.dump(report, of)
     if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         stopDashboardMonitoring(ad)
 
