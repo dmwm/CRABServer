@@ -808,7 +808,7 @@ class PostJob():
         except:
             msg = "Unknown error while preparing the error report."
             logger.exception(msg)
-        
+
         ## Decide if the whole task should be aborted (in case a significant fraction of
         ## the jobs has failed).
         retval = self.check_abort_dag(retval)
@@ -900,7 +900,7 @@ class PostJob():
                                             self.crab_retry_count, self.max_retries, \
                                             self.job_id, self.cluster)
             print "       <----- RetryJob log finish ----"
-        if retryjob_retval: 
+        if retryjob_retval:
             if retryjob_retval == RetryJob.FATAL_ERROR:
                 msg = "The retry handler indicated this was a fatal error."
                 logger.info(msg)
@@ -934,7 +934,7 @@ class PostJob():
         else:
             logger.info("====== Finished to analyze job exit status.")
         ## If CRAB_ASOTimeout was not defined in the job ad, get here the ASO timeout
-        ## from the retry-job. 
+        ## from the retry-job.
         if self.retry_timeout is None:
             self.retry_timeout = retry.get_aso_timeout()
 
@@ -960,7 +960,7 @@ class PostJob():
             return 0
 
         ## Initialize the object we will use for making requests to the REST interface.
-        self.server = HTTPRequests(self.rest_host, os.environ['X509_USER_PROXY'], os.environ['X509_USER_PROXY'])
+        self.server = HTTPRequests(self.rest_host, os.environ['X509_USER_PROXY'], os.environ['X509_USER_PROXY'], retry = 2)
 
         ## Upload the logs archive file metadata if it was not already done from the WN.
         if self.log_needs_file_metadata_upload:
@@ -986,7 +986,7 @@ class PostJob():
         ## Do the transfers (inject to ASO database if needed, and monitor the transfers
         ## statuses until they reach a terminal state).
         logger.info("====== Starting to check for ASO transfers.")
-        try: 
+        try:
             self.perform_transfers()
         except PermanentStageoutError, pse:
             msg = "Got fatal stageout exception:\n%s" % (str(pse))
@@ -1011,15 +1011,16 @@ class PostJob():
         logger.info("====== Finished to check for ASO transfers.")
 
         ## Upload the output files metadata.
-        logger.info("====== Starting upload of output files metadata.")
+        logger.info("====== Starting upload of input/output files metadata.")
         try:
             self.upload_output_files_metadata()
+            self.upload_input_files_metadata()
         except Exception, exmsg:
-            msg = "Fatal error uploading output files metadata: %s" % (str(exmsg))
-            logger.error(msg)
-            logger.info("====== Finished upload of output files metadata.")
+            msg = "Fatal error uploading input/output files metadata: %s" % (str(exmsg))
+            logger.exception(msg)
+            logger.info("====== Finished upload of input/output files metadata.")
             return self.check_retry_count()
-        logger.info("====== Finished upload of output files metadata.")
+        logger.info("====== Finished upload of input/output files metadata.")
 
         self.set_dashboard_state('FINISHED')
 
@@ -1140,9 +1141,51 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    def upload_input_files_metadata(self):
+        """
+        Upload the output files metadata. We care about the number of events
+        and about the lumis for the report.
+        """
+        direct_stageout = int(self.job_report.get(u'direct_stageout', 0))
+        if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
+            return
+        for ifile in self.job_report['steps']['cmsRun']['input']['source']:
+            configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
+                         "globalTag"       : "None",
+                         "pandajobid"      : self.crab_id,
+                         "outsize"         : "0",
+                         "publishdataname" : self.publish_name,,
+                         "appver"          : self.job_ad['CRAB_JobSW'],
+                         "outtype"         : "POOLIN",#file['input_source_class'],
+                         "checksummd5"     : "0",
+                         "checksumcksum"   : "0",
+                         "checksumadler32" : "0",
+                         "outlocation"     : self.job_ad['CRAB_AsyncDest'],
+                         "outtmplocation"  : self.executed_site,
+                         "acquisitionera"  : "null", # Not implemented
+                         "outlfn"          : ifile['lfn'],
+                         "events"          : ifile.get('events', 0),
+                         "outdatasetname"  : "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER",
+                         "directstageout"  : direct_stageout
+                        }
+            configreq = configreq.items()
+            if 'outfileruns' in ifile:
+                for run in ifile['outfileruns']:
+                    configreq.append(("outfileruns", run))
+            if 'outfilelumis' in ifile:
+                for lumi in ifile['outfilelumis']:
+                    configreq.append(("outfilelumis", lumi))
+            try:
+                self.server.put(self.rest_uri_no_api + '/filemetadata', data = urllib.urlencode(configreq))
+            except HTTPException, hte:
+                self.logger.error(hte.headers)
+                raise
+
+    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
     def upload_output_files_metadata(self):
         """
-        Upload the output files metadata. 
+        Upload the output files metadata.
         """
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
@@ -1211,7 +1254,7 @@ class PostJob():
                 ## BrianB. Suppressing this exception is a tough decision.
                 ## If the file made it back alright, I suppose we can proceed.
                 msg = "Error uploading output file metadata: %s" % (str(hte.headers))
-                logger.exception(msg)
+                logger.error(msg)
                 if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
                    not hte.headers.get('X-Error-Http', -1) == '400':
                     raise
@@ -1549,11 +1592,11 @@ class PostJob():
         return False
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-    
+
     def check_retry_count(self):
         """
         When a recoverable error happens, we still have to check if the maximum allowed
-        number of job retries was hit. If it was, the post-job should return with the 
+        number of job retries was hit. If it was, the post-job should return with the
         fatal error exit code. Otherwise with the recoverable error exit code.
         """
         if self.dag_retry_count >= self.max_retries:
