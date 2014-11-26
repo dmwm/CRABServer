@@ -1,10 +1,11 @@
+import time
+import signal
+import urllib
+import logging
+import traceback
 import multiprocessing
 from Queue import Empty
-import logging
-import time
-import traceback
 from base64 import b64encode
-import urllib
 
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.WorkerExceptions import WorkerHandlerException
@@ -85,6 +86,10 @@ class Worker(object):
         :arg WMCore.Configuration config: input TaskWorker configuration
         :arg str instance: the hostname where the rest interface is running
         :arg str resturl: the rest base url to contact."""
+        #Adding signal handlers that do not do anything. Soft kill is handled by the master worker
+        #We just need to prevent "accidental" kill of the worker processes by things like pkill -f TaskWorker
+        signal.signal(signal.SIGINT, lambda code, tb: None)
+        signal.signal(signal.SIGTERM, lambda code, tb: None)
         self.logger = logging.getLogger(type(self).__name__)
         global WORKER_CONFIG
         WORKER_CONFIG = config
