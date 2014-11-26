@@ -48,6 +48,58 @@ with open('wmcore_initialized', 'w') as fd_wmcore:
     fd_wmcore.write('wmcore initialized.\n')
 
 ##==============================================================================
+## DESCRIPTION OF THE STAGEOUT LOGIC USED IN CMSCP.
+##------------------------------------------------------------------------------
+
+## The code assumes there are only two possible stageout policies, namely local
+## and remote, but doesn't assume any particular order. However, in the next
+## explanation of the logic the assumption is "first local, then remote".
+## The code is written such that one can clearly identify the different actions
+## that are involved in this stageout wrapper. Each action can be skipped by
+## turning on the corresponding flag in the "skip" dictionary, which can be
+## useful when debugging or running a test.
+## The actions follow a general order, but since the logic is not such that one
+## action should only be executed if the previous action succeeded, the code
+## doesn't exit if an action fails and instead keeps track of the exit status
+## of each action, updating the cmscp exit code after each action finishes.
+## Each action has a condition that needs to be satisfied in order for the
+## action to be executed. The conditions are in general written using the exit
+## codes of the previous actions. So for example, the condition for executing
+## the stageout of the output files is that the outputs exist and that they
+## are documented in the job report, and this is written in term of the exit
+## codes of these two actions (their exit codes have to be equal to 0).
+## Ok, now to the logic.
+## One thing to keep in mind: Even if the user didn't request the outputs to be
+## transferred, we still do local stageout and fail the job if the local
+## stageout fails. For the logs we also do local stageout, but don't fail the
+## job if the stageout fails.
+##  1) Parse the job ad. Don't exit if fails.
+##  2) Do a basic validation of the job report. Don't exit if fails.
+##  3) Check that the output files listed in the job ad exist in the WN.
+##  4) If 2) and 3) were ok, check that the output files are documented in the
+##     job report (if they are not, add them).
+##  5) Create the logs archive file.
+##  6) Initialize the local stageout manager (if local in stageout policy).
+##  7) Initialize the direct stageout implementation (if remote in stageout
+##     policy).
+##  8) Do the stageout:
+##     8.1) try local stageout for the logs archive (if 5) and 6) were ok);
+##     8.2) if 8.1) was ok, try local stageout for the outputs;
+##     8.3) if 8.2) was ok, continue to 9);
+##     8.3) if 8.1) or 8.2) failed, clean the local temp storage (actually,
+##          don't clean the log so that it is available in case the remote
+##          stageout also fails);
+##     8.4) if 8.1) or 8.2) failed, try remote stageout for the files that were
+##          requested to be transferred;
+##     8.5) if 8.4) failed, clean the remote permanent storage.
+##  9) Inject to ASO for the files that were requested to the transferred, if
+##     and only if their local stageout was successful and their remote stageout
+##     was not (or was not performed).
+## 10) Upload the logs file metadata if and only if the logs archive file was
+##     successfully staged out either to the local temporary storage or to the
+##     remote permanent storage.
+
+##==============================================================================
 ## GLOBAL VARIABLES USED BY THE CODE.
 ##------------------------------------------------------------------------------
 
@@ -141,9 +193,8 @@ def report_failure_to_dashboard(exit_code):
             return
     for attr in ['CRAB_Id', 'CRAB_ReqName', 'CRAB_Retry']:
         if attr not in G_JOB_AD:
-            msg  = "ERROR: Job's HTCondor ClassAd is missing attribute %s."
+            msg  = "ERROR: Job's HTCondor ClassAd is missing attribute %s." % (attr)
             msg += "\nWill not report stageout failure to Dashboard."
-            msg  = msg % (attr)
             print msg
             return
     params = {
@@ -155,7 +206,8 @@ def report_failure_to_dashboard(exit_code):
                          G_JOB_AD['CRAB_Retry']),
         'JobExitCode': exit_code
     }
-    print "Dashboard stageout failure parameters: %s" % (str(params))
+    msg = "Dashboard stageout failure parameters: %s" % (str(params))
+    print msg
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
     DashboardAPI.apmonFree()
 
@@ -173,7 +225,8 @@ def make_logs_archive(arch_file_name):
                   'FrameworkJobReport.xml']
     for file_name in file_names:
         if os.path.exists(file_name):
-            print "Adding %s to archive file %s" % (file_name, arch_file_name)
+            msg = "Adding %s to archive file %s" % (file_name, arch_file_name)
+            print msg
             file_name_no_ext, ext = file_name.rsplit('.', 1)
             job_id_str = '-%s' % (G_JOB_AD['CRAB_Id'])
             file_name_in_arch = file_name_no_ext + job_id_str + '.' + ext
@@ -182,7 +235,8 @@ def make_logs_archive(arch_file_name):
             ## Will not fail stageout is logs are missing, because for example
             ## when runinng scriptExe there are no cmsRun-stdout.log and
             ## cmsRun-stderr.log files.
-            print "== WARNING: %s is missing." % (file_name)
+            msg = "WARNING: %s is missing." % (file_name)
+            print msg
     arch_file.close()
     return retval
 
@@ -229,17 +283,15 @@ def get_from_job_report(key, default = None, location = None):
             subreport = subreport[loc]
             subreport_name += "['%s']" % (loc)
         else:
-            msg = "WARNING: Job report doesn't contain section %s['%s']."
-            msg = msg % (subreport_name, loc)
+            msg = "WARNING: Job report doesn't contain section %s['%s']." % (subreport_name, loc)
             print msg
             return default
     if type(subreport) != dict:
         if subreport_name:
-            msg = "WARNING: Job report section %s is not a dict."
-            msg = msg % (subreport_name)
-            print msg
+            msg = "WARNING: Job report section %s is not a dict." % (subreport_name)
         else:
-            print "WARNING: Job report is not a dict."
+            msg = "WARNING: Job report is not a dict."
+        print msg
         return default
     return subreport.get(key, default)
 
@@ -295,23 +347,20 @@ def add_to_job_report(key_value_pairs, location = None, mode = 'overwrite'):
             subreport = subreport[loc]
             subreport_name += "['%s']" % loc
         else:
-            msg = "WARNING: Job report doesn't contain section %s['%s']."
-            msg = msg % (subreport_name, loc)
+            msg = "WARNING: Job report doesn't contain section %s['%s']." % (subreport_name, loc)
             print msg
             return False
     if type(subreport) != dict:
         if subreport_name:
-            msg = "WARNING: Job report section %s is not a dict."
-            msg = msg % (subreport_name) 
-            print msg
+            msg = "WARNING: Job report section %s is not a dict." % (subreport_name) 
         else:
-            print "WARNING: Job report is not a dict."
+            msg = "WARNING: Job report is not a dict."
+        print msg
         return False
     if mode in ['new', 'overwrite']:
         for key, value in key_value_pairs:
             if mode == 'new' and key in subreport:
-                msg = "WARNING: Key '%s' already exists in job report section %s."
-                msg = msg % (key, subreport_name)
+                msg = "WARNING: Key '%s' already exists in job report section %s." % (key, subreport_name)
                 print msg
                 return False
             subreport[key] = value
@@ -319,7 +368,8 @@ def add_to_job_report(key_value_pairs, location = None, mode = 'overwrite'):
         for key, value in key_value_pairs:
             subreport.setdefault(key, []).append(value)
     else:
-        print "WARNING: Unknown mode '%s'." % mode
+        msg = "WARNING: Unknown mode '%s'." % (mode)
+        print msg
         return False
     with open(G_JOB_REPORT_NAME, 'w') as fd_job_report:
         json.dump(job_report, fd_job_report)
@@ -333,19 +383,22 @@ def add_output_file_to_job_report(file_name, key = 'addoutput'):
     ['output'] under the given key. The value to add is a dictionary
     {'pfn': file_name}.
     """
-    print "Adding file %s to job report." % (file_name)
+    msg = "Adding file %s to job report." % (file_name)
+    print msg
     output_file_info = {}
     output_file_info['pfn'] = file_name
     try:
         file_size = os.stat(file_name).st_size
     except:
-        print "WARNING: Unable to add output file size to job report."
+        msg = "WARNING: Unable to add output file size to job report."
+        print msg
     else:
         output_file_info['size'] = file_size
     is_ok = add_to_job_report([(key, output_file_info)], \
                               ['steps', 'cmsRun', 'output'], 'update')
     if not is_ok:
-        print "ERROR: Failed to add file to job report."
+        msg = "ERROR: Failed to add file to job report."
+        print msg
     return is_ok
 
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -359,11 +412,13 @@ def add_sites_to_job_report(file_name, is_log, \
     or not.
     """
     orig_file_name, _ = get_job_id(file_name)
-    msg  = "Setting temp_storage_site = '%s', storage_site = '%s',"
-    msg += " local_stageout = %s and direct_stageout = %s"
-    msg += " for file %s in job report."
-    msg  = msg % (temp_storage_site, storage_site, str(bool(local_stageout)), \
-                  str(bool(direct_stageout)), orig_file_name)
+    msg  = "Setting"
+    msg += " temp_storage_site = '%s'," % (temp_storage_site)
+    msg += " storage_site = '%s'," % (storage_site)
+    msg += " local_stageout = %s" % (str(bool(local_stageout)))
+    msg += " and"
+    msg += " direct_stageout = %s" % (str(bool(direct_stageout)))
+    msg += " for file %s in job report." % (orig_file_name)
     print msg
     is_ok = True
     key_value_pairs = [('temp_storage_site', temp_storage_site), \
@@ -395,8 +450,7 @@ def add_to_file_in_job_report(file_name, is_log, key_value_pairs):
         job_report = json.load(fd_job_report)
     output_file_info = get_output_file_from_job_report(orig_file_name, job_report)
     if output_file_info is None:
-        msg = "WARNING: Metadata for file %s not found in job report."
-        msg = msg % (orig_file_name)
+        msg = "WARNING: Metadata for file %s not found in job report." % (orig_file_name)
         print msg
         return False
     for key, value in key_value_pairs:
@@ -442,9 +496,11 @@ def perform_stageout(local_stageout_mgr, direct_stageout_impl, \
                                          source_file, dest_pfn, dest_site, \
                                          is_log)
     else:
-        print "ERROR: Skipping unknown stageout policy named '%s'." % (policy)
+        msg = "ERROR: Skipping unknown stageout policy named '%s'." % (policy)
+        print msg
     if result == -1:
-        print "FATAL ERROR: No stageout policy was attempted."
+        msg = "FATAL ERROR: No stageout policy was attempted."
+        print msg
         result = 80000
     return result
 
@@ -476,7 +532,8 @@ def perform_local_stageout(local_stageout_mgr, \
         print msg
         result = 60403
     except Exception, ex:
-        print "Error during stageout: %s" % (ex)
+        msg = "Error during stageout: %s" % (ex)
+        print msg
         print "       <----- Stageout manager log finish"
         result = 60307
     finally:
@@ -490,8 +547,7 @@ def perform_local_stageout(local_stageout_mgr, \
                                                  dest_site if inject else 'unknown', \
                                                  True, False)
         if not sites_added_ok:
-            msg  = "WARNING: Ignoring failure in adding the above information"
-            msg += " to the job report."
+            msg = "WARNING: Ignoring failure in adding the above information to the job report."
             print msg
         if inject:
             file_transfer_info = {'source'             : {'lfn': dest_temp_lfn, 'site': dest_temp_site},
@@ -509,15 +565,13 @@ def inject_to_aso(file_transfer_info):
     """
     Inject a document to the ASO database.
     """
-    parse_job_ad()
     for attr in ['CRAB_ASOURL', 'CRAB_AsyncDest', 'CRAB_InputData', \
                  'CRAB_UserGroup', 'CRAB_UserRole', 'CRAB_DBSURL', \
                  'CRAB_ReqName', 'CRAB_UserHN', 'CRAB_Publish', \
                  'CRAB_RestHost', 'CRAB_RestURInoAPI']:
         if attr not in G_JOB_AD:
-            msg  = "ERROR: Job's HTCondor ClassAd is missing attribute %s."
+            msg  = "ERROR: Job's HTCondor ClassAd is missing attribute %s." % (attr)
             msg += " Cannot inject to ASO."
-            msg  = msg % (attr)
             print msg
             return 80000
     if 'X509_USER_PROXY' not in os.environ:
@@ -526,9 +580,8 @@ def inject_to_aso(file_transfer_info):
         print msg
         return 80000
     if not os.path.exists(os.environ['X509_USER_PROXY']):
-        msg  = "ERROR: User proxy %s missing on disk."
+        msg  = "ERROR: User proxy %s missing on disk." % (os.environ['X509_USER_PROXY'])
         msg += " Cannot inject to ASO."
-        msg  = msg % (os.environ['X509_USER_PROXY'])
         print msg
         return 80000
 
@@ -568,9 +621,8 @@ def inject_to_aso(file_transfer_info):
     task_publish = int(G_JOB_AD['CRAB_Publish'])
     publish = int(task_publish and file_type == 'output' and is_edm)
     if task_publish and file_type == 'output' and not is_edm:
-        msg  = "Disabling publication of output file %s,"
+        msg  = "Disabling publication of output file %s," % (file_name)
         msg += " it is not of EDM type (not produced by PoolOutputModule)."
-        msg  = msg % (file_name)
         print msg
     publish = int(publish and G_JOB_EXIT_CODE == 0)
 
@@ -599,12 +651,13 @@ def inject_to_aso(file_transfer_info):
                     'failure_reason'  : [],
                     'job_retry_count' : G_JOB_AD.get('CRAB_Retry', -1),
                    }
+    msg = "Stageout request document so far:\n%s" % (pprint.pformat(doc_new_info))
+    print msg
 
     couch_server = CMSCouch.CouchServer(dburl = G_JOB_AD['CRAB_ASOURL'], \
                                         ckey = os.environ['X509_USER_PROXY'], \
                                         cert = os.environ['X509_USER_PROXY'])
     couch_database = couch_server.connectDatabase("asynctransfer", create = False)
-    print "Stageout request document so far:\n%s" % (pprint.pformat(doc_new_info))
 
     needs_commit = True
     try:
@@ -626,8 +679,8 @@ def inject_to_aso(file_transfer_info):
     except CMSCouch.CouchNotFoundError:
         ## The document is not yet in ASO database. We commit a new document.
         msg  = "LFN %s (id %s) is not yet in ASO database."
-        msg += " Uploading new stageout request."
         msg  = msg % (file_transfer_info['source']['lfn'], doc_id)
+        msg += " Uploading new stageout request."
         print msg
         doc = {'_id'                     : doc_id,
                'workflow'                : G_JOB_AD['CRAB_ReqName'],
@@ -660,18 +713,21 @@ def inject_to_aso(file_transfer_info):
             print "Couldn't add to ASO database; error follows:"
             print commit_result
             return 60320
-        print "Final stageout job description:\n%s" % (pprint.pformat(doc))
+        msg = "Final stageout job description:\n%s" % (pprint.pformat(doc))
+        print msg
         if get_from_job_report('aso_start_time') is None or \
            get_from_job_report('aso_start_timestamp') is None:
-            msg  = "Setting aso_start_time = %s and aso_start_time_stamp = %s"
+            msg  = "Setting"
+            msg += " aso_start_time = %s" % (G_NOW)
+            msg += " and"
+            msg += " aso_start_time_stamp = %s" % (G_NOW_EPOCH)
             msg += " in job report."
-            msg  = msg % (G_NOW, G_NOW_EPOCH)
             print msg 
             is_ok = add_to_job_report([('aso_start_time', G_NOW), \
                                        ('aso_start_timestamp', G_NOW_EPOCH)])
             if not is_ok:
-                print "WARNING: Failed to set aso_start_time in job report."
-
+                msg = "WARNING: Failed to set aso_start_time in job report."
+                print msg
     return 0
 
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -707,14 +763,13 @@ def perform_direct_stageout(direct_stageout_impl, \
             print "       <----- Stageout implementation log finish"
             ## Alarm was raised, because the timeout (G_TRANSFERS_TIMEOUT) was
             ## reached.
-            msg  = "Timeout reached during stage out of %s;"
+            msg  = "Timeout reached during stage out of %s;" % (source_file)
             msg += " setting return code to 60403."
-            msg  = msg % (source_file)
             print msg
             result = 60403
         except Exception, ex:
-            msg = "Failure in direct stage out:\n"
-            msg += str(ex)
+            msg  = "Failure in direct stage out:"
+            msg += "\n%s" % (str(ex))
             try:
                 msg += "\n%s" % (traceback.format_exc())
             except AttributeError, ex:
@@ -725,7 +780,9 @@ def perform_direct_stageout(direct_stageout_impl, \
         finally:
             signal.alarm(0)
     except WMException.WMException, ex:
-        print "Error during direct stageout:\n%s" % str(ex)
+        msg  = "Error during direct stageout:"
+        msg += "\n%s" % (str(ex))
+        print msg
         print "       <----- Stageout implementation log finish"
         result = ex.data.get("ErrorCode", 60307)
     if result == 0:
@@ -734,8 +791,7 @@ def perform_direct_stageout(direct_stageout_impl, \
                                                  'unknown', dest_site, \
                                                  False, True)
         if not sites_added_ok:
-            msg  = "WARNING: Ignoring failure in adding the above information"
-            msg += " to the job report."
+            msg = "WARNING: Ignoring failure in adding the above information to the job report."
             print msg
 
     return result
@@ -761,18 +817,17 @@ def clean_stageout_area(local_stageout_mgr, direct_stageout_impl, policy, \
                 logs_arch_info = local_stageout_mgr.completedFiles[logs_arch_dest_temp_lfn]
                 del local_stageout_mgr.completedFiles[logs_arch_dest_temp_lfn]
                 add_back_logs_arch = True
-                msg  = "Will not remove logs archive file from local temporary"
-                msg += " storage (but will consider its local stageout"
-                msg += " as failed for transfer purposes)."
+                msg  = "Will not remove logs archive file from local temporary storage"
+                msg += " (but will consider its local stageout as failed for transfer purposes)."
                 print msg
         for dest_temp_lfn in local_stageout_mgr.completedFiles.keys():
             file_name = os.path.basename(dest_temp_lfn)
             orig_file_name, _ = get_job_id(file_name)
             is_log = (dest_temp_lfn == logs_arch_dest_temp_lfn)
-            msg = "Setting local_stageout = False for file %s in job report."
-            msg = msg % (orig_file_name)
+            msg = "Setting local_stageout = False for file %s in job report." % (orig_file_name)
             print msg
-            add_to_file_in_job_report(file_name, is_log, [('local_stageout', False)])
+            add_to_file_in_job_report(file_name, is_log, \
+                                      [('local_stageout', False)])
         num_files_to_remove = len(local_stageout_mgr.completedFiles)
         if num_files_to_remove > 0:
             msg = "Will remove %d %sfile%s from local temporary storage."
@@ -827,8 +882,8 @@ def clean_stageout_area(local_stageout_mgr, direct_stageout_impl, policy, \
                 if direct_stageout_info['removed']:
                     continue
                 if direct_stageout_info['is_log'] and keep_log:
-                    msg  = "Will not remove logs archive file from"
-                    msg += " permanent storage at %s" % (dest_site)
+                    msg  = "Will not remove logs archive file"
+                    msg += " from permanent storage at %s" % (dest_site)
                     msg += " (but will consider its direct stageout as failed)."
                     print msg
                     continue
@@ -836,24 +891,28 @@ def clean_stageout_area(local_stageout_mgr, direct_stageout_impl, policy, \
                 dest_pfn  = direct_stageout_info['dest_pfn']
                 file_name = os.path.basename(dest_pfn)
                 orig_file_name, _ = get_job_id(file_name)
-                msg = "Setting direct_stageout = False for file %s in job report."
-                msg = msg % (orig_file_name)
+                msg  = "Setting"
+                msg += " direct_stageout = False"
+                msg += " for file %s in job report." % (orig_file_name)
                 print msg
                 add_to_file_in_job_report(file_name, \
                                           direct_stageout_info['is_log'], \
                                           [('direct_stageout', False)])
                 direct_stageout_info['removed'] = True
-                msg = "Attempting to remove PFN %s from permanent storage at %s."
-                msg = msg % (dest_pfn, dest_site)
+                msg  = "Attempting to remove PFN %s" % (dest_pfn)
+                msg += " from permanent storage at %s." % (dest_site)
                 print msg
                 try:
                     print "       -----> Stageout implementation log start"
                     direct_stageout_impl.removeFile(dest_pfn)
                     print "       <----- Stageout implementation log finish"
-                    print "File successfully removed."
+                    msg = "File successfully removed."
+                    print msg
                 except:
                     print "       <----- Stageout implementation log finish"
-                    print "WARNING: Failed to remove file (maybe the file was not transferred)."
+                    msg  = "WARNING: Failed to remove file"
+                    msg += " (maybe the file was not transferred)."
+                    print msg
                     pass
         else:
             msg = "There are no %sfiles to remove in the permanent storage at %s."
@@ -876,14 +935,14 @@ def upload_log_file_metadata(dest_temp_lfn, dest_lfn):
         print msg
         return 80000
     if not os.path.exists(os.environ['X509_USER_PROXY']):
-        msg  = "ERROR: User proxy %s missing on disk." % os.environ['X509_USER_PROXY']
+        msg  = "ERROR: User proxy %s missing on disk." % (os.environ['X509_USER_PROXY'])
         msg += " Unable to upload file metadata."
         print msg
         return 80000
     for attr in ['CRAB_ReqName', 'CRAB_Id', 'CRAB_PublishName', 'CRAB_JobSW', \
                  'CRAB_RestHost', 'CRAB_RestURInoAPI']:
         if attr not in G_JOB_AD:
-            msg  = "ERROR: Job's HTCondor ClassAd is missing attribute %s." % attr
+            msg  = "ERROR: Job's HTCondor ClassAd is missing attribute %s." % (attr)
             msg += " Unable to upload file metadata."
             print msg
             return 80000
@@ -913,9 +972,8 @@ def upload_log_file_metadata(dest_temp_lfn, dest_lfn):
                  'outlocation'     : G_JOB_AD['CRAB_AsyncDest'],
                  'outlfn'          : dest_lfn,
                  'outtmplocation'  : temp_storage_site,
-                 #'outtmplfn'       : dest_temp_lfn,
+                 'outtmplfn'       : dest_temp_lfn,
                  'outdatasetname'  : '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER',
-                 #'localstageout'   : int(get_from_job_report('local_stageout', 0)),
                  'directstageout'  : int(get_from_job_report('direct_stageout', 0))
                 }
     rest_host = G_JOB_AD['CRAB_RestHost']
@@ -953,17 +1011,23 @@ def main():
     """
     cmscp main.
     """
-    ## Initialize the cmscp return code.
-    cmscp_return_code = 0
-    def update_cmscp_return_code(cmscp_return_code, return_code, force = False):
+    ## Initialize the cmscp exit status. This is what will be written into the
+    ## report.
+    exit_info = {'exit_code'    : 0,
+                 'exit_acronym' : 'OK',
+                 'exit_msg'     : 'OK',
+                }
+    def update_exit_info(exit_info, exit_code, exit_msg = '', force = False):
         """
-        Function used to update the cmscp return code.
+        Function used to update the cmscp exit info dictionary.
         """
-        if (cmscp_return_code == 0 and not return_code in [None, 0]) or \
-           (force                  and not return_code in [None]   ):
-            msg = "Setting cmscp.py return status code to %d." % (return_code)
+        if (exit_info['exit_code'] == 0 and not exit_code in [None, 0]) or \
+           (force                       and not exit_code in [None]   ):
+            exit_info['exit_code'] = exit_code
+            exit_info['exit_acronym'] = 'FAILED' if exit_code else 'OK'
+            exit_info['exit_msg'] = exit_msg
+            msg = "Setting cmscp.py exit info to %s." % (exit_info)
             print msg
-            cmscp_return_code = return_code
 
     transfer_logs    = None
     transfer_outputs = None
@@ -978,20 +1042,31 @@ def main():
 
     ## These flags can be used to force skipping any of the steps coded below.
     ## May be useful for debugging.
-    skip_job_report_validation = False
-    skip_outputs_exist = False
-    skip_outputs_in_job_report = False
-    skip_logs_arch = False
-    skip_init_local_stageout_mgr = False
-    skip_init_direct_stageout_impl = False
-    skip_logs_stageout = {}
-    skip_logs_stageout['local']  = False
-    skip_logs_stageout['remote'] = False
-    skip_outputs_stageout = {}
-    skip_outputs_stageout['local']  = False
-    skip_outputs_stageout['remote'] = False
-    skip_aso_injection = False
-    skip_logs_metadata_upload = False
+    skip = {'job_report_validation'     : False,
+            'outputs_exist'             : False,
+            'outputs_in_job_report'     : False,
+            'logs_archive'              : False,
+            'init_local_stageout_mgr'   : False,
+            'init_direct_stageout_impl' : False,
+            'logs_stageout'             : {'local' : False, 'remote' : False},
+            'outputs_stageout'          : {'local' : False, 'remote' : False},
+            'aso_injection'             : False,
+            'logs_metadata_upload'      : False
+           }
+
+    ## A dictionary with the exit status code for each of the steps coded
+    ## below. Exist status code = None means the step was not executed.
+    retval = {'job_report_validation'     : None,
+              'outputs_exist'             : None,
+              'outputs_in_job_report'     : None,
+              'logs_archive'              : None,
+              'init_local_stageout_mgr'   : None,
+              'init_direct_stageout_impl' : None,
+              'logs_stageout'             : {'local' : None, 'remote' : None},
+              'outputs_stageout'          : {'local' : None, 'remote' : None},
+              'aso_injection'             : None,
+              'logs_metadata_upload'      : None
+             }
 
     ## Fill in the G_NODE_MAP dictionary with the mapping of node storage
     ## storage name to site name. Currently only used to translate the SE name
@@ -1006,15 +1081,15 @@ def main():
         msg  = "ERROR: _CONDOR_JOB_AD not in environment."
         msg += "\nNo stageout will be performed."
         print msg
-        update_cmscp_return_code(cmscp_return_code, 80000, True)
-        return cmscp_return_code
+        update_exit_info(exit_info, 80000, '', True)
+        return exit_info
     if not os.path.exists(os.environ['_CONDOR_JOB_AD']):
         msg  = "ERROR: _CONDOR_JOB_AD (%s) does not exist."
         msg += "\nNo stageout will be performed."
         msg  = msg % (os.environ['_CONDOR_JOB_AD'])
         print msg
-        update_cmscp_return_code(cmscp_return_code, 80000, True)
-        return cmscp_return_code
+        update_exit_info(exit_info, 80000, '', True)
+        return exit_info
     try:
         parse_job_ad()
     except Exception:
@@ -1027,20 +1102,20 @@ def main():
     ## extraJDL from the client) then we don't do the stageout.
     if G_JOB_AD.get('CRAB_NoWNStageout', 0):
         print "==== NOT PERFORMING STAGEOUT AS CRAB_NoWNStageout is 1 ===="
-        update_cmscp_return_code(cmscp_return_code, 0, True)
-        return cmscp_return_code
+        update_exit_info(exit_info, 0, 'OK', True)
+        return exit_info
     ## If we couldn't read CRAB_SaveLogsFlag from the job ad, we assume False.
     if 'CRAB_SaveLogsFlag' not in G_JOB_AD:
-        msg  = "WARNING: Job's HTCondor ClassAd is missing attribute"
-        msg += "CRAB_SaveLogsFlag. Will assume CRAB_SaveLogsFlag = False."
+        msg  = "WARNING: Job's HTCondor ClassAd is missing attribute CRAB_SaveLogsFlag."
+        msg += " Will assume CRAB_SaveLogsFlag = False."
         print msg
         transfer_logs = False
     else:
         transfer_logs = G_JOB_AD['CRAB_SaveLogsFlag']
     ## If we couldn't read CRAB_TransferOutputs from the job ad, we assume True.
     if 'CRAB_TransferOutputs' not in G_JOB_AD:
-        msg  = "WARNING: Job's HTCondor ClassAd is missing attribute"
-        msg += " CRAB_TransferOutputs. Will assume CRAB_TransferOutputs = True."
+        msg  = "WARNING: Job's HTCondor ClassAd is missing attribute CRAB_TransferOutputs."
+        msg += " Will assume CRAB_TransferOutputs = True."
         print msg
         transfer_outputs = True
     else:
@@ -1048,20 +1123,18 @@ def main():
     ## If we couldn't read CRAB_Id or CRAB_localOutputFiles from the job ad, we
     ## can not continue. If we couldn't read CRAB_StageoutPolicy,
     ## CRAB_Destination or CRAB_Dest, we don't continue.
-    for attr in ['CRAB_Id', 'CRAB_localOutputFiles', \
-                 'CRAB_StageoutPolicy', 'CRAB_Destination', 'CRAB_Dest', \
-                 'CRAB_AsyncDest']:
+    for attr in ['CRAB_Id', 'CRAB_localOutputFiles', 'CRAB_StageoutPolicy', \
+                 'CRAB_Destination', 'CRAB_Dest', 'CRAB_AsyncDest']:
         if attr not in G_JOB_AD:
-            msg  = "ERROR: Job's HTCondor ClassAd is missing attribute %s."
+            msg  = "ERROR: Job's HTCondor ClassAd is missing attribute %s." % (attr)
             msg += "\nNo stageout will be performed."
-            msg  = msg % (attr)
             print msg
-            update_cmscp_return_code(cmscp_return_code, 80000, True)
-            return cmscp_return_code
+            update_exit_info(exit_info, 80000, '', True)
+            return exit_info
     split_re = re.compile(",\s*")
     output_files = split_re.split(G_JOB_AD['CRAB_localOutputFiles'])
     stageout_policy = split_re.split(G_JOB_AD['CRAB_StageoutPolicy'])
-    print "Stageout policy: %s" % ", ".join(stageout_policy)
+    print "Stageout policy: %s" % (", ".join(stageout_policy))
     dest_temp_dir = G_JOB_AD['CRAB_Dest']
     dest_files = split_re.split(G_JOB_AD['CRAB_Destination'])
     dest_site = G_JOB_AD['CRAB_AsyncDest']
@@ -1076,36 +1149,36 @@ def main():
     global G_JOB_REPORT_NAME
     G_JOB_REPORT_NAME = 'jobReport.json.%d' % G_JOB_AD['CRAB_Id']
     ## Load the json job report and make sure it has the expected structure.
-    retval_job_report = None
     condition = no_condition
-    if skip_job_report_validation:
-        msg  = "WARNING: Internal wrapper flag 'skip_job_report_validation' is"
-        msg += " True. Skipping to validate the json job report."
+    if skip['job_report_validation']:
+        msg  = "WARNING: Internal wrapper flag skip['job_report_validation'] is True."
+        msg += " Skipping to validate the json job report."
         print msg
     elif condition:
-        msg = "====== %s: Starting job report validation."
-        msg = msg % (time.asctime(time.gmtime()))
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Starting job report validation."
         print msg
         try:
             with open(G_JOB_REPORT_NAME) as fd_job_report:
                 job_report = json.load(fd_job_report)
-            retval_job_report = 0
+            retval['job_report_validation'] = 0
         except Exception:
             msg  = "ERROR: Unable to load %s." % (G_JOB_REPORT_NAME)
             msg += "\n%s" % (traceback.format_exc())
             print msg
-            retval_job_report = 80000
+            retval['job_report_validation'] = 80000
         ## Sanity check of the json job report.
         if 'steps' not in job_report:
             print "ERROR: Invalid job report: missing 'steps'."
-            retval_job_report = 80000
+            retval['job_report_validation'] = 80000
         elif 'cmsRun' not in job_report['steps']:
             print "ERROR: Invalid job report: missing 'cmsRun'."
-            retval_job_report = 80000
+            retval['job_report_validation'] = 80000
         elif 'output' not in job_report['steps']['cmsRun']:
             print "ERROR: Invalid job report: missing 'output'."
-            retval_job_report = 80000
-        print "Job report is ok (it has the expected structure)."
+            retval['job_report_validation'] = 80000
+        else:
+            print "Job report seems ok (it has the expected structure)."
         ## Try to determine whether the payload actually succeeded.
         ## If the payload didn't succeed, we put it in a different directory.
         ## This prevents us from putting failed output files in the same
@@ -1122,10 +1195,11 @@ def main():
             msg += "\n- if stageout is still possible, it will be done into a subdirectory named 'failed';"
             msg += "\n- if stageout is still possible, publication will be disabled."
             print msg
-        msg = "====== %s: Finished job report validation (status %d)."
-        msg = msg % (time.asctime(time.gmtime()), retval_job_report)
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Finished job report validation"
+        msg += " (status %d)." % (retval['job_report_validation'])
         print msg
-    update_cmscp_return_code(cmscp_return_code, retval_job_report)
+    update_exit_info(exit_info, retval['job_report_validation'], '')
     ##--------------------------------------------------------------------------
     ## Finish JOB REPORT VALIDATION
     ##--------------------------------------------------------------------------
@@ -1162,36 +1236,39 @@ def main():
     ##--------------------------------------------------------------------------
     ## Check that the output files are well defined in the job ad and that they
     ## exist in the worker node.
-    retval_outputs_exist = None
     condition = no_condition
-    if skip_outputs_exist:
-        msg  = "WARNING: Internal wrapper flag 'skip_outputs_exist' is True."
+    if skip['outputs_exist']:
+        msg  = "WARNING: Internal wrapper flag skip['outputs_exist'] is True."
         msg += " Skipping to check if user output files exist."
         print msg
     elif condition:
-        msg = "====== %s: Starting to check if user output files exist."
-        msg = msg % (time.asctime(time.gmtime()))
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Starting to check if user output files exist."
         print msg
         for output_file_name_info in output_files:
             cur_retval = 0
             ## The output_file_name_info is something like this:
             ## my_output_file.root=my_output_file_<job-id>.root
             if len(output_file_name_info.split('=')) != 2:
-                print "ERROR: Invalid output format (%s)." % (output_file_name_info)
+                msg = "ERROR: Invalid output format (%s)." % (output_file_name_info)
+                print msg
                 cur_retval = 80000
             else:
                 output_file_name = output_file_name_info.split('=')[0]
                 if not os.path.exists(output_file_name):
-                    print "ERROR: Output file %s does not exist." % (output_file_name)
+                    msg = "ERROR: Output file %s does not exist." % (output_file_name)
+                    print msg
                     cur_retval = 60302
                 else:
-                    print "Output file %s exists." % (output_file_name)
-            if retval_outputs_exist in [None, 0]:
-                retval_outputs_exist = cur_retval
-        msg = "====== %s: Finished to check if user output files exist (status %d)."
-        msg = msg % (time.asctime(time.gmtime()), retval_outputs_exist)
+                    msg = "Output file %s exists." % (output_file_name)
+                    print msg
+            if retval['outputs_exist'] in [None, 0]:
+                retval['outputs_exist'] = cur_retval
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Finished to check if user output files exist"
+        msg += " (status %d)." % (retval['outputs_exist'])
         print msg
-    update_cmscp_return_code(cmscp_return_code, retval_outputs_exist)
+    update_exit_info(exit_info, retval['outputs_exist'], '')
     ##--------------------------------------------------------------------------
     ## Finish CHECK OUTPUT FILES EXIST
     ##--------------------------------------------------------------------------
@@ -1200,42 +1277,42 @@ def main():
     ## Start CHECK OUTPUT FILES IN JOB REPORT
     ##--------------------------------------------------------------------------
     ## Check if the output file is in the json job report. If it is not, add it.
-    retval_outputs_in_job_report = None
-    condition = (retval_job_report == 0 and retval_outputs_exist == 0)
-    if skip_outputs_in_job_report:
-        msg  = "WARNING: Internal wrapper flag 'skip_outputs_in_job_report' is"
-        msg += " True. Skipping to check if user output files are in the job"
-        msg += " report."
+    condition = (retval['job_report_validation'] == 0 and retval['outputs_exist'] == 0)
+    if skip['outputs_in_job_report']:
+        msg  = "WARNING: Internal wrapper flag skip['outputs_in_job_report'] is True."
+        msg += " Skipping to check if user output files are in the job report."
         print msg
     elif condition:
-        msg  = "====== %s: Starting to check if user output files are in job"
-        msg += " report."
-        msg  = msg % (time.asctime(time.gmtime()))
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Starting to check if user output files are in job report."
         print msg
         for output_file_name_info in output_files:
             cur_retval = 0
             ## The output_file_name_info is something like this:
             ## my_output_file.root=my_output_file_<job-id>.root
             if len(output_file_name_info.split('=')) != 2:
-                print "ERROR: Invalid output format (%s)." % (output_file_name_info)
+                msg = "ERROR: Invalid output format (%s)." % (output_file_name_info)
+                print msg
                 cur_retval = 80000
             else:
                 output_file_name = output_file_name_info.split('=')[0]
                 is_file_in_job_report = bool(get_output_file_from_job_report(output_file_name))
                 if not is_file_in_job_report:
-                    print "Output file %s not found in job report." % (output_file_name)
+                    msg = "Output file %s not found in job report." % (output_file_name)
+                    print msg
                     file_added_ok = add_output_file_to_job_report(output_file_name)
                     if not file_added_ok:
                         cur_retval = 60318
                 else:
-                    print "Output file %s found in job report." % (output_file_name)
-            if retval_outputs_in_job_report in [None, 0]:
-                retval_outputs_in_job_report = cur_retval
-        msg  = "====== %s: Finished to check if user output files are in job"
-        msg += " report (status %d)."
-        msg = msg % (time.asctime(time.gmtime()), retval_outputs_in_job_report)
+                    msg = "Output file %s found in job report." % (output_file_name)
+                    print msg
+            if retval['outputs_in_job_report'] in [None, 0]:
+                retval['outputs_in_job_report'] = cur_retval
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Finished to check if user output files are in job report"
+        msg += " (status %d)." % (retval['outputs_in_job_report'])
         print msg
-    update_cmscp_return_code(cmscp_return_code, retval_outputs_in_job_report)
+    update_exit_info(exit_info, retval['outputs_in_job_report'], '')
     ##--------------------------------------------------------------------------
     ## Finish CHECK OUTPUT FILES IN JOB REPORT
     ##--------------------------------------------------------------------------
@@ -1244,37 +1321,38 @@ def main():
     ## Start LOGS TARBALL CREATION
     ##--------------------------------------------------------------------------
     ## Create a zipped tar archive file of the user logs.
-    retval_logs_arch = None
     condition = no_condition
-    if skip_logs_arch:
-        msg  = "WARNING: Internal wrapper flag 'skip_logs_arch' is True."
+    if skip['logs_archive']:
+        msg  = "WARNING: Internal wrapper flag skip['logs_archive'] is True."
         msg += " Skipping creation of user logs archive file."
         print msg
     elif condition:
-        msg = "====== %s: Starting creation of user logs archive file."
-        msg = msg % (time.asctime(time.gmtime()))
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Starting creation of user logs archive file."
         print msg
         try:
-            retval_logs_arch = make_logs_archive(logs_arch_file_name)
+            retval['logs_archive'] = make_logs_archive(logs_arch_file_name)
         except tarfile.TarError:
             msg  = "ERROR creating user logs archive file."
             msg += "\n%s" % (traceback.format_exc())
             print msg
-            if retval_logs_arch in [None, 0]:
-                retval_logs_arch = 80000
-        msg = "====== %s: Finished creation of user logs archive file (status %d)."
-        msg = msg % (time.asctime(time.gmtime()), retval_logs_arch)
+            if retval['logs_archive'] in [None, 0]:
+                retval['logs_archive'] = 80000
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Finished creation of user logs archive file"
+        msg += " (status %d)." % (retval['logs_archive'])
         print msg
         ## Determine the logs archive file size and write it in the job report.
         try:
             log_size = os.stat(logs_arch_file_name).st_size
-            add_to_file_in_job_report(logs_arch_dest_file_name, True, [('log_size', log_size)])
+            add_to_file_in_job_report(logs_arch_dest_file_name, True, \
+                                      [('log_size', log_size)])
         except Exception:
             msg = "WARNING: Unable to add logs archive file size to job report."
             print msg
     if transfer_logs:
-        update_cmscp_return_code(cmscp_return_code, retval_logs_arch)
-    elif not retval_logs_arch in [None, 0]:
+        update_exit_info(exit_info, retval['logs_archive'], '')
+    elif not retval['logs_archive'] in [None, 0]:
         msg  = "Ignoring compression failure of user logs,"
         msg += " because the user did not request the logs to be staged out."
         print msg
@@ -1283,9 +1361,9 @@ def main():
     ##--------------------------------------------------------------------------
 
     ## Define what are so far the conditions for doing the stageouts.
-    condition_logs_stageout = (retval_logs_arch == 0)
-    condition_outputs_stageout = (retval_outputs_exist == 0 and \
-                                  retval_outputs_in_job_report == 0)
+    condition_logs_stageout = (retval['logs_archive'] == 0)
+    condition_outputs_stageout = (retval['outputs_exist'] == 0 and \
+                                  retval['outputs_in_job_report'] == 0)
     condition_stageout = (condition_logs_stageout or condition_outputs_stageout)
 
     ##--------------------------------------------------------------------------
@@ -1293,17 +1371,14 @@ def main():
     ##--------------------------------------------------------------------------
     ## This stageout manager will be used for all local stageout attempts (for
     ## user logs archive and user outputs).
-    retval_local_stageout_mgr = None
     condition = ('local' in stageout_policy and condition_stageout)
-    if skip_init_local_stageout_mgr:
-        msg  = "WARNING: Internal wrapper flag 'skip_init_local_stageout_mgr'"
-        msg += " is True. Skipping initialization of stageout manager for"
-        msg += " local stageouts."
+    if skip['init_local_stageout_mgr']:
+        msg  = "WARNING: Internal wrapper flag skip['init_local_stageout_mgr'] is True."
+        msg += " Skipping initialization of stageout manager for local stageouts."
         print msg
     elif condition:
-        msg  = "====== %s: Starting initialization of stageout manager for"
-        msg += " local stageouts."
-        msg  = msg % (time.asctime(time.gmtime()))
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Starting initialization of stageout manager for local stageouts."
         print msg
         try:
             print "       -----> Stageout manager log start"
@@ -1311,20 +1386,21 @@ def main():
             local_stageout_mgr.numberOfRetries = G_NUMBER_OF_RETRIES
             local_stageout_mgr.retryPauseTime = G_RETRY_PAUSE_TIME
             print "       <----- Stageout manager log finish"
-            retval_local_stageout_mgr = 0
-            print "Initialization was ok."
+            msg = "Initialization was ok."
+            print msg
+            retval['init_local_stageout_mgr'] = 0
         except Exception:
             print "       <----- Stageout manager log finish"
             msg  = "WARNING: Error initializing StageOutMgr."
             msg += " Will not be able to do local stageouts."
             print msg
-            retval_local_stageout_mgr = 60311
-        msg  = "====== %s: Finished initialization of stageout manager for"
-        msg += " local stageouts (status %d)."
-        msg  = msg % (time.asctime(time.gmtime()), retval_local_stageout_mgr)
+            retval['init_local_stageout_mgr'] = 60311
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Finished initialization of stageout manager for local stageouts"
+        msg += " (status %d)." % (retval['init_local_stageout_mgr'])
         print msg
     if not transfer_outputs:
-        update_cmscp_return_code(cmscp_return_code, retval_local_stageout_mgr)
+        update_exit_info(exit_info, retval['init_local_stageout_mgr'], '')
     ##--------------------------------------------------------------------------
     ## Finish LOCAL STAGEOUT MANAGER INITIALIZATION
     ##--------------------------------------------------------------------------
@@ -1334,17 +1410,14 @@ def main():
     ##--------------------------------------------------------------------------
     ## This stageout implementation will be used for all direct stageout
     ## attempts (for user logs archive and user outputs).
-    retval_direct_stageout_impl = None
     condition = ('remote' in stageout_policy and condition_stageout)
-    if skip_init_direct_stageout_impl:
-        msg  = "WARNING: Internal wrapper flag 'skip_init_direct_stageout_impl'"
-        msg += " is True. Skipping initialization of stageout implementation"
-        msg += " for direct stageouts."
+    if skip['init_direct_stageout_impl']:
+        msg  = "WARNING: Internal wrapper flag skip['init_direct_stageout_impl'] is True."
+        msg += " Skipping initialization of stageout implementation for direct stageouts."
         print msg
     elif condition:
-        msg  = "====== %s: Starting initialization of stageout implementation"
-        msg += " for direct stageouts."
-        msg  = msg % (time.asctime(time.gmtime()))
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Starting initialization of stageout implementation for direct stageouts."
         print msg
         direct_stageout_command = "srmv2-lcg"
         direct_stageout_protocol = "srmv2"
@@ -1352,20 +1425,20 @@ def main():
             direct_stageout_impl = retrieveStageOutImpl(direct_stageout_command)
             direct_stageout_impl.numRetries = G_NUMBER_OF_RETRIES
             direct_stageout_impl.retryPause = G_RETRY_PAUSE_TIME
-            retval_direct_stageout_impl = 0
-            print "Initialization was ok."
-        except Exception:
-            msg  = "WARNING: Error retrieving StageOutImpl for command '%s'."
-            msg += " Will not be able to do direct stageouts."
-            msg  = msg % (direct_stageout_command) 
+            retval['init_direct_stageout_impl'] = 0
+            msg = "Initialization was ok."
             print msg
-            retval_direct_stageout_impl = 60311
-        msg  = "====== %s: Finished initialization of stageout implementation"
-        msg += " for direct stageouts (status %d)."
-        msg  = msg % (time.asctime(time.gmtime()), retval_direct_stageout_impl)
+        except Exception:
+            msg  = "WARNING: Error retrieving StageOutImpl for command '%s'." % (direct_stageout_command)
+            msg += " Will not be able to do direct stageouts."
+            print msg
+            retval['init_direct_stageout_impl'] = 60311
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Finished initialization of stageout implementation for direct stageouts"
+        msg += " (status %d)." % (retval['init_direct_stageout_impl'])
         print msg
-    if (transfer_outputs or transfer_logs) and retval_local_stageout_mgr != 0:
-        update_cmscp_return_code(cmscp_return_code, retval_direct_stageout_impl) 
+    if (transfer_outputs or transfer_logs) and retval['init_local_stageout_mgr'] != 0:
+        update_exit_info(exit_info, retval['init_direct_stageout_impl'], '') 
     ##--------------------------------------------------------------------------
     ## Finish DIRECT STAGEOUT IMPLEMENTATION INITIALIZATION
     ##--------------------------------------------------------------------------
@@ -1386,8 +1459,6 @@ def main():
     ## stageout according to the (configurable) stageout policy. But don't
     ## inject to ASO. Injection to ASO is done after all the local stageouts are
     ## done successfully.
-    retval_logs_stageout    = {'local': None, 'remote': None}
-    retval_outputs_stageout = {'local': None, 'remote': None}
     first_stageout_failure_code = None
     is_log_in_storage = {'local': False, 'remote': False}
     for policy in stageout_policy:
@@ -1397,34 +1468,32 @@ def main():
         ##---------------
         condition = condition_logs_stageout
         if policy == 'local':
-            condition = (condition and retval_local_stageout_mgr == 0 and \
-                         retval_logs_stageout['remote'] != 0)
+            condition = (condition and \
+                         retval['init_local_stageout_mgr'] == 0 and \
+                         retval['logs_stageout']['remote'] != 0)
         elif policy == 'remote':
-            condition = (condition and retval_direct_stageout_impl == 0 and \
-                         retval_logs_stageout['local'] != 0)
+            condition = (condition and \
+                         retval['init_direct_stageout_impl'] == 0 and \
+                         retval['logs_stageout']['local'] != 0)
         ## There are some cases where we don't have to stage out the logs.
         if condition:
-            skip = False
-            if skip_logs_stageout[policy]:
-                msg  = "WARNING: Internal wrapper flag"
-                msg += " 'skip_logs_stageout['%s']' is True."
-                msg += " Skipping %s stageout of user logs archive file."
-                msg  = msg % (policy, policy)
+            if skip['logs_stageout'][policy]:
+                msg  = "WARNING: Internal wrapper flag skip['logs_stageout']['%s'] is True." % (policy)
+                msg += " Skipping %s stageout of user logs archive file." % (policy)
                 print msg
-                skip = True
+                condition = False
             elif policy == 'remote' and not transfer_logs:
                 msg  = "Will not do remote stageout of user logs archive file,"
                 msg += " since the user did not specify to transfer the logs."
                 print msg
-                skip = True
-            condition = not skip
+                condition = False
         ## If we have to, stage out the logs.
         if condition:
-            msg = "====== %s: Starting %s stageout of user logs archive file."
-            msg = msg % (time.asctime(time.gmtime()), policy)
+            msg  = "====== %s: " % (time.asctime(time.gmtime()))
+            msg += "Starting %s stageout of user logs archive file." % (policy)
             print msg
             try:
-                retval_logs_stageout[policy] = perform_stageout(local_stageout_mgr, \
+                retval['logs_stageout'][policy] = perform_stageout(local_stageout_mgr, \
                                                                 direct_stageout_impl, \
                                                                 direct_stageout_command, \
                                                                 direct_stageout_protocol, \
@@ -1436,75 +1505,71 @@ def main():
                                                                 dest_site, is_log = True, \
                                                                 inject = transfer_logs)
             except Exception:
-                msg  = "ERROR: Unhandled exception when performing stageout"
-                msg += " of user logs archive file.\n%s"
-                msg  = msg % (traceback.format_exc())
+                msg  = "ERROR: Unhandled exception when performing stageout of user logs archive file."
+                msg += "\n%s" % (traceback.format_exc())
                 print msg
-                if retval_logs_stageout[policy] in [None, 0]:
-                    retval_logs_stageout[policy] = 60318
-            msg  = "====== %s: Finished %s stageout of user logs archive file"
-            msg += " (status %d)."
-            msg  = msg % (time.asctime(time.gmtime()), policy, \
-                          retval_logs_stageout[policy])
+                if retval['logs_stageout'][policy] in [None, 0]:
+                    retval['logs_stageout'][policy] = 60318
+            msg  = "====== %s: " % (time.asctime(time.gmtime()))
+            msg += "Finished %s stageout of user logs archive file" % (policy)
+            msg += " (status %d)." % (retval['logs_stageout'][policy])
             print msg
-            if retval_logs_stageout[policy] == 0:
+            if retval['logs_stageout'][policy] == 0:
                 is_log_in_storage[policy] = True
             ## If the stageout failed, clean the stageout area. But don't remove
             ## the log from the local stageout area (we want to keep it there in
             ## case the next stageout policy also fails).
-            if not retval_logs_stageout[policy] in [None, 0]:
+            if not retval['logs_stageout'][policy] in [None, 0]:
                 clean = True
                 if transfer_logs and first_stageout_failure_code is None:
-                    first_stageout_failure_code = retval_logs_stageout[policy]
+                    first_stageout_failure_code = retval['logs_stageout'][policy]
         ##------------------
         ## Outputs stageout.
         ##------------------
         condition = condition_outputs_stageout
         if policy == 'local':
-            condition = (condition and retval_local_stageout_mgr == 0 and \
-                         retval_outputs_stageout['remote'] != 0)
+            condition = (condition and \
+                         retval['init_local_stageout_mgr'] == 0 and \
+                         retval['outputs_stageout']['remote'] != 0)
         elif policy == 'remote':
-            condition = (condition and retval_direct_stageout_impl == 0 and \
-                         retval_outputs_stageout['local'] != 0)
+            condition = (condition and \
+                         retval['init_direct_stageout_impl'] == 0 and \
+                         retval['outputs_stageout']['local'] != 0)
         ## There are some cases where we don't have to stage out the outputs.
         if condition:
-            skip = False
-            if skip_outputs_stageout[policy]:
-                msg  = "WARNING: Internal wrapper flag"
-                msg += " 'skip_outputs_stageout['%s']' is True."
-                msg += " Skipping %s stageout of user outputs."
-                msg  = msg % (policy, policy)
+            if skip['outputs_stageout'][policy]:
+                msg  = "WARNING: Internal wrapper flag skip['outputs_stageout']['%s'] is True." % (policy)
+                msg += " Skipping %s stageout of user outputs." % (policy)
                 print msg
-                skip = True
+                condition = False
             if policy == 'remote' and not transfer_outputs:
                 msg  = "Will not do remote stageout of output files,"
                 msg += " since the user specified to not transfer the outputs."
                 print msg
-                skip = True
-            if not retval_logs_stageout[policy] in [None, 0]:
-                msg  = "Will not do %s stageout of output files, because"
-                msg += " %s stageout already failed for the logs archive file."
-                msg  = msg % (policy, policy)
+                condition = False
+            if not retval['logs_stageout'][policy] in [None, 0]:
+                msg  = "Will not do %s stageout of output files," % (policy)
+                msg += " because %s stageout already failed for the logs archive file." % (policy)
                 print msg
-                skip = True
-                retval_outputs_stageout[policy] = 60318
-            condition = not skip
+                retval['outputs_stageout'][policy] = 60318
+                condition = False
         ## If we have to, stage out the outputs.
         if condition:
-            msg = "====== %s: Starting %s stageout of user outputs."
-            msg = msg % (time.asctime(time.gmtime()), policy)
+            msg  = "====== %s: " % (time.asctime(time.gmtime()))
+            msg += "Starting %s stageout of user outputs." % (policy)
             print msg
             for output_file_name_info, output_dest_pfn in zip(output_files, dest_files[1:]):
                 ## The output_file_name_info is something like this:
                 ## my_output_file.root=my_output_file_<job-id>.root
                 if len(output_file_name_info.split('=')) != 2:
-                    print "ERROR: Invalid output format (%s)." % (output_file_name_info)
+                    msg = "ERROR: Invalid output format (%s)." % (output_file_name_info)
+                    print msg
                     cur_retval = 80000
                 else:
                     cur_retval = None
                     output_file_name, output_dest_file_name = output_file_name_info.split('=')
-                    msg = "-----> %s: Starting %s stageout of %s."
-                    msg = msg % (time.asctime(time.gmtime()), policy, output_file_name)
+                    msg  = "-----> %s: " % (time.asctime(time.gmtime()))
+                    msg += "Starting %s stageout of %s." % (policy, output_file_name)
                     print msg
                     output_dest_temp_lfn = os.path.join(dest_temp_dir, output_dest_file_name)
                     output_dest_pfn_path = os.path.dirname(output_dest_pfn)
@@ -1534,69 +1599,70 @@ def main():
                         print msg
                         if cur_retval in [None, 0]:
                             cur_retval = 60318
-                    msg = "<----- %s: Finished %s stageout of %s (status %d)."
-                    msg = msg % (time.asctime(time.gmtime()), policy, \
-                                 output_file_name, cur_retval)
+                    msg  = "<----- %s: " % (time.asctime(time.gmtime()))
+                    msg += "Finished %s stageout of %s" % (policy, output_file_name)
+                    msg += " (status %d)." % (cur_retval)
                     print msg
-                if retval_outputs_stageout[policy] in [None, 0]:
-                    retval_outputs_stageout[policy] = cur_retval
+                if retval['outputs_stageout'][policy] in [None, 0]:
+                    retval['outputs_stageout'][policy] = cur_retval
                 ## If the stageout failed for one of the outputs, don't even try
                 ## to stage out the rest of the outputs.
-                if not retval_outputs_stageout[policy] in [None, 0]:
-                    msg  = "%s stageout of %s failed. Will not attempt"
-                    msg += " %s stageout for any other output files (if any)."
-                    msg  = msg % (policy.title(), output_file_name, policy)
+                if not retval['outputs_stageout'][policy] in [None, 0]:
+                    msg  = "%s stageout of %s failed." % (policy.title(), output_file_name)
+                    msg += " Will not attempt %s stageout for any other output files (if any)." % (policy)
                     print msg
                     break
-            msg = "====== %s: Finished %s stageout of user outputs (status %d)."
-            msg = msg % (time.asctime(time.gmtime()), policy, retval_outputs_stageout[policy])
+            msg  = "====== %s: " % (time.asctime(time.gmtime()))
+            msg += "Finished %s stageout of user outputs" % (policy)
+            msg += " (status %d)." % (retval['outputs_stageout'][policy])
             print msg
-            if not retval_outputs_stageout[policy] in [None, 0]:
+            if not retval['outputs_stageout'][policy] in [None, 0]:
                 clean = True
                 if first_stageout_failure_code is None:
-                    first_stageout_failure_code = retval_outputs_stageout[policy]
+                    first_stageout_failure_code = retval['outputs_stageout'][policy]
         if clean:
             ## If the stageout failed, clean the stageout area. But don't remove
             ## the logs archive file from the local stageout area (we want to
             ## keep it there in case the direct stageout also fails). Not
             ## cleaning the log doesn't mean that we will request ASO to
             ## transfer it; we will not.
-            msg = "====== %s: Starting to clean %s stageout area."
-            msg = msg % (time.asctime(time.gmtime()), policy)
+            msg  = "====== %s: " % (time.asctime(time.gmtime()))
+            msg += "Starting to clean %s stageout area." % (policy)
             print msg
             clean_log = (policy == 'remote')
             if clean_log:
                 is_log_in_storage[policy] = False
-            clean_stageout_area(local_stageout_mgr, direct_stageout_impl, policy, \
-                                logs_arch_dest_temp_lfn, keep_log = not clean_log)
-            msg = "====== %s: Finished to clean %s stageout area."
-            msg = msg % (time.asctime(time.gmtime()), policy)
+            clean_stageout_area(local_stageout_mgr, direct_stageout_impl, \
+                                policy, logs_arch_dest_temp_lfn, \
+                                keep_log = not clean_log)
+            msg  = "====== %s: " % (time.asctime(time.gmtime()))
+            msg += "Finished to clean %s stageout area." % (policy)
             print msg
             ## Since we cleaned the storage area, we have to set the return
             ## status of this policy stageout to a general failure code (if
             ## originally 0).
-            if retval_logs_stageout[policy] == 0:
-                retval_logs_stageout[policy] = 60318
-            if retval_outputs_stageout[policy] == 0:
-                retval_outputs_stageout[policy] = 60318
-        ## If the local (remote) stageout succeeded for the both logs archive
-        ## file and output files, then we don't need to try remote (local)
-        ## stageout.
-        if retval_logs_stageout[policy] == 0 and retval_outputs_stageout[policy] == 0:
+            if retval['logs_stageout'][policy] == 0:
+                retval['logs_stageout'][policy] = 60318
+            if retval['outputs_stageout'][policy] == 0:
+                retval['outputs_stageout'][policy] = 60318
+        ## If this stageout policy succeeded for the both logs archive file
+        ## and output files, then we don't need to try any other stageout
+        ## policy.
+        if retval['logs_stageout'][policy] == 0 and retval['outputs_stageout'][policy] == 0:
             break
-    ## If stageout failed, update the cmscp return code with the stageout failure
-    ## that happened first (except that if it was the local stageout of the logs
-    ## archive file what failed first and the user didn't request the logs to be
-    ## transferred, we ignore that failure).
+    ## If stageout failed, update the cmscp return code with the stageout
+    ## failure that happened first (except that if it was the local stageout of
+    ## the logs archive file what failed first and the user didn't request the
+    ## logs to be transferred, we ignore that failure).
     if transfer_logs:
-        if not (retval_logs_stageout['local'] == 0 or retval_logs_stageout['remote'] == 0):
-            update_cmscp_return_code(cmscp_return_code, first_stageout_failure_code)
-    elif not retval_logs_stageout['local'] in [None, 0]:
-        msg  = "Ignoring stageout failure of user logs,"
+        if not (retval['logs_stageout']['local'] == 0 or retval['logs_stageout']['remote'] == 0):
+            update_exit_info(exit_info, first_stageout_failure_code, '')
+    elif not retval['logs_stageout']['local'] in [None, 0]:
+        msg  = "Ignoring local stageout failure of user logs,"
         msg += " because the user did not request the logs to be staged out."
         print msg
-    if not (retval_outputs_stageout['local'] == 0 or retval_outputs_stageout['remote'] == 0):
-        update_cmscp_return_code(cmscp_return_code, first_stageout_failure_code)
+    if not (retval['outputs_stageout']['local'] == 0 or retval['outputs_stageout']['remote'] == 0):
+        update_exit_info(exit_info, first_stageout_failure_code, '')
     ##--------------------------------------------------------------------------
     ## Finish STAGEOUT OF USER LOGS TARBALL AND USER OUTPUTS
     ##--------------------------------------------------------------------------
@@ -1606,15 +1672,14 @@ def main():
     ##--------------------------------------------------------------------------
     ## Do the injection of the transfer request documents to the ASO database
     ## only if all the local or direct stageouts have succeeded.
-    retval_aso_injection = None
     condition_inject_outputs = False
     not_inject_msg_outputs = ''
     if transfer_outputs:
-        condition_inject_outputs = (retval_outputs_stageout['local'] == 0 and \
-                                    retval_outputs_stageout['remote'] != 0)
+        condition_inject_outputs = (retval['outputs_stageout']['local'] == 0 and \
+                                    retval['outputs_stageout']['remote'] != 0)
         if not condition_inject_outputs:
             not_inject_msg_outputs = "Will not inject transfer requests to ASO for the user outputs,"
-            if retval_outputs_stageout['remote'] == 0:
+            if retval['outputs_stageout']['remote'] == 0:
                 not_inject_msg_outputs += " because they were staged out directly to the permanent storage."
             else:
                 not_inject_msg_outputs += " because their local stageouts were not successful"
@@ -1622,19 +1687,19 @@ def main():
                 not_inject_msg_outputs += " or local stageout was not even performed)."
     else:
         not_inject_msg_outputs = "Will not inject transfer requests to ASO for the user outputs"
-        if retval_outputs_stageout['local'] == 0:
+        if retval['outputs_stageout']['local'] == 0:
             not_inject_msg_outputs += " (even if their local stageouts were successful)"
         not_inject_msg_outputs += ", because the user didn't request the outputs to be transferred."
-        if retval_outputs_stageout['local'] != 0:
+        if retval['outputs_stageout']['local'] != 0:
             not_inject_msg_outputs += " (And in any case, their local stageouts were not successful -or not even performed-.)"
     condition_inject_logs = False
     not_inject_msg_logs = ''
     if transfer_logs:
-        condition_inject_logs = (retval_logs_stageout['local'] == 0 and \
-                                 retval_logs_stageout['remote'] != 0)
+        condition_inject_logs = (retval['logs_stageout']['local'] == 0 and \
+                                 retval['logs_stageout']['remote'] != 0)
         if not condition_inject_logs:
             not_inject_msg_logs = "Will not inject transfer request to ASO the for user logs archive file,"
-            if retval_logs_stageout['remote'] == 0:
+            if retval['logs_stageout']['remote'] == 0:
                 not_inject_msg_logs += " because it was staged out directly to the permanent storage."
             else:
                 not_inject_msg_logs += " because its local stageout was not successful"
@@ -1642,19 +1707,19 @@ def main():
                 not_inject_msg_logs += " or local stageout was not even performed)."
     else:
         not_inject_msg_logs = "Will not inject transfer request to ASO for the user logs archive file"
-        if retval_logs_stageout['local'] == 0:
+        if retval['logs_stageout']['local'] == 0:
             not_inject_msg_logs += " (even if its local stageout was successful)"
         not_inject_msg_logs += ", because the user didn't request the logs to be transferred."
-        if retval_logs_stageout['local'] != 0:
+        if retval['logs_stageout']['local'] != 0:
             not_inject_msg_logs += " (And in any case, its local stageout was not successful -or not even performed-.)"
     condition = condition_inject_outputs or condition_inject_logs
-    if skip_aso_injection:
-        msg  = "WARNING: Internal wrapper flag 'skip_aso_injection' is True."
+    if skip['aso_injection']:
+        msg  = "WARNING: Internal wrapper flag skip['aso_injection'] is True."
         msg += " Skipping injection of transfer requests to ASO."
         print msg
     elif condition:
-        msg = "====== %s: Starting injection of transfer requests to ASO."
-        msg = msg % (time.asctime(time.gmtime()))
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Starting injection of transfer requests to ASO."
         print msg
         if not_inject_msg_logs:
             print not_inject_msg_logs
@@ -1671,13 +1736,14 @@ def main():
                          's' if num_docs_to_inject > 1 else '')
             print msg
             if 'CRAB_ASOURL' in G_JOB_AD and G_JOB_AD['CRAB_ASOURL']:
-                print "Will use ASO server at %s." % G_JOB_AD['CRAB_ASOURL']
+                msg = "Will use ASO server at %s." % (G_JOB_AD['CRAB_ASOURL'])
+                print msg
             for file_transfer_info in G_ASO_TRANSFER_REQUESTS:
                 if not file_transfer_info['inject']:
                     continue
                 file_name = os.path.basename(file_transfer_info['source']['lfn'])
-                msg = "-----> %s: Starting injection for %s."
-                msg = msg % (time.asctime(time.gmtime()), file_name)
+                msg  = "-----> %s: " % (time.asctime(time.gmtime()))
+                msg += "Starting injection for %s." % (file_name)
                 print msg
                 try:
                     cur_retval = inject_to_aso(file_transfer_info)
@@ -1687,17 +1753,19 @@ def main():
                     print msg
                     if cur_retval in [None, 0]:
                         cur_retval = 60318
-                msg = "<----- %s: Finished injection for %s (status %d)."
-                msg = msg % (time.asctime(time.gmtime()), file_name, cur_retval)
+                msg  = "<----- %s: " % (time.asctime(time.gmtime()))
+                msg += "Finished injection for %s" % (file_name)
+                msg += " (status %d)." % (cur_retval)
                 print msg
-                if retval_aso_injection in [None, 0]:
-                    retval_aso_injection = cur_retval
+                if retval['aso_injection'] in [None, 0]:
+                    retval['aso_injection'] = cur_retval
         else:
             msg = "There are no %sdocuments to inject."
             msg = msg % ('other ' if not_inject_msg_outputs or not_inject_msg_logs else '')
             print msg
-        msg = "====== %s: Finished injection of transfer requests to ASO (status %d)."
-        msg = msg % (time.asctime(time.gmtime()), retval_aso_injection)
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Finished injection of transfer requests to ASO"
+        msg += " (status %d)." % (retval['aso_injection'])
         print msg
     else:
         if not_inject_msg_logs:
@@ -1717,31 +1785,29 @@ def main():
     ##--------------------------------------------------------------------------
     ## Upload of the log file metadata to the crab cache. Ignore any failure
     ## since the post-job can always retry the upload.
-    retval_logs_metadata = None
     condition = (is_log_in_storage['local'] or is_log_in_storage['remote'])
-    if skip_logs_metadata_upload:
-        msg  = "WARNING: Internal wrapper flag 'skip_logs_metadata_upload' is"
-        msg += " True. Skipping upload of logs archive file metadata."
+    if skip['logs_metadata_upload']:
+        msg  = "WARNING: Internal wrapper flag skip['logs_metadata_upload'] is True."
+        msg += " Skipping upload of logs archive file metadata."
         print msg
     elif condition:
-        msg = "====== %s: Starting upload of logs archive file metadata."
-        msg = msg % (time.asctime(time.gmtime()))
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Starting upload of logs archive file metadata."
         print msg
         try:
-            retval_logs_metadata = upload_log_file_metadata(logs_arch_dest_temp_lfn, \
-                                                            logs_arch_dest_lfn)
+            retval['logs_metadata_upload'] = upload_log_file_metadata(logs_arch_dest_temp_lfn, \
+                                                                      logs_arch_dest_lfn)
         except Exception:
             msg  = "WARNING: Failed to upload logs archive file metadata."
-            msg += " Will ignore the failure, since the post-job can retry"
-            msg += " the upload."
+            msg += " Will ignore the failure, since the post-job can retry the upload."
             print msg
-            if retval_logs_metadata in [None, 0]:
-                retval_logs_metadata = 80000 ## TODO: Need a new code here.
+            if retval['logs_metadata_upload'] in [None, 0]:
+                retval['logs_metadata_upload'] = 80000 ## TODO: Need a new code here.
         add_to_file_in_job_report(logs_arch_dest_file_name, True, \
-                                  [('file_metadata_upload', not bool(retval_logs_metadata))])
-        msg  = "====== %s: Finished upload of logs archive file metadata"
-        msg += " (status %d)."
-        msg  = msg % (time.asctime(time.gmtime()), retval_logs_metadata)
+                                  [('file_metadata_upload', not bool(retval['logs_metadata_upload']))])
+        msg  = "====== %s: " % (time.asctime(time.gmtime()))
+        msg += "Finished upload of logs archive file metadata"
+        msg += " (status %d)." % (retval['logs_metadata_upload'])
         print msg
     else:
         msg  = "Will NOT upload logs archive file metadata,"
@@ -1751,15 +1817,15 @@ def main():
     ## Finish LOG FILE METADATA UPLOAD
     ##--------------------------------------------------------------------------
 
-    return cmscp_return_code
+    return exit_info
 
 ##==============================================================================
 ## CMSCP RUNS HERE WHEN SOURCED FROM gWMS-CMSRunAnalysis.sh.
 ##------------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    MSG = "====== %s: cmscp.py STARTING."
-    MSG = MSG % (time.asctime(time.gmtime()))
+    MSG  = "====== %s: " % (time.asctime(time.gmtime()))
+    MSG += "cmscp.py STARTING."
     print MSG
     logging.basicConfig(level = logging.INFO)
     JOB_WRAPPER_EXIT_CODE = 0
@@ -1770,36 +1836,38 @@ if __name__ == '__main__':
     except:
         pass
     try:
-        JOB_STGOUT_WRAPPER_EXIT_CODE = main()
+        JOB_STGOUT_WRAPPER_EXIT_INFO = main()
     except:
         MSG  = "ERROR: Unhandled exception."
         MSG += "\n%s" % (traceback.format_exc())
         print MSG
-        JOB_STGOUT_WRAPPER_EXIT_CODE = 60307
+        EXIT_MSG = "cmscp.py" + MSG
+        JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'] = 60307
+        JOB_STGOUT_WRAPPER_EXIT_INFO['exit_acronym'] = 'FAILED'
+        JOB_STGOUT_WRAPPER_EXIT_INFO['exit_msg'] = EXIT_MSG
     if JOB_WRAPPER_EXIT_CODE:
-        JOB_STGOUT_WRAPPER_EXIT_CODE = JOB_WRAPPER_EXIT_CODE
-    elif JOB_STGOUT_WRAPPER_EXIT_CODE:
-        add_to_job_report([('exitCode', JOB_STGOUT_WRAPPER_EXIT_CODE)])
-    if JOB_STGOUT_WRAPPER_EXIT_CODE:
+        JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'] = JOB_WRAPPER_EXIT_CODE
+    elif JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code']:
+        add_to_job_report([('exitCode', JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'])])
+    if JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code']:
         if G_JOB_AD:
             try:
-                MSG  = "Stageout wrapper finished with exit code %s."
+                MSG  = "Stageout wrapper finished with exit code %s." % (JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'])
                 MSG += " Will report stageout failure to Dashboard."
-                MSG  = MSG % (JOB_STGOUT_WRAPPER_EXIT_CODE)
                 print MSG
-                report_failure_to_dashboard(JOB_STGOUT_WRAPPER_EXIT_CODE)
+                report_failure_to_dashboard(JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'])
             except:
-                MSG  = "ERROR: Unhandled exception when reporting failure"
-                MSG += " to Dashboard.\n%s"
-                MSG  = MSG % (traceback.format_exc())
+                MSG  = "ERROR: Unhandled exception when reporting failure to dashboard."
+                MSG += "\n%s" % (traceback.format_exc())
                 print MSG
         else:
             MSG  = "ERROR: Job's HTCondor ClassAd was not read."
             MSG += " Will not report stageout failure to Dashboard."
             print MSG
-    MSG = "====== %s: cmscp.py FINISHING (status %d)."
-    MSG = MSG % (time.asctime(time.gmtime()), JOB_STGOUT_WRAPPER_EXIT_CODE)
+    MSG  = "====== %s: " % (time.asctime(time.gmtime()))
+    MSG += "cmscp.py FINISHING"
+    MSG += " (status %d)." % (JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'])
     print MSG
-    sys.exit(JOB_STGOUT_WRAPPER_EXIT_CODE)
+    sys.exit(JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'])
 
 ##==============================================================================

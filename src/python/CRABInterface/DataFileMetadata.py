@@ -43,7 +43,8 @@ class DataFileMetadata(object):
                    'filesize': row[14],
                    'parents': literal_eval(row[15].read()),
                    'state': row[16],
-                   'created': str(row[17]),}
+                   'created': str(row[17]),
+                   'tmplfn': row[18]}
 
     def inject(self, *args, **kwargs):
         self.logger.debug("Calling jobmetadata inject with parameters %s" % kwargs)
@@ -62,8 +63,8 @@ class DataFileMetadata(object):
         self.api.modifynocheck(self.FileMetaData.New_sql, **binds)
         return []
 
-    def changeState(self, *args, **kwargs):  # kwargs are (taskname, outlfn, filestate)
-        self.logger.debug("Changing state of file %(taskname)s in task %(outlfn)s to %(filestate)s" % kwargs)
+    def changeState(self, *args, **kwargs):#kwargs are (taskname, outlfn, filestate)
+        self.logger.debug("Changing state of file %(outlfn)s in task %(taskname)s to %(filestate)s" % kwargs)
 
         self.api.modify(self.FileMetaData.ChangeFileState_sql, **dict((k, [v]) for k,v in kwargs.iteritems()))
 
