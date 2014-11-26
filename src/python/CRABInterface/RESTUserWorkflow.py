@@ -103,27 +103,28 @@ class RESTUserWorkflow(RESTEntity):
             If the list of releases is empty (reason may be an ExpatError) then report an error message
             If the asked released is not there then report an error message
         """
-
         msg = False
         goodReleases = {}
         try:
             goodReleases = allScramArchsAndVersions()
         except IOError:
-            msg = "Error connecting to %s and determine the list of available releases. You may need to contact an operator." % TAG_COLLECTOR_URL
-
-        if goodReleases == {}:
-            msg = "The list of releases at %s is empty. You may need to contact an operator." % TAG_COLLECTOR_URL
-
-        if jobarch not in goodReleases or jobsw not in goodReleases[jobarch]:
-            msg = "ERROR: %s on %s is not among supported releases" % (jobsw, jobarch)
-            msg += "\nUse config.JobType.allowNonProductionCMSSW = True if you are sure of what you are doing"
+            msg = "Error connecting to %s and determine the list of available releases. " % TAG_COLLECTOR_URL +\
+                  "Skipping the check of the releases"
+        else:
+            if goodReleases == {}:
+                msg = "The list of releases at %s is empty. " % TAG_COLLECTOR_URL +\
+                      "Skipping the check of the releases"
+            elif jobarch not in goodReleases or jobsw not in goodReleases[jobarch]:
+                msg = "ERROR: %s on %s is not among supported releases" % (jobsw, jobarch)
+                msg += "\nUse config.JobType.allowNonProductionCMSSW = True if you are sure of what you are doing"
+                excasync = "ERROR: %s on %s is not among supported releases or an error occurred" % (jobsw, jobarch)
+                invalidp = InvalidParameter(msg, errobj = excasync)
+                setattr(invalidp, 'trace', '')
+                raise invalidp
 
         if msg:
-            excasync = "ERROR: %s on %s is not among supported releases" % (jobsw, jobarch)
-            invalidp = InvalidParameter(msg, errobj = excasync)
-            setattr(invalidp, 'trace', '')
-            raise invalidp
-
+            #Need to log the message in the db for the users
+            self.logger.warning(msg)
 
     @conn_handler(services=['sitedb', 'centralconfig'])
     def validate(self, apiobj, method, api, param, safe):
