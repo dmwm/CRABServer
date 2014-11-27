@@ -38,9 +38,7 @@ CRAB_META_HEADERS = \
 +CRAB_ConfigDoc = %(configdoc)s
 +CRAB_DBSUrl = %(dbsurl)s
 +CRAB_LumiMask = %(lumimask)s
-+CRAB_TransferOutputs = %(saveoutput)s
 +CRAB_Publish = %(publication)s
-+CRAB_PublishName = %(publishname)s
 +CRAB_PublishDBSUrl = %(publishdbsurl)s
 """
 
@@ -75,46 +73,54 @@ queue 1
 """
 
 SUBMIT_INFO = [ \
-            ('CRAB_Workflow', 'workflow'),
+            ##----- These are the CRAB_HEADERS ---------
             ('CRAB_ReqName', 'requestname'),
+            ('CRAB_Workflow', 'workflow'),
             ('CRAB_JobType', 'jobtype'),
             ('CRAB_JobSW', 'jobsw'),
             ('CRAB_JobArch', 'jobarch'),
             ('CRAB_InputData', 'inputdata'),
+            ('CRAB_PublishName', 'publishname'),
             ('CRAB_ISB', 'cacheurl'),
             ('CRAB_SiteBlacklist', 'siteblacklist'),
             ('CRAB_SiteWhitelist', 'sitewhitelist'),
+            ('CRAB_SaveLogsFlag', 'savelogsflag'),
             ('CRAB_AdditionalOutputFiles', 'addoutputfiles'),
             ('CRAB_EDMOutputFiles', 'edmoutfiles'),
             ('CRAB_TFileOutputFiles', 'tfileoutfiles'),
-            ('CRAB_SaveLogsFlag', 'savelogsflag'),
             ('CRAB_TransferOutputs', 'saveoutput'),
             ('CRAB_UserDN', 'userdn'),
             ('CRAB_UserHN', 'userhn'),
             ('CRAB_AsyncDest', 'asyncdest'),
+            #('CRAB_AsyncDestSE', 'asyncdest_se'),
             ('CRAB_BlacklistT1', 'blacklistT1'),
+            #('CRAB_StageoutPolicy', 'stageoutpolicy'),
+            ('CRAB_UserRole', 'tm_user_role'),
+            ('CRAB_UserGroup', 'tm_user_group'),
+            ('CRAB_TaskWorker', 'worker_name'),
+            ('CRAB_RetryOnASOFailures', 'retry_aso'),
+            ('CRAB_ASOTimeout', 'aso_timeout'),
+            ('CRAB_RestHost', 'resthost'),
+            ('CRAB_RestURInoAPI', 'resturinoapi'),
+            ##----- These are the CRAB_META_HEADERS ------
             ('CRAB_SplitAlgo', 'splitalgo'),
             ('CRAB_AlgoArgs', 'algoargs'),
             ('CRAB_DBSUrl', 'dbsurl'),
-            ('CRAB_Publish', 'publication'),
-            ('CRAB_PublishName', 'publishname'),
-            ('CRAB_PublishDBSUrl', 'publishdbsurl'),
             ('CRAB_LumiMask', 'lumimask'),
+            ('CRAB_Publish', 'publication'),
+            ('CRAB_PublishDBSUrl', 'publishdbsurl'),
+            ##--------------------------------------------
             ('CRAB_JobCount', 'jobcount'),
             ('CRAB_UserVO', 'tm_user_vo'),
-            ('CRAB_UserRole', 'tm_user_role'),
-            ('CRAB_UserGroup', 'tm_user_group'),
             ('RequestMemory', 'tm_maxmemory'),
             ('RequestCpus', 'tm_numcores'),
             ('MaxWallTimeMins', 'tm_maxjobruntime'),
             ('JobPrio', 'tm_priority'),
-            ("CRAB_ASOURL", "tm_asourl"),
-            ("CRAB_FailedNodeLimit", "faillimit"),
-            ("CRAB_DashboardTaskType", "taskType"),
-            ("CRAB_MaxPost", "maxpost"),
-            ("CRAB_TaskWorker", "worker_name"),
-            ("CRAB_RetryOnASOFailures", "retry_aso"),
-            ("CRAB_ASOTimeout", "aso_timeout")]
+            ('CRAB_ASOURL', 'tm_asourl'),
+            ('CRAB_FailedNodeLimit', 'faillimit'),
+            ('CRAB_DashboardTaskType', 'taskType'),
+            ('CRAB_MaxPost', 'maxpost')]
+
 
 def addCRABInfoToClassAd(ad, info):
     """
@@ -146,7 +152,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                              'status': "FAILED",
                              'subresource': 'failure',
                              'failure': base64.b64encode(msg)}
-                self.server.post(self.resturl, data = urllib.urlencode(configreq))
+                self.server.post(self.rest_uri, data = urllib.urlencode(configreq))
                 raise
         retry_issues = []
         for retry in range(self.config.TaskWorker.max_retry):
@@ -162,13 +168,13 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 self.logger.error("Will retry in %s seconds." % str(self.config.TaskWorker.retry_interval[retry]))
                 time.sleep(self.config.TaskWorker.retry_interval[retry])
         msg = "The CRAB3 server backend could not submit your jobs to the Grid scheduler. This could be a temporary glitch, please retry again later and contact"+\
-              "the experts if the error persist. The submission was retried %s times, these are the failures: %s" % (len(retry_issues),str(retry_issues))
+              " the experts if the error persist. The submission was retried %s times, these are the failures: %s" % (len(retry_issues), str(retry_issues))
         self.logger.error(msg)
 #        configreq = {'workflow': kw['task']['tm_taskname'],
 #                     'status': "FAILED",
 #                     'subresource': 'failure',
 #                     'failure': base64.b64encode(msg)}
-#        self.server.post(self.resturl, data = urllib.urlencode(configreq))
+#        self.server.post(self.rest_uri, data = urllib.urlencode(configreq))
         raise TaskWorkerException(msg)
 
     def duplicateCheck(self, task):
@@ -197,7 +203,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     }
         self.logger.warning("Task %s already submitted to HTCondor; pushing information centrally: %s" % (workflow, str(configreq)))
         data = urllib.urlencode(configreq)
-        self.server.post(self.resturl, data = data)
+        self.server.post(self.rest_uri, data = data)
 
         # Note that we don't re-send Dashboard jobs; we assume this is a rare occurrance and
         # don't want to upset any info already in the Dashboard.
@@ -237,6 +243,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
         info['outputFilesString'] = ", ".join(outputFiles)
         arg = "RunJobs.dag"
 
+        info['resthost'] = '"%s"' % (self.server['host'])
+        #info['resthost'] = self.config.TaskWorker.resturl
+        info['resturinoapi'] = '"%s"' % (self.rest_uri_no_api)
+
         try:
             info['remote_condor_setup'] = ''
             loc = HTCondorLocator.HTCondorLocator(self.backendurls)
@@ -271,7 +281,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                      'subresource': 'success',}
         self.logger.debug("Pushing information centrally %s" %(str(configreq)))
         data = urllib.urlencode(configreq)
-        self.server.post(self.resturl, data = data)
+        self.server.post(self.rest_uri, data = data)
 
         self.sendDashboardJobs(dashboard_params, info['apmon'])
 
@@ -294,8 +304,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         if 'JobPrio' not in dagAd:
             dagAd['JobPrio'] = 10
 
-        dagAd["CRAB_RestTaskUrl"] = self.config.TaskWorker.resturl
-        dagAd["CRAB_RestTaskInstance"] = self.resturl.replace('workflowdb', '')
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
         dagAd["Err"] = str(os.path.join(info['scratch'], "request.err"))
