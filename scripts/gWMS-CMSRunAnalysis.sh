@@ -118,11 +118,11 @@ set +x
 if [[ $rc != 0 ]]
 then
 	echo "Error: Python2.6 isn't available on this worker node." >&2
-	echo "Error: job execution REQUIRES python2.6" >&2
+	echo "Error: execution of job stageout wrapper REQUIRES python2.6" >&2
 	sleep 20m
         exec sh ./DashboardFailure.sh 10043
 else
-	echo "I found python2.6 at.."
+	echo "Found python2.6 at:"
 	echo `which python2.6`
 fi
 echo "======== python2.6 bootstrap for stageout at $(TZ=GMT date) FINISHING ========"
@@ -133,7 +133,7 @@ condor_chirp phase output
 echo "======== Stageout at $(TZ=GMT date) STARTING ========"
 rm -f wmcore_initialized
 # Note we prevent buffering of stdout/err -- this is due to observed issues in mixing of out/err for stageout plugins
-PYTHONUNBUFFERED=1 ./cmscp.py "JOB_EXIT_CODE=$EXIT_STATUS"
+PYTHONUNBUFFERED=1 ./cmscp.py "JOB_WRAPPER_EXIT_CODE=$EXIT_STATUS"
 STAGEOUT_EXIT_STATUS=$?
 
 if [ ! -e wmcore_initialized ];
@@ -144,7 +144,7 @@ then
 fi
 
 if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
-    set -x
+    #set -x
     if [ $EXIT_STATUS -eq 0 ]; then
         EXIT_STATUS=$STAGEOUT_EXIT_STATUS
     fi
@@ -152,7 +152,8 @@ fi
 echo "======== Stageout at $(TZ=GMT date) FINISHING (status $STAGEOUT_EXIT_STATUS) ========"
 
 echo "======== gWMS-CMSRunAnalysis.sh FINISHING at $(TZ=GMT date) on $(hostname) with status $EXIT_STATUS ========"
-echo "Local time : $(date)"
-set -x
+echo "Local time: $(date)"
+#set -x
+echo "Exit status: $EXIT_STATUS"
 exit $EXIT_STATUS
 
