@@ -272,9 +272,9 @@ def logCMSSW():
         print "ERROR: Cannot dump CMSSW stdout; perhaps CMSSW never executed (e.g.: scriptExe was set)?"
         return
     print "======== CMSSW OUTPUT STARTING ========"
-
+    
     outfile = "cmsRun-stdout.log"
-
+    
     # check size of outfile
     keepAtStart = 1000
     keepAtEnd   = 3000
