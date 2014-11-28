@@ -54,10 +54,15 @@ class DataFileMetadata(object):
             binds[name] = [str(kwargs[name])]
         binds['runlumi'] = [str(dict(zip(map(str, kwargs['outfileruns']), [map(str, lumilist.split(',')) for lumilist in kwargs['outfilelumis']])))]
 
-        self.api.modify(self.FileMetaData.New_sql, **binds)
+        # Duplicating values. oracle is not bounding variables from dictionary
+        binds['taskname_unq'] = binds['taskname']
+        binds['outlfn_unq'] = binds['outlfn']
+        binds['outtmplocation_upd'] = binds['outtmplocation']
+        binds['outsize_upd'] = binds['outsize']
+        self.api.modifynocheck(self.FileMetaData.New_sql, **binds)
         return []
 
-    def changeState(self, *args, **kwargs):#kwargs are (taskname, outlfn, filestate)
+    def changeState(self, *args, **kwargs):  # kwargs are (taskname, outlfn, filestate)
         self.logger.debug("Changing state of file %(taskname)s in task %(outlfn)s to %(filestate)s" % kwargs)
 
         self.api.modify(self.FileMetaData.ChangeFileState_sql, **dict((k, [v]) for k,v in kwargs.iteritems()))
