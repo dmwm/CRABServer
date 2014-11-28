@@ -234,4 +234,5 @@ class Task(dict):
         self['tm_generator'] = task[45]
         self['tm_asourl'] = task[46]
         self['tm_events_per_lumi'] = task[47]
+        self['tm_use_parent'] = task[48]
 
