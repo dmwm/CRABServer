@@ -120,11 +120,33 @@ class RetryJob(object):
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    def create_fake_fjr(self, exitMsg, exitCode):
+        """If FatalError is got, fjr is not generated and it is needed for error_summary"""
+
+        fake_fjr = {}
+        fake_fjr['exitCode'] = exitCode
+        fake_fjr['exitMsg'] = exitMsg
+        jobReport = 'jobReport.json.%s' % self.count
+        if os.path.isfile(jobReport) and os.path.getsize(jobReport) > 0:
+            #File exists and it is not empty
+            print '%s file exists and it is not empty! CRAB3 will overwrite it, because your job got FatalError' % jobReport
+            with open(jobReport, 'r') as fd:
+                print 'Old %s file content : ' % jobReport
+                print fd.read()
+        with open(jobReport, 'w') as fd:
+            print  'New %s file content : %s' % (jobReport, json.dumps(fake_fjr))
+            json.dump(fake_fjr, fd)
+
+        # Fake FJR raises FatalError
+        raise FatalError(exitMsg)
+
+    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
     def check_cpu_report(self):
 
         # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to wall clock limit"):
-            raise FatalError("Not retrying job due to wall clock limit (job killed by CRAB3 watchdog)")
+            self.create_fake_fjr("Not retrying job due to wall clock limit (job killed by CRAB3 watchdog)", 50664)
         subreport = self.report
         for attr in ['steps', 'cmsRun', 'performance', 'cpu', 'TotalJobTime']:
             subreport = subreport.get(attr, None)
@@ -142,9 +164,11 @@ class RetryJob(object):
         self.integrated_job_time = integrated_job_time
         # TODO: Compare the job against its requested walltime, not a hardcoded max.
         if total_job_time > MAX_WALLTIME:
-            raise FatalError("Not retrying a long running job (job ran for %d hours)" % (total_job_time / 3600))
+            exitMsg = "Not retrying a long running job (job ran for %d hours)" % (total_job_time / 3600)
+            self.create_fake_fjr(exitMsg, 50664)
         if integrated_job_time > 1.5*MAX_WALLTIME:
-            raise FatalError("Not retrying a job because the integrated time (across all retries) is %d hours." % (integrated_job_time / 3600))
+            exitMsg = "Not retrying a job because the integrated time (across all retries) is %d hours." % (integrated_job_time / 3600)
+            self.create_fake_fjr(exitMsg, exitCode)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -152,7 +176,8 @@ class RetryJob(object):
 
         # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to memory use"):
-            raise FatalError("Not retrying job due to excessive memory use (job killed by CRAB3 watchdog)")
+            self.create_fake_fjr("Not retrying job due to excessive memory use (job killed by CRAB3 watchdog)", exitCode)
+            raise FatalError(exitMsg)
         subreport = self.report
         for attr in ['steps', 'cmsRun', 'performance', 'memory', 'PeakValueRss']:
             subreport = subreport.get(attr, None)
@@ -165,7 +190,17 @@ class RetryJob(object):
             return
         # TODO: Compare the job against its requested memory, not a hardcoded max.
         if total_job_memory > MAX_MEMORY:
-            raise FatalError("Not retrying job due to excessive memory use (%d MB)" % (total_job_memory))
+            exitMsg = "Not retrying job due to excessive memory use (%d MB)" % total_job_memory
+            self.create_fake_fjr(exitMsg, exitCode)
+
+    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def check_disk_report(self):
+
+        # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
+        if self.ad.get("RemoveReason", "").startswith("Removed due to disk usage"):
+            exitMsg = "Not retrying job due to excessive disk usage (job killed by CRAB3 watchdog)"
+            self.create_fake_fjr(exitMsg, 50662)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -285,6 +320,7 @@ class RetryJob(object):
             try:
                 self.check_memory_report()
                 self.check_cpu_report()
+                self.check_disk_report()
             except:
                 print "Original error: %s" % (orig_msg)
                 raise

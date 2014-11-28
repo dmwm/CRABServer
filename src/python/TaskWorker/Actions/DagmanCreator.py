@@ -148,11 +148,12 @@ periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReas
 periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) || \
                   ((JobStatus =?= 2) && ( \
                      (MemoryUsage > RequestMemory) || \
-                     (MaxWallTimeMins*60 < time() - EnteredCurrentStatus) \
+                     (MaxWallTimeMins*60 < time() - EnteredCurrentStatus) || \
+                     (DiskUsage > RequestDisk) \
                   ))
 +PeriodicRemoveReason = ifThenElse(MemoryUsage > RequestMemory, "Removed due to memory use", \
                           ifThenElse(MaxWallTimeMins*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
-                            "Removed due to job being held"))
+                            ifThenElse(DiskUsage > RequestDisk, "Removed due to disk usage", "Removed due to job being held")))
 %(extra_jdl)s
 queue
 """
