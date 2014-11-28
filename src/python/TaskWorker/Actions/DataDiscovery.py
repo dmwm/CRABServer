@@ -5,6 +5,7 @@ from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.DataObjects.Result import Result
+from TaskWorker.WorkerExceptions import TaskWorkerException
 
 # TEMPORARY
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
@@ -43,6 +44,12 @@ class DataDiscovery(TaskAction):
             if not infos.get('ValidFile', True):
                 self.logger.warning("Skipping invalid file %s" % lfn)
                 continue
+
+            if task['tm_use_parent'] == 1 and len(infos['Parents']) == 0:
+                raise TaskWorkerException(
+                        "The CRAB3 server backend refuses to submit jobs to the Grid scheduler\n" +
+                        "because you specified useParents=True but some your files have no" +
+                        "parents.\nExample: " + lfn)
             ## Createa a WMCore File object.
             wmfile = File(lfn = lfn, events = infos['NumberOfEvents'], size = infos['Size'], checksums = infos['Checksums'], parents = infos['Parents'])
             wmfile['block'] = infos['BlockName']
