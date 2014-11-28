@@ -36,10 +36,16 @@ class Splitter(TaskAction):
                 splitparam['events_per_lumi'] = kwargs['task']['tm_events_per_lumi']
             if 'tm_generator' in kwargs['task'] and kwargs['task']['tm_generator'] == 'lhe':
                 splitparam['lheInputFiles'] = True
+        splitparam['applyLumiCorrection'] = True
         factory = jobfactory(**splitparam)
         if len(factory) == 0:
             raise TaskWorkerException("The CRAB3 server backend could not submit any job to the Grid scheduler:\n"+\
                         "splitting task %s on dataset %s with %s method does not generate any job")
+        #printing duplicated lumis if any
+        lumiChecker = getattr(jobfactory, 'lumiChecker', None)
+        if lumiChecker and lumiChecker.splitLumiFiles:
+            self.logger.warning("The input dataset contains the following duplicated lumis %s" % lumiChecker.splitLumiFiles.keys())
+            import pdb;pdb.set_trace()
 
         return Result(task = kwargs['task'], result = factory)
 
