@@ -44,7 +44,7 @@ class DataDiscovery(TaskAction):
                 self.logger.warning("Skipping invalid file %s" % lfn)
                 continue
             ## Createa a WMCore File object.
-            wmfile = File(lfn = lfn, events = infos['NumberOfEvents'], size = infos['Size'], checksums = infos['Checksums'])
+            wmfile = File(lfn = lfn, events = infos['NumberOfEvents'], size = infos['Size'], checksums = infos['Checksums'], parents = infos['Parents'])
             wmfile['block'] = infos['BlockName']
             wmfile['locations'] = []
             for pnn in locations[infos['BlockName']]:
