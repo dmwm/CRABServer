@@ -42,6 +42,7 @@ class Create(DBCreator):
         tm_job_sw VARCHAR(255) NOT NULL,
         tm_job_arch VARCHAR(255),
         tm_input_dataset VARCHAR(500),
+        tm_use_parent BIGINT,
         tm_site_whitelist VARCHAR(4000),
         tm_site_blacklist VARCHAR(4000),
         tm_split_algo VARCHAR(255) NOT NULL,
