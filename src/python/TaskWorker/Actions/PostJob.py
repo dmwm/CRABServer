@@ -1153,6 +1153,7 @@ class PostJob():
             if file_info['filetype'] == 'EDM':
                 edm_file_count += 1
         multiple_edm = edm_file_count > 1
+        output_datasets = set()
         for file_info in self.output_files_info:
             publishname = self.publish_name
             if 'pset_hash' in file_info:
@@ -1167,6 +1168,7 @@ class PostJob():
                                           self.job_ad['CRAB_UserHN'] + '-' + publishname, 'USER')
             else:
                 outdataset = '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER'
+            output_datasets.add(outdataset)
             configreq = {'taskname'        : self.reqname,
                          'pandajobid'      : self.job_id,
                          'outsize'         : file_info['outsize'],
@@ -1204,20 +1206,36 @@ class PostJob():
             rest_api = 'filemetadata'
             rest_uri = self.rest_uri_no_api + '/' + rest_api
             rest_url = self.rest_host + rest_uri
-            msg = "Uploading file metadata for %s to https://%s: %s"
-            msg = msg % (filename, rest_url, configreq)
+            msg = "Uploading file metadata for %s to https://%s: %s" % (filename, rest_url, configreq)
             logger.debug(msg)
             try:
                 self.server.put(rest_uri, data = urllib.urlencode(configreq))
             except HTTPException, hte:
                 ## BrianB. Suppressing this exception is a tough decision.
                 ## If the file made it back alright, I suppose we can proceed.
-                msg = "Got exception when uploading output file metadata: %s"
-                msg = msg % (str(hte.headers))
+                msg = "Error uploading output file metadata: %s" % (str(hte.headers))
                 logger.exception(msg)
                 if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
                    not hte.headers.get('X-Error-Http', -1) == '400':
                     raise
+
+            if not os.path.exists('output_datasets'):
+                configreq = [('subresource', 'addoutputdatasets'),
+                             ('workflow', self.ad['CRAB_ReqName'])]
+                for dset in output_datasets:
+                    configreq.append(('outputdatasets', dset))
+                rest_api = 'task'
+                rest_uri = self.rest_uri_no_api + '/' + rest_api
+                rest_url = self.rest_host + rest_uri
+                msg = "Uploading output datasets to https://%s: %s" % (rest_url, configreq))
+                logger.debug(msg)
+                try:
+                    self.server.post(rest_uri, data = urllib.urlencode(configreq))
+                    with open('output_datasets', 'w') as f:
+                        f.write(' '.join(output_datasets))
+                except HTTPException, hte:
+                    msg = "Error uploading output dataset: %s" % (str(hte.headers)
+                    logger.exception(msg)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
