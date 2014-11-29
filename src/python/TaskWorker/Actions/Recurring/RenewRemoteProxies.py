@@ -17,8 +17,8 @@ from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 class RenewRemoteProxies(BaseRecurringAction):
     pollingTime = 360 #minutes
 
-    def _execute(self, instance, resturl, config, task):
-        renewer = CRAB3ProxyRenewer(config, instance, resturl.replace("workflowdb","info"), self.logger)
+    def _execute(self, resthost, resturi, config, task):
+        renewer = CRAB3ProxyRenewer(config, resthost, resturi.replace("workflowdb","info"), self.logger)
         renewer.execute()
 
 MINPROXYLENGTH = 60 * 60 * 24
@@ -26,7 +26,7 @@ QUERY_ATTRS = ['x509userproxyexpiration', 'CRAB_ReqName', 'ClusterId', 'ProcId',
 
 class CRAB3ProxyRenewer(object):
 
-    def __init__(self, config, instance, resturl, logger=None):
+    def __init__(self, config, resthost, resturi, logger=None):
         if not logger:
             self.logger = logging.getLogger(__name__)
             handler = logging.StreamHandler(sys.stdout)
@@ -37,8 +37,8 @@ class CRAB3ProxyRenewer(object):
         else:
             self.logger = logger
 
-        self.resturl = resturl
-        self.instance = instance
+        self.resturi = resturi
+        self.resthost = resthost
         self.config = config
         self.pool = ''
         self.schedds = []
@@ -48,9 +48,9 @@ class CRAB3ProxyRenewer(object):
             htcondor.enable_debug()
 
     def get_backendurls(self):
-        self.logger.info("Querying server %s for HTCondor schedds and pool names." % self.resturl)
-        server = HTTPRequests(self.instance, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey)
-        result = server.get(self.resturl, data={'subresource':'backendurls'})[0]['result'][0]
+        self.logger.info("Querying server %s for HTCondor schedds and pool names." % self.resturi)
+        server = HTTPRequests(self.resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey)
+        result = server.get(self.resturi, data={'subresource':'backendurls'})[0]['result'][0]
         self.pool = str(result['htcondorPool'])
         self.schedds = [str(i) for i in result['htcondorSchedds']]
         self.logger.info("Resulting pool %s; schedds %s" % (self.pool, ",".join(self.schedds)))
@@ -70,7 +70,7 @@ class CRAB3ProxyRenewer(object):
         proxycfg = {'vo': vo,
                     'logger': self.logger,
                     'myProxySvr': self.config.Services.MyProxy,
-                    'myproxyAccount': self.config.TaskWorker.resturl,
+                    'myproxyAccount': self.config.TaskWorker.resturi,
                     'proxyValidity' : '144:0',
                     'min_time_left' : MINPROXYLENGTH, ## do we need this ? or should we use self.myproxylen? 
                     'userDN' : ad['CRAB_UserDN'],

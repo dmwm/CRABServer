@@ -27,7 +27,7 @@ class RESTTask(RESTEntity):
         if method in ['POST']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
-            validate_str("warning", param, safe, RX_WORKFLOW, optional=True)
+            validate_str("warning", param, safe, RX_TEXT_FAIL, optional=True)
             validate_str("webdirurl", param, safe, RX_URL, optional=True)
             validate_strlist("outputdatasets", param, safe, RX_OUT_DATASET)
         elif method in ['GET']:

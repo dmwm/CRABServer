@@ -2,10 +2,10 @@ import time
 import logging
 from TaskWorker.DataObjects.Result import Result
 
-def handleRecurring(instance, resturl, config, task, action):
+def handleRecurring(resthost, resturi, config, task, action):
     actionClass = action.split('.')[-1]
     mod = __import__(action, fromlist=actionClass)
-    getattr(mod, actionClass)().execute(instance, resturl, config, task)
+    getattr(mod, actionClass)().execute(resthost, resturi, config, task)
 
 class BaseRecurringAction:
     def __init__(self):
@@ -25,10 +25,10 @@ class BaseRecurringAction:
             self.lastExecution = time.time()
         return timetogo
 
-    def execute(self, instance, resturl, config, task):
+    def execute(self, resthost, resturi, config, task):
         try:
             self.logger.info("Executing %s" % task)
-            self._execute(instance, resturl, config, task)
+            self._execute(resthost, resturi, config, task)
             return Result(task=task['tm_taskname'], result="OK")
         except Exception, ex:
             self.logger.error("Error while runnig recurring action.")

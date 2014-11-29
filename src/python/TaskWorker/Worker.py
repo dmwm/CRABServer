@@ -16,7 +16,7 @@ from RESTInteractions import HTTPRequests
 global WORKER_CONFIG
 
 
-def processWorker(inputs, results, instance, resturl):
+def processWorker(inputs, results, resthost, resturi):
     """Wait for an reference to appear in the input queue, call the referenced object
        and write the output in the output queue.
 
@@ -41,7 +41,7 @@ def processWorker(inputs, results, instance, resturl):
         logger.debug("%s: Starting %s on %s" %(procName, str(work), task['tm_taskname']))
         try:
             msg = None
-            outputs = work(instance, resturl, WORKER_CONFIG, task, inputargs)
+            outputs = work(resthost, resturi, WORKER_CONFIG, task, inputargs)
         except WorkerHandlerException, we:
             outputs = Result(task=task, err=str(we))
             msg = str(we)
@@ -54,13 +54,13 @@ def processWorker(inputs, results, instance, resturl):
         finally:
             if msg:
                 try:
-                    server = HTTPRequests(instance, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey)
+                    server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey)
                     configreq = {  'workflow': task['tm_taskname'],
                                    'status': "FAILED",
                                    'subresource': 'failure',
                                    'failure': b64encode(msg)}
 
-                    server.post(resturl, data = urllib.urlencode(configreq))
+                    server.post(resturi, data = urllib.urlencode(configreq))
                     logger.info("Error message successfully uploaded to the REST")
                 except Exception, exc:
                     logger.warning("Cannot upload failure message to the REST for workflow %s.\nReason: %s" % (task['tm_taskname'], exc))
@@ -80,12 +80,12 @@ class Worker(object):
     """Worker class providing all the functionalities to manage all the slaves
        and distribute the work"""
 
-    def __init__(self, config, instance, resturl):
+    def __init__(self, config, resthost, resturi):
         """Initializer
 
         :arg WMCore.Configuration config: input TaskWorker configuration
         :arg str instance: the hostname where the rest interface is running
-        :arg str resturl: the rest base url to contact."""
+        :arg str resturi: the rest base url to contact."""
         #Adding signal handlers that do not do anything. Soft kill is handled by the master worker
         #We just need to prevent "accidental" kill of the worker processes by things like pkill -f TaskWorker
         signal.signal(signal.SIGINT, lambda code, tb: None)
@@ -101,8 +101,8 @@ class Worker(object):
         self.inputs  = multiprocessing.Queue(self.leninqueue)
         self.results = multiprocessing.Queue()
         self.working = {}
-        self.instance = instance
-        self.resturl = resturl
+        self.resthost = resthost
+        self.resturi = resturi
 
     def __del__(self):
         """When deleted shutting down all slaves"""
@@ -114,7 +114,7 @@ class Worker(object):
             # Starting things up
             for x in range(self.nworkers):
                 self.logger.debug("Starting process %i" %x)
-                p = multiprocessing.Process(target = processWorker, args = (self.inputs, self.results, self.instance, self.resturl))
+                p = multiprocessing.Process(target = processWorker, args = (self.inputs, self.results, self.resthost, self.resturi))
                 p.start()
                 self.pool.append(p)
         self.logger.info("Started %d slaves"% len(self.pool))

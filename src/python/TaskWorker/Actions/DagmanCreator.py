@@ -737,7 +737,7 @@ class DagmanCreator(TaskAction.TaskAction):
             kw['task']['scratch'] = temp_dir
 
         kw['task']['resthost'] = self.server['host']
-        kw['task']['resturinoapi'] = self.rest_uri_no_api
+        kw['task']['resturinoapi'] = self.restURInoAPI
         self.task = kw['task']
         params = self.sendDashboardTask()
 

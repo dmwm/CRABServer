@@ -101,4 +101,4 @@ class DagmanResubmitter(TaskAction.TaskAction):
                      'subresource': 'success',}
         self.logger.debug("Setting the task as successfully resubmitted with %s " % str(configreq))
         data = urllib.urlencode(configreq)
-        self.server.post(self.resturl, data = data)
+        self.server.post(self.resturi, data = data)

@@ -70,13 +70,6 @@ class DBSDataDiscovery(DataDiscovery):
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
             msg = "The CRAB3 server backend could not find any location for dataset %s in %s." % (kwargs['task']['tm_input_dataset'], dbsurl)
-#           You should not need the following if you raise TaskWorkerException
-#            self.logger.error("Setting %s as failed" % str(kwargs['task']['tm_taskname']))
-#            configreq = {'workflow': kwargs['task']['tm_taskname'],
-#                         'status': "FAILED",
-#                         'subresource': 'failure',
-#                         'failure': b64encode(msg)}
-#            self.server.post(self.resturl, data = urllib.urlencode(configreq))
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))

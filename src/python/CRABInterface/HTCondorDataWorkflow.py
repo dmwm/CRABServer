@@ -295,6 +295,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         if verbose == None:
             verbose = 0
         self.logger.info("Status result for workflow %s: %s (detail level %d)" % (workflow, row.task_status, verbose))
+        taskWarnings = literal_eval(row.task_warnings if isinstance(row.task_warnings, str) else row.task_warnings.read())
         if row.task_status not in ['SUBMITTED', 'KILLFAILED', 'KILLED']:
             if isinstance(row.task_failure, str):
                 taskFailureMsg = row.task_failure
@@ -303,7 +304,8 @@ class HTCondorDataWorkflow(DataWorkflow):
             else:
                 taskFailureMsg = row.task_failure.read()
             result = [ {"status" : row.task_status,
-                      "taskFailureMsg" : taskFailureMsg,
+                      "taskFailureMsg"  : taskFailureMsg,
+                      "taskWarningMsg"  : taskWarnings,
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
@@ -331,6 +333,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             self.logger.exception(msg)
             return [{"status" : "UNKNOWN",
                       "taskFailureMsg" : str(msg),
+                      "taskWarningMsg"  : taskWarnings,
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
@@ -341,6 +344,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         if not results:
             return [ {"status" : "UNKNOWN",
                       "taskFailureMsg" : "The CRAB3 server frontend cannot find any information about your jobs in the Grid scheduler. Remember, jobs are only kept for a limited amount of time on the scheduler (one month usually)",
+                      "taskWarningMsg"  : taskWarnings,
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
@@ -354,6 +358,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             if taskStatusCode != 1 and taskStatusCode != 2:
                 return [ {"status" : "UNKNOWN",
                       "taskFailureMsg"  : "Your task failed to bootstrap on the Grid scheduler %s." % address,
+                      "taskWarningMsg"  : taskWarnings,
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
@@ -378,6 +383,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         except MissingNodeStatus:
             return [ {"status" : "UNKNOWN",
                 "taskFailureMsg"  : "Node status file not currently available.  Retry in a minute if you just submitted the task",
+                "taskWarningMsg"  : taskWarnings,
                 "jobSetID"        : '',
                 "jobsPerStatus"   : {},
                 "failedJobdefs"   : 0,
@@ -392,7 +398,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'finished', 5: 'held'}
         task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
         retval = {"status": task_codes.get(taskStatusCode, 'unknown'), "taskFailureMsg": "", "jobSetID": workflow,
-            "jobsPerStatus" : jobsPerStatus, "jobList": jobList}
+            "jobsPerStatus" : jobsPerStatus, "jobList": jobList, "taskWarningMsg" : taskWarnings}
         # HoldReasonCode == 1 indicates that the TW killed the task; perhaps the DB was not properly updated afterward?
         if row.task_status != "KILLED" and taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 1:
             retval['status'] = 'KILLED'

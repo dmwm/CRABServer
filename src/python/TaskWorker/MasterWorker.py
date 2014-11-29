@@ -103,19 +103,19 @@ class MasterWorker(object):
         self.TEST = test
         self.logger = getLogging(quiet, debug)
         self.config = config
-        restinstance = None
-        self.resturl = '/crabserver/prod/workflowdb'
+        resthost = None
+        self.restURInoAPI = None
         if not self.config.TaskWorker.mode in MODEURL.keys():
             raise ConfigException("No mode provided: need to specify config.TaskWorker.mode in the configuration")
         elif MODEURL[self.config.TaskWorker.mode]['host'] is not None:
-            restinstance = MODEURL[self.config.TaskWorker.mode]['host']
-            self.resturl = self.resturl.replace('prod', MODEURL[self.config.TaskWorker.mode]['instance'])
+            resthost = MODEURL[self.config.TaskWorker.mode]['host']
+            self.restURInoAPI = '/crabserver/' + MODEURL[self.config.TaskWorker.mode]['instance']
         else:
-            restinstance = self.config.TaskWorker.resturl
-            self.resturl = self.resturl.replace('prod', MODEURL[self.config.TaskWorker.mode]['instance'])
-        if self.resturl is None or restinstance is None:
+            resthost = self.config.TaskWorker.resturl #this should be called resthost in the TaskWorkerConfig -_-
+            self.restURInoAPI = '/crabserver/' + MODEURL[self.config.TaskWorker.mode]['instance']
+        if resthost is None:
             raise ConfigException("No correct mode provided: need to specify config.TaskWorker.mode in the configuration")
-        self.server = HTTPRequests(restinstance, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey)
+        self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey)
         self.logger.debug("Hostcert: %s, hostkey: %s" %(str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey)))
         # Retries for any failures
         if not hasattr(self.config.TaskWorker, 'max_retry'):
@@ -125,9 +125,9 @@ class MasterWorker(object):
         if not len(self.config.TaskWorker.retry_interval) == self.config.TaskWorker.max_retry:
             raise ConfigException("No correct max_retry and retry_interval specified; len of retry_interval must be equal to max_retry.")
         if self.TEST:
-            self.slaves = TestWorker(self.config, restinstance, self.resturl)
+            self.slaves = TestWorker(self.config, resthost, self.restURInoAPI + '/workflowdb')
         else:
-            self.slaves = Worker(self.config, restinstance, self.resturl)
+            self.slaves = Worker(self.config, resthost, self.restURInoAPI + '/workflowdb')
         self.slaves.begin()
         recurringActionsNames = getattr(self.config.TaskWorker, 'recurringActions', [])
         self.recurringActions = [self.getRecurringActionInst(name) for name in recurringActionsNames]
@@ -145,7 +145,7 @@ class MasterWorker(object):
             * the server has an internal error"""
         configreq = {'subresource': 'process', 'workername': self.config.TaskWorker.name, 'getstatus': getstatus, 'limit': limit, 'status': setstatus}
         try:
-            self.server.post(self.resturl, data = urllib.urlencode(configreq))
+            self.server.post(self.restURInoAPI + '/workflowdb', data = urllib.urlencode(configreq))
         except HTTPException, hte:
             #Using a msg variable and only one self.logger.error so that messages do not get shuffled
             msg = "Task Worker could not update a task status (HTTPException): %s\nConfiguration parameters=%s\n" % (str(hte), configreq)
@@ -171,7 +171,7 @@ class MasterWorker(object):
         configreq = {'limit': limit, 'workername': self.config.TaskWorker.name, 'getstatus': getstatus}
         pendingwork = []
         try:
-            pendingwork = self.server.get(self.resturl, data = configreq)[0]['result']
+            pendingwork = self.server.get(self.restURInoAPI + '/workflowdb', data = configreq)[0]['result']
         except HTTPException, hte:
             self.logger.error("Could not get any work from the server: \n" +
                               "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown')) +
@@ -195,7 +195,7 @@ class MasterWorker(object):
         retry = True
         while retry:
             try:
-                self.server.post(self.resturl, data = urllib.urlencode(configreq))
+                self.server.post(self.restURInoAPI + '/workflowdb', data = urllib.urlencode(configreq))
                 retry = False
             except HTTPException, hte:
                 #Using a msg variable and only one self.logger.error so that messages do not get shuffled
