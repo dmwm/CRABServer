@@ -152,7 +152,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                              'status': "FAILED",
                              'subresource': 'failure',
                              'failure': base64.b64encode(msg)}
-                self.server.post(self.rest_uri, data = urllib.urlencode(configreq))
+                self.server.post(self.resturi, data = urllib.urlencode(configreq))
                 raise
         retry_issues = []
         for retry in range(self.config.TaskWorker.max_retry):
@@ -170,11 +170,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         msg = "The CRAB3 server backend could not submit your jobs to the Grid scheduler. This could be a temporary glitch, please retry again later and contact"+\
               " the experts if the error persist. The submission was retried %s times, these are the failures: %s" % (len(retry_issues), str(retry_issues))
         self.logger.error(msg)
-#        configreq = {'workflow': kw['task']['tm_taskname'],
-#                     'status': "FAILED",
-#                     'subresource': 'failure',
-#                     'failure': base64.b64encode(msg)}
-#        self.server.post(self.rest_uri, data = urllib.urlencode(configreq))
         raise TaskWorkerException(msg)
 
     def duplicateCheck(self, task):
@@ -203,7 +198,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     }
         self.logger.warning("Task %s already submitted to HTCondor; pushing information centrally: %s" % (workflow, str(configreq)))
         data = urllib.urlencode(configreq)
-        self.server.post(self.rest_uri, data = data)
+        self.server.post(self.resturi, data = data)
 
         # Note that we don't re-send Dashboard jobs; we assume this is a rare occurrance and
         # don't want to upset any info already in the Dashboard.
@@ -245,7 +240,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         info['resthost'] = '"%s"' % (self.server['host'])
         #info['resthost'] = self.config.TaskWorker.resturl
-        info['resturinoapi'] = '"%s"' % (self.rest_uri_no_api)
+        info['resturinoapi'] = '"%s"' % (self.restURInoAPI)
 
         try:
             info['remote_condor_setup'] = ''
@@ -281,7 +276,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                      'subresource': 'success',}
         self.logger.debug("Pushing information centrally %s" %(str(configreq)))
         data = urllib.urlencode(configreq)
-        self.server.post(self.rest_uri, data = data)
+        self.server.post(self.resturi, data = data)
 
         self.sendDashboardJobs(dashboard_params, info['apmon'])
 

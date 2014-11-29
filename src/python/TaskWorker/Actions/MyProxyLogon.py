@@ -15,8 +15,8 @@ MINPROXYLENGTH = 60 * 60 * 1
 
 class MyProxyLogon(TaskAction):
 
-    def __init__(self, config, server, resturl, myproxylen=MINPROXYLENGTH):
-        TaskAction.__init__(self, config, server, resturl)
+    def __init__(self, config, server, resturi, myproxylen=MINPROXYLENGTH):
+        TaskAction.__init__(self, config, server, resturi)
         self.myproxylen = myproxylen
 
     def execute(self, *args, **kwargs):
@@ -49,7 +49,7 @@ class MyProxyLogon(TaskAction):
                          'subresource': 'failure',
                          'failure': b64encode(msg)}
             self.logger.error(str(configreq))
-            self.server.post(self.resturl, data = urllib.urlencode(configreq))
+            self.server.post(self.resturi, data = urllib.urlencode(configreq))
             raise StopHandler(msg)
         else:
             kwargs['task']['user_proxy'] = userproxy

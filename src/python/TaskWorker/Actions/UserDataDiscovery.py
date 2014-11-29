@@ -26,7 +26,7 @@ class UserDataDiscovery(DataDiscovery):
 
         userfiles = kwargs['task']['tm_arguments'].get('userfiles')
         splitting = kwargs['task']['tm_split_algo']
-        total_units = kwargs['task']['tm_totalunits'] 
+        total_units = kwargs['task']['tm_totalunits']
         if not userfiles or splitting != 'FileBased':
             if not userfiles:
                 msg = "No files specified to process for task %s." % kwargs['task']['tm_taskname']
@@ -37,7 +37,7 @@ class UserDataDiscovery(DataDiscovery):
                          'status': "FAILED",
                          'subresource': 'failure',
                          'failure': b64encode(msg)}
-            self.server.post(self.resturl, data = urllib.urlencode(configreq))
+            self.server.post(self.resturi, data = urllib.urlencode(configreq))
             raise StopHandler(msg)
 
         if hasattr(self.config.Sites, 'available'):

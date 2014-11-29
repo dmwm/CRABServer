@@ -45,7 +45,13 @@ class Splitter(TaskAction):
         lumiChecker = getattr(jobfactory, 'lumiChecker', None)
         if lumiChecker and lumiChecker.splitLumiFiles:
             self.logger.warning("The input dataset contains the following duplicated lumis %s" % lumiChecker.splitLumiFiles.keys())
-            import pdb;pdb.set_trace()
+            try:
+                configreq = {'subresource': 'addwarning',
+                             'workflow': kwargs['task']['tm_taskname'],
+                             'warning': 'blahblah'}
+                self.server.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
+            except:
+                self.warning("Cannot add warnint to REST after finding duplicates")
 
         return Result(task = kwargs['task'], result = factory)
 

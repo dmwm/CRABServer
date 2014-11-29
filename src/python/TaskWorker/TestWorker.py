@@ -4,10 +4,10 @@ class TestWorker(object):
         multiple threads.
     """
 
-    def __init__(self, config, instance, resturl):
+    def __init__(self, config, resthost, resturi):
         self.config = config
-        self.instance = instance
-        self.resturl = resturl
+        self.resthost = resthost
+        self.resturi = resturi
 
     def pendingTasks(self):
         return 0
@@ -27,7 +27,7 @@ class TestWorker(object):
     def injectWorks(self, works):
         if works:
             func, task, _ = works[0]
-            func(self.instance, self.resturl, self.config, task)
+            func(self.resthost, self.resturi, self.config, task)
 
     def checkFinished(self):
         return []

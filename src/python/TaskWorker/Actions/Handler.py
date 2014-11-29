@@ -78,91 +78,91 @@ class TaskHandler(object):
         tot1 = time.time()
         return nextinput
 
-def handleNewTask(instance, resturl, config, task, *args, **kwargs):
+def handleNewTask(resthost, resturi, config, task, *args, **kwargs):
     """Performs the injection of a new task
 
-    :arg str instance: the hostname where the rest interface is running
-    :arg str resturl: the rest base url to contact
+    :arg str resthost: the hostname where the rest interface is running
+    :arg str resturi: the rest base url to contact
     :arg WMCore.Configuration config: input configuration
     :arg TaskWorker.DataObjects.Task task: the task to work on
     :*args and *kwargs: extra parameters currently not defined
     :return: the handler."""
-    server = HTTPRequests(instance, config.TaskWorker.cmscert, config.TaskWorker.cmskey)
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey)
     handler = TaskHandler(task)
-    handler.addWork( MyProxyLogon(config=config, server=server, resturl=resturl, myproxylen=60*60*24) )
+    handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, myproxylen=60*60*24) )
     if task['tm_job_type'] == 'Analysis': 
         if task.get('tm_arguments', {}).get('userfiles'):
-            handler.addWork( UserDataDiscovery(config=config, server=server, resturl=resturl) )
+            handler.addWork( UserDataDiscovery(config=config, server=server, resturi=resturi) )
         else:
-            handler.addWork( DBSDataDiscovery(config=config, server=server, resturl=resturl) )
+            handler.addWork( DBSDataDiscovery(config=config, server=server, resturi=resturi) )
     elif task['tm_job_type'] == 'PrivateMC': 
-        handler.addWork( MakeFakeFileSet(config=config, server=server, resturl=resturl) )
-    handler.addWork( Splitter(config=config, server=server, resturl=resturl) )
+        handler.addWork( MakeFakeFileSet(config=config, server=server, resturi=resturi) )
+    handler.addWork( Splitter(config=config, server=server, resturi=resturi) )
 
     def glidein(config):
         """Performs the injection of a new task into Glidein
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( DagmanCreator(config=config, server=server, resturl=resturl) )
-        handler.addWork( DagmanSubmitter(config=config, server=server, resturl=resturl) )
+        handler.addWork( DagmanCreator(config=config, server=server, resturi=resturi) )
+        handler.addWork( DagmanSubmitter(config=config, server=server, resturi=resturi) )
 
     def panda(config):
         """Performs the injection into PanDA of a new task
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( PanDABrokerage(pandaconfig=config, server=server, resturl=resturl) )
-        handler.addWork( PanDAInjection(pandaconfig=config, server=server, resturl=resturl) )
+        handler.addWork( PanDABrokerage(pandaconfig=config, server=server, resturi=resturi) )
+        handler.addWork( PanDAInjection(pandaconfig=config, server=server, resturi=resturi) )
 
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args)
 
-def handleResubmit(instance, resturl, config, task, *args, **kwargs):
+def handleResubmit(resthost, resturi, config, task, *args, **kwargs):
     """Performs the re-injection of failed jobs
 
-    :arg str instance: the hostname where the rest interface is running
-    :arg str resturl: the rest base url to contact
+    :arg str resthost: the hostname where the rest interface is running
+    :arg str resturi: the rest base url to contact
     :arg WMCore.Configuration config: input configuration
     :arg TaskWorker.DataObjects.Task task: the task to work on
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(instance, config.TaskWorker.cmscert, config.TaskWorker.cmskey)
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey)
     handler = TaskHandler(task)
-    handler.addWork( MyProxyLogon(config=config, server=server, resturl=resturl, myproxylen=60*60*24) )
+    handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, myproxylen=60*60*24) )
     def glidein(config):
         """Performs the re-injection into Glidein
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( DagmanResubmitter(config=config, server=server, resturl=resturl) )
+        handler.addWork( DagmanResubmitter(config=config, server=server, resturi=resturi) )
 
     def panda(config):
         """Performs the re-injection into PanDA
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( PanDAgetSpecs(pandaconfig=config, server=server, resturl=resturl) )
-        handler.addWork( PanDASpecs2Jobs(pandaconfig=config, server=server, resturl=resturl) )
-        handler.addWork( PanDABrokerage(pandaconfig=config, server=server, resturl=resturl) )
-        handler.addWork( PanDAInjection(pandaconfig=config, server=server, resturl=resturl) )
+        handler.addWork( PanDAgetSpecs(pandaconfig=config, server=server, resturi=resturi) )
+        handler.addWork( PanDASpecs2Jobs(pandaconfig=config, server=server, resturi=resturi) )
+        handler.addWork( PanDABrokerage(pandaconfig=config, server=server, resturi=resturi) )
+        handler.addWork( PanDAInjection(pandaconfig=config, server=server, resturi=resturi) )
 
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args)
 
-def handleKill(instance, resturl, config, task, *args, **kwargs):
+def handleKill(resthost, resturi, config, task, *args, **kwargs):
     """Asks to kill jobs
 
-    :arg str instance: the hostname where the rest interface is running
-    :arg str resturl: the rest base url to contact
+    :arg str resthost: the hostname where the rest interface is running
+    :arg str resturi: the rest base url to contact
     :arg WMCore.Configuration config: input configuration
     :arg TaskWorker.DataObjects.Task task: the task to work on
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(instance, config.TaskWorker.cmscert, config.TaskWorker.cmskey)
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey)
     handler = TaskHandler(task)
-    handler.addWork( MyProxyLogon(config=config, server=server, resturl=resturl, myproxylen=60*5) )
+    handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, myproxylen=60*5) )
     def glidein(config):
         """Performs kill of jobs sent through Glidein
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( DagmanKiller(config=config, server=server, resturl=resturl) )
+        handler.addWork( DagmanKiller(config=config, server=server, resturi=resturi) )
 
     def panda(config):
         """Performs the re-injection into PanDA
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( PanDAKill(pandaconfig=config, server=server, resturl=resturl) )
+        handler.addWork( PanDAKill(pandaconfig=config, server=server, resturi=resturi) )
 
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)
