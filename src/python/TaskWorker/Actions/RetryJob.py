@@ -62,16 +62,9 @@ class RetryJob(object):
         except ValueError:
             pass
 
-        shutil.copy("job_log", "job_log.%s" % str(self.cluster))
-
-        p = subprocess.Popen(["condor_q", "-debug", "-l", "-userlog", "job_log.%s" % str(self.cluster), str(self.cluster)], stdout=subprocess.PIPE, stderr=sys.stderr)
+        p = subprocess.Popen(["condor_q", "-debug", "-l", "-userlog", "job_log"], stdout=subprocess.PIPE, stderr=sys.stderr)
         output, _ = p.communicate()
         status = p.returncode
-
-        try:
-            os.unlink("job_log.%s" % str(self.cluster))
-        except:
-            pass
 
         if status:
             raise FatalError("Failed to query condor user log:\n%s" % output)
