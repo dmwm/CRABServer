@@ -459,7 +459,16 @@ class DagmanCreator(TaskAction.TaskAction):
         lastDirectDest = None
         lastDirectPfn = None
         for job in jobgroup.getJobs():
-            inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']]).replace('"', r'\"\"')
+            if task['tm_use_parent'] == 1:
+                inputFiles = json.dumps([
+                    {
+                        'lfn': inputfile['lfn'],
+                        'parents': [{'lfn': parentfile} for parentfile in inputfile['parents']]
+                    }
+                    for inputfile in job['input_files']
+                ]).replace('"', r'\"\"')
+            else:
+                inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']]).replace('"', r'\"\"')
             runAndLumiMask = '\'' + json.dumps(job['mask']['runAndLumis']) + '\''
             firstEvent = str(job['mask']['FirstEvent'])
             lastEvent = str(job['mask']['LastEvent'])

@@ -46,7 +46,9 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
     """
     location:       the working directory. PSet.py must be located there. The output PSet.pkl is also put there.
                     N.B.: this parameter must end with WMTaskSpace.cmsRun.PSet
-    inputFiles:     the input files of the job. This must be a list of dictionaries whose keys are "lfn" and "parents".
+    inputFiles:     the input files of the job. This must be a list of dictionaries whose keys are "lfn" and "parents"
+                    or a list of filenames.
+
                     For example a valid input for this parameter is [{"lfn": , "parents" : }, {"lfn": , "parents" : }]
                     If the "lfn"s start with MCFakeFile then mask.FirstLumi is used to tweak process.source.firstLuminosityBlock
                     If the len of the list is >1 then the "lfn" values are put in a list and used to tweak "process.source.fileNames"
@@ -92,7 +94,10 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
         self.job = jobDict(lheInputFiles, seeding)
         self.job["input_files"] = []
         for inputF in inputFiles:
-            self.job["input_files"].append({"lfn" : inputF, "parents" : ""})
+            if isinstance(inputF, basestring):
+                self.job["input_files"].append({"lfn" : inputF, "parents" : ""})
+            else:
+                self.job["input_files"].append(inputF)
 
         self.job['mask'] = Mask()
         self.job['mask']["FirstEvent"] = firstEvent
@@ -163,7 +168,7 @@ runAndLumis = {}
 if opts.runAndLumis:
     readFileFromTarball(opts.runAndLumis, 'run_and_lumis.tar.gz')
 
-pset = SetupCMSSWPsetCore( opts.location, map(str, literal_eval(opts.inputFile)), runAndLumis, agentNumber, lfnBase, outputMods,\
+pset = SetupCMSSWPsetCore( opts.location, literal_eval(opts.inputFile), runAndLumis, agentNumber, lfnBase, outputMods,\
                            literal_eval(opts.firstEvent), literal_eval(opts.lastEvent), literal_eval(opts.firstLumi),\
                            literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode, literal_eval(opts.eventsPerLumi))
 
