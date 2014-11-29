@@ -48,10 +48,12 @@ class Splitter(TaskAction):
             try:
                 configreq = {'subresource': 'addwarning',
                              'workflow': kwargs['task']['tm_taskname'],
-                             'warning': 'blahblah'}
+                             'warning': b64encode('The CRAB3 server backend detected lumis split across files in the input dataset.'
+                                        ' Will apply the necessary corrections in the splitting algorithms')}
                 self.server.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
-            except:
-                self.warning("Cannot add warnint to REST after finding duplicates")
+            except Exception, e:
+                self.logger.error(e.headers)
+                self.logger.warning("Cannot add warning to REST after finding duplicates")
 
         return Result(task = kwargs['task'], result = factory)
 
