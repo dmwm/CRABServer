@@ -26,32 +26,6 @@ import HTCondorLocator
 
 JOB_KILLED_HOLD_REASON = "Python-initiated action."
 
-def lfn_to_temp(lfn, userdn, username, role, group):
-    lfn_parts = lfn[1:].split("/")
-    if lfn_parts[1] == "temp":
-        return lfn
-    del lfn_parts[2]
-    hash_input = userdn
-    if group:
-        hash_input += "," + group
-    if role:
-        hash_input += "," + role
-    user = "%s.%s" % (username, hashlib.sha1(hash_input).hexdigest())
-    lfn_parts.insert(2, user)
-    lfn_parts.insert(1, "temp")
-    return "/" + "/".join(lfn_parts)
-
-
-def temp_to_lfn(lfn, username):
-    lfn_parts = lfn[1:].split("/")
-    if lfn_parts[1] != "temp":
-        return lfn
-    del lfn_parts[1]
-    del lfn_parts[2]
-    lfn_parts.insert(2, username)
-    return "/" + "/".join(lfn_parts)
-
-
 class MissingNodeStatus(ExecutionError):
     pass
 
@@ -105,6 +79,9 @@ class HTCondorDataWorkflow(DataWorkflow):
             transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
             finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
         else:
+            ## The clasification here is irrelevant, because getFiles will anyway
+            ## retrieve from the temporary storage. But we still have to put the
+            ## job ids either in one list or the other.
             transferingIds = []
             finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferring', 'cooloff', 'held']]
         return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, row.user_dn, row.username, row.user_role, row.user_group, savelogs, userproxy)
@@ -125,6 +102,9 @@ class HTCondorDataWorkflow(DataWorkflow):
             transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
             finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
         else:
+            ## The clasification here is irrelevant, because getFiles will anyway
+            ## retrieve from the temporary storage. But we still have to put the
+            ## job ids either in one list or the other.
             transferingIds = []
             finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferring', 'cooloff', 'held']]
 
@@ -170,17 +150,25 @@ class HTCondorDataWorkflow(DataWorkflow):
             try:
                 jobid = row[GetFromTaskAndType.PANDAID]
                 if transfer_files:
-                    if jobid in finishedIds:
-                        lfn = temp_to_lfn(row[GetFromTaskAndType.LFN], username)
-                        pfn = self.phedex.getPFN(row[GetFromTaskAndType.LOCATION], lfn)[(row[GetFromTaskAndType.LOCATION], lfn)]
-                    elif jobid in transferingIds:
-                        lfn = lfn_to_temp(row[GetFromTaskAndType.LFN], userdn, username, role, group)
-                        pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
+                    if row[GetFromTaskAndType.DIRECTSTAGEOUT]:
+                        lfn  = row[GetFromTaskAndType.LFN]
+                        site = row[GetFromTaskAndType.LOCATION]
+                        pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
                     else:
-                        continue
+                        if jobid in finishedIds:
+                            lfn  = row[GetFromTaskAndType.LFN]
+                            site = row[GetFromTaskAndType.LOCATION]
+                            pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
+                        elif jobid in transferingIds:
+                            lfn  = row[GetFromTaskAndType.TMPLFN]
+                            site = row[GetFromTaskAndType.TMPLOCATION]
+                            pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
+                        else:
+                            continue
                 else:
-                    lfn = lfn_to_temp(row[GetFromTaskAndType.LFN], userdn, username, role, group)
-                    pfn = self.phedex.getPFN(row[GetFromTaskAndType.TMPLOCATION], lfn)[(row[GetFromTaskAndType.TMPLOCATION], lfn)]
+                    lfn  = row[GetFromTaskAndType.TMPLFN]
+                    site = row[GetFromTaskAndType.TMPLOCATION]
+                    pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
             except Exception, err:
                 self.logger.exception(err)
                 raise ExecutionError("Exception while contacting PhEDEX.")

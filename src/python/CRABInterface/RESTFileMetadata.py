@@ -46,6 +46,7 @@ class RESTFileMetadata(RESTEntity):
             validate_str("acquisitionera", param, safe, RX_WORKFLOW, optional=False)#TODO Do we really need this?
             validate_str("outdatasetname", param, safe, RX_OUTDSLFN, optional=False)#TODO temporary, need to come up with a regex
             validate_str("outlfn", param, safe, RX_LFN, optional=False)
+            validate_str("outtmplfn", param, safe, RX_LFN, optional=False)
             validate_num("events", param, safe, optional=False)
             validate_str("filestate", param, safe, RX_FILESTATE, optional=True)
             validate_num("directstageout", param, safe, optional=True)
@@ -66,12 +67,13 @@ class RESTFileMetadata(RESTEntity):
 
     @restcall
     def put(self, taskname, outfilelumis, inparentlfns, globalTag, outfileruns, pandajobid, outsize, publishdataname, appver, outtype, checksummd5,\
-                checksumcksum, checksumadler32, outlocation, outtmplocation, outdatasetname, acquisitionera, outlfn, events, filestate, directstageout):
+                checksumcksum, checksumadler32, outlocation, outtmplocation, outdatasetname, acquisitionera, outlfn, outtmplfn, events, filestate, directstageout):
         """Insert a new job metadata information"""
         return self.jobmetadata.inject(taskname=taskname, outfilelumis=outfilelumis, inparentlfns=inparentlfns, globalTag=globalTag, outfileruns=outfileruns,\
                            pandajobid=pandajobid, outsize=outsize, publishdataname=publishdataname, appver=appver, outtype=outtype, checksummd5=checksummd5,\
                            checksumcksum=checksumcksum, checksumadler32=checksumadler32, outlocation=outlocation, outtmplocation=outtmplocation,\
-                           outdatasetname=outdatasetname, acquisitionera=acquisitionera, outlfn=outlfn, events=events, filestate=filestate, directstageout=directstageout)
+                           outdatasetname=outdatasetname, acquisitionera=acquisitionera, outlfn=outlfn, outtmplfn=outtmplfn, events=events, filestate=filestate, \
+                           directstageout=directstageout)
 
     @restcall
     def post(self, taskname, outlfn, filestate):

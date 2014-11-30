@@ -757,7 +757,7 @@ class PostJob():
         ## CRAB_EDMOutputFiles, CRAB_TFileOutputFiles and CRAB_AdditionalOutputFiles.
         ## (We only need to add the job_id in the file names.)
         self.output_files_names  = []
-        for i in range(9, len(args)):
+        for i in xrange(9, len(args)):
             self.output_files_names.append(args[i])
         self.job_status = int(self.job_status)
         self.crab_retry_count = self.calculate_crab_retry_count()
@@ -1119,9 +1119,8 @@ class PostJob():
                      'outlocation'     : self.dest_site,
                      'outlfn'          : os.path.join(self.dest_dir, 'log', self.logs_arch_file_name),
                      'outtmplocation'  : temp_storage_site,
-                     #'outtmplfn'       : os.path.join(self.source_dir, 'log', self.logs_arch_file_name),
+                     'outtmplfn'       : os.path.join(self.source_dir, 'log', self.logs_arch_file_name),
                      'outdatasetname'  : '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER',
-                     #'localstageout'   : int(self.job_report.get('local_stageout', 0)),
                      'directstageout'  : int(self.job_report.get('direct_stageout', 0))
                     }
         rest_api = 'filemetadata'
@@ -1183,9 +1182,8 @@ class PostJob():
                          'outlocation'     : file_info['outlocation'],
                          'outlfn'          : file_info['outlfn'],
                          'outtmplocation'  : file_info['outtmplocation'],
-                         #'outtmplfn'       : file_info['outtmplfn'],
+                         'outtmplfn'       : file_info['outtmplfn'],
                          'outdatasetname'  : outdataset,
-                         #'localstageout'   : int(file_info['local_stageout']),
                          'directstageout'  : int(file_info['direct_stageout']),
                          'globalTag'       : 'None'
                         }

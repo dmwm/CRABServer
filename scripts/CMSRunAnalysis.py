@@ -302,7 +302,7 @@ def logCMSSW():
     print "======== CMSSW OUTPUT FINSHING ========"
 
 
-def handleException(exitAcronymn, exitCode, exitMsg):
+def handleException(exitAcronym, exitCode, exitMsg):
     #first save the traceback before it gets overwritten by other tracebacks (e.g.: wrong jobReport)
     formatted_tb = traceback.format_exc()
 
@@ -330,7 +330,7 @@ def handleException(exitAcronymn, exitCode, exitMsg):
             exitMsg += error['type'] + '\n'
             exitMsg += error['details'] + '\n'
 
-    report['exitAcronym'] = exitAcronymn
+    report['exitAcronym'] = exitAcronym
     report['exitCode'] = exitCode
     report['exitMsg'] = exitMsg
     print "ERROR: Exceptional exit at %s (%s): %s" % (time.asctime(time.gmtime()), str(exitCode), str(exitMsg))
@@ -558,7 +558,6 @@ def executeScriptExe(opts, scram):
 
     command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
     ret = scram(command_, runtimeDir = os.getcwd(), logName='cmsRun-stdout.log')#subprocess.PIPE) for printing to the stdout
-    with open('cmsRun-stderr.log','w'): pass #cmscp fails without stderr. Would be better to modify Scram.py to get the real stderr (now added to cmsRun-stdout.log)
     if ret > 0:
         msg = scram.diagnostic()
         handleException("FAILED", EC_CMSRunWrapper, 'Error executing scriptExe.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))

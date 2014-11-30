@@ -25,7 +25,8 @@ class FileMetaData(object):
                            fmd_lfn AS lfn,
                            fmd_size AS filesize,
                            fmd_parent AS parents,
-                           fmd_filestate AS state
+                           fmd_filestate AS state,
+                           fmd_tmplfn AS tmplfn
                     FROM filemetadata
                     WHERE tm_taskname = %(taskname)s
                     AND FIND_IN_SET(fmd_type, %(filetype)s)
@@ -35,10 +36,11 @@ class FileMetaData(object):
     New_sql = "INSERT INTO filemetadata ( \
                tm_taskname, panda_job_id, fmd_outdataset, fmd_acq_era, fmd_sw_ver, fmd_in_events, fmd_global_tag,\
                fmd_publish_name, fmd_location, fmd_tmp_location, fmd_runlumi, fmd_adler32, fmd_cksum, fmd_md5, fmd_lfn, fmd_size,\
-               fmd_type,fmd_parent,fmd_creation_time,fmd_filestate) \
+               fmd_type, fmd_parent, fmd_creation_time, fmd_filestate, fmd_tmplfn) \
                VALUES (%(taskname)s, %(pandajobid)s, %(outdatasetname)s, %(acquisitionera)s, %(appver)s, %(events)s, %(globalTag)s,\
-                       %(publishdataname)s, %(outlocation)s, %(outtmplocation)s, %(runlumi)s, %(checksumadler32)s, %(checksumcksum)s, %(checksummd5)s, %(outlfn)s, %(outsize)s,\
-                       %(outtype)s, %(inparentlfns)s, UTC_TIMESTAMP(), %(filestate)s)"
+                       %(publishdataname)s, %(outlocation)s, %(outtmplocation)s, %(runlumi)s, %(checksumadler32)s, %(checksumcksum)s, \
+                       %(checksummd5)s, %(outlfn)s, %(outsize)s,\
+                       %(outtype)s, %(inparentlfns)s, UTC_TIMESTAMP(), %(filestate)s, %(outtmplfn)s)"
 
     DeleteTaskFiles_sql = "DELETE FROM filemetadata WHERE tm_taskname = %(taskname)s"
     DeleteFilesByTime_sql = "DELETE FROM filemetadata WHERE fmd_creation_time < sysdate - (:hours/24)" #TODO need to check this
