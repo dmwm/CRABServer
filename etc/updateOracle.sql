@@ -31,3 +31,5 @@ ALTER TABLE tasks ADD tm_asourl VARCHAR(4000);
 ALTER TABLE tasks ADD tm_events_per_lumi NUMBER(38); --for issue #4499
 alter table tasks add (tm_use_parent NUMBER(1));
 alter table filemetadata add (fmd_tmplfn VARCHAR(500));
+update tasks set tm_task_warnings = '[]';
+alter table tasks modify(tm_task_warnings DEFAULT '[]');

@@ -78,7 +78,7 @@ class Create(DBCreator):
         tm_maxmemory NUMBER(38),
         tm_priority NUMBER(38),
         tm_output_dataset CLOB,
-        tm_task_warnings CLOB,
+        tm_task_warnings CLOB DEFAULT '[]',
         tm_user_webdir VARCHAR(1000),
         tm_scriptexe VARCHAR(255),
         tm_scriptargs VARCHAR(4000),
