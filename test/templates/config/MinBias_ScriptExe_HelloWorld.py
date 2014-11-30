@@ -11,15 +11,17 @@ config.General.instance = 'preprod'
 
 #Job Type Section
 config.section_("JobType")
-config.JobType.pluginName = 'Analysis'
-config.JobType.psetName = 'psets/pset_tutorial_analysis.py'
+config.JobType.pluginName = 'PrivateMC'
+config.JobType.psetName = 'psets/pset_tutorial_MC_generation.py'
+config.JobType.scriptExe = 'input_files/simple_script.sh'
+config.JobType.outputFiles = ['simpleoutput.txt']
 
 #Data Section
 config.section_("Data")
-config.Data.inputDataset = '/GenericTTbar/HC-CMSSW_5_3_1_START53_V5-v1/GEN-SIM-RECO'
-config.Data.inputDBS = 'global'
-config.Data.splitting = 'FileBased'
-config.Data.unitsPerJob = 10
+config.Data.primaryDataset = 'MinBias'
+config.Data.splitting = 'EventBased'
+config.Data.unitsPerJob = 100 
+config.Data.totalUnits = 1000
 config.Data.ignoreLocality = False
 config.Data.publication = True
 config.Data.publishDBS = 'phys03'
@@ -27,4 +29,4 @@ config.Data.publishDataName = 'CHANGE'
 
 #Site Section
 config.section_("Site")
-config.Site.storageSite = 'CHANGE' 
+config.Site.storageSite = 'CHANGE'

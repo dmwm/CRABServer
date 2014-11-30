@@ -5,8 +5,8 @@ config = Configuration()
 config.section_("General")
 config.General.requestName = 'CHANGE'
 config.General.workArea = 'CHANGE'
-config.General.transferOutput = True
-config.General.saveLogs = True
+config.General.transferOutputs = True
+config.General.transferLogs = True
 config.General.instance = 'preprod'
 
 #Job Type Section
@@ -17,13 +17,13 @@ config.JobType.psetName = 'psets/pset_TFile.py'
 #Data Section
 config.section_("Data")
 config.Data.inputDataset = '/GenericTTbar/HC-CMSSW_5_3_1_START53_V5-v1/GEN-SIM-RECO'
-config.Data.dbsUrl = 'global'
+config.Data.inputDBS = 'global'
 config.Data.splitting = 'LumiBased'
-config.Data.unitsPerJob = 20
+config.Data.unitsPerJob = 200
 config.Data.ignoreLocality = False
 config.Data.lumiMask = 'lumimask/GenericTTbar_File1_lumimask.txt'
 config.Data.publication = True
-config.Data.publishDbsUrl = 'phys03'
+config.Data.publishDBS = 'phys03'
 config.Data.publishDataName = 'CHANGE'
 
 #Site Section

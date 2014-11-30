@@ -4,13 +4,14 @@
 
 #Parameters required to change !
 #------------------------------
-TAG='HG1408c'
-VERSION=2
+TAG='HG1411'
+VERSION=1
 CMSSW='CMSSW_7_0_6'
-WORK_DIR=~/VALIDATION/$TAG
+WORK_DIR=~/Validation/Templates/$TAG
 MAIN_DIR=`pwd`
 CLIENT=/cvmfs/cms.cern.ch/crab3/crab_pre.sh
 STORAGE_SITE='T2_CH_CERN'
+INSTANCE='preprod'
 #-----------------------------
 
 source /afs/cern.ch/cms/cmsset_default.sh
@@ -19,10 +20,10 @@ export SCRAM_ARCH=slc6_amd64_gcc481
 
 # out_cond - Output conditions, log_cond - Logs condition, pub_cond - Publication cond, ign_cond - IgnoreLocality
 # Number of possible values should be always equal
-out_cond=(True True True False True False)
-log_cond=(True True False False False True)
-pub_cond=(True False False False True False)
-ign_cond=(True False False False False False)
+out_cond=(True True True False True True False)
+log_cond=(True True False False False False True)
+pub_cond=(True False False False False True False)
+ign_cond=(True False False False True False False)
 
 
 #Get specified CMSSW
@@ -44,6 +45,9 @@ source $CLIENT
 
 cp -R $MAIN_DIR/config/* .
 
+#Copy LHE file from AFS (Size too big for GIT)
+cp /afs/cern.ch/user/j/jbalcas/public/forLHE/dynlo.lhe  input_files/
+
 #untar skimming and do scram b
 tar -xvf SkimMsecSleep.tar
 scram b
@@ -60,14 +64,14 @@ do
     pub_v=${pub_cond[$i]:0:1}
     ign_v=${ign_cond[$i]:0:1}
 
-#Generate new name
+    #Generate new name
     new_name=$TAG-$VERSION-$file_name_temp-'L-'$log_v'_O-'$out_v'_P-'$pub_v'_IL-'$ign_v
     publish_name=$new_name-`date +%s`
     echo $new_name
-#General part
+    #General part
     sed --in-place "s|\.General\.requestName = .*|\.General\.requestName = '$new_name'|" $file_name
-    sed --in-place "s|\.General\.transferOutput = .*|\.General\.transferOutput = ${out_cond[$i]} |" $file_name
-    sed --in-place "s|\.General\.saveLogs = .*|\.General\.saveLogs = ${log_cond[$i]} |" $file_name
+    sed --in-place "s|\.General\.transferOutputs = .*|\.General\.transferOutputs = ${out_cond[$i]} |" $file_name
+    sed --in-place "s|\.General\.transferLogs = .*|\.General\.transferLogs = ${log_cond[$i]} |" $file_name
     sed --in-place "s|\.General\.workArea = .*|\.General\.workArea = '$TAG-$VERSION' |" $file_name
     #Publication part
     sed --in-place "s|\.Data\.publication = .*|\.Data\.publication = ${pub_cond[$i]} |" $file_name
@@ -76,6 +80,7 @@ do
     sed --in-place "s|\.Site\.storageSite = .*|\.Site\.storageSite = '$STORAGE_SITE' |" $file_name
     #Data part
     sed --in-place "s|\.Data\.ignoreLocality = .*|\.Data\.ignoreLocality = ${ign_cond[$i]} |" $file_name
+    sed --in-place "s|\.General\.instance = .*|\.General\.instance = '$INSTANCE' |" $file_name
     crab submit -c $file_name
   done
 done
