@@ -1154,7 +1154,7 @@ class PostJob():
                          "globalTag"       : "None",
                          "pandajobid"      : self.crab_id,
                          "outsize"         : "0",
-                         "publishdataname" : self.publish_name,,
+                         "publishdataname" : self.publish_name,
                          "appver"          : self.job_ad['CRAB_JobSW'],
                          "outtype"         : "POOLIN",#file['input_source_class'],
                          "checksummd5"     : "0",
