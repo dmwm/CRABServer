@@ -4,8 +4,6 @@ alter table tasks add (tm_scriptexe VARCHAR(255));
 alter table tasks add (tm_scriptargs VARCHAR(4000));
 alter table tasks add (tm_extrajdl VARCHAR(1000));
 alter table tasks add (tm_generator VARCHAR(255));
-alter table tasks add (tm_use_parent NUMBER(1));
-alter table filemetadata add (fmd_tmplfn VARCHAR(500));
 
 -- This is needed, because I was not allowed to change from VARCHAR to CLOB.
 -- And I found this solution 
@@ -31,3 +29,5 @@ ALTER TABLE tasks ADD tm_asourl VARCHAR(4000);
 
 --Changes that will be needed for version 3.3.12
 ALTER TABLE tasks ADD tm_events_per_lumi NUMBER(38); --for issue #4499
+alter table tasks add (tm_use_parent NUMBER(1));
+alter table filemetadata add (fmd_tmplfn VARCHAR(500));
