@@ -71,7 +71,6 @@ import unittest
 import datetime
 import tempfile
 import traceback
-import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 import WMCore.Database.CMSCouch as CMSCouch
 from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
 from httplib import HTTPException
@@ -1219,20 +1218,20 @@ class PostJob():
 
             if not os.path.exists('output_datasets'):
                 configreq = [('subresource', 'addoutputdatasets'),
-                             ('workflow', self.ad['CRAB_ReqName'])]
+                             ('workflow', self.reqname)]
                 for dset in output_datasets:
                     configreq.append(('outputdatasets', dset))
                 rest_api = 'task'
                 rest_uri = self.rest_uri_no_api + '/' + rest_api
                 rest_url = self.rest_host + rest_uri
-                msg = "Uploading output datasets to https://%s: %s" % (rest_url, configreq))
+                msg = "Uploading output datasets to https://%s: %s" % (rest_url, configreq)
                 logger.debug(msg)
                 try:
                     self.server.post(rest_uri, data = urllib.urlencode(configreq))
                     with open('output_datasets', 'w') as f:
                         f.write(' '.join(output_datasets))
                 except HTTPException, hte:
-                    msg = "Error uploading output dataset: %s" % (str(hte.headers)
+                    msg = "Error uploading output dataset: %s" % (str(hte.headers))
                     logger.exception(msg)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
