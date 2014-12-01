@@ -75,7 +75,7 @@ class Create(DBCreator):
         tm_maxmemory BIGINT,
         tm_priority BIGINT,
         tm_output_dataset LONGTEXT,
-        tm_task_warnings LONGTEXT,
+        tm_task_warnings LONGTEXT DEFAULT '[]',
         tm_user_webdir VARCHAR(1000),
         tm_scriptexe VARCHAR(255),
         tm_scriptargs VARCHAR(4000),

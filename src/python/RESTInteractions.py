@@ -2,8 +2,9 @@
 Handles client interactions with remote REST interface
 """ 
 
-import urllib
 import os
+import time
+import urllib
 from urlparse import urlunparse
 from httplib import HTTPException
 
@@ -27,7 +28,7 @@ class HTTPRequests(dict):
     is used more in the client.
     """
 
-    def __init__(self, url='localhost', localcert=None, localkey=None, version=None):
+    def __init__(self, url='localhost', localcert=None, localkey=None, version=None, retry=0):
         """
         Initialise an HTTP handler
         """
@@ -43,6 +44,7 @@ class HTTPRequests(dict):
         if not version:
             version = __version__
         self.setdefault("version", version)
+        self.setdefault("retry", retry)
 
     def getUrlOpener(self):
         """
@@ -101,20 +103,17 @@ class HTTPRequests(dict):
         uri = urllib.quote(uri)
         caCertPath = self.getCACertPath()
         url = 'https://' + self['host'] + uri
-        response, datares = self['conn'].request(url, data, headers, verb=verb, doseq = True, ckey=self['key'], cert=self['cert'], \
-                            capath=caCertPath)#, verbose=True)# for debug
-        if response.status >= 400:
-            e = HTTPException()
-            setattr(e, 'req_data', data)
-            setattr(e, 'req_headers', headers)
-            setattr(e, 'url', self.buildUrl(uri))
-            setattr(e, 'result', datares)
-            setattr(e, 'status', response.status)
-            setattr(e, 'reason', response.reason)
-            setattr(e, 'headers', response.getheaders())
-            raise e
 
-        #result = json.loads(result)
+        #retries this up to self['retry'] times if the exit code is 503 (the only code at the moemnt)
+        for i in xrange(self['retry'] + 1):
+            try:
+                response, datares = self['conn'].request(url, data, headers, verb=verb, doseq = True, ckey=self['key'], cert=self['cert'], \
+                                capath=caCertPath)#, verbose=True)# for debug
+            except HTTPException, ex:
+                if ex.status not in [503] or i == self['retry']: #add here other temporary errors we need to retry
+                    raise #really exit and raise exception it this was the last retry or the exit code is not among the list of the one we retry
+                time.sleep(2 * (i + 1)) #sleeps 20s the first time, 40s the second time and so on
+
         return self.decodeJson(datares), response.status, response.reason
 
     def decodeJson(self, result):

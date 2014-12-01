@@ -192,7 +192,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             """
             lumilist = {}
             for file, info in datasetInfo.iteritems():
-                for run,lumis in info['Lumis'].iteritems():
+                for run, lumis in info['Lumis'].iteritems():
                     lumilist.setdefault(str(run), []).extend(lumis)
             return lumilist
 
@@ -204,7 +204,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
         row = self.Task.ID_tuple(*row)
         inputDataset = row.input_dataset
-        outputDatasets = literal_eval(row.tm_output_dataset.read() if row.tm_output_dataset else 'None')
+        outputDatasets = literal_eval(row.output_dataset.read() if row.output_dataset else 'None')
         dbsUrl = row.dbs_url
 
         #load the lumimask
@@ -214,16 +214,21 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         #extract the finished jobs from filemetadata
         jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished']]
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM', taskname=workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,POOLIN', taskname=workflow)
 
         res['runsAndLumis'] = {}
         for row in rows:
-            self.logger.debug("Got lumi info for job %d." % row[GetFromTaskAndType.PANDAID])
             if row[GetFromTaskAndType.PANDAID] in jobids:
-                res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])] = { 'parents' : row[GetFromTaskAndType.PARENTS].read(),
+                if str(row[GetFromTaskAndType.PANDAID]) not in res['runsAndLumis']:
+                    res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])] = []
+                res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])].append( { 'parents' : row[GetFromTaskAndType.PARENTS].read(),
                         'runlumi' : row[GetFromTaskAndType.RUNLUMI].read(),
                         'events'  : row[GetFromTaskAndType.INEVENTS],
-                }
+                        'type'    : row[GetFromTaskAndType.TYPE],
+                })
+            if str(row[GetFromTaskAndType.PANDAID]) == '2':
+                self.logger.debug("Got lumi info for job %d." % row[GetFromTaskAndType.PANDAID])
+                self.logger.debug("%s" % res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])])
         self.logger.info("Got %s edm files for workflow %s" % (len(res['runsAndLumis']), workflow))
 
         if usedbs:
@@ -415,18 +420,18 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         #getting publication information
         publication_info = {}
-        outdatasets = literal_eval(row.tm_output_dataset.read() if row.tm_output_dataset else 'None')
+        outdatasets = literal_eval(row.output_dataset.read() if row.output_dataset else 'None')
         arguments = literal_eval(row.arguments.read())
 
         #Always returning ASOURL also, it is required for kill, resubmit
-        self.logger.info("ASO: %s" % row.tm_asourl)
-        retval['ASOURL'] = row.tm_asourl
+        self.logger.info("ASO: %s" % row.asourl)
+        retval['ASOURL'] = row.asourl
 
-        if (row.tm_publication == 'T' and 'finished' in retval['jobsPerStatus']):
-            publication_info = self.publicationStatus(workflow, row.tm_asourl)
+        if (row.publication == 'T' and 'finished' in retval['jobsPerStatus']):
+            publication_info = self.publicationStatus(workflow, row.asourl)
             self.logger.info("Publiation status for workflow %s done" % workflow)
         else:
-            self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.tm_publication, retval['jobsPerStatus'].get('finished', 0)))
+            self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.publication, retval['jobsPerStatus'].get('finished', 0)))
 
         if len(taskStatus) == 0 and results[0]['JobStatus'] == 2:
             retval['status'] = 'Running (jobs not submitted)'

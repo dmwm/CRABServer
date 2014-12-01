@@ -45,8 +45,8 @@ class RESTFileMetadata(RESTEntity):
             validate_str("outtmplocation", param, safe, RX_CMSSITE, optional=False)
             validate_str("acquisitionera", param, safe, RX_WORKFLOW, optional=False)#TODO Do we really need this?
             validate_str("outdatasetname", param, safe, RX_OUTDSLFN, optional=False)#TODO temporary, need to come up with a regex
-            validate_str("outlfn", param, safe, RX_LFN, optional=False)
-            validate_str("outtmplfn", param, safe, RX_LFN, optional=False)
+            validate_str("outlfn", param, safe, RX_PARENTLFN, optional=False)
+            validate_str("outtmplfn", param, safe, RX_PARENTLFN, optional=False)
             validate_num("events", param, safe, optional=False)
             validate_str("filestate", param, safe, RX_FILESTATE, optional=True)
             validate_num("directstageout", param, safe, optional=True)

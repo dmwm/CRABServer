@@ -139,9 +139,17 @@ class RESTTask(RESTEntity):
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
 
         row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
-        outputdatasets = literal_eval(row.tm_output_dataset.read() if row.tm_output_dataset else '[]')
+        outputdatasets = literal_eval(row.output_dataset.read() if row.output_dataset else '[]')
         outputdatasets = str(list(set(outputdatasets + kwargs['outputdatasets'])))
 
         self.api.modify(self.Task.SetUpdateOutDataset_sql, tm_output_dataset=[outputdatasets], tm_taskname=[workflow])
 
         return []
+
+
+    def webdir(self, **kwargs):
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+        workflow = kwargs['workflow']
+        row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
+        yield row.user_webdir
