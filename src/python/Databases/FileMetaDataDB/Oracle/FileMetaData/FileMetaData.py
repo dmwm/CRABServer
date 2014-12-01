@@ -5,7 +5,8 @@ import logging
 class GetFromTaskAndType():
     """ Used for indexing columns retrieved by the GetFromTaskAndType_sql query
     """
-    PANDAID, OUTDS, ACQERA, SWVER, INEVENTS, GLOBALTAG, PUBLISHNAME, LOCATION, TMPLOCATION, RUNLUMI, ADLER32, CKSUM, MD5, LFN, SIZE, PARENTS, STATE, TMPLFN = range(18)
+    PANDAID, OUTDS, ACQERA, SWVER, INEVENTS, GLOBALTAG, PUBLISHNAME, LOCATION, TMPLOCATION, RUNLUMI, ADLER32, CKSUM, MD5, LFN, SIZE, PARENTS, STATE,\
+    TMPLFN, CREATIONTIME, TYPE = range(20)
 
 class FileMetaData(object):
     """
@@ -32,7 +33,8 @@ class FileMetaData(object):
                            fmd_parent AS parents, \
                            fmd_filestate AS state, \
                            fmd_creation_time AS created, \
-                           fmd_tmplfn AS tmplfn \
+                           fmd_tmplfn AS tmplfn, \
+                           fmd_type AS type \
                     FROM filemetadata \
                     WHERE tm_taskname = :taskname \
                     AND fmd_type IN (SELECT REGEXP_SUBSTR(:filetype, '[^,]+', 1, LEVEL) FROM DUAL CONNECT BY LEVEL <= REGEXP_COUNT(:filetype, ',') + 1) \

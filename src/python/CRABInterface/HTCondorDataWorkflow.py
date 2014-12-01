@@ -192,7 +192,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             """
             lumilist = {}
             for file, info in datasetInfo.iteritems():
-                for run,lumis in info['Lumis'].iteritems():
+                for run, lumis in info['Lumis'].iteritems():
                     lumilist.setdefault(str(run), []).extend(lumis)
             return lumilist
 
@@ -214,16 +214,21 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         #extract the finished jobs from filemetadata
         jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished']]
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM', taskname=workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,POOLIN', taskname=workflow)
 
         res['runsAndLumis'] = {}
         for row in rows:
-            self.logger.debug("Got lumi info for job %d." % row[GetFromTaskAndType.PANDAID])
             if row[GetFromTaskAndType.PANDAID] in jobids:
-                res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])] = { 'parents' : row[GetFromTaskAndType.PARENTS].read(),
+                if str(row[GetFromTaskAndType.PANDAID]) not in res['runsAndLumis']:
+                    res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])] = []
+                res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])].append( { 'parents' : row[GetFromTaskAndType.PARENTS].read(),
                         'runlumi' : row[GetFromTaskAndType.RUNLUMI].read(),
                         'events'  : row[GetFromTaskAndType.INEVENTS],
-                }
+                        'type'    : row[GetFromTaskAndType.TYPE],
+                })
+            if str(row[GetFromTaskAndType.PANDAID]) == '2':
+                self.logger.debug("Got lumi info for job %d." % row[GetFromTaskAndType.PANDAID])
+                self.logger.debug("%s" % res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])])
         self.logger.info("Got %s edm files for workflow %s" % (len(res['runsAndLumis']), workflow))
 
         if usedbs:

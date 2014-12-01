@@ -1149,10 +1149,14 @@ class PostJob():
         direct_stageout = int(self.job_report.get(u'direct_stageout', 0))
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
+        temp_storage_site = self.executed_site
+        if 'temp_storage_site' in self.job_report and self.job_report['temp_storage_site'] != 'unknown':
+            temp_storage_site = self.job_report['temp_storage_site']
         for ifile in self.job_report['steps']['cmsRun']['input']['source']:
+            #Many of these parameters are not needed and are using fake/defined values
             configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
                          "globalTag"       : "None",
-                         "pandajobid"      : self.crab_id,
+                         "pandajobid"      : self.job_id,
                          "outsize"         : "0",
                          "publishdataname" : self.publish_name,
                          "appver"          : self.job_ad['CRAB_JobSW'],
@@ -1161,9 +1165,10 @@ class PostJob():
                          "checksumcksum"   : "0",
                          "checksumadler32" : "0",
                          "outlocation"     : self.job_ad['CRAB_AsyncDest'],
-                         "outtmplocation"  : self.executed_site,
+                         "outtmplocation"  : temp_storage_site,
                          "acquisitionera"  : "null", # Not implemented
-                         "outlfn"          : ifile['lfn'],
+                         "outlfn"          : ifile['lfn'] + "_" + self.job_id, # jobs can analyze the same input
+                         "outtmplfn"       : self.source_dir, #does not have sense for input files
                          "events"          : ifile.get('events', 0),
                          "outdatasetname"  : "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER",
                          "directstageout"  : direct_stageout
@@ -1175,10 +1180,13 @@ class PostJob():
             if 'outfilelumis' in ifile:
                 for lumi in ifile['outfilelumis']:
                     configreq.append(("outfilelumis", lumi))
+            msg = "Uploading file metadata for input file %s" % ifile['lfn']
+            logger.debug(msg)
             try:
                 self.server.put(self.rest_uri_no_api + '/filemetadata', data = urllib.urlencode(configreq))
             except HTTPException, hte:
-                self.logger.error(hte.headers)
+                msg = "Error uploading input file metadata: %s" % (str(hte.headers))
+                logger.error(msg)
                 raise
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
