@@ -168,7 +168,7 @@ class RetryJob(object):
             self.create_fake_fjr(exitMsg, 50664)
         if integrated_job_time > 1.5*MAX_WALLTIME:
             exitMsg = "Not retrying a job because the integrated time (across all retries) is %d hours." % (integrated_job_time / 3600)
-            self.create_fake_fjr(exitMsg, exitCode)
+            self.create_fake_fjr(exitMsg, 50664)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -176,7 +176,7 @@ class RetryJob(object):
 
         # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to memory use"):
-            self.create_fake_fjr("Not retrying job due to excessive memory use (job killed by CRAB3 watchdog)", exitCode)
+            self.create_fake_fjr("Not retrying job due to excessive memory use (job killed by CRAB3 watchdog)", 50660)
             raise FatalError(exitMsg)
         subreport = self.report
         for attr in ['steps', 'cmsRun', 'performance', 'memory', 'PeakValueRss']:
@@ -191,7 +191,7 @@ class RetryJob(object):
         # TODO: Compare the job against its requested memory, not a hardcoded max.
         if total_job_memory > MAX_MEMORY:
             exitMsg = "Not retrying job due to excessive memory use (%d MB)" % total_job_memory
-            self.create_fake_fjr(exitMsg, exitCode)
+            self.create_fake_fjr(exitMsg, 50660)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
