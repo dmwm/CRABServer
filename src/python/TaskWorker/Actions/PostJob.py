@@ -1152,6 +1152,9 @@ class PostJob():
         temp_storage_site = self.executed_site
         if 'temp_storage_site' in self.job_report and self.job_report['temp_storage_site'] != 'unknown':
             temp_storage_site = self.job_report['temp_storage_site']
+        if not 'source' in self.job_report.get('steps', {}).get('cmsRun', {}).get('input', {}):
+            logger.info("Skipping input filemetadata upload as no inputs were found")
+            return
         for ifile in self.job_report['steps']['cmsRun']['input']['source']:
             #Many of these parameters are not needed and are using fake/defined values
             configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
