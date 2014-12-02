@@ -469,7 +469,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 ]).replace('"', r'\"\"')
             else:
                 inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']]).replace('"', r'\"\"')
-            runAndLumiMask = '\'' + json.dumps(job['mask']['runAndLumis']) + '\''
+            runAndLumiMask = json.dumps(job['mask']['runAndLumis'])
             firstEvent = str(job['mask']['FirstEvent'])
             lastEvent = str(job['mask']['LastEvent'])
             firstLumi = str(job['mask']['FirstLumi'])

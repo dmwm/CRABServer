@@ -166,7 +166,7 @@ if opts.oneEventMode:
 
 runAndLumis = {}
 if opts.runAndLumis:
-    readFileFromTarball(opts.runAndLumis, 'run_and_lumis.tar.gz')
+    runAndLumis = readFileFromTarball(opts.runAndLumis, 'run_and_lumis.tar.gz')
 
 pset = SetupCMSSWPsetCore( opts.location, literal_eval(opts.inputFile), runAndLumis, agentNumber, lfnBase, outputMods,\
                            literal_eval(opts.firstEvent), literal_eval(opts.lastEvent), literal_eval(opts.firstLumi),\
