@@ -1220,7 +1220,7 @@ def main():
     logs_arch_dest_pfn_path = os.path.dirname(dest_files[0])
     if G_JOB_EXIT_CODE != 0:
         if logs_arch_dest_pfn_path.endswith('/log'):
-            logs_arch_dest_pfn_path = logs_arch_dest_pfn_path.rstrip('/log')
+            logs_arch_dest_pfn_path = re.sub(r'/log$', '', logs_arch_dest_pfn_path)
         logs_arch_dest_pfn_path = os.path.join(logs_arch_dest_pfn_path, 'failed', 'log')
         logs_arch_dest_pfn = os.path.join(logs_arch_dest_pfn_path, logs_arch_dest_file_name)
     logs_arch_dest_temp_lfn = os.path.join(dest_temp_dir, 'log', logs_arch_dest_file_name)

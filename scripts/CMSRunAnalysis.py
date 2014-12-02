@@ -748,11 +748,11 @@ def StripReport(report):
             ## Stripping 'file:' from each output module pfn value is needed so that cmscp
             ## and PostJob are able to find the output file in the jobReport.json.
             if 'pfn' in fileInfo:
-                fileInfo['pfn'] = fileInfo['pfn'].lstrip('file:')
+                fileInfo['pfn'] = re.sub(r'^file:', '', fileInfo['pfn'])
             ## Stripping 'file:' from each output module fileName value is needed because the
             ## function AddChecksums() uses fileName as the pfn if the last is not defined.
             if 'fileName' in fileInfo:
-                fileInfo['fileName'] = fileInfo['fileName'].lstrip('file:')
+                fileInfo['fileName'] = re.sub(r'^file:', '', fileInfo['fileName'])
 
 
 if __name__ == "__main__":
