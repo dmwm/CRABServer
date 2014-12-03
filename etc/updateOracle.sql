@@ -33,4 +33,4 @@ alter table tasks add (tm_use_parent NUMBER(1));
 alter table filemetadata add (fmd_tmplfn VARCHAR(500));
 update tasks set tm_task_warnings = '[]';
 alter table tasks modify(tm_task_warnings DEFAULT '[]');
-ALTER TABLE TASK ADD(tm_output_dataset CLOB);
+ALTER TABLE tasks ADD(tm_output_dataset CLOB);
