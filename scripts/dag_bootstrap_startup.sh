@@ -20,6 +20,7 @@ export LD_LIBRARY_PATH=/opt/glidecondor/lib:/opt/glidecondor/lib/condor:.:$LD_LI
 export LD_LIBRARY_PATH=/data/srv/glidecondor/lib:/data/srv/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 
 mkdir -p retry_info
+mkdir -p resubmit_info
 
 # Note that the scheduler universe populate the .job.ad from 8.3.2 version.
 # Before it was written by this script using condor_q (This command is expensive to Scheduler)
@@ -153,8 +154,19 @@ elif [ ! -r $X509_USER_PROXY ]; then
     condor_qedit $CONDOR_ID DagmanHoldReason "'The proxy is unreadable for some reason'"
     EXIT_STATUS=6
 else
+    # Documentation about condor_dagman: http://research.cs.wisc.edu/htcondor/manual/v8.3/condor_dagman.html
+    # In particular:
+    # -autorescue 0|1
+    #     Whether to automatically run the newest rescue DAG for the given DAG file, if one exists (0 = false, 1 = true).
+    # -DoRecovery
+    #     Causes condor_dagman to start in recovery mode. This means that it reads the relevant job user log(s) and catches up
+    #     to the given DAG's previous state before submitting any new jobs.
+    # More about running DAGMan in rescue or recovery mode in the HTCondor manual, section 2.10:
+    # http://research.cs.wisc.edu/htcondor/manual/v8.3/2_10DAGMan_Applications.html -
+    # see subsections 2.10.9 "The Rescue DAG" and 2.10.10 "DAG Recovery".
+    #
     # Re-nice the process so, even when we churn through lots of processes, we never starve the schedd or shadows for cycles.
-    exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -AutoRescue 1 -DoRescueFrom 0 -MaxPre 20 -MaxIdle 200 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
+    exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -DoRecov -AutoRescue 0 -MaxPre 20 -MaxIdle 200 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
     EXIT_STATUS=$?
 fi
 exit $EXIT_STATUS

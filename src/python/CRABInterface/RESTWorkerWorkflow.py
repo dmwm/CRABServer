@@ -209,13 +209,19 @@ class Task(dict):
         self['tm_edm_outfiles'] = literal_eval(task[29] if ( task[29] is None or isinstance(task[29], str) ) else task[29].read())
         self['tm_job_type'] = task[30]
         extraargs = literal_eval(task[31] if ( task[31] is None or isinstance(task[31],str) ) else task[31].read())
-        self['resubmit_site_whitelist'] = extraargs['siteWhiteList'] if 'siteWhiteList' in extraargs else []
-        self['resubmit_site_blacklist'] = extraargs['siteBlackList'] if 'siteBlackList' in extraargs else []
+        self['resubmit_jobids'] = extraargs['resubmit_jobids'] if 'resubmit_jobids' in extraargs else None
+        if self['resubmit_jobids'] is None and 'resubmitList' in extraargs: ## For backward compatibility only.
+            self['resubmit_jobids'] = extraargs['resubmitList']
+        self['resubmit_site_whitelist'] = extraargs['site_whitelist'] if 'site_whitelist' in extraargs else None
+        if self['resubmit_site_whitelist'] is None and 'siteWhiteList' in extraargs: ## For backward compatibility only.
+            self['resubmit_site_whitelist'] = extraargs['siteWhiteList']
+        self['resubmit_site_blacklist'] = extraargs['site_blacklist'] if 'site_blacklist' in extraargs else None
+        if self['resubmit_site_blacklist'] is None and 'siteBlackList' in extraargs: ## For backward compatibility only.
+            self['resubmit_site_blacklist'] = extraargs['siteBlackList']
         self['resubmit_priority'] = extraargs['priority'] if 'priority' in extraargs else None
         self['resubmit_numcores'] = extraargs['numcores'] if 'numcores' in extraargs else None
         self['resubmit_maxmemory'] = extraargs['maxmemory'] if 'maxmemory' in extraargs else None
         self['resubmit_maxjobruntime'] = extraargs['maxjobruntime'] if 'maxjobruntime' in extraargs else None
-        self['resubmit_ids'] = extraargs['resubmitList'] if 'resubmitList' in extraargs else []
         self['kill_ids'] = extraargs['killList'] if 'killList' in extraargs else []
         self['kill_all'] = extraargs['killAll'] if 'killAll' in extraargs else False
         self['panda_resubmitted_jobs'] = literal_eval(task[32] if ( task[32] is None or isinstance(task[32],str)) else task[32].read())
