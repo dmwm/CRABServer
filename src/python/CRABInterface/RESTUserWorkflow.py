@@ -52,11 +52,12 @@ class RESTUserWorkflow(RESTEntity):
         return list(res)
 
     def _checkOutLFN(self, kwargs):
-        """Check the lfn parameter: it must start with '/store/user/username/' or '/store/group/groupname/username/'
+        """Check the lfn parameter: it must start with '/store/user/username/' or '/store/group/groupname[/subgroupname]*/username/',
            where username is the one registered in SiteDB (i.e. the one used in the CERN primary account).
            If lfn is not there, default to '/store/user/username/'.
            Handle old clients lfnprefix parameter.
         """
+        ## Is this the username registered in SiteDB?
         username = cherrypy.request.user['login']
         if kwargs['lfnprefix']:
             kwargs['lfn'] = '/store/user/%s/%s' % (username, kwargs["lfnprefix"])
@@ -65,12 +66,12 @@ class RESTUserWorkflow(RESTEntity):
             kwargs['lfn'] = '/store/user/%s/' % (username)
         else:
             msg  = "The parameter Data.outLFN in the CRAB configuration file must start with either"
-            msg += " '/store/user/<username>/' or '/store/group/<groupname>/<username>/'"
+            msg += " '/store/user/<username>/' or '/store/group/<groupname>[/<subgroupname>]*/<username>/'"
             msg += " (or '/store/local/' if publication is off),"
             msg += " where username is your username as registered in SiteDB"
             msg += " (i.e. the username of your CERN primary account)."
             if kwargs['lfn'].startswith('/store/group/'):
-                if len(kwargs['lfn'].split('/')) < 5 or kwargs['lfn'].split('/')[4] != username:
+                if len(kwargs['lfn'].split('/')) < 5 or kwargs['lfn'].split('/')[3] == username or username not in kwargs['lfn'].split('/'):
                     raise InvalidParameter(msg)
             elif kwargs['lfn'].startswith('/store/user/'):
                 if len(kwargs['lfn'].split('/')) < 4 or kwargs['lfn'].split('/')[3] != username:
