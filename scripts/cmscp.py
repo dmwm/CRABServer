@@ -179,7 +179,7 @@ def report_failure_to_dashboard(exit_code):
     """
     if os.environ.get('TEST_CMSCP_NO_STATUS_UPDATE', False):
         msg  = "Environment flag TEST_CMSCP_NO_STATUS_UPDATE is set."
-        msg += " Will NOT send report to dashbaord."
+        msg += " Will not send report to dashbaord."
         print msg
         return
     if not G_JOB_AD:
@@ -187,7 +187,7 @@ def report_failure_to_dashboard(exit_code):
             parse_job_ad()
         except Exception:
             msg  = "ERROR: Unable to parse job's HTCondor ClassAd."
-            msg += "\nWill NOT report stageout failure to Dashboard."
+            msg += "\nWill not report stageout failure to Dashboard."
             msg += "\n%s" % (traceback.format_exc())
             print msg
             return
@@ -215,7 +215,7 @@ def report_failure_to_dashboard(exit_code):
 
 def make_logs_archive(arch_file_name):
     """
-    Make a zipped tar archive file of the user logs plus the framework job
+    Make a zipped tar archive file of the user log files plus the framework job
     report xml file.
     """
     retval = 0
@@ -232,9 +232,9 @@ def make_logs_archive(arch_file_name):
             file_name_in_arch = file_name_no_ext + job_id_str + '.' + ext
             arch_file.add(file_name, arcname = file_name_in_arch)
         else:
-            ## Will not fail stageout is logs are missing, because for example
-            ## when runinng scriptExe there are no cmsRun-stdout.log and
-            ## cmsRun-stderr.log files.
+            ## Will not fail stageout if log files are missing, because for
+            ## example when runinng scriptExe there are no cmsRun-stdout.log
+            ## and cmsRun-stderr.log files.
             msg = "WARNING: %s is missing." % (file_name)
             print msg
     arch_file.close()
@@ -628,7 +628,7 @@ def inject_to_aso(file_transfer_info):
     publish = int(task_publish and file_type == 'output' and is_edm)
     if task_publish and file_type == 'output' and not is_edm:
         msg  = "Disabling publication of output file %s," % (file_name)
-        msg += " it is not of EDM type (not produced by PoolOutputModule)."
+        msg += " since it is not of EDM type (not produced by PoolOutputModule)."
         print msg
     publish = int(publish and G_JOB_EXIT_CODE == 0)
 
@@ -1027,8 +1027,8 @@ def main():
         """
         Function used to update the cmscp exit info dictionary.
         """
-        if (exit_info['exit_code'] == 0 and not exit_code in [None, 0]) or \
-           (force                       and not exit_code in [None]   ):
+        if (exit_info['exit_code'] == 0 and exit_code not in [None, 0]) or \
+           (force                       and exit_code not in [None]   ):
             exit_info['exit_code'] = exit_code
             exit_info['exit_acronym'] = 'FAILED' if exit_code else 'OK'
             exit_info['exit_msg'] = exit_msg
@@ -1074,11 +1074,6 @@ def main():
               'logs_metadata_upload'      : None
              }
 
-    ## Fill in the G_NODE_MAP dictionary with the mapping of node storage
-    ## storage name to site name. Currently only used to translate the SE name
-    ## returned by the local stageout manager into a site name. 
-    make_node_map()
-
     ##--------------------------------------------------------------------------
     ## Start PARSE JOB AD
     ##--------------------------------------------------------------------------
@@ -1118,6 +1113,10 @@ def main():
         transfer_logs = False
     else:
         transfer_logs = G_JOB_AD['CRAB_SaveLogsFlag']
+    if not transfer_logs:
+        msg  = "The user has not specified to transfer the log files."
+        msg += " No log files stageout (nor log files metadata upload) will be performed."
+        print msg
     ## If we couldn't read CRAB_TransferOutputs from the job ad, we assume True.
     if 'CRAB_TransferOutputs' not in G_JOB_AD:
         msg  = "WARNING: Job's HTCondor ClassAd is missing attribute CRAB_TransferOutputs."
@@ -1126,19 +1125,61 @@ def main():
         transfer_outputs = True
     else:
         transfer_outputs = G_JOB_AD['CRAB_TransferOutputs']
-    ## If we couldn't read CRAB_Id or CRAB_localOutputFiles from the job ad, we
-    ## can not continue. If we couldn't read CRAB_StageoutPolicy,
-    ## CRAB_Destination or CRAB_Dest, we don't continue.
-    for attr in ['CRAB_Id', 'CRAB_localOutputFiles', 'CRAB_StageoutPolicy', \
-                 'CRAB_Destination', 'CRAB_Dest', 'CRAB_AsyncDest']:
+    ## If we couldn't read CRAB_localOutputFiles from the job ad, we abort.
+    if 'CRAB_localOutputFiles' not in G_JOB_AD:
+        msg  = "ERROR: Job's HTCondor ClassAd is missing attribute CRAB_localOutputFiles."
+        msg += "\nNo stageout will be performed."
+        print msg
+        update_exit_info(exit_info, 80000, '', True)
+        return exit_info
+    split_re = re.compile(",\s*")
+    ## Get the list of output files produced by the job.
+    output_files = []
+    if G_JOB_AD['CRAB_localOutputFiles'].replace(' ',''):
+        output_files = split_re.split(G_JOB_AD['CRAB_localOutputFiles'].replace(' ',''))
+    ## If there is no list of output files, turn off their transfer.
+    if len(output_files) == 0:
+        if not transfer_outputs:
+            msg  = "Job's HTCondor ClassAd attribute CRAB_localOutputFiles is empty,"
+            msg += " indicating that the job doesn't produce any output file." 
+            msg += " In any case, the user has specified to not transfer output files."
+            print msg
+        else:
+            msg  = "The transfer of output files flag in on,"
+            msg += " but the job's HTCondor ClassAd attribute CRAB_localOutputFiles is empty,"
+            msg += " indicating that the job doesn't produce any output file."
+            msg += " Turning off the transfer of output files flag."
+            print msg
+            transfer_outputs = False
+    else:
+        if not transfer_outputs:
+            msg  = "The user has specified to not transfer the output files."
+            msg += " No output files stageout (nor output files metadata upload) will be performed."
+            print msg
+    ## If we don't have to transfer the log files or the output files, there is
+    ## nothing to do in cmscp. So exit right here.
+    if not (transfer_logs or transfer_outputs):
+        msg = "Stageout wrapper has no work to do. Finishing here."
+        print msg
+        update_exit_info(exit_info, 0, 'OK', True)
+        return exit_info
+    ## At this point we are sure that one of the transfer flags (transfer_logs
+    ## or transfer_outputs) is True.
+    ## List of attributes that the code must be able to get from the job ad.
+    job_ad_required_attrs = ['CRAB_Id', \
+                             'CRAB_StageoutPolicy', \
+                             'CRAB_Destination', \
+                             'CRAB_Dest', \
+                             'CRAB_AsyncDest']
+    ## Check that the above attributes are defined in the job ad.
+    for attr in job_ad_required_attrs:
         if attr not in G_JOB_AD:
             msg  = "ERROR: Job's HTCondor ClassAd is missing attribute %s." % (attr)
             msg += "\nNo stageout will be performed."
             print msg
             update_exit_info(exit_info, 80000, '', True)
             return exit_info
-    split_re = re.compile(",\s*")
-    output_files = split_re.split(G_JOB_AD['CRAB_localOutputFiles'])
+    ## Retrieve the above attributes from the job ad.
     stageout_policy = split_re.split(G_JOB_AD['CRAB_StageoutPolicy'])
     print "Stageout policy: %s" % (", ".join(stageout_policy))
     dest_temp_dir = G_JOB_AD['CRAB_Dest']
@@ -1242,7 +1283,7 @@ def main():
     ##--------------------------------------------------------------------------
     ## Check that the output files are well defined in the job ad and that they
     ## exist in the worker node.
-    condition = no_condition
+    condition = transfer_outputs
     if skip['outputs_exist']:
         msg  = "WARNING: Internal wrapper flag skip['outputs_exist'] is True."
         msg += " Skipping to check if user output files exist."
@@ -1327,7 +1368,7 @@ def main():
     ## Start LOGS TARBALL CREATION
     ##--------------------------------------------------------------------------
     ## Create a zipped tar archive file of the user logs.
-    condition = no_condition
+    condition = transfer_logs
     if skip['logs_archive']:
         msg  = "WARNING: Internal wrapper flag skip['logs_archive'] is True."
         msg += " Skipping creation of user logs archive file."
@@ -1356,12 +1397,7 @@ def main():
         except Exception:
             msg = "WARNING: Unable to add logs archive file size to job report."
             print msg
-    if transfer_logs:
-        update_exit_info(exit_info, retval['logs_archive'], '')
-    elif not retval['logs_archive'] in [None, 0]:
-        msg  = "Ignoring compression failure of user logs,"
-        msg += " because the user did not request the logs to be staged out."
-        print msg
+    update_exit_info(exit_info, retval['logs_archive'], '')
     ##--------------------------------------------------------------------------
     ## Finish LOGS TARBALL CREATION
     ##--------------------------------------------------------------------------
@@ -1376,7 +1412,7 @@ def main():
     ## Start LOCAL STAGEOUT MANAGER INITIALIZATION
     ##--------------------------------------------------------------------------
     ## This stageout manager will be used for all local stageout attempts (for
-    ## user logs archive and user outputs).
+    ## the user logs archive file and the user output files).
     condition = ('local' in stageout_policy and condition_stageout)
     if skip['init_local_stageout_mgr']:
         msg  = "WARNING: Internal wrapper flag skip['init_local_stageout_mgr'] is True."
@@ -1405,17 +1441,22 @@ def main():
         msg += "Finished initialization of stageout manager for local stageouts"
         msg += " (status %d)." % (retval['init_local_stageout_mgr'])
         print msg
-    if not transfer_outputs:
-        update_exit_info(exit_info, retval['init_local_stageout_mgr'], '')
+    update_exit_info(exit_info, retval['init_local_stageout_mgr'], '')
     ##--------------------------------------------------------------------------
     ## Finish LOCAL STAGEOUT MANAGER INITIALIZATION
     ##--------------------------------------------------------------------------
+
+    ## Fill in the G_NODE_MAP dictionary with the mapping of node storage
+    ## storage name to site name. Currently only used to translate the SE name
+    ## returned by the local stageout manager into a site name. 
+    if retval['init_local_stageout_mgr'] == 0:
+        make_node_map()
 
     ##--------------------------------------------------------------------------
     ## Start DIRECT STAGEOUT IMPLEMENTATION INITIALIZATION
     ##--------------------------------------------------------------------------
     ## This stageout implementation will be used for all direct stageout
-    ## attempts (for user logs archive and user outputs).
+    ## attempts (for the user logs archive file and the user output files).
     condition = ('remote' in stageout_policy and condition_stageout)
     if skip['init_direct_stageout_impl']:
         msg  = "WARNING: Internal wrapper flag skip['init_direct_stageout_impl'] is True."
@@ -1443,7 +1484,7 @@ def main():
         msg += "Finished initialization of stageout implementation for direct stageouts"
         msg += " (status %d)." % (retval['init_direct_stageout_impl'])
         print msg
-    if (transfer_outputs or transfer_logs) and retval['init_local_stageout_mgr'] != 0:
+    if retval['init_local_stageout_mgr'] != 0:
         update_exit_info(exit_info, retval['init_direct_stageout_impl'], '') 
     ##--------------------------------------------------------------------------
     ## Finish DIRECT STAGEOUT IMPLEMENTATION INITIALIZATION
@@ -1472,19 +1513,14 @@ def main():
             condition = (condition and \
                          retval['init_direct_stageout_impl'] == 0 and \
                          retval['logs_stageout']['local'] != 0)
-        ## There are some cases where we don't have to stage out the logs.
+        ## There are some cases where we don't have to stage out the log files.
         if condition:
             if skip['logs_stageout'][policy]:
                 msg  = "WARNING: Internal wrapper flag skip['logs_stageout']['%s'] is True." % (policy)
                 msg += " Skipping %s stageout of user logs archive file." % (policy)
                 print msg
                 condition = False
-            elif policy == 'remote' and not transfer_logs:
-                msg  = "Will not do remote stageout of user logs archive file,"
-                msg += " since the user did not specify to transfer the logs."
-                print msg
-                condition = False
-        ## If we have to, stage out the logs.
+        ## If we have to, stage out the logs archive file.
         if condition:
             msg  = "====== %s: " % (time.asctime(time.gmtime()))
             msg += "Starting %s stageout of user logs archive file." % (policy)
@@ -1516,7 +1552,7 @@ def main():
             ## If the stageout failed, clean the stageout area. But don't remove
             ## the log from the local stageout area (we want to keep it there in
             ## case the next stageout policy also fails).
-            if not retval['logs_stageout'][policy] in [None, 0]:
+            if retval['logs_stageout'][policy] not in [None, 0]:
                 clean = True
                 if transfer_logs and first_stageout_failure_code is None:
                     first_stageout_failure_code = retval['logs_stageout'][policy]
@@ -1532,28 +1568,23 @@ def main():
             condition = (condition and \
                          retval['init_direct_stageout_impl'] == 0 and \
                          retval['outputs_stageout']['local'] != 0)
-        ## There are some cases where we don't have to stage out the outputs.
+        ## There are some cases where we don't have to stage out the output files.
         if condition:
             if skip['outputs_stageout'][policy]:
                 msg  = "WARNING: Internal wrapper flag skip['outputs_stageout']['%s'] is True." % (policy)
-                msg += " Skipping %s stageout of user outputs." % (policy)
+                msg += " Skipping %s stageout of user output files." % (policy)
                 print msg
                 condition = False
-            if policy == 'remote' and not transfer_outputs:
-                msg  = "Will not do remote stageout of output files,"
-                msg += " since the user specified to not transfer the outputs."
-                print msg
-                condition = False
-            if not retval['logs_stageout'][policy] in [None, 0]:
+            if retval['logs_stageout'][policy] not in [None, 0]:
                 msg  = "Will not do %s stageout of output files," % (policy)
                 msg += " because %s stageout already failed for the logs archive file." % (policy)
                 print msg
                 retval['outputs_stageout'][policy] = 60318
                 condition = False
-        ## If we have to, stage out the outputs.
+        ## If we have to, stage out the output files.
         if condition:
             msg  = "====== %s: " % (time.asctime(time.gmtime()))
-            msg += "Starting %s stageout of user outputs." % (policy)
+            msg += "Starting %s stageout of user output files." % (policy)
             print msg
             for output_file_name_info, output_dest_pfn in zip(output_files, dest_files[1:]):
                 ## The output_file_name_info is something like this:
@@ -1602,18 +1633,18 @@ def main():
                     print msg
                 if retval['outputs_stageout'][policy] in [None, 0]:
                     retval['outputs_stageout'][policy] = cur_retval
-                ## If the stageout failed for one of the outputs, don't even try
-                ## to stage out the rest of the outputs.
-                if not retval['outputs_stageout'][policy] in [None, 0]:
+                ## If the stageout failed for one of the output files, don't even
+                ## try to stage out the rest of the output files.
+                if retval['outputs_stageout'][policy] not in [None, 0]:
                     msg  = "%s stageout of %s failed." % (policy.title(), output_file_name)
                     msg += " Will not attempt %s stageout for any other output files (if any)." % (policy)
                     print msg
                     break
             msg  = "====== %s: " % (time.asctime(time.gmtime()))
-            msg += "Finished %s stageout of user outputs" % (policy)
+            msg += "Finished %s stageout of user output files" % (policy)
             msg += " (status %d)." % (retval['outputs_stageout'][policy])
             print msg
-            if not retval['outputs_stageout'][policy] in [None, 0]:
+            if retval['outputs_stageout'][policy] not in [None, 0]:
                 clean = True
                 if first_stageout_failure_code is None:
                     first_stageout_failure_code = retval['outputs_stageout'][policy]
@@ -1648,18 +1679,13 @@ def main():
         if retval['logs_stageout'][policy] == 0 and retval['outputs_stageout'][policy] == 0:
             break
     ## If stageout failed, update the cmscp return code with the stageout
-    ## failure that happened first (except that if it was the local stageout of
-    ## the logs archive file what failed first and the user didn't request the
-    ## logs to be transferred, we ignore that failure).
+    ## failure that happened first.
     if transfer_logs:
         if not (retval['logs_stageout']['local'] == 0 or retval['logs_stageout']['remote'] == 0):
             update_exit_info(exit_info, first_stageout_failure_code, '')
-    elif not retval['logs_stageout']['local'] in [None, 0]:
-        msg  = "Ignoring local stageout failure of user logs,"
-        msg += " because the user did not request the logs to be staged out."
-        print msg
-    if not (retval['outputs_stageout']['local'] == 0 or retval['outputs_stageout']['remote'] == 0):
-        update_exit_info(exit_info, first_stageout_failure_code, '')
+    if transfer_outputs:
+        if not (retval['outputs_stageout']['local'] == 0 or retval['outputs_stageout']['remote'] == 0):
+            update_exit_info(exit_info, first_stageout_failure_code, '')
     ##--------------------------------------------------------------------------
     ## Finish STAGEOUT OF USER LOGS TARBALL AND USER OUTPUTS
     ##--------------------------------------------------------------------------
@@ -1669,46 +1695,30 @@ def main():
     ##--------------------------------------------------------------------------
     ## Do the injection of the transfer request documents to the ASO database
     ## only if all the local or direct stageouts have succeeded.
-    condition_inject_outputs = False
+    condition_inject_outputs = (retval['outputs_stageout']['local'] == 0 and \
+                                retval['outputs_stageout']['remote'] != 0)
     not_inject_msg_outputs = ''
     if transfer_outputs:
-        condition_inject_outputs = (retval['outputs_stageout']['local'] == 0 and \
-                                    retval['outputs_stageout']['remote'] != 0)
         if not condition_inject_outputs:
-            not_inject_msg_outputs = "Will not inject transfer requests to ASO for the user outputs,"
+            not_inject_msg_outputs = "Will not inject transfer requests to ASO for the user output files,"
             if retval['outputs_stageout']['remote'] == 0:
                 not_inject_msg_outputs += " because they were staged out directly to the permanent storage."
             else:
                 not_inject_msg_outputs += " because their local stageouts were not successful"
                 not_inject_msg_outputs += " (or files were removed from local temporary storage"
                 not_inject_msg_outputs += " or local stageout was not even performed)."
-    else:
-        not_inject_msg_outputs = "Will not inject transfer requests to ASO for the user outputs"
-        if retval['outputs_stageout']['local'] == 0:
-            not_inject_msg_outputs += " (even if their local stageouts were successful)"
-        not_inject_msg_outputs += ", because the user didn't request the outputs to be transferred."
-        if retval['outputs_stageout']['local'] != 0:
-            not_inject_msg_outputs += " (And in any case, their local stageouts were not successful -or not even performed-.)"
-    condition_inject_logs = False
+    condition_inject_logs = (retval['logs_stageout']['local'] == 0 and \
+                             retval['logs_stageout']['remote'] != 0)
     not_inject_msg_logs = ''
     if transfer_logs:
-        condition_inject_logs = (retval['logs_stageout']['local'] == 0 and \
-                                 retval['logs_stageout']['remote'] != 0)
         if not condition_inject_logs:
-            not_inject_msg_logs = "Will not inject transfer request to ASO the for user logs archive file,"
+            not_inject_msg_logs = "Will not inject transfer request to ASO for the user logs archive file,"
             if retval['logs_stageout']['remote'] == 0:
                 not_inject_msg_logs += " because it was staged out directly to the permanent storage."
             else:
                 not_inject_msg_logs += " because its local stageout was not successful"
                 not_inject_msg_logs += " (or file was removed from local temporary storage"
                 not_inject_msg_logs += " or local stageout was not even performed)."
-    else:
-        not_inject_msg_logs = "Will not inject transfer request to ASO for the user logs archive file"
-        if retval['logs_stageout']['local'] == 0:
-            not_inject_msg_logs += " (even if its local stageout was successful)"
-        not_inject_msg_logs += ", because the user didn't request the logs to be transferred."
-        if retval['logs_stageout']['local'] != 0:
-            not_inject_msg_logs += " (And in any case, its local stageout was not successful -or not even performed-.)"
     condition = condition_inject_outputs or condition_inject_logs
     if skip['aso_injection']:
         msg  = "WARNING: Internal wrapper flag skip['aso_injection'] is True."
@@ -1807,9 +1817,10 @@ def main():
         msg += " (status %d)." % (retval['logs_metadata_upload'])
         print msg
     else:
-        msg  = "Will NOT upload logs archive file metadata,"
-        msg += " since the logs archive file is not in a storage area."
-        print msg
+        if transfer_logs:
+            msg  = "Will not upload logs archive file metadata,"
+            msg += " since the logs archive file is not in a storage area."
+            print msg
     ##--------------------------------------------------------------------------
     ## Finish LOG FILE METADATA UPLOAD
     ##--------------------------------------------------------------------------

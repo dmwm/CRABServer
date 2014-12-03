@@ -57,7 +57,7 @@ class RESTUserWorkflow(RESTEntity):
            If lfn is not there, default to '/store/user/username/'.
            Handle old clients lfnprefix parameter.
         """
-        ## Is this the username registered in SiteDB?
+        ## This is the username registered in SiteDB.
         username = cherrypy.request.user['login']
         if kwargs['lfnprefix']:
             kwargs['lfn'] = '/store/user/%s/%s' % (username, kwargs["lfnprefix"])
