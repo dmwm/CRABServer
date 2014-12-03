@@ -220,10 +220,10 @@ class RetryJob(object):
         exitMsg = self.report.get("exitMsg", "UNKNOWN")
 
         if exitCode == 0:
-            print "Job wrapper finished successfully (exit code %d)." % (exitCode)
+            print "Job and stageout wrappers finished successfully (exit code %d)." % (exitCode)
             return
 
-        msg  = "Job wrapper finished with exit code %d." % (exitCode)
+        msg  = "Job or stageout wrapper finished with exit code %d." % (exitCode)
         msg += " Trying to determine the meaning of the exit code and if it is a recoverable or fatal error."
         print msg
 
@@ -283,7 +283,10 @@ class RetryJob(object):
             raise RecoverableError("Required application version not found at the site.")
 
         if exitCode == 60403 or exitCode == 243:
-            raise RecoverableError("Timeout during attempted file transfer.")
+            raise RecoverableError("Timeout during attempted file stageout.")
+
+        if exitCode == 60307 or exitCode == 147:
+            raise RecoverableError("Error during attempted file stageout.")
 
         if exitCode:
             raise FatalError("Job wrapper finished with exit code %d.\nExit message:\n  %s" % (exitCode, exitMsg.replace('\n', '\n  ')))
