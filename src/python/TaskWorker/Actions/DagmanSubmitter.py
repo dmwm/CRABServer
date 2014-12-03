@@ -83,8 +83,6 @@ SUBMIT_INFO = [ \
             ('CRAB_Publish', 'publication'),
             ('CRAB_PublishDBSURL', 'publishdbsurl'),
             ('CRAB_ISB', 'cacheurl'),
-            ('CRAB_SiteBlacklist', 'siteblacklist'),
-            ('CRAB_SiteWhitelist', 'sitewhitelist'),
             ('CRAB_SaveLogsFlag', 'savelogsflag'),
             ('CRAB_AdditionalOutputFiles', 'addoutputfiles'),
             ('CRAB_EDMOutputFiles', 'edmoutfiles'),
@@ -112,6 +110,8 @@ SUBMIT_INFO = [ \
             ## schedd.submitRaw() method).
             ('CRAB_JobCount', 'jobcount'),
             ('CRAB_UserVO', 'tm_user_vo'),
+            ('CRAB_SiteBlacklist', 'siteblacklist'),
+            ('CRAB_SiteWhitelist', 'sitewhitelist'),
             ('RequestMemory', 'tm_maxmemory'),
             ('RequestCpus', 'tm_numcores'),
             ('MaxWallTimeMins', 'tm_maxjobruntime'),
@@ -325,16 +325,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         """
         dagAd = classad.ClassAd()
         addCRABInfoToClassAd(dagAd, info)
-
-        # Set default task attributes:
-        if 'RequestMemory' not in dagAd:
-            dagAd['RequestMemory'] = 2000
-        if 'RequestCpus' not in dagAd:
-            dagAd['RequestCpus'] = 1
-        if 'MaxWallTimeMins' not in dagAd:
-            dagAd['MaxWallTimeMins'] = 1315
-        if 'JobPrio' not in dagAd:
-            dagAd['JobPrio'] = 10
 
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))

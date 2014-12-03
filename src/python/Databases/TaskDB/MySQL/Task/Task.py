@@ -69,6 +69,10 @@ class Task(object):
    	       %(job_type)s, %(arguments)s, %(resubmitted_jobs)s, %(save_logs)s, %(user_infiles)s, %(maxjobruntime)s, \
            %(numcores)s, %(maxmemory)s, %(priority)s, %(dry_run)s)"
 
+    GetResubmitParams_sql = "SELECT tm_site_blacklist, tm_site_whitelist, tm_maxjobruntime, tm_maxmemory, tm_numcores, tm_priority \
+                             FROM tasks \
+                             WHERE tm_taskname = %(taskname)s"
+
     SetArgumentsTask_sql = "UPDATE tasks SET tm_arguments = %(arguments)s WHERE tm_taskname = %(taskname)s"
 
     SetEndInjection_sql = "UPDATE tasks SET tm_end_injection = %(tm_end_injection)s \

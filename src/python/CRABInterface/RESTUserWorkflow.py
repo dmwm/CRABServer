@@ -306,16 +306,33 @@ class RESTUserWorkflow(RESTEntity):
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
             validate_str("subresource", param, safe, RX_SUBRESTAT, optional=True)
-            validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
-            safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
-            validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
-            safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
+            ## In a resubmission, the site black- and whitelists need to be interpreted
+            ## differently than in an initial task submission. If there is no site black-
+            ## or whitelist, set it to None and DataWorkflow will use the corresponding
+            ## list defined in the initial task submission. If the site black- or whitelist
+            ## is equal to the string 'empty', set it to an empty list and don't call
+            ## validate_strlist as it would fail.
+            if 'siteblacklist' not in param.kwargs:
+                safe.kwargs['siteblacklist'] = None
+            elif param.kwargs['siteblacklist'] == 'empty':
+                safe.kwargs['siteblacklist'] = []
+                del param.kwargs['siteblacklist']
+            else:
+                validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
+                safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
+            if 'sitewhitelist' not in param.kwargs:
+                safe.kwargs['sitewhitelist'] = None
+            elif param.kwargs['sitewhitelist'] == 'empty':
+                safe.kwargs['sitewhitelist'] = []
+                del param.kwargs['sitewhitelist']
+            else:
+                validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
+                safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
             validate_numlist('jobids', param, safe)
             validate_num("priority", param, safe, optional=True)
             validate_num("maxjobruntime", param, safe, optional=True)
             validate_num("numcores", param, safe, optional=True)
             validate_num("maxmemory", param, safe, optional=True)
-
 
         elif method in ['GET']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=True)
@@ -430,9 +447,10 @@ class RESTUserWorkflow(RESTEntity):
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.api, [workflow], self.Task)
         if not subresource or subresource == 'resubmit':
-            return self.userworkflowmgr.resubmit(workflow=workflow, siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, jobids=jobids, \
-                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority,
-                                        userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+            return self.userworkflowmgr.resubmit(workflow=workflow, \
+                                                 siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, jobids=jobids, \
+                                                 maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, \
+                                                 userdn=cherrypy.request.headers['Cms-Authn-Dn'])
         elif subresource == 'proceed':
             return self.userworkflowmgr.proceed(workflow=workflow)
 

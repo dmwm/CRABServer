@@ -52,41 +52,57 @@ class DagmanResubmitter(TaskAction.TaskAction):
         # Release the DAG
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(workflow)
 
-        # Calculate a new white/blacklist
+        ## Calculate new parameters for resubmited jobs. These parameters will
+        ## be (re)written in the _CONDOR_JOB_AD when we do schedd.edit() below.
         ad = classad.ClassAd()
-        ad['whitelist'] = task['resubmit_site_whitelist']
-        ad['blacklist'] = task['resubmit_site_blacklist']
+        params = {'CRAB_ResubmitList'  : 'jobids',
+                  'CRAB_SiteBlacklist' : 'site_blacklist',
+                  'CRAB_SiteWhitelist' : 'site_whitelist',
+                  'MaxWallTimeMins'    : 'maxjobruntime',
+                  'RequestMemory'      : 'maxmemory',
+                  'RequestCpus'        : 'numcores',
+                  'JobPrio'            : 'priority'
+                 }
+        overwrite = False
+        for taskparam in params.values():
+            if ('resubmit_'+taskparam in task) and task['resubmit_'+taskparam] != None:
+                if type(task['resubmit_'+taskparam]) == list:
+                    ad[taskparam] = task['resubmit_'+taskparam]
+                if taskparam != 'jobids':
+                    overwrite = True
 
-        if ('resubmit_ids' in task) and task['resubmit_ids']:
-            ad['resubmit'] = task['resubmit_ids']
+        if ('resubmit_jobids' in task) and task['resubmit_jobids']:
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
                 if not parent:
                     schedd.edit(rootConst, "HoldKillSig", 'SIGKILL')
-                    schedd.edit(rootConst, "CRAB_ResubmitList", ad['resubmit'])
+                    ## Overwrite parameters in the os.environ[_CONDOR_JOB_AD] file. This will affect
+                    ## all the jobs, not only the ones we want to resubmit. That's why the pre-job
+                    ## is saving the values of the parameters for each job retry in text files (the
+                    ## files are in the directory resubmit_info in the schedd).
+                    for adparam, taskparam in params.iteritems():
+                        if taskparam in ad:
+                            schedd.edit(rootConst, adparam, ad[taskparam])
+                        elif task['resubmit_'+taskparam] != None:
+                            schedd.edit(rootConst, adparam, str(task['resubmit_'+taskparam]))
                     schedd.act(htcondor.JobAction.Hold, rootConst)
                     schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
                     schedd.act(htcondor.JobAction.Release, rootConst)
-        elif task['resubmit_site_whitelist'] or task['resubmit_site_blacklist'] or \
-                task['resubmit_priority'] != None or task['resubmit_maxmemory'] != None or \
-                task['resubmit_numcores'] != None or task['resubmit_maxjobruntime'] != None:
+        elif overwrite:
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
                 if not parent:
-                    if task['resubmit_site_blacklist']:
-                        schedd.edit(rootConst, "CRAB_SiteResubmitBlacklist", ad['blacklist'])
-                    if task['resubmit_site_whitelist']:
-                        schedd.edit(rootConst, "CRAB_SiteResubmitWhitelist", ad['whitelist'])
-                    if task['resubmit_priority'] != None:
-                        schedd.edit(rootConst, "JobPrio", task['resubmit_priority'])
-                    if task['resubmit_numcores'] != None:
-                        schedd.edit(rootConst, "RequestCpus", task['resubmit_numcores'])
-                    if task['resubmit_maxjobruntime'] != None:
-                        schedd.edit(rootConst, "MaxWallTimeMins", task['resubmit_maxjobruntime'])
-                    if task['resubmit_maxmemory'] != None:
-                        schedd.edit(rootConst, "RequestMemory", task['resubmit_maxmemory'])
+                    self.logger.debug("Resubmitting under condition overwrite = True")
+                    for adparam, taskparam in params.iteritems():
+                        if taskparam == 'jobids':
+                            continue
+                        if taskparam in ad:
+                            schedd.edit(rootConst, adparam, ad[taskparam])
+                        elif task['resubmit_'+taskparam] != None:
+                            schedd.edit(rootConst, adparam, str(task['resubmit_'+taskparam]))
                     schedd.act(htcondor.JobAction.Release, rootConst)
         else:
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
                 if not parent:
+                    self.logger.debug("Resubmitting under condition overwrite = False")
                     schedd.edit(rootConst, "HoldKillSig", 'SIGKILL')
                     schedd.edit(rootConst, "CRAB_ResubmitList", classad.ExprTree("true"))
                     schedd.act(htcondor.JobAction.Hold, rootConst)
@@ -106,13 +122,13 @@ class DagmanResubmitter(TaskAction.TaskAction):
                      'status': "SUBMITTED",
                      'jobset': "-1",
                      'subresource': 'success',}
-        self.logger.debug("Setting the task as successfully resubmited with %s " % str(configreq))
+        self.logger.debug("Setting the task as successfully resubmitted with %s " % str(configreq))
         data = urllib.urlencode(configreq)
         try:
             self.server.post(self.resturi, data = data)
         except HTTPException, hte:
             self.logger.error(hte.headers)
-            raise TaskWorkerException("The CRAB3 server backend successfully resubmited your task to the Grid scheduler, but was unable to update\n"+\
+            raise TaskWorkerException("The CRAB3 server backend successfully resubmitted your task to the Grid scheduler, but was unable to update\n"+\
                                       "the task status from QUEUED to SUBMITTED. This should be a harmless (temporary) error.\n")
 
 if __name__ == "__main__":
@@ -129,9 +145,9 @@ if __name__ == "__main__":
     config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
     config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
 
-    server = HTTPRequests('mmascher-dev6.cern.ch', config.TaskWorker.cmscert, config.TaskWorker.cmskey)
+    server = HTTPRequests('vmatanasi2.cern.ch', config.TaskWorker.cmscert, config.TaskWorker.cmskey)
     resubmitter = DagmanResubmitter(config, server, '/crabserver/dev/workflowdb')
-    resubmitter.execute(task={'tm_taskname':'141205_105541_crab3test-5:mmascher_crab_asommascher-dev6_43', 'user_proxy' : os.environ["X509_USER_PROXY"],
-                              'resubmit_site_whitelist' : ['T2_IT_Bari'], 'resubmit_site_blacklist' : ['T2_IT_Legnaro'], 'resubmit_priority' : '2',
-                              'resubmit_numcores' : '1', 'resubmit_maxjobruntime' : '1000', 'resubmit_maxmemory' : '1000'
+    resubmitter.execute(task={'tm_taskname':'141129_110306_crab3test-5:atanasi_crab_test_resubmit', 'user_proxy' : os.environ["X509_USER_PROXY"],
+                              'resubmit_site_whitelist' : ['T2_IT_Bari'], 'resubmit_site_blacklist' : ['T2_IT_Legnaro'], 'resubmit_priority' : 2,
+                              'resubmit_numcores' : 1, 'resubmit_maxjobruntime' : 1000, 'resubmit_maxmemory' : 1000
                              })
