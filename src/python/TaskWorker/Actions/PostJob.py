@@ -824,22 +824,16 @@ class PostJob():
         are done from here.
         """
 
-        ## Copy the job's stdout file job_out.<jobid> to the schedd web directory,
+        ## Move the job's stdout file job_out.<jobid> to the schedd web directory,
         ## naming it job_out.<jobid>.<crabretrycount>.txt.
         stdout = "job_out.%s" % (self.job_id)
-        stdout_tmp = "job_out.tmp.%s" % (self.job_id)
         logpath = os.path.expanduser("~/%s" % (self.reqname))
         if os.path.exists(stdout):
-            os.rename(stdout, stdout_tmp)
             fname = 'job_out.'+str(self.job_id)+'.'+str(self.crab_retry_count)+'.txt'
             fname = os.path.join(logpath, fname)
-            msg = "Copying job stdout from %s to %s."
-            msg = msg % (stdout, fname)
+            msg = "Moving job stdout from %s to %s." % (stdout, fname)
             logger.debug(msg)
-            shutil.copy(stdout_tmp, fname)
-            fd_stdout = open(stdout_tmp, 'w')
-            fd_stdout.truncate(0)
-            fd_stdout.close()
+            shutil.move(stdout, fname)
             os.chmod(fname, 0644)
 
         ## Copy the json job report file jobReport.json.<jobid> to the schedd web
