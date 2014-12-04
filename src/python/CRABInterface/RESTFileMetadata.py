@@ -46,7 +46,7 @@ class RESTFileMetadata(RESTEntity):
             validate_str("acquisitionera", param, safe, RX_WORKFLOW, optional=False)#TODO Do we really need this?
             validate_str("outdatasetname", param, safe, RX_OUTDSLFN, optional=False)#TODO temporary, need to come up with a regex
             validate_str("outlfn", param, safe, RX_PARENTLFN, optional=False)
-            validate_str("outtmplfn", param, safe, RX_PARENTLFN, optional=False)
+            validate_str("outtmplfn", param, safe, RX_PARENTLFN, optional=True)
             validate_num("events", param, safe, optional=False)
             validate_str("filestate", param, safe, RX_FILESTATE, optional=True)
             validate_num("directstageout", param, safe, optional=True)
@@ -65,9 +65,18 @@ class RESTFileMetadata(RESTEntity):
                raise InvalidParameter("You have to specify a taskname or a number of hours. Files of this task or created before the number of hours"+\
                                         " will be deleted. Only one of the two parameters can be specified.")
 
+    ## A few notes about how the following methods (put, post, get, delete) work when decorated with restcall.
+    ## * The order of the arguments is irrelevant. For example, these two definitions are equivalent:
+    ##   def get(self, a, b) or def get(self, b, a)
+    ## * One can not assign default values to the arguments. For example, one can not write
+    ##   def get(self, a, b = 'ciao').
+    ## * The validate() function above is called for each of the methods. So for example, it is in the validate()
+    ##   function where it is decided whether an argument is mandatory or not.
+    ## * The name of the arguments has to be the same as used in the http request, and the same as used in validate().
+
     @restcall
     def put(self, taskname, outfilelumis, inparentlfns, globalTag, outfileruns, pandajobid, outsize, publishdataname, appver, outtype, checksummd5,\
-                checksumcksum, checksumadler32, outlocation, outtmplocation, outdatasetname, acquisitionera, outlfn, outtmplfn, events, filestate, directstageout):
+            checksumcksum, checksumadler32, outlocation, outtmplocation, outdatasetname, acquisitionera, outlfn, events, filestate, directstageout, outtmplfn):
         """Insert a new job metadata information"""
         return self.jobmetadata.inject(taskname=taskname, outfilelumis=outfilelumis, inparentlfns=inparentlfns, globalTag=globalTag, outfileruns=outfileruns,\
                            pandajobid=pandajobid, outsize=outsize, publishdataname=publishdataname, appver=appver, outtype=outtype, checksummd5=checksummd5,\
