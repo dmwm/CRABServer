@@ -78,6 +78,10 @@ class RESTFileMetadata(RESTEntity):
     def put(self, taskname, outfilelumis, inparentlfns, globalTag, outfileruns, pandajobid, outsize, publishdataname, appver, outtype, checksummd5,\
             checksumcksum, checksumadler32, outlocation, outtmplocation, outdatasetname, acquisitionera, outlfn, events, filestate, directstageout, outtmplfn):
         """Insert a new job metadata information"""
+        # Don`t want to have None in outtmplfn. This needs to be removed in 2015 February release
+        # For old tasks submitted to old crabserver and which are not passing outtmplfn make it same as outlfn
+        if not outtmplfn:
+            outtmplfn = outlfn
         return self.jobmetadata.inject(taskname=taskname, outfilelumis=outfilelumis, inparentlfns=inparentlfns, globalTag=globalTag, outfileruns=outfileruns,\
                            pandajobid=pandajobid, outsize=outsize, publishdataname=publishdataname, appver=appver, outtype=outtype, checksummd5=checksummd5,\
                            checksumcksum=checksumcksum, checksumadler32=checksumadler32, outlocation=outlocation, outtmplocation=outtmplocation,\
