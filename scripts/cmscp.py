@@ -1026,7 +1026,7 @@ def main():
             exit_info['exit_code'] = exit_code
             exit_info['exit_acronym'] = 'FAILED' if exit_code else 'OK'
             exit_info['exit_msg'] = exit_msg
-            msg = "Setting cmscp.py exit info to %s." % (exit_info)
+            msg = "Setting stageout wrapper exit info to %s." % (exit_info)
             print msg
 
     transfer_logs    = None
@@ -1443,15 +1443,6 @@ def main():
     ## Finish DIRECT STAGEOUT IMPLEMENTATION INITIALIZATION
     ##--------------------------------------------------------------------------
 
-    ## Current transfer paradigm: If a user didn't request the transfer of
-    ## files, should we still do a local stageout? Eric said that we shouldn't;
-    ## that if a user disables the transfers this should be interpreted as "I
-    ## don't care about my files". But we know that there might be users that
-    ## don't have a storage area where to stage out the files. Therefore I
-    ## prefer to still do a local stageout. Now, if the local stageout fails,
-    ## should we fail the job? So far we fail the job if the outputs were not
-    ## requested to be transferred.
-
     ##--------------------------------------------------------------------------
     ## Start STAGEOUT OF USER LOGS TARBALL AND USER OUTPUTS
     ##--------------------------------------------------------------------------
@@ -1828,6 +1819,8 @@ if __name__ == '__main__':
     MSG += "cmscp.py STARTING."
     print MSG
     logging.basicConfig(level = logging.INFO)
+    ## When 'exitCode' exists in the job report, it should be the same as what
+    ## is passed as JOB_WRAPPER_EXIT_CODE argument to cmscp.
     JOB_WRAPPER_EXIT_CODE = 0
     try:
         for arg in sys.argv:
@@ -1835,6 +1828,7 @@ if __name__ == '__main__':
                 JOB_WRAPPER_EXIT_CODE = int(arg.split('=')[1])
     except:
         pass
+    ## Run the stageout wrapper.
     try:
         JOB_STGOUT_WRAPPER_EXIT_INFO = main()
     except:
@@ -1842,32 +1836,45 @@ if __name__ == '__main__':
         MSG += "\n%s" % (traceback.format_exc())
         print MSG
         EXIT_MSG = "cmscp.py" + MSG
-        JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'] = 60307
+        JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'] = 80000
         JOB_STGOUT_WRAPPER_EXIT_INFO['exit_acronym'] = 'FAILED'
         JOB_STGOUT_WRAPPER_EXIT_INFO['exit_msg'] = EXIT_MSG
-    if JOB_WRAPPER_EXIT_CODE:
-        JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'] = JOB_WRAPPER_EXIT_CODE
-    elif JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code']:
-        add_to_job_report([('exitCode', JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'])])
-    if JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code']:
+        MSG = "Setting stageout wrapper exit info to %s." % (JOB_STGOUT_WRAPPER_EXIT_INFO)
+        print MSG
+    ## If the job wrapper finished successfully, but the stageout wrapper
+    ## didn't, record the failure in the job report.
+    if JOB_WRAPPER_EXIT_CODE == 0 and JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'] != 0:
+        add_to_job_report([('exitCode',    JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code']), \
+                           ('exitAcronym', JOB_STGOUT_WRAPPER_EXIT_INFO['exit_acronym']), \
+                           ('exitMsg',     JOB_STGOUT_WRAPPER_EXIT_INFO['exit_msg'])])
+    ## Now we have to exit with the appropriate exit code, and report failures
+    ## to dashboard.
+    if JOB_WRAPPER_EXIT_CODE != 0:
+        MSG  = "Job (or job wrapper) didn't finish successfully (exit code %d)." % (JOB_WRAPPER_EXIT_CODE)
+        MSG += " Setting that same exit code for the stageout wrapper."
+        print MSG
+        CMSCP_EXIT_CODE = JOB_WRAPPER_EXIT_CODE
+    else:
+        CMSCP_EXIT_CODE = JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code']
+    if CMSCP_EXIT_CODE != 0:
         if G_JOB_AD:
             try:
-                MSG  = "Stageout wrapper finished with exit code %s." % (JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'])
-                MSG += " Will report stageout failure to Dashboard."
+                MSG  = "Stageout wrapper finished with exit code %s." % (CMSCP_EXIT_CODE)
+                MSG += " Will report failure to Dashboard."
                 print MSG
-                report_failure_to_dashboard(JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'])
+                report_failure_to_dashboard(CMSCP_EXIT_CODE)
             except:
                 MSG  = "ERROR: Unhandled exception when reporting failure to dashboard."
                 MSG += "\n%s" % (traceback.format_exc())
                 print MSG
         else:
             MSG  = "ERROR: Job's HTCondor ClassAd was not read."
-            MSG += " Will not report stageout failure to Dashboard."
+            MSG += " Will not report failure to Dashboard."
             print MSG
     MSG  = "====== %s: " % (time.asctime(time.gmtime()))
     MSG += "cmscp.py FINISHING"
-    MSG += " (status %d)." % (JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'])
+    MSG += " (status %d)." % (CMSCP_EXIT_CODE)
     print MSG
-    sys.exit(JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'])
+    sys.exit(CMSCP_EXIT_CODE)
 
 ##==============================================================================
