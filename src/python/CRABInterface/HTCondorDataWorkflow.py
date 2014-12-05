@@ -325,7 +325,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             results = self.getRootTasks(workflow, schedd)
             self.logger.info("Web status for workflow %s done" % workflow)
         except Exception, exp:
-            msg = "%s: The CRAB3 server frontend is not able to contact the Grid scheduler. This could be a temporary glicth, please, retry later or contact the experts if the problem persist: %s" % (workflow, str(exp))
+            msg = "%s: The CRAB3 server frontend is not able to find your task in the Grid scheduler (remember tasks older than 30 days are automatically removed). If your task is a recent onem, this could mean there is a temporary glicth. Please, retry later: %s" % (workflow, str(exp))
             self.logger.exception(msg)
             return [{"status" : "UNKNOWN",
                       "taskFailureMsg" : str(msg),
