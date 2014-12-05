@@ -145,7 +145,6 @@ class HTCondorDataWorkflow(DataWorkflow):
         if howmany != -1:
             rows = rows[:howmany]
         #jobids=','.join(map(str,jobids)), limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
-
         for row in rows:
             try:
                 jobid = row[GetFromTaskAndType.PANDAID]
@@ -153,21 +152,25 @@ class HTCondorDataWorkflow(DataWorkflow):
                     if row[GetFromTaskAndType.DIRECTSTAGEOUT]:
                         lfn  = row[GetFromTaskAndType.LFN]
                         site = row[GetFromTaskAndType.LOCATION]
+                        self.logger.debug("LFN: %s and site %s" % (lfn, site))
                         pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
                     else:
                         if jobid in finishedIds:
                             lfn  = row[GetFromTaskAndType.LFN]
                             site = row[GetFromTaskAndType.LOCATION]
+                            self.logger.debug("LFN: %s and site %s" % (lfn, site))
                             pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
                         elif jobid in transferingIds:
                             lfn  = row[GetFromTaskAndType.TMPLFN]
                             site = row[GetFromTaskAndType.TMPLOCATION]
+                            self.logger.debug("LFN: %s and site %s" % (lfn, site))
                             pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
                         else:
                             continue
                 else:
                     lfn  = row[GetFromTaskAndType.TMPLFN]
                     site = row[GetFromTaskAndType.TMPLOCATION]
+                    self.logger.debug("LFN: %s and site %s" % (lfn, site))
                     pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
             except Exception, err:
                 self.logger.exception(err)
