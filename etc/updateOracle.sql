@@ -34,3 +34,4 @@ alter table filemetadata add (fmd_tmplfn VARCHAR(500));
 update tasks set tm_task_warnings = '[]';
 alter table tasks modify(tm_task_warnings DEFAULT '[]');
 ALTER TABLE tasks ADD(tm_output_dataset CLOB);
+UPDATE filemetadata SET fmd_tmplfn=fmd_lfn WHERE fmd_tmplfn is NULL or fmd_tmplfn='';
