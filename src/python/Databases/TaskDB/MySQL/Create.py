@@ -63,7 +63,6 @@ class Create(DBCreator):
         tm_outfiles LONGTEXT,
         tm_tfile_outfiles LONGTEXT,
         tm_edm_outfiles LONGTEXT,
-        tm_transformation VARCHAR(255) NOT NULL,
         tm_job_type VARCHAR(255) NOT NULL,
         tm_arguments LONGTEXT,
         panda_resubmitted_jobs LONGTEXT,
