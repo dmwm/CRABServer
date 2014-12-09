@@ -110,9 +110,11 @@ class HTTPRequests(dict):
                 response, datares = self['conn'].request(url, data, headers, verb=verb, doseq = True, ckey=self['key'], cert=self['cert'], \
                                 capath=caCertPath)#, verbose=True)# for debug
             except HTTPException, ex:
-                if ex.status not in [503] or i == self['retry']: #add here other temporary errors we need to retry
+                if ex.status not in [500, 502, 503] or i == self['retry']: #add here other temporary errors we need to retry
                     raise #really exit and raise exception it this was the last retry or the exit code is not among the list of the one we retry
-                time.sleep(2 * (i + 1)) #sleeps 20s the first time, 40s the second time and so on
+                time.sleep(20 * (i + 1)) #sleeps 20s the first time, 40s the second time and so on
+            else:
+                break
 
         return self.decodeJson(datares), response.status, response.reason
 
