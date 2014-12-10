@@ -470,6 +470,12 @@ def make_node_map():
     nodes = phedex.getNodeMap()['phedex']['node']
     global G_NODE_MAP
     for node in nodes:
+        ## Not sure these two ifs can happen, but better to have them.
+        if str(node[u'se']) in ['', 'None']:
+            continue
+        if str(node[u'name']) in ['', 'None']:
+            msg = "WARNING: Could not retrieve PhEDEx Node Name for SE name '%s'" % (str(node[u'se']))
+            print msg
         G_NODE_MAP[str(node[u'se'])] = str(node[u'name'])
 
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -606,7 +612,7 @@ def inject_to_aso(file_transfer_info):
             is_edm = False
 
     source_site = file_transfer_info['source']['site']
-    if source_site is None:
+    if source_site in ['', 'None', 'unknown']:
         msg  = "ERROR: Unable to determine local node name."
         msg += " Cannot inject to ASO." 
         print msg

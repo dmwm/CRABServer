@@ -1103,8 +1103,8 @@ class PostJob():
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
         temp_storage_site = self.executed_site
-        if 'temp_storage_site' in self.job_report and self.job_report['temp_storage_site'] != 'unknown':
-            temp_storage_site = self.job_report['temp_storage_site']
+        if self.job_report.get(u'temp_storage_site', 'unknown') != 'unknown':
+            temp_storage_site = self.job_report.get(u'temp_storage_site')
         configreq = {'taskname'        : self.reqname,
                      'pandajobid'      : self.job_id,
                      'outsize'         : self.job_report.get(u'log_size', 0),
@@ -1146,15 +1146,15 @@ class PostJob():
         Upload the output files metadata. We care about the number of events
         and about the lumis for the report.
         """
-        direct_stageout = int(self.job_report.get(u'direct_stageout', 0))
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
         temp_storage_site = self.executed_site
-        if 'temp_storage_site' in self.job_report and self.job_report['temp_storage_site'] != 'unknown':
-            temp_storage_site = self.job_report['temp_storage_site']
+        if self.job_report.get(u'temp_storage_site', 'unknown') != 'unknown':
+            temp_storage_site = self.job_report.get(u'temp_storage_site')
         if not 'source' in self.job_report.get('steps', {}).get('cmsRun', {}).get('input', {}):
             logger.info("Skipping input filemetadata upload as no inputs were found")
             return
+        direct_stageout = int(self.job_report.get(u'direct_stageout', 0))
         for ifile in self.job_report['steps']['cmsRun']['input']['source']:
             #Many of these parameters are not needed and are using fake/defined values
             configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
@@ -1446,8 +1446,8 @@ class PostJob():
                 file_info['outlocation'] = self.dest_site
                 if output_file_info.get(u'temp_storage_site', 'unknown') != 'unknown':
                     file_info['outtmplocation'] = output_file_info.get(u'temp_storage_site')
-                elif 'temp_storage_site' in self.job_report and self.job_report['temp_storage_site'] != 'unknown':
-                    file_info['outtmplocation'] = self.job_report['temp_storage_site']
+                elif self.job_report.get(u'temp_storage_site', 'unknown') != 'unknown':
+                    file_info['outtmplocation'] = self.job_report.get(u'temp_storage_site')
                 else:
                     file_info['outtmplocation'] = self.executed_site
                 if u'runs' not in output_file_info:
