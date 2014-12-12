@@ -1,4 +1,3 @@
-
 import base64
 import urllib
 import traceback
@@ -102,3 +101,24 @@ class DagmanResubmitter(TaskAction.TaskAction):
         self.logger.debug("Setting the task as successfully resubmitted with %s " % str(configreq))
         data = urllib.urlencode(configreq)
         self.server.post(self.resturi, data = data)
+
+if __name__ == "__main__":
+    import os
+    import logging
+    from RESTInteractions import HTTPRequests
+    from WMCore.Configuration import Configuration
+
+    logging.basicConfig(level = logging.DEBUG)
+    config = Configuration()
+
+    config.section_("TaskWorker")
+    #will use X509_USER_PROXY var for this test
+    config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
+    config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
+
+    server = HTTPRequests('mmascher-dev6.cern.ch', config.TaskWorker.cmscert, config.TaskWorker.cmskey)
+    resubmitter = DagmanResubmitter(config, server, '/crabserver/dev/workflowdb')
+    resubmitter.execute(task={'tm_taskname':'141205_105541_crab3test-5:mmascher_crab_asommascher-dev6_43', 'user_proxy' : os.environ["X509_USER_PROXY"],
+                              'resubmit_site_whitelist' : ['T2_IT_Bari'], 'resubmit_site_blacklist' : ['T2_IT_Legnaro'], 'resubmit_priority' : '2',
+                              'resubmit_numcores' : '1', 'resubmit_maxjobruntime' : '1000', 'resubmit_maxmemory' : '1000'
+                             })
