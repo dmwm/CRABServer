@@ -115,7 +115,7 @@ class MasterWorker(object):
             self.restURInoAPI = '/crabserver/' + MODEURL[self.config.TaskWorker.mode]['instance']
         if resthost is None:
             raise ConfigException("No correct mode provided: need to specify config.TaskWorker.mode in the configuration")
-        self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey)
+        self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry = 2)
         self.logger.debug("Hostcert: %s, hostkey: %s" %(str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey)))
         # Retries for any failures
         if not hasattr(self.config.TaskWorker, 'max_retry'):

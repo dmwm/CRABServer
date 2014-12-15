@@ -87,7 +87,7 @@ def handleNewTask(resthost, resturi, config, task, *args, **kwargs):
     :arg TaskWorker.DataObjects.Task task: the task to work on
     :*args and *kwargs: extra parameters currently not defined
     :return: the handler."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey)
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry = 2)
     handler = TaskHandler(task)
     handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, myproxylen=60*60*24) )
     if task['tm_job_type'] == 'Analysis': 
@@ -123,7 +123,7 @@ def handleResubmit(resthost, resturi, config, task, *args, **kwargs):
     :arg TaskWorker.DataObjects.Task task: the task to work on
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey)
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry = 2)
     handler = TaskHandler(task)
     handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, myproxylen=60*60*24) )
     def glidein(config):
@@ -151,7 +151,7 @@ def handleKill(resthost, resturi, config, task, *args, **kwargs):
     :arg TaskWorker.DataObjects.Task task: the task to work on
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey)
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry = 2)
     handler = TaskHandler(task)
     handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, myproxylen=60*5) )
     def glidein(config):

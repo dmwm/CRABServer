@@ -54,7 +54,7 @@ def processWorker(inputs, results, resthost, resturi):
         finally:
             if msg:
                 try:
-                    server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey)
+                    server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey, retry = 2)
                     configreq = {  'workflow': task['tm_taskname'],
                                    'status': "FAILED",
                                    'subresource': 'failure',
