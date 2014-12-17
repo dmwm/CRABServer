@@ -41,7 +41,7 @@ class RetryJob(object):
         """
         Class constructor.
         """
-        self.count = "-1"
+        self.job_id = -1
         self.site = None
         self.ad = {}
         self.validreport = True
@@ -91,7 +91,7 @@ class RetryJob(object):
 
     def get_report(self):
         try:
-            with open('jobReport.json.%s' % self.count, 'r') as fd_job_report:
+            with open("jobReport.json.%d" % (self.job_id), 'r') as fd_job_report:
                 try:
                     self.report = json.load(fd_job_report)
                 except ValueError:
@@ -106,14 +106,14 @@ class RetryJob(object):
 
     def record_site(self, result):
         try:
-            with os.fdopen(os.open("task_statistics.%s.%s" % (self.site, id_to_name[result]), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), "a") as fd:
-                fd.write("%s\n" % self.count)
+            with os.fdopen(os.open("task_statistics.%s.%s" % (self.site, id_to_name[result]), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), 'a') as fd:
+                fd.write("%d\n" % (self.job_id))
         except Exception, e:
             print "ERROR: %s" % str(e)
             # Swallow the exception - record_site is advisory only
         try:
-            with os.fdopen(os.open("task_statistics.%s" % (id_to_name[result]), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), "a") as fd:
-                fd.write("%s\n" % (self.count))
+            with os.fdopen(os.open("task_statistics.%s" % (id_to_name[result]), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), 'a') as fd:
+                fd.write("%d\n" % (self.job_id))
         except Exception, exmsg:
             print "ERROR: %s" % (str(exmsg))
             # Swallow the exception - record_site is advisory only
@@ -126,12 +126,14 @@ class RetryJob(object):
         fake_fjr = {}
         fake_fjr['exitCode'] = exitCode
         fake_fjr['exitMsg'] = exitMsg
-        jobReport = 'jobReport.json.%s' % self.count
+        jobReport = "jobReport.json.%d" % (self.job_id)
         if os.path.isfile(jobReport) and os.path.getsize(jobReport) > 0:
             #File exists and it is not empty
-            print '%s file exists and it is not empty! CRAB3 will overwrite it, because your job got FatalError' % jobReport
+            msg  = "%s file exists and it is not empty!" % (jobReport)
+            msg += " CRAB3 will overwrite it, because the job got FatalError"
+            print msg
             with open(jobReport, 'r') as fd:
-                print 'Old %s file content : ' % jobReport
+                print 'Old %s file content : ' % (jobReport)
                 print fd.read()
         with open(jobReport, 'w') as fd:
             print  'New %s file content : %s' % (jobReport, json.dumps(fake_fjr))
@@ -190,7 +192,7 @@ class RetryJob(object):
             return
         # TODO: Compare the job against its requested memory, not a hardcoded max.
         if total_job_memory > MAX_MEMORY:
-            exitMsg = "Not retrying job due to excessive memory use (%d MB)" % total_job_memory
+            exitMsg = "Not retrying job due to excessive memory use (%d MB)" % (total_job_memory)
             self.create_fake_fjr(exitMsg, 50660)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -245,7 +247,7 @@ class RetryJob(object):
         if exitCode == 134:
             recoverable_signal = False
             try:
-                fname = os.path.expanduser("~/%s/job_out.%s.%s.txt" % (self.reqname, self.count, self.retry_count))
+                fname = os.path.expanduser("~/%s/job_out.%d.%d.txt" % (self.reqname, self.job_id, self.retry_count))
                 with open(fname) as fd:
                     for line in fd:
                         if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
@@ -260,7 +262,7 @@ class RetryJob(object):
         if exitCode == 8001 or exitCode == 65:
             cvmfs_issue = False
             try:
-                fname = os.path.expanduser("~/%s/job_out.%s.%s.txt" % (self.reqname, self.count, self.retry_count))
+                fname = os.path.expanduser("~/%s/job_out.%d.%d.txt" % (self.reqname, self.job_id, self.retry_count))
                 cvmfs_issue_re = re.compile("== CMSSW:  unable to load /cvmfs/.*file too short")
                 with open(fname) as fd:
                     for line in fd: 
@@ -299,10 +301,10 @@ class RetryJob(object):
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def execute_internal(self, reqname, status, retry_count, max_retries, count, cluster):
+    def execute_internal(self, reqname, status, retry_count, job_id, cluster):
 
         self.reqname = reqname
-        self.count = count
+        self.job_id = job_id
         self.retry_count = retry_count
         self.cluster = cluster
 
