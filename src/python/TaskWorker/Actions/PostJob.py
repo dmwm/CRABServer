@@ -962,7 +962,8 @@ class PostJob():
             return 0
 
         ## Initialize the object we will use for making requests to the REST interface.
-        self.server = HTTPRequests(self.rest_host, os.environ['X509_USER_PROXY'], os.environ['X509_USER_PROXY'], retry = 2)
+        self.server = HTTPRequests(self.rest_host, os.environ['X509_USER_PROXY'], os.environ['X509_USER_PROXY'],
+                                   retry = 2, logger = logger)
 
         ## Upload the logs archive file metadata if it was not already done from the WN.
         if self.log_needs_file_metadata_upload:
@@ -1143,6 +1144,26 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    def file_exists(self, lfn, type):
+        """ Because of a bug in Oracle we need to do this if we get an exception while executing the filemetadata insert. See:
+            https://cern.service-now.com/nav_to.do?uri=incident.do?sys_id=92982f051d497500c7138e7019d56af9%26sysparm_view=RPT72d916c9f0d3d94079046a0c9f0e01d6
+            With the February deployment we should change the merge to an insert/update
+        """
+
+        try:
+            configreq = {"taskname" : self.job_ad['CRAB_ReqName'],
+                         "filetype" : type
+            }
+            res, _, _ = self.server.get(self.rest_uri_no_api + '/filemetadata', data = configreq)
+            lfns = [x['lfn'] for x in res[u'result']]
+        except HTTPException, hte:
+            msg = "Error getting list of file metadata: %s" % (str(hte.headers))
+            logger.error(msg)
+            return False
+        return (lfn in lfns)
+
+    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
     def upload_input_files_metadata(self):
         """
         Upload the output files metadata. We care about the number of events
@@ -1158,28 +1179,29 @@ class PostJob():
             return
         direct_stageout = int(self.job_report.get(u'direct_stageout', 0))
         for ifile in self.job_report['steps']['cmsRun']['input']['source']:
-            #Many of these parameters are not needed and are using fake/defined values
+            ## Many of these parameters are not needed and are using fake/defined values
+            lfn = ifile['lfn'] + "_" + str(self.job_id) ## jobs can analyze the same input
             configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
                          "globalTag"       : "None",
                          "pandajobid"      : self.job_id,
                          "outsize"         : "0",
                          "publishdataname" : self.publish_name,
                          "appver"          : self.job_ad['CRAB_JobSW'],
-                         "outtype"         : "POOLIN",#file['input_source_class'],
+                         "outtype"         : "POOLIN", ## file['input_source_class'],
                          "checksummd5"     : "0",
                          "checksumcksum"   : "0",
                          "checksumadler32" : "0",
                          "outlocation"     : self.job_ad['CRAB_AsyncDest'],
                          "outtmplocation"  : temp_storage_site,
-                         "acquisitionera"  : "null", # Not implemented
-                         "outlfn"          : ifile['lfn'] + "_" + str(self.job_id), # jobs can analyze the same input
-                         "outtmplfn"       : self.source_dir, #does not have sense for input files
+                         "acquisitionera"  : "null", ## Not implemented
+                         "outlfn"          : lfn,
+                         "outtmplfn"       : self.source_dir, ## does not have sense for input files
                          "events"          : ifile.get('events', 0),
                          "outdatasetname"  : "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER",
                          "directstageout"  : direct_stageout
                         }
             configreq = configreq.items()
-            outfilerun = []
+            outfileruns = []
             outfilelumis = []
             for run, lumis in ifile[u'runs'].iteritems():
                 outfileruns.append(str(run))
@@ -1195,7 +1217,12 @@ class PostJob():
             except HTTPException, hte:
                 msg = "Error uploading input file metadata: %s" % (str(hte.headers))
                 logger.error(msg)
-                raise
+                if not self.file_exists(lfn, 'POOLIN'):
+                    raise
+                else:
+                    msg = "Ignoring the error since the file %s is already in the database" % lfn
+                    logger.debug(msg)
+
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1271,9 +1298,11 @@ class PostJob():
                 ## If the file made it back alright, I suppose we can proceed.
                 msg = "Error uploading output file metadata: %s" % (str(hte.headers))
                 logger.error(msg)
-                if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
-                   not hte.headers.get('X-Error-Http', -1) == '400':
+                if not self.file_exists(file_info['outlfn'], file_info['filetype']):
                     raise
+                else:
+                    msg = "Ignoring the error since the file %s is already in the database" % lfn
+                    logger.debug(msg)
 
             if not os.path.exists('output_datasets'):
                 configreq = [('subresource', 'addoutputdatasets'),
