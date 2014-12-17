@@ -113,7 +113,7 @@ class HTTPRequests(dict):
                                 capath=caCertPath)#, verbose=True)# for debug
             except HTTPException, ex:
                 #add here other temporary errors we need to retry
-                if ex.status not in [500, 502, 503] or i == self['retry']
+                if ex.status not in [500, 502, 503] or i == self['retry']:
                     raise #really exit and raise exception it this was the last retry or the exit code is not among the list of the one we retry
                 sleeptime = 20 * (i + 1)
                 self.logger.debug("Sleeping %s seconds after HTTP error. Error details %s:", sleeptime, ex.headers)

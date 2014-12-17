@@ -1250,9 +1250,9 @@ class PostJob():
                     publishname = "%s_%s-%s" % (left, file_info['module_label'], right)
                 outdataset = os.path.join('/' + self.input_dataset.split('/')[1], \
                                           self.job_ad['CRAB_UserHN'] + '-' + publishname, 'USER')
+                output_datasets.add(outdataset)
             else:
                 outdataset = '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER'
-            output_datasets.add(outdataset)
             configreq = {'taskname'        : self.reqname,
                          'pandajobid'      : self.job_id,
                          'outsize'         : file_info['outsize'],
@@ -1304,23 +1304,26 @@ class PostJob():
                     msg = "Ignoring the error since the file %s is already in the database" % lfn
                     logger.debug(msg)
 
-            if not os.path.exists('output_datasets'):
-                configreq = [('subresource', 'addoutputdatasets'),
-                             ('workflow', self.reqname)]
-                for dset in output_datasets:
-                    configreq.append(('outputdatasets', dset))
-                rest_api = 'task'
-                rest_uri = self.rest_uri_no_api + '/' + rest_api
-                rest_url = self.rest_host + rest_uri
-                msg = "Uploading output datasets to https://%s: %s" % (rest_url, configreq)
-                logger.debug(msg)
-                try:
-                    self.server.post(rest_uri, data = urllib.urlencode(configreq))
-                    with open('output_datasets', 'w') as f:
-                        f.write(' '.join(output_datasets))
-                except HTTPException, hte:
-                    msg = "Error uploading output dataset: %s" % (str(hte.headers))
-                    logger.exception(msg)
+        if not os.path.exists('output_datasets'):
+            configreq = [('subresource', 'addoutputdatasets'),
+                         ('workflow', self.reqname)]
+            for dset in output_datasets:
+                configreq.append(('outputdatasets', dset))
+            rest_api = 'task'
+            rest_uri = self.rest_uri_no_api + '/' + rest_api
+            rest_url = self.rest_host + rest_uri
+            msg = "Uploading output datasets to https://%s: %s" % (rest_url, configreq)
+            logger.debug(msg)
+            try:
+                self.server.post(rest_uri, data = urllib.urlencode(configreq))
+                with open('output_datasets', 'w') as f:
+                    f.write(' '.join(output_datasets))
+            except HTTPException, hte:
+                msg = "Error uploading output dataset: %s" % (str(hte.headers))
+                logger.error(msg)
+            except IOError, ioe:
+                msq = "Error writing the output_datasets file"
+                logger.error(msg)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
