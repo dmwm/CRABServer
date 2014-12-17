@@ -1,10 +1,11 @@
 """
 Handles client interactions with remote REST interface
-""" 
+"""
 
 import os
 import time
 import urllib
+import logging
 from urlparse import urlunparse
 from httplib import HTTPException
 
@@ -28,7 +29,7 @@ class HTTPRequests(dict):
     is used more in the client.
     """
 
-    def __init__(self, url='localhost', localcert=None, localkey=None, version=None, retry=0):
+    def __init__(self, url='localhost', localcert=None, localkey=None, version=None, retry=0, logger=None):
         """
         Initialise an HTTP handler
         """
@@ -45,6 +46,7 @@ class HTTPRequests(dict):
             version = __version__
         self.setdefault("version", version)
         self.setdefault("retry", retry)
+        self.logger = logger if logger else logging.getLogger()
 
     def getUrlOpener(self):
         """
@@ -110,11 +112,12 @@ class HTTPRequests(dict):
                 response, datares = self['conn'].request(url, data, headers, verb=verb, doseq = True, ckey=self['key'], cert=self['cert'], \
                                 capath=caCertPath)#, verbose=True)# for debug
             except HTTPException, ex:
-                if ex.status not in [500, 502, 503] or i == self['retry']: #add here other temporary errors we need to retry
+                #add here other temporary errors we need to retry
+                if ex.status not in [500, 502, 503] or i == self['retry']
                     raise #really exit and raise exception it this was the last retry or the exit code is not among the list of the one we retry
-                time.sleep(20 * (i + 1)) #sleeps 20s the first time, 40s the second time and so on
-            else:
-                break
+                sleeptime = 20 * (i + 1)
+                self.logger.debug("Sleeping %s seconds after HTTP error. Error details %s:", sleeptime, ex.headers)
+                time.sleep(sleeptime) #sleeps 20s the first time, 40s the second time and so on
 
         return self.decodeJson(datares), response.status, response.reason
 
