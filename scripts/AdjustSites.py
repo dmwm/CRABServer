@@ -31,7 +31,7 @@ def adjustPost(resubmit):
     """
     if not resubmit:
         return
-    resubmit_all = resubmit == True
+    resubmit_all = (resubmit == True)
     ra_buffer = []
     alt = None
     output = ''
@@ -80,7 +80,7 @@ def adjustPost(resubmit):
     # file descriptors open.  Accordingly, we write the file once (to see if we)
     # have enough quota space, then rewrite "the real file" after deleting the
     # temporary one.  There's a huge race condition here, but it seems to be the
-    # best we can do giveen the constraints.  Note that we don't race with the
+    # best we can do given the constraints.  Note that we don't race with the
     # shadow as we have a write lock on the file itself.
     output_fd = open("RunJobs.dag.nodes.log.tmp", "w")
     output_fd.write(output)
@@ -91,19 +91,26 @@ def adjustPost(resubmit):
     output_fd.close()
 
 def resubmitDag(filename, resubmit):
+    """
+    Update the RunJobs.dag file changing only the maximum allowed number of retries
+    from dagman and only for the jobs that will be resubmitted.
+    """
     if not os.path.exists(filename):
         return
     retry_re = re.compile(r'RETRY Job([0-9]+) ([0-9]+) ')
     output = ""
-    resubmit_all = resubmit == True
-
+    ## I think resubmit is always a list, in the worst case an empty list or a list
+    ## with all the job ids in the task. So resubmit_all is always False.
+    resubmit_all = (resubmit == True)
+    ## This number here should be the same as in the TaskWorker config.
+    max_retries_per_resubmission = 3
     for line in open(filename).readlines():
         m = retry_re.search(line)
         if m:
             job_id = m.groups()[0]
             if resubmit_all or (job_id in resubmit):
                 try:
-                    retry_count = int(m.groups()[1]) + 10
+                    retry_count = int(m.groups()[1]) + max_retries_per_resubmission
                 except ValueError:
                     retry_count = 10
                 line = retry_re.sub(r'RETRY Job%s %d ' % (job_id, retry_count), line)
