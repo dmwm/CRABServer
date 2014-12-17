@@ -533,10 +533,8 @@ class ASOServerJob(object):
                            'publish'                 : publish,
                           }
                     if not needs_transfer:
-                        ## TODO: The "/store/user" variant of the LFN should be used for files that
-                        ## are marked as 'done'. Otherwise, publication may break.
-                        doc['lfn'] = dest_lfn
-                        doc['source_lfn'] = dest_lfn
+                        doc['lfn'] = source_lfn.replace('/store/temp', '/store', 1)
+                        doc['source_lfn'] = source_lfn.replace('/store/temp', '/store', 1)
                 except Exception, exmsg:
                     msg = "Got exception while trying to load the document from ASO database: %s" % (str(exmsg))
                     try:
