@@ -219,20 +219,21 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=True)
             validate_str('subresource', param, safe, RX_SUBRESTAT, optional=True)
             validate_str('username', param, safe, RX_USERNAME, optional=True)
-            validate_str('timestamp', param, safe, RX_DATE, optional=True)  #inserted by eric
+            validate_str('timestamp', param, safe, RX_DATE, optional=True) ## inserted by eric
 
-            # Used to determine how much information to return to the client for status
+            ## Used to determine how much information to return to the client for status.
+            ## also used by report to determine if it has to check job states
             validate_num("verbose", param, safe, optional=True)
 
-            #used by get log, get data
+            ## used by get log, get data
             validate_num('limit', param, safe, optional=True)
             validate_num('exitcode', param, safe, optional=True)
             validate_numlist('jobids', param, safe)
 
-            #used by errors and report (short format in report means we do not query DBS)
+            ## used by errors and report (short format in report means we do not query DBS)
             validate_num('shortformat', param, safe, optional=True)
 
-            #validation parameters
+            ## validation parameters
             if not safe.kwargs['workflow'] and safe.kwargs['subresource']:
                 raise InvalidParameter("Invalid input parameters")
             if safe.kwargs['subresource'] in ['data', 'logs'] and not safe.kwargs['limit'] and not safe.kwargs['jobids']:

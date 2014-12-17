@@ -1179,12 +1179,15 @@ class PostJob():
                          "directstageout"  : direct_stageout
                         }
             configreq = configreq.items()
-            if 'outfileruns' in ifile:
-                for run in ifile['outfileruns']:
-                    configreq.append(("outfileruns", run))
-            if 'outfilelumis' in ifile:
-                for lumi in ifile['outfilelumis']:
-                    configreq.append(("outfilelumis", lumi))
+            outfilerun = []
+            outfilelumis = []
+            for run, lumis in ifile[u'runs'].iteritems():
+                outfileruns.append(str(run))
+                outfilelumis.append(','.join(map(str, lumis)))
+            for run in outfileruns:
+                configreq.append(("outfileruns", run))
+            for lumi in outfilelumis:
+                configreq.append(("outfilelumis", lumi))
             msg = "Uploading file metadata for input file %s" % ifile['lfn']
             logger.debug(msg)
             try:

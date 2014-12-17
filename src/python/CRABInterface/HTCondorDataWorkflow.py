@@ -229,9 +229,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                         'events'  : row[GetFromTaskAndType.INEVENTS],
                         'type'    : row[GetFromTaskAndType.TYPE],
                 })
-            if str(row[GetFromTaskAndType.PANDAID]) == '2':
-                self.logger.debug("Got lumi info for job %d." % row[GetFromTaskAndType.PANDAID])
-                self.logger.debug("%s" % res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])])
         self.logger.info("Got %s edm files for workflow %s" % (len(res['runsAndLumis']), workflow))
 
         if usedbs:
@@ -325,7 +322,8 @@ class HTCondorDataWorkflow(DataWorkflow):
             results = self.getRootTasks(workflow, schedd)
             self.logger.info("Web status for workflow %s done" % workflow)
         except Exception, exp:
-            msg = "%s: The CRAB3 server frontend is not able to find your task in the Grid scheduler (remember tasks older than 30 days are automatically removed). If your task is a recent onem, this could mean there is a temporary glicth. Please, retry later: %s" % (workflow, str(exp))
+            msg = ("%s: The CRAB3 server frontend is not able to find your task in the Grid scheduler (remember tasks older than 30 days are automatically removed)."
+                   "If your task is a recent one, this could mean there is a temporary glicth. Please, retry later: %s") % (workflow, str(exp))
             self.logger.exception(msg)
             return [{"status" : "UNKNOWN",
                       "taskFailureMsg" : str(msg),
@@ -339,7 +337,8 @@ class HTCondorDataWorkflow(DataWorkflow):
                       "saveLogs"        : row.save_logs }]
         if not results:
             return [ {"status" : "UNKNOWN",
-                      "taskFailureMsg" : "The CRAB3 server frontend cannot find any information about your jobs in the Grid scheduler. Remember, jobs are only kept for a limited amount of time on the scheduler (one month usually)",
+                      "taskFailureMsg" : ("The CRAB3 server frontend cannot find any information about your jobs in the Grid scheduler."
+                                         "Remember, jobs are only kept for a limited amount of time on the scheduler (30 days)"),
                       "taskWarningMsg"  : taskWarnings,
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
@@ -631,7 +630,8 @@ class HTCondorDataWorkflow(DataWorkflow):
                 if m:
                     node = m.groups()[0]
                     proc = event['Cluster'], event['Proc']
-                    info = nodes.setdefault(node, {'Retries': 0, 'Restarts': 0, 'SiteHistory': [], 'ResidentSetSize': [], 'SubmitTimes': [], 'StartTimes': [], 'EndTimes': [], 'TotalUserCpuTimeHistory': [], 'TotalSysCpuTimeHistory': [], 'WallDurations': [], 'JobIds': []})
+                    info = nodes.setdefault(node, {'Retries': 0, 'Restarts': 0, 'SiteHistory': [], 'ResidentSetSize': [], 'SubmitTimes': [], 'StartTimes': [],
+                                                'EndTimes': [], 'TotalUserCpuTimeHistory': [], 'TotalSysCpuTimeHistory': [], 'WallDurations': [], 'JobIds': []})
                     info['State'] = 'idle'
                     info['JobIds'].append("%d.%d" % proc)
                     info['RecordedSite'] = False

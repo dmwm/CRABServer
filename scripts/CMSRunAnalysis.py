@@ -555,7 +555,8 @@ def executeScriptExe(opts, scram):
         sys.exit(EC_CMSRunWrapper)
 
     command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
-    ret = scram(command_, runtimeDir = os.getcwd(), logName='cmsRun-stdout.log')#subprocess.PIPE) for printing to the stdout
+
+    ret = scram(command_, runtimeDir = os.getcwd(), logName = 'cmsRun-stdout.log', cleanEnv = False)#logName=subprocess.PIPE) for printing to the stdout
     if ret > 0:
         msg = scram.diagnostic()
         handleException("FAILED", EC_CMSRunWrapper, 'Error executing scriptExe.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
