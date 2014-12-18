@@ -118,6 +118,8 @@ class HTTPRequests(dict):
                 sleeptime = 20 * (i + 1)
                 self.logger.debug("Sleeping %s seconds after HTTP error. Error details %s:", sleeptime, ex.headers)
                 time.sleep(sleeptime) #sleeps 20s the first time, 40s the second time and so on
+            else:
+                break
 
         return self.decodeJson(datares), response.status, response.reason
 
