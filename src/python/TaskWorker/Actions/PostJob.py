@@ -190,7 +190,7 @@ class ASOServerJob(object):
         self.retry_timeout = retry_timeout
         self.couch_server = None
         self.couch_database = None
-        self.sleep = 200
+        self.sleep = 300
         self.count = count
         self.dest_site = dest_site
         self.source_dir = source_dir
@@ -235,7 +235,16 @@ class ASOServerJob(object):
         if self.aso_start_timestamp:
             starttime = self.aso_start_timestamp
         logger.info("====== Starting to monitor ASO transfers.")
+        ## This call to get_transfer_statuses() is only to make a first call to
+        ## the couch view in order to reduce the probability of getting a stale
+        ## result when calling the view inside the while loop below.
+        self.get_transfers_statuses()
         while True:
+            ## Sleep is done before calling get_transfer_statuses(), in order to
+            ## give some time to couch to load the view after the above call to
+            ## get_transfer_statuses().
+            time.sleep(self.sleep + random.randint(0, 60))
+            ## Get the transfer status in all documents listed in self.doc_ids.
             transfers_statuses = self.get_transfers_statuses()
             msg = "Got statuses: %s; %.1f hours since transfer submit." 
             msg = msg % (", ".join(transfers_statuses), (time.time()-starttime)/3600.0)
@@ -256,12 +265,8 @@ class ASOServerJob(object):
                     if doc_id not in failed_killed_transfers:
                         failed_killed_transfers.append(doc_id)
                         msg = "Job (internal ID %s) failed with status '%s'." % (doc_id, transfer_status)
-                        try:
-                            doc = self.couch_database.document(doc_id)
-                        except:
-                            logger.error("Failed to retrieve document for %s." % (doc_id))
-                            doc = {}
-                        if ('failure_reason' in doc) and doc['failure_reason']:
+                        doc = self.load_couch_document(doc_id)
+                        if doc and ('failure_reason' in doc) and doc['failure_reason']:
                             ## reasons:  The transfer failure reason(s).
                             ## app:      The application that gave the transfer failure reason(s).
                             ##           E.g. 'aso' or '' (meaning the postjob). When printing the
@@ -311,9 +316,6 @@ class ASOServerJob(object):
                         self.cancel({doc_id: reason})
                 logger.info("====== Finished to monitor ASO transfers.")
                 return 1
-            else:
-                ## Sleep is done here in case if the transfer is done immediately (direct stageout case).
-                time.sleep(self.sleep + random.randint(0, 60))
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -537,7 +539,7 @@ class ASOServerJob(object):
                         doc['lfn'] = source_lfn.replace('/store/temp', '/store', 1)
                         doc['source_lfn'] = source_lfn.replace('/store/temp', '/store', 1)
                 except Exception, exmsg:
-                    msg = "Got exception while trying to load the document from ASO database: %s" % (str(exmsg))
+                    msg = "Error loading document from ASO database: %s" % (str(exmsg))
                     try:
                         msg += "\n%s" % (traceback.format_exc())
                     except AttributeError:
@@ -622,16 +624,37 @@ class ASOServerJob(object):
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    def load_couch_document(self, doc_id):
+        """
+        Wrapper to load a document from CouchDB, catching exceptions.
+        """
+        doc = None
+        try:
+            doc = self.couch_database.document(doc_id)
+        except CMSCouch.CouchError, cee:
+            msg = "Error retrieving document from ASO database for ID %s: %s" % (doc_id, str(cee))
+            logger.error(msg)
+        except HTTPException, hte:
+            msg = "Error retrieving document from ASO database for ID %s: %s" % (doc_id, str(hte.headers))
+            logger.error(msg)
+        except Exception:
+            msg = "Error retrieving document from ASO database for ID %s" % (doc_id)
+            logger.exception(msg)
+        return doc
+
+    ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
     def get_transfers_statuses_fallback(self):
         """
         Retrieve the status of all transfers by loading the correspnding documents
         from ASO database and checking the 'state' field.
         """
-        logger.debug("Querying transfer status using fallback method.")
+        logger.debug("Querying transfers statuses using fallback method (i.e. loading each document).")
         statuses = []
         for doc_id in self.doc_ids:
-            doc = self.couch_database.document(doc_id)
-            statuses.append(doc['state'])
+            doc = self.load_couch_document(doc_id)
+            status = doc['state'] if doc else 'unknown'
+            statuses.append(status)
         return statuses
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -648,11 +671,15 @@ class ASOServerJob(object):
             for doc_id in self.doc_ids:
                 doc_ids_reasons[doc_id] = ''
         for doc_id, reason in doc_ids_reasons.iteritems():
-            msg = "Cancelling ASO data transfer %s" % (doc_id)
+            msg = "Cancelling ASO transfer %s" % (doc_id)
             if reason:
                 msg += " with following reason: %s" % (reason)
             logger.info(msg)
-            doc = self.couch_database.document(doc_id)
+            doc = self.load_couch_document(doc_id)
+            if not doc:
+                msg = "Could not cancel ASO transfer %s" % (doc_id)
+                logger.info(msg)
+                continue
             doc['state'] = 'killed'
             doc['end_time'] = now
             if reason:
@@ -665,7 +692,7 @@ class ASOServerJob(object):
                     doc['failure_reason'] = reason
             res = self.couch_database.commitOne(doc)
             if 'error' in res:
-                exmsg = "Got error killing ASO data transfer %s: %s" % (doc_id, res)
+                exmsg = "Got error killing ASO transfer %s: %s" % (doc_id, res)
                 raise RuntimeError, exmsg
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -1135,9 +1162,8 @@ class PostJob():
         try:
             self.server.put(rest_uri, data = urllib.urlencode(configreq))
         except HTTPException, hte:
-            msg = "Got exception when uploading logs file metadata: %s"
-            msg = msg % (str(hte.headers))
-            logger.exception(msg)
+            msg = "Error uploading logs file metadata: %s" % (str(hte.headers))
+            logger.error(msg)
             if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
                not hte.headers.get('X-Error-Http', -1) == '400':
                 raise
@@ -1340,8 +1366,7 @@ class PostJob():
             self.job_ad = classad.parseOld(fd_job_ad)
             fd_job_ad.close()
         except Exception, exmsg:
-            msg = "Got exception while trying to parse the job ad: %s"
-            msg = msg % (str(exmsg))
+            msg = "Error parsing job ad: %s" % (str(exmsg))
             logger.exception(msg)
             return not OK
         ## Check if all the required attributes from the job ad are there.
@@ -1412,8 +1437,7 @@ class PostJob():
             with open(G_JOB_REPORT_NAME) as fd_job_report:
                 self.job_report = json.load(fd_job_report)
         except Exception, exmsg:
-            msg = "Got exception while trying to load the job report: %s"
-            msg = msg % (str(exmsg))
+            msg = "Error loading job report: %s" % (str(exmsg))
             logger.exception(msg)
             return not OK
         ## Check that the job_report has the expected structure.
