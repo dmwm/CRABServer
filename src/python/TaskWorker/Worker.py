@@ -1,3 +1,4 @@
+import os
 import time
 import signal
 import urllib
@@ -6,25 +7,26 @@ import traceback
 import multiprocessing
 from Queue import Empty
 from base64 import b64encode
+from logging.handlers import TimedRotatingFileHandler
 
+from RESTInteractions import HTTPRequests
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.WorkerExceptions import WorkerHandlerException
-from RESTInteractions import HTTPRequests
-
 
 ## Creating configuration globals to avoid passing these around at every request
 global WORKER_CONFIG
 
 
-def processWorker(inputs, results, resthost, resturi):
+def processWorker(inputs, results, resthost, resturi, procnum):
     """Wait for an reference to appear in the input queue, call the referenced object
        and write the output in the output queue.
 
        :arg Queue inputs: the queue where the inputs are shared by the master
        :arg Queue results: the queue where this method writes the output
        :return: default returning zero, but not really needed."""
-    logger = logging.getLogger()
-    procName = multiprocessing.current_process().name
+    logger = logging.getLogger(str(procnum))
+    logger.info("Process %s is starting. PID %s", procnum, os.getpid())
+    procName = "Process-%s" % procnum
     while True:
         try:
             workid, work, task, inputargs = inputs.get()
@@ -41,7 +43,7 @@ def processWorker(inputs, results, resthost, resturi):
         logger.debug("%s: Starting %s on %s" %(procName, str(work), task['tm_taskname']))
         try:
             msg = None
-            outputs = work(resthost, resturi, WORKER_CONFIG, task, inputargs)
+            outputs = work(resthost, resturi, WORKER_CONFIG, task, procnum, inputargs)
         except WorkerHandlerException, we:
             outputs = Result(task=task, err=str(we))
             msg = str(we)
@@ -54,6 +56,7 @@ def processWorker(inputs, results, resthost, resturi):
         finally:
             if msg:
                 try:
+                    #logger.info("Uploading error message to REST: %s" % msg)
                     server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey, retry = 2)
                     configreq = {  'workflow': task['tm_taskname'],
                                    'status': "FAILED",
@@ -71,9 +74,21 @@ def processWorker(inputs, results, resthost, resturi):
                      'workid': workid,
                      'out' : outputs
                     })
-    logger.debug("Slave exiting.")
+    logger.debug("Slave %s exiting." % procnum)
     return 0
 
+
+def setProcessLogger(name):
+    """ Set the logger for a single process. The file used for it is logs/processes/proc.name.txt and it
+        can be retrieved with logging.getLogger(name) in other parts of the code
+    """
+    logger = logging.getLogger(name)
+    handler = TimedRotatingFileHandler('logs/processes/proc.%s.txt' % name, 'midnight', backupCount=30)
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    return logger
 
 
 class Worker(object):
@@ -90,7 +105,7 @@ class Worker(object):
         #We just need to prevent "accidental" kill of the worker processes by things like pkill -f TaskWorker
         signal.signal(signal.SIGINT, lambda code, tb: None)
         signal.signal(signal.SIGTERM, lambda code, tb: None)
-        self.logger = logging.getLogger(type(self).__name__)
+        self.logger = logging.getLogger("master")
         global WORKER_CONFIG
         WORKER_CONFIG = config
         #global WORKER_DBCONFIG
@@ -112,19 +127,20 @@ class Worker(object):
         """Starting up all the slaves"""
         if len(self.pool) == 0:
             # Starting things up
-            for x in range(self.nworkers):
+            for x in xrange(1, self.nworkers + 1):
                 self.logger.debug("Starting process %i" %x)
-                p = multiprocessing.Process(target = processWorker, args = (self.inputs, self.results, self.resthost, self.resturi))
+                setProcessLogger(str(x))
+                p = multiprocessing.Process(target = processWorker, args = (self.inputs, self.results, self.resthost, self.resturi, x))
                 p.start()
                 self.pool.append(p)
         self.logger.info("Started %d slaves"% len(self.pool))
 
     def end(self):
         """Stopping all the slaves"""
-        self.logger.debug("Ready to close all %i started processes "%len(self.pool))
+        self.logger.debug("Ready to close all %i started processes " % len(self.pool))
         for x in self.pool:
             try:
-                self.logger.debug("Shutting down %s "%str(x))
+                self.logger.debug("Putting stop message in the queue for %s " % str(x))
                 self.inputs.put(('-1', 'STOP', 'control', []))
             except Exception, ex:
                 msg =  "Hit some exception in deletion\n"
@@ -148,7 +164,7 @@ class Worker(object):
             worktype, task, arguments = work
             self.inputs.put((workid, worktype, task, arguments))
             self.working[workid] = {'workflow': task['tm_taskname'], 'injected': time.time()}
-            self.logger.info('Injecting work %d' %workid)
+            self.logger.info('Injecting work %d: %s' % (workid, task['tm_taskname']))
             workid += 1
         self.logger.debug("Injection completed.")
 
@@ -209,6 +225,7 @@ class Worker(object):
         if len(self.working) <= len(self.pool):
             return 0
         return len(self.working) - len(self.pool)
+
 
 if __name__ == '__main__':
 
