@@ -38,9 +38,14 @@ class Splitter(TaskAction):
                 splitparam['lheInputFiles'] = True
         splitparam['applyLumiCorrection'] = True
         factory = jobfactory(**splitparam)
-        if len(factory) == 0:
+        numJobs = sum([len(jobgroup.getJobs()) for jobgroup in factory])
+        maxJobs = getattr(self.config.TaskWorker, 'maxJobsPerTask', 10000)
+        if numJobs == 0:
             raise TaskWorkerException("The CRAB3 server backend could not submit any job to the Grid scheduler:\n"+\
                         "splitting task %s on dataset %s with %s method does not generate any job")
+        elif numJobs > maxJobs:
+            raise TaskWorkerException("The splitting on your task generated %s jobs. The maximum number of jobs in each task is %s" %
+                                        (numJobs, maxJobs))
         #printing duplicated lumis if any
         lumiChecker = getattr(jobfactory, 'lumiChecker', None)
         if lumiChecker and lumiChecker.splitLumiFiles:
@@ -51,8 +56,8 @@ class Splitter(TaskAction):
                              'warning': b64encode('The CRAB3 server backend detected lumis split across files in the input dataset.'
                                         ' Will apply the necessary corrections in the splitting algorithms')}
                 self.server.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
-            except Exception, e:
-                self.logger.error(e.headers)
+            except HTTPException, hte:
+                self.logger.error(hte.headers)
                 self.logger.warning("Cannot add warning to REST after finding duplicates")
 
         return Result(task = kwargs['task'], result = factory)
