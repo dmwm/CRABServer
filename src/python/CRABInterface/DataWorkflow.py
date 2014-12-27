@@ -31,7 +31,8 @@ class DataWorkflow(object):
 
         self.splitArgMap = { "LumiBased" : "lumis_per_job",
                         "FileBased" : "files_per_job",
-                        "EventBased" : "events_per_job",}
+                        "EventBased" : "events_per_job",
+                        "EventAwareLumiBased": "events_per_job"}
 
 	self.Task = getDBinstance(config, 'TaskDB', 'Task')
 	self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
