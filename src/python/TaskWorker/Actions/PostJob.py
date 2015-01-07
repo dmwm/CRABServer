@@ -181,7 +181,7 @@ class ASOServerJob(object):
     def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, \
                  filenames, reqname, log_size, log_needs_transfer, \
                  job_report_output, job_ad, crab_retry_count, retry_timeout, \
-                 job_failed):
+                 job_failed, transfer_logs, transfer_outputs):
         """
         ASOServerJob constructor.
         """
@@ -202,6 +202,8 @@ class ASOServerJob(object):
         self.job_report_output = job_report_output
         self.log_size = log_size
         self.log_needs_transfer = log_needs_transfer
+        self.transfer_logs = transfer_logs
+        self.transfer_outputs = transfer_outputs
         self.job_ad = job_ad
         self.failures = {}
         self.aso_start_timestamp = None
@@ -264,7 +266,7 @@ class ASOServerJob(object):
                 elif transfer_status in ['failed', 'killed']:
                     if doc_id not in failed_killed_transfers:
                         failed_killed_transfers.append(doc_id)
-                        msg = "Job (internal ID %s) failed with status '%s'." % (doc_id, transfer_status)
+                        msg = "Stageout job (internal ID %s) failed with status '%s'." % (doc_id, transfer_status)
                         doc = self.load_couch_document(doc_id)
                         if doc and ('failure_reason' in doc) and doc['failure_reason']:
                             ## reasons:  The transfer failure reason(s).
@@ -293,7 +295,7 @@ class ASOServerJob(object):
                     exmsg = "Got an unknown status: %s" % (transfer_status)
                     raise RuntimeError, exmsg
             if all_transfers_finished:
-                msg = "All transfers finished. There were %s failed/killed transfers" % (len(failed_killed_transfers))
+                msg = "All transfers finished. There were %s failed/killed transfers." % (len(failed_killed_transfers))
                 if failed_killed_transfers:
                     msg += " (%s)" % ', '.join(failed_killed_transfers)
                     logger.info(msg)
@@ -361,33 +363,28 @@ class ASOServerJob(object):
         task_publish = int(self.job_ad['CRAB_Publish'])
 
         # TODO: Add a method to resolve a single PFN.
-        for output_module in self.job_report_output.values():
-            for output_file_info in output_module:
-                file_info = {}
-                file_info['checksums'] = output_file_info.get(u'checksums', {'cksum': '0', 'adler32': '0'})
-                file_info['outsize'] = output_file_info.get(u'size', 0)
-                file_info['direct_stageout'] = output_file_info.get(u'direct_stageout', False)
-                if (output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
-                    output_file_info.get(u'ouput_module_class',  '') == u'PoolOutputModule'):
-                    file_info['filetype'] = 'EDM'
-                elif output_file_info.get(u'Source', '') == u'TFileService':
-                    file_info['filetype'] = 'TFILE'
-                else:
-                    file_info['filetype'] = 'FAKE'
-                if u'pfn' in output_file_info:
-                    file_info['pfn'] = str(output_file_info[u'pfn'])
-                output_files.append(file_info)
-        transfer_outputs = int(self.job_ad['CRAB_TransferOutputs'])
-        if not transfer_outputs:
-            logger.debug("Transfer outputs flag is false; skipping outputs stageout.")
-        transfer_logs = int(self.job_ad['CRAB_SaveLogsFlag'])
-        if not transfer_logs:
-            logger.debug("Transfer logs flag is false; skipping logs stageout.")
+        if self.transfer_outputs:
+            for output_module in self.job_report_output.values():
+                for output_file_info in output_module:
+                    file_info = {}
+                    file_info['checksums'] = output_file_info.get(u'checksums', {'cksum': '0', 'adler32': '0'})
+                    file_info['outsize'] = output_file_info.get(u'size', 0)
+                    file_info['direct_stageout'] = output_file_info.get(u'direct_stageout', False)
+                    if (output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
+                        output_file_info.get(u'ouput_module_class',  '') == u'PoolOutputModule'):
+                        file_info['filetype'] = 'EDM'
+                    elif output_file_info.get(u'Source', '') == u'TFileService':
+                        file_info['filetype'] = 'TFILE'
+                    else:
+                        file_info['filetype'] = 'FAKE'
+                    if u'pfn' in output_file_info:
+                        file_info['pfn'] = str(output_file_info[u'pfn'])
+                    output_files.append(file_info)
         found_log = False
         for source_site, filename in zip(self.source_sites, self.filenames):
             ## We assume that the first file in self.filenames is the logs archive.
             if found_log:
-                if not transfer_outputs:
+                if not self.transfer_outputs:
                     continue
                 source_lfn = os.path.join(self.source_dir, filename)
                 dest_lfn = os.path.join(self.dest_dir, filename)
@@ -401,7 +398,7 @@ class ASOServerJob(object):
                 file_output_type = output_files[ifile]['filetype']
             else:
                 found_log = True
-                if not transfer_logs:
+                if not self.transfer_logs:
                     continue
                 source_lfn = os.path.join(self.source_dir, 'log', filename)
                 dest_lfn = os.path.join(self.dest_dir, 'log', filename)
@@ -742,6 +739,8 @@ class PostJob():
         self.rest_host           = None
         self.rest_uri_no_api     = None
         self.retry_timeout       = None
+        self.transfer_logs       = None
+        self.transfer_outputs    = None
         ## These are read from the job report (see parse_job_report()).
         self.job_report          = {}
         self.job_report_output   = {}
@@ -796,8 +795,7 @@ class PostJob():
             os.makedirs(logpath)
         except OSError, ose:
             if ose.errno != errno.EEXIST:
-                msg = "Failed to create log web-shared directory %s"
-                msg = msg % (logpath)
+                msg = "Failed to create log web-shared directory %s" % (logpath)
                 logger.exception(msg)
                 raise
 
@@ -811,16 +809,14 @@ class PostJob():
         else:
             os.dup2(fd, 1)
             os.dup2(fd, 2)
-            msg = "Post-job started with output redirected to %s."
-            msg = msg % (postjob_log_file_name)
+            msg = "Post-job started with output redirected to %s." % (postjob_log_file_name)
             logger.info(msg)
 
         ## Call execute_internal().
         retval = 1
         try:
             retval = self.execute_internal()
-            msg = "Post-job finished executing with status code %d."
-            msg = msg % (retval)
+            msg = "Post-job finished executing with status code %d." % (retval)
             logger.info(msg)
         except:
             msg = "Failure during post-job execution."
@@ -851,8 +847,8 @@ class PostJob():
         are done from here.
         """
 
-        ## Copy the job's stdout file job_out.<jobid> to the schedd web directory,
-        ## naming it job_out.<jobid>.<crabretrycount>.txt.
+        ## Copy the job's stdout file job_out.<job_id> to the schedd web directory,
+        ## naming it job_out.<job_id>.<crab_retry_count>.txt.
         stdout = "job_out.%d" % (self.job_id)
         stdout_tmp = "job_out.tmp.%d" % (self.job_id)
         logpath = os.path.expanduser("~/%s" % (self.reqname))
@@ -860,8 +856,7 @@ class PostJob():
             os.rename(stdout, stdout_tmp)
             fname = 'job_out.'+str(self.job_id)+'.'+str(self.crab_retry_count)+'.txt'
             fname = os.path.join(logpath, fname)
-            msg = "Copying job stdout from %s to %s."
-            msg = msg % (stdout, fname)
+            msg = "Copying job stdout from %s to %s." % (stdout, fname)
             logger.debug(msg)
             shutil.copy(stdout_tmp, fname)
             fd_stdout = open(stdout_tmp, 'w')
@@ -869,8 +864,8 @@ class PostJob():
             fd_stdout.close()
             os.chmod(fname, 0644)
 
-        ## Copy the json job report file jobReport.json.<jobid> to the schedd web
-        ## directory, naming it job_fjr.<jobid>.<crabretrycount>.json.
+        ## Copy the json job report file jobReport.json.<job_id> to the schedd web
+        ## directory, naming it job_fjr.<job_id>.<crab_retry_count>.json.
         ## NOTE: We now redirect stdout -> stderr; hence, we don't keep stderr in
         ## the webdir.
         global G_JOB_REPORT_NAME
@@ -878,7 +873,8 @@ class PostJob():
         if os.path.exists(G_JOB_REPORT_NAME):
             fname = 'job_fjr.'+str(self.job_id)+'.'+str(self.crab_retry_count)+'.json'
             fname = os.path.join(logpath, fname)
-            logger.debug("Copying job report from %s to %s." % (G_JOB_REPORT_NAME, fname))
+            msg = "Copying job report from %s to %s." % (G_JOB_REPORT_NAME, fname)
+            logger.debug(msg)
             shutil.copy(G_JOB_REPORT_NAME, fname)
             os.chmod(fname, 0644)
 
@@ -907,11 +903,10 @@ class PostJob():
         ## Execute the retry-job. The retry-job decides whether an error is
         ## recoverable or fatal. It uses the cmscp exit code and error message,
         ## and the memory and cpu perfomance information; all from the job
-        ## report. If the retry-job returns non 0 (meaning there was an error),
+        ## report. We also pass the job exit code as argument (job_status) in
+        ## case the exit code in the job report was not updated by cmscp.
+        ## If the retry-job returns non 0 (meaning there was an error),
         ## report the state to dashboard and exit the post-job.
-        ## This is for the case in which we forgot to update the exit code in
-        ## the job report. I mean, it may be that the exit code in the job
-        ## is 0, but actually the job failed.
         retry = RetryJob.RetryJob()
         retryjob_retval = None
         if not os.environ.get('TEST_POSTJOB_DISABLE_RETRIES', False):
@@ -931,7 +926,7 @@ class PostJob():
                 if self.dag_retry_count >= self.max_retries:
                     msg  = "The retry handler indicated this was a recoverable error,"
                     msg += " but the maximum number of retries was already hit."
-                    msg += " DAGMan will NOT retry."
+                    msg += " DAGMan will not retry."
                     logger.info(msg)
                     self.set_dashboard_state('FAILED')
                     logger.info("====== Finished to analyze job exit status.")
@@ -944,9 +939,8 @@ class PostJob():
                     logger.info("====== Finished to analyze job exit status.")
                     return RetryJob.RECOVERABLE_ERROR
             else:
-                msg  = "The retry handler returned an unexpected value (%d)."
-                msg += " Will consider this as a fatal error. DAGMan will NOT retry."
-                msg  = msg % (retryjob_retval)
+                msg  = "The retry handler returned an unexpected value (%d)." % (retryjob_retval)
+                msg += " Will consider this as a fatal error. DAGMan will not retry."
                 logger.info(msg)
                 self.set_dashboard_state('FAILED')
                 logger.info("====== Finished to analyze job exit status.")
@@ -954,7 +948,7 @@ class PostJob():
         ## This is for the case in which we don't run the retry-job.
         elif self.job_status != 0:
             if self.dag_retry_count >= self.max_retries:
-                msg  = "The maximum allowed number of retries was hit and the job failed."
+                msg = "The maximum allowed number of retries was hit and the job failed."
                 msg += " Setting this node (job) to permanent failure."
                 logger.info(msg)
                 self.set_dashboard_state('FAILED')
@@ -980,6 +974,10 @@ class PostJob():
         self.fix_job_logs_permissions()
 
         ## If the flag CRAB_NoWNStageout is set, we finish the post-job here.
+        ## (I didn't remove this yet, because even if the transfer of the logs and
+        ## outputs is off, in a user analysis task it still makes sense to do the
+        ## upload of the input files metadata, so that the user can do 'crab report'
+        ## and see how many events have been read and/or get the lumiSummary files.)
         if int(self.job_ad.get('CRAB_NoWNStageout', 0)) != 0:
             msg  = "CRAB_NoWNStageout is set to %d in the job ad." % (int(self.job_ad.get('CRAB_NoWNStageout', 0)))
             msg += " Skipping files stageout and files metadata upload."
@@ -988,69 +986,111 @@ class PostJob():
             self.set_dashboard_state('FINISHED')
             return 0
 
+        if not self.transfer_logs:
+            msg  = "The user has not specified to transfer the log files."
+            msg += " No log files stageout (nor log files metadata upload) will be performed."
+            logger.info(msg)
+        if len(self.output_files_names) == 0:
+            if not self.transfer_outputs:
+                msg  = "Post-job got an empty list of output files (i.e. no output file) to work on."
+                msg += " In any case, the user has specified to not transfer output files."
+                logger.info(msg)
+            else:
+                msg  = "The transfer of output files flag in on,"
+                msg += " but the post-job got an empty list of output files (i.e. no output file) to work on."
+                msg += " Turning off the transfer of output files flag."
+                logger.info(msg)
+                self.transfer_outputs = 0
+        else:
+            if not self.transfer_outputs:
+                msg  = "The user has specified to not transfer the output files."
+                msg += " No output files stageout (nor output files metadata upload) will be performed."
+                logger.info(msg)
+
         ## Initialize the object we will use for making requests to the REST interface.
-        self.server = HTTPRequests(self.rest_host, os.environ['X509_USER_PROXY'], os.environ['X509_USER_PROXY'],
+        self.server = HTTPRequests(self.rest_host, \
+                                   os.environ['X509_USER_PROXY'], \
+                                   os.environ['X509_USER_PROXY'], \
                                    retry = 2, logger = logger)
 
         ## Upload the logs archive file metadata if it was not already done from the WN.
-        if self.log_needs_file_metadata_upload:
-            logger.info("====== Starting upload of logs archive file metadata.")
-            try:
-                self.upload_log_file_metadata()
-            except Exception, exmsg:
-                msg = "Fatal error uploading logs archive file metadata: %s" % (str(exmsg)) 
-                logger.error(msg)
+        if self.transfer_logs:
+            if self.log_needs_file_metadata_upload:
+                logger.info("====== Starting upload of logs archive file metadata.")
+                try:
+                    self.upload_log_file_metadata()
+                except Exception, exmsg:
+                    msg = "Fatal error uploading logs archive file metadata: %s" % (str(exmsg)) 
+                    logger.error(msg)
+                    logger.info("====== Finished upload of logs archive file metadata.")
+                    return self.check_retry_count()
                 logger.info("====== Finished upload of logs archive file metadata.")
-                return self.check_retry_count()
-            logger.info("====== Finished upload of logs archive file metadata.")
-        else:
-            msg  = "Skipping logs archive file metadata upload, because it is marked as"
-            msg += " having been uploaded already from the worker node."
-            logger.info(msg)
+            else:
+                msg  = "Skipping logs archive file metadata upload, because it is marked as"
+                msg += " having been uploaded already from the worker node."
+                logger.info(msg)
 
         ## Just an info message.
-        msg = "Preparing to transfer the logs archive file and %d output files."
-        msg = msg % (len(self.output_files_names))
-        logger.info(msg)
+        if self.transfer_logs or self.transfer_outputs:
+            msg = "Preparing to transfer "
+            msgadd = []
+            if self.transfer_logs:
+                msgadd.append("the logs archive file")
+            if self.transfer_outputs:
+                msgadd.append("%d output files" % (len(self.output_files_names)))
+            msg = msg + ' and '.join(msgadd) + '.'
+            logger.info(msg)
 
         ## Do the transfers (inject to ASO database if needed, and monitor the transfers
         ## statuses until they reach a terminal state).
-        logger.info("====== Starting to check for ASO transfers.")
-        try:
-            self.perform_transfers()
-        except PermanentStageoutError, pse:
-            msg = "Got fatal stageout exception:\n%s" % (str(pse))
-            logger.error(msg)
-            msg = "There was at least one permanent stageout error; user will need to resubmit."
-            logger.error(msg)
-            self.set_dashboard_state('FAILED')
+        if self.transfer_logs or self.transfer_outputs:
+            logger.info("====== Starting to check for ASO transfers.")
+            try:
+                self.perform_transfers()
+            except PermanentStageoutError, pse:
+                msg = "Got fatal stageout exception:\n%s" % (str(pse))
+                logger.error(msg)
+                msg = "There was at least one permanent stageout error; user will need to resubmit."
+                logger.error(msg)
+                self.set_dashboard_state('FAILED')
+                logger.info("====== Finished to check for ASO transfers.")
+                return RetryJob.FATAL_ERROR
+            except RecoverableStageoutError, rse:
+                msg = "Got recoverable stageout exception:\n%s" % (str(rse))
+                logger.error(msg)
+                msg = "These are all recoverable stageout errors; automatic resubmit is possible."
+                logger.error(msg)
+                logger.info("====== Finished to check for ASO transfers.")
+                return self.check_retry_count()
+            except:
+                msg = "Stageout failure due to unknown issue."
+                logger.exception(msg)
+                logger.info("====== Finished to check for ASO transfers.")
+                return self.check_retry_count()
             logger.info("====== Finished to check for ASO transfers.")
-            return RetryJob.FATAL_ERROR
-        except RecoverableStageoutError, rse:
-            msg = "Got recoverable stageout exception:\n%s" % (str(rse))
-            logger.error(msg)
-            msg = "These are all recoverable stageout errors; automatic resubmit is possible."
-            logger.error(msg)
-            logger.info("====== Finished to check for ASO transfers.")
-            return self.check_retry_count()
-        except:
-            msg = "Stageout failure due to unknown issue."
-            logger.exception(msg)
-            logger.info("====== Finished to check for ASO transfers.")
-            return self.check_retry_count()
-        logger.info("====== Finished to check for ASO transfers.")
 
         ## Upload the output files metadata.
-        logger.info("====== Starting upload of input/output files metadata.")
+        if self.transfer_outputs:
+            logger.info("====== Starting upload of output files metadata.")
+            try:
+                self.upload_output_files_metadata()
+            except Exception, exmsg:
+                msg = "Fatal error uploading output files metadata: %s" % (str(exmsg))
+                logger.exception(msg)
+                logger.info("====== Finished upload of output files metadata.")
+                return self.check_retry_count()
+            logger.info("====== Finished upload of output files metadata.")
+
+        ## Upload the input files metadata.
+        logger.info("====== Starting upload of input files metadata.")
         try:
-            self.upload_output_files_metadata()
             self.upload_input_files_metadata()
         except Exception, exmsg:
-            msg = "Fatal error uploading input/output files metadata: %s" % (str(exmsg))
+            msg = "Fatal error uploading input files metadata: %s" % (str(exmsg))
             logger.exception(msg)
-            logger.info("====== Finished upload of input/output files metadata.")
+            logger.info("====== Finished upload of input files metadata.")
             return self.check_retry_count()
-        logger.info("====== Finished upload of input/output files metadata.")
+        logger.info("====== Finished upload of input files metadata.")
 
         self.set_dashboard_state('FINISHED')
 
@@ -1077,7 +1117,8 @@ class PostJob():
                                self.reqname, self.log_size, \
                                self.log_needs_transfer, self.job_report_output, \
                                self.job_ad, self.crab_retry_count, \
-                               self.retry_timeout, self.job_failed)
+                               self.retry_timeout, self.job_failed, \
+                               self.transfer_logs, self.transfer_outputs)
         aso_job_result = ASO_JOB.run()
         ## If no transfers failed, return success immediately.
         if not aso_job_result:
@@ -1373,12 +1414,26 @@ class PostJob():
         if self.check_required_job_ad_attrs() is not OK:
             return not OK
         ## Set some class variables using the job ad.
-        self.dest_site       = str(self.job_ad['CRAB_AsyncDest'])
-        self.input_dataset   = str(self.job_ad['CRAB_InputData'])
-        self.job_sw          = str(self.job_ad['CRAB_JobSW'])
-        self.publish_name    = str(self.job_ad['CRAB_PublishName'])
-        self.rest_host       = str(self.job_ad['CRAB_RestHost'])
-        self.rest_uri_no_api = str(self.job_ad['CRAB_RestURInoAPI'])
+        self.dest_site        = str(self.job_ad['CRAB_AsyncDest'])
+        self.input_dataset    = str(self.job_ad['CRAB_InputData'])
+        self.job_sw           = str(self.job_ad['CRAB_JobSW'])
+        self.publish_name     = str(self.job_ad['CRAB_PublishName'])
+        self.rest_host        = str(self.job_ad['CRAB_RestHost'])
+        self.rest_uri_no_api  = str(self.job_ad['CRAB_RestURInoAPI'])
+        if 'CRAB_SaveLogsFlag' not in self.job_ad:
+            msg  = "Job's HTCondor ClassAd is missing attribute CRAB_SaveLogsFlag."
+            msg += " Will assume CRAB_SaveLogsFlag = False."
+            logger.warning(msg)
+            self.transfer_logs = 0
+        else:
+            self.transfer_logs = int(self.job_ad['CRAB_SaveLogsFlag'])
+        if 'CRAB_TransferOutputs' not in self.job_ad:
+            msg  = "Job's HTCondor ClassAd is missing attribute CRAB_TransferOutputs."
+            msg += " Will assume CRAB_TransferOutputs = True."
+            logger.warning(msg)
+            self.transfer_outputs = 1
+        else:
+            self.transfer_outputs = int(self.job_ad['CRAB_TransferOutputs'])
         ## If self.job_ad['CRAB_ASOTimeout'] = 0, will use default timeout logic.
         if 'CRAB_ASOTimeout' in self.job_ad and int(self.job_ad['CRAB_ASOTimeout']) > 0:
             self.retry_timeout = int(self.job_ad['CRAB_ASOTimeout'])
@@ -1528,7 +1583,7 @@ class PostJob():
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     ## job_err is empty because we redirect to stderr to stdout, and job_out.tmp is
-    ## empty becuase we truncate it to 0 after copying it to the web directory.
+    ## empty because we truncate it to 0 after copying it to the web directory.
     ## So we don't need this method IMHO. AndresT.
     def fix_job_logs_permissions(self):
         """
