@@ -53,6 +53,8 @@ class DagmanKiller(TaskAction):
             raise Exception("Invalid workflow name.")
 
         # Query HTCondor for information about running jobs and update Dashboard appropriately
+        if self.task['tm_collector']:
+            self.backendurls['htcondorPool'] = self.task['tm_collector']
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
         self.schedd, address = loc.getScheddObj(self.workflow) #TODO wrap this with a try/except. Copy from HTCondorDataWf
 
