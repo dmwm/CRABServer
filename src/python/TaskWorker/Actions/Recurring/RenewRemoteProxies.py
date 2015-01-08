@@ -70,7 +70,7 @@ class CRAB3ProxyRenewer(object):
         proxycfg = {'vo': vo,
                     'logger': self.logger,
                     'myProxySvr': self.config.Services.MyProxy,
-                    'myproxyAccount': self.config.TaskWorker.resturi,
+                    'myproxyAccount': self.config.TaskWorker.resturl,
                     'proxyValidity' : '144:0',
                     'min_time_left' : MINPROXYLENGTH, ## do we need this ? or should we use self.myproxylen? 
                     'userDN' : ad['CRAB_UserDN'],
@@ -162,6 +162,17 @@ class CRAB3ProxyRenewer(object):
                 self.logger.exception("Unable to update all proxies for schedd %s" % schedd_name)
 
 if __name__ == '__main__':
+    """ Simple main to execute the action standalon. You just need to set the task worker environment.
+        The main is set up to work with the production task worker. If you want to use it on your own
+        instance you need to change resthost, resturi, and twconfig. For example:
+            resthost = 'mmascher-dev6.cern.ch'
+            resturi = '/crabserver/dev/info'
+            twconfig = '/data/srv/TaskManager/TaskWorkerConfig.py'
+    """
+    resthost = 'cmsweb.cern.ch'
+    resturi = '/crabserver/prod/info'
+    twconfig = '/data/srv/TaskManager/current/TaskWorkerConfig.py'
+
     logger = logging.getLogger()
     handler = logging.StreamHandler(sys.stdout)
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
@@ -170,7 +181,7 @@ if __name__ == '__main__':
     logger.setLevel(logging.DEBUG)
 
     from WMCore.Configuration import loadConfigurationFile
-    config = loadConfigurationFile('/data/srv/TaskWorkerConfig.py')
+    config = loadConfigurationFile(twconfig)
 
-    pr = CRAB3ProxyRenewer(config, 'mmascher-poc.cern.ch', '/crabserver/dev/info', logger)
+    pr = CRAB3ProxyRenewer(config, resthost, resturi, logger)
     pr.execute()
