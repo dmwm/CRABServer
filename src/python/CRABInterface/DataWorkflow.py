@@ -227,8 +227,9 @@ class DataWorkflow(object):
                             user_vo         = ['cms'],
                             user_role       = [vorole],
                             user_group      = [vogroup],
-                            #a dash in the publishname is there if the user specified the publishname (publishname-isbcheckusm). Otherwise publishname=isbchecksum
-                            #BTW isbchecksum is overwritten later with the psethash for publication
+                            ## The client defines publishname = <Data.publishDataName>-<isbchecksum>
+                            ## if the user defines Data.publishDataName, and publishname = <isbchecksum> otherwise.
+                            ## (The PostJob replaces then the isbchecksum by the psethash.)
                             publish_name    = [(workflow.replace(":", "_") + '-' + publishname) if publishname.find('-')==-1 else publishname],
                             asyncdest       = [asyncdest],
                             dbs_url         = [dbsurl],

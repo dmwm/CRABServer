@@ -1,8 +1,9 @@
-# WMCore dep#endecies here
+# WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.REST.Server import RESTEntity, restcall, rows
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import allScramArchsAndVersions, TAG_COLLECTOR_URL
+from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
 
 # CRABServer dependecies here
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
@@ -82,11 +83,86 @@ class RESTUserWorkflow(RESTEntity):
             else:
                 raise InvalidParameter(msg)
 
+    def _checkPublishDataName(self, kwargs):
+        """
+        Validate the (user specified part of the) output dataset name for publication
+        using the WMCore.Lexicon method userprocdataset(), which does the same
+        validation as DBS (see discussion with Yuyi Guo in following github CRABClient
+        issue: https://github.com/dmwm/CRABClient/issues/4257).
+        """
+        ## These if statements should actually never evaluate to True, because
+        ## the client always defines kwargs['publishname'] and kwargs['workflow'].
+        if 'publishname' not in kwargs:
+            msg  = "Server parameter 'publishname' is not defined."
+            msg += " Unable to validate the publication dataset name."
+            raise InvalidParameter(msg)
+        if kwargs['publishname'].find('-') == -1 and 'workflow' not in kwargs:
+            msg  = "Server parameter 'workflow' is not defined."
+            msg += " Unable to validate the publication dataset name."
+            raise InvalidParameter(msg)
+        ## The client defines kwargs['publishname'] = <Data.publishDataName>-<isbchecksum>
+        ## if the user defines Data.publishDataName, and kwargs['publishname'] = <isbchecksum> otherwise.
+        ## (The PostJob replaces then the isbchecksum by the psethash.)
+        ## In DataWorkflow.py, the publish_name column of the TaskDB is defined
+        ## in this way (without "username-"), and that's what is used later by
+        ## PostJob to define the output dataset name.
+        if kwargs['publishname'].find('-') == -1:
+            publishDataNameToCheck = "username-%s-%s" % (kwargs['workflow'].replace(':','_'), kwargs['publishname'])
+        else:
+            publishDataNameToCheck = "username-%s" % (kwargs['publishname'])
+        try:
+            userprocdataset(publishDataNameToCheck)
+        except AssertionError:
+            ## The messages below are more descriptive than if we would use
+            ## the message from AssertionError exception.
+            if kwargs['publishname'].find('-') == -1:
+                msg  = "Invalid CRAB configuration parameter General.requestName."
+                msg += " The parameter should not have more than 152 characters"
+                msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
+            else:
+                msg  = "Invalid CRAB configuration parameter Data.publishDataName."
+                msg += " The parameter should not have more than 157 characters"
+                msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
+            raise InvalidParameter(msg)
+
+    def _checkPrimaryDataset(self, kwargs):
+        """
+        Validate the primary dataset name using the WMCore.Lexicon method primdataset(),
+        which does the same validation as DBS (see discussion with Yuyi Guo in following
+        github CRABClient issue: https://github.com/dmwm/CRABClient/issues/4257).
+        """
+        ## This if statement should actually never evaluate to True, because
+        ## the client always defines kwargs['inputdata'].
+        if 'inputdata' not in kwargs:
+            msg  = "Server parameter 'inputdata' is not defined."
+            msg += " Unable to validate the primary dataset name."
+            raise InvalidParameter(msg)
+        try:
+            ## The client defines kwargs['inputdata'] = "/<primary-dataset-name>",
+            ## i.e. it adds a "/" at the beginning, which we should remove if we
+            ## want to do the validation of the primary dataset name only.
+            ## (The client puts the primary dataset name in kwargs['inputdata'],
+            ## because the PostJob extracts the primary dataset name from this
+            ## parameter splitting by "/" and taking the element 1, which is the
+            ## right thing to do when kwargs['inputdata'] is the input dataset in
+            ## an analysis job type.)
+            primdataset(kwargs['inputdata'][1:])
+        except AssertionError:
+            ## This message is more descriptive than if we would use the message
+            ## from AssertionError exception, but I had to explicitely write the
+            ## regular expression [a-zA-Z][a-zA-Z0-9\-_]*, which is not nice.
+            ## The message from AssertionError exception would be:
+            ## "'<kwargs['inputdata'][1:]>' does not match regular expression [a-zA-Z0-9\.\-_]+".
+            msg  = "Invalid CRAB configuration parameter Data.primaryDataset."
+            msg += " The parameter should not have more than 99 characters"
+            msg += " and should match the regular expression [a-zA-Z][a-zA-Z0-9\-_]*"
+            raise InvalidParameter(msg)
+
     def _checkASODestination(self, site):
         self._checkSite(site)
         if site in self.centralcfg.centralconfig.get('banned-out-destinations', []):
             excasync = ValueError("Remote output data site is banned")
-            invalidp = InvalidParameter("The output site you specified in the config.Site.storageSite parameter (%s) is blacklisted (banned sites: %s)" %\
+            invalidp = InvalidParameter("The output site you specified in the Site.storageSite parameter (%s) is blacklisted (banned sites: %s)" %\
                             (site, self.centralcfg.centralconfig['banned-out-destinations']), errobj = excasync)
             setattr(invalidp, 'trace', '')
             raise invalidp
@@ -133,7 +209,6 @@ class RESTUserWorkflow(RESTEntity):
         #authz_login_valid()
 
         if method in ['PUT']:
-            validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
             validate_str("activity", param, safe, RX_ACTIVITY, optional=True)
             validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
             validate_str("generator", param, safe, RX_GENERATOR, optional=True)
@@ -144,10 +219,6 @@ class RESTUserWorkflow(RESTEntity):
             if not safe.kwargs["nonprodsw"]: #if the user wants to allow non-production releases
                 self._checkReleases(safe.kwargs['jobarch'], safe.kwargs['jobsw'])
             jobtype = safe.kwargs.get('jobtype', None)
-            if jobtype == 'Analysis':
-                validate_str("inputdata", param, safe, RX_DATASET, optional=False)
-            else:
-                validate_str("inputdata", param, safe, RX_DATASET, optional=True)
             validate_num("useparent", param, safe, optional=True)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
             safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
@@ -171,12 +242,50 @@ class RESTUserWorkflow(RESTEntity):
                 safe.kwargs['siteblacklist'] += self._expandSites(self.centralcfg.centralconfig['ign-locality-blacklist'])
             validate_str("vorole", param, safe, RX_VOPARAMS, optional=True)
             validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
-            validate_str("publishname", param, safe, RX_PUBLISH, optional=False)
-            validate_str("publishdbsurl", param, safe, RX_DBSURL, optional=True)
             validate_num("publication", param, safe, optional=False)
-            #if publication is set as true both publishDataName and publishDbsUrl are needed
-            if safe.kwargs["publication"] and not (bool(safe.kwargs["publishname"]) and bool(safe.kwargs["publishdbsurl"])):
-                raise InvalidParameter("You need to set both publishDataName and publishDbsUrl parameters if you need the automatic publication")
+            validate_str("publishdbsurl", param, safe, RX_DBSURL, optional=(not bool(safe.kwargs['publication'])))
+            ## Validations needed in case publication is on.
+            if safe.kwargs['publication']:
+                ## The (user specified part of the) publication dataset name must be
+                ## specified and must pass DBS validation. Since this is the correct
+                ## validation function, it must be done before the
+                ## validate_str("workflow", ...) and validate_str("publishname", ...)
+                ## we have below. Not sure why RX_PUBLISH was introduced in CRAB, but
+                ## it is not the correct regular expression for publication dataset
+                ## name validation.
+                self._checkPublishDataName(param.kwargs)
+                ## 'publishname' was already validated above in _checkPublishDataName().
+                ## But I am not sure if we can skip the validate_str('publishname', ...)
+                ## or we need it so that all parameters are moved from param to safe.
+                ## Therefore, I didn't remove the validate_str('publishname', ...),
+                ## but only changed RX_PUBLISH -> RX_ANYTHING.
+                validate_str('publishname', param, safe, RX_ANYTHING, optional=False)
+                ## If this is a MC generation job type, the primary dataset name will
+                ## be used to define the primary dataset field in the publication
+                ## dataset name. Therefore, the primary dataset name must pass DBS
+                ## validation. Since in a MC generation job type the primary dataset
+                ## name is saved in 'inputdata', _checkPrimaryDataset() actually
+                ## validates 'inputdata'. Therefore, this function must come before
+                ## the validate_str('inputdata', ...) we have below. OTOH, matching
+                ## 'inputdata' agains RX_DATASET is not the correct validation for
+                ## the primary dataset name.
+                if jobtype == 'PrivateMC':
+                    self._checkPrimaryDataset(param.kwargs)
+            else:
+                ## Not sure if we need to match publishname against RX_PUBLISH...
+                validate_str("publishname", param, safe, RX_PUBLISH, optional=False)
+            ## This line must come after _checkPublishDataName()
+            validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
+            if jobtype == 'Analysis':
+                validate_str("inputdata", param, safe, RX_DATASET, optional=False)
+            ## Added this if, because in this case 'inputdata' was already validated
+            ## above in _checkPrimaryDataset(), and I am not sure if we can skip the
+            ## validate_str('inputdata', ...) or we need it so that all parameters
+            ## are moved from param to safe.
+            elif jobtype == 'PrivateMC' and safe.kwargs['publication']:
+                validate_str("inputdata", param, safe, RX_ANYTHING, optional=False)
+            else:
+                validate_str("inputdata", param, safe, RX_DATASET, optional=True)
             #if one and only one between publishDataName and publishDbsUrl is set raise an error (we need both or none of them)
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkASODestination(safe.kwargs['asyncdest'])

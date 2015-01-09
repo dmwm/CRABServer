@@ -1315,8 +1315,14 @@ class PostJob():
                 if multiple_edm and file_info.get('module_label'):
                     left, right = publishname.rsplit('-', 1)
                     publishname = "%s_%s-%s" % (left, file_info['module_label'], right)
-                outdataset = os.path.join('/' + self.input_dataset.split('/')[1], \
-                                          self.job_ad['CRAB_UserHN'] + '-' + publishname, 'USER')
+                ## Extracting the primary dataset name from the input dataset is ok
+                ## for an analysis job type. But to make sense of this same logic in
+                ## a MC generation job type, the client defines the input dataset as
+                ## '/' + primary dataset name. TODO: Some day maybe we could improve
+                ## this (define a primary dataset parameter in the job ad and in the
+                ## rest interface).
+                primary_dataset_name = self.input_dataset.split('/')[1]
+                outdataset = os.path.join('/' + primary_dataset_name, self.job_ad['CRAB_UserHN'] + '-' + publishname, 'USER')
                 output_datasets.add(outdataset)
             else:
                 outdataset = '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER'
