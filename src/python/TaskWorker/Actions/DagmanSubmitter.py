@@ -180,6 +180,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         """
         workflow = task['tm_taskname']
 
+        if task['tm_collector']:
+            self.backendurls['htcondorPool'] = task['tm_collector']
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
         schedd, address = loc.getScheddObj(workflow)
 
@@ -244,6 +246,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         try:
             info['remote_condor_setup'] = ''
+            if task['tm_collector']:
+                self.backendurls['htcondorPool'] = task['tm_collector']
             loc = HTCondorLocator.HTCondorLocator(self.backendurls)
             schedd, address = loc.getScheddObj(task['tm_taskname'])
 
