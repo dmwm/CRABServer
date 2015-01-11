@@ -55,12 +55,26 @@ class DataFileMetadata(object):
             binds[name] = [str(kwargs[name])]
         binds['runlumi'] = [str(dict(zip(map(str, kwargs['outfileruns']), [map(str, lumilist.split(',')) for lumilist in kwargs['outfilelumis']])))]
 
-        # Duplicating values. oracle is not bounding variables from dictionary
-        binds['taskname_unq'] = binds['taskname']
-        binds['outlfn_unq'] = binds['outlfn']
-        binds['outtmplocation_upd'] = binds['outtmplocation']
-        binds['outsize_upd'] = binds['outsize']
-        self.api.modifynocheck(self.FileMetaData.New_sql, **binds)
+        #Changed to Select if exist, update, else insert
+        binds['outtmplfn'] = binds['outlfn']
+        row = self.api.query(None, None, self.FileMetaData.GetCurrent_sql, 
+                              outlfn=binds['outlfn'][0], taskname=binds['taskname'][0])
+        try:
+            #just one row is picked up by the previous query
+            row = row.next()
+        except StopIteration:
+            #StipIteration will be raised if no rows was found
+            self.logger.debug('No rows selected. Inserting new row into filemetadata')
+            self.api.modify(self.FileMetaData.New_sql, **binds)
+            return []
+        self.logger.debug('Changing filemetadata information about job %s' % row)
+        update_bind = {}
+        update_bind['outtmplocation'] = binds['outtmplocation']
+        update_bind['outsize'] = binds['outsize']
+        update_bind['taskname'] = binds['taskname']
+        update_bind['outlfn'] = binds['outlfn']
+        update_bind['outtmplfn'] = binds['outlfn']
+        self.api.modify(self.FileMetaData.Update_sql, **update_bind)
         return []
 
     def changeState(self, *args, **kwargs):#kwargs are (taskname, outlfn, filestate)
