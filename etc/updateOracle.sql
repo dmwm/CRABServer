@@ -35,3 +35,6 @@ update tasks set tm_task_warnings = '[]';
 alter table tasks modify(tm_task_warnings DEFAULT '[]');
 ALTER TABLE tasks ADD(tm_output_dataset CLOB);
 UPDATE filemetadata SET fmd_tmplfn=fmd_lfn WHERE fmd_tmplfn is NULL or fmd_tmplfn='';
+
+--Changes that will be needed for version 3.4.02
+alter table tasks add (tm_collector VARCHAR(1000));

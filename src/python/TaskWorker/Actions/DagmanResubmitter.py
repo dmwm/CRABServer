@@ -36,6 +36,8 @@ class DagmanResubmitter(TaskAction.TaskAction):
         self.logger.info("About to resubmit workflow: %s." % workflow)
         self.logger.info("Task info: %s" % str(task))
 
+        if task['tm_collector']:
+            self.backendurls['htcondorPool'] = task['tm_collector']
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
         schedd, address = loc.getScheddObj(workflow) #TODO wrap
 

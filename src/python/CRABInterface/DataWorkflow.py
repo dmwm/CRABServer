@@ -118,7 +118,7 @@ class DataWorkflow(object):
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, scriptexe=None, scriptargs=None, scheddname=None,
-               extrajdl=None):
+               extrajdl=None, collector=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -163,12 +163,19 @@ class DataWorkflow(object):
            :arg str userfiles: The files to process instead of a DBS-based dataset.
            :arg str asourl: Specify which ASO to use for transfers and publishing.
            :arg str scheddname: Schedd Name used for debugging.
+           :arg str collector: Collector Name used for debugging.
            :returns: a dict which contaians details of the request"""
 
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         requestname = ""
+        backend_urls = self.centralcfg.centralconfig.get("backend-urls", {})
+        if collector:
+            backend_urls['htcondorPool'] = collector
+        else:
+            collector = backend_urls['htcondorPool']
+
         try:
-            requestname = self.updateRequest('%s_%s_%s' % (timestamp, userhn, workflow), scheddname)
+            requestname = self.updateRequest('%s_%s_%s' % (timestamp, userhn, workflow), scheddname, backend_urls)
         except IOError, err:
             self.logger.debug("Failed to communicate with components %s. Request name %s: " % (str(err), str(requestname)))
             raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")
@@ -243,7 +250,8 @@ class DataWorkflow(object):
                             scriptexe       = [scriptexe],
                             scriptargs      = [dbSerializer(scriptargs)],
                             extrajdl        = [dbSerializer(extrajdl)],
-                            asourl          = [asourl]
+                            asourl          = [asourl],
+                            collector       = [collector]
         )
 
         return [{'RequestName': requestname}]

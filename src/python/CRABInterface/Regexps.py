@@ -50,6 +50,7 @@ RX_ASOURL = RX_DBSURL
 RX_URL = re.compile(r"^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w :\.-])*$")
 RX_SCRIPTARGS = re.compile(r'^[+a-zA-Z0-9\-._:?/"]+=[a-zA-Z0-9\-._:?/"]+$')
 RX_SCHEDD_NAME = re.compile(r"^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+\.[A-Za-z]{2,6}$")
+RX_COLLECTOR = re.compile(r"^(([A-Za-z0-9._-]+\.[A-Za-z]{2,6}),?)+$")
 #TODO!
 RX_OUT_DATASET = re.compile(r"^.*$")
 
