@@ -232,9 +232,7 @@ def make_logs_archive(arch_file_name):
             file_name_in_arch = file_name_no_ext + job_id_str + '.' + ext
             arch_file.add(file_name, arcname = file_name_in_arch)
         else:
-            ## Will not fail stageout if log files are missing, because for
-            ## example when runinng scriptExe there are no cmsRun-stdout.log
-            ## and cmsRun-stderr.log files.
+            ## Will not fail stageout if log files are missing.
             msg = "WARNING: %s is missing." % (file_name)
             print msg
     arch_file.close()
