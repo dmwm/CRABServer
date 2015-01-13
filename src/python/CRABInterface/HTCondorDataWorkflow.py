@@ -71,20 +71,14 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
         row = self.Task.ID_tuple(*row)
-        savelogs = True if row.save_logs == 'T' else False
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        if savelogs:
-            transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
-            finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
-        else:
-            ## The clasification here is irrelevant, because getFiles will anyway
-            ## retrieve from the temporary storage. But we still have to put the
-            ## job ids either in one list or the other.
-            transferingIds = []
-            finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferring', 'cooloff', 'held']]
-        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, row.user_dn, row.username, row.user_role, row.user_group, savelogs, userproxy)
+        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
+        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
+
+        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, \
+                             row.user_dn, row.username, row.user_role, row.user_group, userproxy)
 
 
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
@@ -93,27 +87,17 @@ class HTCondorDataWorkflow(DataWorkflow):
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
         row = self.Task.ID_tuple(*row)
 
-        arguments = literal_eval(row.arguments.read())
-        saveoutput = True if arguments.get("saveoutput", "T") == 'T' else False
-
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
-        if saveoutput:
-            transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
-            finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
-        else:
-            ## The clasification here is irrelevant, because getFiles will anyway
-            ## retrieve from the temporary storage. But we still have to put the
-            ## job ids either in one list or the other.
-            transferingIds = []
-            finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferring', 'cooloff', 'held']]
+        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
+        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
 
-        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], transferingIds, finishedIds, row.user_dn, row.username, row.user_role,\
-                               row.user_group, saveoutput, userproxy=userproxy)
+        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], transferingIds, finishedIds, \
+                             row.user_dn, row.username, row.user_role, row.user_group, userproxy)
 
 
     @conn_handler(services=['phedex'])
-    def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, username, role, group, transfer_files, userproxy = None):
+    def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, username, role, group, userproxy = None):
         """
         Retrieves the output PFN aggregating output in final and temporary locations.
 
@@ -148,30 +132,24 @@ class HTCondorDataWorkflow(DataWorkflow):
         for row in rows:
             try:
                 jobid = row[GetFromTaskAndType.PANDAID]
-                if transfer_files:
-                    if row[GetFromTaskAndType.DIRECTSTAGEOUT]:
+                if row[GetFromTaskAndType.DIRECTSTAGEOUT]:
+                    lfn  = row[GetFromTaskAndType.LFN]
+                    site = row[GetFromTaskAndType.LOCATION]
+                    self.logger.debug("LFN: %s and site %s" % (lfn, site))
+                    pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
+                else:
+                    if jobid in finishedIds:
                         lfn  = row[GetFromTaskAndType.LFN]
                         site = row[GetFromTaskAndType.LOCATION]
                         self.logger.debug("LFN: %s and site %s" % (lfn, site))
                         pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
+                    elif jobid in transferingIds:
+                        lfn  = row[GetFromTaskAndType.TMPLFN]
+                        site = row[GetFromTaskAndType.TMPLOCATION]
+                        self.logger.debug("LFN: %s and site %s" % (lfn, site))
+                        pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
                     else:
-                        if jobid in finishedIds:
-                            lfn  = row[GetFromTaskAndType.LFN]
-                            site = row[GetFromTaskAndType.LOCATION]
-                            self.logger.debug("LFN: %s and site %s" % (lfn, site))
-                            pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
-                        elif jobid in transferingIds:
-                            lfn  = row[GetFromTaskAndType.TMPLFN]
-                            site = row[GetFromTaskAndType.TMPLOCATION]
-                            self.logger.debug("LFN: %s and site %s" % (lfn, site))
-                            pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
-                        else:
-                            continue
-                else:
-                    lfn  = row[GetFromTaskAndType.TMPLFN]
-                    site = row[GetFromTaskAndType.TMPLOCATION]
-                    self.logger.debug("LFN: %s and site %s" % (lfn, site))
-                    pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
+                        continue
             except Exception, err:
                 self.logger.exception(err)
                 raise ExecutionError("Exception while contacting PhEDEX.")
