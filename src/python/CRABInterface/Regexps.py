@@ -1,6 +1,11 @@
 import re
 from WMCore.Lexicon import lfnParts, SEARCHDATASET_RE
 
+
+## This regular expression matches anything. It is useful for example for
+## functions that require a regular expression against which they will match a
+## given value, but we don't really want to do that matching.
+RX_ANYTHING = re.compile(r"^.*$")
 # TODO: we should start replacing most of the regex here with what we have in WMCore.Lexicon
 #       (this probably requires to adapt something on Lexicon)
 wfBase = r"^[a-zA-Z0-9\-_:]{1,%s}$"
