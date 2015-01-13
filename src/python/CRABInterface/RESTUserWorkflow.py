@@ -11,6 +11,7 @@ from CRABInterface.DataUserWorkflow import DataWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
 from CRABInterface.Regexps import *
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
+from ServerUtilities import checkOutLFN
 
 # external dependecies here
 import cherrypy
@@ -71,16 +72,7 @@ class RESTUserWorkflow(RESTEntity):
             msg += " (or '/store/local/' if publication is off),"
             msg += " where username is your username as registered in SiteDB"
             msg += " (i.e. the username of your CERN primary account)."
-            if kwargs['lfn'].startswith('/store/group/'):
-                if len(kwargs['lfn'].split('/')) < 5 or kwargs['lfn'].split('/')[3] == username or username not in kwargs['lfn'].split('/'):
-                    raise InvalidParameter(msg)
-            elif kwargs['lfn'].startswith('/store/user/'):
-                if len(kwargs['lfn'].split('/')) < 4 or kwargs['lfn'].split('/')[3] != username:
-                    raise InvalidParameter(msg)
-            elif kwargs['lfn'].startswith('/store/local/'):
-                if kwargs['publication']:
-                    raise InvalidParameter(msg)
-            else:
+            if not checkOutLFN(kwargs['lfn'], username):
                 raise InvalidParameter(msg)
 
     def _checkPublishDataName(self, kwargs):
