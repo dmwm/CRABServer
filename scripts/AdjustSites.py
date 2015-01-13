@@ -103,16 +103,16 @@ def resubmitDag(filename, resubmit):
     ## with all the job ids in the task. So resubmit_all is always False.
     resubmit_all = (resubmit == True)
     ## This number here should be the same as in the TaskWorker config.
-    max_retries_per_resubmission = 3
+    max_retries_per_resubmission = 2
     for line in open(filename).readlines():
         m = retry_re.search(line)
         if m:
             job_id = m.groups()[0]
             if resubmit_all or (job_id in resubmit):
                 try:
-                    retry_count = int(m.groups()[1]) + max_retries_per_resubmission
+                    retry_count = int(m.groups()[1]) + (max_retries_per_resubmission + 1)
                 except ValueError:
-                    retry_count = 10
+                    retry_count = max_retries_per_resubmission
                 line = retry_re.sub(r'RETRY Job%s %d ' % (job_id, retry_count), line)
         output += line
     output_fd = open(filename, 'w')
