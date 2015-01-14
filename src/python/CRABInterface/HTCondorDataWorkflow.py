@@ -206,6 +206,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                         'runlumi' : row[GetFromTaskAndType.RUNLUMI].read(),
                         'events'  : row[GetFromTaskAndType.INEVENTS],
                         'type'    : row[GetFromTaskAndType.TYPE],
+                        'lfn'     : row[GetFromTaskAndType.LFN],
                 })
         self.logger.info("Got %s edm files for workflow %s" % (len(res['runsAndLumis']), workflow))
 
