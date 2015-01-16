@@ -51,11 +51,12 @@ class Splitter(TaskAction):
         if lumiChecker and lumiChecker.splitLumiFiles:
             self.logger.warning("The input dataset contains the following duplicated lumis %s" % lumiChecker.splitLumiFiles.keys())
             try:
+                userServer = HTTPRequests(resthost, kwargs['task']['user_proxy'], kwargs['task']['user_proxy'])
                 configreq = {'subresource': 'addwarning',
                              'workflow': kwargs['task']['tm_taskname'],
                              'warning': b64encode('The CRAB3 server backend detected lumis split across files in the input dataset.'
-                                        ' Will apply the necessary corrections in the splitting algorithms')}
-                self.server.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
+                                        ' Will apply the necessary corrections in the splitting algorithms. You can ignore this message.')}
+                userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
             except HTTPException, hte:
                 self.logger.error(hte.headers)
                 self.logger.warning("Cannot add warning to REST after finding duplicates")
