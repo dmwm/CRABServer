@@ -75,7 +75,6 @@ CRAB_HEADERS = \
 +CRAB_UserDN = %(userdn)s
 +CRAB_UserHN = %(userhn)s
 +CRAB_AsyncDest = %(asyncdest)s
-+CRAB_AsyncDestSE = %(asyncdest_se)s
 +CRAB_BlacklistT1 = %(blacklistT1)s
 +CRAB_StageoutPolicy = %(stageoutpolicy)s
 +CRAB_UserRole = %(tm_user_role)s
@@ -215,7 +214,7 @@ def transform_strings(input):
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
                'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-               'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'asyncdest_se', \
+               'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', \
                'stageoutpolicy', 'taskType', 'maxpost', 'worker_name', 'desired_opsys', 'desired_opsysvers', \
                'desired_arch', 'accounting_group', 'resthost', 'resturinoapi':
         val = input.get(var, None)
@@ -326,11 +325,11 @@ class DagmanCreator(TaskAction.TaskAction):
             dest_sites_.append(dest_site + "_Disk")
         try:
             pfn_info = self.phedex.getPFN(nodes=dest_sites_, lfns=lfns)
-        except Exception, ex: #TODO should we catch HttpException instead?
-            self.logger.exception(ex)
+        except HTTPException, ex:
+            self.logger.error(ex.headers)
             raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not contact phedex to do the site+lfn=>pfn translation.\n"+\
                                 "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
-                                " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the lfn2pfn phedex so the user can check themselves
+                                " and contact the experts if the error persists.\nError reason: %s" % str(ex))
         results = []
         for lfn in lfns:
             found_lfn = False
@@ -395,7 +394,6 @@ class DagmanCreator(TaskAction.TaskAction):
         info['userhn'] = info['tm_username']
         info['publishname'] = info['tm_publish_name']
         info['asyncdest'] = info['tm_asyncdest']
-        info['asyncdest_se'] = self.phedex.getNodeSE(info['tm_asyncdest']) #is this really needed?? #TODO remove it or at least try/excpet
         info['dbsurl'] = info['tm_dbs_url']
         info['publishdbsurl'] = info['tm_publish_dbs_url']
         info['publication'] = 1 if info['tm_publication'] == 'T' else 0
