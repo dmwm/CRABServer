@@ -38,3 +38,4 @@ UPDATE filemetadata SET fmd_tmplfn=fmd_lfn WHERE fmd_tmplfn is NULL or fmd_tmplf
 
 --Changes that will be needed for version 3.4.02
 alter table tasks add (tm_collector VARCHAR(1000));
+ALTER TABLE tasks DROP column tm_transformation;

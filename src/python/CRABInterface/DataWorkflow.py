@@ -238,7 +238,6 @@ class DataWorkflow(object):
                             outfiles        = [dbSerializer(addoutputfiles)],
                             tfile_outfiles  = [dbSerializer(tfileoutfiles)],
                             edm_outfiles    = [dbSerializer(edmoutfiles)],
-                            transformation  = [self.centralcfg.centralconfig["transformation"][jobtype]],
                             job_type        = [jobtype],
                             arguments       = [dbSerializer(arguments)],
                             resubmitted_jobs= [dbSerializer([])],

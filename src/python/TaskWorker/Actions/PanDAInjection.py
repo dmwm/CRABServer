@@ -104,7 +104,6 @@ class PanDAInjection(PanDAAction):
         pandajob.computingSite = site
         pandajob.cloud = getSite(pandajob.computingSite)
         pandajob.destinationSE = 'local'
-        pandajob.transformation = task['tm_transformation']
         ## need to initialize this
         pandajob.metadata = ''
 
