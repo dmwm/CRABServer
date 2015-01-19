@@ -20,7 +20,7 @@ systems = \
   },
   'CRABInterface':
   {
-    'py_modules' : ['PandaServerInterface','CRABQuality', 'HTCondorUtils', 'HTCondorLocator'],
+    'py_modules' : ['PandaServerInterface','CRABQuality', 'HTCondorUtils', 'HTCondorLocator', 'ServerUtilities'],
     'python': ['CRABInterface','CRABInterface/Pages',
                'Databases',
                  'Databases/FileMetaDataDB', 'Databases/FileMetaDataDB/Oracle',
