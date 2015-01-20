@@ -183,7 +183,15 @@ class DagmanSubmitter(TaskAction.TaskAction):
         if task['tm_collector']:
             self.backendurls['htcondorPool'] = task['tm_collector']
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
-        schedd, address = loc.getScheddObj(workflow)
+
+        # If tm_schedd exist, this means task is submitted with new crabserver version
+        # TODO remove it later when no old tasks will be left
+        address = ""
+        schedd = ""
+        if task['tm_schedd']:
+            schedd, address = loc.getScheddObjNew(task['tm_schedd'])
+        else:
+            schedd, address = loc.getScheddObj(self.workflow) #TODO wrap this with a try/except. Copy from HTCondorDataWf
 
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
 
@@ -249,7 +257,14 @@ class DagmanSubmitter(TaskAction.TaskAction):
             if task['tm_collector']:
                 self.backendurls['htcondorPool'] = task['tm_collector']
             loc = HTCondorLocator.HTCondorLocator(self.backendurls)
-            schedd, address = loc.getScheddObj(task['tm_taskname'])
+            # If tm_schedd exist, this means task is submitted with new crabserver version
+            # TODO remove it later when no old tasks will be left
+            address = ""
+            schedd = ""
+            if task['tm_schedd']:
+                schedd, address = loc.getScheddObjNew(task['tm_schedd'])
+            else:
+                schedd, address = loc.getScheddObj(self.workflow) #TODO wrap this with a try/except. Copy from HTCondorDataWf
 
             #try to gsissh in order to create the home directory (and check if we can connect to the schedd)
             try:

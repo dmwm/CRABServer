@@ -78,7 +78,15 @@ class DagmanResubmitter(TaskAction.TaskAction):
         if task['tm_collector']:
             self.backendurls['htcondorPool'] = task['tm_collector']
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
-        schedd, address = loc.getScheddObj(workflow) #TODO wrap
+
+        # If tm_schedd exist, this means task is submitted with new crabserver version
+        # TODO remove it later when no old tasks will be left
+        schedd = ""
+        address = ""
+        if task['tm_schedd']:
+            schedd, address = loc.getScheddObjNew(task['tm_schedd'])
+        else:
+            schedd, address = loc.getScheddObj(workflow) #TODO wrap
 
         # Release the DAG
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(workflow)

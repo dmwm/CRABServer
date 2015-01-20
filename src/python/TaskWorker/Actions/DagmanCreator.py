@@ -165,7 +165,7 @@ SPLIT_ARG_MAP = { "LumiBased" : "lumis_per_job",
 
 
 def getCreateTimestamp(taskname):
-    return "_".join(taskname.split("_")[:2])
+    return "_".join(taskname.split(":")[:1])
 
 
 def makeLFNPrefixes(task):
