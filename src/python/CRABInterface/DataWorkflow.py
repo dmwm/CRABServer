@@ -168,6 +168,7 @@ class DataWorkflow(object):
 
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         requestname = ""
+        schedd_name = ""
         backend_urls = self.centralcfg.centralconfig.get("backend-urls", {})
         if collector:
             backend_urls['htcondorPool'] = collector
@@ -175,7 +176,8 @@ class DataWorkflow(object):
             collector = backend_urls['htcondorPool']
 
         try:
-            requestname = self.updateRequest('%s_%s_%s' % (timestamp, userhn, workflow), scheddname, backend_urls)
+            requestname = '%s:%s_%s' % (timestamp, userhn, workflow)
+            schedd_name = self.chooseScheduler(scheddname, backend_urls).split(":")[0]
         except IOError, err:
             self.logger.debug("Failed to communicate with components %s. Request name %s: " % (str(err), str(requestname)))
             raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")
@@ -251,7 +253,8 @@ class DataWorkflow(object):
                             scriptargs      = [dbSerializer(scriptargs)],
                             extrajdl        = [dbSerializer(extrajdl)],
                             asourl          = [asourl],
-                            collector       = [collector]
+                            collector       = [collector],
+                            schedd_name     = [schedd_name]
         )
 
         return [{'RequestName': requestname}]

@@ -56,7 +56,14 @@ class DagmanKiller(TaskAction):
         if self.task['tm_collector']:
             self.backendurls['htcondorPool'] = self.task['tm_collector']
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
-        self.schedd, address = loc.getScheddObj(self.workflow) #TODO wrap this with a try/except. Copy from HTCondorDataWf
+
+        # If tm_schedd exist, this means task is submitted with new crabserver version
+        # TODO remove it later when no old tasks will be left
+        address = ""
+        if self.task['tm_schedd']:
+            self.schedd, address = loc.getScheddObjNew(self.task['tm_schedd'])
+        else:
+            self.schedd, address = loc.getScheddObj(self.workflow) #TODO wrap this with a try/except. Copy from HTCondorDataWf
 
         ad = classad.ClassAd()
         ad['foo'] = self.task['kill_ids']

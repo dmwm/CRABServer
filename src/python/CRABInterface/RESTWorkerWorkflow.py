@@ -235,4 +235,5 @@ class Task(dict):
         self['tm_events_per_lumi'] = task[46]
         self['tm_use_parent'] = task[47]
         self['tm_collector'] = task[48]
+        self['tm_schedd'] = task[49]
 
