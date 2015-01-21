@@ -185,7 +185,7 @@ class ASOServerJob(object):
         """
         ASOServerJob constructor.
         """
-        self.doc_ids = None
+        self.docs_in_transfer = None
         self.crab_retry_count = crab_retry_count
         self.retry_timeout = retry_timeout
         self.couch_server = None
@@ -224,11 +224,11 @@ class ASOServerJob(object):
         This is the main method in ASOServerJob. Should be called after initializing
         an instance.
         """
-        self.doc_ids = self.inject_to_aso()
-        if self.doc_ids == False:
+        self.docs_in_transfer = self.inject_to_aso()
+        if self.docs_in_transfer == False:
             exmsg = "Couldn't upload document to ASO database"
             raise RuntimeError, exmsg
-        if not self.doc_ids:
+        if not self.docs_in_transfer:
             logger.info("No files to transfer via ASO. Done!")
             return 0
         failed_killed_transfers = []
@@ -237,24 +237,25 @@ class ASOServerJob(object):
         if self.aso_start_timestamp:
             starttime = self.aso_start_timestamp
         logger.info("====== Starting to monitor ASO transfers.")
-        ## This call to get_transfer_statuses() is only to make a first call to
+        ## This call to get_transfers_statuses() is only to make a first call to
         ## the couch view in order to reduce the probability of getting a stale
         ## result when calling the view inside the while loop below.
         self.get_transfers_statuses()
         while True:
-            ## Sleep is done before calling get_transfer_statuses(), in order to
+            ## Sleep is done before calling get_transfers_statuses(), in order to
             ## give some time to couch to load the view after the above call to
-            ## get_transfer_statuses().
+            ## get_transfers_statuses().
             time.sleep(self.sleep + random.randint(0, 60))
-            ## Get the transfer status in all documents listed in self.doc_ids.
+            ## Get the transfer status in all documents listed in self.docs_in_transfer.
             transfers_statuses = self.get_transfers_statuses()
             msg = "Got statuses: %s; %.1f hours since transfer submit." 
             msg = msg % (", ".join(transfers_statuses), (time.time()-starttime)/3600.0)
             logger.info(msg)
             all_transfers_finished = True
-            for transfer_status, doc_id in zip(transfers_statuses, self.doc_ids):
+            doc_ids = [doc_info['doc_id'] for doc_info in self.docs_in_transfer]
+            for transfer_status, doc_id in zip(transfers_statuses, doc_ids):
                 ## States to wait on.
-                if transfer_status in ['new', 'acquired', 'retry']:
+                if transfer_status in ['new', 'acquired', 'retry', 'unknown']:
                     all_transfers_finished = False
                     continue
                 ## Good states.
@@ -311,7 +312,8 @@ class ASOServerJob(object):
                 msg = "Killing ongoing ASO transfers after timeout of %d (seconds)." % (self.retry_timeout)
                 logger.warning(msg)
                 reason = "Killed ASO transfer after timeout of %d (seconds)." % (self.retry_timeout)
-                for doc_id in self.doc_ids:
+                for doc_info in self.docs_in_transfer:
+                    doc_id = doc_info['doc_id']
                     if doc_id not in done_transfers + failed_killed_transfers:
                         app, severity = '', ''
                         self.failures[doc_id] = {'reasons': reason, 'app': app, 'severity': severity}
@@ -326,7 +328,7 @@ class ASOServerJob(object):
         Inject documents to ASO database if not done by cmscp from worker node.
         """
         logger.info("====== Starting to check uploads to ASO database.")
-        all_ids = []
+        docs_in_transfer = []
         output_files = []
 
         now = str(datetime.datetime.now())
@@ -394,6 +396,8 @@ class ASOServerJob(object):
                     continue
                 size = output_files[ifile]['outsize']
                 checksums = output_files[ifile]['checksums']
+                ## needs_transfer is False if and only if the file was staged out
+                ## from the worker node directly to the permanent storage.
                 needs_transfer = not output_files[ifile]['direct_stageout']
                 file_output_type = output_files[ifile]['filetype']
             else:
@@ -405,6 +409,8 @@ class ASOServerJob(object):
                 file_type = 'log'
                 size = self.log_size
                 checksums = {'adler32': 'abc'}
+                ## needs_transfer is False if and only if the file was staged out
+                ## from the worker node directly to the permanent storage.
                 needs_transfer = self.log_needs_transfer
             logger.info("Working on file %s" % (filename))
             doc_id = hashlib.sha224(source_lfn).hexdigest()
@@ -555,11 +561,14 @@ class ASOServerJob(object):
                         return False
                 ## Record all files for which we want the post-job to monitor their transfer.
                 if needs_transfer:
-                    all_ids.append(doc_id)
+                    doc_info = {'doc_id'     : doc_id,
+                                'start_time' : doc.get('start_time')
+                               }
+                    docs_in_transfer.append(doc_info)
 
         logger.info("====== Finished to check uploads to ASO database.")
 
-        return all_ids
+        return docs_in_transfer
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -590,33 +599,62 @@ class ASOServerJob(object):
             # attempts results.
             if (time.time() - last_query < 300) and (last_query > self.aso_start_timestamp):
                 query_view = False
-            for doc_id in self.doc_ids:
+            for doc_info in self.docs_in_transfer:
+                doc_id = doc_info['doc_id']
                 if doc_id not in aso_info.get("results", {}):
                     query_view = True
                     break
         if query_view:
             query = {'reduce': False, 'key': self.reqname, 'stale': 'update_after'}
-            logger.debug("Querying task view.")
+            logger.debug("Querying ASO view.")
             try:
-                states = self.couch_database.loadView('AsyncTransfer', 'JobsIdsStatesByWorkflow', query)['rows']
-                states_dict = {}
-                for state in states:
-                    states_dict[state['id']] = state
+                view_results = self.couch_database.loadView('AsyncTransfer', 'JobsIdsStatesByWorkflow', query)['rows']
+                view_results_dict = {}
+                for view_result in view_results:
+                    view_results_dict[view_result['id']] = view_result
             except Exception:
-                logger.exception("Error while querying the asynctransfer CouchDB")
+                logger.exception("Error while querying the asynctransfer CouchDB.")
                 return self.get_transfers_statuses_fallback()
-            aso_info = {"query_timestamp": time.time(), "results": states_dict}
+            aso_info = {"query_timestamp": time.time(), "results": view_results_dict}
             tmp_fname = "aso_status.%d.json" % (os.getpid())
             with open(tmp_fname, 'w') as fd_aso_status:
                 json.dump(aso_info, fd_aso_status)
             os.rename(tmp_fname, "aso_status.json")
+        else:
+            logger.debug("Using cached results.")
         if not aso_info:
             return self.get_transfers_statuses_fallback()
         statuses = []
-        for doc_id in self.doc_ids:
+        for doc_info in self.docs_in_transfer:
+            doc_id = doc_info['doc_id']
             if doc_id not in aso_info.get("results", {}):
                 return self.get_transfers_statuses_fallback()
-            statuses.append(aso_info['results'][doc_id]['value']['state'])
+            ## Use the start_time parameter to check whether the transfer state in aso_info
+            ## corresponds to the document we have to monitor. The reason why we have to do
+            ## this check is because the information in aso_info might have been obtained by
+            ## querying an ASO CouchDB view, which can return stale results. We don't mind
+            ## having stale results as long as they correspond to the documents we have to
+            ## monitor (the worst that can happen is that we will wait more than necessary
+            ## to see the transfers in a terminal state). But it could be that some results
+            ## returned by the view correspond to documents injected in a previous job retry
+            ## (or restart), and this is not what we want. If the start_time in aso_info is
+            ## not the same as in the document (we saved the start_time from the documents
+            ## in self.docs_in_transfer), then the view result corresponds to a previous job
+            ## retry. In that case, return transfer state = 'unknown'.
+            transfer_status = aso_info['results'][doc_id]['value']['state']
+            if 'start_time' in aso_info['results'][doc_id]['value']:
+                start_time = aso_info['results'][doc_id]['value']['start_time']
+                if start_time == doc_info['start_time']:
+                    statuses.append(transfer_status)
+                else:
+                    msg  = "Got stale transfer state '%s' for document %s" % (transfer_status, doc_id)
+                    msg += " (got start_time = %s, while in the document is start_time = %s)." % (start_time, doc_info['start_time'])
+                    msg += " Transfer state may correspond to a document from a previous job retry."
+                    msg += " Returning transfer state = 'unknown'."
+                    logger.info(msg)
+                    statuses.append('unknown')
+            else:
+                statuses.append(transfer_status)
         return statuses
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -648,7 +686,8 @@ class ASOServerJob(object):
         """
         logger.debug("Querying transfers statuses using fallback method (i.e. loading each document).")
         statuses = []
-        for doc_id in self.doc_ids:
+        for doc_info in self.docs_in_transfer:
+            doc_id = doc_info['doc_id']
             doc = self.load_couch_document(doc_id)
             status = doc['state'] if doc else 'unknown'
             statuses.append(status)
@@ -665,7 +704,8 @@ class ASOServerJob(object):
         """
         now = str(datetime.datetime.now())
         if not doc_ids_reasons:
-            for doc_id in self.doc_ids:
+            for doc_info in self.docs_in_transfer:
+                doc_id = doc_info['doc_id']
                 doc_ids_reasons[doc_id] = ''
         for doc_id, reason in doc_ids_reasons.iteritems():
             msg = "Cancelling ASO transfer %s" % (doc_id)
