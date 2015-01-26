@@ -588,6 +588,9 @@ class DagmanCreator(TaskAction.TaskAction):
 
             if not availablesites:
                 msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
+                if global_blacklist and set(possiblesites).issubset(global_blacklist):
+                    msg += "\n\t\t\t\tThe sites available for submission of task %s might be blacklisted."  % (kwargs['task']['tm_taskname'])
+                    msg += "\n\t\t\t\tThis is the list of sites that are blacklisted by CRAB3 server: %s" % (list(global_blacklist))
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             # NOTE: User can still shoot themselves in the foot with the resubmit blacklist
