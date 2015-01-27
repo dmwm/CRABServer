@@ -102,7 +102,7 @@ def getCentralConfig(extconfigurl, mode):
 
     header = ResponseHeader(hbuf.getvalue())
     if header.status < 200 or header.status >= 300:
-        cherrypy.log("Problem %d reading from %s." %(extconfigurl, header.status))
+        cherrypy.log("Problem %s reading from %s." %(extconfigurl, header.status))
         raise ExecutionError("Internal issue when retrieving external confifuration")
     return json.decode(bbuf.getvalue())[mode]
 
