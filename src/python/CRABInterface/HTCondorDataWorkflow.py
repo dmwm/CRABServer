@@ -75,7 +75,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
-        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
+        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferred']]
 
         return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, \
                              row.user_dn, row.username, row.user_role, row.user_group, userproxy)
@@ -90,7 +90,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
-        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed']]
+        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferred']]
 
         return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], transferingIds, finishedIds, \
                              row.user_dn, row.username, row.user_role, row.user_group, userproxy)
