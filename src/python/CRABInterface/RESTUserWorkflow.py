@@ -203,6 +203,7 @@ class RESTUserWorkflow(RESTEntity):
         if method in ['PUT']:
             validate_str("activity", param, safe, RX_ACTIVITY, optional=True)
             validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
+            # TODO this should be changed to be non-optional
             validate_str("generator", param, safe, RX_GENERATOR, optional=True)
             validate_str("eventsperlumi", param, safe, RX_LUMIEVENTS, optional=True)
             validate_str("jobsw", param, safe, RX_CMSSW, optional=False)
