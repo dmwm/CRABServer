@@ -290,6 +290,9 @@ class RetryJob(object):
         if exitCode == 60307 or exitCode == 147:
             raise RecoverableError("Error during attempted file stageout.")
 
+        if exitCode == 60311 or exitCode == 151:
+            raise RecoverableError("Error during attempted file stageout.")
+
         if exitCode:
             raise FatalError("Job wrapper finished with exit code %d.\nExit message:\n  %s" % (exitCode, exitMsg.replace('\n', '\n  ')))
 
