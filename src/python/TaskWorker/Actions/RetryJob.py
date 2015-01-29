@@ -126,7 +126,7 @@ class RetryJob(object):
         fake_fjr = {}
         fake_fjr['exitCode'] = exitCode
         fake_fjr['exitMsg'] = exitMsg
-        jobReport = "jobReport.json.%d" % (self.job_id)
+        jobReport = "job_fjr.%d.%d.json" % (self.job_id, self.retry_count)
         if os.path.isfile(jobReport) and os.path.getsize(jobReport) > 0:
             #File exists and it is not empty
             msg  = "%s file exists and it is not empty!" % (jobReport)
