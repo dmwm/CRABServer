@@ -126,7 +126,7 @@ class RetryJob(object):
         fake_fjr = {}
         fake_fjr['exitCode'] = exitCode
         fake_fjr['exitMsg'] = exitMsg
-        jobReport = "jobReport.json.%d" % (self.job_id)
+        jobReport = "job_fjr.%d.%d.json" % (self.job_id, self.retry_count)
         if os.path.isfile(jobReport) and os.path.getsize(jobReport) > 0:
             #File exists and it is not empty
             msg  = "%s file exists and it is not empty!" % (jobReport)
@@ -179,7 +179,6 @@ class RetryJob(object):
         # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to memory use"):
             self.create_fake_fjr("Not retrying job due to excessive memory use (job killed by CRAB3 watchdog)", 50660)
-            raise FatalError(exitMsg)
         subreport = self.report
         for attr in ['steps', 'cmsRun', 'performance', 'memory', 'PeakValueRss']:
             subreport = subreport.get(attr, None)
