@@ -1411,6 +1411,7 @@ def main():
     ##--------------------------------------------------------------------------
     ## This stageout manager will be used for all local stageout attempts (for
     ## the user logs archive file and the user output files).
+    local_stageout_mgr = None
     condition = ('local' in stageout_policy and condition_stageout)
     if skip['init_local_stageout_mgr']:
         msg  = "WARNING: Internal wrapper flag skip['init_local_stageout_mgr'] is True."
@@ -1455,6 +1456,9 @@ def main():
     ##--------------------------------------------------------------------------
     ## This stageout implementation will be used for all direct stageout
     ## attempts (for the user logs archive file and the user output files).
+    direct_stageout_impl = None
+    direct_stageout_command = "srmv2-lcg"
+    direct_stageout_protocol = "srmv2"
     condition = ('remote' in stageout_policy and condition_stageout)
     if skip['init_direct_stageout_impl']:
         msg  = "WARNING: Internal wrapper flag skip['init_direct_stageout_impl'] is True."
@@ -1464,8 +1468,6 @@ def main():
         msg  = "====== %s: " % (time.asctime(time.gmtime()))
         msg += "Starting initialization of stageout implementation for direct stageouts."
         print msg
-        direct_stageout_command = "srmv2-lcg"
-        direct_stageout_protocol = "srmv2"
         try:
             direct_stageout_impl = retrieveStageOutImpl(direct_stageout_command)
             direct_stageout_impl.numRetries = G_NUMBER_OF_RETRIES
@@ -1525,16 +1527,16 @@ def main():
             print msg
             try:
                 retval['logs_stageout'][policy] = perform_stageout(local_stageout_mgr, \
-                                                                direct_stageout_impl, \
-                                                                direct_stageout_command, \
-                                                                direct_stageout_protocol, \
-                                                                policy, \
-                                                                logs_arch_file_name, \
-                                                                logs_arch_dest_temp_lfn, \
-                                                                logs_arch_dest_pfn, \
-                                                                logs_arch_dest_lfn, \
-                                                                dest_site, is_log = True, \
-                                                                inject = transfer_logs)
+                                                                   direct_stageout_impl, \
+                                                                   direct_stageout_command, \
+                                                                   direct_stageout_protocol, \
+                                                                   policy, \
+                                                                   logs_arch_file_name, \
+                                                                   logs_arch_dest_temp_lfn, \
+                                                                   logs_arch_dest_pfn, \
+                                                                   logs_arch_dest_lfn, \
+                                                                   dest_site, is_log = True, \
+                                                                   inject = transfer_logs)
             except Exception:
                 msg  = "ERROR: Unhandled exception when performing stageout of user logs archive file."
                 msg += "\n%s" % (traceback.format_exc())
@@ -1844,6 +1846,7 @@ if __name__ == '__main__':
     except:
         pass
     ## Run the stageout wrapper.
+    JOB_STGOUT_WRAPPER_EXIT_INFO = {}
     try:
         JOB_STGOUT_WRAPPER_EXIT_INFO = main()
     except:
