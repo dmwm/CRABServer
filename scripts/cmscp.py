@@ -1204,6 +1204,7 @@ def main():
         msg += "Starting job report validation."
         print msg
         try:
+            job_report = {}
             with open(G_JOB_REPORT_NAME) as fd_job_report:
                 job_report = json.load(fd_job_report)
             retval['job_report_validation'] = 0
