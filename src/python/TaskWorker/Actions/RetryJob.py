@@ -179,7 +179,6 @@ class RetryJob(object):
         # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to memory use"):
             self.create_fake_fjr("Not retrying job due to excessive memory use (job killed by CRAB3 watchdog)", 50660)
-            raise FatalError(exitMsg)
         subreport = self.report
         for attr in ['steps', 'cmsRun', 'performance', 'memory', 'PeakValueRss']:
             subreport = subreport.get(attr, None)
