@@ -40,8 +40,7 @@ class HTCondorLocator(object):
             if 'DetectedMemory' in schedd and 'Name' in schedd:
                 schedds_dict[schedd['Name']] = schedd['DetectedMemory']
         if self.config and "htcondorSchedds" in self.config:
-            choices = [(i, schedds_dict.get(i)) for i in self.config["htcondorSchedds"]]
-            choices = [item for item in choices if item[1] is not None]
+            choices = [(i, schedds_dict.get(i, 24*1024)) for i in self.config["htcondorSchedds"]]
             schedd = weighted_choice(choices)
         if collector:
             return "%s:%s" % (schedd, collector)
