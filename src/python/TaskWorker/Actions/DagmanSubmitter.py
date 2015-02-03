@@ -337,11 +337,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 if resultAds:
                     id = "%s.%s" % (resultAds[0]['ClusterId'], resultAds[0]['ProcId'])
                     schedd.edit([id], "LeaveJobInQueue", classad.ExprTree("(JobStatus == 4) && (time()-EnteredCurrentStatus < 30*86400)"))
+                    schedd.reschedule()
         results = rpipe.read()
         if results != "OK":
             raise TaskWorkerException("Failure when submitting task to scheduler. Error reason: '%s'" % results)
-
-        schedd.reschedule()
 
 
     def sendDashboardJobs(self, params, info):
