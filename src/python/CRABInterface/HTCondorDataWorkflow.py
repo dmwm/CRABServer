@@ -368,7 +368,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             else:
                 return [ {"status" : "SUBMITTED",
                       "taskFailureMsg"  : "",
-                      "taskWarningMsg"  : "Task has not yet bootstrapped.",
+                      "taskWarningMsg"  : ["Task has not yet bootstrapped."] + taskWarnings,
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
                       "failedJobdefs"   : 0,
@@ -396,8 +396,16 @@ class HTCondorDataWorkflow(DataWorkflow):
         taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
         codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'finished', 5: 'held'}
         task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
-        retval = {"status": task_codes.get(taskStatusCode, 'unknown'), "taskFailureMsg": "", "jobSetID": workflow,
-            "jobsPerStatus" : jobsPerStatus, "jobList": jobList, "taskWarningMsg" : taskWarnings}
+        retval = {"status"         : task_codes.get(taskStatusCode, 'unknown'),
+                  "taskFailureMsg" : "",
+                  "taskWarningMsg" : taskWarnings,
+                  "jobSetID"       : workflow,
+                  "jobsPerStatus"  : jobsPerStatus,
+                  "failedJobdefs"  : 0,
+                  "totalJobdefs"   : 0,
+                  "jobdefErrors"   : [],
+                  "jobList"        : jobList,
+                  "saveLogs"       : row.save_logs}
         # HoldReasonCode == 1 indicates that the TW killed the task; perhaps the DB was not properly updated afterward?
         if row.task_status != "KILLED" and taskStatusCode == 5 and results[-1]['HoldReasonCode'] == 1:
             retval['status'] = 'KILLED'
@@ -421,9 +429,6 @@ class HTCondorDataWorkflow(DataWorkflow):
             jobsPerStatus[status] += 1
             jobList.append((status, job))
 
-        retval["failedJobdefs"] = 0
-        retval["totalJobdefs"] = 0
-
         #getting publication information
         publication_info = {}
         outdatasets = literal_eval(row.output_dataset.read() if row.output_dataset else 'None')
@@ -443,8 +448,6 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         if len(taskStatus) == 0 and results[0]['JobStatus'] == 2:
             retval['status'] = 'Running (jobs not submitted)'
-
-        retval['jobdefErrors'] = []
 
         retval['jobs'] = taskStatus
         retval['pool'] = pool
