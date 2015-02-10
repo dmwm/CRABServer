@@ -1,3 +1,5 @@
+import os
+import json
 import base64
 import urllib
 import traceback
@@ -9,7 +11,7 @@ import HTCondorLocator
 import HTCondorUtils
 
 import TaskWorker.Actions.TaskAction as TaskAction
-from TaskWorker.WorkerExceptions import TaskWorkerException
+from TaskWorker.WorkerExceptions import TaskWorkerException, NoAvailableSite
 
 from httplib import HTTPException
 
@@ -35,6 +37,43 @@ class DagmanResubmitter(TaskAction.TaskAction):
 
         self.logger.info("About to resubmit workflow: %s." % workflow)
         self.logger.info("Task info: %s" % str(task))
+
+        # This config setting acts as a global black / white list
+        global_whitelist = []
+        global_blacklist = []
+        if hasattr(self.config.Sites, 'available'):
+            global_whitelist = self.config.Sites.available
+        if hasattr(self.config.Sites, 'banned'):
+            global_blacklist = self.config.Sites.banned
+
+        #Always block site which is in morgue
+        if hasattr(self.config.Sites, 'blacklist_morgue_save_path'):
+            save_location = self.config.Sites.blacklist_morgue_save_path
+            if os.path.isfile(save_location):
+                with open(save_location, 'r') as fd:
+                    current_morgue_list = json.load(fd)
+                    global_blacklist = current_morgue_list + global_blacklist
+        resubmit_site_whitelist = task['resubmit_site_whitelist']
+        # If global_whitelist is not empty, means TW is configured to submit only to specific sites
+        # But more othen blacklist is used and not whitelist in TaskWorker configuration
+        if resubmit_site_whitelist:
+            # If any whitelist was specified for task, user wants to run only on that site/sites
+            # Check with TaskWorker configuration if it is allowed to submit to that site.
+            if global_whitelist:
+                resubmit_site_whitelist = [item for item in resubmit_site_whitelist if item in global_whitelist]
+            if global_blacklist and resubmit_site_whitelist:
+                resubmit_site_whitelist = [item for item in resubmit_site_whitelist if item not in global_blacklist]
+            #If list is empty, means that site is banned.
+            # TODO: Add warning to CRABServer if one/any site was rejected from users resubmittion and
+            # that TaskWorker will resubmit only to good site.
+            if not resubmit_site_whitelist:
+                msg = "The CRAB3 server backend refuses to resubmit jobs to the Grid scheduler. "\
+                      "You put (%s) in the site whitelist, and these sites: %s are blocked in CRAB3 server backend. "\
+                      "Please check site whitelist and contact an expert if the error persist."\
+                      % (", ".join(task['resubmit_site_whitelist']), global_blacklist)
+                raise NoAvailableSite(msg)
+            else:
+                task['resubmit_site_whitelist'] = resubmit_site_whitelist
 
         if task['tm_collector']:
             self.backendurls['htcondorPool'] = task['tm_collector']
