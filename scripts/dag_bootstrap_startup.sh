@@ -21,119 +21,94 @@ export LD_LIBRARY_PATH=/data/srv/glidecondor/lib:/data/srv/glidecondor/lib/condo
 
 mkdir -p retry_info
 
-# Bootstrap the HTCondor environment
-
-# If we wrote out the .job.ad ourselves previously
-# (we determine this by looking if the .job.ad is in
-# the local directory and is more than 30s old), then
-# we are also responsible for cleaning things up.
-# This way, we get the most up-to-date .job.ad for
-# AdjustSites.py (essential for resubmit!).
-
-# Once HTCondor writes .job.ad for us, this code block
-# should never be used!
-if [ -e .job.ad ]; then
-  now=`date '+%s'`
-  age=`stat -c '%Z' .job.ad`
-  maxage=$(($age+30))
-  if [ $now -gt $maxage ]; then
-    rm .job.ad
-  fi
-fi
-
-if [ "X$_CONDOR_JOB_AD" == "X" ];
-then
-    export _CONDOR_JOB_AD=.job.ad
-fi
-# Note that the scheduler universe does not populate the .job.ad file but the local
-# universe does.  As CRAB3 switched to the scheduler universe, we must do this manually.
-# We encountered transient condor_q failures when many tasks were submitted simultaneously;
-# hence, the while loop was added.
+# Note that the scheduler universe populate the .job.ad from 8.3.2 version.
+# Before it was written by this script using condor_q (This command is expensive to Scheduler)
 counter=0
 while [[ (counter -lt 10) && (!(-e $_CONDOR_JOB_AD) || ($(cat $_CONDOR_JOB_AD | wc -l) -lt 3)) ]]; do
-    if [ "X$CONDOR_ID" != "X" ]; then
-        condor_q $CONDOR_ID -l | grep -v '^$' > $_CONDOR_JOB_AD
-    fi
     sleep $((counter*3+1))
     let counter=counter+1
 done
-
-if [ "X$_CONDOR_JOB_AD" != "X" ];
-then
-    source_script=`grep '^RemoteCondorSetup =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
-    if [ "X$source_script" != "X" ] && [ -e $source_script ];
-    then
-        source $source_script
+# Have a fallback to condor_q in the case of HTCondor bug.
+if [ $(cat $_CONDOR_JOB_AD | wc -l) -lt 3 ]; then
+    if [ "X$CONDOR_ID" != "X" ]; then
+        # TODO: Report that condor_q was executed!
+        counter=0
+        while [[ (counter -lt 10) && (!(-e $_CONDOR_JOB_AD) || ($(cat $_CONDOR_JOB_AD | wc -l) -lt 3)) ]]; do
+            condor_q $CONDOR_ID -l | grep -v '^$' > $_CONDOR_JOB_AD
+            sleep $((counter*3+1))
+            let counter=counter+1
+        done
+    else
+        echo "Error: CONDOR_ID is unknown."
+        echo "Error: Failed to get ClassAds on `hostname`." >&2
+        echo "Error: dag_bootstrap_startup requires ClassAds for execution." >&2
+        exit 1 # TODO: On every exit code report back to CRABServer.
     fi
-
 fi
 
+#Sourcing Remote Condor setup
+source_script=`grep '^RemoteCondorSetup =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
+if [ "X$source_script" != "X" ] && [ -e $source_script ]; then
+    source $source_script
+fi
+
+#MAX_POST is set in TaskWorker configuration.
 MAX_POST=20
-if [ "X$_CONDOR_JOB_AD" != "X" ];
-then
-    MAX_POST_TMP=`grep '^CRAB_MaxPost =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
-    if [ "X$MAX_POST_TMP" != "X" ];
-    then
-        MAX_POST=$MAX_POST_TMP
-    fi
+MAX_POST_TMP=`grep '^CRAB_MaxPost =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
+if [ "X$MAX_POST_TMP" != "X" ]; then
+    MAX_POST=$MAX_POST_TMP
 fi
 
 # Bootstrap the runtime - we want to do this before DAG is submitted
 # so all the children don't try this at once.
-if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]
-then
+if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]; then
+    command -v python2.6 > /dev/null
+    rc=$?
+    if [[ $rc != 0 ]]; then
+        echo "Error: Python2.6 isn't available on `hostname`." >&2
+        echo "Error: bootstrap execution requires python2.6" >&2
+        exit 1 # TODO: On every exit code report back to CRABServer.
+    else
+        echo "I found python2.6 at.."
+        echo `which python2.6`
+    fi
 
-	command -v python2.6 > /dev/null
-	rc=$?
-	if [[ $rc != 0 ]]
-	then
-		echo "Error: Python2.6 isn't available on `hostname`." >&2
-		echo "Error: bootstrap execution requires python2.6" >&2
-		exit 1
-	else
-		echo "I found python2.6 at.."
-		echo `which python2.6`
-	fi
+    if [[ "X$CRAB_TASKMANAGER_TARBALL" == "X" ]]; then
+        # If CRAB_TASKMANAGER_TARBALL empty you have to
+        # specify CRAB_TARBALL_URL with full url to tarball
+        CRAB_TASKMANAGER_TARBALL="$CRAB_TARBALL_URL"
+    fi
 
-	if [ "x$CRAB3_VERSION" = "x" ]; then
-		TARBALL_NAME=TaskManagerRun.tar.gz
-	else
-		TARBALL_NAME=TaskManagerRun-$CRAB3_VERSION.tar.gz
-	fi
+    if [[ "X$CRAB_TASKMANAGER_TARBALL" != "Xlocal" ]]; then
+        # pass, we'll just use that value
+        echo "Downloading tarball from $CRAB_TASKMANAGER_TARBALL"
+        curl $CRAB_TASKMANAGER_TARBALL > TaskManagerRun.tar.gz
+        if [[ $? != 0 ]]; then
+            echo "Error: Unable to download the task manager runtime environment." >&2
+            exit 3 # TODO: On every exit code report back to CRABServer.
+        fi
+    else
+        echo "Using tarball shipped within condor"
+    fi
 
-	if [[ "X$CRAB_TASKMANAGER_TARBALL" == "X" ]]; then
-		CRAB_TASKMANAGER_TARBALL="http://hcc-briantest.unl.edu/$TARBALL_NAME"
-	fi
-    
-	if [[ "X$CRAB_TASKMANAGER_TARBALL" != "Xlocal" ]]; then
-		# pass, we'll just use that value
-		echo "Downloading tarball from $CRAB_TASKMANAGER_TARBALL"
-		curl $CRAB_TASKMANAGER_TARBALL > TaskManagerRun.tar.gz
-		if [[ $? != 0 ]]
-		then
-			echo "Error: Unable to download the task manager runtime environment." >&2
-			exit 3
-		fi
-	else
-		echo "Using tarball shipped within condor"
-	fi
-    	
-	tar xvfzm TaskManagerRun.tar.gz
-	if [[ $? != 0 ]]
-	then
-		echo "Error: Unable to unpack the task manager runtime environment." >&2
-		exit 4
-	fi
-        unzip CRAB3.zip
-	ls -lah
+    TARBALL_NAME=TaskManagerRun.tar.gz
+    tar xvfzm $TARBALL_NAME
+    if [[ $? != 0 ]]; then
+        echo "Error: Unable to unpack the task manager runtime environment." >&2
+        exit 3 # TODO: On every exit code report back to CRABServer.
+    fi
+    unzip CRAB3.zip
+    ls -lah
 
-        export TASKWORKER_ENV="1"
+    export TASKWORKER_ENV="1"
 fi
 
 # Recalculate the black / whitelist
-if [ -e AdjustSites.py ];
-then
-  python2.6 AdjustSites.py
+if [ -e AdjustSites.py ]; then
+    python2.6 AdjustSites.py
+else
+    echo 'Error: AdjustSites.py does not exist.' >&2
+    exit 4 # TODO: On every exit code report back to CRABServer.
 fi
 
 # Fix for issues with condor_rm.  See https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=4615
@@ -167,14 +142,13 @@ export CONDOR_ID="${CLUSTER_ID}.${PROC_ID}"
 ls -lah
 if [ "X" == "X$X509_USER_PROXY" ] || [ ! -e $X509_USER_PROXY ]; then
     echo "Failed to find a proxy at: $X509_USER_PROXY"
-    EXIT_STATUS=5
+    EXIT_STATUS=5 # TODO: On every exit code report back to CRABServer.
 elif [ ! -r $X509_USER_PROXY ]; then
     echo "The proxy is unreadable for some reason"
-    EXIT_STATUS=6
+    EXIT_STATUS=6 # TODO: On every exit code report back to CRABServer.
 else
     # Re-nice the process so, even when we churn through lots of processes, we never starve the schedd or shadows for cycles.
     exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -AutoRescue 1 -DoRescueFrom 0 -MaxPre 20 -MaxIdle 200 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
     EXIT_STATUS=$?
 fi
 exit $EXIT_STATUS
-
