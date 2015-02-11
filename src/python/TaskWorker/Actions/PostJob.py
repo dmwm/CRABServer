@@ -1286,6 +1286,9 @@ class PostJob():
             return
         direct_stageout = int(self.job_report.get(u'direct_stageout', 0))
         for ifile in self.job_report['steps']['cmsRun']['input']['source']:
+            if ifile['input_source_class'] != 'PoolSource' or not ifile['lfn']:
+                #skip the file if it's not PoolSource or the lfn is empty
+                continue
             ## Many of these parameters are not needed and are using fake/defined values
             lfn = ifile['lfn'] + "_" + str(self.job_id) ## jobs can analyze the same input
             configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
