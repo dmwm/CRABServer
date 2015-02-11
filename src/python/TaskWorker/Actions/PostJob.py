@@ -1287,7 +1287,9 @@ class PostJob():
         direct_stageout = int(self.job_report.get(u'direct_stageout', 0))
         for ifile in self.job_report['steps']['cmsRun']['input']['source']:
             if ifile['input_source_class'] != 'PoolSource' or not ifile['lfn']:
-                #skip the file if it's not PoolSource or the lfn is empty
+                #TODO: should we also check that "input_type" = "primaryFiles"?
+                #The problematic 'input_type' = 'mixingFiles' is catched now because it does not have an lfn.
+                #See https://cms-logbook.cern.ch/elog/Analysis+Operations/488
                 continue
             ## Many of these parameters are not needed and are using fake/defined values
             lfn = ifile['lfn'] + "_" + str(self.job_id) ## jobs can analyze the same input
