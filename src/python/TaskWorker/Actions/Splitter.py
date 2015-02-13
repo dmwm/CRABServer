@@ -6,6 +6,8 @@ from WMCore.DataStructs.Workflow import Workflow
 from WMCore.DataStructs.Subscription import Subscription
 from WMCore.JobSplitting.SplitterFactory import SplitterFactory
 
+from RESTInteractions import HTTPRequests
+
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.WorkerExceptions import StopHandler
 from TaskWorker.Actions.TaskAction import TaskAction
@@ -51,7 +53,7 @@ class Splitter(TaskAction):
         if lumiChecker and lumiChecker.splitLumiFiles:
             self.logger.warning("The input dataset contains the following duplicated lumis %s" % lumiChecker.splitLumiFiles.keys())
             try:
-                userServer = HTTPRequests(resthost, kwargs['task']['user_proxy'], kwargs['task']['user_proxy'])
+                userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'])
                 configreq = {'subresource': 'addwarning',
                              'workflow': kwargs['task']['tm_taskname'],
                              'warning': b64encode('The CRAB3 server backend detected lumis split across files in the input dataset.'
