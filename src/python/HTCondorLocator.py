@@ -50,6 +50,7 @@ class HTCondorLocator(object):
         """
         Return a tuple (schedd, address) containing an object representing the
         remote schedd and its corresponding address.
+        Still required for OLD tasks. Remove it later TODO
         """
         info = name.split("_")
         if len(info) > 3:
@@ -74,6 +75,21 @@ class HTCondorLocator(object):
             address = self.scheddAd['MyAddress']
             schedd = htcondor.Schedd(self.scheddAd)
         return schedd, address
+
+    def getScheddObjNew(self,schedd):
+        """
+        Return a tuple (schedd, address) containing an object representing the
+        remote schedd and its corresponding address.
+        """
+        htcondor.param['COLLECTOR_HOST'] = self.getCollector()
+        coll = htcondor.Collector()
+        schedds = coll.query(htcondor.AdTypes.Schedd, 'regexp(%s, Name)' % HTCondorUtils.quote(schedd))
+        if not schedds:
+            raise Exception("Unable to locate schedd %s" % schedd)
+        self.scheddAd = schedds[0]
+        address = self.scheddAd['MyAddress']
+        scheddObj = htcondor.Schedd(self.scheddAd)
+        return scheddObj, address
 
     def getCollector(self, name="localhost"):
         """

@@ -37,18 +37,11 @@ class HTCondorDataWorkflow(DataWorkflow):
     failedList = ['held', 'failed', 'cooloff']
 
     @conn_handler(services=['centralconfig'])
-    def updateRequest(self, workflow, scheddname=None, backend_urls=None):
-        info = workflow.split("_", 3)
-        if len(info) < 4:
-            return workflow
-        hn_name = info[2]
+    def chooseScheduler(self, scheddname=None, backend_urls=None):
         if not scheddname:
             locator = HTCondorLocator.HTCondorLocator(backend_urls)
-            name = locator.getSchedd().split("@")[0].split(".")[0]
-        else:
-            name = scheddname.split("@")[0].split(".")[0]
-        info[2] = "%s:%s" % (name, hn_name)
-        return "_".join(info)
+            scheddname = locator.getSchedd()
+        return scheddname
 
 
     def getRootTasks(self, workflow, schedd):
@@ -288,35 +281,64 @@ class HTCondorDataWorkflow(DataWorkflow):
             self.logger.debug("Detailed result for workflow %s: %s\n" % (workflow, result))
             return result
 
-        name = workflow.split("_")[2].split(":")[0]
-        self.logger.info("Getting status for workflow %s, looking for schedd %s" %\
-                                (workflow, name))
-
+        # From 3.4.04 version schedd name is not saved anymore in task_name
+        # But support is needed for tasks submitted before this version.
         backend_urls = self.centralcfg.centralconfig["backend-urls"]
         if row.collector:
             backend_urls['htcondorPool'] = row.collector
-        try:
-            locator = HTCondorLocator.HTCondorLocator(backend_urls)
-            self.logger.debug("Will talk to %s." % locator.getCollector())
-            name = locator.getSchedd()
-            self.logger.debug("Schedd name %s." % name)
-            schedd, address = locator.getScheddObj(workflow)
-            results = self.getRootTasks(workflow, schedd)
-            self.logger.info("Web status for workflow %s done" % workflow)
-        except Exception, exp:
-            msg = ("%s: The CRAB3 server frontend is not able to find your task in the Grid scheduler (remember tasks older than 30 days are automatically removed)."
-                   "If your task is a recent one, this could mean there is a temporary glicth. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
-            self.logger.exception(msg)
-            return [{"status" : "UNKNOWN",
-                      "taskFailureMsg" : str(msg),
-                      "taskWarningMsg"  : taskWarnings,
-                      "jobSetID"        : '',
-                      "jobsPerStatus"   : {},
-                      "failedJobdefs"   : 0,
-                      "totalJobdefs"    : 0,
-                      "jobdefErrors"    : [],
-                      "jobList"         : [],
-                      "saveLogs"        : row.save_logs }]
+        name = workflow
+        if not row.schedd:
+            name = workflow.split("_")[2].split(":")[0]
+            self.logger.info("Getting status for workflow %s, looking for schedd %s" % (workflow, name))
+            # Debug information to double check later (after ~2,3 months to see if users still checking old tasks)
+            # If not, need to clean up this code. Comment here to remember.
+            self.logger.debug("User asked information about old task. %s" % workflow)
+            try:
+                locator = HTCondorLocator.HTCondorLocator(backend_urls)
+                self.logger.debug("Will talk to %s." % locator.getCollector())
+                name = locator.getSchedd()
+                self.logger.debug("Schedd name %s." % name)
+                schedd, address = locator.getScheddObj(workflow)
+                results = self.getRootTasks(workflow, schedd)
+                self.logger.info("Web status for workflow %s done" % workflow)
+            except Exception, exp:
+                msg = ("%s: The CRAB3 server frontend is not able to find your task in the Grid scheduler (remember tasks older than 30 days are automatically removed)."
+                       "If your task is a recent one, this could mean there is a temporary glicth. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
+                self.logger.exception(msg)
+                return [{"status" : "UNKNOWN",
+                         "taskFailureMsg" : str(msg),
+                         "taskWarningMsg"  : taskWarnings,
+                         "jobSetID"        : '',
+                         "jobsPerStatus"   : {},
+                         "failedJobdefs"   : 0,
+                         "totalJobdefs"    : 0,
+                         "jobdefErrors"    : [],
+                         "jobList"         : [],
+                         "saveLogs"        : row.save_logs }]
+        else:
+            # This is new implementation and we already know scheduler name
+            self.logger.info("Getting status for workflow %s, looking for schedd %s" % (name, row.schedd))
+            try:
+               locator  = HTCondorLocator.HTCondorLocator(backend_urls)
+               self.logger.debug("Will talk to %s." % locator.getCollector())
+               self.logger.debug("Schedd name %s." % row.schedd)
+               schedd, address = locator.getScheddObjNew(row.schedd)
+               results = self.getRootTasks(workflow, schedd)
+               self.logger.info("Web status for workflow %s done " % workflow)
+            except Exception, exp:
+                msg = ("%s: The CRAB3 server frontend is not able to find your task in the Grid scheduler (remember tasks older than 30 days are automatically removed)."
+                       "If your task is a recent one, this could mean there is a temporary glicth. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
+                self.logger.exception(msg)
+                return [{"status" : "UNKNOWN",
+                         "taskFailureMsg" : str(msg),
+                         "taskWarningMsg"  : taskWarnings,
+                         "jobSetID"        : '',
+                         "jobsPerStatus"   : {},
+                         "failedJobdefs"   : 0,
+                         "totalJobdefs"    : 0,
+                         "jobdefErrors"    : [],
+                         "jobList"         : [],
+                         "saveLogs"        : row.save_logs }]
         if not results:
             return [ {"status" : "UNKNOWN",
                       "taskFailureMsg" : ("The CRAB3 server frontend cannot find any information about your jobs in the Grid scheduler."
