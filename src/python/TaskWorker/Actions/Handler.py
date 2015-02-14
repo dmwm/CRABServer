@@ -3,6 +3,7 @@ import time
 import logging
 import traceback
 from logging import FileHandler
+from httplib import HTTPException
 
 from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 
@@ -85,14 +86,16 @@ class TaskHandler(object):
                 self.logger.removeHandler(taskhandler)
                 raise WorkerHandlerException(msg) #Errors not foreseen. Print everything!
             finally:
-                #take the UFC from the taskdb? Or from the server like..
-                #cacheurl = server_info('backendurls', serverurl, proxyfilename, baseurl)
-                #cacheurl = cacheurl['cacheSSL']
-                #cacheurldict = {'endpoint': cacheurl}
-                #do the upload
-                #ufc = UserFileCache(cacheurldict)
-                #ufc.uploadLog(logpath, logfilename)
-                pass #upload the log? We need the user proxy...
+                logpath = 'logs/tasks/%s/%s.log' % (self._task['tm_username'], self._task['tm_taskname'])
+                if os.path.isfile(logpath):
+                    cacheurldict = {'endpoint': self._task['tm_cache_url']}
+                    ufc = UserFileCache(cacheurldict)
+                    try:
+                        logfilename = self._task['tm_taskname'] + '_TaskWorker.log'
+                        ufc.uploadLog(logpath, logfilename)
+                    except HTTPException, hte:
+                        msg = "Failed to upload the logfile fo the crabcache. More details in the http headers\n:%s" % ht.headers
+                        self.logger.error(msg)
             t1 = time.time()
             self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1-t0))
             try:
