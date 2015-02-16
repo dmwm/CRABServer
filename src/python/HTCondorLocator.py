@@ -1,13 +1,13 @@
-
 import types
 import bisect
 import random
-
+import time
 import classad
 import htcondor
 
 import HTCondorUtils
 
+CollectorCache = {}
 # From http://stackoverflow.com/questions/3679694/a-weighted-version-of-random-choice
 def weighted_choice(choices):
     values, weights = zip(*choices)
@@ -69,9 +69,12 @@ class HTCondorLocator(object):
             htcondor.param['COLLECTOR_HOST'] = self.getCollector(pool)
             coll = htcondor.Collector()
             schedds = coll.query(htcondor.AdTypes.Schedd, 'regexp(%s, Name)' % HTCondorUtils.quote(info[0]))
+            self.scheddAd = ""
             if not schedds:
-                raise Exception("Unable to locate schedd %s" % info[0])
-            self.scheddAd = schedds[0]
+                self.scheddAd = self.getCachedCollectorOutput(info[0])
+            else:
+                self.cacheCollectorOutput(info[0], schedds[0])
+                self.scheddAd = self.getCachedCollectorOutput(info[0])
             address = self.scheddAd['MyAddress']
             schedd = htcondor.Schedd(self.scheddAd)
         return schedd, address
@@ -84,12 +87,41 @@ class HTCondorLocator(object):
         htcondor.param['COLLECTOR_HOST'] = self.getCollector()
         coll = htcondor.Collector()
         schedds = coll.query(htcondor.AdTypes.Schedd, 'regexp(%s, Name)' % HTCondorUtils.quote(schedd))
+        self.scheddAd = ""
         if not schedds:
-            raise Exception("Unable to locate schedd %s" % schedd)
-        self.scheddAd = schedds[0]
+            self.scheddAd = self.getCachedCollectorOutput(schedd)
+        else:
+            self.cacheCollectorOutput(schedd, schedds[0])
+            self.scheddAd = self.getCachedCollectorOutput(schedd)
         address = self.scheddAd['MyAddress']
         scheddObj = htcondor.Schedd(self.scheddAd)
         return scheddObj, address
+
+    def cacheCollectorOutput(self, cacheName, output):
+        """
+        Saves Collector output in tmp directory.
+        """
+        global CollectorCache
+        if cacheName in CollectorCache.keys():
+            CollectorCache[cacheName]['ScheddAds'] = output
+        else:
+            CollectorCache[cacheName] = {}
+            CollectorCache[cacheName]['ScheddAds'] = output
+        CollectorCache[cacheName]['updated'] = int(time.time())
+
+    def getCachedCollectorOutput(self, cacheName):
+        """
+        Return cached Collector output if they exist.
+        """
+        global CollectorCache
+        now = int(time.time())
+        if cacheName in CollectorCache.keys():
+            if (now - CollectorCache[cacheName]['updated']) < 1800:
+                return CollectorCache[cacheName]['ScheddAds']
+            else:
+                raise Exception("Unable to contact the collector and cached results are too old for using.")
+        else:
+            raise Exception("Unable to contact the collector and cached results does not exist for %s" % cacheName)
 
     def getCollector(self, name="localhost"):
         """
