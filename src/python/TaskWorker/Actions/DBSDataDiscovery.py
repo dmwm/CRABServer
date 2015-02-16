@@ -1,5 +1,6 @@
 import os
 import logging
+from httplib import HTTPException
 
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.WorkQueue.WorkQueueUtils import get_dbs
@@ -16,8 +17,8 @@ class DBSDataDiscovery(DataDiscovery):
         #get all the PNN that are of kind disk
         try:
             diskLocations = set([pnn['name'] for pnn in phedex.getNodeMap()['phedex']['node'] if pnn['kind']=='Disk'])
-        except Exception, ex: #TODO should we catch HttpException instead?
-            self.logger.exception(ex)
+        except HTTPException, ex:
+            self.logger.error(ex.headers)
             raise TaskWorkerException("The CRAB3 server backend could not contact phedex to get the list of site storages.\n"+\
                                 "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
