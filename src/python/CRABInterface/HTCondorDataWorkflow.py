@@ -261,7 +261,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             verbose = 0
         self.logger.info("Status result for workflow %s: %s (detail level %d)" % (workflow, row.task_status, verbose))
         taskWarnings = literal_eval(row.task_warnings if isinstance(row.task_warnings, str) else row.task_warnings.read())
-        if row.task_status not in ['SUBMITTED', 'KILLFAILED', 'KILLED']:
+        if row.task_status not in ['SUBMITTED', 'KILLFAILED', 'KILLED', 'QUEUED']:
             if isinstance(row.task_failure, str):
                 taskFailureMsg = row.task_failure
             elif row.task_failure == None:
@@ -302,6 +302,24 @@ class HTCondorDataWorkflow(DataWorkflow):
                 results = self.getRootTasks(workflow, schedd)
                 self.logger.info("Web status for workflow %s done" % workflow)
             except Exception, exp:
+                #when the task is submitted for the first time
+                if row.task_status in ['QUEUED']:
+                    if isinstance(row.task_failure, str):
+                        taskFailureMsg = row.task_failure
+                    elif row.task_failure == None:
+                        taskFailureMsg = ""
+                    else:
+                        taskFailureMsg = row.task_failure.read()
+                    return [ {"status" : row.task_status,
+                              "taskFailureMsg"  : taskFailureMsg,
+                              "taskWarningMsg"  : taskWarnings,
+                              "jobSetID"        : '',
+                              "jobsPerStatus"   : {},
+                              "failedJobdefs"   : 0,
+                              "totalJobdefs"    : 0,
+                              "jobdefErrors"    : [],
+                              "jobList"         : [],
+                              "saveLogs"        : row.save_logs }]
                 msg = ("%s: The CRAB3 server frontend is not able to find your task in the Grid scheduler (remember tasks older than 30 days are automatically removed)."
                        "If your task is a recent one, this could mean there is a temporary glicth. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
                 self.logger.exception(msg)
@@ -326,6 +344,24 @@ class HTCondorDataWorkflow(DataWorkflow):
                results = self.getRootTasks(workflow, schedd)
                self.logger.info("Web status for workflow %s done " % workflow)
             except Exception, exp:
+                #when the task is submitted for the first time
+                if row.task_status in ['QUEUED']:
+                    if isinstance(row.task_failure, str):
+                        taskFailureMsg = row.task_failure
+                    elif row.task_failure == None:
+                        taskFailureMsg = ""
+                    else:
+                        taskFailureMsg = row.task_failure.read()
+                    return [ {"status" : row.task_status,
+                              "taskFailureMsg"  : taskFailureMsg,
+                              "taskWarningMsg"  : taskWarnings,
+                              "jobSetID"        : '',
+                              "jobsPerStatus"   : {},
+                              "failedJobdefs"   : 0,
+                              "totalJobdefs"    : 0,
+                              "jobdefErrors"    : [],
+                              "jobList"         : [],
+                              "saveLogs"        : row.save_logs }]
                 msg = ("%s: The CRAB3 server frontend is not able to find your task in the Grid scheduler (remember tasks older than 30 days are automatically removed)."
                        "If your task is a recent one, this could mean there is a temporary glicth. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
                 self.logger.exception(msg)
@@ -396,7 +432,11 @@ class HTCondorDataWorkflow(DataWorkflow):
         taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
         codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'finished', 5: 'held'}
         task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
-        retval = {"status"         : task_codes.get(taskStatusCode, 'unknown'),
+        if row.task_status in ['QUEUED']:
+            task_status = 'QUEUED'
+        else:
+            task_status = task_codes.get(taskStatusCode, 'unknown')
+        retval = {"status"         : task_status,
                   "taskFailureMsg" : "",
                   "taskWarningMsg" : taskWarnings,
                   "jobSetID"       : workflow,
