@@ -63,6 +63,7 @@ class TaskHandler(object):
         if not os.path.isdir(taskdirname):
             os.mkdir(taskdirname)
         taskhandler = FileHandler(taskdirname + self._task['tm_taskname'] + '.log')
+        taskhandler.setLevel(logging.DEBUG)
         self.logger.addHandler(taskhandler)
 
         for work in self.getWorks():
@@ -86,6 +87,7 @@ class TaskHandler(object):
                 self.logger.removeHandler(taskhandler)
                 raise WorkerHandlerException(msg) #Errors not foreseen. Print everything!
             finally:
+                #upload logfile of the task to the crabcache
                 logpath = 'logs/tasks/%s/%s.log' % (self._task['tm_username'], self._task['tm_taskname'])
                 if os.path.isfile(logpath):
                     cacheurldict = {'endpoint': self._task['tm_cache_url']}
