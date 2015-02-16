@@ -49,7 +49,7 @@ class CRAB3ProxyRenewer(object):
 
     def get_backendurls(self):
         self.logger.info("Querying server %s for HTCondor schedds and pool names." % self.resturi)
-        server = HTTPRequests(self.resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey)
+        server = HTTPRequests(self.resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry = 2)
         result = server.get(self.resturi, data={'subresource':'backendurls'})[0]['result'][0]
         self.pool = str(result['htcondorPool'])
         self.schedds = [str(i) for i in result['htcondorSchedds']]

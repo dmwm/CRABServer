@@ -1,15 +1,14 @@
 #!/usr/bin/env python
 #external dependencies
-import signal
+import os
 import time
+import urllib
+import signal
 import random
 import logging
-import os
-from logging.handlers import TimedRotatingFileHandler
-import urllib
-from httplib import HTTPException
 import traceback
-from MultiProcessingLog import MultiProcessingLog
+from httplib import HTTPException
+from logging.handlers import TimedRotatingFileHandler
 
 #WMcore dependencies
 from WMCore.Configuration import loadConfigurationFile, Configuration
@@ -17,12 +16,12 @@ from WMCore.Configuration import loadConfigurationFile, Configuration
 #CAFUtilities dependencies
 from RESTInteractions import HTTPRequests
 
-import TaskWorker.Actions.Recurring.BaseRecurringAction
-from TaskWorker.TestWorker import TestWorker
-from TaskWorker.Worker import Worker
 from TaskWorker.WorkerExceptions import *
-from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
+from TaskWorker.TestWorker import TestWorker
+from TaskWorker.Worker import Worker, setProcessLogger
+import TaskWorker.Actions.Recurring.BaseRecurringAction
 from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
+from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
 
 ## NOW placing this here, then to be verified if going into Action.Handler, or TSM
 ## This is a list because we want to preserve the order
@@ -42,7 +41,6 @@ MODEURL = {'cmsweb-dev': {'host': 'cmsweb-dev.cern.ch', 'instance':  'dev'},
            'private': {'host': None, 'instance':  'dev'},}
 
 
-
 def validateConfig(config):
     """Verify that the input configuration contains all needed info
 
@@ -51,16 +49,6 @@ def validateConfig(config):
     if getattr(config, 'TaskWorker', None) is None:
         return False, "Configuration problem: Task worker section is missing. "
     return True, 'Ok'
-
-def validateDbConfig(config):
-    """Verify that the input configuration contains all needed info
-
-    :arg WMCore.Configuration config: input configuration
-    :return bool, string: flag for validation result and a message."""
-    if getattr(config, 'CoreDatabase', None) is None:
-        return False, "Configuration problem: Core Database section is missing. "
-    return True, 'Ok'
-
 
 
 class MasterWorker(object):
@@ -73,18 +61,40 @@ class MasterWorker(object):
         :arg logging logger: the logger
         :arg bool quiet: it tells if a quiet logger is needed
         :arg bool debug: it tells if needs a verbose logger."""
-        def getLogging(quiet, debug):
-            """Retrieves a logger and set the proper level
+
+
+        def createLogdir(dirname):
+            """ Create the directory dirname ignoring erors in case it exists. Exit if
+                the directory cannot be created.
+            """
+            try:
+                os.mkdir(dirname)
+            except OSError, ose:
+                if ose.errno != 17: #ignore the "Directory already exists error"
+                    print str(ose)
+                    print "The task worker need to access the '%s' directory" % dirname
+                    sys.exit(1)
+
+
+        def setRootLogger(quiet, debug):
+            """Sets the root logger with the desired verbosity level
+               The root logger logs to logs/twlog.txt and every single
+               logging instruction is propagated to it (not really nice
+               to read)
 
             :arg bool quiet: it tells if a quiet logger is needed
             :arg bool debug: it tells if needs a verbose logger
             :return logger: a logger with the appropriate logger level."""
 
+            createLogdir('logs')
+            createLogdir('logs/processes')
+            createLogdir('logs/tasks')
+
             if self.TEST:
                 #if we are testing log to the console is easier
                 logging.getLogger().addHandler(logging.StreamHandler())
             else:
-                logHandler = MultiProcessingLog('twlog.log', when="midnight")
+                logHandler = TimedRotatingFileHandler('logs/twlog.txt', 'midnight')
                 logFormatter = \
                     logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
                 logHandler.setFormatter(logFormatter)
@@ -95,13 +105,14 @@ class MasterWorker(object):
             if debug:
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
-            logger = logging.getLogger()
+            logger = setProcessLogger("master")
+            logger.debug("PID %s." % os.getpid())
             logger.debug("Logging level initialized to %s." %loglevel)
             return logger
 
         self.STOP = False
         self.TEST = test
-        self.logger = getLogging(quiet, debug)
+        self.logger = setRootLogger(quiet, debug)
         self.config = config
         resthost = None
         self.restURInoAPI = None
@@ -115,7 +126,7 @@ class MasterWorker(object):
             self.restURInoAPI = '/crabserver/' + MODEURL[self.config.TaskWorker.mode]['instance']
         if resthost is None:
             raise ConfigException("No correct mode provided: need to specify config.TaskWorker.mode in the configuration")
-        self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey)
+        self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry = 2)
         self.logger.debug("Hostcert: %s, hostkey: %s" %(str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey)))
         # Retries for any failures
         if not hasattr(self.config.TaskWorker, 'max_retry'):
@@ -173,6 +184,7 @@ class MasterWorker(object):
         try:
             pendingwork = self.server.get(self.restURInoAPI + '/workflowdb', data = configreq)[0]['result']
         except HTTPException, hte:
+            self.logger.error("HTTP Error during _getWork: %s" % str(hte))
             self.logger.error("Could not get any work from the server: \n" +
                               "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown')) +
                               "\treason: %s" %(hte.headers.get('X-Error-Detail', 'unknown')))
@@ -241,7 +253,7 @@ class MasterWorker(object):
                     self.logger.debug("Injecting recurring action: \n%s" %(str(action.__module__)))
                     self.slaves.injectWorks([(handleRecurring, {'tm_taskname' : action.__module__}, action.__module__)])
 
-            self.logger.info('Worker status:')
+            self.logger.info('Master Worker status:')
             self.logger.info(' - free slaves: %d' % self.slaves.freeSlaves())
             self.logger.info(' - acquired tasks: %d' % self.slaves.queuedTasks())
             self.logger.info(' - tasks pending in queue: %d' % self.slaves.pendingTasks())
@@ -249,11 +261,11 @@ class MasterWorker(object):
             finished = self.slaves.checkFinished()
 
             time.sleep(self.config.TaskWorker.polling)
-        self.logger.debug("Stopping")
+        self.logger.debug("Master Worker Exiting Main Cycle")
 
-    def __del__(self):
-        """Shutting down all the slaves"""
-        self.slaves.end()
+#    def __del__(self):
+#        """Shutting down all the slaves"""
+#        self.slaves.end()
 
 if __name__ == '__main__':
     from optparse import OptionParser
@@ -293,5 +305,3 @@ if __name__ == '__main__':
     signal.signal(signal.SIGTERM, mw.quit)
     mw.algorithm()
     mw.slaves.end()
-    del mw
-

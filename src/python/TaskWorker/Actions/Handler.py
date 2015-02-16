@@ -1,36 +1,41 @@
-import logging
+import os
 import time
+import logging
 import traceback
+from logging import FileHandler
+from httplib import HTTPException
+
+from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 
 from RESTInteractions import HTTPRequests
 
-from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
-from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
-from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
 from TaskWorker.Actions.Splitter import Splitter
+from TaskWorker.DataObjects.Result import Result
+from TaskWorker.Actions.PanDAKill import PanDAKill
+from TaskWorker.Actions.DagmanKiller import DagmanKiller
+from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
+from TaskWorker.Actions.DagmanCreator import DagmanCreator
+from TaskWorker.Actions.PanDAgetSpecs import PanDAgetSpecs
 from TaskWorker.Actions.PanDABrokerage import PanDABrokerage
 from TaskWorker.Actions.PanDAInjection import PanDAInjection
-from TaskWorker.Actions.PanDAgetSpecs import PanDAgetSpecs
-from TaskWorker.Actions.PanDAKill import PanDAKill
 from TaskWorker.Actions.PanDASpecs2Jobs import PanDASpecs2Jobs
-from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
-from TaskWorker.WorkerExceptions import WorkerHandlerException, StopHandler, TaskWorkerException
-from TaskWorker.DataObjects.Result import Result
-from TaskWorker.Actions.DagmanCreator import DagmanCreator
+from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
 from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
+from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
+from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
-from TaskWorker.Actions.DagmanKiller import DagmanKiller
+from TaskWorker.WorkerExceptions import WorkerHandlerException, StopHandler, TaskWorkerException
 
 DEFAULT_BACKEND = 'panda'
 
 class TaskHandler(object):
     """Handling the set of operations to be performed."""
 
-    def __init__(self, task):
+    def __init__(self, task, procnum):
         """Initializer
 
         :arg TaskWorker.DataObjects.Task task: the task to work on."""
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger(str(procnum))
         self._work = []
         self._task = task
 
@@ -51,6 +56,15 @@ class TaskHandler(object):
     def actionWork(self, *args, **kwargs):
         """Performing the set of actions"""
         nextinput = args
+
+        #set the logger to save the tasklog
+        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
+        taskdirname = "logs/tasks/%s/" % self._task['tm_username']
+        if not os.path.isdir(taskdirname):
+            os.mkdir(taskdirname)
+        taskhandler = FileHandler(taskdirname + self._task['tm_taskname'] + '.log')
+        self.logger.addHandler(taskhandler)
+
         for work in self.getWorks():
             self.logger.debug("Starting %s on %s" % (str(work), self._task['tm_taskname']))
             t0 = time.time()
@@ -63,106 +77,124 @@ class TaskHandler(object):
                 break #exit normally. Worker will not notice there was an error
             except TaskWorkerException, twe:
                 self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
+                self.logger.removeHandler(taskhandler)
                 raise WorkerHandlerException(str(twe)) #TaskWorker error, do not add traceback to the error propagated to the REST
             except Exception, exc:
                 msg = "Problem handling %s because of %s failure, traceback follows\n" % (self._task['tm_taskname'], str(exc))
                 msg += str(traceback.format_exc())
                 self.logger.error(msg)
+                self.logger.removeHandler(taskhandler)
                 raise WorkerHandlerException(msg) #Errors not foreseen. Print everything!
+            finally:
+                logpath = 'logs/tasks/%s/%s.log' % (self._task['tm_username'], self._task['tm_taskname'])
+                if os.path.isfile(logpath):
+                    cacheurldict = {'endpoint': self._task['tm_cache_url']}
+                    ufc = UserFileCache(cacheurldict)
+                    try:
+                        logfilename = self._task['tm_taskname'] + '_TaskWorker.log'
+                        ufc.uploadLog(logpath, logfilename)
+                    except HTTPException, hte:
+                        msg = "Failed to upload the logfile fo the crabcache. More details in the http headers\n:%s" % ht.headers
+                        self.logger.error(msg)
             t1 = time.time()
             self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1-t0))
             try:
                 nextinput = output.result
             except AttributeError:
                 nextinput = output
-        tot1 = time.time()
+
+        self.logger.removeHandler(taskhandler)
+
         return nextinput
 
-def handleNewTask(resthost, resturi, config, task, *args, **kwargs):
+def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     """Performs the injection of a new task
 
     :arg str resthost: the hostname where the rest interface is running
     :arg str resturi: the rest base url to contact
     :arg WMCore.Configuration config: input configuration
     :arg TaskWorker.DataObjects.Task task: the task to work on
+    :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the handler."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey)
-    handler = TaskHandler(task)
-    handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, myproxylen=60*60*24) )
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry = 2)
+    handler = TaskHandler(task, procnum)
+    handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60*60*24) )
     if task['tm_job_type'] == 'Analysis': 
         if task.get('tm_arguments', {}).get('userfiles'):
-            handler.addWork( UserDataDiscovery(config=config, server=server, resturi=resturi) )
+            handler.addWork( UserDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum) )
         else:
-            handler.addWork( DBSDataDiscovery(config=config, server=server, resturi=resturi) )
+            handler.addWork( DBSDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum) )
     elif task['tm_job_type'] == 'PrivateMC': 
-        handler.addWork( MakeFakeFileSet(config=config, server=server, resturi=resturi) )
-    handler.addWork( Splitter(config=config, server=server, resturi=resturi) )
+        handler.addWork( MakeFakeFileSet(config=config, server=server, resturi=resturi, procnum=procnum) )
+    handler.addWork( Splitter(config=config, server=server, resturi=resturi, procnum=procnum) )
 
     def glidein(config):
         """Performs the injection of a new task into Glidein
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( DagmanCreator(config=config, server=server, resturi=resturi) )
-        handler.addWork( DagmanSubmitter(config=config, server=server, resturi=resturi) )
+        handler.addWork( DagmanCreator(config=config, server=server, resturi=resturi, procnum=procnum) )
+        handler.addWork( DagmanSubmitter(config=config, server=server, resturi=resturi, procnum=procnum) )
 
     def panda(config):
         """Performs the injection into PanDA of a new task
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( PanDABrokerage(pandaconfig=config, server=server, resturi=resturi) )
-        handler.addWork( PanDAInjection(pandaconfig=config, server=server, resturi=resturi) )
+        handler.addWork( PanDABrokerage(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
+        handler.addWork( PanDAInjection(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
 
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args)
 
-def handleResubmit(resthost, resturi, config, task, *args, **kwargs):
+def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
     """Performs the re-injection of failed jobs
 
     :arg str resthost: the hostname where the rest interface is running
     :arg str resturi: the rest base url to contact
     :arg WMCore.Configuration config: input configuration
     :arg TaskWorker.DataObjects.Task task: the task to work on
+    :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey)
-    handler = TaskHandler(task)
-    handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, myproxylen=60*60*24) )
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry = 2)
+    handler = TaskHandler(task, procnum)
+    handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60*60*24) )
     def glidein(config):
         """Performs the re-injection into Glidein
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( DagmanResubmitter(config=config, server=server, resturi=resturi) )
+        handler.addWork( DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum) )
 
     def panda(config):
         """Performs the re-injection into PanDA
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( PanDAgetSpecs(pandaconfig=config, server=server, resturi=resturi) )
-        handler.addWork( PanDASpecs2Jobs(pandaconfig=config, server=server, resturi=resturi) )
-        handler.addWork( PanDABrokerage(pandaconfig=config, server=server, resturi=resturi) )
-        handler.addWork( PanDAInjection(pandaconfig=config, server=server, resturi=resturi) )
+        handler.addWork( PanDAgetSpecs(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
+        handler.addWork( PanDASpecs2Jobs(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
+        handler.addWork( PanDABrokerage(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
+        handler.addWork( PanDAInjection(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
 
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args)
 
-def handleKill(resthost, resturi, config, task, *args, **kwargs):
+def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
     """Asks to kill jobs
 
     :arg str resthost: the hostname where the rest interface is running
     :arg str resturi: the rest base url to contact
     :arg WMCore.Configuration config: input configuration
     :arg TaskWorker.DataObjects.Task task: the task to work on
+    :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey)
-    handler = TaskHandler(task)
-    handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, myproxylen=60*5) )
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry = 2)
+    handler = TaskHandler(task, procnum)
+    handler.addWork( MyProxyLogon(config=config, server=server, resturi=restur, procnum=procnum, myproxylen=60*5) )
     def glidein(config):
         """Performs kill of jobs sent through Glidein
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( DagmanKiller(config=config, server=server, resturi=resturi) )
+        handler.addWork( DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum) )
 
     def panda(config):
         """Performs the re-injection into PanDA
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( PanDAKill(pandaconfig=config, server=server, resturi=resturi) )
+        handler.addWork( PanDAKill(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
 
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)

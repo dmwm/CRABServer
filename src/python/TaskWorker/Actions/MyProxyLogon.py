@@ -15,8 +15,8 @@ MINPROXYLENGTH = 60 * 60 * 1
 
 class MyProxyLogon(TaskAction):
 
-    def __init__(self, config, server, resturi, myproxylen=MINPROXYLENGTH):
-        TaskAction.__init__(self, config, server, resturi)
+    def __init__(self, config, server, resturi, procnum=-1, myproxylen=MINPROXYLENGTH):
+        TaskAction.__init__(self, config, server, resturi, procnum)
         self.myproxylen = myproxylen
 
     def execute(self, *args, **kwargs):
