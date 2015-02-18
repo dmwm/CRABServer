@@ -36,9 +36,9 @@ alter table tasks modify(tm_task_warnings DEFAULT '[]');
 ALTER TABLE tasks ADD(tm_output_dataset CLOB);
 UPDATE filemetadata SET fmd_tmplfn=fmd_lfn WHERE fmd_tmplfn is NULL or fmd_tmplfn='';
 
---Changes that will be needed for version 3.4.02
+--Changes that will be needed for version 3.4.13
 alter table tasks add (tm_collector VARCHAR(1000));
 ALTER TABLE tasks DROP column tm_transformation;
 
------------------------------------------------
+--Changes that will be needed for version 3.4.14
 ALTER TABLE tasks ADD (tm_schedd VARCHAR(255));
