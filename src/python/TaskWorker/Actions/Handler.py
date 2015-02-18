@@ -96,7 +96,7 @@ class TaskHandler(object):
                         logfilename = self._task['tm_taskname'] + '_TaskWorker.log'
                         ufc.uploadLog(logpath, logfilename)
                     except HTTPException, hte:
-                        msg = "Failed to upload the logfile fo the crabcache. More details in the http headers\n:%s" % ht.headers
+                        msg = "Failed to upload the logfile fo the crabcache. More details in the http headers\n:%s" % hte.headers
                         self.logger.error(msg)
             t1 = time.time()
             self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1-t0))
