@@ -22,12 +22,15 @@ class Task(object):
     #INSERTED BY ERIC SUMMER STUDENT
     ALLUSER_sql = "SELECT DISTINCT(tm_username) FROM tasks"
     TASKSUMMARY_sql = "select tm_username, tm_task_status, count(*) from tasks group by tm_username, tm_task_status order by tm_username"
-    #get taskname byt user and status
+    #get taskname by user and status
     GetByUserAndStatus_sql = "select tm_taskname from tasks where tm_username=:username and tm_task_status=:status"
     #quick search
     QuickSearch_sql = "SELECT tm_task_status,tm_totalunits,tm_user_sandbox,tm_cache_url,tm_username,tm_publish_name,tm_outfiles,tm_job_type, tm_save_logs, tm_user_infiles FROM tasks WHERE tm_taskname = :taskname"
     #get all jobs with a specified status
     TaskByStatus_sql = "SELECT tm_task_status,tm_taskname FROM tasks WHERE tm_task_status = :taskstatus AND tm_username=:username_"
+    #get all the tasks in a certain state in the last :hour
+    CountLastTasksByStatus = "SELECT tm_task_status, count(*) FROM tasks WHERE tm_start_time > sysdate - (:minutes/1440)  GROUP BY tm_task_status"
+
     #New
     New_sql = "INSERT INTO tasks ( \
               tm_taskname,tm_activity, panda_jobset_id, tm_task_status, tm_start_time, tm_task_failure, tm_job_sw, \
