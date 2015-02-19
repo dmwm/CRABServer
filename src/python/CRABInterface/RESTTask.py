@@ -35,6 +35,7 @@ class RESTTask(RESTEntity):
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
             validate_str('taskstatus', param, safe, RX_STATUS, optional=True)
             validate_str('username', param, safe, RX_USERNAME, optional=True)
+            validate_str('minutes', param, safe, RX_RUNS, optional=True)
 
     @restcall
     def get(self, subresource, **kwargs):
@@ -70,11 +71,32 @@ class RESTTask(RESTEntity):
 
         return rows
 
+
+    def webdir(self, **kwargs):
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+        workflow = kwargs['workflow']
+        row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
+        yield row.user_webdir
+
+
+    def counttasksbystatus(self, **kwargs):
+        """Retrieves all jobs of the specified user with the specified status
+           curl -X GET 'https://mmascher-dev6.cern.ch/crabserver/dev/task?subresource=counttasksbystatus&minutes=100'\
+                        -k --key /tmp/x509up_u8440 --cert /tmp/x509up_u8440 -v
+        """
+        if 'minutes' not in kwargs:
+            raise InvalidParameter("The parameter minutes is mandatory for the tasksbystatus api")
+        rows = self.api.query(None, None, self.Task.CountLastTasksByStatus, minutes=kwargs["minutes"])
+
+        return rows
+
     @restcall
     def post(self, subresource, **kwargs):
         """ Updates task information """
 
         return getattr(RESTTask, subresource)(self, **kwargs)
+
 
     def addwarning(self, **kwargs):
         """ Add a warning to the wraning column in the database. Can be tested with:
@@ -111,6 +133,7 @@ class RESTTask(RESTEntity):
 
         return []
 
+
     def addwebdir(self, **kwargs):
         """ Add web directory to web_dir column in the database. Can be tested with:
             curl -X POST https://balcas-crab.cern.ch/crabserver/dev/task -k --key $X509_USER_PROXY --cert $X509_USER_PROXY \
@@ -129,6 +152,7 @@ class RESTTask(RESTEntity):
 
         return []
 
+
     def addoutputdatasets(self, **kwargs):
         if 'outputdatasets' not in kwargs or not kwargs['outputdatasets']:
             raise InvalidParameter("Output datasets not found in the input parameters")
@@ -146,10 +170,3 @@ class RESTTask(RESTEntity):
 
         return []
 
-
-    def webdir(self, **kwargs):
-        if 'workflow' not in kwargs or not kwargs['workflow']:
-            raise InvalidParameter("Task name not found in the input parameters")
-        workflow = kwargs['workflow']
-        row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
-        yield row.user_webdir
