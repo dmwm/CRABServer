@@ -28,8 +28,11 @@ class Task(object):
     QuickSearch_sql = "SELECT tm_task_status,tm_totalunits,tm_user_sandbox,tm_cache_url,tm_username,tm_publish_name,tm_outfiles,tm_job_type, tm_save_logs, tm_user_infiles FROM tasks WHERE tm_taskname = :taskname"
     #get all jobs with a specified status
     TaskByStatus_sql = "SELECT tm_task_status,tm_taskname FROM tasks WHERE tm_task_status = :taskstatus AND tm_username=:username_"
-    #get all the tasks in a certain state in the last :hour
+    #get all the tasks in a certain state in the last :minutes minutes
     CountLastTasksByStatus = "SELECT tm_task_status, count(*) FROM tasks WHERE tm_start_time > sysdate - (:minutes/1440)  GROUP BY tm_task_status"
+    #get all the task failures sorted by username in the last :minutes minutes
+    LastFailures = "SELECT tm_username, tm_taskname, tm_task_failure from tasks WHERE tm_start_time > sysdate - (:minutes/1440) and tm_task_status='FAILED' \
+                    ORDER BY tm_username"
 
     #New
     New_sql = "INSERT INTO tasks ( \

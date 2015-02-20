@@ -91,6 +91,20 @@ class RESTTask(RESTEntity):
 
         return rows
 
+
+    def lastfailures(self, **kwargs):
+        """Retrieves all jobs of the specified user with the specified status
+           curl -X GET 'https://mmascher-dev6.cern.ch/crabserver/dev/task?subresource=lastfailures&minutes=100'\
+                        -k --key /tmp/x509up_u8440 --cert /tmp/x509up_u8440 -v
+        """
+        if 'minutes' not in kwargs:
+            raise InvalidParameter("The parameter minutes is mandatory for the tasksbystatus api")
+        rows = self.api.query(None, None, self.Task.LastFailures, minutes=kwargs["minutes"])
+
+        for row in rows:
+            yield [row[0], row[1], row[2].read()]
+
+
     @restcall
     def post(self, subresource, **kwargs):
         """ Updates task information """
