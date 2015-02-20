@@ -90,14 +90,18 @@ class TaskHandler(object):
                 #upload logfile of the task to the crabcache
                 logpath = 'logs/tasks/%s/%s.log' % (self._task['tm_username'], self._task['tm_taskname'])
                 if os.path.isfile(logpath):
-                    cacheurldict = {'endpoint': self._task['tm_cache_url']}
-                    ufc = UserFileCache(cacheurldict)
+                    cacheurldict = {'endpoint': self._task['tm_cache_url'], 'cert' : self._task['user_proxy'], 'key' : self._task['user_proxy']}
                     try:
+                        ufc = UserFileCache(cacheurldict)
                         logfilename = self._task['tm_taskname'] + '_TaskWorker.log'
                         ufc.uploadLog(logpath, logfilename)
                     except HTTPException, hte:
-                        msg = "Failed to upload the logfile fo the crabcache. More details in the http headers\n:%s" % hte.headers
+                        msg = ("Failed to upload the logfile to %s for task %s. More details in the http headers and body:\n%s\n%s" %
+                               (self._task['tm_cache_url'], self._task['tm_taskname'], hte.headers, hte.result))
                         self.logger.error(msg)
+                    except Exception, e:
+                        msg = "Unknown error while uploading the logfile for task %s" % self._task['tm_taskname']
+                        self.logger.exception(msg)
             t1 = time.time()
             self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1-t0))
             try:
