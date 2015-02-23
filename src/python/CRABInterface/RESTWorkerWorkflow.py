@@ -24,7 +24,8 @@ class RESTWorkerWorkflow(RESTEntity):
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
-        authz_login_valid()
+        authz_login_valid() #TODO: should we also call authz_operator here ? Otherwise anybody can get tasks from here.
+                            #      Actually, maybe something even more strict is necessary (only the prod TW machine can access this resource)
 
         if method in ['PUT']:
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)

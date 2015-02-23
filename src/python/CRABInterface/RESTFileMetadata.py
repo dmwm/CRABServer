@@ -4,7 +4,7 @@ from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
 
 # CRABServer dependecies here
-from CRABInterface.RESTExtensions import authz_login_valid
+from CRABInterface.RESTExtensions import authz_login_valid, authz_operator
 from CRABInterface.Regexps import *
 from CRABInterface.DataFileMetadata import DataFileMetadata
 
@@ -59,6 +59,7 @@ class RESTFileMetadata(RESTEntity):
             validate_str("taskname", param, safe, RX_WORKFLOW, optional=False)
             validate_str("filetype", param, safe, RX_OUTTYPES, optional=False)
         elif method in ['DELETE']:
+            authz_operator()
             validate_str("taskname", param, safe, RX_WORKFLOW, optional=True)
             validate_str("hours", param, safe, RX_HOURS, optional=True)
             if bool(safe.kwargs["taskname"]) == bool(safe.kwargs["hours"]):
