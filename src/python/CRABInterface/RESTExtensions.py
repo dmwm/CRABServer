@@ -11,6 +11,17 @@ from WMCore.REST.Error import MissingObject
 import cherrypy
 import traceback
 
+
+def authz_operator(username = None):
+    """ Check if the the user who is trying to access this resource (i.e.: cherrypy.request.user['login'], the cert username) is the
+        same as username. If not check if the user is a CRAB3 operator. {... 'operator': {'group': set(['crab3']) ... in the cherrypy roles}
+        If the username is not passed just check role
+    """
+    if cherrypy.request.user['login'] != username and\
+       'crab3' not in cherrypy.request.user.get('roles', {}).get('operator', {}).get('group', set()):
+        raise cherrypy.HTTPError(403, "You are not allowed to access this resource. You need to be a CRAB3 operator in sitedb to perform this action")
+
+
 def authz_owner_match(dbapi, workflows, Task):
     """Match user against authorisation requirements to modify an existing resource.
        Allows to cache couchdb fetched documents if the caller needs them.
@@ -44,7 +55,7 @@ def authz_owner_match(dbapi, workflows, Task):
     log("ERROR: authz denied for user '%s' to resource '%s'" % (user, str(workflows)))
     raise cherrypy.HTTPError(403, "You are not allowed to access this resource.")
 
+
 def authz_login_valid():
-    print cherrypy.request.user['roles']
     if not cherrypy.request.user['login']:
         raise cherrypy.HTTPError(403, "You are not allowed to access this resource. Please check: https://twiki.cern.ch/twiki/bin/viewauth/CMS/SiteDBForCRAB")
