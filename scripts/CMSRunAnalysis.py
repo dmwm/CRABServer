@@ -35,7 +35,7 @@ def mintime():
     mymin = 20*60
     tottime = time.time()-starttime
     remaining = mymin - tottime
-    if remaining > 0:
+    if remaining > 0 and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         print "==== Failure sleep STARTING at %s ====" % time.asctime(time.gmtime())
         print "Sleeping for %d seconds due to failure." % remaining
         sys.stdout.flush()
