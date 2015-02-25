@@ -25,7 +25,7 @@ class Task(object):
     #get taskname by user and status
     GetByUserAndStatus_sql = "select tm_taskname from tasks where tm_username=:username and tm_task_status=:status"
     #quick search
-    QuickSearch_sql = "SELECT tm_task_status,tm_totalunits,tm_user_sandbox,tm_cache_url,tm_username,tm_publish_name,tm_outfiles,tm_job_type, tm_save_logs, tm_user_infiles FROM tasks WHERE tm_taskname = :taskname"
+    QuickSearch_sql = "SELECT * FROM tasks WHERE tm_taskname = :taskname"
     #get all jobs with a specified status
     TaskByStatus_sql = "SELECT tm_task_status,tm_taskname FROM tasks WHERE tm_task_status = :taskstatus AND tm_username=:username_"
     #get all the tasks in a certain state in the last :minutes minutes
@@ -53,10 +53,10 @@ class Task(object):
 
     #GetFailedTasks
     GetFailedTasks_sql = "SELECT tm_taskname, tm_task_status FROM tasks WHERE tm_task_status = 'FAILED'"
-   
+
     #GetInjectedTasks
     GetInjectedTasks_sql = "SELECT tm_taskname, tm_task_status FROM tasks WHERE tm_task_status = 'INJECTED'"
-   
+
     #GetKillTasks
     GetKillTasks_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, \
                        tm_start_time, tm_start_injection, tm_end_injection, \
@@ -67,7 +67,7 @@ class Task(object):
                        tm_publish_dbs_url, tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
                        tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, tm_user_infiles, tm_asourl, tm_collector, tm_schedd \
                        FROM tasks WHERE tm_task_status = 'KILL' """
-   
+
     #GetNewResubmit
     GetNewResubmit_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, \
                        tm_start_time, tm_start_injection, tm_end_injection, \
@@ -79,7 +79,7 @@ class Task(object):
                        tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, \
                        tm_user_infiles, tw_name, tm_asourl, tm_collector, tm_schedd \
                        FROM tasks WHERE tm_task_status = 'NEW' OR tm_task_status = 'RESUBMIT' """
-   
+
     #GetReadyTasks
     GetReadyTasks_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, \
                        tm_start_time, tm_start_injection, tm_end_injection, \
