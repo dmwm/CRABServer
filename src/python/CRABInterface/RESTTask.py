@@ -48,9 +48,11 @@ class RESTTask(RESTEntity):
         rows = self.api.query(None, None, self.Task.ALLUSER_sql)
         return rows
 
+
     def allinfo(self, **kwargs):
         rows = self.api.query(None, None, self.Task.IDAll_sql, taskname=kwargs['workflow'])
         return rows
+
 
 	#INSERTED BY ERIC SUMMER STUDENT
     def summary(self, **kwargs):
@@ -58,11 +60,28 @@ class RESTTask(RESTEntity):
         rows = self.api.query(None, None, self.Task.TASKSUMMARY_sql)
         return rows
 
+
     #Quick search api
     def search(self, **kwargs):
-        """Retrieves specific data from task db"""
-        rows = self.api.query(None, None, self.Task.QuickSearch_sql, taskname=kwargs["workflow"])
-        return rows
+        """Retrieves all the columns of a task in the task table (select * from task ...)
+           The API is (only?) used in the monitor for operator.
+           curl -X GET 'https://mmascher-dev6.cern.ch/crabserver/dev/task?subresource=search&workflow=150224_230633:mmascher_crab_testecmmascher-dev6_3' \
+                        -k --key /tmp/x509up_u8440 --cert /tmp/x509up_u8440 -v"""
+
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+
+        row = self.api.query(None, None, self.Task.QuickSearch_sql, taskname=kwargs["workflow"]).next()
+        def getval(col):
+            """ Some columns in oracle can be CLOB and we need to call read on them.
+            """
+            #TODO move the function in ServerUtils and use it when required (e.g.: mysql LONGTEXT does not need read())
+            try:
+                return str(col)
+            except:
+                return col.read()
+        return [getval(col) for col in row]
+
 
     #Get all jobs with a specified status
     def taskbystatus(self, **kwargs):
