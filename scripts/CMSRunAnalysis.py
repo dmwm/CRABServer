@@ -825,6 +825,8 @@ if __name__ == "__main__":
             directory = os.getcwd(),
             architecture = opts.scramArch,
             )
+            
+        print "==== SCRAM Obj CREATED at %s ====" % time.asctime(time.gmtime())
         if scram.project() or scram.runtime(): #if any of the two commands fail...
             msg = scram.diagnostic()
             handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
@@ -834,9 +836,11 @@ if __name__ == "__main__":
         try:
             jobExitCode = None
             if opts.scriptExe=='None':
+                print "==== CMSSW JOB Execution started at %s ====" % time.asctime(time.gmtime())
                 cmssw = executeCMSSWStack(opts, scram)
                 jobExitCode = cmssw.step.execution.exitStatus
             else:
+                print "==== ScriptEXE Execution started at %s ====" % time.asctime(time.gmtime())
                 jobExitCode = executeScriptExe(opts, scram)
         except:
             print "==== CMSSW Stack Execution FAILED at %s ====" % time.asctime(time.gmtime())
