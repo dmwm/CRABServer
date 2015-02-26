@@ -144,10 +144,7 @@ class PreJob:
             if id <= 5:
                 self.task_ad['JobPrio'] += 10
             new_submit_text += '+JobPrio = %s\n' % str(self.task_ad['JobPrio'] + retry)
-        if 'MaxWallTimeMins_RAW' in self.task_ad:
-            if self.task_ad['MaxWallTimeMins_RAW'] != 1315:
-                new_submit_text += '+MaxWallTimeMins = %s\n' % str(self.task_ad.lookup('MaxWallTimeMins_RAW'))
-        elif 'MaxWallTimeMins' in self.task_ad:
+        if 'MaxWallTimeMins' in self.task_ad:
             new_submit_text += '+MaxWallTimeMins = %s\n' % str(self.task_ad.lookup('MaxWallTimeMins'))
         if 'RequestCpus' in self.task_ad:
             new_submit_text += '+RequestCpus = %s\n' % str(self.task_ad.lookup('RequestCpus'))
