@@ -86,6 +86,7 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
         self.step.data.application.section_("multicore")
         self.step.data.application.command.configuration = "PSet.py"
         self.step.data.application.command.oneEventMode = oneEventMode in ["1", "True", True]
+        self.step.data.application.command.memoryCheck = False
 #        self.step.data.application.configuration.pickledarguments.globalTag/globalTagTransaction
         if eventsPerLumi:
             self.step.data.application.configuration.eventsPerLumi = eventsPerLumi
