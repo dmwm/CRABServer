@@ -71,7 +71,11 @@ class RESTTask(RESTEntity):
         if 'workflow' not in kwargs or not kwargs['workflow']:
             raise InvalidParameter("Task name not found in the input parameters")
 
-        row = self.api.query(None, None, self.Task.QuickSearch_sql, taskname=kwargs["workflow"]).next()
+        try:
+           row = self.api.query(None, None, self.Task.QuickSearch_sql, taskname=kwargs["workflow"]).next()
+        except StopIteration:
+            raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"])
+
         def getval(col):
             """ Some columns in oracle can be CLOB and we need to call read on them.
             """
