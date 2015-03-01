@@ -146,9 +146,9 @@ class RetryJob(object):
 
     def check_cpu_report(self):
 
-        # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
+        # If job was killed on the worker node, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to wall clock limit"):
-            self.create_fake_fjr("Not retrying job due to wall clock limit (job killed by CRAB3 watchdog)", 50664)
+            self.create_fake_fjr("Not retrying job due to wall clock limit (job automatically killed on the worker node)", 50664)
         subreport = self.report
         for attr in ['steps', 'cmsRun', 'performance', 'cpu', 'TotalJobTime']:
             subreport = subreport.get(attr, None)
@@ -176,9 +176,9 @@ class RetryJob(object):
 
     def check_memory_report(self):
 
-        # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
+        # If job was killed on the worker node, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to memory use"):
-            self.create_fake_fjr("Not retrying job due to excessive memory use (job killed by CRAB3 watchdog)", 50660)
+            self.create_fake_fjr("Not retrying job due to excessive memory use (job automatically killed on the worker node)", 50660)
         subreport = self.report
         for attr in ['steps', 'cmsRun', 'performance', 'memory', 'PeakValueRss']:
             subreport = subreport.get(attr, None)
@@ -198,9 +198,9 @@ class RetryJob(object):
 
     def check_disk_report(self):
 
-        # If job was killed by CRAB3 watchdog, we probably don't have a FJR.
+        # If job was killed on the WN, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to disk usage"):
-            exitMsg = "Not retrying job due to excessive disk usage (job killed by CRAB3 watchdog)"
+            exitMsg = "Not retrying job due to excessive disk usage (job automatically killed on the worker node)"
             self.create_fake_fjr(exitMsg, 50662)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
