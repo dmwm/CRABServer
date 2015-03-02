@@ -284,7 +284,7 @@ class DataWorkflow(object):
                 if len(resubmitList) != len(jobids):
                     requestedResub = list(set(jobids) - set(resubmitList))
                     retmsg = "CRAB3 server refused to resubmit these jobs: %s." \
-                             "You cannot resubmit these jobs if they are running" % str(requestedResub)
+                             "You cannot resubmit them if they in one of these states: " % (requestedResub, self.failedList)
                     return [{"result":retmsg}]
             #if not resubmitList:
             #    raise ExecutionError("There are no jobs to resubmit. Only jobs in %s states are resubmitted" % self.failedList)
