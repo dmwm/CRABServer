@@ -191,7 +191,7 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
     :return: the result of the handler operation."""
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry = 2)
     handler = TaskHandler(task, procnum)
-    handler.addWork( MyProxyLogon(config=config, server=server, resturi=restur, procnum=procnum, myproxylen=60*5) )
+    handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60*5) )
     def glidein(config):
         """Performs kill of jobs sent through Glidein
         :arg WMCore.Configuration config: input configuration"""
