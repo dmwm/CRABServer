@@ -190,7 +190,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         if task['tm_schedd']:
             schedd, address = loc.getScheddObjNew(task['tm_schedd'])
         else:
-            schedd, address = loc.getScheddObj(self.workflow) #TODO wrap this with a try/except. Copy from HTCondorDataWf
+            schedd, address = loc.getScheddObj(workflow) #TODO wrap this with a try/except. Copy from HTCondorDataWf
 
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
 
@@ -221,6 +221,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             raise Exception("Unable to import HTCondor module")
 
         task = kw['task']
+        workflow = task['tm_taskname']
         tempDir = args[0][0]
         info = args[0][1]
         #self.logger.debug("Task input information: %s" % str(info))
@@ -263,7 +264,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             if task['tm_schedd']:
                 schedd, address = loc.getScheddObjNew(task['tm_schedd'])
             else:
-                schedd, address = loc.getScheddObj(self.workflow) #TODO wrap this with a try/except. Copy from HTCondorDataWf
+                schedd, address = loc.getScheddObj(workflow) #TODO wrap this with a try/except. Copy from HTCondorDataWf
 
             #try to gsissh in order to create the home directory (and check if we can connect to the schedd)
             try:
