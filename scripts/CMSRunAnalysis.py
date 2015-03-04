@@ -136,19 +136,30 @@ def addReportInfo(params, fjr):
     if 'steps' not in fjr or 'cmsRun' not in fjr['steps']:
         return
     fjr = fjr['steps']['cmsRun']
-    if 'performance' in fjr and 'cpu' in fjr['performance']:
-        if fjr['performance']['cpu'].get("TotalJobTime"):
-            params['ExeTime'] = int(float(fjr['performance']['cpu']['TotalJobTime']))
-        if fjr['performance']['cpu'].get("TotalJobCPU"):
-            params['CrabUserCpuTime'] = float(fjr['performance']['cpu']['TotalJobCPU'])
-        if params.get('ExeTime') and params.get("CrabUserCpuTime"):
-            params['CrabCpuPercentage'] = params['CrabUserCpuTime'] / float(params['ExeTime'])
+    if 'performance' in fjr:
+        # CPU Statistics
+        if 'cpu' in fjr['performance']:
+            if fjr['performance']['cpu'].get("TotalJobTime"):
+                params['ExeTime'] = int(float(fjr['performance']['cpu']['TotalJobTime']))
+            if fjr['performance']['cpu'].get("TotalJobCPU"):
+                params['CrabUserCpuTime'] = float(fjr['performance']['cpu']['TotalJobCPU'])
+            if params.get('ExeTime') and params.get("CrabUserCpuTime"):
+                params['CrabCpuPercentage'] = params['CrabUserCpuTime'] / float(params['ExeTime'])
+        # Storage Statistics
+        if 'storage' in fjr['performance']:
+            if fjr['performance']['storage'].get("readTotalMB"):
+                params['CRABUserReadMB'] = float(fjr['performance']['storage']['readTotalMB']))
+            if fjr['performance']['storage'].get("writeTotalMB"):
+                params['CRABUserWriteMB'] = float(fjr['performance']['storage']['writeTotalMB']))
+        # Memory Statistics
+        if 'memory' in fjr['performance']:
+            if fjr['performance']['memory'].get("PeakValueRss"):
+                params['CRABUserPeakRss'] = float(fjr['performance']['memory']['PeakValueRss']))
+    # Num Events Statistics
     inputEvents = 0
     if 'input' in fjr and 'source' in fjr['input']:
         for info in fjr['input']['source']:
             if 'events' in info:
-                params['NoEventsPerRun'] = info['events']
-                params['NbEvPerRun'] = info['events']
                 params['NEventsProcessed'] = info['events']
 
 
