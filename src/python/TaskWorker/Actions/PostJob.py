@@ -62,10 +62,12 @@ import json
 import uuid
 import glob
 import errno
+import pprint
 import random
 import shutil
 import signal
 import urllib
+import hashlib
 import logging
 import classad
 import commands
@@ -74,10 +76,8 @@ import datetime
 import tempfile
 import traceback
 from httplib import HTTPException
-import hashlib
-import pprint
-import DashboardAPI
 
+import DashboardAPI
 import WMCore.Database.CMSCouch as CMSCouch
 
 from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
