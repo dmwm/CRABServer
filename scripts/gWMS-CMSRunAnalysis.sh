@@ -53,6 +53,8 @@ then
    echo "======== HTCONDOR JOB SUMMARY at $(TZ=GMT date) FINISH ========"
 fi
 
+touch jobReport.json.$CRAB_Id
+
 echo "======== PROXY INFORMATION START at $(TZ=GMT date) ========"
 voms-proxy-info -all
 echo "======== PROXY INFORMATION FINISH at $(TZ=GMT date) ========"
