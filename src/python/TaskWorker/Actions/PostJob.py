@@ -1424,7 +1424,7 @@ class PostJob():
                     msg = "Ignoring the error since the file %s is already in the database" % lfn
                     logger.debug(msg)
 
-        if not os.path.exists('output_datasets'):
+        if not os.path.exists('output_datasets') and output_datasets:
             configreq = [('subresource', 'addoutputdatasets'),
                          ('workflow', self.reqname)]
             for dset in output_datasets:
