@@ -928,7 +928,6 @@ class PostJob():
         ## Copy the job's stdout file job_out.<job_id> to the schedd web directory,
         ## naming it job_out.<job_id>.<crab_retry>.txt.
         stdout = "job_out.%d" % (self.job_id)
-        stdout_tmp = "job_out.tmp.%d" % (self.job_id)
         logpath = os.path.expanduser("~/%s" % (self.reqname))
         if os.path.exists(stdout):
             os.rename(stdout, stdout_tmp)
