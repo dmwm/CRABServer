@@ -646,7 +646,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         try:
             db = server.connectDatabase('asynctransfer')
         except Exception, ex:
-            msg =  "Error while connecting to asynctransfer CouchDB"
+            msg =  "Error while connecting to asynctransfer CouchDB for workflow %s " % workflow
             self.logger.exception(msg)
             publication_info = {'error' : msg}
             return  publication_info
@@ -655,7 +655,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             publicationlist = None
             publicationlist = db.loadView('AsyncTransfer', 'PublicationStateByWorkflow', query)['rows']
         except Exception, ex:
-            msg =  "Error while querying CouchDB for publication status information"
+            msg =  "Error while querying CouchDB for publication status information for workflow %s " % workflow
             self.logger.exception(msg)
             publication_info = {'error' : msg}
             return  publication_info
