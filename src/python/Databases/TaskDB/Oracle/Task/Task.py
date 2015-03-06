@@ -32,7 +32,7 @@ class Task(object):
     CountLastTasksByStatus = "SELECT tm_task_status, count(*) FROM tasks WHERE tm_start_time > sysdate - (:minutes/1440)  GROUP BY tm_task_status"
     #get all the task failures sorted by username in the last :minutes minutes
     LastFailures = "SELECT tm_username, tm_taskname, tm_task_failure from tasks WHERE tm_start_time > sysdate - (:minutes/1440) and tm_task_status='FAILED' \
-                    ORDER BY tm_username"
+                    AND tm_task_failure IS NOT NULL ORDER BY tm_username"
 
     #New
     New_sql = "INSERT INTO tasks ( \
@@ -93,7 +93,7 @@ class Task(object):
                        tm_scriptexe, tm_scriptargs, tm_extrajdl, tm_generator, tm_asourl, tm_events_per_lumi, \
                        tm_use_parent, tm_collector, tm_schedd \
                        FROM tasks WHERE tm_task_status = :get_status AND ROWNUM <= :limit AND tw_name = :tw_name"""
-   
+
     #GetUserFromID
     GetUserFromID_sql ="SELECT tm_username FROM tasks WHERE tm_taskname=:taskname"
 
@@ -102,13 +102,13 @@ class Task(object):
 
     #SetArgumentsTask
     SetArgumentsTask_sql = "UPDATE tasks SET tm_arguments = :arguments WHERE tm_taskname = :taskname"
-   
+
     # Obsolete
     ##SetEndInjection
     #SetEndInjection_sql = "UPDATE tasks SET tm_end_injection = :tm_end_injection  
     #                      WHERE tm_taskname = :tm_taskname"
     #    time_sql = "select SYS_EXTRACT_UTC(SYSTIMESTAMP) from dual"
-   
+
     #SetFailedTasks
     SetFailedTasks_sql = "UPDATE tasks SET tm_end_injection = SYS_EXTRACT_UTC(SYSTIMESTAMP), \
                          tm_task_status = UPPER(:tm_task_status), tm_task_failure = :failure \
