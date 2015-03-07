@@ -56,7 +56,7 @@ def processWorker(inputs, results, resthost, resturi, procnum):
         finally:
             if msg:
                 try:
-                    #logger.info("Uploading error message to REST: %s" % msg)
+                    logger.info("Uploading error message to REST: %s" % msg)
                     server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey, retry = 2)
                     configreq = {  'workflow': task['tm_taskname'],
                                    'status': "FAILED",
