@@ -29,9 +29,9 @@ class Task(object):
     #get all jobs with a specified status
     TaskByStatus_sql = "SELECT tm_task_status,tm_taskname FROM tasks WHERE tm_task_status = :taskstatus AND tm_username=:username_"
     #get all the tasks in a certain state in the last :minutes minutes
-    CountLastTasksByStatus = "SELECT tm_task_status, count(*) FROM tasks WHERE tm_start_time > sysdate - (:minutes/1440)  GROUP BY tm_task_status"
+    CountLastTasksByStatus = "SELECT tm_task_status, count(*) FROM tasks WHERE tm_start_time > SYS_EXTRACT_UTC(SYSTIMESTAMP) - (:minutes/1440)  GROUP BY tm_task_status"
     #get all the task failures sorted by username in the last :minutes minutes
-    LastFailures = "SELECT tm_username, tm_taskname, tm_task_failure from tasks WHERE tm_start_time > sysdate - (:minutes/1440) and tm_task_status='FAILED' \
+    LastFailures = "SELECT tm_username, tm_taskname, tm_task_failure from tasks WHERE tm_start_time > SYS_EXTRACT_UTC(SYSTIMESTAMP) - (:minutes/1440) and tm_task_status='FAILED' \
                     AND tm_task_failure IS NOT NULL ORDER BY tm_username"
 
     #New
