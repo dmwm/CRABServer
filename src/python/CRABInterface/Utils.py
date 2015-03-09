@@ -82,6 +82,8 @@ def execute_command(command, logger, timeout):
     return stdout, rc
 
 
+#This is used in case git is down for more than 30 minutes
+centralCfgFallback = None
 def getCentralConfig(extconfigurl, mode):
     """Utility to retrieve the central configuration to be used for dynamic variables
 
@@ -89,6 +91,7 @@ def getCentralConfig(extconfigurl, mode):
     arg str mode: also known as the variant of the rest (prod, preprod, dev, private)
     return: the dictionary containing the external configuration for the selected mode."""
 
+    global centralCfgFallback
     hbuf = StringIO.StringIO()
     bbuf = StringIO.StringIO()
 
@@ -101,10 +104,18 @@ def getCentralConfig(extconfigurl, mode):
     curl.close()
 
     header = ResponseHeader(hbuf.getvalue())
-    if header.status < 200 or header.status >= 300:
-        cherrypy.log("Problem %s reading from %s." %(extconfigurl, header.status))
-        raise ExecutionError("Internal issue when retrieving external confifuration")
-    return json.decode(bbuf.getvalue())[mode]
+    if (header.status < 200 or header.status >= 300):
+        msg = "Reading %s returned %s." % (extconfigurl, header.status)
+        if centralCfgFallback:
+            msg += "\nUsing cached values for external configuration."
+            cherrypy.log(msg)
+            return centralCfgFallback
+        else:
+            cherrypy.log(msg)
+            raise ExecutionError("Internal issue when retrieving external confifuration")
+
+    centralCfgFallback = json.decode(bbuf.getvalue())[mode]
+    return centralCfgFallback
 
 
 def conn_handler(services):
