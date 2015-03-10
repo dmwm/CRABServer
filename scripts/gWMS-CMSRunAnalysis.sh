@@ -62,7 +62,7 @@ echo "======== PROXY INFORMATION FINISH at $(TZ=GMT date) ========"
 echo "======== CMSRunAnalysis.sh at $(TZ=GMT date) STARTING ========"
 time sh ./CMSRunAnalysis.sh "$@" --oneEventMode=$CRAB_oneEventMode
 EXIT_STATUS=$?
-echo "CMSRunAnalysis.sh complete at $(TZ=GMT date) with exit status $EXIT_STATUS"
+echo "CMSRunAnalysis.sh complete at $(TZ=GMT date) with (short) exit status $EXIT_STATUS"
 # Protect against missing *.sh initialization scripts.
 if [[ $EXIT_STATUS == 1 ]]
 then
@@ -135,7 +135,7 @@ condor_chirp phase output
 echo "======== Stageout at $(TZ=GMT date) STARTING ========"
 rm -f wmcore_initialized
 # Note we prevent buffering of stdout/err -- this is due to observed issues in mixing of out/err for stageout plugins
-PYTHONUNBUFFERED=1 ./cmscp.py "JOB_WRAPPER_EXIT_CODE=$EXIT_STATUS"
+PYTHONUNBUFFERED=1 ./cmscp.py
 STAGEOUT_EXIT_STATUS=$?
 
 if [ ! -e wmcore_initialized ];
@@ -151,11 +151,11 @@ if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
         EXIT_STATUS=$STAGEOUT_EXIT_STATUS
     fi
 fi
-echo "======== Stageout at $(TZ=GMT date) FINISHING (status $STAGEOUT_EXIT_STATUS) ========"
+echo "======== Stageout at $(TZ=GMT date) FINISHING (short status $STAGEOUT_EXIT_STATUS) ========"
 
-echo "======== gWMS-CMSRunAnalysis.sh FINISHING at $(TZ=GMT date) on $(hostname) with status $EXIT_STATUS ========"
+echo "======== gWMS-CMSRunAnalysis.sh FINISHING at $(TZ=GMT date) on $(hostname) with (short) status $EXIT_STATUS ========"
 echo "Local time: $(date)"
 #set -x
-echo "Exit status: $EXIT_STATUS"
+echo "Short exit status: $EXIT_STATUS"
 exit $EXIT_STATUS
 

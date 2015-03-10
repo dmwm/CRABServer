@@ -120,9 +120,13 @@ G_NOW_EPOCH = None
 G_JOB_REPORT_NAME = None
 
 ## The exit code of the job wrapper is put here after reading it from the job
-## report. The exit code is used only to know if the job has failed, in which
-## case we change the stageout directory (adding a 'failed' subdirectory) and
-## to turn off the publication.
+## report. The exit code is used to determine if outputs should be put in the
+## "failed" directory. Also, this is reported to dashboard if it is not 0.
+G_JOB_WRAPPER_EXIT_CODE = None
+
+## The exit code of the job put here after reading it from the job report.
+## The exit code is basically not used here as we consider CMSRunAnalysis
+## as one single atomic thing and we only use G_JOB_WRAPPER_EXIT_CODE
 G_JOB_EXIT_CODE = None
 
 ## List to collect the files that have been staged out directly. The list is
@@ -628,7 +632,7 @@ def inject_to_aso(file_transfer_info):
         msg  = "Disabling publication of output file %s," % (file_name)
         msg += " since it is not of EDM type (not produced by PoolOutputModule)."
         print msg
-    publish = int(publish and G_JOB_EXIT_CODE == 0)
+    publish = int(publish and G_JOB_WRAPPER_EXIT_CODE == 0)
 
     last_update = int(time.time())
     global G_NOW
@@ -848,7 +852,6 @@ def clean_stageout_area(local_stageout_mgr, direct_stageout_impl, policy, \
                 print "       <----- Stageout manager log finish"
             except StageOutError:
                 print "       <----- Stageout manager log finish"
-                pass
         else:
             msg = "There are no %sfiles to remove in local temporary storage."
             msg = msg % ('other ' if add_back_logs_arch else '')
@@ -1095,7 +1098,7 @@ def main():
         global G_JOB_AD
         G_JOB_AD = {}
         msg  = "WARNING: Unable to parse job's HTCondor ClassAd."
-        msg += "\n%s" % (traceback.format_exc())   
+        msg += "\n%s" % (traceback.format_exc())
         print msg
     ## If CRAB_NoWNStageout has been set to an integer value > 0 (maybe with
     ## extraJDL from the client) then we don't do the stageout.
@@ -1231,12 +1234,16 @@ def main():
         ## directory as successful output files; we worry that users may simply
         ## 'ls' the directory and run on all listed files.
         global G_JOB_EXIT_CODE
+        global G_JOB_WRAPPER_EXIT_CODE
         try:
             G_JOB_EXIT_CODE = job_report['jobExitCode']
             msg = "Retrieved jobExitCode = %s from job report." % (G_JOB_EXIT_CODE)
             print msg
+            G_JOB_WRAPPER_EXIT_CODE = job_report['exitCode']
+            msg = "Retrieved job wrapper exitCode = %s from job report." % (G_JOB_WRAPPER_EXIT_CODE)
+            print msg
         except Exception:
-            msg  = "WARNING: Unable to retrieve jobExitCode from job report."
+            msg  = "WARNING: Unable to retrieve jobExitCode (or exitCode) from job report."
             msg += "\nWill assume job executable failed, with following implications:"
             msg += "\n- if stageout is still possible, it will be done into a subdirectory named 'failed';"
             msg += "\n- if stageout is still possible, publication will be disabled."
@@ -1255,7 +1262,7 @@ def main():
     counter = "%04d" % (G_JOB_AD['CRAB_Id'] / 1000)
     dest_temp_dir = os.path.join(dest_temp_dir, counter)
     ## b) adding a 'failed' subdirectory in case cmsRun failed.
-    if G_JOB_EXIT_CODE != 0:
+    if G_JOB_WRAPPER_EXIT_CODE != 0:
         dest_temp_dir = os.path.join(dest_temp_dir, 'failed')
 
     ## Definitions needed for the logs archive creation, stageout and metadata
@@ -1264,7 +1271,7 @@ def main():
     logs_arch_dest_file_name = os.path.basename(dest_files[0])
     logs_arch_dest_pfn = dest_files[0]
     logs_arch_dest_pfn_path = os.path.dirname(dest_files[0])
-    if G_JOB_EXIT_CODE != 0:
+    if G_JOB_WRAPPER_EXIT_CODE != 0:
         if logs_arch_dest_pfn_path.endswith('/log'):
             logs_arch_dest_pfn_path = re.sub(r'/log$', '', logs_arch_dest_pfn_path)
         logs_arch_dest_pfn_path = os.path.join(logs_arch_dest_pfn_path, 'failed', 'log')
@@ -1602,7 +1609,7 @@ def main():
                     print msg
                     output_dest_temp_lfn = os.path.join(dest_temp_dir, output_dest_file_name)
                     output_dest_pfn_path = os.path.dirname(output_dest_pfn)
-                    if G_JOB_EXIT_CODE != 0:
+                    if G_JOB_WRAPPER_EXIT_CODE != 0:
                         output_dest_pfn_path = os.path.join(output_dest_pfn_path, 'failed')
                     output_dest_pfn = os.path.join(output_dest_pfn_path, output_dest_file_name)
                     output_dest_lfn = None
@@ -1837,15 +1844,6 @@ if __name__ == '__main__':
     MSG += "cmscp.py STARTING."
     print MSG
     logging.basicConfig(level = logging.INFO)
-    ## When 'exitCode' exists in the job report, it should be the same as what
-    ## is passed as JOB_WRAPPER_EXIT_CODE argument to cmscp.
-    JOB_WRAPPER_EXIT_CODE = 0
-    try:
-        for arg in sys.argv:
-            if 'JOB_WRAPPER_EXIT_CODE=' in arg and len(arg.split('=')) == 2:
-                JOB_WRAPPER_EXIT_CODE = int(arg.split('=')[1])
-    except:
-        pass
     ## Run the stageout wrapper.
     JOB_STGOUT_WRAPPER_EXIT_INFO = {}
     try:
@@ -1862,17 +1860,21 @@ if __name__ == '__main__':
         print MSG
     ## If the job wrapper finished successfully, but the stageout wrapper
     ## didn't, record the failure in the job report.
-    if JOB_WRAPPER_EXIT_CODE == 0 and JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'] != 0:
+    if G_JOB_WRAPPER_EXIT_CODE == 0 and JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code'] != 0:
         add_to_job_report([('exitCode',    JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code']), \
                            ('exitAcronym', JOB_STGOUT_WRAPPER_EXIT_INFO['exit_acronym']), \
                            ('exitMsg',     JOB_STGOUT_WRAPPER_EXIT_INFO['exit_msg'])])
     ## Now we have to exit with the appropriate exit code, and report failures
     ## to dashboard.
-    if JOB_WRAPPER_EXIT_CODE != 0:
-        MSG  = "Job (or job wrapper) didn't finish successfully (exit code %d)." % (JOB_WRAPPER_EXIT_CODE)
+    if G_JOB_WRAPPER_EXIT_CODE == None:
+        MSG = "Cannot retrieve the job exit code from the job report (does %s exist?)." % G_JOB_REPORT_NAME
+        MSG += " Not setting any exit code"
+        print MSG
+    if G_JOB_WRAPPER_EXIT_CODE not in [0, None]:
+        MSG  = "Job (or job wrapper) didn't finish successfully (exit code %d)." % (G_JOB_WRAPPER_EXIT_CODE)
         MSG += " Setting that same exit code for the stageout wrapper."
         print MSG
-        CMSCP_EXIT_CODE = JOB_WRAPPER_EXIT_CODE
+        CMSCP_EXIT_CODE = G_JOB_WRAPPER_EXIT_CODE
     else:
         CMSCP_EXIT_CODE = JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code']
     if CMSCP_EXIT_CODE != 0:
