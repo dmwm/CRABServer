@@ -648,6 +648,7 @@ def inject_to_aso(file_transfer_info):
     doc_new_info = {'state'           : 'new',
                     'source'          : source_site,
                     'destination'     : G_JOB_AD['CRAB_AsyncDest'],
+                    'lfn'             : file_transfer_info['source']['lfn'],
                     'checksums'       : checksums,
                     'size'            : size,
                     # The following four times - and how they're calculated - makes no sense to me. BB
