@@ -152,6 +152,18 @@ def make_webdir(ad):
         except:
             pass
         try:
+            os.symlink(os.path.abspath(os.path.join(".", "RunJobs.dag")), os.path.join(path, "RunJobs.dag"))
+        except:
+            pass
+        try:
+            os.symlink(os.path.abspath(os.path.join(".", "RunJobs.dag.dagman.out")), os.path.join(path, "RunJobs.dag.dagman.out"))
+        except:
+            pass
+        try:
+            os.symlink(os.path.abspath(os.path.join(".", "RunJobs.dag.nodes.log")), os.path.join(path, "RunJobs.dag.nodes.log"))
+        except:
+            pass
+        try:
             shutil.copy2(os.path.join(".", "sandbox.tar.gz"), os.path.join(path, "sandbox.tar.gz"))
         except:
             pass
@@ -170,11 +182,6 @@ def make_webdir(ad):
         htcondor.Schedd().edit([id], 'CRAB_UserWebDir', ad.lookup('CRAB_UserWebDir'))
     except RuntimeError, reerror:
         print str(reerror)
-    try:
-        fd = open(os.environ['_CONDOR_JOB_AD'], 'a')
-        fd.write('CRAB_UserWebDir = %s\n' % ad.lookup('CRAB_UserWebDir'))
-    except:
-        print traceback.format_exc()
 
 def make_job_submit(ad):
     count = ad['CRAB_JobCount']
