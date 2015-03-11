@@ -51,7 +51,16 @@ class DataDiscovery(TaskAction):
                         "because you specified useParents=True but some your files have no" +
                         "parents.\nExample: " + lfn)
             ## Createa a WMCore File object.
-            wmfile = File(lfn = lfn, events = infos['NumberOfEvents'], size = infos['Size'], checksums = infos['Checksums'], parents = infos['Parents'])
+            try:
+                size = infos['FileSize']
+                checksums = {'Checksum': infos['Checksum'], 'Adler32': infos['Adler32'], 'Md5': infos['Md5']}
+            except:
+                #This is so that the task worker does not crash if an old version of WMCore is used (the interface of an API suddenly changed).
+                # We may want to remove the try/except and the following two lines eventually, but keeping them for the moment so other devels won't be affected
+                #See this WMCore commit: https://github.com/dmwm/WMCore/commit/2afc01ae571390f5fa009dd258be757adac89c28#diff-374b7a6640288184175057234e393e1cL204
+                size = infos['Size']
+                checksums = infos['Checksums']
+            wmfile = File(lfn = lfn, events = infos['NumberOfEvents'], size = size, checksums = checksums, parents = infos['Parents'])
             wmfile['block'] = infos['BlockName']
             wmfile['locations'] = []
             for pnn in locations[infos['BlockName']]:
