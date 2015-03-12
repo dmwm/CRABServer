@@ -158,13 +158,13 @@ def addReportInfo(params, fjr):
         # Storage Statistics
         if 'storage' in fjr['performance']:
             if fjr['performance']['storage'].get("readTotalMB"):
-                params['CRABUserReadMB'] = float(fjr['performance']['storage']['readTotalMB']))
+                params['CRABUserReadMB'] = float(fjr['performance']['storage']['readTotalMB'])
             if fjr['performance']['storage'].get("writeTotalMB"):
-                params['CRABUserWriteMB'] = float(fjr['performance']['storage']['writeTotalMB']))
+                params['CRABUserWriteMB'] = float(fjr['performance']['storage']['writeTotalMB'])
         # Memory Statistics
         if 'memory' in fjr['performance']:
             if fjr['performance']['memory'].get("PeakValueRss"):
-                params['CRABUserPeakRss'] = float(fjr['performance']['memory']['PeakValueRss']))
+                params['CRABUserPeakRss'] = float(fjr['performance']['memory']['PeakValueRss'])
     # Num Events Statistics
     inputEvents = 0
     if 'input' in fjr and 'source' in fjr['input']:
