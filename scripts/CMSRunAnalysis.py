@@ -23,6 +23,16 @@ from optparse import OptionParser, BadOptionError, AmbiguousOptionError
 import DashboardAPI
 import WMCore.Storage.SiteLocalConfig as SiteLocalConfig
 
+logCMSSWSaved = False
+
+def sighandler(signum, stack):
+    print 'Job was killed with signal: %s' % signum
+    if not logCMSSWSaved:
+        logCMSSW()
+    sys.exit(50669)
+
+signal.signal(signal.SIGTERM, sighandler)
+
 EC_MissingArg  =        50113 #10 for ATLAS trf
 EC_CMSMissingSoftware = 10034
 EC_CMSRunWrapper =      10040
@@ -279,8 +289,14 @@ def stopDashboardMonitoring(myad):
 
 
 def logCMSSW():
+    global logCMSSWSaved
+    if logCMSSWSaved:
+        return
     if not os.path.exists("cmsRun-stdout.log"):
         print "ERROR: Cannot dump CMSSW stdout; perhaps CMSSW never executed (e.g.: scriptExe was set)?"
+        logCMSSWSaved = True
+        open('logCMSSWSaved.txt', 'a').close()
+        os.utime('logCMSSWSaved.txt', None)
         return
     print "======== CMSSW OUTPUT STARTING ========"
 
@@ -311,6 +327,9 @@ def logCMSSW():
             print "== CMSSW: ", line,
 
     print "======== CMSSW OUTPUT FINSHING ========"
+    logCMSSWSaved = True
+    open('logCMSSWSaved.txt', 'a').close()
+    os.utime('logCMSSWSaved.txt', None)
 
 
 def handleException(exitAcronym, exitCode, exitMsg):

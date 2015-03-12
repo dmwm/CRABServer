@@ -1,6 +1,21 @@
 #!/bin/bash
 exec 2>&1
-#touch Report.pkl
+
+sigterm() {
+  echo "ERROR: Job was killed. Logging ulimits:"
+  ulimit -a
+  echo "Logging free memory info:"
+  free -m
+  echo "Logging disk usage:"
+  df -h
+  echo "Logging disk usage in directory:"
+  du -h
+  exec sh ./DashboardFailure.sh 50669
+  if [ ! -e logCMSSWSaved.txt ];
+  then
+    python -c "import CMSRunAnalysis; logCMSSW()"
+  fi
+}
 
 # should be a bit nicer than before
 echo "======== CMSRunAnalysis.sh STARTING at $(TZ=GMT date) ========"
@@ -160,9 +175,13 @@ echo "======== CMSRunAnalysis.py FINISHING at $(TZ=GMT date) ========"
 if [[ $jobrc == 68 ]]
 then
   echo "WARNING: CMSSW encountered a malloc failure.  Logging ulimits:"
-  ulimit -a
-  echo "Logging free memory info:"
-  free
+  sigterm
+fi
+
+if [[ $jobrc == 137 ]]
+then
+  echo "Job was killed. Check Postjob for kill reason."
+  sigterm
 fi
 
 if [ -e scramOutput.log ]; then
