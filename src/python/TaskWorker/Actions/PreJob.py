@@ -150,6 +150,7 @@ class PreJob:
             new_submit_text += '+RequestCpus = %s\n' % str(self.task_ad.lookup('RequestCpus'))
         if 'RequestMemory' in self.task_ad:
             new_submit_text += '+RequestMemory = %s\n' % str(self.task_ad.lookup('RequestMemory'))
+        new_submit_text += '+PostJobPrio1 = -%s\n' % str(self.task_ad.lookup('QDate'))
         blacklist = self.calculate_blacklist()
         if blacklist:
             self.task_ad['CRAB_SiteAutomaticBlacklist'] = blacklist
