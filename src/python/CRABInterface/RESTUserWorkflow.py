@@ -301,9 +301,11 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
             validate_str("collector", param, safe, RX_COLLECTOR, optional=True)
             validate_strlist("extrajdl", param, safe, RX_SCRIPTARGS)
+            validate_num("dryrun", param, safe, optional=False)
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
+            validate_str("subresource", param, safe, RX_SUBRESTAT, optional=False)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
             safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
@@ -350,7 +352,7 @@ class RESTUserWorkflow(RESTEntity):
     def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, useparent, generator, eventsperlumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                 savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfnprefix, lfn, saveoutput,
-                faillimit, ignorelocality, userfiles, asourl, scriptexe, scriptargs, scheddname, extrajdl, collector):
+                faillimit, ignorelocality, userfiles, asourl, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -401,6 +403,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str scheddname: Schedd Name used for debugging.
            :arg str extrajdl: extra Job Description Language parameters to be added.
            :arg str collector: Collector Name used for debugging.
+           :arg int dryrun: enable dry run mode (initialize but do not submit request).
            :returns: a dict which contaians details of the request"""
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
@@ -415,20 +418,23 @@ class RESTUserWorkflow(RESTEntity):
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfnprefix=lfnprefix, lfn=lfn,
                                        ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, asourl=asourl,
-                                       scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector)
+                                       scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun)
 
     @restcall
-    def post(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority):
-        """Resubmit an existing workflow. The caller needs to be a CMS user owner of the workflow.
+    def post(self, workflow, subresource, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority):
+        """Resubmit or continue an existing workflow. The caller needs to be a CMS user owner of the workflow.
 
            :arg str workflow: unique name identifier of the workflow;
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name."""
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.api, [workflow], self.Task)
-        return self.userworkflowmgr.resubmit(workflow=workflow, siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, jobids=jobids, \
+        if subresource == 'resubmit':
+            return self.userworkflowmgr.resubmit(workflow=workflow, siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, jobids=jobids, \
                                         maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority,
                                         userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+        elif subresource == 'proceed':
+            return self.userworkflowmgr.proceed(workflow=workflow)
 
     @restcall
     def get(self, workflow, subresource, username, limit, shortformat, exitcode, jobids, verbose, timestamp):

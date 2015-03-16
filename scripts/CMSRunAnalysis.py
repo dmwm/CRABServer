@@ -923,12 +923,13 @@ if __name__ == "__main__":
         # allow us to use a different LFN on job failure.
         report['jobExitCode'] = jobExitCode
         AddChecksums(report)
-        try:
-            AddPsetHash(report, scram)
-        except:
-            handleException("FAILED", EC_PsetHash, "Unable to compute pset hash for job output")
-            mintime()
-            sys.exit(EC_PsetHash)
+        if not 'CRAB3_RUNTIME_DEBUG' in os.environ:
+            try:
+                AddPsetHash(report, scram)
+            except:
+                handleException("FAILED", EC_PsetHash, "Unable to compute pset hash for job output")
+                mintime()
+                sys.exit(EC_PsetHash)
         if jobExitCode: #TODO check exitcode from fwjr
             report['exitAcronym'] = "FAILED"
             report['exitCode'] = jobExitCode

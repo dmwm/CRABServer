@@ -237,4 +237,4 @@ class Task(dict):
         self['tm_use_parent'] = task[47]
         self['tm_collector'] = task[48]
         self['tm_schedd'] = task[49]
-
+        self['tm_dry_run'] = task[50]
