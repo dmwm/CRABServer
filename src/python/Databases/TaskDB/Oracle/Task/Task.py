@@ -157,3 +157,7 @@ class Task(object):
                               WHERE tm_taskname = :workflow"""
 
     SetDryRun_sql = "UPDATE tasks set tm_dry_run = :dry_run WHERE tm_taskname = :taskname"
+
+    #UpdateSchedd_sql
+    UpdateSchedd_sql = """UPDATE tasks SET tm_schedd = :scheddname \
+                              WHERE tm_taskname = :workflow"""
