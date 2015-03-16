@@ -226,6 +226,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         info = args[0][1]
         #self.logger.debug("Task input information: %s" % str(info))
         dashboard_params = args[0][2]
+        inputFiles = args[0][3]
 
         dup = self.duplicateCheck(task)
         if dup != None:
@@ -234,15 +235,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         cwd = os.getcwd()
         os.chdir(tempDir)
 
-        #FIXME: hardcoding the transform name for now.
-        #inputFiles = ['gWMS-CMSRunAnalysis.sh', task['tm_transformation'], 'cmscp.py', 'RunJobs.dag']
-        inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', 'AdjustSites.py', 'site.ad', 'site.ad.json', 'run_and_lumis.tar.gz']
-        if task.get('tm_user_sandbox') == 'sandbox.tar.gz':
-            inputFiles.append('sandbox.tar.gz')
-        if os.path.exists("CMSRunAnalysis.tar.gz"):
-            inputFiles.append("CMSRunAnalysis.tar.gz")
-        if os.path.exists("TaskManagerRun.tar.gz"):
-            inputFiles.append("TaskManagerRun.tar.gz")
         info['inputFilesString'] = ", ".join(inputFiles)
         outputFiles = ["RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001"]
         info['outputFilesString'] = ", ".join(outputFiles)

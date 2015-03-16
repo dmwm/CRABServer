@@ -39,7 +39,7 @@ class Task(object):
                    tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \
                    tm_publish_dbs_url, tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
                    tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, \
-                   tm_user_infiles, tw_name \
+                   tm_user_infiles, tw_name, tm_dry_run \
                    FROM tasks \
                    WHERE tm_task_status = %(get_status)s \
                    AND tw_name = %(tw_name)s limit %(limit)s """
@@ -48,7 +48,8 @@ class Task(object):
 
     ID_sql = "SELECT tm_taskname, panda_jobset_id, tm_task_status, tm_user_role, \
              tm_user_group, tm_task_failure, tm_split_args, panda_resubmitted_jobs, \
-             tm_save_logs, tm_username, tm_user_dn, tm_arguments, tm_input_dataset, tm_dbs_url, tm_publication, tm_user_webdir, tm_output_dataset \
+             tm_save_logs, tm_username, tm_user_dn, tm_arguments, tm_input_dataset, tm_dbs_url, tm_publication,
+             tm_user_webdir, tm_output_dataset, tm_dry_run \
              FROM tasks WHERE tm_taskname=%(taskname)s"
 
     New_sql = "INSERT INTO tasks ( \
@@ -58,14 +59,15 @@ class Task(object):
    	       tm_username, tm_user_dn, tm_user_vo, tm_user_role, tm_user_group, tm_publish_name, \
    	       tm_asyncdest, tm_dbs_url, tm_publish_dbs_url, tm_publication, tm_outfiles, \
    	       tm_tfile_outfiles, tm_edm_outfiles, tm_job_type, tm_arguments,\
-               panda_resubmitted_jobs, tm_save_logs, tm_user_infiles, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority) \
+               panda_resubmitted_jobs, tm_save_logs, tm_user_infiles, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority, tm_dry_run) \
                VALUES (%(task_name)s, %(jobset_id)s, upper(%(task_status)s), UTC_TIMESTAMP(), \
    	       %(task_failure)s, %(job_sw)s, %(job_arch)s, %(input_dataset)s, %(site_whitelist)s, \
    	       %(site_blacklist)s, %(split_algo)s, %(split_args)s, %(total_units)s, \
                %(user_sandbox)s, %(cache_url)s, %(username)s, %(user_dn)s, %(user_vo)s, %(user_role)s, \
    	       %(user_group)s, %(publish_name)s, %(asyncdest)s, %(dbs_url)s, %(publish_dbs_url)s, \
                %(publication)s, %(outfiles)s, %(tfile_outfiles)s, %(edm_outfiles)s, \
-   	       %(job_type)s, %(arguments)s, %(resubmitted_jobs)s, %(save_logs)s, %(user_infiles)s, %(maxjobruntime)s, %(numcores)s, %(maxmemory)s, %(priority)s)"
+   	       %(job_type)s, %(arguments)s, %(resubmitted_jobs)s, %(save_logs)s, %(user_infiles)s, %(maxjobruntime)s, \
+           %(numcores)s, %(maxmemory)s, %(priority)s, %(dry_run)s)"
 
     SetArgumentsTask_sql = "UPDATE tasks SET tm_arguments = %(arguments)s WHERE tm_taskname = %(taskname)s"
 
@@ -101,3 +103,5 @@ class Task(object):
 
     UpdateWebUrl_sql = """UPDATE tasks SET tm_user_webdir = %(webdirurl)s \
                               WHERE tm_taskname = %(workflow)s"""
+
+    SetDryRun_sql = "UPDATE tasks set tm_dry_run = %(dry_run)s WHERE tm_taskname = %(taskname)s"

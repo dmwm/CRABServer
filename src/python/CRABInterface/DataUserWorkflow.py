@@ -150,3 +150,10 @@ class DataUserWorkflow(object):
            :arg str userproxy: the user proxy retrieved by `retrieveUserCert`
            :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
         return self.workflow.kill(workflow, force, jobids, userdn, userproxy)
+
+    def proceed(self, workflow):
+        """Continue a task initialized with 'crab submit --dryrun'.
+
+           :arg str workflow: a workflow name
+        """
+        return self.workflow.proceed(workflow)

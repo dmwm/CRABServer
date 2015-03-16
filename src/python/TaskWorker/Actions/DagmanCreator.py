@@ -521,7 +521,7 @@ class DagmanCreator(TaskAction.TaskAction):
         return specs, i
 
 
-    def createSubdag(self, splitter_result, **kwargs):
+    def createSubdag(self, splitterResult, **kwargs):
 
         startjobid = 0
         specs = []
@@ -554,7 +554,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         sitead = classad.ClassAd()
         siteinfo = {'groups': {}}
-        for jobgroup in splitter_result:
+        for jobgroup in splitterResult:
             jobs = jobgroup.getJobs()
 
             whitelist = set(kwargs['task']['tm_site_whitelist'])
@@ -690,7 +690,11 @@ class DagmanCreator(TaskAction.TaskAction):
                 self.logger.error("Failed to record the number of jobs.")
                 return 1
 
-        return info
+        with open("dagman.json", "wb") as fd:
+            json.dump(info.update(specs[0]), fd)
+
+
+        return info, splitterResult
 
 
     def executeInternal(self, *args, **kw):
@@ -741,17 +745,28 @@ class DagmanCreator(TaskAction.TaskAction):
         kw['task']['resthost'] = self.server['host']
         kw['task']['resturinoapi'] = self.restURInoAPI
         self.task = kw['task']
-        params = self.sendDashboardTask()
+
+        params = {}
+        if kw['task']['tm_dry_run'] == 'F':
+            params = self.sendDashboardTask()
+
+        inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', \
+                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'run_and_lumis.tar.gz', 'dagman.json']
+        if kw['task'].get('tm_user_sandbox') == 'sandbox.tar.gz':
+            inputFiles.append('sandbox.tar.gz')
+        if os.path.exists("CMSRunAnalysis.tar.gz"):
+            inputFiles.append("CMSRunAnalysis.tar.gz")
+        if os.path.exists("TaskManagerRun.tar.gz"):
+            inputFiles.append("TaskManagerRun.tar.gz")
 
         try:
-            info = self.createSubdag(*args, **kw)
+            info, splitterResult = self.createSubdag(*args, **kw)
         finally:
             if cwd:
                 os.chdir(cwd)
 
-        return TaskWorker.DataObjects.Result.Result(task = kw['task'], result = (temp_dir, info, params))
+        return TaskWorker.DataObjects.Result.Result(task = kw['task'], result = (temp_dir, info, params, inputFiles, splitterResult))
 
     def execute(self, *args, **kw):
         return self.executeInternal(*args, **kw)
-
 
