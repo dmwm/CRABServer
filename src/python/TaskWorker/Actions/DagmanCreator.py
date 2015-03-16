@@ -530,6 +530,7 @@ class DagmanCreator(TaskAction.TaskAction):
         return dagSpecs, i
 
 
+
     def createSubdag(self, splitterResult, **kwargs):
 
         startjobid = 0
@@ -716,6 +717,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 self.logger.error(output)
                 self.logger.error("Failed to record the number of jobs.")
                 return 1
+
 
         return info, splitterResult
 
