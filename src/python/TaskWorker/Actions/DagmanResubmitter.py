@@ -40,14 +40,14 @@ class DagmanResubmitter(TaskAction.TaskAction):
             self.backendurls['htcondorPool'] = task['tm_collector']
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
 
-        # If tm_schedd exist, this means task is submitted with new crabserver version
-        # TODO remove it later when no old tasks will be left
         schedd = ""
         address = ""
-        if task['tm_schedd']:
+        try:
             schedd, address = loc.getScheddObjNew(task['tm_schedd'])
-        else:
-            schedd, address = loc.getScheddObj(workflow) #TODO wrap
+        except Exception, exp:
+            msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
+            self.logger.exception(msg)
+            raise TaskWorkerException(msg)
 
         # Release the DAG
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(workflow)

@@ -57,13 +57,13 @@ class DagmanKiller(TaskAction):
             self.backendurls['htcondorPool'] = self.task['tm_collector']
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
 
-        # If tm_schedd exist, this means task is submitted with new crabserver version
-        # TODO remove it later when no old tasks will be left
         address = ""
-        if self.task['tm_schedd']:
+        try:
             self.schedd, address = loc.getScheddObjNew(self.task['tm_schedd'])
-        else:
-            self.schedd, address = loc.getScheddObj(self.workflow) #TODO wrap this with a try/except. Copy from HTCondorDataWf
+        except Exception, exp:
+            msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (self.workflow, str(exp))
+            self.logger.exception(msg)
+            raise TaskWorkerException(msg)
 
         ad = classad.ClassAd()
         ad['foo'] = self.task['kill_ids']

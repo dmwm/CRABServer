@@ -14,6 +14,7 @@ import subprocess
 import HTCondorUtils
 import HTCondorLocator
 
+from httplib import HTTPException
 import TaskWorker.Actions.TaskAction as TaskAction
 import TaskWorker.DataObjects.Result as Result
 
@@ -21,6 +22,8 @@ from TaskWorker.Actions.DagmanCreator import CRAB_HEADERS
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from ApmonIf import ApmonIf
+
+from RESTInteractions import HTTPRequests
 
 # Bootstrap either the native module or the BossAir variant.
 try:
@@ -141,33 +144,54 @@ class DagmanSubmitter(TaskAction.TaskAction):
     """
 
     def execute(self, *args, **kw):
-        if self.config.TaskWorker.max_retry == 0:
+        userServer = HTTPRequests(self.server['host'], kw['task']['user_proxy'], kw['task']['user_proxy'], retries=2)
+        retryIssues = []
+        retryIssuesBySchedd = {}
+        goodSchedulers = []
+        try:
+            goodSchedulers = self.server.get(self.restURInoAPI + '/task', data={'subresource': 'backendurls'})[0]['result'][0]['htcondorSchedds']
+        except HTTPException, hte:
+            self.logger.error(hte.headers)
+            self.logger.warning("Unable to contact cmsweb. Will use only on schedulers which was chosen by CRAB3 frontend.")
+        self.logger.info(goodSchedulers)
+        submissionFailure = False
+        if kw['task']['tm_schedd'] not in goodSchedulers:
+            goodSchedulers.append(kw['task']['tm_schedd'])
+        for schedd in goodSchedulers:
+            #If submission failure is true, trying to change a scheduler
+            configreq = {'workflow': kw['task']['tm_taskname'],
+                         'subresource': 'updateschedd',
+                         'scheddname': schedd}
             try:
-                return self.executeInternal(*args, **kw)
-            except Exception, e:
-                msg = "Failed to submit task %s; '%s'" % (kw['task']['tm_taskname'], str(e))
-                self.logger.error(msg)
-                configreq = {'workflow': kw['task']['tm_taskname'],
-                             'status': "FAILED",
-                             'subresource': 'failure',
-                             'failure': base64.b64encode(msg)}
-                self.server.post(self.resturi, data = urllib.urlencode(configreq))
-                raise
-        retry_issues = []
-        for retry in range(self.config.TaskWorker.max_retry):
-            self.logger.debug("Trying to submit task %s %s time." % (kw['task']['tm_taskname'], str(retry)))
-            exec_int = ""
-            try:
-                exec_int = self.executeInternal(*args, **kw)
-                return exec_int
-            except Exception, e:
-                msg = "Failed to submit task %s; '%s'" % (kw['task']['tm_taskname'], str(e))
-                self.logger.error(msg)
-                retry_issues.append(msg)
-                self.logger.error("Will retry in %s seconds." % str(self.config.TaskWorker.retry_interval[retry]))
-                time.sleep(self.config.TaskWorker.retry_interval[retry])
-        msg = "The CRAB3 server backend could not submit your jobs to the Grid scheduler. This could be a temporary glitch, please retry again later and contact"+\
-              " the experts if the error persist. The submission was retried %s times, these are the failures: %s" % (len(retry_issues), str(retry_issues))
+                userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
+                kw['task']['tm_schedd'] = schedd
+            except HTTPException, hte:
+                msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
+                self.logger.warning(msg)
+                time.sleep(20)
+                retryIssuesBySchedd.setDefault(schedd, []).append(msg)
+                continue
+            for retry in range(self.config.TaskWorker.max_retry):
+                self.logger.debug("Trying to submit task %s %s time." % (kw['task']['tm_taskname'], str(retry)))
+                submissionFailure = False
+                execInt = ""
+                try:
+                    execInt = self.executeInternal(*args, **kw)
+                    return execInt
+                except Exception, e:
+                    msg = "Failed to submit task %s; '%s'" % (kw['task']['tm_taskname'], str(e))
+                    self.logger.error(msg)
+                    retryIssues.append(msg)
+                    self.logger.error("Will retry in %s seconds." % str(self.config.TaskWorker.retry_interval[retry]))
+                    time.sleep(self.config.TaskWorker.retry_interval[retry])
+                    submissionFailure = True
+            if submissionFailure:
+                msg = "Failed to submit task %s to %s with errors %s" % (kw['task']['tm_taskname'], schedd, retryIssues)
+                retryIssuesBySchedd[schedd] = retryIssues
+
+        msg = "The CRAB3 server backend could not submit your jobs to the Grid schedulers. This could be a temporary glitch, please retry again later and contact"+\
+              " the experts if the error persist. The submission was retried %s times on %s schedulers, these are the failures: %s" \
+               % (len(retryIssues), len(retryIssuesBySchedd), str(retryIssuesBySchedd))
         self.logger.error(msg)
         raise TaskWorkerException(msg)
 
@@ -183,14 +207,14 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.backendurls['htcondorPool'] = task['tm_collector']
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
 
-        # If tm_schedd exist, this means task is submitted with new crabserver version
-        # TODO remove it later when no old tasks will be left
         address = ""
         schedd = ""
-        if task['tm_schedd']:
+        try:
             schedd, address = loc.getScheddObjNew(task['tm_schedd'])
-        else:
-            schedd, address = loc.getScheddObj(workflow) #TODO wrap this with a try/except. Copy from HTCondorDataWf
+        except Exception, exp:
+            msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
+            self.logger.exception(msg)
+            raise TaskWorkerException(msg)
 
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
 
@@ -249,14 +273,14 @@ class DagmanSubmitter(TaskAction.TaskAction):
             if task['tm_collector']:
                 self.backendurls['htcondorPool'] = task['tm_collector']
             loc = HTCondorLocator.HTCondorLocator(self.backendurls)
-            # If tm_schedd exist, this means task is submitted with new crabserver version
-            # TODO remove it later when no old tasks will be left
             address = ""
             schedd = ""
-            if task['tm_schedd']:
+            try:
                 schedd, address = loc.getScheddObjNew(task['tm_schedd'])
-            else:
-                schedd, address = loc.getScheddObj(workflow) #TODO wrap this with a try/except. Copy from HTCondorDataWf
+            except Exception, exp:
+                msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (self.workflow, str(exp))
+                self.logger.exception(msg)
+                raise TaskWorkerException(msg)
 
             #try to gsissh in order to create the home directory (and check if we can connect to the schedd)
             try:
