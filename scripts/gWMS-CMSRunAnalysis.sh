@@ -73,6 +73,14 @@ echo "======== CMSRunAnalsysis.sh at $(TZ=GMT date) FINISHING ========"
 
 mv jobReport.json jobReport.json.$CRAB_Id
 
+if [[ $EXIT_STATUS == 137 ]]
+then
+  echo "Error: Job was killed. Check PostJob for kill reason."
+  echo "Local time: $(date)"
+  echo "Short exit status: $EXIT_STATUS"
+  exit $EXIT_STATUS
+fi
+
 echo "======== python2.6 bootstrap for stageout at $(TZ=GMT date) STARTING ========"
 set -x
 ### Need python2.6 for stageout also
