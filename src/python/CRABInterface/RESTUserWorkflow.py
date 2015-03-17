@@ -301,11 +301,11 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
             validate_str("collector", param, safe, RX_COLLECTOR, optional=True)
             validate_strlist("extrajdl", param, safe, RX_SCRIPTARGS)
-            validate_num("dryrun", param, safe, optional=False)
+            validate_num("dryrun", param, safe, optional=True)
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
-            validate_str("subresource", param, safe, RX_SUBRESTAT, optional=False)
+            validate_str("subresource", param, safe, RX_SUBRESTAT, optional=True)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
             safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
@@ -429,7 +429,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str list sitewhitelist: white list of sites, with CMS name."""
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.api, [workflow], self.Task)
-        if subresource == 'resubmit':
+        if not subresource or subresource == 'resubmit':
             return self.userworkflowmgr.resubmit(workflow=workflow, siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, jobids=jobids, \
                                         maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority,
                                         userdn=cherrypy.request.headers['Cms-Authn-Dn'])
