@@ -118,7 +118,7 @@ class DataWorkflow(object):
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, scriptexe=None, scriptargs=None, scheddname=None,
-               extrajdl=None, collector=None):
+               extrajdl=None, collector=None, dryrun=False):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -164,6 +164,7 @@ class DataWorkflow(object):
            :arg str asourl: Specify which ASO to use for transfers and publishing.
            :arg str scheddname: Schedd Name used for debugging.
            :arg str collector: Collector Name used for debugging.
+           :arg int dryrun: enable dry run mode (initialize but do not submit task).
            :returns: a dict which contaians details of the request"""
 
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
@@ -254,7 +255,8 @@ class DataWorkflow(object):
                             extrajdl        = [dbSerializer(extrajdl)],
                             asourl          = [asourl],
                             collector       = [collector],
-                            schedd_name     = [schedd_name]
+                            schedd_name     = [schedd_name],
+                            dry_run         = ['T' if dryrun else 'F']
         )
 
         return [{'RequestName': requestname}]
@@ -370,3 +372,18 @@ class DataWorkflow(object):
             raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
 
         return [{"result":retmsg}]
+
+    def proceed(self, workflow):
+        """Continue a task which was initialized with 'crab submit --dryrun'.
+
+           :arg str workflow: a workflow name
+        """
+        row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
+        if row.task_status != 'UPLOADED':
+            msg = 'Can only proceed if task is in the UPLOADED state, but it is in the %s state.' % row.task_status
+            raise ExecutionError(msg)
+        else:
+            self.api.modify(self.Task.SetDryRun_sql, taskname=[workflow], dry_run=['F'])
+            self.api.modify(self.Task.SetStatusTask_sql, taskname=[workflow], status=['NEW'])
+
+        return [{'result': 'ok'}]
