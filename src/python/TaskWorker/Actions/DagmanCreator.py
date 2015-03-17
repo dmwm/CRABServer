@@ -699,8 +699,6 @@ class DagmanCreator(TaskAction.TaskAction):
                 self.logger.error("Failed to record the number of jobs.")
                 return 1
 
-        with open("dagman.json", "wb") as fd:
-            json.dump(info.update(specs[0]), fd)
 
 
         return info, splitterResult
