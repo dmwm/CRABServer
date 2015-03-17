@@ -718,7 +718,6 @@ class DagmanCreator(TaskAction.TaskAction):
                 self.logger.error("Failed to record the number of jobs.")
                 return 1
 
-
         return info, splitterResult
 
 
