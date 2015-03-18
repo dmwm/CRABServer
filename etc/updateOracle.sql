@@ -4,7 +4,6 @@ alter table tasks add (tm_scriptexe VARCHAR(255));
 alter table tasks add (tm_scriptargs VARCHAR(4000));
 alter table tasks add (tm_extrajdl VARCHAR(1000));
 alter table tasks add (tm_generator VARCHAR(255));
-alter table tasks add (tm_dry_run VARCHAR(1)); --for issue ##4462
 
 -- This is needed, because I was not allowed to change from VARCHAR to CLOB.
 -- And I found this solution 
@@ -43,3 +42,6 @@ ALTER TABLE tasks DROP column tm_transformation;
 
 --Changes that will be needed for version 3.4.14
 ALTER TABLE tasks ADD (tm_schedd VARCHAR(255));
+
+--Changes that will be needed for version 3.4.15
+alter table tasks add (tm_dry_run VARCHAR(1)); --for issue ##4462
