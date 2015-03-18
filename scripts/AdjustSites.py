@@ -24,6 +24,7 @@ terminator_re = re.compile(r"^\.\.\.$")
 event_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
 term_re = re.compile(r"Normal termination \(return value 2\)")
 node_re = re.compile(r"DAG Node: Job(\d+)")
+
 def adjustPostScriptExitStatus(resubmitJobIds):
     """
     ...
