@@ -4,18 +4,19 @@ CMSRunAnalysis.py - the runtime python portions to launch a CRAB3 / cmsRun job.
 """
 
 import os
+import re
+import sys
 import stat
+import time
+import json
 import shutil
 import socket
-import os.path
-import time
-import commands
-import sys
-import re
-import json
-import traceback
 import pickle
+import signal
+import os.path
 import logging
+import commands
+import traceback
 import subprocess
 from ast import literal_eval
 from optparse import OptionParser, BadOptionError, AmbiguousOptionError
