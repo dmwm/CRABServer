@@ -47,7 +47,7 @@ class HTCondorDataWorkflow(DataWorkflow):
     def getRootTasks(self, workflow, schedd):
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
         rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType', "HoldReason", "HoldReasonCode", "CRAB_UserWebDir",
-                        "CRAB_SiteWhitelist", "CRAB_SiteBlacklist", "CRAB_SiteResubmitWhitelist", "CRAB_SiteResubmitBlacklist"]
+                        "CRAB_SiteWhitelist", "CRAB_SiteBlacklist", "CRAB_SiteResubmitWhitelist", "CRAB_SiteResubmitBlacklist", "DagmanHoldReason"]
 
         # Note: may throw if the schedd is down.  We may want to think about wrapping the
         # status function and have it catch / translate HTCondor errors.
@@ -391,8 +391,10 @@ class HTCondorDataWorkflow(DataWorkflow):
         taskStatusCode = int(results[-1]['JobStatus'])
         if 'CRAB_UserWebDir' not in results[-1]:
             if taskStatusCode != 1 and taskStatusCode != 2:
+                DagmanHoldReason = results[-1]['DagmanHoldReason'] if 'DagmanHoldReason' in results[-1] else None
+                msg = "Your task failed to bootstrap on the Grid scheduler %s. Please contact an expert. Hold Reason: %s" % (address, DagmanHoldReason)
                 return [ {"status" : "UNKNOWN",
-                      "taskFailureMsg"  : "Your task failed to bootstrap on the Grid scheduler %s." % address,
+                      "taskFailureMsg"  : msg,
                       "taskWarningMsg"  : taskWarnings,
                       "jobSetID"        : '',
                       "jobsPerStatus"   : {},
