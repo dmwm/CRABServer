@@ -73,22 +73,22 @@ import unittest
 import datetime
 import tempfile
 import traceback
-import WMCore.Database.CMSCouch as CMSCouch
-from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
 from httplib import HTTPException
 import hashlib
-import TaskWorker.Actions.RetryJob as RetryJob
 import pprint
-
 import DashboardAPI
+
+import WMCore.Database.CMSCouch as CMSCouch
+
+from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
+from TaskWorker.Actions.RetryJob import RetryJob
+from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 
 ASO_JOB = None
 config = None
 G_JOB_REPORT_NAME = None
 
-## Auxiliary variable to make code more readable in if statements for example.
-OK = True
 
 def sighandler(*args):
     if ASO_JOB:
@@ -173,7 +173,6 @@ class ASOServerJob(object):
     """
     Class used to inject transfer requests to ASO database.
     """
-
     def __init__(self, logger, dest_site, source_dir, dest_dir, source_sites, \
                  count, filenames, reqname, log_size, log_needs_transfer, \
                  job_report_output, job_ad, crab_retry, retry_timeout, \
@@ -759,7 +758,7 @@ class PostJob():
         ## These attributes are set from arguments passed to the post-job (see
         ## RunJobs.dag file).
         self.dag_jobid           = None
-        self.job_status          = None
+        self.job_return_code     = None
         self.dag_retry           = None
         self.max_retries         = None
         self.reqname             = None
@@ -812,7 +811,7 @@ class PostJob():
         """
         ## Put the arguments to PostJob into class variables.
         self.dag_jobid           = args[0] ## = ClusterId.ProcId
-        self.job_status          = args[1]
+        self.job_return_code     = args[1]
         self.dag_retry           = int(args[2])
         self.max_retries         = int(args[3])
         ## TODO: Why not get the request name from the job ad?
@@ -828,7 +827,7 @@ class PostJob():
         self.output_files_names  = []
         for i in xrange(9, len(args)):
             self.output_files_names.append(args[i])
-        self.job_status = int(self.job_status)
+        self.job_return_code = int(self.job_return_code)
         self.crab_retry = self.calculate_crab_retry()
         if self.crab_retry is None:
             self.crab_retry = self.dag_retry
@@ -935,37 +934,35 @@ class PostJob():
         ## Parse the job ad.
         job_ad_file_name = os.environ.get("_CONDOR_JOB_AD", ".job.ad")
         self.logger.info("====== Starting to parse job ad file %s." % (job_ad_file_name))
-        parse_job_ad_status = self.parse_job_ad(job_ad_file_name)
-        if parse_job_ad_status is not OK:
+        if self.parse_job_ad(job_ad_file_name):
             self.set_dashboard_state('FAILED')
             self.logger.info("====== Finished to parse job ad.")
-            return RetryJob.FATAL_ERROR
+            return JOB_RETURN_CODES.FATAL_ERROR
         self.logger.info("====== Finished to parse job ad.")
 
         self.logger.info("====== Starting to analyze job exit status.")
-        ## Execute the retry-job. The retry-job decides whether an error is
-        ## recoverable or fatal. It uses the cmscp exit code and error message,
-        ## and the memory and cpu perfomance information; all from the job
-        ## report. We also pass the job exit code as argument (job_status) in
-        ## case the exit code in the job report was not updated by cmscp.
-        ## If the retry-job returns non 0 (meaning there was an error),
-        ## report the state to dashboard and exit the post-job.
-        retry = RetryJob.RetryJob()
+        ## Execute the retry-job. The retry-job decides whether an error is recoverable
+        ## or fatal. It uses the cmscp exit code and error message, and the memory and
+        ## cpu perfomance information; all from the job report. We also pass the job
+        ## return code in case the exit code in the job report was not updated by cmscp.
+        ## If the retry-job returns non 0 (meaning there was an error), report the state
+        ## to dashboard and exit the post-job.
+        retry = RetryJob()
         retryjob_retval = None
         if not os.environ.get('TEST_POSTJOB_DISABLE_RETRIES', False):
             print "       -----> RetryJob log start -----"
-            retryjob_retval = retry.execute(self.reqname, self.job_status, \
+            retryjob_retval = retry.execute(self.reqname, self.job_return_code, \
                                             self.crab_retry, self.job_id, \
                                             self.dag_jobid)
             print "       <----- RetryJob log finish ----"
         if retryjob_retval:
-            if retryjob_retval == RetryJob.FATAL_ERROR:
+            if retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:
                 msg = "The retry handler indicated this was a fatal error."
                 self.logger.info(msg)
                 self.set_dashboard_state('FAILED')
                 self.logger.info("====== Finished to analyze job exit status.")
-                return RetryJob.FATAL_ERROR
-            elif retryjob_retval == RetryJob.RECOVERABLE_ERROR:
+                return JOB_RETURN_CODES.FATAL_ERROR
+            elif retryjob_retval == JOB_RETURN_CODES.RECOVERABLE_ERROR:
                 if self.dag_retry >= self.max_retries:
                     msg  = "The retry handler indicated this was a recoverable error,"
                     msg += " but the maximum number of retries was already hit."
@@ -973,30 +970,30 @@ class PostJob():
                     self.logger.info(msg)
                     self.set_dashboard_state('FAILED')
                     self.logger.info("====== Finished to analyze job exit status.")
-                    return RetryJob.FATAL_ERROR
+                    return JOB_RETURN_CODES.FATAL_ERROR
                 else:
                     msg  = "The retry handler indicated this was a recoverable error."
                     msg += " DAGMan will retry."
                     self.logger.info(msg)
                     self.set_dashboard_state('COOLOFF')
                     self.logger.info("====== Finished to analyze job exit status.")
-                    return RetryJob.RECOVERABLE_ERROR
+                    return JOB_RETURN_CODES.RECOVERABLE_ERROR
             else:
                 msg  = "The retry handler returned an unexpected value (%d)." % (retryjob_retval)
                 msg += " Will consider this as a fatal error. DAGMan will not retry."
                 self.logger.info(msg)
                 self.set_dashboard_state('FAILED')
                 self.logger.info("====== Finished to analyze job exit status.")
-                return RetryJob.FATAL_ERROR
+                return JOB_RETURN_CODES.FATAL_ERROR
         ## This is for the case in which we don't run the retry-job.
-        elif self.job_status != 0:
+        elif self.job_return_code != JOB_RETURN_CODES.OK:
             if self.dag_retry >= self.max_retries:
                 msg = "The maximum allowed number of retries was hit and the job failed."
                 msg += " Setting this node (job) to permanent failure."
                 self.logger.info(msg)
                 self.set_dashboard_state('FAILED')
                 self.logger.info("====== Finished to analyze job exit status.")
-                return RetryJob.FATAL_ERROR
+                return JOB_RETURN_CODES.FATAL_ERROR
         else:
             self.logger.info("====== Finished to analyze job exit status.")
         ## If CRAB_ASOTimeout was not defined in the job ad, get here the ASO timeout
@@ -1006,11 +1003,10 @@ class PostJob():
 
         ## Parse the job report.
         self.logger.info("====== Starting to parse job report file %s." % (G_JOB_REPORT_NAME))
-        parse_job_report_status = self.parse_job_report()
-        if parse_job_report_status is not OK:
+        if self.parse_job_report():
             self.set_dashboard_state('FAILED')
             self.logger.info("====== Finished to parse job report.")
-            return RetryJob.FATAL_ERROR
+            return JOB_RETURN_CODES.FATAL_ERROR
         self.logger.info("====== Finished to parse job report.")
 
         ## AndresT. We don't need this method IMHO. See note I made in the method.
@@ -1097,7 +1093,7 @@ class PostJob():
                 self.logger.error(msg)
                 self.set_dashboard_state('FAILED')
                 self.logger.info("====== Finished to check for ASO transfers.")
-                return RetryJob.FATAL_ERROR
+                return JOB_RETURN_CODES.FATAL_ERROR
             except RecoverableStageoutError, rse:
                 msg = "Got recoverable stageout exception:\n%s" % (str(rse))
                 self.logger.error(msg)
@@ -1456,17 +1452,17 @@ class PostJob():
         ## Load the job ad.
         if not os.path.exists(job_ad_file_name) or not os.stat(job_ad_file_name).st_size:
             self.logger.error("Missing job ad!")
-            return not OK
+            return 1
         try:
             with open(job_ad_file_name) as fd:
                 self.job_ad = classad.parseOld(fd)
         except Exception, exmsg:
             msg = "Error parsing job ad: %s" % (str(exmsg))
             self.logger.exception(msg)
-            return not OK
+            return 1
         ## Check if all the required attributes from the job ad are there.
-        if self.check_required_job_ad_attrs() is not OK:
-            return not OK
+        if self.check_required_job_ad_attrs():
+            return 1
         ## Set some class variables using the job ad.
         self.dest_site        = str(self.job_ad['CRAB_AsyncDest'])
         self.input_dataset    = str(self.job_ad['CRAB_InputData'])
@@ -1491,7 +1487,7 @@ class PostJob():
         ## If self.job_ad['CRAB_ASOTimeout'] = 0, will use default timeout logic.
         if 'CRAB_ASOTimeout' in self.job_ad and int(self.job_ad['CRAB_ASOTimeout']) > 0:
             self.retry_timeout = int(self.job_ad['CRAB_ASOTimeout'])
-        return OK
+        return 0
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1521,7 +1517,7 @@ class PostJob():
             msg = "The following required attributes are missing in the job ad: %s"
             msg = msg % (missing_attrs)
             self.logger.error(msg)
-            return not OK
+            return 1
         undefined_attrs = []
         for attr in required_job_ad_attrs:
             if self.job_ad[attr] is None or str(self.job_ad[attr]).lower() in ['', 'undefined']:
@@ -1530,8 +1526,8 @@ class PostJob():
             msg = "Could not determine the following required attributes from the job ad: %s"
             msg = msg % (undefined_attrs)
             self.logger.error(msg)
-            return not OK
-        return OK
+            return 1
+        return 0
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1548,20 +1544,20 @@ class PostJob():
         except Exception, exmsg:
             msg = "Error loading job report: %s" % (str(exmsg))
             self.logger.exception(msg)
-            return not OK
+            return 1
         ## Check that the job_report has the expected structure.
         if 'steps' not in self.job_report:
             self.logger.error("Invalid job report: missing 'steps'")
-            return not OK
+            return 1
         if 'cmsRun' not in self.job_report['steps']:
             self.logger.error("Invalid job report: missing 'cmsRun'")
-            return not OK
+            return 1
         if 'input' not in self.job_report['steps']['cmsRun']:
             self.logger.error("Invalid job report: missing 'input'")
-            return not OK
+            return 1
         if 'output' not in self.job_report['steps']['cmsRun']:
             self.logger.error("Invalid job report: missing 'output'")
-            return not OK
+            return 1
         ## This is the job report part containing information about the output files.
         self.job_report_output = self.job_report['steps']['cmsRun']['output']
         ## Set some class variables using the job report.
@@ -1572,14 +1568,14 @@ class PostJob():
         if not self.executed_site:
             msg = "Unable to determine executed site from job report."
             self.logger.error(msg)
-            return not OK
+            return 1
         self.job_failed = bool(self.job_report.get(u'jobExitCode', 0))
         if self.job_failed:
             self.source_dir = os.path.join(self.source_dir, 'failed')
             self.dest_dir = os.path.join(self.dest_dir, 'failed')
         ## Fill self.output_files_info by parsing the job report.
         self.fill_output_files_info()
-        return OK
+        return 0
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1785,12 +1781,12 @@ class PostJob():
             msg += " Setting this node (job) to permanent failure. DAGMan will NOT retry."
             self.logger.info(msg)
             self.set_dashboard_state('FAILED')
-            return RetryJob.FATAL_ERROR
+            return JOB_RETURN_CODES.FATAL_ERROR
         else:
             msg = "Job will be retried by DAGMan."
             self.logger.info(msg)
             self.set_dashboard_state('COOLOFF')
-            return RetryJob.RECOVERABLE_ERROR
+            return JOB_RETURN_CODES.RECOVERABLE_ERROR
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
