@@ -42,7 +42,7 @@ if [ $(cat $_CONDOR_JOB_AD | wc -l) -lt 3 ]; then
         echo "Error: CONDOR_ID is unknown."
         echo "Error: Failed to get ClassAds on `hostname`." >&2
         echo "Error: dag_bootstrap_startup requires ClassAds for execution." >&2
-        exit 1 # TODO: On every exit code report back to CRABServer.
+        exit 1
     fi
 fi
 
@@ -66,8 +66,9 @@ if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]; then
     rc=$?
     if [[ $rc != 0 ]]; then
         echo "Error: Python2.6 isn't available on `hostname`." >&2
-        echo "Error: bootstrap execution requires python2.6" >&2
-        exit 1 # TODO: On every exit code report back to CRABServer.
+        echo "Error: Bootstrap execution requires python2.6" >&2
+        condor_qedit $CONDOR_ID DagmanHoldReason "'Error: Bootstrap execution requires python2.6.'"
+        exit 1
     else
         echo "I found python2.6 at.."
         echo `which python2.6`
@@ -85,7 +86,8 @@ if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]; then
         curl $CRAB_TASKMANAGER_TARBALL > TaskManagerRun.tar.gz
         if [[ $? != 0 ]]; then
             echo "Error: Unable to download the task manager runtime environment." >&2
-            exit 3 # TODO: On every exit code report back to CRABServer.
+            condor_qedit $CONDOR_ID DagmanHoldReason "'Unable to download the task manager runtime environment.'"
+            exit 1
         fi
     else
         echo "Using tarball shipped within condor"
@@ -95,7 +97,8 @@ if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]; then
     tar xvfzm $TARBALL_NAME
     if [[ $? != 0 ]]; then
         echo "Error: Unable to unpack the task manager runtime environment." >&2
-        exit 3 # TODO: On every exit code report back to CRABServer.
+        condor_qedit $CONDOR_ID DagmanHoldReason "'Unable to unpack the task manager runtime environment.'"
+        exit 1
     fi
     unzip CRAB3.zip
     ls -lah
@@ -107,8 +110,9 @@ fi
 if [ -e AdjustSites.py ]; then
     python2.6 AdjustSites.py
 else
-    echo 'Error: AdjustSites.py does not exist.' >&2
-    exit 4 # TODO: On every exit code report back to CRABServer.
+    echo "Error: AdjustSites.py does not exist." >&2
+    condor_qedit $CONDOR_ID DagmanHoldReason "'AdjustSites.py does not exist.'"
+    exit 1 
 fi
 
 # Fix for issues with condor_rm.  See https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=4615
@@ -142,10 +146,12 @@ export CONDOR_ID="${CLUSTER_ID}.${PROC_ID}"
 ls -lah
 if [ "X" == "X$X509_USER_PROXY" ] || [ ! -e $X509_USER_PROXY ]; then
     echo "Failed to find a proxy at: $X509_USER_PROXY"
-    EXIT_STATUS=5 # TODO: On every exit code report back to CRABServer.
+    condor_qedit $CONDOR_ID DagmanHoldReason "'Failed to find users proxy.'"
+    EXIT_STATUS=5
 elif [ ! -r $X509_USER_PROXY ]; then
     echo "The proxy is unreadable for some reason"
-    EXIT_STATUS=6 # TODO: On every exit code report back to CRABServer.
+    condor_qedit $CONDOR_ID DagmanHoldReason "'The proxy is unreadable for some reason'"
+    EXIT_STATUS=6
 else
     # Re-nice the process so, even when we churn through lots of processes, we never starve the schedd or shadows for cycles.
     exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -AutoRescue 1 -DoRescueFrom 0 -MaxPre 20 -MaxIdle 200 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
