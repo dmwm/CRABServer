@@ -105,3 +105,6 @@ class Task(object):
                               WHERE tm_taskname = %(workflow)s"""
 
     SetDryRun_sql = "UPDATE tasks set tm_dry_run = %(dry_run)s WHERE tm_taskname = %(taskname)s"
+
+    UpdateSchedd_sql = """UPDATE tasks SET tm_schedd = %(scheddname)s \
+                              WHERE tm_taskname = %(workflow)s"""
