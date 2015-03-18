@@ -1743,7 +1743,11 @@ class PostJob():
             msg = "Failed to update file %s with increased post-job count by +1."
             msg = msg % (fname)
             self.logger.warning(msg)
+<<<<<<< HEAD
         return crab_retry
+=======
+        return crab_retry_count
+>>>>>>> Add logger to Prejob. Move PostJob logger from module level to class level to avoid duplicate lines in log files.
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
