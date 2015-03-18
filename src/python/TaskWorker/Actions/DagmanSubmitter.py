@@ -17,7 +17,6 @@ import HTCondorLocator
 from httplib import HTTPException
 import TaskWorker.Actions.TaskAction as TaskAction
 import TaskWorker.DataObjects.Result as Result
-
 from TaskWorker.Actions.DagmanCreator import CRAB_HEADERS
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
@@ -34,26 +33,20 @@ except ImportError, _:
     classad = None
     htcondor = None
 
+
 CRAB_META_HEADERS = \
 """
 +CRAB_SplitAlgo = %(splitalgo)s
 +CRAB_AlgoArgs = %(algoargs)s
 +CRAB_ConfigDoc = %(configdoc)s
-+CRAB_DBSUrl = %(dbsurl)s
 +CRAB_LumiMask = %(lumimask)s
-+CRAB_Publish = %(publication)s
-+CRAB_PublishDBSUrl = %(publishdbsurl)s
 """
-
-# NOTE: Changes here must be synchronized with the submitDirect function below
+## This is the fragment to be used as the JDL in the schedd.submitRaw() method.
+## NOTE: Changes here must be synchronized with the submitDirect() function below.
 MASTER_DAG_SUBMIT_FILE = CRAB_HEADERS + CRAB_META_HEADERS + \
 """
 +CRAB_Attempt = 0
-+CRAB_Workflow = %(workflow)s
-+CRAB_UserDN = %(userdn)s
 universe = local
-# Can't ever remember if this is quotes or not
-+CRAB_ReqName = "%(requestname)s"
 scratch = %(scratch)s
 bindir = %(bindir)s
 output = $(scratch)/request.out
@@ -75,15 +68,20 @@ X509UserProxy = %(user_proxy)s
 queue 1
 """
 
+## These are the CRAB attributes that we want to add to the job class ad when
+## using the submitDirect() method.
 SUBMIT_INFO = [ \
-            ##----- These are the CRAB_HEADERS ---------
+            ## CRAB_HEADERS
             ('CRAB_ReqName', 'requestname'),
             ('CRAB_Workflow', 'workflow'),
             ('CRAB_JobType', 'jobtype'),
             ('CRAB_JobSW', 'jobsw'),
             ('CRAB_JobArch', 'jobarch'),
             ('CRAB_InputData', 'inputdata'),
+            ('CRAB_DBSURL', 'dbsurl'),
             ('CRAB_PublishName', 'publishname'),
+            ('CRAB_Publish', 'publication'),
+            ('CRAB_PublishDBSURL', 'publishdbsurl'),
             ('CRAB_ISB', 'cacheurl'),
             ('CRAB_SiteBlacklist', 'siteblacklist'),
             ('CRAB_SiteWhitelist', 'sitewhitelist'),
@@ -104,14 +102,14 @@ SUBMIT_INFO = [ \
             ('CRAB_ASOTimeout', 'aso_timeout'),
             ('CRAB_RestHost', 'resthost'),
             ('CRAB_RestURInoAPI', 'resturinoapi'),
-            ##----- These are the CRAB_META_HEADERS ------
+            ('CRAB_NumAutomJobRetries', 'numautomjobretries'),
+            ## CRAB_META_HEADERS
             ('CRAB_SplitAlgo', 'splitalgo'),
             ('CRAB_AlgoArgs', 'algoargs'),
-            ('CRAB_DBSUrl', 'dbsurl'),
             ('CRAB_LumiMask', 'lumimask'),
-            ('CRAB_Publish', 'publication'),
-            ('CRAB_PublishDBSUrl', 'publishdbsurl'),
-            ##--------------------------------------------
+            ## Additional CRAB attributes (since these are not part of CRAB_HEADERS or
+            ## CRAB_META_HEADERS, they are not added by defaul to the class ad if using the
+            ## schedd.submitRaw() method).
             ('CRAB_JobCount', 'jobcount'),
             ('CRAB_UserVO', 'tm_user_vo'),
             ('RequestMemory', 'tm_maxmemory'),
@@ -136,6 +134,7 @@ def addCRABInfoToClassAd(ad, info):
         for jdl in info['extra_jdl'].split('\n'):
             adName, adVal = jdl.lstrip('+').split('=')
             ad[adName] = adVal
+
 
 class DagmanSubmitter(TaskAction.TaskAction):
 
@@ -194,6 +193,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                % (len(retryIssues), len(retryIssuesBySchedd), str(retryIssuesBySchedd))
         self.logger.error(msg)
         raise TaskWorkerException(msg)
+
 
     def duplicateCheck(self, task):
         """
@@ -316,6 +316,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         self.sendDashboardJobs(dashboard_params, info['apmon'])
 
         return Result.Result(task=kw['task'], result=(-1))
+
 
     def submitDirect(self, schedd, cmd, arg, info): #pylint: disable=R0201
         """

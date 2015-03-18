@@ -8,8 +8,10 @@ import glob
 import classad
 import htcondor
 
+
 if '_CONDOR_JOB_AD' not in os.environ or not os.path.exists(os.environ["_CONDOR_JOB_AD"]):
     sys.exit(0)
+
 
 new_stdout = "adjust_out.txt"
 fd = os.open(new_stdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
@@ -22,7 +24,7 @@ terminator_re = re.compile(r"^\.\.\.$")
 event_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
 term_re = re.compile(r"Normal termination \(return value 2\)")
 node_re = re.compile(r"DAG Node: Job(\d+)")
-def adjustPost(resubmit):
+def adjustPostScriptExitStatus(resubmit):
     """
     ...
     016 (146493.000.000) 11/11 17:45:46 POST Script terminated.
@@ -91,34 +93,39 @@ def adjustPost(resubmit):
     output_fd.write(output)
     output_fd.close()
 
-def resubmitDag(filename, resubmit):
+
+def adjustMaxRetries(resubmitJobIds, ad):
     """
-    Update the RunJobs.dag file changing only the maximum allowed number of retries
-    from dagman and only for the jobs that will be resubmitted.
+    Edit the DAG file adjusting the maximum allowed number of retries to the
+    current retry + CRAB_NumAutomJobRetries for the job ids passed in the
+    resubmitJobIds argument.
     """
-    if not os.path.exists(filename):
+    if not resubmitJobIds:
         return
+    if not os.path.exists("RunJobs.dag"):
+        return
+    ## Search for the RETRY directives in the DAG file for the job ids passed in the
+    ## resubmitJobIds argument and change the maximum retries to the current retry
+    ## count + CRAB_NumAutomJobRetries.
     retry_re = re.compile(r'RETRY Job([0-9]+) ([0-9]+) ')
     output = ""
-    ## I think resubmit is always a list, in the worst case an empty list or a list
-    ## with all the job ids in the task. So resubmit_all is always False.
-    resubmit_all = (resubmit == True)
-    ## This number here should be the same as in the TaskWorker config.
-    max_retries_per_resubmission = 2
-    for line in open(filename).readlines():
-        m = retry_re.search(line)
-        if m:
-            job_id = m.groups()[0]
-            if resubmit_all or (job_id in resubmit):
-                try:
-                    retry_count = int(m.groups()[1]) + (max_retries_per_resubmission + 1)
-                except ValueError:
-                    retry_count = max_retries_per_resubmission
-                line = retry_re.sub(r'RETRY Job%s %d ' % (job_id, retry_count), line)
-        output += line
-    output_fd = open(filename, 'w')
-    output_fd.write(output)
-    output_fd.close()
+    resubmitAll = (resubmitJobIds == True)
+    numAutomJobRetries = int(ad.get('CRAB_NumAutomJobRetries', 2))
+    with open("RunJobs.dag", 'r') as fd:
+        for line in fd.readlines():
+            match_retry_re = retry_re.search(line)
+            if match_retry_re:
+                jobId = match_retry_re.groups()[0]
+                if resubmitAll or (jobId in resubmitJobIds):
+                    try:
+                        maxRetries = int(match_retry_re.groups()[1]) + (1 + numAutomJobRetries)
+                    except ValueError:
+                        maxRetries = numAutomJobRetries
+                    line = retry_re.sub(r'RETRY Job%s %d ' % (jobId, maxRetries), line)
+            output += line
+    with open("RunJobs.dag", 'w') as fd:
+        fd.write(output)
+
 
 def make_webdir(ad):
     path = os.path.expanduser("~/%s" % ad['CRAB_ReqName'])
@@ -228,39 +235,28 @@ def main():
 
     clear_automatic_blacklist(ad)
 
-    blacklist = set()
-    if 'CRAB_SiteBlacklist' in ad:
-        blacklist = set(ad['CRAB_SiteBlacklist'])
-
-    whitelist = set()
-    if 'CRAB_SiteWhitelist' in ad:
-        whitelist = set(ad['CRAB_SiteWhitelist'])
-
-    resubmit = []
+    resubmitJobIds = []
     if 'CRAB_ResubmitList' in ad:
-        resubmit = set(ad['CRAB_ResubmitList'])
+        resubmitJobIds = set(ad['CRAB_ResubmitList'])
         id = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
         ad['foo'] = []
         try:
             htcondor.Schedd().edit([id], 'CRAB_ResubmitList', ad['foo'])
         except RuntimeError, reerror:
             print "ERROR: %s" % str(reerror)
-        # To do this right, we ought to look up how many existing retries were done
-        # and adjust the retry account according to that.
-    if resubmit != True:
-        resubmit = [str(i) for i in resubmit]
-
-    if resubmit:
+    if resubmitJobIds != True:
+        resubmitJobIds = [str(i) for i in resubmitJobIds]
+    if resubmitJobIds:
         if hasattr(htcondor, 'lock'):
             # While dagman is not running at this point, the schedd may be writing events to this
             # file; hence, we only edit the file while holding an appropriate lock.
             # Note this lock method didn't exist until 8.1.6; prior to this, we simply
             # run dangerously.
             with htcondor.lock(open("RunJobs.dag.nodes.log", "a"), htcondor.LockType.WriteLock) as lock:
-                adjustPost(resubmit)
+                adjustPostScriptExitStatus(resubmitJobIds)
         else:
-            adjustPost(resubmit)
-        resubmitDag("RunJobs.dag", resubmit)
+            adjustPostScriptExitStatus(resubmitJobIds)
+        adjustMaxRetries(resubmitJobIds, ad)
 
     if 'CRAB_SiteAdUpdate' in ad:
         new_site_ad = ad['CRAB_SiteAdUpdate']
@@ -272,9 +268,12 @@ def main():
         id = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
         ad['foo'] = []
         try:
+            ## Is CRAB_ResubmitList the attribute we want to edit ?
+            ## Or is it CRAB_SiteAdUpdate ?
             htcondor.Schedd().edit([id], 'CRAB_ResubmitList', ad['foo'])
         except RuntimeError, reerror:
             print "ERROR: %s" % str(reerror)
+
 
 if __name__ == '__main__':
     main()
