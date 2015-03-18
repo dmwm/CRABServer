@@ -88,7 +88,7 @@ class TaskHandler(object):
             finally:
                 #upload logfile of the task to the crabcache
                 logpath = 'logs/tasks/%s/%s.log' % (self._task['tm_username'], self._task['tm_taskname'])
-                if os.path.isfile(logpath):
+                if os.path.isfile(logpath) and 'user_proxy' in self._task: #the user proxy might not be there if myproxy retrieval failed
                     cacheurldict = {'endpoint': self._task['tm_cache_url'], 'cert' : self._task['user_proxy'], 'key' : self._task['user_proxy']}
                     try:
                         ufc = UserFileCache(cacheurldict)
