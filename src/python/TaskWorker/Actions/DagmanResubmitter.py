@@ -13,8 +13,8 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from httplib import HTTPException
 
-class DagmanResubmitter(TaskAction.TaskAction):
 
+class DagmanResubmitter(TaskAction.TaskAction):
     """
     Given a task name, resubmit failed tasks.
 
@@ -66,7 +66,6 @@ class DagmanResubmitter(TaskAction.TaskAction):
                     schedd.act(htcondor.JobAction.Hold, rootConst)
                     schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
                     schedd.act(htcondor.JobAction.Release, rootConst)
-
         elif task['resubmit_site_whitelist'] or task['resubmit_site_blacklist'] or \
                 task['resubmit_priority'] != None or task['resubmit_maxmemory'] != None or \
                 task['resubmit_numcores'] != None or task['resubmit_maxjobruntime'] != None:
@@ -85,7 +84,6 @@ class DagmanResubmitter(TaskAction.TaskAction):
                     if task['resubmit_maxmemory'] != None:
                         schedd.edit(rootConst, "RequestMemory", task['resubmit_maxmemory'])
                     schedd.act(htcondor.JobAction.Release, rootConst)
-
         else:
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
                 if not parent:
@@ -97,9 +95,9 @@ class DagmanResubmitter(TaskAction.TaskAction):
 
         results = rpipe.read()
         if results != "OK":
-            raise TaskWorkerException("The CRAB3 server backend could not reubmit your task because the Grid scheduler answered with an error\n"+\
-                                      "This is probably a temporary glitch, please try it again and contact an expert if the error persist\n"+\
-                                      "Error reason %s" % results)
+            raise TaskWorkerException("The CRAB3 server backend could not resubmit your task because the Grid scheduler answered with an error.\n"+\
+                                      "This is probably a temporary glitch, please try it again and contact an expert if the error persist.\n"+\
+                                      "Error reason: %s" % (results))
 
 
     def execute(self, *args, **kwargs):
@@ -108,13 +106,13 @@ class DagmanResubmitter(TaskAction.TaskAction):
                      'status': "SUBMITTED",
                      'jobset': "-1",
                      'subresource': 'success',}
-        self.logger.debug("Setting the task as successfully resubmitted with %s " % str(configreq))
+        self.logger.debug("Setting the task as successfully resubmited with %s " % str(configreq))
         data = urllib.urlencode(configreq)
         try:
             self.server.post(self.resturi, data = data)
         except HTTPException, hte:
             self.logger.error(hte.headers)
-            raise TaskWorkerException("The CRAB3 server backend successfully resubmited your task because the Grid scheduler, but was unable to update\n"+\
+            raise TaskWorkerException("The CRAB3 server backend successfully resubmited your task to the Grid scheduler, but was unable to update\n"+\
                                       "the task status from QUEUED to SUBMITTED. This should be a harmless (temporary) error.\n")
 
 if __name__ == "__main__":
