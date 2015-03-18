@@ -374,7 +374,7 @@ class DagmanCreator(TaskAction.TaskAction):
     def makeJobSubmit(self, task):
         """
         Create the submit file.  This is reused by all jobs in the task; differences
-        between the jobs are taken care of in the makeSpecs.
+        between the jobs are taken care of in the makeDagSpecs.
         """
 
         if os.path.exists("Job.submit"):
@@ -448,8 +448,8 @@ class DagmanCreator(TaskAction.TaskAction):
         return info
 
 
-    def makeSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid):
-        specs = []
+    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid):
+        dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
         groupid = len(siteinfo['groups'])
@@ -500,30 +500,40 @@ class DagmanCreator(TaskAction.TaskAction):
                 lastDirectDest = directDest
             pfns = ["log/cmsRun_%d.log.tar.gz" % i] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
-            specs.append({'count': i, 'runAndLumiMask': runAndLumiMask, 'inputFiles': inputFiles,
-                          'remoteOutputFiles': remoteOutputFilesStr,
-                          'localOutputFiles': localOutputFiles, 'asyncDest': task['tm_asyncdest'],
-                          'firstEvent' : firstEvent, 'lastEvent' : lastEvent,
-                          'firstLumi' : firstLumi, 'firstRun' : firstRun,
-                          'seeding' : 'AutomaticSeeding',
-                          'lheInputFiles' : 'tm_generator' in task and task['tm_generator'] == 'lhe',
-                          'eventsPerLumi' : task['tm_events_per_lumi'],
-                          'sw': task['tm_job_sw'], 'taskname': task['tm_taskname'],
-                          'outputData': task['tm_publish_name'],
-                          'tempDest': tempDest,
-                          'outputDest': os.path.join(dest, counter),
-                          'block': block, 'destination': pfns,
-                          'scriptExe' : task['tm_scriptexe'], 'scriptArgs' : json.dumps(task['tm_scriptargs']).replace('"', r'\"\"'),
-                          'backend': os.environ.get('HOSTNAME','')})
-
-            self.logger.debug(specs[-1])
-        return specs, i
+            nodeSpec = {'count'             : i,
+                        'maxretries'        : task['numautomjobretries'],
+                        'taskname'          : task['tm_taskname'],
+                        'backend'           : os.environ.get('HOSTNAME',''),
+                        'tempDest'          : tempDest,
+                        'outputDest'        : os.path.join(dest, counter),
+                        'remoteOutputFiles' : remoteOutputFilesStr,
+                        'runAndLumiMask'    : runAndLumiMask,
+                        'inputFiles'        : inputFiles,
+                        'localOutputFiles'  : localOutputFiles,
+                        'asyncDest'         : task['tm_asyncdest'],
+                        'firstEvent'        : firstEvent,
+                        'lastEvent'         : lastEvent,
+                        'firstLumi'         : firstLumi,
+                        'firstRun'          : firstRun,
+                        'seeding'           : 'AutomaticSeeding',
+                        'lheInputFiles'     : 'tm_generator' in task and task['tm_generator'] == 'lhe',
+                        'eventsPerLumi'     : task['tm_events_per_lumi'],
+                        'sw'                : task['tm_job_sw'],
+                        'outputData'        : task['tm_publish_name'],
+                        'block'             : block,
+                        'destination'       : pfns,
+                        'scriptExe'         : task['tm_scriptexe'],
+                        'scriptArgs'        : json.dumps(task['tm_scriptargs']).replace('"', r'\"\"'),
+                       }
+            dagSpecs.append(nodeSpec)
+            self.logger.debug(dagSpecs[-1])
+        return dagSpecs, i
 
 
     def createSubdag(self, splitterResult, **kwargs):
 
         startjobid = 0
-        specs = []
+        dagSpecs = []
 
         if hasattr(self.config.TaskWorker, 'stageoutPolicy'):
             kwargs['task']['stageoutpolicy'] = ",".join(self.config.TaskWorker.stageoutPolicy)
@@ -625,21 +635,25 @@ class DagmanCreator(TaskAction.TaskAction):
             availablesites = [str(i) for i in availablesites]
             self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
 
-            jobgroupspecs, startjobid = self.makeSpecs(kwargs['task'], sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid)
-            specs += jobgroupspecs
+            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid)
+            dagSpecs += jobgroupDagSpecs
 
         ## Write down the DAG as needed by DAGMan.
         dag = DAG_HEADER % {'resthost': kwargs['task']['resthost'], 'resturiwfdb': kwargs['task']['resturinoapi'] + '/workflowdb'}
+        for dagSpec in dagSpecs:
+            dag += DAG_FRAGMENT % dagSpec
+
+        ## Create a tarball with all the job lumi files.
         run_and_lumis_tar = tarfile.open("run_and_lumis.tar.gz", "w:gz")
-        for spec in specs:
-            dag += DAG_FRAGMENT % spec
-            job_lumis_file = 'job_lumis_'+ str(spec['count']) +'.json'
+        for dagSpec in dagSpecs:
+            job_lumis_file = 'job_lumis_'+ str(dagSpec['count']) +'.json'
             with open(job_lumis_file, "w") as fd:
-                fd.write(str(spec['runAndLumiMask']))
+                fd.write(str(dagSpec['runAndLumiMask']))
             run_and_lumis_tar.add(job_lumis_file)
             os.remove(job_lumis_file)
         run_and_lumis_tar.close()
 
+        ## Save the DAG into a file.
         with open("RunJobs.dag", "w") as fd:
             fd.write(dag)
 
@@ -652,7 +666,7 @@ class DagmanCreator(TaskAction.TaskAction):
         task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
         userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
 
-        info["jobcount"] = len(specs)
+        info["jobcount"] = len(dagSpecs)
         maxpost = getattr(self.config.TaskWorker, 'maxPost', 20)
         if maxpost == -1:
             maxpost = info['jobcount']
@@ -695,7 +709,7 @@ class DagmanCreator(TaskAction.TaskAction):
         # When running in standalone mode, we want to record the number of jobs in the task
         if ('CRAB_ReqName' in kwargs['task']) and ('CRAB_UserDN' in kwargs['task']):
             const = 'TaskType =?= \"ROOT\" && CRAB_ReqName =?= "%s" && CRAB_UserDN =?= "%s"' % (task_name, userdn)
-            cmd = "condor_qedit -const '%s' CRAB_JobCount %d" % (const, len(specs))
+            cmd = "condor_qedit -const '%s' CRAB_JobCount %d" % (const, len(dagSpecs))
             self.logger.debug("+ %s" % cmd)
             status, output = commands.getstatusoutput(cmd)
             if status:
