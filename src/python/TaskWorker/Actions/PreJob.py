@@ -232,6 +232,7 @@ class PreJob:
                 if oe.errno != errno.EEXIST:
                     msg = "Failed to create log web-shared directory %s" % (logpath)
                     self.logger.info(msg)
+                    return
             fname = os.path.join(logpath, "job_out.%s.%s.txt" % (id ,retry_num))
             with open(fname, "w") as fd:
                 fd.write("Job output has not been processed by post-job\n")
