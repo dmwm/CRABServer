@@ -774,7 +774,7 @@ class DagmanCreator(TaskAction.TaskAction):
             params = self.sendDashboardTask()
 
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', \
-                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'run_and_lumis.tar.gz', 'dagman.json']
+                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'run_and_lumis.tar.gz']
         if kw['task'].get('tm_user_sandbox') == 'sandbox.tar.gz':
             inputFiles.append('sandbox.tar.gz')
         if os.path.exists("CMSRunAnalysis.tar.gz"):
