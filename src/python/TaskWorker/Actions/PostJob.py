@@ -82,12 +82,6 @@ import pprint
 
 import DashboardAPI
 
-logger = logging.getLogger()
-handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
 
 ASO_JOB = None
 config = None
@@ -106,7 +100,7 @@ signal.signal(signal.SIGTERM, sighandler)
 
 ##==============================================================================
 
-def prepareErrorSummary(reqname):#, job_id, crab_retry):
+def prepareErrorSummary(logger, reqname):#, job_id, crab_retry):
     """ Load the current error_summary.json and do the equivalent of an 'ls job_fjr.*.json' to get the completed jobs.
         Then, add the error reason of the job that are not in errorReport.json
     """
@@ -180,13 +174,14 @@ class ASOServerJob(object):
     Class used to inject transfer requests to ASO database.
     """
 
-    def __init__(self, dest_site, source_dir, dest_dir, source_sites, count, \
-                 filenames, reqname, log_size, log_needs_transfer, \
+    def __init__(self, logger, dest_site, source_dir, dest_dir, source_sites, \
+                 count, filenames, reqname, log_size, log_needs_transfer, \
                  job_report_output, job_ad, crab_retry_count, retry_timeout, \
                  job_failed, transfer_logs, transfer_outputs):
         """
         ASOServerJob constructor.
         """
+        self.logger = logger
         self.docs_in_transfer = None
         self.crab_retry_count = crab_retry_count
         self.retry_timeout = retry_timeout
@@ -212,11 +207,11 @@ class ASOServerJob(object):
         proxy = os.environ.get('X509_USER_PROXY', None)
         self.aso_db_url = self.job_ad['CRAB_ASOURL']
         try:
-            logger.info("Will use ASO server at %s." % (self.aso_db_url))
+            self.logger.info("Will use ASO server at %s." % (self.aso_db_url))
             self.couch_server = CMSCouch.CouchServer(dburl = self.aso_db_url, ckey = proxy, cert = proxy)
             self.couch_database = self.couch_server.connectDatabase("asynctransfer", create = False)
         except:
-            logger.error("Failed to connect to ASO database.")
+            self.logger.error("Failed to connect to ASO database.")
             raise
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -231,14 +226,14 @@ class ASOServerJob(object):
             exmsg = "Couldn't upload document to ASO database"
             raise RuntimeError, exmsg
         if not self.docs_in_transfer:
-            logger.info("No files to transfer via ASO. Done!")
+            self.logger.info("No files to transfer via ASO. Done!")
             return 0
         failed_killed_transfers = []
         done_transfers = []
         starttime = time.time()
         if self.aso_start_timestamp:
             starttime = self.aso_start_timestamp
-        logger.info("====== Starting to monitor ASO transfers.")
+        self.logger.info("====== Starting to monitor ASO transfers.")
         ## This call to get_transfers_statuses() is only to make a first call to
         ## the couch view in order to reduce the probability of getting a stale
         ## result when calling the view inside the while loop below.
@@ -252,7 +247,7 @@ class ASOServerJob(object):
             transfers_statuses = self.get_transfers_statuses()
             msg = "Got statuses: %s; %.1f hours since transfer submit." 
             msg = msg % (", ".join(transfers_statuses), (time.time()-starttime)/3600.0)
-            logger.info(msg)
+            self.logger.info(msg)
             all_transfers_finished = True
             doc_ids = [doc_info['doc_id'] for doc_info in self.docs_in_transfer]
             for transfer_status, doc_id in zip(transfers_statuses, doc_ids):
@@ -288,11 +283,11 @@ class ASOServerJob(object):
                             msg += "\n%s" % reasons
                             if app:
                                 msg += "\n<----- %s log finish ----" % str(app).upper()
-                            logger.error(msg)
+                            self.logger.error(msg)
                         else:
                             reasons, app, severity = 'Failure reason unavailable.', '', ''
-                            logger.error(msg)
-                            logger.warning("WARNING: no failure reason available.")
+                            self.logger.error(msg)
+                            self.logger.warning("WARNING: no failure reason available.")
                         self.failures[doc_id] = {'reasons': reasons, 'app': app, 'severity': severity}
                 else:
                     exmsg = "Got an unknown status: %s" % (transfer_status)
@@ -301,18 +296,18 @@ class ASOServerJob(object):
                 msg = "All transfers finished. There were %s failed/killed transfers." % (len(failed_killed_transfers))
                 if failed_killed_transfers:
                     msg += " (%s)" % ', '.join(failed_killed_transfers)
-                    logger.info(msg)
-                    logger.info("====== Finished to monitor ASO transfers.")
+                    self.logger.info(msg)
+                    self.logger.info("====== Finished to monitor ASO transfers.")
                     return 1
                 else:
-                    logger.info(msg)
-                    logger.info("====== Finished to monitor ASO transfers.")
+                    self.logger.info(msg)
+                    self.logger.info("====== Finished to monitor ASO transfers.")
                     return 0
             ## If there is a timeout for transfers to complete, check if it was exceeded
             ## and if so kill the ongoing transfers. # timeout = -1 means no timeout.
             if self.retry_timeout != -1 and time.time() - starttime > self.retry_timeout:
                 msg = "Killing ongoing ASO transfers after timeout of %d (seconds)." % (self.retry_timeout)
-                logger.warning(msg)
+                self.logger.warning(msg)
                 reason = "Killed ASO transfer after timeout of %d (seconds)." % (self.retry_timeout)
                 for doc_info in self.docs_in_transfer:
                     doc_id = doc_info['doc_id']
@@ -320,7 +315,7 @@ class ASOServerJob(object):
                         app, severity = '', ''
                         self.failures[doc_id] = {'reasons': reason, 'app': app, 'severity': severity}
                         self.cancel({doc_id: reason})
-                logger.info("====== Finished to monitor ASO transfers.")
+                self.logger.info("====== Finished to monitor ASO transfers.")
                 return 1
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -329,7 +324,7 @@ class ASOServerJob(object):
         """
         Inject documents to ASO database if not done by cmscp from worker node.
         """
-        logger.info("====== Starting to check uploads to ASO database.")
+        self.logger.info("====== Starting to check uploads to ASO database.")
         docs_in_transfer = []
         output_files = []
 
@@ -353,7 +348,7 @@ class ASOServerJob(object):
             msg  = "Unable to determine ASO start time from job report."
             msg += " Will use ASO start time = %s (%s)."
             msg  = msg % (aso_start_time, self.aso_start_timestamp)
-            logger.warning(msg)
+            self.logger.warning(msg)
 
         if str(self.job_ad['CRAB_UserRole']).lower() != 'undefined':
             role = str(self.job_ad['CRAB_UserRole'])
@@ -414,7 +409,7 @@ class ASOServerJob(object):
                 ## needs_transfer is False if and only if the file was staged out
                 ## from the worker node directly to the permanent storage.
                 needs_transfer = self.log_needs_transfer
-            logger.info("Working on file %s" % (filename))
+            self.logger.info("Working on file %s" % (filename))
             doc_id = hashlib.sha224(source_lfn).hexdigest()
             doc_new_info = {'state'           : 'new',
                             'source'          : source_site,
@@ -433,7 +428,7 @@ class ASOServerJob(object):
                 msg  = "File %s is marked as having been directly staged out"
                 msg += " from the worker node to the permanent storage."
                 msg  = msg % (filename)
-                logger.info(msg)
+                self.logger.info(msg)
                 doc_new_info['state'] = 'done'
                 doc_new_info['end_time'] = now
             ## Set the publication flag.
@@ -464,11 +459,11 @@ class ASOServerJob(object):
                 ## This file doesn't need transfer nor publication, so we don't need to upload
                 ## a document to ASO database.
                 if publication_msg:
-                    logger.info(publication_msg)
+                    self.logger.info(publication_msg)
                 msg  = "File %s doesn't need transfer nor publication."
                 msg += " No need to inject a document to ASO."
                 msg  = msg % (filename)
-                logger.info(msg)
+                self.logger.info(msg)
             else:
                 ## This file needs transfer and/or publication. If a document (for the current
                 ## job retry) is not yet in ASO database, we need to do the upload.
@@ -489,7 +484,7 @@ class ASOServerJob(object):
                         msg += " (it was injected from the worker node in the current job retry)"
                         msg += " and file transfer status is '%s'."
                         msg  = msg % (source_lfn, doc_id, transfer_status)
-                        logger.info(msg)
+                        self.logger.info(msg)
                         needs_commit = False
                     else:
                         ## The document was uploaded in a previous job retry. This means that in the
@@ -503,13 +498,13 @@ class ASOServerJob(object):
                         if transfer_status in ['acquired', 'new', 'retry']:
                             msg += "\nFile transfer status is not terminal ('done', 'failed' or 'killed')."
                             msg += " Will not inject a new document for the current job retry."
-                            logger.info(msg)
+                            self.logger.info(msg)
                             needs_commit = False
                         else:
                             msg += " Will inject a new %s request." % (' and '.join(aso_tasks))
-                            logger.info(msg)
+                            self.logger.info(msg)
                             msg = "Previous document: %s" % (pprint.pformat(doc))
-                            logger.debug(msg)
+                            self.logger.debug(msg)
                 except CMSCouch.CouchNotFoundError:
                     ## The document was not yet uploaded to ASO database (if this is the first job
                     ## retry, then either the upload from the WN failed, or cmscp did a direct
@@ -518,9 +513,9 @@ class ASOServerJob(object):
                     msg  = "LFN %s (id %s) is not in ASO database."
                     msg += " Will inject a new %s request."
                     msg  = msg % (source_lfn, doc_id, ' and '.join(aso_tasks))
-                    logger.info(msg)
+                    self.logger.info(msg)
                     if publication_msg:
-                        logger.info(publication_msg)
+                        self.logger.info(publication_msg)
                     doc = {'_id'                     : doc_id,
                            'inputdataset'            : str(self.job_ad['CRAB_InputData']),
                            'rest_host'               : str(self.job_ad['CRAB_RestHost']),
@@ -549,17 +544,17 @@ class ASOServerJob(object):
                         msg += "\n%s" % (traceback.format_exc())
                     except AttributeError:
                         msg += "\nTraceback unavailable."
-                    logger.error(msg)
+                    self.logger.error(msg)
                     return False
                 ## If after all we need to upload a new document to ASO database, let's do it.
                 if needs_commit:
                     doc.update(doc_new_info)
                     msg = "ASO job description: %s" % (pprint.pformat(doc))
-                    logger.info(msg)
+                    self.logger.info(msg)
                     commit_result_msg = self.couch_database.commitOne(doc)[0]
                     if 'error' in commit_result_msg:
                         msg = "Got error injecting document to ASO database:\n%s" % (commit_result_msg)
-                        logger.info(msg)
+                        self.logger.info(msg)
                         return False
                 ## Record all files for which we want the post-job to monitor their transfer.
                 if needs_transfer:
@@ -568,7 +563,7 @@ class ASOServerJob(object):
                                }
                     docs_in_transfer.append(doc_info)
 
-        logger.info("====== Finished to check uploads to ASO database.")
+        self.logger.info("====== Finished to check uploads to ASO database.")
 
         return docs_in_transfer
 
@@ -591,7 +586,7 @@ class ASOServerJob(object):
                 with open("aso_status.json") as fd_aso_status:
                     aso_info = json.load(fd_aso_status)
             except:
-                logger.exception("Failed to load common ASO status.")
+                self.logger.exception("Failed to load common ASO status.")
                 return self.get_transfers_statuses_fallback()
             last_query = aso_info.get("query_timestamp", 0)
             # We can use the cached data if:
@@ -608,14 +603,14 @@ class ASOServerJob(object):
                     break
         if query_view:
             query = {'reduce': False, 'key': self.reqname, 'stale': 'update_after'}
-            logger.debug("Querying ASO view.")
+            self.logger.debug("Querying ASO view.")
             try:
                 view_results = self.couch_database.loadView('AsyncTransfer', 'JobsIdsStatesByWorkflow', query)['rows']
                 view_results_dict = {}
                 for view_result in view_results:
                     view_results_dict[view_result['id']] = view_result
             except Exception:
-                logger.exception("Error while querying the asynctransfer CouchDB.")
+                self.logger.exception("Error while querying the asynctransfer CouchDB.")
                 return self.get_transfers_statuses_fallback()
             aso_info = {"query_timestamp": time.time(), "results": view_results_dict}
             tmp_fname = "aso_status.%d.json" % (os.getpid())
@@ -623,7 +618,7 @@ class ASOServerJob(object):
                 json.dump(aso_info, fd_aso_status)
             os.rename(tmp_fname, "aso_status.json")
         else:
-            logger.debug("Using cached results.")
+            self.logger.debug("Using cached results.")
         if not aso_info:
             return self.get_transfers_statuses_fallback()
         statuses = []
@@ -653,7 +648,7 @@ class ASOServerJob(object):
                     msg += " (got start_time = %s, while in the document is start_time = %s)." % (start_time, doc_info['start_time'])
                     msg += " Transfer state may correspond to a document from a previous job retry."
                     msg += " Returning transfer state = 'unknown'."
-                    logger.info(msg)
+                    self.logger.info(msg)
                     statuses.append('unknown')
             else:
                 statuses.append(transfer_status)
@@ -670,13 +665,13 @@ class ASOServerJob(object):
             doc = self.couch_database.document(doc_id)
         except CMSCouch.CouchError, cee:
             msg = "Error retrieving document from ASO database for ID %s: %s" % (doc_id, str(cee))
-            logger.error(msg)
+            self.logger.error(msg)
         except HTTPException, hte:
             msg = "Error retrieving document from ASO database for ID %s: %s" % (doc_id, str(hte.headers))
-            logger.error(msg)
+            self.logger.error(msg)
         except Exception:
             msg = "Error retrieving document from ASO database for ID %s" % (doc_id)
-            logger.exception(msg)
+            self.logger.exception(msg)
         return doc
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -686,7 +681,8 @@ class ASOServerJob(object):
         Retrieve the status of all transfers by loading the correspnding documents
         from ASO database and checking the 'state' field.
         """
-        logger.debug("Querying transfers statuses using fallback method (i.e. loading each document).")
+        msg = "Querying transfers statuses using fallback method (i.e. loading each document)."
+        self.logger.debug(msg)
         statuses = []
         for doc_info in self.docs_in_transfer:
             doc_id = doc_info['doc_id']
@@ -713,11 +709,11 @@ class ASOServerJob(object):
             msg = "Cancelling ASO transfer %s" % (doc_id)
             if reason:
                 msg += " with following reason: %s" % (reason)
-            logger.info(msg)
+            self.logger.info(msg)
             doc = self.load_couch_document(doc_id)
             if not doc:
                 msg = "Could not cancel ASO transfer %s" % (doc_id)
-                logger.info(msg)
+                self.logger.info(msg)
                 continue
             doc['state'] = 'killed'
             doc['end_time'] = now
@@ -758,8 +754,8 @@ class PostJob():
         """
         PostJob constructor.
         """
-        ## These are set from arguments to PostJob (see RunJobs.dag file in the schedd).
-        ## We set them in execute(). Is the very first thing we do.
+        ## These attributes are set from arguments passed to the post-job (see
+        ## RunJobs.dag file).
         self.cluster             = None
         self.job_status          = None
         self.dag_retry_count     = None
@@ -770,9 +766,10 @@ class PostJob():
         self.dest_dir            = None
         self.logs_arch_file_name = None
         self.output_files_names  = None
-        ## This is the number of times the post-job was ran for this job.
+        ## The crab_retry is the number of times the post-job was ran (not necessarilly
+        ## completing) for this job id.
         self.crab_retry_count    = None
-        ## These are read from the job ad file in the schedd (see parse_job_ad()).
+        ## These attributes are read from the job ad file in the schedd (see parse_job_ad()).
         self.job_ad              = {}
         self.dest_site           = None
         self.input_dataset       = None
@@ -783,7 +780,7 @@ class PostJob():
         self.retry_timeout       = None
         self.transfer_logs       = None
         self.transfer_outputs    = None
-        ## These are read from the job report (see parse_job_report()).
+        ## These attributes are read from the job report (see parse_job_report()).
         self.job_report          = {}
         self.job_report_output   = {}
         self.log_needs_transfer  = None
@@ -795,6 +792,15 @@ class PostJob():
         ## Object we will use for making requests to the REST interface (uploading logs
         ## archive and output files matadata).
         self.server              = None
+        ## Set a logger for the post-job.
+        self.logger = logging.getLogger()
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", \
+                                      datefmt = "%a, %d %b %Y %H:%M:%S %Z(%z)")
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.propagate = False
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -802,12 +808,6 @@ class PostJob():
         """
         The execute method of PostJob.
         """
-        ## Make sure there are enough arguments passed to PostJob.
-        if len(args) < 9:
-            msg = "PostJob expects at least 9 arguments; %d were given."
-            msg = msg % (len(args))
-            logger.error(msg)
-            return 2
         ## Put the arguments to PostJob into class variables.
         self.cluster             = args[0]
         self.job_status          = args[1]
@@ -831,48 +831,47 @@ class PostJob():
         if self.crab_retry_count is None:
             self.crab_retry_count = self.dag_retry_count
 
-        ## Create the user's task web directory in the schedd. 
+        ## Create the task web directory in the schedd.
         logpath = os.path.expanduser("~/%s" % (self.reqname))
         try:
             os.makedirs(logpath)
         except OSError, ose:
             if ose.errno != errno.EEXIST:
-                msg = "Failed to create log web-shared directory %s" % (logpath)
-                logger.exception(msg)
+                print "Failed to create log web-shared directory %s" % (logpath)
                 raise
 
-        ## Create (open) the post-job log file postjob.<jobid>.<crabretrycount>.txt.
-        postjob_log_file_name = os.path.join(logpath, 'postjob.%d.%d.txt' % (self.job_id, self.crab_retry_count))
-        fd = os.open(postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
+        ## Create (open) the post-job log file postjob.<job_id>.<crab_retry>.txt.
+        postjob_log_file_name = os.path.join(logpath, "postjob.%d.%d.txt" % (self.job_id, self.crab_retry_count))
+        fd_postjob_log = os.open(postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
         os.chmod(postjob_log_file_name, 0644)
+        ## Redirect stdout and stderr to the post-job log file.
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
-            msg = "Post-job started with no output redirection."
-            logger.info(msg)
+            print "Post-job started with no output redirection."
         else:
-            os.dup2(fd, 1)
-            os.dup2(fd, 2)
+            os.dup2(fd_postjob_log, 1)
+            os.dup2(fd_postjob_log, 2)
             msg = "Post-job started with output redirected to %s." % (postjob_log_file_name)
-            logger.info(msg)
+            self.logger.info(msg)
 
         ## Call execute_internal().
         retval = 1
         try:
             retval = self.execute_internal()
             msg = "Post-job finished executing with status code %d." % (retval)
-            logger.info(msg)
+            self.logger.info(msg)
         except:
             msg = "Failure during post-job execution."
-            logger.exception(msg)
+            self.logger.exception(msg)
         finally:
             DashboardAPI.apmonFree()
 
         ## Prepare the error report. Enclosing it in a try except as we don't want to
         ## fail jobs because this fails.
         try:
-            prepareErrorSummary(self.reqname)
+            prepareErrorSummary(self.logger, self.reqname)
         except:
             msg = "Unknown error while preparing the error report."
-            logger.exception(msg)
+            self.logger.exception(msg)
 
         ## Decide if the whole task should be aborted (in case a significant fraction of
         ## the jobs has failed).
@@ -899,7 +898,7 @@ class PostJob():
             fname = 'job_out.'+str(self.job_id)+'.'+str(self.crab_retry_count)+'.txt'
             fname = os.path.join(logpath, fname)
             msg = "Copying job stdout from %s to %s." % (stdout, fname)
-            logger.debug(msg)
+            self.logger.debug(msg)
             shutil.copy(stdout_tmp, fname)
             fd_stdout = open(stdout_tmp, 'w')
             fd_stdout.truncate(0)
@@ -916,32 +915,32 @@ class PostJob():
             fname = 'job_fjr.'+str(self.job_id)+'.'+str(self.crab_retry_count)+'.json'
             fname = os.path.join(logpath, fname)
             msg = "Copying job report from %s to %s." % (G_JOB_REPORT_NAME, fname)
-            logger.debug(msg)
+            self.logger.debug(msg)
             shutil.copy(G_JOB_REPORT_NAME, fname)
             os.chmod(fname, 0644)
 
         ## Print a message about what job retry number are we on.
         msg  = "This is job retry number %d." % (self.dag_retry_count)
         msg += " The maximum allowed number of retries is %d." % (self.max_retries)
-        logger.info(msg)
+        self.logger.info(msg)
 
         ## Make sure the location of the user's proxy file is set in the environment.
         if 'X509_USER_PROXY' not in os.environ:
             msg = "X509_USER_PROXY is not present in environment."
-            logger.error(msg)
+            self.logger.error(msg)
             return 10
 
         ## Parse the job ad.
         job_ad_file_name = os.environ.get("_CONDOR_JOB_AD", ".job.ad")
-        logger.info("====== Starting to parse job ad file %s." % (job_ad_file_name))
+        self.logger.info("====== Starting to parse job ad file %s." % (job_ad_file_name))
         parse_job_ad_status = self.parse_job_ad(job_ad_file_name)
         if parse_job_ad_status is not OK:
             self.set_dashboard_state('FAILED')
-            logger.info("====== Finished to parse job ad.")
+            self.logger.info("====== Finished to parse job ad.")
             return RetryJob.FATAL_ERROR
-        logger.info("====== Finished to parse job ad.")
+        self.logger.info("====== Finished to parse job ad.")
 
-        logger.info("====== Starting to analyze job exit status.")
+        self.logger.info("====== Starting to analyze job exit status.")
         ## Execute the retry-job. The retry-job decides whether an error is
         ## recoverable or fatal. It uses the cmscp exit code and error message,
         ## and the memory and cpu perfomance information; all from the job
@@ -960,57 +959,57 @@ class PostJob():
         if retryjob_retval:
             if retryjob_retval == RetryJob.FATAL_ERROR:
                 msg = "The retry handler indicated this was a fatal error."
-                logger.info(msg)
+                self.logger.info(msg)
                 self.set_dashboard_state('FAILED')
-                logger.info("====== Finished to analyze job exit status.")
+                self.logger.info("====== Finished to analyze job exit status.")
                 return RetryJob.FATAL_ERROR
             elif retryjob_retval == RetryJob.RECOVERABLE_ERROR:
                 if self.dag_retry_count >= self.max_retries:
                     msg  = "The retry handler indicated this was a recoverable error,"
                     msg += " but the maximum number of retries was already hit."
                     msg += " DAGMan will not retry."
-                    logger.info(msg)
+                    self.logger.info(msg)
                     self.set_dashboard_state('FAILED')
-                    logger.info("====== Finished to analyze job exit status.")
+                    self.logger.info("====== Finished to analyze job exit status.")
                     return RetryJob.FATAL_ERROR
                 else:
                     msg  = "The retry handler indicated this was a recoverable error."
                     msg += " DAGMan will retry."
-                    logger.info(msg)
+                    self.logger.info(msg)
                     self.set_dashboard_state('COOLOFF')
-                    logger.info("====== Finished to analyze job exit status.")
+                    self.logger.info("====== Finished to analyze job exit status.")
                     return RetryJob.RECOVERABLE_ERROR
             else:
                 msg  = "The retry handler returned an unexpected value (%d)." % (retryjob_retval)
                 msg += " Will consider this as a fatal error. DAGMan will not retry."
-                logger.info(msg)
+                self.logger.info(msg)
                 self.set_dashboard_state('FAILED')
-                logger.info("====== Finished to analyze job exit status.")
+                self.logger.info("====== Finished to analyze job exit status.")
                 return RetryJob.FATAL_ERROR
         ## This is for the case in which we don't run the retry-job.
         elif self.job_status != 0:
             if self.dag_retry_count >= self.max_retries:
                 msg = "The maximum allowed number of retries was hit and the job failed."
                 msg += " Setting this node (job) to permanent failure."
-                logger.info(msg)
+                self.logger.info(msg)
                 self.set_dashboard_state('FAILED')
-                logger.info("====== Finished to analyze job exit status.")
+                self.logger.info("====== Finished to analyze job exit status.")
                 return RetryJob.FATAL_ERROR
         else:
-            logger.info("====== Finished to analyze job exit status.")
+            self.logger.info("====== Finished to analyze job exit status.")
         ## If CRAB_ASOTimeout was not defined in the job ad, get here the ASO timeout
         ## from the retry-job.
         if self.retry_timeout is None:
             self.retry_timeout = retry.get_aso_timeout()
 
         ## Parse the job report.
-        logger.info("====== Starting to parse job report file %s." % (G_JOB_REPORT_NAME))
+        self.logger.info("====== Starting to parse job report file %s." % (G_JOB_REPORT_NAME))
         parse_job_report_status = self.parse_job_report()
         if parse_job_report_status is not OK:
             self.set_dashboard_state('FAILED')
-            logger.info("====== Finished to parse job report.")
+            self.logger.info("====== Finished to parse job report.")
             return RetryJob.FATAL_ERROR
-        logger.info("====== Finished to parse job report.")
+        self.logger.info("====== Finished to parse job report.")
 
         ## AndresT. We don't need this method IMHO. See note I made in the method.
         self.fix_job_logs_permissions()
@@ -1024,53 +1023,53 @@ class PostJob():
             msg  = "CRAB_NoWNStageout is set to %d in the job ad." % (int(self.job_ad.get('CRAB_NoWNStageout', 0)))
             msg += " Skipping files stageout and files metadata upload."
             msg += " Finishing post-job execution with exit code 0."
-            logger.info(msg)
+            self.logger.info(msg)
             self.set_dashboard_state('FINISHED')
             return 0
 
         if not self.transfer_logs:
             msg  = "The user has not specified to transfer the log files."
             msg += " No log files stageout (nor log files metadata upload) will be performed."
-            logger.info(msg)
+            self.logger.info(msg)
         if len(self.output_files_names) == 0:
             if not self.transfer_outputs:
                 msg  = "Post-job got an empty list of output files (i.e. no output file) to work on."
                 msg += " In any case, the user has specified to not transfer output files."
-                logger.info(msg)
+                self.logger.info(msg)
             else:
                 msg  = "The transfer of output files flag in on,"
                 msg += " but the post-job got an empty list of output files (i.e. no output file) to work on."
                 msg += " Turning off the transfer of output files flag."
-                logger.info(msg)
+                self.logger.info(msg)
                 self.transfer_outputs = 0
         else:
             if not self.transfer_outputs:
                 msg  = "The user has specified to not transfer the output files."
                 msg += " No output files stageout (nor output files metadata upload) will be performed."
-                logger.info(msg)
+                self.logger.info(msg)
 
         ## Initialize the object we will use for making requests to the REST interface.
         self.server = HTTPRequests(self.rest_host, \
                                    os.environ['X509_USER_PROXY'], \
                                    os.environ['X509_USER_PROXY'], \
-                                   retry = 2, logger = logger)
+                                   retry = 2, logger = self.logger)
 
         ## Upload the logs archive file metadata if it was not already done from the WN.
         if self.transfer_logs:
             if self.log_needs_file_metadata_upload:
-                logger.info("====== Starting upload of logs archive file metadata.")
+                self.logger.info("====== Starting upload of logs archive file metadata.")
                 try:
                     self.upload_log_file_metadata()
                 except Exception, exmsg:
                     msg = "Fatal error uploading logs archive file metadata: %s" % (str(exmsg)) 
-                    logger.error(msg)
-                    logger.info("====== Finished upload of logs archive file metadata.")
+                    self.logger.error(msg)
+                    self.logger.info("====== Finished upload of logs archive file metadata.")
                     return self.check_retry_count()
-                logger.info("====== Finished upload of logs archive file metadata.")
+                self.logger.info("====== Finished upload of logs archive file metadata.")
             else:
                 msg  = "Skipping logs archive file metadata upload, because it is marked as"
                 msg += " having been uploaded already from the worker node."
-                logger.info(msg)
+                self.logger.info(msg)
 
         ## Just an info message.
         if self.transfer_logs or self.transfer_outputs:
@@ -1081,58 +1080,58 @@ class PostJob():
             if self.transfer_outputs:
                 msgadd.append("%d output files" % (len(self.output_files_names)))
             msg = msg + ' and '.join(msgadd) + '.'
-            logger.info(msg)
+            self.logger.info(msg)
 
         ## Do the transfers (inject to ASO database if needed, and monitor the transfers
         ## statuses until they reach a terminal state).
         if self.transfer_logs or self.transfer_outputs:
-            logger.info("====== Starting to check for ASO transfers.")
+            self.logger.info("====== Starting to check for ASO transfers.")
             try:
                 self.perform_transfers()
             except PermanentStageoutError, pse:
                 msg = "Got fatal stageout exception:\n%s" % (str(pse))
-                logger.error(msg)
+                self.logger.error(msg)
                 msg = "There was at least one permanent stageout error; user will need to resubmit."
-                logger.error(msg)
+                self.logger.error(msg)
                 self.set_dashboard_state('FAILED')
-                logger.info("====== Finished to check for ASO transfers.")
+                self.logger.info("====== Finished to check for ASO transfers.")
                 return RetryJob.FATAL_ERROR
             except RecoverableStageoutError, rse:
                 msg = "Got recoverable stageout exception:\n%s" % (str(rse))
-                logger.error(msg)
+                self.logger.error(msg)
                 msg = "These are all recoverable stageout errors; automatic resubmit is possible."
-                logger.error(msg)
-                logger.info("====== Finished to check for ASO transfers.")
+                self.logger.error(msg)
+                self.logger.info("====== Finished to check for ASO transfers.")
                 return self.check_retry_count()
             except:
                 msg = "Stageout failure due to unknown issue."
-                logger.exception(msg)
-                logger.info("====== Finished to check for ASO transfers.")
+                self.logger.exception(msg)
+                self.logger.info("====== Finished to check for ASO transfers.")
                 return self.check_retry_count()
-            logger.info("====== Finished to check for ASO transfers.")
+            self.logger.info("====== Finished to check for ASO transfers.")
 
         ## Upload the output files metadata.
         if self.transfer_outputs:
-            logger.info("====== Starting upload of output files metadata.")
+            self.logger.info("====== Starting upload of output files metadata.")
             try:
                 self.upload_output_files_metadata()
             except Exception, exmsg:
                 msg = "Fatal error uploading output files metadata: %s" % (str(exmsg))
-                logger.exception(msg)
-                logger.info("====== Finished upload of output files metadata.")
+                self.logger.exception(msg)
+                self.logger.info("====== Finished upload of output files metadata.")
                 return self.check_retry_count()
-            logger.info("====== Finished upload of output files metadata.")
+            self.logger.info("====== Finished upload of output files metadata.")
 
         ## Upload the input files metadata.
-        logger.info("====== Starting upload of input files metadata.")
+        self.logger.info("====== Starting upload of input files metadata.")
         try:
             self.upload_input_files_metadata()
         except Exception, exmsg:
             msg = "Fatal error uploading input files metadata: %s" % (str(exmsg))
-            logger.exception(msg)
-            logger.info("====== Finished upload of input files metadata.")
+            self.logger.exception(msg)
+            self.logger.info("====== Finished upload of input files metadata.")
             return self.check_retry_count()
-        logger.info("====== Finished upload of input files metadata.")
+        self.logger.info("====== Finished upload of input files metadata.")
 
         self.set_dashboard_state('FINISHED')
 
@@ -1154,7 +1153,8 @@ class PostJob():
             source_sites.append(self.get_file_source_site(filename, ifile))
 
         global ASO_JOB
-        ASO_JOB = ASOServerJob(self.dest_site, self.source_dir, self.dest_dir, \
+        ASO_JOB = ASOServerJob(self.logger, \
+                               self.dest_site, self.source_dir, self.dest_dir, \
                                source_sites, self.job_id, log_and_output_files_names, \
                                self.reqname, self.log_size, \
                                self.log_needs_transfer, self.job_report_output, \
@@ -1241,12 +1241,12 @@ class PostJob():
         rest_url = self.rest_host + rest_uri
         msg = "Uploading file metadata for %s to https://%s: %s"
         msg = msg % (self.logs_arch_file_name, rest_url, configreq)
-        logger.debug(msg)
+        self.logger.debug(msg)
         try:
             self.server.put(rest_uri, data = urllib.urlencode(configreq))
         except HTTPException, hte:
             msg = "Error uploading logs file metadata: %s" % (str(hte.headers))
-            logger.error(msg)
+            self.logger.error(msg)
             if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
                not hte.headers.get('X-Error-Http', -1) == '400':
                 raise
@@ -1267,7 +1267,7 @@ class PostJob():
             lfns = [x['lfn'] for x in res[u'result']]
         except HTTPException, hte:
             msg = "Error getting list of file metadata: %s" % (str(hte.headers))
-            logger.error(msg)
+            self.logger.error(msg)
             return False
         return (lfn in lfns)
 
@@ -1284,7 +1284,7 @@ class PostJob():
         if self.job_report.get(u'temp_storage_site', 'unknown') != 'unknown':
             temp_storage_site = self.job_report.get(u'temp_storage_site')
         if not 'source' in self.job_report.get('steps', {}).get('cmsRun', {}).get('input', {}):
-            logger.info("Skipping input filemetadata upload as no inputs were found")
+            self.logger.info("Skipping input filemetadata upload as no inputs were found")
             return
         direct_stageout = int(self.job_report.get(u'direct_stageout', 0))
         for ifile in self.job_report['steps']['cmsRun']['input']['source']:
@@ -1325,17 +1325,17 @@ class PostJob():
             for lumi in outfilelumis:
                 configreq.append(("outfilelumis", lumi))
             msg = "Uploading file metadata for input file %s" % ifile['lfn']
-            logger.debug(msg)
+            self.logger.debug(msg)
             try:
                 self.server.put(self.rest_uri_no_api + '/filemetadata', data = urllib.urlencode(configreq))
             except HTTPException, hte:
                 msg = "Error uploading input file metadata: %s" % (str(hte.headers))
-                logger.error(msg)
+                self.logger.error(msg)
                 if not self.file_exists(lfn, 'POOLIN'):
                     raise
                 else:
                     msg = "Ignoring the error since the file %s is already in the database" % lfn
-                    logger.debug(msg)
+                    self.logger.debug(msg)
 
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -1410,19 +1410,19 @@ class PostJob():
             rest_uri = self.rest_uri_no_api + '/' + rest_api
             rest_url = self.rest_host + rest_uri
             msg = "Uploading file metadata for %s to https://%s: %s" % (filename, rest_url, configreq)
-            logger.debug(msg)
+            self.logger.debug(msg)
             try:
                 self.server.put(rest_uri, data = urllib.urlencode(configreq))
             except HTTPException, hte:
                 ## BrianB. Suppressing this exception is a tough decision.
                 ## If the file made it back alright, I suppose we can proceed.
                 msg = "Error uploading output file metadata: %s" % (str(hte.headers))
-                logger.error(msg)
+                self.logger.error(msg)
                 if not self.file_exists(file_info['outlfn'], file_info['filetype']):
                     raise
                 else:
                     msg = "Ignoring the error since the file %s is already in the database" % lfn
-                    logger.debug(msg)
+                    self.logger.debug(msg)
 
         if not os.path.exists('output_datasets') and output_datasets:
             configreq = [('subresource', 'addoutputdatasets'),
@@ -1433,17 +1433,17 @@ class PostJob():
             rest_uri = self.rest_uri_no_api + '/' + rest_api
             rest_url = self.rest_host + rest_uri
             msg = "Uploading output datasets to https://%s: %s" % (rest_url, configreq)
-            logger.debug(msg)
+            self.logger.debug(msg)
             try:
                 self.server.post(rest_uri, data = urllib.urlencode(configreq))
                 with open('output_datasets', 'w') as f:
                     f.write(' '.join(output_datasets))
             except HTTPException, hte:
                 msg = "Error uploading output dataset: %s" % (str(hte.headers))
-                logger.error(msg)
+                self.logger.error(msg)
             except IOError, ioe:
                 msq = "Error writing the output_datasets file"
-                logger.error(msg)
+                self.logger.error(msg)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1453,7 +1453,7 @@ class PostJob():
         """
         ## Load the job ad.
         if not os.path.exists(job_ad_file_name) or not os.stat(job_ad_file_name).st_size:
-            logger.error("Missing job ad!")
+            self.logger.error("Missing job ad!")
             return not OK
         try:
             fd_job_ad = open(job_ad_file_name)
@@ -1461,7 +1461,7 @@ class PostJob():
             fd_job_ad.close()
         except Exception, exmsg:
             msg = "Error parsing job ad: %s" % (str(exmsg))
-            logger.exception(msg)
+            self.logger.exception(msg)
             return not OK
         ## Check if all the required attributes from the job ad are there.
         if self.check_required_job_ad_attrs() is not OK:
@@ -1476,14 +1476,14 @@ class PostJob():
         if 'CRAB_SaveLogsFlag' not in self.job_ad:
             msg  = "Job's HTCondor ClassAd is missing attribute CRAB_SaveLogsFlag."
             msg += " Will assume CRAB_SaveLogsFlag = False."
-            logger.warning(msg)
+            self.logger.warning(msg)
             self.transfer_logs = 0
         else:
             self.transfer_logs = int(self.job_ad['CRAB_SaveLogsFlag'])
         if 'CRAB_TransferOutputs' not in self.job_ad:
             msg  = "Job's HTCondor ClassAd is missing attribute CRAB_TransferOutputs."
             msg += " Will assume CRAB_TransferOutputs = True."
-            logger.warning(msg)
+            self.logger.warning(msg)
             self.transfer_outputs = 1
         else:
             self.transfer_outputs = int(self.job_ad['CRAB_TransferOutputs'])
@@ -1519,7 +1519,7 @@ class PostJob():
         if missing_attrs:
             msg = "The following required attributes are missing in the job ad: %s"
             msg = msg % (missing_attrs)
-            logger.error(msg)
+            self.logger.error(msg)
             return not OK
         undefined_attrs = []
         for attr in required_job_ad_attrs:
@@ -1528,7 +1528,7 @@ class PostJob():
         if undefined_attrs:
             msg = "Could not determine the following required attributes from the job ad: %s"
             msg = msg % (undefined_attrs)
-            logger.error(msg)
+            self.logger.error(msg)
             return not OK
         return OK
 
@@ -1546,20 +1546,20 @@ class PostJob():
                 self.job_report = json.load(fd_job_report)
         except Exception, exmsg:
             msg = "Error loading job report: %s" % (str(exmsg))
-            logger.exception(msg)
+            self.logger.exception(msg)
             return not OK
         ## Check that the job_report has the expected structure.
         if 'steps' not in self.job_report:
-            logger.error("Invalid job report: missing 'steps'")
+            self.logger.error("Invalid job report: missing 'steps'")
             return not OK
         if 'cmsRun' not in self.job_report['steps']:
-            logger.error("Invalid job report: missing 'cmsRun'")
+            self.logger.error("Invalid job report: missing 'cmsRun'")
             return not OK
         if 'input' not in self.job_report['steps']['cmsRun']:
-            logger.error("Invalid job report: missing 'input'")
+            self.logger.error("Invalid job report: missing 'input'")
             return not OK
         if 'output' not in self.job_report['steps']['cmsRun']:
-            logger.error("Invalid job report: missing 'output'")
+            self.logger.error("Invalid job report: missing 'output'")
             return not OK
         ## This is the job report part containing information about the output files.
         self.job_report_output = self.job_report['steps']['cmsRun']['output']
@@ -1570,7 +1570,7 @@ class PostJob():
         self.executed_site = self.job_report.get(u'executed_site', None)
         if not self.executed_site:
             msg = "Unable to determine executed site from job report."
-            logger.error(msg)
+            self.logger.error(msg)
             return not OK
         self.job_failed = bool(self.job_report.get(u'jobExitCode', 0))
         if self.job_failed:
@@ -1590,7 +1590,7 @@ class PostJob():
             for output_file_info in output_module:
                 msg = "Output file info for %s: %s"
                 msg = msg % (output_file_info.get(u'pfn', "(unknown 'pfn')").split('/')[-1], output_file_info)
-                logger.debug(msg)
+                self.logger.debug(msg)
                 file_info = {}
                 self.output_files_info.append(file_info)
                 ## Note incorrect spelling of 'output module' in current WMCore
@@ -1691,7 +1691,7 @@ class PostJob():
         ## updates by at least 1s in order for it to get the correct ordering.
         time.sleep(1)
         msg += " Dashboard parameters: %s" % (str(params))
-        logger.info(msg)
+        self.logger.info(msg)
         DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -1720,17 +1720,17 @@ class PostJob():
                 with open(fname, 'r') as fd_retry_info:
                     retry_info = json.load(fd_retry_info)
             except:
-                msg  = "Unable to calculate crab retry count."
+                msg  = "Unable to calculate post-job retry count."
                 msg += " Failed to load file %s." % (fname)
-                logger.warning(msg)
+                self.logger.warning(msg)
                 return None
         else:
             retry_info = {'pre': 0, 'post': 0}
         if 'pre' not in retry_info or 'post' not in retry_info:
-            msg  = "Unable to calculate crab retry count."
+            msg  = "Unable to calculate post-job retry count."
             msg += " File %s doesn't contain the expected information."
             msg = msg % (fname)
-            logger.warning(msg)
+            self.logger.warning(msg)
             return None
         crab_retry_count = retry_info['post']
         retry_info['post'] += 1
@@ -1739,9 +1739,9 @@ class PostJob():
                 json.dump(retry_info, fd_retry_info)
             os.rename(fname + '.tmp', fname)
         except Exception:
-            msg = "Failed to update file %s with increased post count by +1."
+            msg = "Failed to update file %s with increased post-job count by +1."
             msg = msg % (fname)
-            logger.warning(msg)
+            self.logger.warning(msg)
         return crab_retry_count
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -1754,7 +1754,7 @@ class PostJob():
         if int(self.job_ad['CRAB_RetryOnASOFailures']) == 0:
             msg  = "Considering transfer error as a permanent failure"
             msg += " because CRAB_RetryOnASOFailures = 0 in the job ad."
-            logger.debug(msg)
+            self.logger.debug(msg)
             return True
         permanent_failure_reasons = [
                                      ".*killed aso transfer after timeout.*",
@@ -1782,12 +1782,12 @@ class PostJob():
         if self.dag_retry_count >= self.max_retries:
             msg  = "Job could be retried, but the maximum allowed number of retries was hit."
             msg += " Setting this node (job) to permanent failure. DAGMan will NOT retry."
-            logger.info(msg)
+            self.logger.info(msg)
             self.set_dashboard_state('FAILED')
             return RetryJob.FATAL_ERROR
         else:
             msg = "Job will be retried by DAGMan."
-            logger.info(msg)
+            self.logger.info(msg)
             self.set_dashboard_state('COOLOFF')
             return RetryJob.RECOVERABLE_ERROR
 
@@ -1831,7 +1831,7 @@ class PostJob():
                     msg += " Will abort the whole DAG."
                     msg = msg % (num_fatal_failed_jobs, num_successful_jobs, \
                                  num_successful_jobs + num_fatal_failed_jobs, limit)
-                    logger.error(msg)
+                    self.logger.error(msg)
                     rval = 3
         finally:
             return rval
