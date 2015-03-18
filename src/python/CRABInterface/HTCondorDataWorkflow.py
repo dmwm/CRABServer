@@ -419,7 +419,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             taskStatus, pool = self.taskWebStatus(results[0], verbose=verbose)
         except MissingNodeStatus:
             return [ {"status" : "UNKNOWN",
-                "taskFailureMsg"  : "Node status file not currently available.  Retry in a minute if you just submitted the task",
+                "taskFailureMsg"  : "Node status file not currently available. Retry in a minute if you just submitted the task",
                 "taskWarningMsg"  : taskWarnings,
                 "jobSetID"        : '',
                 "jobsPerStatus"   : {},
@@ -471,10 +471,12 @@ class HTCondorDataWorkflow(DataWorkflow):
             jobsPerStatus[status] += 1
             jobList.append((status, job))
 
-        #getting publication information
+        ## Publication information will go here.
         publication_info = {}
+
+        ## The output datasets are written into the Task DB by the post-job
+        ## when uploading the output files metadata.
         outdatasets = literal_eval(row.output_dataset.read() if row.output_dataset else 'None')
-        arguments = literal_eval(row.arguments.read())
 
         #Always returning ASOURL also, it is required for kill, resubmit
         self.logger.info("ASO: %s" % row.asourl)
@@ -555,7 +557,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                 hbuf.truncate(0)
             else:
                 raise ExecutionError("Cannot get jobs log file. Retry in a minute if you just submitted the task")
-
         elif verbose == 2:
             site_url = url + "/site_ad.txt"
             curl.setopt(pycurl.URL, site_url)
@@ -918,7 +919,6 @@ class HTCondorDataWorkflow(DataWorkflow):
     job_name_re = re.compile(r"Job(\d+)")
     def parseSiteAd(self, fp, task_ad, nodes):
         site_ad = classad.parse(fp)
-
         blacklist = set(task_ad['CRAB_SiteBlacklist'])
         whitelist = set(task_ad['CRAB_SiteWhitelist'])
         if 'CRAB_SiteResubmitWhitelist' in task_ad:
@@ -936,7 +936,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                 sites &= whitelist
             # Never blacklist something on the whitelist
             sites -= (blacklist-whitelist)
-
             info = nodes.setdefault(nodeid, {})
             info['AvailableSites'] = list([i.eval() for i in sites])
 
