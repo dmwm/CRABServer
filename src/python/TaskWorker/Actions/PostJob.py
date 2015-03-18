@@ -176,14 +176,14 @@ class ASOServerJob(object):
 
     def __init__(self, logger, dest_site, source_dir, dest_dir, source_sites, \
                  count, filenames, reqname, log_size, log_needs_transfer, \
-                 job_report_output, job_ad, crab_retry_count, retry_timeout, \
+                 job_report_output, job_ad, crab_retry, retry_timeout, \
                  job_failed, transfer_logs, transfer_outputs):
         """
         ASOServerJob constructor.
         """
         self.logger = logger
         self.docs_in_transfer = None
-        self.crab_retry_count = crab_retry_count
+        self.crab_retry = crab_retry
         self.retry_timeout = retry_timeout
         self.couch_server = None
         self.couch_database = None
@@ -338,8 +338,8 @@ class ASOServerJob(object):
         ## the job report, define them to the current time.
         aso_start_time = None
         try:
-            with open(G_JOB_REPORT_NAME) as fd_job_report:
-                job_report = json.load(fd_job_report)
+            with open(G_JOB_REPORT_NAME) as fd:
+                job_report = json.load(fd)
             self.aso_start_timestamp = job_report.get("aso_start_timestamp")
             aso_start_time = job_report.get("aso_start_time")
         except Exception:
@@ -422,7 +422,9 @@ class ASOServerJob(object):
                             'job_end_time'    : time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
                             'retry_count'     : [],
                             'failure_reason'  : [],
-                            'job_retry_count' : self.crab_retry_count,
+                            ## The 'job_retry_count' is used by ASO when reporting to dashboard,
+                            ## so it is OK to set it equal to the crab (post-job) retry count.
+                            'job_retry_count' : self.crab_retry,
                            }
             if not needs_transfer:
                 msg  = "File %s is marked as having been directly staged out"
@@ -583,8 +585,8 @@ class ASOServerJob(object):
         if not query_view:
             query_view = True
             try:
-                with open("aso_status.json") as fd_aso_status:
-                    aso_info = json.load(fd_aso_status)
+                with open("aso_status.json") as fd:
+                    aso_info = json.load(fd)
             except:
                 self.logger.exception("Failed to load common ASO status.")
                 return self.get_transfers_statuses_fallback()
@@ -614,8 +616,8 @@ class ASOServerJob(object):
                 return self.get_transfers_statuses_fallback()
             aso_info = {"query_timestamp": time.time(), "results": view_results_dict}
             tmp_fname = "aso_status.%d.json" % (os.getpid())
-            with open(tmp_fname, 'w') as fd_aso_status:
-                json.dump(aso_info, fd_aso_status)
+            with open(tmp_fname, 'w') as fd:
+                json.dump(aso_info, fd)
             os.rename(tmp_fname, "aso_status.json")
         else:
             self.logger.debug("Using cached results.")
@@ -756,9 +758,9 @@ class PostJob():
         """
         ## These attributes are set from arguments passed to the post-job (see
         ## RunJobs.dag file).
-        self.cluster             = None
+        self.dag_jobid           = None
         self.job_status          = None
-        self.dag_retry_count     = None
+        self.dag_retry           = None
         self.max_retries         = None
         self.reqname             = None
         self.job_id              = None
@@ -768,8 +770,8 @@ class PostJob():
         self.output_files_names  = None
         ## The crab_retry is the number of times the post-job was ran (not necessarilly
         ## completing) for this job id.
-        self.crab_retry_count    = None
-        ## These attributes are read from the job ad file in the schedd (see parse_job_ad()).
+        self.crab_retry          = None
+        ## These attributes are read from the job ad (see parse_job_ad()).
         self.job_ad              = {}
         self.dest_site           = None
         self.input_dataset       = None
@@ -809,9 +811,9 @@ class PostJob():
         The execute method of PostJob.
         """
         ## Put the arguments to PostJob into class variables.
-        self.cluster             = args[0]
+        self.dag_jobid           = args[0] ## = ClusterId.ProcId
         self.job_status          = args[1]
-        self.dag_retry_count     = int(args[2])
+        self.dag_retry           = int(args[2])
         self.max_retries         = int(args[3])
         ## TODO: Why not get the request name from the job ad?
         ## We will need to parse the job ad earlier, that's all.
@@ -827,9 +829,9 @@ class PostJob():
         for i in xrange(9, len(args)):
             self.output_files_names.append(args[i])
         self.job_status = int(self.job_status)
-        self.crab_retry_count = self.calculate_crab_retry_count()
-        if self.crab_retry_count is None:
-            self.crab_retry_count = self.dag_retry_count
+        self.crab_retry = self.calculate_crab_retry()
+        if self.crab_retry is None:
+            self.crab_retry = self.dag_retry
 
         ## Create the task web directory in the schedd.
         logpath = os.path.expanduser("~/%s" % (self.reqname))
@@ -841,7 +843,7 @@ class PostJob():
                 raise
 
         ## Create (open) the post-job log file postjob.<job_id>.<crab_retry>.txt.
-        postjob_log_file_name = os.path.join(logpath, "postjob.%d.%d.txt" % (self.job_id, self.crab_retry_count))
+        postjob_log_file_name = os.path.join(logpath, "postjob.%d.%d.txt" % (self.job_id, self.crab_retry))
         fd_postjob_log = os.open(postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
         os.chmod(postjob_log_file_name, 0644)
         ## Redirect stdout and stderr to the post-job log file.
@@ -889,13 +891,13 @@ class PostJob():
         """
 
         ## Copy the job's stdout file job_out.<job_id> to the schedd web directory,
-        ## naming it job_out.<job_id>.<crab_retry_count>.txt.
+        ## naming it job_out.<job_id>.<crab_retry>.txt.
         stdout = "job_out.%d" % (self.job_id)
         stdout_tmp = "job_out.tmp.%d" % (self.job_id)
         logpath = os.path.expanduser("~/%s" % (self.reqname))
         if os.path.exists(stdout):
             os.rename(stdout, stdout_tmp)
-            fname = 'job_out.'+str(self.job_id)+'.'+str(self.crab_retry_count)+'.txt'
+            fname = "job_out.%d.%d.txt" % (self.job_id, self.crab_retry)
             fname = os.path.join(logpath, fname)
             msg = "Copying job stdout from %s to %s." % (stdout, fname)
             self.logger.debug(msg)
@@ -906,13 +908,13 @@ class PostJob():
             os.chmod(fname, 0644)
 
         ## Copy the json job report file jobReport.json.<job_id> to the schedd web
-        ## directory, naming it job_fjr.<job_id>.<crab_retry_count>.json.
+        ## directory, naming it job_fjr.<job_id>.<crab_retry>.json.
         ## NOTE: We now redirect stdout -> stderr; hence, we don't keep stderr in
         ## the webdir.
         global G_JOB_REPORT_NAME
         G_JOB_REPORT_NAME = "jobReport.json.%d" % (self.job_id)
         if os.path.exists(G_JOB_REPORT_NAME):
-            fname = 'job_fjr.'+str(self.job_id)+'.'+str(self.crab_retry_count)+'.json'
+            fname = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry)
             fname = os.path.join(logpath, fname)
             msg = "Copying job report from %s to %s." % (G_JOB_REPORT_NAME, fname)
             self.logger.debug(msg)
@@ -920,7 +922,7 @@ class PostJob():
             os.chmod(fname, 0644)
 
         ## Print a message about what job retry number are we on.
-        msg  = "This is job retry number %d." % (self.dag_retry_count)
+        msg  = "This is job retry number %d." % (self.dag_retry)
         msg += " The maximum allowed number of retries is %d." % (self.max_retries)
         self.logger.info(msg)
 
@@ -953,8 +955,8 @@ class PostJob():
         if not os.environ.get('TEST_POSTJOB_DISABLE_RETRIES', False):
             print "       -----> RetryJob log start -----"
             retryjob_retval = retry.execute(self.reqname, self.job_status, \
-                                            self.crab_retry_count, self.job_id, \
-                                            self.cluster)
+                                            self.crab_retry, self.job_id, \
+                                            self.dag_jobid)
             print "       <----- RetryJob log finish ----"
         if retryjob_retval:
             if retryjob_retval == RetryJob.FATAL_ERROR:
@@ -964,7 +966,7 @@ class PostJob():
                 self.logger.info("====== Finished to analyze job exit status.")
                 return RetryJob.FATAL_ERROR
             elif retryjob_retval == RetryJob.RECOVERABLE_ERROR:
-                if self.dag_retry_count >= self.max_retries:
+                if self.dag_retry >= self.max_retries:
                     msg  = "The retry handler indicated this was a recoverable error,"
                     msg += " but the maximum number of retries was already hit."
                     msg += " DAGMan will not retry."
@@ -988,7 +990,7 @@ class PostJob():
                 return RetryJob.FATAL_ERROR
         ## This is for the case in which we don't run the retry-job.
         elif self.job_status != 0:
-            if self.dag_retry_count >= self.max_retries:
+            if self.dag_retry >= self.max_retries:
                 msg = "The maximum allowed number of retries was hit and the job failed."
                 msg += " Setting this node (job) to permanent failure."
                 self.logger.info(msg)
@@ -1158,7 +1160,7 @@ class PostJob():
                                source_sites, self.job_id, log_and_output_files_names, \
                                self.reqname, self.log_size, \
                                self.log_needs_transfer, self.job_report_output, \
-                               self.job_ad, self.crab_retry_count, \
+                               self.job_ad, self.crab_retry, \
                                self.retry_timeout, self.job_failed, \
                                self.transfer_logs, self.transfer_outputs)
         aso_job_result = ASO_JOB.run()
@@ -1456,9 +1458,8 @@ class PostJob():
             self.logger.error("Missing job ad!")
             return not OK
         try:
-            fd_job_ad = open(job_ad_file_name)
-            self.job_ad = classad.parseOld(fd_job_ad)
-            fd_job_ad.close()
+            with open(job_ad_file_name) as fd:
+                self.job_ad = classad.parseOld(fd)
         except Exception, exmsg:
             msg = "Error parsing job ad: %s" % (str(exmsg))
             self.logger.exception(msg)
@@ -1542,8 +1543,8 @@ class PostJob():
         """
         ## Load the job report.
         try:
-            with open(G_JOB_REPORT_NAME) as fd_job_report:
-                self.job_report = json.load(fd_job_report)
+            with open(G_JOB_REPORT_NAME) as fd:
+                self.job_report = json.load(fd)
         except Exception, exmsg:
             msg = "Error loading job report: %s" % (str(exmsg))
             self.logger.exception(msg)
@@ -1668,10 +1669,10 @@ class PostJob():
         state = states_dict.get(state, state)
         msg = "Setting Dashboard state to %s." % (state)
         params = {'MonitorID'    : self.reqname,
-                  'MonitorJobID' : '%d_https://glidein.cern.ch/%d/%s_%d' \
+                  'MonitorJobID' : "%d_https://glidein.cern.ch/%d/%s_%d" \
                                    % (self.job_id, self.job_id, \
                                       self.reqname.replace("_", ":"), \
-                                      self.crab_retry_count),
+                                      self.crab_retry),
                   'StatusValue'  : state,
                  }
         if reason:
@@ -1683,7 +1684,7 @@ class PostJob():
                 log_file_basename, log_file_extension = log_file
                 log_file_name = "%s/%s.%d.%d.%s" % (self.job_ad['CRAB_UserWebDir'], \
                                                     log_file_basename, self.job_id, \
-                                                    self.crab_retry_count, \
+                                                    self.crab_retry, \
                                                     log_file_extension)
                 log_files[i] = log_file_name
             params['StatusLogFile'] = ",".join(log_files)
@@ -1710,15 +1711,15 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def calculate_crab_retry_count(self):
+    def calculate_crab_retry(self):
         """
         Calculate the retry number we're on. See the notes in PreJob.
         """
         fname = "retry_info/job.%d.txt" % (self.job_id)
         if os.path.exists(fname):
             try:
-                with open(fname, 'r') as fd_retry_info:
-                    retry_info = json.load(fd_retry_info)
+                with open(fname, 'r') as fd:
+                    retry_info = json.load(fd)
             except:
                 msg  = "Unable to calculate post-job retry count."
                 msg += " Failed to load file %s." % (fname)
@@ -1732,17 +1733,17 @@ class PostJob():
             msg = msg % (fname)
             self.logger.warning(msg)
             return None
-        crab_retry_count = retry_info['post']
+        crab_retry = retry_info['post']
         retry_info['post'] += 1
         try:
-            with open(fname + '.tmp', 'w') as fd_retry_info:
-                json.dump(retry_info, fd_retry_info)
+            with open(fname + '.tmp', 'w') as fd:
+                json.dump(retry_info, fd)
             os.rename(fname + '.tmp', fname)
         except Exception:
             msg = "Failed to update file %s with increased post-job count by +1."
             msg = msg % (fname)
             self.logger.warning(msg)
-        return crab_retry_count
+        return crab_retry
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1779,7 +1780,7 @@ class PostJob():
         number of job retries was hit. If it was, the post-job should return with the
         fatal error exit code. Otherwise with the recoverable error exit code.
         """
-        if self.dag_retry_count >= self.max_retries:
+        if self.dag_retry >= self.max_retries:
             msg  = "Job could be retried, but the maximum allowed number of retries was hit."
             msg += " Setting this node (job) to permanent failure. DAGMan will NOT retry."
             self.logger.info(msg)
@@ -1812,14 +1813,14 @@ class PostJob():
         try:
             limit = int(self.job_ad['CRAB_FailedNodeLimit'])
             fatal_failed_jobs = []
-            with open(file_name_jobs_fatal, 'r') as fd_jobs_fatal:
-                for job_id in fd_jobs_fatal.readlines():
+            with open(file_name_jobs_fatal, 'r') as fd:
+                for job_id in fd.readlines():
                     if job_id not in fatal_failed_jobs:
                         fatal_failed_jobs.append(job_id)
             num_fatal_failed_jobs = len(fatal_failed_jobs)
             successful_jobs = []
-            with open(file_name_jobs_ok, 'r') as fd_jobs_ok:
-                for job_id in fd_jobs_ok.readlines():
+            with open(file_name_jobs_ok, 'r') as fd:
+                for job_id in fd.readlines():
                     if job_id not in successful_jobs:
                         successful_jobs.append(job_id)
             num_successful_jobs = len(successful_jobs)
@@ -1887,7 +1888,7 @@ class testServer(unittest.TestCase):
     def setUp(self):
         self.postjob = PostJob()
         #self.job = ASOServerJob()
-        #status, crab_retry_count, max_retries, restinstance, resturl, reqname, id,
+        #status, crab_retry, max_retries, restinstance, resturl, reqname, id,
         #outputdata, job_sw, async_dest, source_dir, dest_dir, *filenames
         self.full_args = ['0', 0, 2, 'restinstance', 'resturl',
                           'reqname', 1234, 'outputdata', 'sw', 'T2_US_Vanderbilt']
