@@ -7,7 +7,7 @@ echo "As user: $(whoami)"
 set -x
 
 # Touch a bunch of files to make sure job doesn't go on hold for missing files
-for FILE in $1.dagman.out RunJobs.dag RunJobs.dag.dagman.out RunJobs.dag.rescue.001 dbs_discovery.err dbs_discovery.out job_splitting.err job_splitting.out; do
+for FILE in $1.dagman.out RunJobs.dag RunJobs.dag.dagman.out dbs_discovery.err dbs_discovery.out job_splitting.err job_splitting.out; do
     touch $FILE
 done
 
