@@ -3,20 +3,14 @@ import re
 import sys
 import json
 import shutil
-import commands
 import traceback
 import subprocess
 import classad
+from collections import namedtuple
 
-OK = 0
-FATAL_ERROR = 2
-RECOVERABLE_ERROR = 1
 
-id_to_name = { \
-    OK: "OK",
-    FATAL_ERROR: "FATAL_ERROR",
-    RECOVERABLE_ERROR: "RECOVERABLE_ERROR",
-}
+JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERROR')(0, 1, 2)
+
 
 # Fatal error limits for job resource usage
 MAX_WALLTIME = 21*60*60 + 30*60
@@ -36,40 +30,53 @@ class RecoverableError(Exception):
 ##==============================================================================
 
 class RetryJob(object):
-
+    """
+    Need a doc string here.
+    """
     def __init__(self):
         """
         Class constructor.
         """
-        self.job_id = -1
-        self.site = None
-        self.ad = {}
-        self.validreport = True
+        self.reqname             = None
+        self.job_return_code     = None
+        self.crab_retry_count    = None
+        self.job_id              = None
+        self.dag_jobid           = None
+        self.site                = None
+        self.ad                  = {}
+        self.report              = {}
+        self.validreport         = True
         self.integrated_job_time = 0
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def get_aso_timeout(self):
+        """
+        Need a doc string here.
+        """
         return min(max(self.integrated_job_time/4, 4*3600), 6*3600)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def get_job_ad(self):
+        """
+        Need a doc string here.
+        """
         try:
-            cluster = int(self.cluster.split(".")[0])
-            if cluster == -1:
+            dag_clusterid = int(self.dag_jobid.split(".")[0])
+            if dag_clusterid == -1:
                 return
         except ValueError:
             pass
 
-        shutil.copy("job_log", "job_log.%s" % str(self.cluster))
+        shutil.copy("job_log", "job_log.%s" % str(self.dag_jobid))
 
-        p = subprocess.Popen(["condor_q", "-debug", "-l", "-userlog", "job_log.%s" % str(self.cluster), str(self.cluster)], stdout=subprocess.PIPE, stderr=sys.stderr)
+        p = subprocess.Popen(["condor_q", "-debug", "-l", "-userlog", "job_log.%s" % str(self.dag_jobid), str(self.dag_jobid)], stdout=subprocess.PIPE, stderr=sys.stderr)
         output, _ = p.communicate()
         status = p.returncode
 
         try:
-            os.unlink("job_log.%s" % str(self.cluster))
+            os.unlink("job_log.%s" % str(self.dag_jobid))
         except:
             pass
 
@@ -90,10 +97,13 @@ class RetryJob(object):
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def get_report(self):
+        """
+        Need a doc string here.
+        """
         try:
-            with open("jobReport.json.%d" % (self.job_id), 'r') as fd_job_report:
+            with open("jobReport.json.%d" % (self.job_id), 'r') as fd:
                 try:
-                    self.report = json.load(fd_job_report)
+                    self.report = json.load(fd)
                 except ValueError:
                     self.report = {}
             site = self.report.get('executed_site', None)
@@ -104,15 +114,22 @@ class RetryJob(object):
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def record_site(self, result):
+    def record_site(self, job_status):
+        """
+        Need a doc string here.
+        """
+        job_status_name = None
+        for name, code in JOB_RETURN_CODES._asdict().iteritems():
+            if code == job_status:
+                job_status_name = name
         try:
-            with os.fdopen(os.open("task_statistics.%s.%s" % (self.site, id_to_name[result]), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), 'a') as fd:
+            with os.fdopen(os.open("task_statistics.%s.%s" % (self.site, job_status_name), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), 'a') as fd:
                 fd.write("%d\n" % (self.job_id))
         except Exception, e:
             print "ERROR: %s" % str(e)
             # Swallow the exception - record_site is advisory only
         try:
-            with os.fdopen(os.open("task_statistics.%s" % (id_to_name[result]), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), 'a') as fd:
+            with os.fdopen(os.open("task_statistics.%s" % (job_status_name), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), 'a') as fd:
                 fd.write("%d\n" % (self.job_id))
         except Exception, exmsg:
             print "ERROR: %s" % (str(exmsg))
@@ -126,7 +143,7 @@ class RetryJob(object):
         fake_fjr = {}
         fake_fjr['exitCode'] = exitCode
         fake_fjr['exitMsg'] = exitMsg
-        jobReport = "job_fjr.%d.%d.json" % (self.job_id, self.retry_count)
+        jobReport = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry_count)
         if os.path.isfile(jobReport) and os.path.getsize(jobReport) > 0:
             #File exists and it is not empty
             msg  = "%s file exists and it is not empty!" % (jobReport)
@@ -145,7 +162,9 @@ class RetryJob(object):
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_cpu_report(self):
-
+        """
+        Need a doc string here.
+        """
         # If job was killed on the worker node, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to wall clock limit"):
             self.create_fake_fjr("Not retrying job due to wall clock limit (job automatically killed on the worker node)", 50664)
@@ -175,7 +194,9 @@ class RetryJob(object):
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_memory_report(self):
-
+        """
+        Need a doc string here.
+        """
         # If job was killed on the worker node, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to memory use"):
             self.create_fake_fjr("Not retrying job due to excessive memory use (job automatically killed on the worker node)", 50660)
@@ -197,7 +218,9 @@ class RetryJob(object):
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_disk_report(self):
-
+        """
+        Need a doc string here.
+        """
         # If job was killed on the WN, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to disk usage"):
             exitMsg = "Not retrying job due to excessive disk usage (job automatically killed on the worker node)"
@@ -246,7 +269,7 @@ class RetryJob(object):
         if exitCode == 134:
             recoverable_signal = False
             try:
-                fname = os.path.expanduser("~/%s/job_out.%d.%d.txt" % (self.reqname, self.job_id, self.retry_count))
+                fname = os.path.expanduser("~/%s/job_out.%d.%d.txt" % (self.reqname, self.job_id, self.crab_retry_count))
                 with open(fname) as fd:
                     for line in fd:
                         if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
@@ -261,7 +284,7 @@ class RetryJob(object):
         if exitCode == 8001 or exitCode == 65:
             cvmfs_issue = False
             try:
-                fname = os.path.expanduser("~/%s/job_out.%d.%d.txt" % (self.reqname, self.job_id, self.retry_count))
+                fname = os.path.expanduser("~/%s/job_out.%d.%d.txt" % (self.reqname, self.job_id, self.crab_retry_count))
                 cvmfs_issue_re = re.compile("== CMSSW:  unable to load /cvmfs/.*file too short")
                 with open(fname) as fd:
                     for line in fd: 
@@ -298,17 +321,23 @@ class RetryJob(object):
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
  
     def check_empty_report(self):
+        """
+        Need a doc string here.
+        """
         if not self.report or not self.validreport:
             raise RecoverableError("Job did not produce a usable framework job report.")
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def execute_internal(self, reqname, status, retry_count, job_id, cluster):
-
-        self.reqname = reqname
-        self.job_id = job_id
-        self.retry_count = retry_count
-        self.cluster = cluster
+    def execute_internal(self, reqname, job_return_code, crab_retry_count, job_id, dag_jobid):
+        """
+        Need a doc string here.
+        """
+        self.reqname          = reqname
+        self.job_return_code  = job_return_code
+        self.crab_retry_count = crab_retry_count
+        self.job_id           = job_id
+        self.dag_jobid        = dag_jobid
 
         self.get_job_ad()
         self.get_report()
@@ -333,27 +362,30 @@ class RetryJob(object):
                 raise
             raise
 
-        if status: # Probably means stageout failed!
-            raise RecoverableError("Payload job was successful, but wrapper exited with non-zero status %d (stageout failure)?" % status)
+        if self.job_return_code != JOB_RETURN_CODES.OK: # Probably means stageout failed!
+            raise RecoverableError("Payload job was successful, but wrapper exited with non-zero status %d (stageout failure)?" % (self.job_return_code))
 
-        return OK
+        return JOB_RETURN_CODES.OK
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def execute(self, *args, **kw):
+        """
+        Need a doc string here.
+        """
         try:
-            result = self.execute_internal(*args, **kw)
-            self.record_site(result)
-            return result
-        except FatalError, femsg:
-            print "%s" % (femsg)
-            self.record_site(FATAL_ERROR)
-            return FATAL_ERROR
+            job_status = self.execute_internal(*args, **kw)
+            self.record_site(job_status)
+            return job_status
         except RecoverableError, remsg:
             print "%s" % (remsg)
-            self.record_site(RECOVERABLE_ERROR)
-            return RECOVERABLE_ERROR
+            self.record_site(JOB_RETURN_CODES.RECOVERABLE_ERROR)
+            return JOB_RETURN_CODES.RECOVERABLE_ERROR
+        except FatalError, femsg:
+            print "%s" % (femsg)
+            self.record_site(JOB_RETURN_CODES.FATAL_ERROR)
+            return JOB_RETURN_CODES.FATAL_ERROR
         except Exception:
             print str(traceback.format_exc())
-            return 0
+            return 0 # Why do we return 0 here ?
 
