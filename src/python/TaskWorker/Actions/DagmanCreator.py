@@ -49,7 +49,7 @@ JOB Job%(count)d Job.%(count)d.submit
 SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %(backend)s
 SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(taskname)s %(count)d %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
-RETRY Job%(count)d 2 UNLESS-EXIT 2
+RETRY Job%(count)d %(maxretries)d UNLESS-EXIT 2
 VARS Job%(count)d count="%(count)d" runAndLumiMask="job_lumis_%(count)d.json" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" eventsPerLumi="%(eventsPerLumi)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" scriptExe="%(scriptExe)s" scriptArgs="%(scriptArgs)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\"" +CRAB_Destination="\\"%(destination)s\\""
 ABORT-DAG-ON Job%(count)d 3
 
@@ -63,7 +63,10 @@ CRAB_HEADERS = \
 +CRAB_JobSW = %(jobsw)s
 +CRAB_JobArch = %(jobarch)s
 +CRAB_InputData = %(inputdata)s
++CRAB_DBSURL = %(dbsurl)s
 +CRAB_PublishName = %(publishname)s
++CRAB_Publish = %(publication)s
++CRAB_PublishDBSURL = %(publishdbsurl)s
 +CRAB_ISB = %(cacheurl)s
 +CRAB_SiteBlacklist = %(siteblacklist)s
 +CRAB_SiteWhitelist = %(sitewhitelist)s
@@ -84,6 +87,7 @@ CRAB_HEADERS = \
 +CRAB_ASOTimeout = %(aso_timeout)s
 +CRAB_RestHost = %(resthost)s
 +CRAB_RestURInoAPI = %(resturinoapi)s
++CRAB_NumAutomJobRetries = %(numautomjobretries)s
 """
 
 JOB_SUBMIT = CRAB_HEADERS + \
@@ -94,11 +98,6 @@ CRAB_AdditionalOutputFiles = %(addoutputfiles_flatten)s
 CRAB_JobSW = %(jobsw_flatten)s
 CRAB_JobArch = %(jobarch_flatten)s
 CRAB_Archive = %(cachefilename_flatten)s
-+CRAB_ReqName = %(requestname)s
-#CRAB_ReqName = %(requestname_flatten)s
-+CRAB_DBSURL = %(dbsurl)s
-+CRAB_PublishDBSURL = %(publishdbsurl)s
-+CRAB_Publish = %(publication)s
 CRAB_Id = $(count)
 +CRAB_Id = $(count)
 +CRAB_Dest = "%(temp_dest)s"
@@ -215,7 +214,7 @@ def transform_strings(input):
                'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', \
-               'stageoutpolicy', 'taskType', 'maxpost', 'worker_name', 'desired_opsys', 'desired_opsysvers', \
+               'stageoutpolicy', 'taskType', 'worker_name', 'desired_opsys', 'desired_opsysvers', \
                'desired_arch', 'accounting_group', 'resthost', 'resturinoapi':
         val = input.get(var, None)
         if val == None:
@@ -223,7 +222,7 @@ def transform_strings(input):
         else:
             info[var] = json.dumps(val)
 
-    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput':
+    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries':
         info[var] = int(input[var])
 
     for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', 'tfileoutfiles', 'edmoutfiles':
@@ -531,6 +530,10 @@ class DagmanCreator(TaskAction.TaskAction):
         else:
             kwargs['task']['stageoutpolicy'] = "local,remote"
 
+        ## In the future this parameter may be set by the user in the CRAB configuration
+        ## file and we would take it from the Task DB.
+        kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
+
         info = self.makeJobSubmit(kwargs['task'])
 
         outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
@@ -616,6 +619,7 @@ class DagmanCreator(TaskAction.TaskAction):
             jobgroupspecs, startjobid = self.makeSpecs(kwargs['task'], sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid)
             specs += jobgroupspecs
 
+        ## Write down the DAG as needed by DAGMan.
         dag = DAG_HEADER % {'resthost': kwargs['task']['resthost'], 'resturiwfdb': kwargs['task']['resturinoapi'] + '/workflowdb'}
         run_and_lumis_tar = tarfile.open("run_and_lumis.tar.gz", "w:gz")
         for spec in specs:
@@ -689,8 +693,6 @@ class DagmanCreator(TaskAction.TaskAction):
                 self.logger.error(output)
                 self.logger.error("Failed to record the number of jobs.")
                 return 1
-
-
 
         return info, splitterResult
 
