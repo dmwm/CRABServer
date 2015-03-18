@@ -530,7 +530,6 @@ class DagmanCreator(TaskAction.TaskAction):
         return dagSpecs, i
 
 
-
     def createSubdag(self, splitterResult, **kwargs):
 
         startjobid = 0
