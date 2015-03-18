@@ -4,20 +4,31 @@ import time
 import json
 import errno
 import classad
-import traceback
-import json
-import re
+import logging
 
 from ApmonIf import ApmonIf
 
 states = ['OK', 'FATAL_ERROR', 'RECOVERABLE_ERROR']
 
 class PreJob:
-
+    """
+    Need a doc string here.
+    """
 
     def __init__(self):
+        """
+        PreJob constructor.
+        """
         self.task_ad = classad.ClassAd()
-
+        ## Set a logger for the pre-job.
+        self.logger = logging.getLogger()
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", \
+                                      datefmt = "%a, %d %b %Y %H:%M:%S %Z(%z)")
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.propagate = False
 
     def calculate_retry(self, id, retry_num):
         """
@@ -64,10 +75,11 @@ class PreJob:
 
 
     def update_dashboard(self, retry, id, reqname, backend):
-
+        """
+        Need a doc string here.
+        """
         if not self.task_ad:
             return
-
         params = {'tool': 'crab3',
                   'SubmissionType':'crab3',
                   'JSToolVersion': '3.3.0',
@@ -89,22 +101,28 @@ class PreJob:
                   'bossId': str(id),
                   'localId' : '',
                  }
-
         apmon = ApmonIf()
-        print("Dashboard task info: %s" % str(params))
+        self.logger.debug("Dashboard task info: %s" % str(params))
         apmon.sendToML(params)
         apmon.free()
 
 
     def get_task_ad(self):
+        """
+        Need a doc string here.
+        """
         self.task_ad = {}
         try:
             self.task_ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
-        except Exception:
-            print traceback.format_exc()
+        except:
+            msg = "Got exception while trying to parse the job ad."
+            self.logger.exception(msg)
 
 
     def get_statistics(self):
+        """
+        Need a doc string here.
+        """
         results = {}
         try:
             for state in states:
@@ -119,6 +137,9 @@ class PreJob:
 
 
     def get_site_statistics(self, site):
+        """
+        Need a doc string here.
+        """
         results = {}
         try:
             for state in states:
@@ -133,6 +154,9 @@ class PreJob:
 
 
     def calculate_blacklist(self):
+        """
+        Need a doc string here.
+        """
         # TODO: before we can do this, we need a more reliable way to pass
         # the site list to the prejob.
         return []
@@ -206,8 +230,8 @@ class PreJob:
                 os.makedirs(logpath)
             except OSError, oe:
                 if oe.errno != errno.EEXIST:
-                    print "Failed to create log web-shared directory %s" % logpath
-                    return
+                    msg = "Failed to create log web-shared directory %s" % (logpath)
+                    self.logger.info(msg)
             fname = os.path.join(logpath, "job_out.%s.%s.txt" % (id ,retry_num))
             with open(fname, "w") as fd:
                 fd.write("Job output has not been processed by post-job\n")
@@ -217,23 +241,58 @@ class PreJob:
             if retry_num:
                 return time.time() - os.stat(os.path.join(logpath, "postjob.%s.%s.txt" % (id, int(retry_num)-1))).st_mtime
         except:
+            msg = "Exception executing touch_logs()."
+            self.logger.exception(msg)
             pass
 
     def execute(self, *args):
+        """
+        Need a doc string here.
+        """
         retry_num = int(args[0])
         crab_id = int(args[1])
         retry_num = self.calculate_retry(crab_id, retry_num)
         reqname = args[2]
         backend = args[3]
+
+        ## Create a directory in the schedd where to store the prejob logs.
+        logpath = os.path.join(os.getcwd(), "prejob_logs")
+        try:
+            os.makedirs(logpath)
+        except OSError, ose:
+            if ose.errno != errno.EEXIST:
+                logpath = os.getcwd()
+        ## Create (open) the pre-job log file prejob.<job_id>.<crab_retry>.txt.
+        prejob_log_file_name = os.path.join(logpath, "prejob.%d.%d.txt" % (crab_id, retry_num))
+        fd_prejob_log = os.open(prejob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
+        os.chmod(prejob_log_file_name, 0644)
+        ## Redirect stdout and stderr to the pre-job log file.
+        if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
+            print "Pre-job started with no output redirection."
+        else:
+            os.dup2(fd_prejob_log, 1)
+            os.dup2(fd_prejob_log, 2)
+            msg = "Pre-job started with output redirected to %s" % (prejob_log_file_name)
+            self.logger.info(msg)
+
         self.get_task_ad()
-        self.alter_submit(retry_num, crab_id)
+        try:
+            self.alter_submit(retry_num, crab_id)
+        except:
+            msg = "Exception executing the pre-job."
+            self.logger.exception(msg)
+            raise
+
         old_time = self.touch_logs(retry_num, crab_id)
+        ## Note the cooloff time is based on the DAGMan retry number (i.e. the number of
+        ## times the full cycle pre-job + job + post-job finished). This way, we don't
+        ## punish users for condor re-starts.
         sleep_time = int(args[0])*60
         if old_time:
-            sleep_time = int(max(1, sleep_time-old_time))
+            sleep_time = int(max(1, sleep_time - old_time))
         if retry_num != 0:
             self.update_dashboard(retry_num, crab_id, reqname, backend)
-        # Note the cooloff time is based on the number of times the post-job finished
-        # This way, we don't punish users for resubmitting.
+        msg = "Finished pre-job execution. Sleeping %s seconds..." % (sleep_time)
+        self.logger.info(msg)
         os.execv("/bin/sleep", ["sleep", str(sleep_time)])
 
