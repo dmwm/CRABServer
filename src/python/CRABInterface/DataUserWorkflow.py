@@ -128,8 +128,7 @@ class DataUserWorkflow(object):
     def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, userdn, userproxy=None):
         """Request to Resubmit a workflow.
 
-           :arg str workflow: a workflow name
-           :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
+           :arg str workflow: a workflow name"""
         return self.workflow.resubmit(workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, userdn, userproxy)
 
     def status(self, workflow, userdn, userproxy=None, verbose=False):
