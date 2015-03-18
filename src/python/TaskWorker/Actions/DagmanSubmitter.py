@@ -143,12 +143,12 @@ class DagmanSubmitter(TaskAction.TaskAction):
     """
 
     def execute(self, *args, **kw):
-        userServer = HTTPRequests(self.server['host'], kw['task']['user_proxy'], kw['task']['user_proxy'], retries=2)
+        userServer = HTTPRequests(self.server['host'], kw['task']['user_proxy'], kw['task']['user_proxy'], retry=2)
         retryIssues = []
         retryIssuesBySchedd = {}
         goodSchedulers = []
         try:
-            goodSchedulers = self.server.get(self.restURInoAPI + '/task', data={'subresource': 'backendurls'})[0]['result'][0]['htcondorSchedds']
+            goodSchedulers = self.server.get(self.restURInoAPI + '/info', data={'subresource': 'backendurls'})[0]['result'][0]['htcondorSchedds']
         except HTTPException, hte:
             self.logger.error(hte.headers)
             self.logger.warning("Unable to contact cmsweb. Will use only on schedulers which was chosen by CRAB3 frontend.")
@@ -170,7 +170,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 time.sleep(20)
                 retryIssuesBySchedd.setDefault(schedd, []).append(msg)
                 continue
-            for retry in range(self.config.TaskWorker.max_retry):
+            for retry in range(self.config.TaskWorker.max_retry + 1): #max_retry can be 0
                 self.logger.debug("Trying to submit task %s %s time." % (kw['task']['tm_taskname'], str(retry)))
                 submissionFailure = False
                 execInt = ""
@@ -181,8 +181,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     msg = "Failed to submit task %s; '%s'" % (kw['task']['tm_taskname'], str(e))
                     self.logger.error(msg)
                     retryIssues.append(msg)
-                    self.logger.error("Will retry in %s seconds." % str(self.config.TaskWorker.retry_interval[retry]))
-                    time.sleep(self.config.TaskWorker.retry_interval[retry])
+                    if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
+                        self.logger.error("Will retry in %s seconds." % str(self.config.TaskWorker.retry_interval[retry]))
+                        time.sleep(self.config.TaskWorker.retry_interval[retry])
                     submissionFailure = True
             if submissionFailure:
                 msg = "Failed to submit task %s to %s with errors %s" % (kw['task']['tm_taskname'], schedd, retryIssues)
