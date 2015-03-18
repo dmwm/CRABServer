@@ -527,7 +527,7 @@ class ASOServerJob(object):
                            'user'                    : str(self.job_ad['CRAB_UserHN']),
                            'group'                   : group,
                            'role'                    : role,
-                           'dbs_url'                 : str(self.job_ad['CRAB_DBSUrl']),
+                           'dbs_url'                 : str(self.job_ad['CRAB_DBSURL']),
                            'workflow'                : self.reqname,
                            'jobid'                   : self.count,
                            'publication_state'       : 'not_published',
@@ -1500,7 +1500,7 @@ class PostJob():
         """
         required_job_ad_attrs = ['CRAB_ASOURL',
                                  'CRAB_AsyncDest',
-                                 'CRAB_DBSUrl',
+                                 'CRAB_DBSURL',
                                  'CRAB_InputData',
                                  'CRAB_JobSW',
                                  'CRAB_Publish',
