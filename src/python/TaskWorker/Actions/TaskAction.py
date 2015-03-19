@@ -4,7 +4,7 @@ import logging
 class TaskAction(object):
     """The ABC of all actions"""
 
-    def __init__(self, config, server = None, resturi = None, procnum = -1):
+    def __init__(self, config, server = '', resturi = '', procnum = -1):
         self.logger = logging.getLogger(str(procnum))
         self.config = config
         self.jobtypeMapper = {'Analysis'  : 'Processing',
