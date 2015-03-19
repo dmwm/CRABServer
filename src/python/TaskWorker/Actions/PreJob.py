@@ -8,7 +8,8 @@ import logging
 
 from ApmonIf import ApmonIf
 
-states = ['OK', 'FATAL_ERROR', 'RECOVERABLE_ERROR']
+from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES 
+
 
 class PreJob:
     """
@@ -125,9 +126,9 @@ class PreJob:
         """
         results = {}
         try:
-            for state in states:
+            for state in JOB_RETURN_CODES._fields:
                 count = 0
-                with open("task_statistics.%s" % state) as fd:
+                with open("task_statistics.%s" % (state)) as fd:
                     for line in fd:
                         count += 1
                 results[state] = count
@@ -142,7 +143,7 @@ class PreJob:
         """
         results = {}
         try:
-            for state in states:
+            for state in JOB_RETURN_CODES._fields:
                 count = 0
                 with open("task_statistics.%s.%s" % (site, state)) as fd:
                     for line in fd:
@@ -233,7 +234,7 @@ class PreJob:
                     msg = "Failed to create log web-shared directory %s" % (logpath)
                     self.logger.info(msg)
                     return
-            fname = os.path.join(logpath, "job_out.%s.%s.txt" % (id ,retry_num))
+            fname = os.path.join(logpath, "job_out.%s.%s.txt" % (id , retry_num))
             with open(fname, "w") as fd:
                 fd.write("Job output has not been processed by post-job\n")
             fname = os.path.join(logpath, "postjob.%s.%s.txt" % (id, retry_num))
