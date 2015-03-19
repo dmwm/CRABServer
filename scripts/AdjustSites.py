@@ -190,10 +190,6 @@ def make_webdir(ad):
     except RuntimeError, reerror:
         print str(reerror)
 
-def make_job_submit(ad):
-    count = ad['CRAB_JobCount']
-    for i in range(1, count+1):
-        shutil.copy("Job.submit", "Job.%d.submit" % i)
 
 def clear_automatic_blacklist(ad):
     for file in glob.glob("task_statistics.*"):
@@ -201,6 +197,7 @@ def clear_automatic_blacklist(ad):
             os.unlink(file)
         except Exception, e:
             print "ERROR when clearing statistics: %s" % str(e)
+
 
 def updatewebdir(ad):
     data = {'subresource' : 'addwebdir'}
@@ -220,10 +217,10 @@ def updatewebdir(ad):
         print traceback.format_exc()
         return 1
 
+
 def main():
     ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
     make_webdir(ad)
-    make_job_submit(ad)
 
     retries = 0
     exit_code = 1
