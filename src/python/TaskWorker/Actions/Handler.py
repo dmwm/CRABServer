@@ -12,6 +12,7 @@ from RESTInteractions import HTTPRequests
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.PanDAKill import PanDAKill
+from TaskWorker.Actions.DryRunUploader import DryRunUploader
 from TaskWorker.Actions.DagmanKiller import DagmanKiller
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
@@ -24,7 +25,6 @@ from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
 from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
-from TaskWorker.Actions.DryRunUploader import DryRunUploader
 from TaskWorker.WorkerExceptions import WorkerHandlerException, StopHandler, TaskWorkerException
 
 DEFAULT_BACKEND = 'panda'
