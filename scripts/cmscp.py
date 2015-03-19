@@ -1,4 +1,3 @@
-#!/usr/bin/env python2.6
 import warnings
 
 with warnings.catch_warnings():
