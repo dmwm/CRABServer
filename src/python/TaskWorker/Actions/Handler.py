@@ -12,13 +12,13 @@ from RESTInteractions import HTTPRequests
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.PanDAKill import PanDAKill
-from TaskWorker.Actions.DryRunUploader import DryRunUploader
 from TaskWorker.Actions.DagmanKiller import DagmanKiller
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.Actions.PanDAgetSpecs import PanDAgetSpecs
 from TaskWorker.Actions.PanDABrokerage import PanDABrokerage
 from TaskWorker.Actions.PanDAInjection import PanDAInjection
+from TaskWorker.Actions.DryRunUploader import DryRunUploader
 from TaskWorker.Actions.PanDASpecs2Jobs import PanDASpecs2Jobs
 from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
 from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
