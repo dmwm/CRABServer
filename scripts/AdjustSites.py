@@ -13,8 +13,8 @@ if '_CONDOR_JOB_AD' not in os.environ or not os.path.exists(os.environ["_CONDOR_
     sys.exit(0)
 
 
-new_stdout = "adjust_out.txt"
-fd = os.open(new_stdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
+newstdout = "adjust_out.txt"
+fd = os.open(newstdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
 if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
     os.dup2(fd, 1)
     os.dup2(fd, 2)
@@ -24,7 +24,7 @@ terminator_re = re.compile(r"^\.\.\.$")
 event_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
 term_re = re.compile(r"Normal termination \(return value 2\)")
 node_re = re.compile(r"DAG Node: Job(\d+)")
-def adjustPostScriptExitStatus(resubmit):
+def adjustPostScriptExitStatus(resubmitJobIds):
     """
     ...
     016 (146493.000.000) 11/11 17:45:46 POST Script terminated.
@@ -32,9 +32,9 @@ def adjustPostScriptExitStatus(resubmit):
         DAG Node: Job105
     ...
     """
-    if not resubmit:
+    if not resubmitJobIds:
         return
-    resubmit_all = (resubmit == True)
+    resubmitAll = (resubmitJobIds == True)
     ra_buffer = []
     alt = None
     output = ''
@@ -64,9 +64,9 @@ def adjustPostScriptExitStatus(resubmit):
                 ra_buffer = []
         elif len(ra_buffer) == 3:
             m = node_re.search(line)
-            print line, m, m.groups(), resubmit
-            if m and (resubmit_all or (m.groups()[0] in resubmit)):
-                print m.groups()[0], resubmit
+            print line, m, m.groups(), resubmitJobIds
+            if m and (resubmitAll or (m.groups()[0] in resubmitJobIds)):
+                print m.groups()[0], resubmitJobIds
                 for l in ra_buffer: output += l
             else:
                 for l in ra_buffer[:-1]: output += l
@@ -104,6 +104,18 @@ def adjustMaxRetries(resubmitJobIds, ad):
         return
     if not os.path.exists("RunJobs.dag"):
         return
+    ## Get the latest retry count of each DAG node from the node status file.
+    retriesDict = {}
+    if os.path.exists("node_state"):
+        with open("node_state", 'r') as fd:
+            for nodeStatusAd in classad.parseAds(fd):
+                if nodeStatusAd['Type'] != "NodeStatus":
+                    continue
+                node = nodeStatusAd.get('Node', '')
+                if not node.startswith("Job"):
+                    continue
+                jobId = node[3:]
+                retriesDict[jobId] = int(nodeStatusAd.get('RetryCount', -1))
     ## Search for the RETRY directives in the DAG file for the job ids passed in the
     ## resubmitJobIds argument and change the maximum retries to the current retry
     ## count + CRAB_NumAutomJobRetries.
@@ -117,17 +129,26 @@ def adjustMaxRetries(resubmitJobIds, ad):
             if match_retry_re:
                 jobId = match_retry_re.groups()[0]
                 if resubmitAll or (jobId in resubmitJobIds):
-                    try:
-                        maxRetries = int(match_retry_re.groups()[1]) + (1 + numAutomJobRetries)
-                    except ValueError:
-                        maxRetries = numAutomJobRetries
+                    if jobId in retriesDict and retriesDict[jobId] != -1:
+                        lastRetry = retriesDict[jobId]
+                        ## The 1 is to account for the resubmission itself; then, if the job fails, we
+                        ## allow up to numAutomJobRetries automatic retries from DAGMan.
+                        maxRetries = lastRetry + (1 + numAutomJobRetries)
+                    else:
+                        try:
+                            maxRetries = int(match_retry_re.groups()[1]) + (1 + numAutomJobRetries)
+                        except ValueError:
+                            maxRetries = numAutomJobRetries
                     line = retry_re.sub(r'RETRY Job%s %d ' % (jobId, maxRetries), line)
             output += line
     with open("RunJobs.dag", 'w') as fd:
         fd.write(output)
 
 
-def make_webdir(ad):
+def makeWebDir(ad):
+    """
+    Need a doc string here.
+    """
     path = os.path.expanduser("~/%s" % ad['CRAB_ReqName'])
     try:
         try:
@@ -184,22 +205,17 @@ def make_webdir(ad):
     storage_re = re.compile(sinfo[0])
     val = storage_re.sub(sinfo[1], path)
     ad['CRAB_UserWebDir'] = val
-    id = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
+    dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
     try:
-        htcondor.Schedd().edit([id], 'CRAB_UserWebDir', ad.lookup('CRAB_UserWebDir'))
+        htcondor.Schedd().edit([dagJobId], 'CRAB_UserWebDir', ad.lookup('CRAB_UserWebDir'))
     except RuntimeError, reerror:
         print str(reerror)
 
 
-def clear_automatic_blacklist(ad):
-    for file in glob.glob("task_statistics.*"):
-        try:
-            os.unlink(file)
-        except Exception, e:
-            print "ERROR when clearing statistics: %s" % str(e)
-
-
-def updatewebdir(ad):
+def updateWebDir(ad):
+    """
+    Need a doc string here.
+    """
     data = {'subresource' : 'addwebdir'}
     host = ad['CRAB_RestHost']
     uri = ad['CRAB_RestURInoAPI'] + '/task'
@@ -208,7 +224,6 @@ def updatewebdir(ad):
     cert = ad['X509UserProxy']
     try:
         from RESTInteractions import HTTPRequests
-        from httplib import HTTPException
         import urllib
         server = HTTPRequests(host, cert, cert)
         server.post(uri, data = urllib.urlencode(data))
@@ -218,27 +233,41 @@ def updatewebdir(ad):
         return 1
 
 
+def clearAutomaticBlacklist():
+    """
+    Need a doc string here.
+    """
+    for file in glob.glob("task_statistics.*"):
+        try:
+            os.unlink(file)
+        except Exception, e:
+            print "ERROR when clearing statistics: %s" % str(e)
+
+
 def main():
+    """
+    Need a doc string here.
+    """
     ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
-    make_webdir(ad)
+    makeWebDir(ad)
 
     retries = 0
-    exit_code = 1
-    while retries < 3 and exit_code != 0:
-        exit_code = updatewebdir(ad)
-        if exit_code != 0:
+    exitCode = 1
+    while retries < 3 and exitCode != 0:
+        exitCode = updateWebDir(ad)
+        if exitCode != 0:
             time.sleep(retries*20)
         retries += 1
 
-    clear_automatic_blacklist(ad)
+    clearAutomaticBlacklist()
 
     resubmitJobIds = []
     if 'CRAB_ResubmitList' in ad:
         resubmitJobIds = set(ad['CRAB_ResubmitList'])
-        id = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
+        dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
         ad['foo'] = []
         try:
-            htcondor.Schedd().edit([id], 'CRAB_ResubmitList', ad['foo'])
+            htcondor.Schedd().edit([dagJobId], 'CRAB_ResubmitList', ad['foo'])
         except RuntimeError, reerror:
             print "ERROR: %s" % str(reerror)
     if resubmitJobIds != True:
@@ -256,18 +285,18 @@ def main():
         adjustMaxRetries(resubmitJobIds, ad)
 
     if 'CRAB_SiteAdUpdate' in ad:
-        new_site_ad = ad['CRAB_SiteAdUpdate']
+        newSiteAd = ad['CRAB_SiteAdUpdate']
         with open("site.ad") as fd:
-            site_ad = classad.parse(fd)
-        site_ad.update(new_site_ad)
+            siteAd = classad.parse(fd)
+        siteAd.update(newSiteAd)
         with open("site.ad", "w") as fd:
-            fd.write(str(site_ad))
-        id = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
+            fd.write(str(siteAd))
+        dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
         ad['foo'] = []
         try:
             ## Is CRAB_ResubmitList the attribute we want to edit ?
             ## Or is it CRAB_SiteAdUpdate ?
-            htcondor.Schedd().edit([id], 'CRAB_ResubmitList', ad['foo'])
+            htcondor.Schedd().edit([dagJobId], 'CRAB_ResubmitList', ad['foo'])
         except RuntimeError, reerror:
             print "ERROR: %s" % str(reerror)
 
