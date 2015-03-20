@@ -4,7 +4,7 @@
 
 #Parameters required to change !
 #------------------------------
-TAG='HG1501'
+TAG='HG1504a'
 VERSION=1
 CMSSW='CMSSW_7_0_6'
 WORK_DIR=/afs/cern.ch/work/j/jbalcas/VALIDATE/$TAG
@@ -41,6 +41,23 @@ function sed_new_data () {
   sed --in-place "s|\.General\.instance = .*|\.General\.instance = '$INSTANCE' |" $1
 }
 
+function sed_add_data () {
+  sed --in-place "s|\.JobType\.maxJobRuntimeMin = .*|\.JobType\.maxJobRuntimeMin = $2 |" $1
+  sed --in-place "s|\.JobType\.maxMemoryMB = .*|\.JobType\.maxMemoryMB = $3 |" $1
+  sed --in-place "s|\.JobType\.numCores = .*|\.JobType\.numCores = $4 |" $1
+  sed --in-place "s|\.User\.voRole = .*|\.User\.voRole = $5 |" $1
+  sed --in-place "s|\.User\.voGroup = .*|\.User\.voGroup = $6 |" $1
+  if $7; then
+    sed -i -e "/HammerCloud/s/^#//" $file_name
+  else
+    sed -i -e "/HammerCloud/s/^#*/#/" $file_name
+  fi
+  if $8; then
+    sed -i -e "/stageout/s/^#//" $file_name
+  else
+    sed -i -e "/stageout/s/^#*/#/" $file_name
+  fi
+}
 
 #Get specified CMSSW
 if [ ! -d "$WORK_DIR" ]; then
@@ -98,6 +115,30 @@ do
   crab submit -c $file_name
 done
 
+# Number of possible values should be always equal
+add_name=("RuntimeRM" "MemoryRM" "NumCores" "HammerCloud" "Stageout" "voGroupbecms" "voGroupescms")
+wall_cond=(1 1000 1000 1000 1000 1000 1000)
+mem_cond=(2000 20 2000 2000 2000 2000 2000)
+cores_cond=(1 1 2 1 1 1 1)
+group_cond=('""' '""' '""' '""' '""' '"becms"' '"escms"')
+role_cond=('""' '""' '""' '""' '""' '""' '""')
+hc_cond=(false false false true false false false)
+st_cond=(false false false false true false false)
+
+#Extra parameters test
+file_name='MinBias_PrivateMC_EventBased_ExtraParams.py'
+file_name_temp=${file_name:0:(${#file_name})-3};
+
+total=${#add_name[*]}
+for ((i=0;i<=$(($total-1));i++));
+do
+  new_name=$TAG-$VERSION-$file_name_temp-'L-T_O-T_P-T-'${add_name[$i]}
+  publish_name=$new_name-`date +%s`
+  echo $new_name
+  sed_new_data $file_name $new_name True True $TAG-$VERSION True $publish_name False
+  sed_add_data $file_name ${wall_cond[$i]} ${mem_cond[$i]} ${cores_cond[$i]} ${role_cond[$i]} ${group_cond[$i]} ${hc_cond[$i]} ${st_cond[$i]}
+  crab submit -c $file_name
+done
 
 #As for LHE it requires older version of CMSSW. Need to ask Anna to review, she might know for newer version of CMSSW
 CMSSW='CMSSW_5_3_22'
