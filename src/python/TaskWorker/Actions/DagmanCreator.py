@@ -178,18 +178,12 @@ def makeLFNPrefixes(task):
     if 'tm_user_role' in task and task['tm_user_role']:
         hash_input += "," + task['tm_user_role']
     lfn = task.get('tm_arguments', {}).get('lfn', '')
-    lfn_prefix = task.get('tm_arguments', {}).get('lfnprefix', '')
     hash = hashlib.sha1(hash_input).hexdigest()
-    #extracting the username for the lfn as long as https://github.com/dmwm/CRABServer/issues/4344 is sorted out. We need to do this because of https://hypernews.cern.ch/HyperNews/CMS/get/crabDevelopment/2076.html
-    user = task['tm_username'] if not lfn else lfn.split('/')[3]
+    user = task['tm_username']
     tmp_user = "%s.%s" % (user, hash)
     publish_info = task['tm_publish_name'].rsplit('-', 1) #publish_info[0] is the publishname or the taskname
     timestamp = getCreateTimestamp(task['tm_taskname'])
-    if lfn_prefix or not lfn: #keeping the lfn_prefix around so new task workers work with old servers (we should delete this soon) #TODO
-        #publish_info[0] will either be the unique taskname (stripped by the username) or the publishname
-        temp_dest = os.path.join("/store/temp/user", tmp_user, lfn_prefix, primaryds, publish_info[0], timestamp)
-        dest = os.path.join("/store/user", user, lfn_prefix, primaryds, publish_info[0], timestamp)
-    elif lfn:
+    if lfn:
         splitlfn = lfn.split('/')
         if splitlfn[2] == 'user':
             #join:                    /       store    /temp      /user  /mmascher.1234    /lfn          /GENSYM    /publishname     /120414_1634
@@ -198,8 +192,9 @@ def makeLFNPrefixes(task):
             temp_dest = os.path.join('/', splitlfn[1], 'temp', splitlfn[2], *( splitlfn[3:] + [primaryds, publish_info[0], timestamp] ))
         dest = os.path.join(lfn, primaryds, publish_info[0], timestamp)
     else:
-        raise TaskWorker.WorkerExceptions.TaskWorkerException("Cannot find the lfn parameter inside the tm_arguments."+\
-                                        "The CRAB server probably has a configuration error. Please contact an expert.")
+        #publish_info[0] will either be the unique taskname (stripped by the username) or the publishname
+        temp_dest = os.path.join("/store/temp/user", tmp_user, primaryds, publish_info[0], timestamp)
+        dest = os.path.join("/store/user", user, primaryds, publish_info[0], timestamp)
 
     return temp_dest, dest
 

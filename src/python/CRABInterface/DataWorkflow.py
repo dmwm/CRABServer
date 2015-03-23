@@ -116,7 +116,7 @@ class DataWorkflow(object):
     @conn_handler(services=['centralconfig'])
     def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, use_parent, generator, events_per_lumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
-               runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfnprefix=None, lfn=None,
+               runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, scriptexe=None, scriptargs=None, scheddname=None,
                extrajdl=None, collector=None, dryrun=False):
         """Perform the workflow injection
@@ -158,7 +158,6 @@ class DataWorkflow(object):
            :arg int numcores: number of CPU cores required by job
            :arg int maxmemory: maximum amount of RAM required, in MB
            :arg int priority: priority of this task
-           :arg str lfnprefix: prefix for output directory in /store/user. Deprecated in favour of the parameter below (lfn)
            :arg str lfn: lfn used to store output files.
            :arg str userfiles: The files to process instead of a DBS-based dataset.
            :arg str asourl: Specify which ASO to use for transfers and publishing.
@@ -198,7 +197,7 @@ class DataWorkflow(object):
 
         arguments = { \
             'oneEventMode' : 'T' if oneEventMode else 'F',
-            'lfn' : '/store/user/%s/%s' % (username, lfnprefix) if lfnprefix else lfn,
+            'lfn' : lfn,
             'saveoutput' : 'T' if saveoutput else 'F',
             'faillimit' : faillimit,
             'ignorelocality' : 'T' if ignorelocality else 'F',

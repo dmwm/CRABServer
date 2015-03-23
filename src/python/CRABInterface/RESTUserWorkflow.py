@@ -219,7 +219,6 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("totalunits", param, safe, optional=True)
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
             validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
-            validate_str("lfnprefix", param, safe, RX_LFNPATH, optional=True) #keeping this for compatibility with old clients. Will be converted into a full lfn
             validate_str("lfn", param, safe, RX_LFN, optional=True)
             self._checkOutLFN(safe.kwargs)
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE)
@@ -351,7 +350,7 @@ class RESTUserWorkflow(RESTEntity):
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, useparent, generator, eventsperlumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                 savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
-                totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfnprefix, lfn, saveoutput,
+                totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
                 faillimit, ignorelocality, userfiles, asourl, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun):
         """Perform the workflow injection
 
@@ -416,7 +415,7 @@ class RESTUserWorkflow(RESTEntity):
                                        publication=publication, publishname=publishname, asyncdest=asyncdest,
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
-                                       maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfnprefix=lfnprefix, lfn=lfn,
+                                       maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfn=lfn,
                                        ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, asourl=asourl,
                                        scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun)
 
