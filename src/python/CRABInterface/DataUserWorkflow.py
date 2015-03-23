@@ -113,7 +113,6 @@ class DataUserWorkflow(object):
            :arg int numcores: number of CPU cores required by job
            :arg int maxmemory: maximum amount of RAM required, in MB
            :arg int priority: priority of this task
-           :arg str lfnprefix: prefix for the output directory inside /store/user. Deprecated see below.
            :arg str lfn: lfn used to store output files.
            :arg int saveoutput: whether to perform ASO on job output.
            :arg int faillimit: the maximum number of failed jobs allowed before workflow is aborted
