@@ -185,25 +185,25 @@ class DataWorkflow(object):
         username = cherrypy.request.user['login']
         dbSerializer = str
 
-        if numcores == None: numcores = 1
-        if maxjobruntime == None: maxjobruntime = 1315
-        if maxmemory == None: maxmemory = 2000
-        if priority == None: priority = 10
+        ## If these parameters were not set in the submission request, give them
+        ## predefined default values.
+        if maxjobruntime is None:
+            maxjobruntime = 1315
+        if maxmemory is None:
+            maxmemory = 2000
+        if numcores is None:
+            numcores = 1
+        if priority is None:
+            priority = 10
 
         if not asourl:
             asourl = self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", "")
             if type(asourl)==list:
                 asourl = random.choice(asourl)
 
-        arguments = { \
-            'oneEventMode' : 'T' if oneEventMode else 'F',
-            'lfn' : lfn,
-            'saveoutput' : 'T' if saveoutput else 'F',
-            'faillimit' : faillimit,
-            'ignorelocality' : 'T' if ignorelocality else 'F',
-            'userfiles' : userfiles,
-        }
+        arguments = {}
 
+        ## Insert this new task into the Tasks DB.
         self.api.modify(self.Task.New_sql,
                             task_name       = [requestname],
                             task_activity   = [activity],
@@ -255,7 +255,13 @@ class DataWorkflow(object):
                             asourl          = [asourl],
                             collector       = [collector],
                             schedd_name     = [schedd_name],
-                            dry_run         = ['T' if dryrun else 'F']
+                            dry_run         = ['T' if dryrun else 'F'],
+                            user_files       = [dbSerializer(userfiles)],
+                            transfer_outputs = ['T' if saveoutput else 'F'],
+                            output_lfn       = [lfn],
+                            ignore_locality  = ['T' if ignorelocality else 'F'],
+                            fail_limit       = [faillimit],
+                            one_event_mode   = ['T' if oneEventMode else 'F']
         )
 
         return [{'RequestName': requestname}]

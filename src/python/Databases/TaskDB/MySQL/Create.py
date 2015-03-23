@@ -83,10 +83,19 @@ class Create(DBCreator):
         tm_collector VARCHAR(1000),
         tm_schedd VARCHAR(255),
         tm_dry_run VARCHAR(1),
+        tm_user_files LONGTEXT DEFAULT '[]',
+        tm_transfer_outputs VARCHAR(1),
+        tm_output_lfn VARCHAR(1000),
+        tm_ignore_locality VARCHAR(1),
+        tm_fail_limit BIGINT,
+        tm_one_event_mode VARCHAR(1),
         CONSTRAINT taskname_pk PRIMARY KEY(tm_taskname),
         CONSTRAINT check_tm_publication CHECK (tm_publication IN ('T', 'F')),
         CONSTRAINT check_tm_dry_run CHECK (tm_dry_run IN ('T', 'F')),
-        CONSTRAINT check_tm_save_logs CHECK (tm_save_logs IN ('T', 'F'))
+        CONSTRAINT check_tm_save_logs CHECK (tm_save_logs IN ('T', 'F')),
+        CONSTRAINT check_tm_transfer_outputs CHECK (tm_transfer_outputs IN ('T', 'F')),
+        CONSTRAINT check_tm_ignore_locality CHECK (tm_ignore_locality IN ('T', 'F')),
+        CONSTRAINT check_tm_one_event_mode CHECK (tm_one_event_mode IN ('T', 'F'))
         ) ENGINE=InnoDB 
         """
         self.create['c_jobgroups'] = """

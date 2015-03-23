@@ -128,7 +128,9 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     handler = TaskHandler(task, procnum)
     handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60*60*24) )
     if task['tm_job_type'] == 'Analysis': 
-        if task.get('tm_arguments', {}).get('userfiles'):
+        if task.get('tm_user_files'):
+            handler.addWork( UserDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum) )
+        elif task.get('tm_arguments', {}).get('userfiles'): ## For backward compatibility only.
             handler.addWork( UserDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum) )
         else:
             handler.addWork( DBSDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum) )

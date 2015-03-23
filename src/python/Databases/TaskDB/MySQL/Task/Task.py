@@ -10,15 +10,17 @@ class Task(object):
     GetInjectedTasks_sql = "SELECT tm_taskname, tm_task_status FROM tasks WHERE \
     		        tm_task_status = 'INJECTED'"
 
-    GetKillTasks_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, tm_start_time, \
-                   tm_start_injection, tm_end_injection, tm_task_failure, tm_job_sw, \
-   		   tm_job_arch, tm_input_dataset, tm_site_whitelist, tm_site_blacklist, \
-   		   tm_split_algo, tm_split_args, tm_totalunits, tm_user_sandbox, tm_cache_url, \
-   		   tm_username, tm_user_dn, tm_user_vo, tm_user_role, tm_user_group, \
-   		   tm_publish_name, tm_asyncdest, tm_dbs_url, tm_publish_dbs_url, \
-   		   tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
-                   tm_job_type, tm_arguments, panda_resubmitted_jobs, \
-   		   tm_save_logs, tm_user_infiles FROM tasks WHERE tm_task_status = 'KILL' """
+    GetKillTasks_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, \
+                   tm_start_time, tm_start_injection, tm_end_injection, \
+                   tm_task_failure, tm_job_sw, tm_job_arch, tm_input_dataset, \
+                   tm_site_whitelist, tm_site_blacklist, tm_split_algo, tm_split_args, \
+                   tm_totalunits, tm_user_sandbox, tm_cache_url, tm_username, tm_user_dn, tm_user_vo, \
+                   tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \
+                   tm_publish_dbs_url, tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
+                   tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, \
+                   tm_user_infiles, tw_name, tm_dry_run, \
+                   tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode \
+                   FROM tasks WHERE tm_task_status = 'KILL' """
 
     GetNewResubmit_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, \
                    tm_start_time, tm_start_injection, tm_end_injection, \
@@ -28,7 +30,8 @@ class Task(object):
                    tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \
                    tm_publish_dbs_url, tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
                    tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, \
-                   tm_user_infiles, tw_name \
+                   tm_user_infiles, tw_name, tm_dry_run, \
+                   tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode \
                    FROM tasks WHERE tm_task_status = 'NEW' OR tm_task_status = 'RESUBMIT' """
 
     GetReadyTasks_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, \
@@ -39,10 +42,9 @@ class Task(object):
                    tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \
                    tm_publish_dbs_url, tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
                    tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, \
-                   tm_user_infiles, tw_name, tm_dry_run \
-                   FROM tasks \
-                   WHERE tm_task_status = %(get_status)s \
-                   AND tw_name = %(tw_name)s limit %(limit)s """
+                   tm_user_infiles, tw_name, tm_dry_run, \
+                   tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode \
+                   FROM tasks WHERE tm_task_status = %(get_status)s AND tw_name = %(tw_name)s limit %(limit)s """
 
     GetUserFromID_sql = "SELECT tm_username FROM tasks WHERE tm_taskname=%(taskname)s"
 
@@ -59,7 +61,9 @@ class Task(object):
    	       tm_username, tm_user_dn, tm_user_vo, tm_user_role, tm_user_group, tm_publish_name, \
    	       tm_asyncdest, tm_dbs_url, tm_publish_dbs_url, tm_publication, tm_outfiles, \
    	       tm_tfile_outfiles, tm_edm_outfiles, tm_job_type, tm_arguments,\
-               panda_resubmitted_jobs, tm_save_logs, tm_user_infiles, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority, tm_dry_run) \
+               panda_resubmitted_jobs, tm_save_logs, tm_user_infiles, tm_maxjobruntime, \
+               tm_numcores, tm_maxmemory, tm_priority, tm_dry_run, \
+               tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode) \
                VALUES (%(task_name)s, %(jobset_id)s, upper(%(task_status)s), UTC_TIMESTAMP(), \
    	       %(task_failure)s, %(job_sw)s, %(job_arch)s, %(input_dataset)s, %(site_whitelist)s, \
    	       %(site_blacklist)s, %(split_algo)s, %(split_args)s, %(total_units)s, \
@@ -67,7 +71,8 @@ class Task(object):
    	       %(user_group)s, %(publish_name)s, %(asyncdest)s, %(dbs_url)s, %(publish_dbs_url)s, \
                %(publication)s, %(outfiles)s, %(tfile_outfiles)s, %(edm_outfiles)s, \
    	       %(job_type)s, %(arguments)s, %(resubmitted_jobs)s, %(save_logs)s, %(user_infiles)s, %(maxjobruntime)s, \
-           %(numcores)s, %(maxmemory)s, %(priority)s, %(dry_run)s)"
+               %(numcores)s, %(maxmemory)s, %(priority)s, %(dry_run)s, \
+               %(user_files)s, %(transfer_outputs)s, %(output_lfn)s, %(ignore_locality)s, %(fail_limit)s, %(one_event_mode)s)"
 
     SetArgumentsTask_sql = "UPDATE tasks SET tm_arguments = %(arguments)s WHERE tm_taskname = %(taskname)s"
 
