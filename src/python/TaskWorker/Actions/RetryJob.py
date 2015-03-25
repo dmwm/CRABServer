@@ -11,7 +11,6 @@ from collections import namedtuple
 
 JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERROR')(0, 1, 2)
 
-
 # Fatal error limits for job resource usage
 MAX_WALLTIME = 21*60*60 + 30*60
 MAX_MEMORY = 2*1024
@@ -39,7 +38,7 @@ class RetryJob(object):
         """
         self.reqname             = None
         self.job_return_code     = None
-        self.crab_retry_count    = None
+        self.crab_retry          = None
         self.job_id              = None
         self.dag_jobid           = None
         self.site                = None
@@ -143,7 +142,7 @@ class RetryJob(object):
         fake_fjr = {}
         fake_fjr['exitCode'] = exitCode
         fake_fjr['exitMsg'] = exitMsg
-        jobReport = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry_count)
+        jobReport = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry)
         if os.path.isfile(jobReport) and os.path.getsize(jobReport) > 0:
             #File exists and it is not empty
             msg  = "%s file exists and it is not empty!" % (jobReport)
@@ -269,7 +268,7 @@ class RetryJob(object):
         if exitCode == 134:
             recoverable_signal = False
             try:
-                fname = os.path.expanduser("~/%s/job_out.%d.%d.txt" % (self.reqname, self.job_id, self.crab_retry_count))
+                fname = os.path.expanduser("~/%s/job_out.%d.%d.txt" % (self.reqname, self.job_id, self.crab_retry))
                 with open(fname) as fd:
                     for line in fd:
                         if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
@@ -284,7 +283,7 @@ class RetryJob(object):
         if exitCode == 8001 or exitCode == 65:
             cvmfs_issue = False
             try:
-                fname = os.path.expanduser("~/%s/job_out.%d.%d.txt" % (self.reqname, self.job_id, self.crab_retry_count))
+                fname = os.path.expanduser("~/%s/job_out.%d.%d.txt" % (self.reqname, self.job_id, self.crab_retry))
                 cvmfs_issue_re = re.compile("== CMSSW:  unable to load /cvmfs/.*file too short")
                 with open(fname) as fd:
                     for line in fd: 
@@ -329,22 +328,22 @@ class RetryJob(object):
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def execute_internal(self, reqname, job_return_code, crab_retry_count, job_id, dag_jobid):
+    def execute_internal(self, reqname, job_return_code, crab_retry, job_id, dag_jobid):
         """
         Need a doc string here.
         """
-        self.reqname          = reqname
-        self.job_return_code  = job_return_code
-        self.crab_retry_count = crab_retry_count
-        self.job_id           = job_id
-        self.dag_jobid        = dag_jobid
+        self.reqname         = reqname
+        self.job_return_code = job_return_code
+        self.crab_retry      = crab_retry
+        self.job_id          = job_id
+        self.dag_jobid       = dag_jobid
 
         self.get_job_ad()
         self.get_report()
 
         if self.ad.get("RemoveReason", "").startswith("Removed due to job being held"):
             hold_reason = self.ad.get("HoldReason", self.ad.get("LastHoldReason", "Unknown"))
-            raise RecoverableError("Will retry held job; last hold reason: %s" % hold_reason)
+            raise RecoverableError("Will retry held job; last hold reason: %s" % (hold_reason))
 
         try:
             self.check_empty_report()

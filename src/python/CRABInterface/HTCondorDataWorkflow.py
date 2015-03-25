@@ -47,7 +47,7 @@ class HTCondorDataWorkflow(DataWorkflow):
     def getRootTasks(self, workflow, schedd):
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
         rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType', "HoldReason", "HoldReasonCode", "CRAB_UserWebDir",
-                        "CRAB_SiteWhitelist", "CRAB_SiteBlacklist", "CRAB_SiteResubmitWhitelist", "CRAB_SiteResubmitBlacklist", "DagmanHoldReason"]
+                        "CRAB_SiteWhitelist", "CRAB_SiteBlacklist", "DagmanHoldReason"]
 
         # Note: may throw if the schedd is down.  We may want to think about wrapping the
         # status function and have it catch / translate HTCondor errors.
@@ -921,11 +921,6 @@ class HTCondorDataWorkflow(DataWorkflow):
         site_ad = classad.parse(fp)
         blacklist = set(task_ad['CRAB_SiteBlacklist'])
         whitelist = set(task_ad['CRAB_SiteWhitelist'])
-        if 'CRAB_SiteResubmitWhitelist' in task_ad:
-            whitelist.update(task_ad['CRAB_SiteResubmitWhitelist'])
-        if 'CRAB_SiteResubmitBlacklist' in task_ad:
-            blacklist.update(task_ad['CRAB_SiteResubmitBlacklist'])
-
         for key, val in site_ad.items():
             m = self.job_name_re.match(key)
             if not m:

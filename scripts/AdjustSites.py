@@ -20,21 +20,35 @@ if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
     os.dup2(fd, 2)
 os.close(fd)
 
-terminator_re = re.compile(r"^\.\.\.$")
-event_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
-term_re = re.compile(r"Normal termination \(return value 2\)")
-node_re = re.compile(r"DAG Node: Job(\d+)")
 
 def adjustPostScriptExitStatus(resubmitJobIds):
     """
+    Edit the DAG .nodes.log file changing the POST script exit code from 0|2 to 1
+    (i.e., in RetryJob terminology, from OK|FATAL_ERROR to RECOVERABLE_ERROR) for
+    the job ids passed in the resubmitJobIds argument. This way DAGMan will retry
+    these nodes when the DAG is resubmitted. In practice, search for this kind of
+    sequence in the DAG .nodes.log file:
     ...
     016 (146493.000.000) 11/11 17:45:46 POST Script terminated.
-        (1) Normal termination (return value 1)
+        (1) Normal termination (return value [0|2])
         DAG Node: Job105
     ...
+    for the resubmitJobIds and replace the return value to 1.
+
+    Note:
+          When DAGMan runs in recovery mode, the DAG .nodes.log file is used to
+    identify the nodes that have completed and should not be resubmitted.
+          When DAGMan runs in rescue mode (assuming a rescue DAG file is present,
+    which is not the case when a DAG is aborted, for example), all failed nodes
+    are resubmitted. Nodes can be labeled as DONE in the rescue DAG file and
+    DAGMan will not be rerun them, but then the node state would be set to DONE.
     """
     if not resubmitJobIds:
         return
+    terminator_re = re.compile(r"^\.\.\.$")
+    event_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
+    retvalue_re = re.compile(r"Normal termination \(return value [0|2]\)")
+    node_re = re.compile(r"DAG Node: Job(\d+)")
     resubmitAll = (resubmitJobIds == True)
     ra_buffer = []
     alt = None
@@ -51,16 +65,18 @@ def adjustPostScriptExitStatus(resubmitJobIds):
             if m:
                 ra_buffer.append(line)
             else:
-                for l in ra_buffer: output += l
+                for l in ra_buffer:
+                    output += l
                 output += line
                 ra_buffer = []
         elif len(ra_buffer) == 2:
-            m = term_re.search(line)
+            m = retvalue_re.search(line)
             if m:
                 ra_buffer.append("        (1) Normal termination (return value 1)\n")
                 alt = line
             else:
-                for l in ra_buffer: output += l
+                for l in ra_buffer:
+                    output += l
                 output += line
                 ra_buffer = []
         elif len(ra_buffer) == 3:
@@ -68,16 +84,19 @@ def adjustPostScriptExitStatus(resubmitJobIds):
             print line, m, m.groups(), resubmitJobIds
             if m and (resubmitAll or (m.groups()[0] in resubmitJobIds)):
                 print m.groups()[0], resubmitJobIds
-                for l in ra_buffer: output += l
+                for l in ra_buffer:
+                    output += l
             else:
-                for l in ra_buffer[:-1]: output += l
+                for l in ra_buffer[:-1]:
+                    output += l
                 output += alt
             output += line
             ra_buffer = []
         else:
             output += line
     if ra_buffer:
-        for l in ra_buffer: output += l
+        for l in ra_buffer:
+            output += l
     # This is a curious dance!  If the user is out of quota, we don't want
     # to fail halfway into writing the file.  OTOH, we can't write into a temp
     # file and an atomic rename because the running shadows keep their event log
@@ -279,7 +298,7 @@ def main():
             # file; hence, we only edit the file while holding an appropriate lock.
             # Note this lock method didn't exist until 8.1.6; prior to this, we simply
             # run dangerously.
-            with htcondor.lock(open("RunJobs.dag.nodes.log", "a"), htcondor.LockType.WriteLock) as lock:
+            with htcondor.lock(open("RunJobs.dag.nodes.log", 'a'), htcondor.LockType.WriteLock) as lock:
                 adjustPostScriptExitStatus(resubmitJobIds)
         else:
             adjustPostScriptExitStatus(resubmitJobIds)
