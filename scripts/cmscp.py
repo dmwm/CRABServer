@@ -956,9 +956,9 @@ def upload_log_file_metadata(dest_temp_lfn, dest_lfn):
             return 80000
     temp_storage_site = str(get_from_job_report('temp_storage_site', 'unknown'))
     if temp_storage_site == 'unknown':
-        msg  = "WARNING: Temporary storage site for logs archive file"
-        msg += " not defined in job report."
-        msg += " Will use the executed site as the temporary storage site."
+        msg  = "WARNING: Temporary storage site for logs archive file not defined in job report."
+        msg += " This is expected if there was no attempt to stage out the file into a temporary storage."
+        msg += " Will use the executed site as the temporary storage site in the file metadata."
         print msg
         temp_storage_site = str(get_from_job_report('executed_site', 'unknown'))
         if temp_storage_site == 'unknown':
