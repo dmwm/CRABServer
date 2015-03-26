@@ -1213,9 +1213,13 @@ class PostJob():
         """
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
-        temp_storage_site = self.executed_site
-        if self.job_report.get(u'temp_storage_site', 'unknown') != 'unknown':
-            temp_storage_site = self.job_report.get(u'temp_storage_site')
+        temp_storage_site = self.job_report.get('temp_storage_site', 'unknown')
+        if temp_storage_site == 'unknown':
+            msg  = "Temporary storage site for logs archive file not defined in job report."
+            msg += " This is expected if there was no attempt to stage out the file into a temporary storage."
+            msg += " Will use the executed site as the temporary storage site in the file metadata."
+            self.logger.warning(msg)
+            temp_storage_site = self.executed_site
         configreq = {'taskname'        : self.reqname,
                      'pandajobid'      : self.job_id,
                      'outsize'         : self.job_report.get(u'log_size', 0),
@@ -1632,7 +1636,7 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    ## job_err is empty because we redirect to stderr to stdout, and job_out.tmp is
+    ## job_err is empty because we redirect stderr to stdout, and job_out.tmp is
     ## empty because we truncate it to 0 after copying it to the web directory.
     ## So we don't need this method IMHO. AndresT.
     def fix_job_logs_permissions(self):
