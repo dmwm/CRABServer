@@ -58,7 +58,7 @@ class DBSDataDiscovery(DataDiscovery):
         except DBSReaderError, dbsexc:
             #dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
-                raise TaskWorkerException("The CRAB3 server backend could not could not find dataset %s in this DBS instance: %s" % (kwargs['task']['tm_input_dataset'], dbsurl))
+                raise TaskWorkerException("The CRAB3 server backend could not find dataset %s in this DBS instance: %s" % (kwargs['task']['tm_input_dataset'], dbsurl))
             raise
         #Create a map for block's locations: for each block get the list of locations
         try:
