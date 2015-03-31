@@ -550,6 +550,15 @@ class DagmanCreator(TaskAction.TaskAction):
             global_whitelist = set(self.config.Sites.available)
         if hasattr(self.config.Sites, 'banned'):
             global_blacklist = set(self.config.Sites.banned)
+
+        #Always block site which is in morgue
+        if hasattr(self.config.Sites, 'blacklist_morgue_save_path'):
+            save_location = self.config.Sites.blacklist_morgue_save_path
+            if os.path.isfile(save_location):
+                with open(save_location, 'r') as fd:
+                    current_morgue_list = set(json.load(fd))
+                    global_blacklist = set(current_morgue_list | global_blacklist)
+
         # This is needed for Site Metrics
         # It should not block any site for Site Metrics and if needed for other activities
         # self.config.TaskWorker.ActivitiesToRunEverywhere = ['hctest', 'hcdev']
