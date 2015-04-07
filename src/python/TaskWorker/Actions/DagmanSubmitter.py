@@ -152,10 +152,19 @@ class DagmanSubmitter(TaskAction.TaskAction):
         except HTTPException, hte:
             self.logger.error(hte.headers)
             self.logger.warning("Unable to contact cmsweb. Will use only on schedulers which was chosen by CRAB3 frontend.")
-        self.logger.info(goodSchedulers)
+        self.logger.info("Good schedulers list got from crabserver: %s " % goodSchedulers)
         submissionFailure = False
         if kw['task']['tm_schedd'] not in goodSchedulers:
-            goodSchedulers.append(kw['task']['tm_schedd'])
+            self.logger.info("Scheduler which is chosen is not in crabserver output %s." % goodSchedulers)
+            self.logger.info("No late binding of schedd. Will use %s for submission." % kw['task']['tm_schedd'])
+            goodSchedulers = [kw['task']['tm_schedd']]
+        else:
+            #Make sure that first scheduler is used which is chosen by HTCondorLocator
+            try:
+                goodSchedulers.remove(kw['task']['tm_schedd'])
+            except ValueError:
+                pass
+            goodSchedulers.insert(0,kw['task']['tm_schedd'])
         for schedd in goodSchedulers:
             #If submission failure is true, trying to change a scheduler
             configreq = {'workflow': kw['task']['tm_taskname'],
