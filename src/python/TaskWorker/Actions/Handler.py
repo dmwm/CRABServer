@@ -102,6 +102,7 @@ class TaskHandler(object):
                         msg = "Unknown error while uploading the logfile for task %s" % self._task['tm_taskname']
                         self.logger.exception(msg)
                 taskhandler.flush()
+                taskhandler.close()
                 self.logger.removeHandler(taskhandler)
             t1 = time.time()
             self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1-t0))
@@ -110,6 +111,7 @@ class TaskHandler(object):
             except AttributeError:
                 nextinput = output
 
+        taskhandler.close()
         self.logger.removeHandler(taskhandler)
 
         return nextinput
