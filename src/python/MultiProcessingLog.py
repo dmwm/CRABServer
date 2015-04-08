@@ -5,7 +5,7 @@ class MultiProcessingLog(logging.Handler):
     def __init__(self, filename, when='h', interval=1, backupCount=0, encoding=None, delay=False, utc=False):
         self.filename = filename
         logging.Handler.__init__(self)
- 
+
         self._handler = TimedRotatingFileHandler(filename, when, interval, backupCount, encoding, delay, utc)
         self.queue = multiprocessing.Queue(-1)
 
