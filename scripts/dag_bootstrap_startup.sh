@@ -166,7 +166,7 @@ else
     # see subsections 2.10.9 "The Rescue DAG" and 2.10.10 "DAG Recovery".
     #
     # Re-nice the process so, even when we churn through lots of processes, we never starve the schedd or shadows for cycles.
-    exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -DoRecov -AutoRescue 0 -MaxPre 20 -MaxIdle 200 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
+    exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -DoRecov -AutoRescue 0 -MaxPre 20 -MaxIdle 400 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
     EXIT_STATUS=$?
 fi
 exit $EXIT_STATUS
