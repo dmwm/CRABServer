@@ -7,23 +7,23 @@ Generates the condor submit files and the master DAG.
 import os
 import re
 import json
-import base64
 import shutil
 import string
-import urllib
 import tarfile
 import hashlib
 import commands
 import tempfile
 from ast import literal_eval
+from httplib import HTTPException
 
-import TaskWorker.Actions.TaskAction as TaskAction
-import TaskWorker.DataObjects.Result
 import TaskWorker.WorkerExceptions
+import TaskWorker.DataObjects.Result
+import TaskWorker.Actions.TaskAction as TaskAction
+from TaskWorker.WorkerExceptions import TaskWorkerException
 
+import WMCore.WMSpec.WMTask
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 import WMCore.Services.SiteDB.SiteDB as SiteDB
-import WMCore.WMSpec.WMTask
 
 import classad
 
@@ -248,6 +248,15 @@ def transform_strings(input):
 
 
 def getLocation(default_name, checkout_location):
+    """ Get the location of the runtime code (job wrapper, postjob, anything executed on the schedd
+        and on the worker node)
+
+        First check if the files are present in the current working directory
+        Then check if CRABTASKWORKER_ROOT is in the environment and use that location (that viariable is
+            set by the taskworker init script. In the prod source script we use "export CRABTASKWORKER_ROOT")
+        Finally, check if the CRAB3_CHECKOUT variable is set. That option is interesting for developer who
+            can use this to point to their github repository. (Marco: we need to check this)
+    """
     loc = default_name
     if not os.path.exists(loc):
         if 'CRABTASKWORKER_ROOT' in os.environ:
@@ -480,11 +489,6 @@ class DagmanCreator(TaskAction.TaskAction):
                 localOutputFiles.append("%s=%s" % (origFile, fileName))
             remoteOutputFilesStr = " ".join(remoteOutputFiles)
             localOutputFiles = ", ".join(localOutputFiles)
-            if task['tm_input_dataset']:
-                primaryds = task['tm_input_dataset'].split('/')[1]
-            else:
-                # For MC
-                primaryds = task['tm_publish_name'].rsplit('-', 1)[0]
             counter = "%04d" % (i / 1000)
             tempDest = os.path.join(temp_dest, counter)
             directDest = os.path.join(dest, counter)
@@ -705,49 +709,40 @@ class DagmanCreator(TaskAction.TaskAction):
 
 
     def executeInternal(self, *args, **kw):
+        # FIXME: In PanDA, we provided the executable as a URL.
+        # So, the filename becomes http:// -- and doesn't really work.  Hardcoding the analysis wrapper.
+        #transform_location = getLocation(kw['task']['tm_transformation'], 'CAFUtilities/src/python/transformation/CMSRunAnalysis/')
+        transform_location = getLocation('CMSRunAnalysis.sh', 'CRABServer/scripts/')
+        cmscp_location = getLocation('cmscp.py', 'CRABServer/scripts/')
+        gwms_location = getLocation('gWMS-CMSRunAnalysis.sh', 'CRABServer/scripts/')
+        dag_bootstrap_location = getLocation('dag_bootstrap_startup.sh', 'CRABServer/scripts/')
+        bootstrap_location = getLocation("dag_bootstrap.sh", "CRABServer/scripts/")
+        adjust_location = getLocation("AdjustSites.py", "CRABServer/scripts/")
 
-        cwd = None
-        if hasattr(self.config, 'TaskWorker') and hasattr(self.config.TaskWorker, 'scratchDir'):
-            temp_dir = tempfile.mkdtemp(prefix='_' + kw['task']['tm_taskname'], dir=self.config.TaskWorker.scratchDir)
+        shutil.copy(transform_location, '.')
+        shutil.copy(cmscp_location, '.')
+        shutil.copy(gwms_location, '.')
+        shutil.copy(dag_bootstrap_location, '.')
+        shutil.copy(bootstrap_location, '.')
+        shutil.copy(adjust_location, '.')
 
-            # FIXME: In PanDA, we provided the executable as a URL.
-            # So, the filename becomes http:// -- and doesn't really work.  Hardcoding the analysis wrapper.
-            #transform_location = getLocation(kw['task']['tm_transformation'], 'CAFUtilities/src/python/transformation/CMSRunAnalysis/')
-            transform_location = getLocation('CMSRunAnalysis.sh', 'CRABServer/scripts/')
-            cmscp_location = getLocation('cmscp.py', 'CRABServer/scripts/')
-            gwms_location = getLocation('gWMS-CMSRunAnalysis.sh', 'CRABServer/scripts/')
-            dag_bootstrap_location = getLocation('dag_bootstrap_startup.sh', 'CRABServer/scripts/')
-            bootstrap_location = getLocation("dag_bootstrap.sh", "CRABServer/scripts/")
-            adjust_location = getLocation("AdjustSites.py", "CRABServer/scripts/")
+        # Bootstrap the ISB if we are using UFC
+        if UserFileCache and kw['task']['tm_cache_url'].find('/crabcache')!=-1:
+            ufc = UserFileCache(dict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint' : kw['task']['tm_cache_url']})
+            try:
+                ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
+            except Exception, ex:
+                self.logger.exception(ex)
+                raise TaskWorkerException("The CRAB3 server backend could not download the input sandbox with your code "+\
+                                    "from the frontend (crabcache component).\nThis could be a temporary glitch; please try to submit a new task later "+\
+                                    "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO url!?
+            kw['task']['tm_user_sandbox'] = 'sandbox.tar.gz'
 
-            cwd = os.getcwd()
-            os.chdir(temp_dir)
-            shutil.copy(transform_location, '.')
-            shutil.copy(cmscp_location, '.')
-            shutil.copy(gwms_location, '.')
-            shutil.copy(dag_bootstrap_location, '.')
-            shutil.copy(bootstrap_location, '.')
-            shutil.copy(adjust_location, '.')
-
-            # Bootstrap the ISB if we are using UFC
-            if UserFileCache and kw['task']['tm_cache_url'].find('/crabcache')!=-1:
-                ufc = UserFileCache(dict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint' : kw['task']['tm_cache_url']})
-                try:
-                    ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
-                except Exception, ex:
-                    self.logger.exception(ex)
-                    raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not download the input sandbox with your code "+\
-                                        "from the frontend (crabcache component).\nThis could be a temporary glitch; please try to submit a new task later "+\
-                                        "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO url!?
-                kw['task']['tm_user_sandbox'] = 'sandbox.tar.gz'
-
-            # Bootstrap the runtime if it is available.
-            job_runtime = getLocation('CMSRunAnalysis.tar.gz', 'CRABServer/')
-            shutil.copy(job_runtime, '.')
-            task_runtime = getLocation('TaskManagerRun.tar.gz', 'CRABServer/')
-            shutil.copy(task_runtime, '.')
-
-            kw['task']['scratch'] = temp_dir
+        # Bootstrap the runtime if it is available.
+        job_runtime = getLocation('CMSRunAnalysis.tar.gz', 'CRABServer/')
+        shutil.copy(job_runtime, '.')
+        task_runtime = getLocation('TaskManagerRun.tar.gz', 'CRABServer/')
+        shutil.copy(task_runtime, '.')
 
         kw['task']['resthost'] = self.server['host']
         kw['task']['resturinoapi'] = self.restURInoAPI
@@ -766,14 +761,27 @@ class DagmanCreator(TaskAction.TaskAction):
         if os.path.exists("TaskManagerRun.tar.gz"):
             inputFiles.append("TaskManagerRun.tar.gz")
 
-        try:
             info, splitterResult = self.createSubdag(*args, **kw)
+
+        return info, params, inputFiles, splitterResult
+
+    def execute(self, *args, **kw):
+        cwd = None
+        try:
+            if hasattr(self.config, 'TaskWorker') and hasattr(self.config.TaskWorker, 'scratchDir'):
+                temp_dir = tempfile.mkdtemp(prefix='_' + kw['task']['tm_taskname'], dir=self.config.TaskWorker.scratchDir)
+                cwd = os.getcwd()
+                os.chdir(temp_dir)
+                kw['task']['scratch'] = temp_dir
+            else:
+                #I prefer to raise Exception and not TaskWorkerException since I want the whole stacktrace to be printed just in case
+                #this gets propagated to the client (should never happen in production as we test this before)
+                raise Exception(("The 'scratchDir' parameter is not set in the config.TaskWorker section of the configuration file."
+                                           " Please set config.TaskWorker.scratchDir in your Task Worker configuration"))
+
+            info, params, inputFiles, splitterResult = self.executeInternal(*args, **kw)
+            return TaskWorker.DataObjects.Result.Result(task = kw['task'], result = (temp_dir, info, params, inputFiles, splitterResult))
         finally:
             if cwd:
                 os.chdir(cwd)
-
-        return TaskWorker.DataObjects.Result.Result(task = kw['task'], result = (temp_dir, info, params, inputFiles, splitterResult))
-
-    def execute(self, *args, **kw):
-        return self.executeInternal(*args, **kw)
 
