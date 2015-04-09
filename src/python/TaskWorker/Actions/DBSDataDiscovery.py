@@ -27,6 +27,19 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "Please, use https://its.cern.ch/jira/browse/CMSTRANSF if you think the dataset should not be deprecated"
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
+    def checkDatasetStatus(self, dataset, kwargs):
+        res = self.dbs.dbs.listDatasets(dataset=dataset, detail=1, dataset_access_type='*')
+        if len(res) > 1:
+            raise TaskWorkerException("Found more than one dataset while checking in DBS the status of %s" % dataset)
+        res = res[0]
+        self.logger.info("Input dataset details: %s" % pprint.pformat(res))
+        accessType = res['dataset_access_type']
+        if accessType != 'VALID':
+            msg = "The dataset you are analyzing is not 'VALID' but '%s'. CRAB3 will try to send jobs if there is any valid file" % accessType
+            if accessType == 'DEPRECATED': #as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
+                msg += "Please, use https://its.cern.ch/jira/browse/CMSTRANSF if you think the dataset should not be deprecated"
+            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+
     def keepOnlyDisks(self, locationsMap):
         self.otherLocations = set()
         phedex = PhEDEx() #TODO use certs from the config!
