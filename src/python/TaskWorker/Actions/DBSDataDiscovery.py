@@ -13,6 +13,7 @@ class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service."""
 
     def keepOnlyDisks(self, locationsMap):
+        self.otherLocations = set()
         phedex = PhEDEx() #TODO use certs from the config!
         #get all the PNN that are of kind disk
         try:
@@ -24,8 +25,9 @@ class DBSDataDiscovery(DataDiscovery):
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
         for block, locations in locationsMap.iteritems():
             locationsMap[block] = set(locations) & diskLocations
+            self.otherLocations = self.otherLocations.union(set(locations) - diskLocations)
         #remove any key with value that has set([])
-        for key, value in locationsMap.items():
+        for key, value in locationsMap.items(): #wont work in python3!
             if value == set([]):
                 locationsMap.pop(key)
 
@@ -71,6 +73,8 @@ class DBSDataDiscovery(DataDiscovery):
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
             msg = "The CRAB3 server backend could not find any location for dataset %s in %s." % (kwargs['task']['tm_input_dataset'], dbsurl)
+            if self.otherLocations:
+                msg += "\nN.B.: your dataset is available at %s, but CRAB3 can only submit a task if the dataset is on 'Disk'" % ','.join(sorted(self.otherLocations))
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
