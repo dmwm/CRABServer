@@ -1,4 +1,5 @@
 import os
+import pprint
 import logging
 from httplib import HTTPException
 
@@ -11,6 +12,19 @@ from TaskWorker.Actions.DataDiscovery import DataDiscovery
 
 class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service."""
+
+    def checkDatasetStatus(self, dataset, kwargs):
+        res = self.dbs.dbs.listDatasets(dataset=dataset, detail=1, dataset_access_type='*')
+        if len(res) > 1:
+            raise TaskWorkerException("Found more than one dataset while checking in DBS the status of %s" % dataset)
+        res = res[0]
+        self.logger.info("Input dataset details: %s" % pprint.pformat(res))
+        accessType = res['dataset_access_type']
+        if accessType != 'VALID':
+            msg = "The dataset you are analyzing is not 'VALID' but '%s'. CRAB3 will try to send jobs if there is any valid file" % accessType
+            if accessType == 'DEPRECATED': #as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
+                msg += "Please, use https://its.cern.ch/jira/browse/CMSTRANSF if you think the dataset should not be deprecated"
+            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
     def keepOnlyDisks(self, locationsMap):
         self.otherLocations = set()
@@ -41,7 +55,7 @@ class DBSDataDiscovery(DataDiscovery):
         dbsurl = self.config.Services.DBSUrl
         if kwargs['task']['tm_dbs_url']:
             dbsurl = kwargs['task']['tm_dbs_url']
-        dbs = get_dbs(dbsurl)
+        self.dbs = get_dbs(dbsurl)
         #
         if old_cert_val != None:
             os.environ['X509_USER_CERT'] = old_cert_val
@@ -51,12 +65,13 @@ class DBSDataDiscovery(DataDiscovery):
             os.environ['X509_USER_KEY'] = old_key_val
         else:
             del os.environ['X509_USER_KEY']
-        self.logger.debug("Data discovery through %s for %s" %(dbs, kwargs['task']['tm_taskname']))
+        self.logger.debug("Data discovery through %s for %s" %(self.dbs, kwargs['task']['tm_taskname']))
+        self.checkDatasetStatus(kwargs['task']['tm_input_dataset'], kwargs)
         try:
             # Get the list of blocks for the locations and then call dls.
             # The WMCore DBS3 implementation makes one call to dls for each block
             # with locations = True so we are using locations=False and looking up location later
-            blocks = [ x['Name'] for x in dbs.getFileBlocksInfo(kwargs['task']['tm_input_dataset'], locations=False)]
+            blocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(kwargs['task']['tm_input_dataset'], locations=False)]
         except DBSReaderError, dbsexc:
             #dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
@@ -64,7 +79,7 @@ class DBSDataDiscovery(DataDiscovery):
             raise
         #Create a map for block's locations: for each block get the list of locations
         try:
-            locationsMap = dbs.listFileBlockLocation(list(blocks), phedexNodes=True)
+            locationsMap = self.dbs.listFileBlockLocation(list(blocks), phedexNodes=True)
         except Exception, ex: #TODO should we catch HttpException instead?
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
@@ -79,12 +94,14 @@ class DBSDataDiscovery(DataDiscovery):
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
         try:
-            filedetails = dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], True)
+            filedetails = self.dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], True)
         except Exception, ex: #TODO should we catch HttpException instead?
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not contact DBS to get the files deteails (Lumis, events, etc).\n"+\
                                 "This is could be a temporary DBS glitch, please try to submit a new task (resubmit will not work)"+\
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
+        if not filedetails:
+            raise TaskWorkerException("Cannot find any valid file inside the dataset. Aborting submission.")
         result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'], datasetfiles = filedetails, locations = locationsMap)
         self.logger.debug("Got %s files" % len(result.result.getFiles()))
         return result
