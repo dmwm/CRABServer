@@ -11,7 +11,8 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 
 class DBSDataDiscovery(DataDiscovery):
-    """Performing the data discovery through CMS DBS service."""
+    """Performing the data discovery through CMS DBS service.
+    """
 
     def checkDatasetStatus(self, dataset, kwargs):
         res = self.dbs.dbs.listDatasets(dataset=dataset, detail=1, dataset_access_type='*')
