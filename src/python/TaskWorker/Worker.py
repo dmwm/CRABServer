@@ -24,7 +24,7 @@ def processWorker(inputs, results, resthost, resturi, procnum):
        :arg Queue inputs: the queue where the inputs are shared by the master
        :arg Queue results: the queue where this method writes the output
        :return: default returning zero, but not really needed."""
-    logger = logging.getLogger(str(procnum))
+    logger = setProcessLogger(str(procnum))
     logger.info("Process %s is starting. PID %s", procnum, os.getpid())
     procName = "Process-%s" % procnum
     while True:
@@ -128,8 +128,7 @@ class Worker(object):
         if len(self.pool) == 0:
             # Starting things up
             for x in xrange(1, self.nworkers + 1):
-                self.logger.debug("Starting process %i" %x)
-                setProcessLogger(str(x))
+                self.logger.debug("Starting process %i" % x)
                 p = multiprocessing.Process(target = processWorker, args = (self.inputs, self.results, self.resthost, self.resturi, x))
                 p.start()
                 self.pool.append(p)

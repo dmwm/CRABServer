@@ -18,6 +18,7 @@ from RESTInteractions import HTTPRequests
 
 from TaskWorker.WorkerExceptions import *
 from TaskWorker.TestWorker import TestWorker
+from MultiProcessingLog import MultiProcessingLog
 from TaskWorker.Worker import Worker, setProcessLogger
 import TaskWorker.Actions.Recurring.BaseRecurringAction
 from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
@@ -94,7 +95,7 @@ class MasterWorker(object):
                 #if we are testing log to the console is easier
                 logging.getLogger().addHandler(logging.StreamHandler())
             else:
-                logHandler = TimedRotatingFileHandler('logs/twlog.txt', 'midnight')
+                logHandler = MultiProcessingLog('logs/twlog.txt', when='midnight')
                 logFormatter = \
                     logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
                 logHandler.setFormatter(logFormatter)
@@ -107,7 +108,7 @@ class MasterWorker(object):
             logging.getLogger().setLevel(loglevel)
             logger = setProcessLogger("master")
             logger.debug("PID %s." % os.getpid())
-            logger.debug("Logging level initialized to %s." %loglevel)
+            logger.debug("Logging level initialized to %s." % loglevel)
             return logger
 
         self.STOP = False
