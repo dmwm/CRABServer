@@ -21,7 +21,7 @@ class DBSDataDiscovery(DataDiscovery):
         self.logger.info("Input dataset details: %s" % pprint.pformat(res))
         accessType = res['dataset_access_type']
         if accessType != 'VALID':
-            msg = "The dataset you are analyzing is not 'VALID' but '%s'. CRAB3 will try to send jobs if there is any valid file" % accessType
+            msg = "The dataset you are analyzing is not 'VALID' but '%s'. CRAB3 will try to see if there is any valid file" % accessType
             if accessType == 'DEPRECATED': #as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
                 msg += "Please, use https://its.cern.ch/jira/browse/CMSTRANSF if you think the dataset should not be deprecated"
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
@@ -84,12 +84,14 @@ class DBSDataDiscovery(DataDiscovery):
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
                                 "This is could be a temporary phedex/dbs glitch, please try to submit a new task (resubmit will not work)"+\
-                                " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
+                                " and contact the experts if the error persists.\nError reason: %s" % str(ex))
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
-            msg = "The CRAB3 server backend could not find any location for dataset %s in %s." % (kwargs['task']['tm_input_dataset'], dbsurl)
+            msg = "Task could not be submitted because there is no DISK replica for dataset %s ." % (kwargs['task']['tm_input_dataset'])
+            msg += " Please, check DAS, https://cmsweb.cern.ch/das, and make sure the dataset is accessible on DISK"
+            msg += " You might want to contact your physics group if you need a disk replica."
             if self.otherLocations:
-                msg += "\nN.B.: your dataset is available at %s, but CRAB3 can only submit a task if the dataset is on 'Disk'" % ','.join(sorted(self.otherLocations))
+                msg += "\nN.B.: your dataset is stored at %s, but those are TAPE locations." % ','.join(sorted(self.otherLocations))
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
