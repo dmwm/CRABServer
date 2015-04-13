@@ -5,7 +5,6 @@ Submit a DAG directory created by the DagmanCreator component.
 
 import os
 import time
-import base64
 import random
 import urllib
 import traceback
@@ -165,6 +164,21 @@ class DagmanSubmitter(TaskAction.TaskAction):
             except ValueError:
                 pass
             goodSchedulers.insert(0,kw['task']['tm_schedd'])
+        self.logger.info("Final good schedulers list after shuffle: %s " % goodSchedulers)
+
+        #Check memory and walltime and if user requires too much:
+        # upload warning back to crabserver
+        # change walltime to max 47h Issue: #4742
+        if kw['task']['tm_maxjobruntime'] > 2800:
+            msg = "task requests %s minutes of runtime but only %s is guaranteed to be available. Jobs may not find a site where to run. CRAB3 have changed this value to %s minutes" % (kw['task']['tm_maxjobruntime'], '2800', '2800')
+            self.logger.warning(msg)
+            args[0][1]['tm_maxjobruntime'] = '2800'
+            self.uploadWarning(msg, kw['task']['user_proxy'], kw['task']['tm_taskname'])
+        if kw['task']['tm_maxmemory'] > 2500:
+            msg = "task requests %s memory but only %s is guaranteed to be available. Jobs may not find a site where to run and stay idle forever" % (kw['task']['tm_maxmemory'], '2500')
+            self.logger.warning(msg)
+            self.uploadWarning(msg, kw['task']['user_proxy'], kw['task']['tm_taskname'])
+
         for schedd in goodSchedulers:
             #If submission failure is true, trying to change a scheduler
             configreq = {'workflow': kw['task']['tm_taskname'],
