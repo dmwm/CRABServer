@@ -1,5 +1,9 @@
+import urllib
 import logging
+from base64 import b64encode
+from httplib import HTTPException
 
+from RESTInteractions import HTTPRequests
 
 class TaskAction(object):
     """The ABC of all actions"""
@@ -29,3 +33,14 @@ class TaskAction(object):
     def execute(self):
         raise NotImplementedError
 
+
+    def uploadWarning(self, warning, userProxy, taskname):
+        try:
+            userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2)
+            configreq = {'subresource': 'addwarning',
+                         'workflow': taskname,
+                         'warning': b64encode(warning)}
+            userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
+        except HTTPException, hte:
+            self.logger.error(hte.headers)
+            self.logger.warning("Cannot add a warning to REST interface. Warning message: %s" % warning)
