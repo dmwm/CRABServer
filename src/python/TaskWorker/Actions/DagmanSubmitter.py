@@ -177,7 +177,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
                 self.logger.warning(msg)
                 time.sleep(20)
-                retryIssuesBySchedd.setDefault(schedd, []).append(msg)
+                retryIssuesBySchedd.setdefault(schedd, []).append(msg)
                 continue
             for retry in range(self.config.TaskWorker.max_retry + 1): #max_retry can be 0
                 self.logger.debug("Trying to submit task %s %s time." % (kw['task']['tm_taskname'], str(retry)))
