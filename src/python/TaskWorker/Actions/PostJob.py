@@ -871,7 +871,7 @@ class PostJob():
         self.logs_arch_file_name = args[8]
         ## TODO: We can get the output files from the job ad where we have
         ## CRAB_EDMOutputFiles, CRAB_TFileOutputFiles and CRAB_AdditionalOutputFiles.
-        ## (We only need to add the job_id in the file names.)
+        ## (We only need to add the job_id in the file names).
         self.output_files_names  = []
         for i in xrange(9, len(args)):
             self.output_files_names.append(args[i])
