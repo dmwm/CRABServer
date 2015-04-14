@@ -973,6 +973,7 @@ class PostJob():
         ## the webdir.
         stdout = "job_out.%d" % (self.job_id)
         stdout_tmp = "job_out.tmp.%d" % (self.job_id)
+
         if os.path.exists(stdout):
             os.rename(stdout, stdout_tmp)
             fname = "job_out.%d.%d.txt" % (self.job_id, self.crab_retry)
