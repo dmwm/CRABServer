@@ -6,11 +6,13 @@ import json
 import errno
 import classad
 import logging
+import htcondor
 from ast import literal_eval
 
 from ApmonIf import ApmonIf
 
-from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES 
+from ServerUtilities import getWebdirForDb
+from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import CMSGroupMapper
 
@@ -154,6 +156,7 @@ class PreJob:
         """
         self.task_ad = {}
         try:
+            self.logger.info("Loading classads from: %s" % os.environ['_CONDOR_JOB_AD'])
             self.task_ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
         except:
             msg = "Got exception while trying to parse the job ad."
@@ -307,6 +310,12 @@ class PreJob:
         ## will first run jobs by JobPrio; then, for jobs with the same JobPrio, it will
         ## run the job with the higher PostJobPrio1.
         new_submit_text += '+PostJobPrio1 = -%s\n' % str(self.task_ad.lookup('QDate'))
+        ## This is used to send to dashbord the location of the logfiles
+        try:
+            storage_rules = htcondor.param['CRAB_StorageRules']
+        except:
+            storage_rules = "^/home/remoteGlidein,http://submit-5.t2.ucsd.edu/CSstoragePath"
+        new_submit_text += '+CRAB_UserWebDir = "%s"\n' % getWebdirForDb(str(self.task_ad.lookup('CRAB_ReqName'))[1:-1], storage_rules)
         ## Add the site black- and whitelists and the DESIRED_SITES to the
         ## Job.<job_id>.submit content.
         new_submit_text = self.redo_sites(new_submit_text, crab_retry, use_resubmit_info)

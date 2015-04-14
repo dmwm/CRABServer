@@ -80,6 +80,7 @@ from httplib import HTTPException
 import DashboardAPI
 import WMCore.Database.CMSCouch as CMSCouch
 
+from ServerUtilities import setDashboardLogs
 from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
@@ -1788,16 +1789,11 @@ class PostJob():
         if reason:
             params['StatusValueReason'] = reason
         ## List with the log files that we want to make available in dashboard.
+        ## Disabling, The one in CMSRunAnalysis should be enough
         if 'CRAB_UserWebDir' in self.job_ad:
-            log_files = [("job_out", "txt"), ("job_fjr", "json"), ("postjob", "txt")]
-            for i, log_file in enumerate(log_files):
-                log_file_basename, log_file_extension = log_file
-                log_file_name = "%s/%s.%d.%d.%s" % (self.job_ad['CRAB_UserWebDir'], \
-                                                    log_file_basename, self.job_id, \
-                                                    self.crab_retry, \
-                                                    log_file_extension)
-                log_files[i] = log_file_name
-            params['StatusLogFile'] = ",".join(log_files)
+            setDashboardLogs(params, self.job_ad['CRAB_UserWebDir'], self.job_id, self.crab_retry)
+        else:
+           print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir in myad."
         ## Unfortunately, Dashboard only has 1-second resolution; we must separate all
         ## updates by at least 1s in order for it to get the correct ordering.
         time.sleep(1)

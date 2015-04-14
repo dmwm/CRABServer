@@ -75,7 +75,7 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
 
     mkdir -p bin
     cp $ORIGDIR/scripts/{TweakPSet.py,CMSRunAnalysis.py,DashboardFailure.sh} .
-    cp $ORIGDIR/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py} .
+    cp $ORIGDIR/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py,ServerUtilities.py} .
 
 else
 
@@ -144,13 +144,13 @@ else
 
     mkdir -p bin
     cp $CRABSERVER_PATH/scripts/{TweakPSet.py,CMSRunAnalysis.py,DashboardFailure.sh} .
-    cp $CRABSERVER_PATH/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py} .
+    cp $CRABSERVER_PATH/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py,ServerUtilities.py} .
 fi
 
 pwd
 echo "Making TaskManagerRun tarball"
-tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py libcurl.so.4 || exit 4
+tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py libcurl.so.4 || exit 4
 echo "Making CMSRunAnalysis tarball"
-tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py DashboardFailure.sh || exit 4
+tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py DashboardFailure.sh || exit 4
 popd
 
