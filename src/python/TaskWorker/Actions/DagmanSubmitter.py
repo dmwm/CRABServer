@@ -12,6 +12,7 @@ import traceback
 import subprocess
 
 import HTCondorUtils
+import CMSGroupMapper
 import HTCondorLocator
 
 from httplib import HTTPException
@@ -334,6 +335,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
         """
         dagAd = classad.ClassAd()
         addCRABInfoToClassAd(dagAd, info)
+
+        groups = CMSGroupMapper.map_user_to_groups(dagAd["CRAB_UserHN"])
+        if groups:
+            dagAd["CMSGroups"] = groups
 
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
