@@ -111,7 +111,7 @@ class CRAB3ProxyRenewer(object):
         self.logger.info("Schedd found at %s" % schedd_ad['MyAddress'])
         schedd = htcondor.Schedd(schedd_ad)
         self.logger.info("Querying schedd for CRAB3 tasks.")
-        task_ads = list(schedd.xquery('JobStatus =!= 4 && TaskType =?= "ROOT"', QUERY_ATTRS))
+        task_ads = list(schedd.xquery('JobStatus =!= 4 && TaskType =?= "ROOT" && CRAB_HC =!= "True"', QUERY_ATTRS))
         self.logger.info("There were %d tasks found." % len(task_ads))
         ads = {}
         now = time.time()

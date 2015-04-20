@@ -145,11 +145,12 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
                   ((JobStatus =?= 2) && ( \
                      (MemoryUsage > RequestMemory) || \
                      (MaxWallTimeMins*60 < time() - EnteredCurrentStatus) || \
-                     (DiskUsage > 100000000) \
-                  ))
+                     (DiskUsage > 100000000))) || \
+                  ((JobStatus =?= 1) && (time() > (x509UserProxyExpiration + 86400)))
 +PeriodicRemoveReason = ifThenElse(MemoryUsage > RequestMemory, "Removed due to memory use", \
                           ifThenElse(MaxWallTimeMins*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
-                            ifThenElse(DiskUsage > 100000000, "Removed due to disk usage", "Removed due to job being held")))
+                            ifThenElse(DiskUsage > 100000000, "Removed due to disk usage", \
+                              ifThenElse(time() > x509UserProxyExpiration, "Removed job due to proxy expiration", "Removed due to job being held"))))
 %(extra_jdl)s
 queue
 """
