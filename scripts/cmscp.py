@@ -415,18 +415,23 @@ def add_sites_to_job_report(file_name, is_log, \
     """
     orig_file_name, _ = get_job_id(file_name)
     msg  = "Setting"
-    msg += " temp_storage_site = '%s'," % (temp_storage_site)
-    msg += " storage_site = '%s'," % (storage_site)
-    msg += " local_stageout = %s" % (str(bool(local_stageout)))
-    msg += " and"
-    msg += " direct_stageout = %s" % (str(bool(direct_stageout)))
+    key_value_pairs = []
+    if temp_storage_site is not None:
+        key_value_pairs.append(('temp_storage_site', temp_storage_site))
+        msg += " temp_storage_site = '%s'," % (temp_storage_site)
+    if storage_site is not None:
+        key_value_pairs.append(('storage_site', storage_site))
+        msg += " storage_site = '%s'," % (storage_site)
+    if local_stageout is not None:
+        key_value_pairs.append(('local_stageout', bool(local_stageout)))
+        msg += " local_stageout = %s" % (str(bool(local_stageout)))
+    if direct_stageout is not None:
+        key_value_pairs.append(('direct_stageout', bool(direct_stageout)))
+        msg += " direct_stageout = %s" % (str(bool(direct_stageout)))
     msg += " for file %s in job report." % (orig_file_name)
+    if not key_value_pairs:
+        return True
     print msg
-    is_ok = True
-    key_value_pairs = [('temp_storage_site', temp_storage_site), \
-                       ('storage_site', storage_site), \
-                       ('local_stageout', bool(local_stageout)), \
-                       ('direct_stageout', bool(direct_stageout))]
     is_ok = add_to_file_in_job_report(file_name, is_log, key_value_pairs)
     if not is_ok:
         msg  = "ERROR: Failed to set the above keys and values"
@@ -553,7 +558,7 @@ def perform_local_stageout(local_stageout_mgr, \
         sites_added_ok = add_sites_to_job_report(dest_temp_file_name, \
                                                  is_log, dest_temp_site, \
                                                  dest_site if inject else 'unknown', \
-                                                 True, False)
+                                                 True, None)
         if not sites_added_ok:
             msg = "WARNING: Ignoring failure in adding the above information to the job report."
             print msg
@@ -797,8 +802,8 @@ def perform_direct_stageout(direct_stageout_impl, \
     if result == 0:
         dest_file_name = os.path.split(dest_pfn)[-1]
         sites_added_ok = add_sites_to_job_report(dest_file_name, is_log, \
-                                                 'unknown', dest_site, \
-                                                 False, True)
+                                                 None, dest_site, \
+                                                 None, True)
         if not sites_added_ok:
             msg = "WARNING: Ignoring failure in adding the above information to the job report."
             print msg
