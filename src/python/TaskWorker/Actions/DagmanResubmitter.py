@@ -1,4 +1,3 @@
-import base64
 import urllib
 import traceback
 
@@ -12,7 +11,6 @@ import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from httplib import HTTPException
-
 
 class DagmanResubmitter(TaskAction.TaskAction):
     """
@@ -48,6 +46,17 @@ class DagmanResubmitter(TaskAction.TaskAction):
             msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
             self.logger.exception(msg)
             raise TaskWorkerException(msg)
+
+        # Check memory and walltime
+        if task['resubmit_maxjobruntime'] != None and task['resubmit_maxjobruntime'] > 2800:
+            msg = "task requests %s minutes of walltime but only %s is guaranteed to be available. Jobs may not find a site where to run. CRAB3 have changed this value to %s minutes" % (task['resubmit_maxjobruntime'], '2800', '2800')
+            self.logger.warning(msg)
+            task['resubmit_maxjobruntime'] = '2800'
+            self.uploadWarning(msg, kw['task']['user_proxy'], kw['task']['tm_taskname'])
+        if task['resubmit_maxmemory'] != None and task['resubmit_maxmemory'] > 2500:
+            msg = "task requests %s memory but only %s is guaranteed to be available. Jobs may not find a site where to run and stay idle forever" % (task['resubmit_maxmemory'], '2500')
+            self.logger.warning(msg)
+            self.uploadWarning(msg, kw['task']['user_proxy'], kw['task']['tm_taskname'])
 
         # Release the DAG
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(workflow)
