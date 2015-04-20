@@ -88,6 +88,7 @@ from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 ASO_JOB = None
 config = None
 G_JOB_REPORT_NAME = None
+G_JOB_REPORT_NAME_NEW = None
 
 
 def sighandler(*args):
@@ -100,7 +101,7 @@ signal.signal(signal.SIGTERM, sighandler)
 
 ##==============================================================================
 
-def prepareErrorSummary(logger, reqname):#, job_id, crab_retry):
+def prepareErrorSummary(logger):
     """ Load the current error_summary.json and do the equivalent of an 'ls job_fjr.*.json' to get the completed jobs.
         Then, add the error reason of the job that are not in errorReport.json
     """
@@ -126,16 +127,14 @@ def prepareErrorSummary(logger, reqname):#, job_id, crab_retry):
 #        #there is nothing to do it the aso_status.json file does not exist or is invalid.
 #        print "aso_status.json is empty or does not exist"
 
-    #iterate over the job reports in the task directory
-    logpath = os.path.expanduser("~/%s" % (reqname))
-    for report in glob.glob(logpath+'/job_fjr.*.json'):
+    ## Iterate over the job reports in the spool directory.
+    for report in glob.glob("job_fjr.*.*.json"):
         split_rep = report.split('.')
         job_id, crab_retry = split_rep[-3], split_rep[-2]
         if job_id in error_summary and crab_retry in error_summary[job_id]:
             #the report has already been processed
             continue
-        fname = os.path.join(logpath, "job_fjr."+job_id+"."+crab_retry+".json")
-        with open(fname) as frep:
+        with open("job_fjr.%s.%s.json" % (job_id, crab_retry)) as frep:
             try:
                 rep = None
                 exit_code = -1
@@ -829,6 +828,8 @@ class PostJob():
         ## Object we will use for making requests to the REST interface (uploading logs
         ## archive and output files matadata).
         self.server              = None
+        ## Path to the task web directory.
+        self.logpath             = None
         ## Set a logger for the post-job.
         self.logger = logging.getLogger()
         handler = logging.StreamHandler(sys.stdout)
@@ -869,16 +870,16 @@ class PostJob():
             self.crab_retry = self.dag_retry
 
         ## Create the task web directory in the schedd.
-        logpath = os.path.expanduser("~/%s" % (self.reqname))
+        self.logpath = os.path.expanduser("~/%s" % (self.reqname))
         try:
-            os.makedirs(logpath)
+            os.makedirs(self.logpath)
         except OSError, ose:
             if ose.errno != errno.EEXIST:
-                print "Failed to create log web-shared directory %s" % (logpath)
+                print "Failed to create log web-shared directory %s" % (self.logpath)
                 raise
 
         ## Create (open) the post-job log file postjob.<job_id>.<crab_retry>.txt.
-        postjob_log_file_name = os.path.join(logpath, "postjob.%d.%d.txt" % (self.job_id, self.crab_retry))
+        postjob_log_file_name = "postjob.%d.%d.txt" % (self.job_id, self.crab_retry)
         fd_postjob_log = os.open(postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
         os.chmod(postjob_log_file_name, 0644)
         ## Redirect stdout and stderr to the post-job log file.
@@ -889,6 +890,22 @@ class PostJob():
             os.dup2(fd_postjob_log, 2)
             msg = "Post-job started with output redirected to %s." % (postjob_log_file_name)
             self.logger.info(msg)
+        ## Create a symbolic link in the task web directory to the post-job log file.
+        msg = "Creating symbolic link in task web directory to post-job log file: %s -> %s" \
+            % (os.path.join(self.logpath, postjob_log_file_name), postjob_log_file_name)
+        self.logger.debug(msg)
+        try:
+            os.symlink(os.path.abspath(os.path.join(".", postjob_log_file_name)), \
+                       os.path.join(self.logpath, postjob_log_file_name))
+        except:
+            pass
+
+        ## Now that we have the job id and retry, we can set the job report file
+        ## names.
+        global G_JOB_REPORT_NAME
+        G_JOB_REPORT_NAME = "jobReport.json.%d" % (self.job_id)
+        global G_JOB_REPORT_NAME_NEW
+        G_JOB_REPORT_NAME_NEW = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry)
 
         ## Call execute_internal().
         retval = 1
@@ -905,7 +922,7 @@ class PostJob():
         ## Prepare the error report. Enclosing it in a try except as we don't want to
         ## fail jobs because this fails.
         try:
-            prepareErrorSummary(self.logger, self.reqname)
+            prepareErrorSummary(self.logger)
         except:
             msg = "Unknown error while preparing the error report."
             self.logger.exception(msg)
@@ -927,12 +944,14 @@ class PostJob():
 
         ## Copy the job's stdout file job_out.<job_id> to the schedd web directory,
         ## naming it job_out.<job_id>.<crab_retry>.txt.
+        ## NOTE: We now redirect stdout -> stderr; hence, we don't keep stderr in
+        ## the webdir.
         stdout = "job_out.%d" % (self.job_id)
-        logpath = os.path.expanduser("~/%s" % (self.reqname))
+        stdout_tmp = "job_out.tmp.%d" % (self.job_id)
         if os.path.exists(stdout):
             os.rename(stdout, stdout_tmp)
             fname = "job_out.%d.%d.txt" % (self.job_id, self.crab_retry)
-            fname = os.path.join(logpath, fname)
+            fname = os.path.join(self.logpath, fname)
             msg = "Copying job stdout from %s to %s." % (stdout, fname)
             self.logger.debug(msg)
             shutil.copy(stdout_tmp, fname)
@@ -941,19 +960,22 @@ class PostJob():
             fd_stdout.close()
             os.chmod(fname, 0644)
 
-        ## Copy the json job report file jobReport.json.<job_id> to the schedd web
-        ## directory, naming it job_fjr.<job_id>.<crab_retry>.json.
-        ## NOTE: We now redirect stdout -> stderr; hence, we don't keep stderr in
-        ## the webdir.
-        global G_JOB_REPORT_NAME
-        G_JOB_REPORT_NAME = "jobReport.json.%d" % (self.job_id)
+        ## Copy the json job report file jobReport.json.<job_id> to
+        ## job_fjr.<job_id>.<crab_retry>.json and create a symbolic link in the task web
+        ## directory to the new job report file.
         if os.path.exists(G_JOB_REPORT_NAME):
-            fname = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry)
-            fname = os.path.join(logpath, fname)
-            msg = "Copying job report from %s to %s." % (G_JOB_REPORT_NAME, fname)
+            msg = "Copying job report from %s to %s." % (G_JOB_REPORT_NAME, G_JOB_REPORT_NAME_NEW)
             self.logger.debug(msg)
-            shutil.copy(G_JOB_REPORT_NAME, fname)
-            os.chmod(fname, 0644)
+            shutil.copy(G_JOB_REPORT_NAME, G_JOB_REPORT_NAME_NEW)
+            os.chmod(G_JOB_REPORT_NAME_NEW, 0644)
+            msg = "Creating symbolic link in task web directory to job report file: %s -> %s" \
+                % (os.path.join(self.logpath, G_JOB_REPORT_NAME_NEW), G_JOB_REPORT_NAME_NEW)
+            self.logger.debug(msg)
+            try:
+                os.symlink(os.path.abspath(os.path.join(".", G_JOB_REPORT_NAME_NEW)), \
+                           os.path.join(self.logpath, G_JOB_REPORT_NAME_NEW))
+            except:
+                pass
 
         ## Print a message about what job retry number are we on.
         msg  = "This is job retry number %d." % (self.dag_retry)
