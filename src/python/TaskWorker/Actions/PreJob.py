@@ -392,11 +392,16 @@ class PreJob:
             fname = os.path.join(logpath, "job_out.%s.%s.txt" % (self.job_id, crab_retry))
             with open(fname, 'w') as fd:
                 fd.write("Job output has not been processed by post-job.\n")
-            fname = os.path.join(logpath, "postjob.%s.%s.txt" % (self.job_id, crab_retry))
+            fname = "postjob.%s.%s.txt" % (self.job_id, crab_retry)
             with open(fname, 'w') as fd:
                 fd.write("Post-job is currently queued.\n")
+            try:
+                os.symlink(os.path.abspath(os.path.join(".", fname)), \
+                           os.path.join(logpath, fname))
+            except:
+                pass
             if crab_retry:
-                return time.time() - os.stat(os.path.join(logpath, "postjob.%s.%s.txt" % (self.job_id, int(crab_retry)-1))).st_mtime
+                return time.time() - os.stat(os.path.join(".", "postjob.%s.%s.txt" % (self.job_id, int(crab_retry)-1))).st_mtime
         except:
             msg = "Exception executing touch_logs()."
             self.logger.exception(msg)
