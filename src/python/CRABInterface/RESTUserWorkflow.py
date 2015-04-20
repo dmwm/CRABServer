@@ -64,7 +64,7 @@ class RESTUserWorkflow(RESTEntity):
             ## Default to '/store/user/<username>/' if the user did not specify the lfn parameter.
             kwargs['lfn'] = '/store/user/%s/' % (username)
         else:
-            msg  = "The parameter Data.outLFN in the CRAB configuration file must start with either"
+            msg  = "The parameter Data.outLFNDirBase in the CRAB configuration file must start with either"
             msg += " '/store/user/<username>/' or '/store/group/<groupname>/'"
             msg += " (or '/store/local/<something>/' if publication is off),"
             msg += " where username is your username as registered in SiteDB"
@@ -182,7 +182,7 @@ class RESTUserWorkflow(RESTEntity):
                       "Skipping the check of the releases"
             elif jobarch not in goodReleases or jobsw not in goodReleases[jobarch]:
                 msg = "ERROR: %s on %s is not among supported releases" % (jobsw, jobarch)
-                msg += "\nUse config.JobType.allowNonProductionCMSSW = True if you are sure of what you are doing"
+                msg += "\nUse config.JobType.allowUndistributedCMSSW = True if you are sure of what you are doing"
                 excasync = "ERROR: %s on %s is not among supported releases or an error occurred" % (jobsw, jobarch)
                 invalidp = InvalidParameter(msg, errobj = excasync)
                 setattr(invalidp, 'trace', '')
