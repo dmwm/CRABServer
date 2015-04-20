@@ -244,3 +244,9 @@ class Task(dict):
         self['tm_collector'] = task[48]
         self['tm_schedd'] = task[49]
         self['tm_dry_run'] = task[50]
+        self['tm_user_files'] = literal_eval(task[51] if ( task[51] is None or isinstance(task[51],str) ) else task[51].read())
+        self['tm_transfer_outputs'] = task[52]
+        self['tm_output_lfn'] = task[53]
+        self['tm_ignore_locality'] = task[54]
+        self['tm_fail_limit'] = task[55]
+        self['tm_one_event_mode'] = task[56]
