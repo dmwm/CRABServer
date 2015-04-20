@@ -891,6 +891,9 @@ class PostJob():
             msg = "Post-job started with output redirected to %s." % (postjob_log_file_name)
             self.logger.info(msg)
         ## Create a symbolic link in the task web directory to the post-job log file.
+        ## The pre-job creates already the symlink, but the post-job has to do it by
+        ## its own in case the pre-job was not executed (e.g. when DAGMan restarts a
+        ## post-job).
         msg = "Creating symbolic link in task web directory to post-job log file: %s -> %s" \
             % (os.path.join(self.logpath, postjob_log_file_name), postjob_log_file_name)
         self.logger.debug(msg)
