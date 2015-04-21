@@ -1658,10 +1658,26 @@ class PostJob():
         """
         Fill self.output_files_info by parsing the job report.
         """
-        for output_module in self.job_report_output.values():
-            for output_file_info in output_module:
-                msg = "Output file info for %s: %s"
-                msg = msg % (output_file_info.get(u'pfn', "(unknown 'pfn')").split('/')[-1], output_file_info)
+        def get_output_file_info(filename):
+            for output_module in self.job_report_output.values():
+                for output_file_info in output_module:
+                    ifile = get_file_index(filename, [output_file_info])
+                    if ifile is not None:
+                        return output_file_info
+            return None
+        ## Loop over the output files that have to be collected.
+        for filename in self.output_files_names:
+            ## Search for the output file info in the job report.
+            output_file_info = get_output_file_info(filename)
+            ## Get the original file name, without the job id.
+            left_piece, jobid_fileext = filename.rsplit("_", 1)
+            orig_file_name = left_piece
+            if "." in jobid_fileext:
+                fileext = jobid_fileext.rsplit(".", 1)[-1]
+                orig_file_name = left_piece + "." + fileext
+            ## If there is an output file info, parse it.
+            if output_file_info:
+                msg = "Output file info for %s: %s" % (orig_file_name, output_file_info)
                 self.logger.debug(msg)
                 file_info = {}
                 self.output_files_info.append(file_info)
@@ -1691,6 +1707,8 @@ class PostJob():
                     file_info['outtmplocation'] = self.job_report.get(u'temp_storage_site')
                 else:
                     file_info['outtmplocation'] = self.executed_site
+                file_info['outlfn'] = os.path.join(self.dest_dir, filename)
+                file_info['outtmplfn'] = os.path.join(self.source_dir, filename)
                 if u'runs' not in output_file_info:
                     continue
                 file_info['outfileruns'] = []
@@ -1698,12 +1716,9 @@ class PostJob():
                 for run, lumis in output_file_info[u'runs'].items():
                     file_info['outfileruns'].append(str(run))
                     file_info['outfilelumis'].append(','.join(map(str, lumis)))
-        for filename in self.output_files_names:
-            ifile = get_file_index(filename, self.output_files_info)
-            if ifile is None:
-                continue
-            self.output_files_info[ifile]['outlfn'] = os.path.join(self.dest_dir, filename)
-            self.output_files_info[ifile]['outtmplfn'] = os.path.join(self.source_dir, filename)
+            else:
+                msg = "Output file info for %s not found in job report." % (orig_file_name)
+                self.logger.error(msg)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
