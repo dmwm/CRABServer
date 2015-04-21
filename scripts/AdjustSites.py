@@ -33,7 +33,8 @@ def adjustPostScriptExitStatus(resubmitJobIds):
         (1) Normal termination (return value [0|2])
         DAG Node: Job105
     ...
-    for the resubmitJobIds and replace the return value to 1.
+    for the job ids in resubmitJobIds and replace the return value to 1.
+    If resubmitJobIds = True, only replace return values 2 (not 0) to 1.
 
     Note:
           When DAGMan runs in recovery mode, the DAG .nodes.log file is used to
@@ -44,15 +45,19 @@ def adjustPostScriptExitStatus(resubmitJobIds):
     DAGMan will not be rerun them, but then the node state would be set to DONE.
     """
     if not resubmitJobIds:
-        return
+        return []
+    resubmitAllFailed = (resubmitJobIds == True)
     terminator_re = re.compile(r"^\.\.\.$")
     event_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
-    retvalue_re = re.compile(r"Normal termination \(return value [0|2]\)")
+    if resubmitAllFailed:
+        retvalue_re = re.compile(r"Normal termination \(return value 2\)")
+    else:
+        retvalue_re = re.compile(r"Normal termination \(return value [0|2]\)")
     node_re = re.compile(r"DAG Node: Job(\d+)")
-    resubmitAll = (resubmitJobIds == True)
     ra_buffer = []
     alt = None
     output = ''
+    adjustedJobIds = []
     for line in open("RunJobs.dag.nodes.log").readlines():
         if len(ra_buffer) == 0:
             m = terminator_re.search(line)
@@ -82,8 +87,9 @@ def adjustPostScriptExitStatus(resubmitJobIds):
         elif len(ra_buffer) == 3:
             m = node_re.search(line)
             print line, m, m.groups(), resubmitJobIds
-            if m and (resubmitAll or (m.groups()[0] in resubmitJobIds)):
+            if m and (resubmitAllFailed or (m.groups()[0] in resubmitJobIds)):
                 print m.groups()[0], resubmitJobIds
+                adjustedJobIds.append(m.groups()[0])
                 for l in ra_buffer:
                     output += l
             else:
@@ -112,15 +118,17 @@ def adjustPostScriptExitStatus(resubmitJobIds):
     output_fd = open("RunJobs.dag.nodes.log", "w")
     output_fd.write(output)
     output_fd.close()
+    return adjustedJobIds
 
 
-def adjustMaxRetries(resubmitJobIds, ad):
+def adjustMaxRetries(adjustJobIds, ad):
     """
-    Edit the DAG file adjusting the maximum allowed number of retries to the
-    current retry + CRAB_NumAutomJobRetries for the job ids passed in the
-    resubmitJobIds argument.
+    Edit the DAG file adjusting the maximum allowed number of retries to the current
+    retry + CRAB_NumAutomJobRetries for the jobs specified in the jobIds argument
+    (or for all jobs if jobIds = True). Incrementing the maximum allowed number of
+    retries is a necessary condition for a job to be resubmitted.
     """
-    if not resubmitJobIds:
+    if not adjustJobIds:
         return
     if not os.path.exists("RunJobs.dag"):
         return
@@ -141,14 +149,14 @@ def adjustMaxRetries(resubmitJobIds, ad):
     ## count + CRAB_NumAutomJobRetries.
     retry_re = re.compile(r'RETRY Job([0-9]+) ([0-9]+) ')
     output = ""
-    resubmitAll = (resubmitJobIds == True)
+    adjustAll = (adjustJobIds == True)
     numAutomJobRetries = int(ad.get('CRAB_NumAutomJobRetries', 2))
     with open("RunJobs.dag", 'r') as fd:
         for line in fd.readlines():
             match_retry_re = retry_re.search(line)
             if match_retry_re:
                 jobId = match_retry_re.groups()[0]
-                if resubmitAll or (jobId in resubmitJobIds):
+                if adjustAll or (jobId in adjustJobIds):
                     if jobId in retriesDict and retriesDict[jobId] != -1:
                         lastRetry = retriesDict[jobId]
                         ## The 1 is to account for the resubmission itself; then, if the job fails, we
@@ -283,26 +291,36 @@ def main():
 
     resubmitJobIds = []
     if 'CRAB_ResubmitList' in ad:
-        resubmitJobIds = set(ad['CRAB_ResubmitList'])
+        resubmitJobIds = ad['CRAB_ResubmitList']
+        try:
+            resubmitJobIds = set(resubmitJobIds)
+            resubmitJobIds = [str(i) for i in resubmitJobIds]
+        except TypeError:
+            resubmitJobIds = True
         dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
         ad['foo'] = []
         try:
             htcondor.Schedd().edit([dagJobId], 'CRAB_ResubmitList', ad['foo'])
         except RuntimeError, reerror:
             print "ERROR: %s" % str(reerror)
-    if resubmitJobIds != True:
-        resubmitJobIds = [str(i) for i in resubmitJobIds]
     if resubmitJobIds:
+        adjustedJobIds = []
         if hasattr(htcondor, 'lock'):
             # While dagman is not running at this point, the schedd may be writing events to this
             # file; hence, we only edit the file while holding an appropriate lock.
             # Note this lock method didn't exist until 8.1.6; prior to this, we simply
             # run dangerously.
             with htcondor.lock(open("RunJobs.dag.nodes.log", 'a'), htcondor.LockType.WriteLock) as lock:
-                adjustPostScriptExitStatus(resubmitJobIds)
+                adjustedJobIds = adjustPostScriptExitStatus(resubmitJobIds)
         else:
-            adjustPostScriptExitStatus(resubmitJobIds)
-        adjustMaxRetries(resubmitJobIds, ad)
+            adjustedJobIds = adjustPostScriptExitStatus(resubmitJobIds)
+        ## Adjust the maximum allowed number of retries only for the job ids for which
+        ## the POST script exit status was adjusted. Why only for these job ids and not
+        ## for all job ids in resubmitJobIds? Because if resubmitJobIds = True, which as
+        ## a general rule means "all failed job ids", we don't have a way to know if a
+        ## job is in failed status or not just from the RunJobs.dag file, while job ids
+        ## in adjustedJobIds correspond only to failed jobs.
+        adjustMaxRetries(adjustedJobIds, ad)
 
     if 'CRAB_SiteAdUpdate' in ad:
         newSiteAd = ad['CRAB_SiteAdUpdate']
