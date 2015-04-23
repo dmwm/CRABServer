@@ -155,10 +155,10 @@ def prepareErrorSummary(logger):
                     postjob_exit_code = rep.get('postjob', {}).get('exitCode', 0)
                     if exit_code == 0 and postjob_exit_code != 0:
                         postjob_exit_msg = rep['postjob'].get('exitMsg', "No post-job error message available.")
-                        ## Use exit code 99999 as a general exit code for failures in the post-processing step.
+                        ## Use exit code 90000 as a general exit code for failures in the post-processing step.
                         ## The 'crab status' error summary should not show this error code,
                         ## but replace it with the generic message "failed in post-processing".
-                        error_summary.setdefault(job_id, {})[crab_retry] = (99999, postjob_exit_msg, {})
+                        error_summary.setdefault(job_id, {})[crab_retry] = (90000, postjob_exit_msg, {})
                     else:
                         error_summary.setdefault(job_id, {})[crab_retry] = (exit_code, exit_msg, {})
             except Exception, ex:
