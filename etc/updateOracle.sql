@@ -46,7 +46,7 @@ ALTER TABLE tasks ADD (tm_schedd VARCHAR(255));
 --Changes that will be needed for version 3.4.15
 alter table tasks add (tm_dry_run VARCHAR(1)); --for issue ##4462
 
-
+--Changes that will be needed for version 3.4.16
 alter table tasks add (tm_user_files CLOB DEFAULT '[]');
 alter table tasks add (tm_transfer_outputs VARCHAR(1));
 alter table tasks add (tm_output_lfn VARCHAR(1000));
