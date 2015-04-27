@@ -332,6 +332,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("maxjobruntime", param, safe, optional=True)
             validate_num("numcores", param, safe, optional=True)
             validate_num("maxmemory", param, safe, optional=True)
+            validate_num("force", param, safe, optional=True)
 
         elif method in ['GET']:
             validate_str("workflow", param, safe, RX_UNIQUEWF, optional=True)
@@ -437,7 +438,7 @@ class RESTUserWorkflow(RESTEntity):
                                        scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun)
 
     @restcall
-    def post(self, workflow, subresource, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority):
+    def post(self, workflow, subresource, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, force=0): # default value for force is only for backward compatibility.
         """Resubmit or continue an existing workflow. The caller needs to be a CMS user owner of the workflow.
 
            :arg str workflow: unique name identifier of the workflow;
@@ -448,7 +449,7 @@ class RESTUserWorkflow(RESTEntity):
         if not subresource or subresource == 'resubmit':
             return self.userworkflowmgr.resubmit(workflow=workflow, \
                                                  siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, jobids=jobids, \
-                                                 maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, \
+                                                 maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, force=force, \
                                                  userdn=cherrypy.request.headers['Cms-Authn-Dn'])
         elif subresource == 'proceed':
             return self.userworkflowmgr.proceed(workflow=workflow)

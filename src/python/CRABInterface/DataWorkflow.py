@@ -264,7 +264,7 @@ class DataWorkflow(object):
 
         return [{'RequestName': requestname}]
 
-    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, userdn, userproxy):
+    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, force, userdn, userproxy):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
 
@@ -280,21 +280,25 @@ class DataWorkflow(object):
         ## If the user wants to resubmit a specific set of jobs, then we also accept the
         ## task to be in COMPLETED state. This is because we want to allow resubmission
         ## of successfully finished jobs if the user explicitly gave the job id.
-        if jobids:
+        if jobids and force:
             allowedTaskStates += ['COMPLETED']
         ## If the task status is not an allowed one, fail the resubmission.
         if statusRes['status'] not in allowedTaskStates:
-            raise ExecutionError("You cannot resubmit a task if it is in the %s state." % (statusRes['status']))
+            if statusRes['status'] in ['COMPLETED']:
+                msg = "Task status is COMPLETED. To resubmit jobs from a task in status COMPLETED, use the --jobids and --force options."
+            else:
+                msg = "You cannot resubmit a task if it is in the %s state." % (statusRes['status'])
+            raise ExecutionError(msg)
         ## This is the list of job ids that we allow to be resubmitted.
         ## Note: This list will be empty if statusRes['jobList'] is empty to begin with.
         ## And statusRes['jobList'] may be empty even if jobs were created and have well
         ## defined state. An example is when the task has status FAILED in the Task DB
         ## because of an exception in the TaskWorker.
-        resubmitjobids = [jobid for jobstatus, jobid in statusRes['jobList'] if (jobstatus in self.failedList) or (jobids and jobstatus in self.successList)]
+        resubmitjobids = [jobid for jobstatus, jobid in statusRes['jobList'] if (jobstatus in self.failedList) or (jobids and force and jobstatus in self.successList)]
         if statusRes['jobList'] and not resubmitjobids:
             msg  = "There are no jobs to resubmit."
             msg += " Only jobs in status %s can be resubmitted." % (self.failedList)
-            msg += " Jobs in status %s can also be resubmitted, but only if the jobid is specified." % (self.successList)
+            msg += " Jobs in status %s can also be resubmitted, but only if the jobid is specified and force = True." % (self.successList)
             raise ExecutionError(msg)
         ## If the user wants to resubmit a specific set of jobs ...
         if jobids:
@@ -303,9 +307,10 @@ class DataWorkflow(object):
             ## Check if all the "wanted" jobs can be resubmitted. If not, fail the resubmission.
             if len(resubmitjobids) != len(jobids):
                 requestedResub = list(set(jobids) - set(resubmitjobids))
-                retmsg  = "CRAB3 server refused to resubmit the following jobs: %s." % (str(requestedResub))
-                retmsg += " You can only resubmit jobs that are in one of the states %s." % (self.failedList + self.successList)
-                return [{'result': retmsg}]
+                msg  = "CRAB3 server refused to resubmit the following jobs: %s." % (str(requestedResub))
+                msg += " Only jobs in status %s can be resubmitted." % (self.failedList)
+                msg += " Jobs in status %s can also be resubmitted, but only if the jobid is specified and force = True." % (self.successList)
+                raise ExecutionError(msg) #return [{'result': msg}]
         self.logger.info("Jobs to resubmit: %s" % (resubmitjobids))
         ## If these parameters were not set in the resubmission request, give them the
         ## same values they had in the original task submission.
