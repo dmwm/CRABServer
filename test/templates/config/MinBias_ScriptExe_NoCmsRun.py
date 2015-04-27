@@ -17,6 +17,7 @@ config.JobType.psetName = 'psets/pset_tutorial_MC_NoCmsRun.py'
 config.JobType.scriptExe = 'input_files/simple_script_NoCmsRun.sh'
 config.JobType.outputFiles = ['simpleoutput.txt']
 config.JobType.inputFiles = ['input_files/FrameworkJobReport.xml']
+config.JobType.disableAutomaticOutputCollection = False
 
 #Data Section
 config.section_("Data")

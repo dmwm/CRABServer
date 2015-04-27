@@ -14,6 +14,7 @@ config.JobType.pluginName = 'PrivateMC'
 config.JobType.generator = 'lhe'
 config.JobType.psetName = 'psets/pset_on_lhe.py'
 config.JobType.inputFiles = ['input_files/dynlo.lhe']
+config.JobType.disableAutomaticOutputCollection = False
 
 config.section_("Data")
 config.Data.primaryDataset = 'MinBias'
