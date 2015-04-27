@@ -33,7 +33,7 @@ systems = \
     'py_modules' : ['PandaServerInterface', 'RESTInteractions', 'ApmonIf',
                     'apmon', 'DashboardAPI', 'Logger', 'ProcInfo',
                     'CRABQuality', 'HTCondorUtils', 'HTCondorLocator',
-                    'ServerUtilities'],
+                    'ServerUtilities', 'MultiProcessingLog'],
     'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
                 'TaskWorker/Actions/Recurring', 'taskbuffer']
   },
