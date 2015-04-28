@@ -921,13 +921,6 @@ class PostJob():
         global G_JOB_REPORT_NAME_NEW
         G_JOB_REPORT_NAME_NEW = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry)
 
-        ## Now that we have the job id and retry, we can set the job report file
-        ## names.
-        global G_JOB_REPORT_NAME
-        G_JOB_REPORT_NAME = "jobReport.json.%d" % (self.job_id)
-        global G_JOB_REPORT_NAME_NEW
-        G_JOB_REPORT_NAME_NEW = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry)
-
         ## Call execute_internal().
         retval = 1
         retmsg = "Failure during post-job execution."
