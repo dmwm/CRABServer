@@ -14,6 +14,7 @@ config.General.activity = 'analysistest'
 config.section_("JobType")
 config.JobType.pluginName = 'PrivateMC'
 config.JobType.psetName = 'psets/pset_tutorial_MC_generation.py'
+config.JobType.disableAutomaticOutputCollection = False
 
 #Data Section
 config.section_("Data")

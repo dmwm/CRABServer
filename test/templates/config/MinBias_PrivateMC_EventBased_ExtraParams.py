@@ -17,6 +17,7 @@ config.JobType.psetName = 'psets/pset_tutorial_MC_generation.py'
 config.JobType.maxJobRuntimeMin = 1000
 config.JobType.numCores = 1
 config.JobType.maxMemoryMB = 2000
+config.JobType.disableAutomaticOutputCollection = False
 
 #Data Section
 config.section_("Data")

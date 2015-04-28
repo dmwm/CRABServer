@@ -14,6 +14,7 @@ config.General.activity = 'analysistest'
 config.section_("JobType")
 config.JobType.pluginName = 'Analysis'
 config.JobType.psetName = 'psets/pset_use_parent.py'
+config.JobType.disableAutomaticOutputCollection = False
 
 #Data Section
 config.section_("Data")

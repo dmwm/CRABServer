@@ -16,6 +16,7 @@ config.JobType.pluginName = 'PrivateMC'
 config.JobType.psetName = 'psets/pset_tutorial_MC_generation.py'
 config.JobType.scriptExe = 'input_files/simple_script.sh'
 config.JobType.outputFiles = ['simpleoutput.txt']
+config.JobType.disableAutomaticOutputCollection = False
 
 #Data Section
 config.section_("Data")
