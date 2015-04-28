@@ -305,7 +305,7 @@ class PreJob:
         ## Add group information:
         username = self.task_ad.get('CRAB_UserHN')
         if 'CMSGroups' in self.task_ad:
-            new_submit_text += '+CMSGroups = %s\n' % classad.quote(groups)
+            new_submit_text += '+CMSGroups = %s\n' % classad.quote(self.task_ad['CMSGroups'])
         elif username:
             groups = CMSGroupMapper.map_user_to_groups(username)
             if groups:
