@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 import json
@@ -10,6 +11,8 @@ from ast import literal_eval
 from ApmonIf import ApmonIf
 
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES 
+
+import CMSGroupMapper
 
 
 class PreJob:
@@ -307,6 +310,16 @@ class PreJob:
         ## Add the site black- and whitelists and the DESIRED_SITES to the
         ## Job.<job_id>.submit content.
         new_submit_text = self.redo_sites(new_submit_text, crab_retry, use_resubmit_info)
+
+        ## Add group information:
+        username = self.task_ad.get('CRAB_UserHN')
+        if 'CMSGroups' in self.task_ad:
+            new_submit_text += '+CMSGroups = %s\n' % classad.quote(self.task_ad['CMSGroups'])
+        elif username:
+            groups = CMSGroupMapper.map_user_to_groups(username)
+            if groups:
+                new_submit_text += '+CMSGroups = %s\n' % classad.quote(groups)
+
         ## Finally add (copy) all the content of the generic Job.submit file.
         with open("Job.submit", 'r') as fd:
             new_submit_text += fd.read()
