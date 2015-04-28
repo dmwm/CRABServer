@@ -102,20 +102,30 @@ signal.signal(signal.SIGTERM, sighandler)
 
 ##==============================================================================
 
-def prepareErrorSummary(logger):
+def prepareErrorSummary(logger, job_id, crab_retry):
     """ Load the current error_summary.json and do the equivalent of an 'ls job_fjr.*.json' to get the completed jobs.
         Then, add the error reason of the job that are not in errorReport.json
     """
 
+    ## The job_id and crab_retry variables in PostJob are integers, while here we
+    ## mostly use them as strings.
+    job_id = str(job_id)
+    crab_retry = str(crab_retry)
+
     logger.info("====== Starting to prepare error report.")
-    #open and load an already existing error summary
+
     error_summary = {}
+    error_summary_changed = False
+
+    ## Open and load an already existing error summary.
+    error_summary_file_name = "error_summary.json"
     try:
-        with open('error_summary.json') as fsummary:
+        with open(error_summary_file_name) as fsummary:
             error_summary = json.load(fsummary)
     except (IOError, ValueError):
-        #there is nothing to do if the errorSummary file does not exist or is invalid. Just recreate it
-        logger.info("File error_summary.json is empty, wrong or does not exist. Will create a new file.")
+        ## There is nothing to do if the error_summary file doesn't exist or is invalid.
+        ## Just recreate it.
+        logger.info("File %s is empty, wrong or does not exist. Will create a new file." % (error_summary_file_name))
 
 #    asosummary = {}
 #    try:
@@ -128,14 +138,16 @@ def prepareErrorSummary(logger):
 #        #there is nothing to do it the aso_status.json file does not exist or is invalid.
 #        print "aso_status.json is empty or does not exist"
 
-    ## Iterate over the job reports in the spool directory.
-    for report in glob.glob("job_fjr.*.*.json"):
-        split_rep = report.split('.')
-        job_id, crab_retry = split_rep[-3], split_rep[-2]
-        if job_id in error_summary and crab_retry in error_summary[job_id]:
-            #the report has already been processed
+    ## Iterate over all the job reports in the spool directory.
+    for fjr_file_name in glob.glob("job_fjr.*.*.json"):
+        fjr_file_name_split = fjr_file_name.split('.')
+        fjr_job_id, fjr_crab_retry = fjr_file_name_split[-3], fjr_file_name_split[-2]
+        ## If this job report has already been written to the error summary, we skip it,
+        ## because we assume whatever is in the error summary should not be changed.
+        if fjr_job_id in error_summary and fjr_crab_retry in error_summary[fjr_job_id]:
             continue
-        with open("job_fjr.%s.%s.json" % (job_id, crab_retry)) as frep:
+        logger.info("Processing job report file %s" % (fjr_file_name))
+        with open(fjr_file_name) as frep:
             try:
                 rep = None
                 exit_code = -1
@@ -148,32 +160,85 @@ def prepareErrorSummary(logger):
                 if not 'cmsRun'   in rep['steps']:           logger.info("'cmsRun' key not found in report['steps']");           raise
                 if not 'errors'   in rep['steps']['cmsRun']: logger.info("'errors' key not found in report['steps']['cmsRun']"); raise
                 if rep['steps']['cmsRun']['errors']:
+                    ## If there are errors in the job report, they come from the job execution. This
+                    ## is the error we want to report to the user, so write it to the error summary.
                     if len(rep['steps']['cmsRun']['errors']) != 1:
                         #this should never happen because the report has just one step, but just in case print a message
-                        logger.info("more than one error found in the job, just considering the first one")
-                    error_summary.setdefault(job_id, {})[crab_retry] = (exit_code, exit_msg, rep['steps']['cmsRun']['errors'][0])
+                        logger.info("More than one error found in report['steps']['cmsRun']['errors']. Just considering the first one.")
+                    msg  = "Updating error summary for jobid %s retry %s with following information:" % (fjr_job_id, fjr_crab_retry)
+                    msg += "\n'exit code' = %s" % (exit_code)
+                    msg += "\n'exit message' = %s" % (exit_msg)
+                    msg += "\n'error message' = %s" % (rep['steps']['cmsRun']['errors'][0])
+                    logger.info(msg)
+                    error_summary.setdefault(fjr_job_id, {})[fjr_crab_retry] = (exit_code, exit_msg, rep['steps']['cmsRun']['errors'][0])
+                    error_summary_changed = True
                 else:
-                    postjob_exit_code = rep.get('postjob', {}).get('exitCode', 0)
-                    if exit_code == 0 and postjob_exit_code != 0:
-                        postjob_exit_msg = rep['postjob'].get('exitMsg', "No post-job error message available.")
-                        ## Use exit code 90000 as a general exit code for failures in the post-processing step.
-                        ## The 'crab status' error summary should not show this error code,
-                        ## but replace it with the generic message "failed in post-processing".
-                        error_summary.setdefault(job_id, {})[crab_retry] = (90000, postjob_exit_msg, {})
+                    ## If there are no errors in the job report, but there is an exit code and exit
+                    ## message from the job (not post-job), we want to report them to the user only
+                    ## in case we know this is the terminal exit code and exit message. And this is
+                    ## the case if the exit code is not 0. Even a post-job exit code != 0 can be
+                    ## added later to the job report, the job exit code takes precedence, so we can
+                    ## already write it to the error summary.
+                    if exit_code != 0:
+                        msg  = "Updating error summary for jobid %s retry %s with following information:" % (fjr_job_id, fjr_crab_retry)
+                        msg += "\n'exit code' = %s" % (exit_code)
+                        msg += "\n'exit message' = %s" % (exit_msg)
+                        logger.info(msg)
+                        error_summary.setdefault(fjr_job_id, {})[fjr_crab_retry] = (exit_code, exit_msg, {})
+                        error_summary_changed = True
                     else:
-                        error_summary.setdefault(job_id, {})[crab_retry] = (exit_code, exit_msg, {})
+                        ## In case the job exit code is 0, write to the error summary only if the job
+                        ## report file we are looking at is the one corresponding to the current job id
+                        ## and crab retry, since otherwise the job report can still get updated by its
+                        ## corresponding post-job.
+                        if fjr_job_id == job_id and fjr_crab_retry == crab_retry:
+                            ## In case the job exit code is 0, we still have to check if there is an exit
+                            ## code from post-job. If there is a post-job exit code != 0, write it to the
+                            ## error summary; otherwise write the exit code 0 and exit message from the job
+                            ## (the message should be "OK").
+                            postjob_exit_code = rep.get('postjob', {}).get('exitCode', -1)
+                            postjob_exit_msg  = rep.get('postjob', {}).get('exitMsg', "No post-job error message available.")
+                            if postjob_exit_code != 0:
+                                ## Use exit code 90000 as a general exit code for failures in the post-processing step.
+                                ## The 'crab status' error summary should not show this error code,
+                                ## but replace it with the generic message "failed in post-processing".
+                                msg  = "Updating error summary for jobid %s retry %s with following information:" % (fjr_job_id, fjr_crab_retry)
+                                msg += "\n'exit code' = 90000 ('Post-processing failed')"
+                                msg += "\n'exit message' = %s" % (postjob_exit_msg)
+                                logger.info(msg)
+                                error_summary.setdefault(fjr_job_id, {})[fjr_crab_retry] = (90000, postjob_exit_msg, {})
+                            else:
+                                msg  = "Updating error summary for jobid %s retry %s with following information:" % (fjr_job_id, fjr_crab_retry)
+                                msg += "\n'exit code' = %s" % (exit_code)
+                                msg += "\n'exit message' = %s" % (exit_msg)
+                                logger.info(msg)
+                                error_summary.setdefault(fjr_job_id, {})[fjr_crab_retry] = (exit_code, exit_msg, {})
+                            error_summary_changed = True
             except Exception, ex:
                 logger.info(str(ex))
-                if not rep:
-                    msg = 'Invalid framework job report. The framework job report exists, but it cannot be loaded.'# % (job_id, crab_retry)
-                else:
-                    msg = rep['exitMsg'] if 'exitMsg' in rep else 'The framework job report could be loaded but no error message found there'
-                error_summary.setdefault(job_id, {})[crab_retry] = (exit_code, msg, {})
+                ## Write to the error summary that the job report is not valid or has no error
+                ## message, but only if the job report file we are looking at is the one
+                ## corresponding to the current job id and crab retry, since the job report can
+                ## still get updated by its corresponding post-job.
+                if fjr_job_id == job_id and fjr_crab_retry == crab_retry:
+                    if not rep:
+                        exit_msg = 'Invalid framework job report. The framework job report exists, but it cannot be loaded.'
+                    else:
+                        exit_msg = rep['exitMsg'] if 'exitMsg' in rep else 'The framework job report could be loaded, but no error message was found there.'
+                    msg  = "Updating error summary for jobid %s retry %s with following information:" % (fjr_job_id, fjr_crab_retry)
+                    msg += "\n'exit code' = %s" % (exit_code)
+                    msg += "\n'exit message' = %s" % (exit_msg)
+                    logger.info(msg)
+                    error_summary.setdefault(fjr_job_id, {})[fjr_crab_retry] = (exit_code, exit_msg, {})
+                    error_summary_changed = True
 
-    tmp_fname = "error_summary.%d.json" % (os.getpid())
-    with open(tmp_fname, "w") as fsummary:
-        json.dump(error_summary, fsummary)
-    os.rename(tmp_fname, "error_summary.json")
+    ## If we have updated the error summary, write it to the json file.
+    ## Use a temporary file and rename to avoid concurrent writing of the file.
+    if error_summary_changed:
+        tmp_fname = "error_summary.%d.json" % (os.getpid())
+        with open(tmp_fname, "w") as fsummary:
+            json.dump(error_summary, fsummary)
+        os.rename(tmp_fname, error_summary_file_name)
     logger.info("====== Finished to prepare error report.")
 
 ##==============================================================================
@@ -947,7 +1012,7 @@ class PostJob():
         ## Prepare the error report. Enclosing it in a try except as we don't want to
         ## fail jobs because this fails.
         try:
-            prepareErrorSummary(self.logger)
+            prepareErrorSummary(self.logger, self.job_id, self.crab_retry)
         except:
             msg = "Unknown error while preparing the error report."
             self.logger.exception(msg)
