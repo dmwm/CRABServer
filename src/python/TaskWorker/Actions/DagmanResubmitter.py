@@ -101,14 +101,19 @@ class DagmanResubmitter(TaskAction.TaskAction):
                 if not parent:
                     self.logger.debug("Resubmitting under condition overwrite = True")
                     for adparam, taskparam in params.iteritems():
-                        if taskparam == 'jobids':
-                            continue
                         if taskparam in ad:
-                            schedd.edit(rootConst, adparam, ad[taskparam])
+                            if taskparam == 'jobids' and len(list(ad[taskparam])) == 0:
+                                self.logger.debug("Setting %s = True in the task ad." % (adparam))
+                                schedd.edit(rootConst, adparam, classad.ExprTree("true"))
+                            else:
+                                schedd.edit(rootConst, adparam, ad[taskparam])
                         elif task['resubmit_'+taskparam] != None:
                             schedd.edit(rootConst, adparam, str(task['resubmit_'+taskparam]))
                     schedd.act(htcondor.JobAction.Release, rootConst)
         else:
+            ## This should actually not occur anymore in CRAB 3.3.16 or above, because
+            ## starting from CRAB 3.3.16 the resubmission parameters are written to the
+            ## Task DB with value != None, so the overwrite variable should never be False.
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
                 if not parent:
                     self.logger.debug("Resubmitting under condition overwrite = False")

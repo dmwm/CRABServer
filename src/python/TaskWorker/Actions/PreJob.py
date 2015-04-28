@@ -237,9 +237,18 @@ class PreJob:
         ## use the same parameters (site black- and whitelists, requested memory, etc)
         ## as used by the previous job retry (which are saved in self.resubmit_info).
         CRAB_ResubmitList_in_taskad = ('CRAB_ResubmitList' in self.task_ad)
-        use_resubmit_info = (('CRAB_ResubmitList' in self.task_ad) and \
-                             len(list(self.task_ad['CRAB_ResubmitList'])) > 0 and \
-                             (self.job_id not in self.task_ad['CRAB_ResubmitList']))
+        use_resubmit_info = False
+        resubmit_jobids = []
+        if 'CRAB_ResubmitList' in self.task_ad:
+            resubmit_jobids = self.task_ad['CRAB_ResubmitList']
+            try:
+                resubmit_jobids = set(resubmit_jobids)
+                resubmit_jobids = [str(i) for i in resubmit_jobids]
+                if resubmit_jobids and self.job_id not in resubmit_jobids:
+                    use_resubmit_info = True
+            except TypeError:
+                resubmit_jobids = True
+        ## If there is no resubmit_info, we can of course not use it.
         if not self.resubmit_info:
             use_resubmit_info = False
         ## Get the resubmission parameters.

@@ -321,7 +321,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                               "jobList"         : [],
                               "saveLogs"        : row.save_logs }]
                 msg = ("%s: The CRAB3 server frontend is not able to find your task in the Grid scheduler (remember tasks older than 30 days are automatically removed)."
-                       "If your task is a recent one, this could mean there is a temporary glicth. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
+                       " If your task is a recent one, this could mean there is a temporary glitch. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
                 self.logger.exception(msg)
                 return [{"status" : "UNKNOWN",
                          "taskFailureMsg" : str(msg),
@@ -363,7 +363,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                               "jobList"         : [],
                               "saveLogs"        : row.save_logs }]
                 msg = ("%s: The CRAB3 server frontend is not able to find your task in the Grid scheduler (remember tasks older than 30 days are automatically removed)."
-                       "If your task is a recent one, this could mean there is a temporary glicth. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
+                       " If your task is a recent one, this could mean there is a temporary glitch. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
                 self.logger.exception(msg)
                 return [{"status" : "UNKNOWN",
                          "taskFailureMsg" : str(msg),
