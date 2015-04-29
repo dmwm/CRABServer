@@ -297,12 +297,6 @@ def main():
             resubmitJobIds = [str(i) for i in resubmitJobIds]
         except TypeError:
             resubmitJobIds = True
-        dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
-        ad['foo'] = []
-        try:
-            htcondor.Schedd().edit([dagJobId], 'CRAB_ResubmitList', ad['foo'])
-        except RuntimeError, reerror:
-            print "ERROR: %s" % str(reerror)
     if resubmitJobIds:
         adjustedJobIds = []
         if hasattr(htcondor, 'lock'):
@@ -329,15 +323,6 @@ def main():
         siteAd.update(newSiteAd)
         with open("site.ad", "w") as fd:
             fd.write(str(siteAd))
-        dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
-        ad['foo'] = []
-        try:
-            ## Is CRAB_ResubmitList the attribute we want to edit ?
-            ## Or is it CRAB_SiteAdUpdate ?
-            htcondor.Schedd().edit([dagJobId], 'CRAB_ResubmitList', ad['foo'])
-        except RuntimeError, reerror:
-            print "ERROR: %s" % str(reerror)
-
 
 if __name__ == '__main__':
     main()
