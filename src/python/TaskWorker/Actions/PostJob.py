@@ -170,7 +170,6 @@ def prepareErrorSummary(logger):
                     msg = rep['exitMsg'] if 'exitMsg' in rep else 'The framework job report could be loaded but no error message found there'
                 error_summary.setdefault(job_id, {})[crab_retry] = (exit_code, msg, {})
 
-    ## write the file. Use a temporary file and rename to avoid concurrent writing of the file
     tmp_fname = "error_summary.%d.json" % (os.getpid())
     with open(tmp_fname, "w") as fsummary:
         json.dump(error_summary, fsummary)
