@@ -249,7 +249,6 @@ class PreJob:
             resubmit_jobids = self.task_ad['CRAB_ResubmitList']
             try:
                 resubmit_jobids = set(resubmit_jobids)
-                resubmit_jobids = [str(i) for i in resubmit_jobids]
                 if resubmit_jobids and self.job_id not in resubmit_jobids:
                     use_resubmit_info = True
             except TypeError:
