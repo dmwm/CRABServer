@@ -51,7 +51,7 @@ about the file to the FJR. The information is:
  u'direct_stageout': False
 }
 
-The PostJob and cmscp are the only places in CRAB3 where we should use camel_case instead of snakeCase
+The PostJob and cmscp are the only places in CRAB3 where we should use camel_case instead of snakeCase.
 """
 
 import os
