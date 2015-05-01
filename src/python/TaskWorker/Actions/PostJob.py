@@ -61,6 +61,7 @@ import time
 import json
 import uuid
 import glob
+import fcntl
 import errno
 import pprint
 import random
@@ -90,7 +91,7 @@ ASO_JOB = None
 config = None
 G_JOB_REPORT_NAME = None
 G_JOB_REPORT_NAME_NEW = None
-
+G_ERROR_SUMMARY_FILE_NAME = "error_summary.json"
 
 def sighandler(*args):
     if ASO_JOB:
@@ -102,7 +103,7 @@ signal.signal(signal.SIGTERM, sighandler)
 
 ##==============================================================================
 
-def prepareErrorSummary(logger, job_id, crab_retry):
+def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
     """ Load the current error_summary.json and do the equivalent of an 'ls job_fjr.*.json' to get the completed jobs.
         Then, add the error reason of the job that are not in errorReport.json
     """
@@ -118,25 +119,13 @@ def prepareErrorSummary(logger, job_id, crab_retry):
     error_summary_changed = False
 
     ## Open and load an already existing error summary.
-    error_summary_file_name = "error_summary.json"
     try:
-        with open(error_summary_file_name) as fsummary:
-            error_summary = json.load(fsummary)
+        fsummary.seek(0)
+        error_summary = json.load(fsummary)
     except (IOError, ValueError):
         ## There is nothing to do if the error_summary file doesn't exist or is invalid.
         ## Just recreate it.
-        logger.info("File %s is empty, wrong or does not exist. Will create a new file." % (error_summary_file_name))
-
-#    asosummary = {}
-#    try:
-#        transferSummary = {}
-#        with open('aso_status.json') as asosummary:
-#            asoTmp = json.load(asosummary)
-#        for _, state_id in asoTmp["results"].iteritems():
-#            transferSummary[state_id["value"]["jobid"]] = state_id["value"]["state"]
-#    except (IOError, ValueError):
-#        #there is nothing to do it the aso_status.json file does not exist or is invalid.
-#        print "aso_status.json is empty or does not exist"
+        logger.info("File %s is empty, wrong or does not exist. Will create a new file." % (G_ERROR_SUMMARY_FILE_NAME))
 
     ## Iterate over all the job reports in the spool directory.
     for fjr_file_name in glob.glob("job_fjr.*.*.json"):
@@ -152,13 +141,18 @@ def prepareErrorSummary(logger, job_id, crab_retry):
                 rep = None
                 exit_code = -1
                 rep = json.load(frep)
-                if not 'exitCode' in rep:                    logger.info("'exitCode' key not found in the report");              raise
+                if not 'exitCode' in rep:
+                    raise Exception("'exitCode' key not found in the report")
                 exit_code = rep['exitCode']
-                if not 'exitMsg'  in rep:                    logger.info("'exitMsg' key not found in the report");               raise
+                if not 'exitMsg'  in rep:
+                    raise Exception("'exitMsg' key not found in the report")
                 exit_msg = rep['exitMsg']
-                if not 'steps'    in rep:                    logger.info("'steps' key not found in the report");                 raise
-                if not 'cmsRun'   in rep['steps']:           logger.info("'cmsRun' key not found in report['steps']");           raise
-                if not 'errors'   in rep['steps']['cmsRun']: logger.info("'errors' key not found in report['steps']['cmsRun']"); raise
+                if not 'steps'    in rep:
+                    raise Exception("'steps' key not found in the report")
+                if not 'cmsRun'   in rep['steps']:
+                    raise Exception("'cmsRun' key not found in report['steps']")
+                if not 'errors'   in rep['steps']['cmsRun']:
+                    raise Exception("'errors' key not found in report['steps']['cmsRun']")
                 if rep['steps']['cmsRun']['errors']:
                     ## If there are errors in the job report, they come from the job execution. This
                     ## is the error we want to report to the user, so write it to the error summary.
@@ -235,10 +229,8 @@ def prepareErrorSummary(logger, job_id, crab_retry):
     ## If we have updated the error summary, write it to the json file.
     ## Use a temporary file and rename to avoid concurrent writing of the file.
     if error_summary_changed:
-        tmp_fname = "error_summary.%d.json" % (os.getpid())
-        with open(tmp_fname, "w") as fsummary:
-            json.dump(error_summary, fsummary)
-        os.rename(tmp_fname, error_summary_file_name)
+        fsummary.truncate(0)
+        json.dump(error_summary, fsummary)
     logger.info("====== Finished to prepare error report.")
 
 ##==============================================================================
@@ -1007,12 +999,16 @@ class PostJob():
             pass
         job_report['postjob'] = {'exitCode': retval, 'exitMsg': retmsg}
         with open(G_JOB_REPORT_NAME_NEW, 'w') as fd:
-            json.dump(job_report, fd)
+           json.dump(job_report, fd)
 
         ## Prepare the error report. Enclosing it in a try except as we don't want to
         ## fail jobs because this fails.
         try:
-            prepareErrorSummary(self.logger, self.job_id, self.crab_retry)
+            with open(G_ERROR_SUMMARY_FILE_NAME, "a+") as fsummary:
+                self.logger.debug("Acquiring lock on error summary file")
+                fcntl.flock(fsummary.fileno(), fcntl.LOCK_EX)
+                self.logger.debug("Acquired lock on error summary file")
+                prepareErrorSummary(self.logger, fsummary, self.job_id, self.crab_retry)
         except:
             msg = "Unknown error while preparing the error report."
             self.logger.exception(msg)
