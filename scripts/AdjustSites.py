@@ -292,11 +292,8 @@ def main():
     resubmitJobIds = []
     if 'CRAB_ResubmitList' in ad:
         resubmitJobIds = ad['CRAB_ResubmitList']
-        try:
-            resubmitJobIds = set(resubmitJobIds)
-            resubmitJobIds = [str(i) for i in resubmitJobIds]
-        except TypeError:
-            resubmitJobIds = True
+        if resubmitJobIds != True:
+            resubmitJobIds = [str(i) for i in set(resubmitJobIds)]
     if resubmitJobIds:
         adjustedJobIds = []
         if hasattr(htcondor, 'lock'):
