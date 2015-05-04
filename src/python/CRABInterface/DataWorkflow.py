@@ -275,9 +275,6 @@ class DataWorkflow(object):
         self.logger.info("About to resubmit workflow: %s. Getting status first." % (workflow))
         ## Get the status of the task/jobs.
         statusRes = self.status(workflow, userdn, userproxy)[0]
-        ## If there are failed jobdef submission we fail.
-        #if statusRes['failedJobdefs']:
-        #    raise ExecutionError("You cannot resubmit a task if not all the jobs have been submitted. The feature will be available in the future")
         ## We allow resubmission of jobs only if the task status is one of these:
         allowedTaskStates = ['SUBMITTED', 'KILLED', 'FAILED', 'KILLFAILED']
         ## If the user wants to resubmit a specific set of jobs, then we also accept the
