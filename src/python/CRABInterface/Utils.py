@@ -225,7 +225,7 @@ def retrieveUserCert(func):
         if serverDN:
             try:
                 userproxy = mypclient.logonRenewMyProxy(username=userhash, myproxyserver=myproxyserver, myproxyport=7512)
-            except MyProxyException, me:
+            except MyProxyException as me:
                 # Unsure if this works in standalone mode...
                 cherrypy.log(str(me))
                 cherrypy.log(str(serverKey))

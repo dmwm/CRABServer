@@ -68,10 +68,10 @@ class DataDiscovery(TaskAction):
                     self.logger.debug("Translating PNN %s" %pnn)
                     try:
                         pnn_psn_map[pnn] = sbj.PNNtoPSN(pnn)
-                    except KeyError, ke:
+                    except KeyError as ke:
                         self.logger.error("Impossible translating %s to a CMS name through SiteDB" %pnn)
                         pnn_psn_map[pnn] = ''
-                    except httplib.HTTPException, ex:
+                    except httplib.HTTPException as ex:
                         self.logger.error("Couldn't map SE to site: %s" % pnn)
                         print "Couldn't map SE to site: %s" % pnn
                         print "got problem: %s" % ex

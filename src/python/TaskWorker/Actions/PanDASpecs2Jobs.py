@@ -25,7 +25,7 @@ class PassThroughOptionParser(OptionParser):
         while rargs:
             try:
                 OptionParser._process_args(self,largs,rargs,values)
-            except (BadOptionError, Exception), e:
+            except (BadOptionError, Exception) as e:
                 #largs.append(e.opt_str)
                 continue
 

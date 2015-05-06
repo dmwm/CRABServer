@@ -176,7 +176,7 @@ class DataWorkflow(object):
         try:
             requestname = '%s:%s_%s' % (timestamp, userhn, workflow)
             schedd_name = self.chooseScheduler(scheddname, backend_urls).split(":")[0]
-        except IOError, err:
+        except IOError as err:
             self.logger.debug("Failed to communicate with components %s. Request name %s: " % (str(err), str(requestname)))
             raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")
         splitArgName = self.splitArgMap[splitalgo]

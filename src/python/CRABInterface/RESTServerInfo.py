@@ -58,7 +58,7 @@ class RESTServerInfo(RESTEntity):
         try:
             loc = HTCondorLocator.HTCondorLocator(backendurl)
             schedd, address = loc.getScheddObj(workflow) 
-        except Exception, ex:
+        except Exception as ex:
             self.logger.exception(ex)
             raise ExecutionError("Unable to get schedd address for task %s" % (workflow)), ex
         yield loc.scheddAd['Machine']

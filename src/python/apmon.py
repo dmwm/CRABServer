@@ -511,7 +511,7 @@ class ApMon:
 		port = int(port)
 		try:
 			host = socket.gethostbyname(host) # convert hostnames to IP addresses to avoid suffocating DNSs
-		except socket.error, msg:
+		except socket.error as msg:
 			self.logger.log(Logger.ERROR, "Error resolving "+host+": "+str(msg))
 			return
 		for h, p, w in tempDestinations.keys():
@@ -552,7 +552,7 @@ class ApMon:
 					return
 			else:
 				confFile = open (confFileName)
-		except IOError, ex:
+		except IOError as ex:
 			self.logger.log(Logger.ERROR, "Cannot open "+confFileName);
 			self.logger.log(Logger.ERROR, "IOError: "+str(ex));
 			return
@@ -638,7 +638,7 @@ class ApMon:
 				af, socktype, proto, canonname, sa = res
 				try:
 					sock = socket.socket(af, socktype, proto)
-				except socket.error, msg:
+				except socket.error as msg:
 					sock = None
 					err = msg
 					continue
@@ -646,13 +646,13 @@ class ApMon:
 					sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDTIMEO, struct.pack("ii", timeout, 0))
 					sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVTIMEO, struct.pack("ii", timeout, 0))
 					sock.connect(sa)
-				except socket.error, msg:
+				except socket.error as msg:
 					sock.close()
 					sock = None
 					err = msg
 					continue
 				break
-		except socket.error, msg:
+		except socket.error as msg:
 			sock = None
 			err = msg
 		if sock is None:
@@ -684,7 +684,7 @@ class ApMon:
 				else:
 					self.logger.log(Logger.ERROR, 'HTTPError: unknown error ['+str(httpStatus)+']')
 				return None
-		except socket.error, msg:
+		except socket.error as msg:
 			self.logger.log(Logger.ERROR, "Cannot open "+url)
 			self.logger.log(Logger.ERROR, "SocketError: "+str(msg))
 			sock.close()
@@ -742,7 +742,7 @@ class ApMon:
 		try:
 			self.__udpSocket.sendto(buffer, (host, port))
 			self.logger.log(Logger.NOTICE, "Packet sent to "+host+":"+str(port)+" "+passwd)
-		except socket.error, msg:
+		except socket.error as msg:
 			self.logger.log(Logger.ERROR, "Cannot send packet to "+host+":"+str(port)+" "+passwd+": "+str(msg[1]))
 		xdrPacker.reset()
 		paramsPacker.reset()
@@ -761,7 +761,7 @@ class ApMon:
 			self.__packFunctions[typeValue] (xdrPacker, value)
 			self.logger.log(Logger.DEBUG, "Adding parameter "+str(name)+" = "+str(value))
 			return True
-		except Exception, ex:
+		except Exception as ex:
 			self.logger.log(Logger.WARNING, "Error packing %s = %s; got %s" % (name, str(value), ex))
 			return False
 

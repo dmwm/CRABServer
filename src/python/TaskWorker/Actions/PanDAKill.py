@@ -23,7 +23,7 @@ class PanDAKill(PanDAAction):
             #not reduce(lambda x, y: x and y, killed)
                 self.logger.error("Not all jobs have been correctly killed")
             self.logger.info("Task %s: killed %d job, failed to kill %s jobs." %(kwargs['task']['tm_taskname'], len(kwargs['task']['kill_ids'])-notkilled, notkilled))
-        except Exception, exc:
+        except Exception as exc:
             self.logger.error(str(traceback.format_exc()))
         finally:
             if kwargs['task']['kill_all']:

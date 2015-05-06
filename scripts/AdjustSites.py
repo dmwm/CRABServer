@@ -236,7 +236,7 @@ def makeWebDir(ad):
     dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
     try:
         htcondor.Schedd().edit([dagJobId], 'CRAB_UserWebDir', ad.lookup('CRAB_UserWebDir'))
-    except RuntimeError, reerror:
+    except RuntimeError as reerror:
         print str(reerror)
 
 
@@ -268,7 +268,7 @@ def clearAutomaticBlacklist():
     for file in glob.glob("task_statistics.*"):
         try:
             os.unlink(file)
-        except Exception, e:
+        except Exception as e:
             print "ERROR when clearing statistics: %s" % str(e)
 
 

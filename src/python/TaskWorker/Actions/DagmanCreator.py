@@ -330,7 +330,7 @@ class DagmanCreator(TaskAction.TaskAction):
             dest_sites_.append(dest_site + "_Disk")
         try:
             pfn_info = self.phedex.getPFN(nodes=dest_sites_, lfns=lfns)
-        except HTTPException, ex:
+        except HTTPException as ex:
             self.logger.error(ex.headers)
             raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not contact phedex to do the site+lfn=>pfn translation.\n"+\
                                 "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
@@ -594,7 +594,7 @@ class DagmanCreator(TaskAction.TaskAction):
                           "cert":self.config.TaskWorker.cmscert})
                     try:
                         possiblesites = set(sbj.getAllCMSNames())
-                    except Exception, ex:
+                    except Exception as ex:
                         raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not contact sitedb to get the list of all CMS sites.\n"+\
                             "This is could be a temporary sitedb glitch, please try to submit a new task (resubmit will not work)"+\
                             " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO add the sitedb url so the user can check themselves!
@@ -746,7 +746,7 @@ class DagmanCreator(TaskAction.TaskAction):
             ufc = UserFileCache(dict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint' : kw['task']['tm_cache_url']})
             try:
                 ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
-            except Exception, ex:
+            except Exception as ex:
                 self.logger.exception(ex)
                 raise TaskWorkerException("The CRAB3 server backend could not download the input sandbox with your code "+\
                                     "from the frontend (crabcache component).\nThis could be a temporary glitch; please try to submit a new task later "+\

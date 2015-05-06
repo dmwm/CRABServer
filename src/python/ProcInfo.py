@@ -123,7 +123,7 @@ class ProcInfo:
 					this.DATA['raw_swap_out'] = float(elem[2]);
 				line = FSTAT.readline();
 			FSTAT.close();
-		except IOError, ex:
+		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ProcInfo: cannot open /proc/stat");
 			return;
 
@@ -152,7 +152,7 @@ class ProcInfo:
 				this.DATA['mem_usage'] = 100.0 * this.DATA['mem_used'] / this.DATA['total_mem'];
 			if this.DATA.has_key('swap_used') and this.DATA.has_key('total_swap') and this.DATA['total_swap'] > 0:
 				this.DATA['swap_usage'] = 100.0 * this.DATA['swap_used'] / this.DATA['total_swap'];
-		except IOError, ex:
+		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ProcInfo: cannot open /proc/meminfo");
 			return;
 
@@ -166,7 +166,7 @@ class ProcInfo:
 			this.DATA['load1'] = float(elem[0]);
 			this.DATA['load5'] = float(elem[1]);
 			this.DATA['load15'] = float(elem[2]);
-		except IOError, ex:
+		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ProcInfo: cannot open /proc/meminfo");
 			return;
 
@@ -181,7 +181,7 @@ class ProcInfo:
 			this.DATA['load1'] = float(elem[1]);
 			this.DATA['load5'] = float(elem[2]);
 			this.DATA['load15'] = float(elem[3]);
-		except IOError, ex:
+		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ProcInfo: cannot run 'sysctl vm.loadavg");
 			return;
 
@@ -214,7 +214,7 @@ class ProcInfo:
 		    this.DATA['processes'] = total;
 		    for key in states.keys():
 			this.DATA['processes_'+key] = states[key];
-		except IOError, ex:
+		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ProcInfo: cannot get output from ps command");
 			return;
 
@@ -237,7 +237,7 @@ class ProcInfo:
 					eth = '';
 				line = output.readline();
 			output.close();
-		except IOError, ex:
+		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ProcInfo: cannot get output from /sbin/ifconfig -a");
 			return;
 		try:
@@ -267,7 +267,7 @@ class ProcInfo:
 				line = FCPU.readline();
 			FCPU.close();
 			this.DATA['no_CPUs'] = no_cpus;
-		except IOError, ex:
+		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ProcInfo: cannot open /proc/cpuinfo");
 			return;
 		try:
@@ -276,7 +276,7 @@ class ProcInfo:
 			FUPT.close();
 			elem = line.split();
 			this.DATA['uptime'] = float(elem[0]) / (24.0 * 3600);
-		except IOError, ex:
+		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ProcInfo: cannot open /proc/uptime");
 			return;
 	
@@ -304,7 +304,7 @@ class ProcInfo:
 					this.DATA['raw_eth'+m.group(1)+'_errs'] = int(m.group(3)) + int(m.group(5));
 				line = FNET.readline();
 			FNET.close();
-		except IOError, ex:
+		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ProcInfo: cannot open /proc/net/dev");
 			return;
 
@@ -342,7 +342,7 @@ class ProcInfo:
             	    this.DATA[key] = sockets[key];
         	for key in tcp_details.keys():
             	    this.DATA[key] = tcp_details[key];
-	    except IOError, ex:
+	    except IOError as ex:
                 this.logger.log(Logger.ERROR, "ProcInfo: cannot get output from netstat command");
                 return;
 
@@ -363,7 +363,7 @@ class ProcInfo:
 				pidmap[elem[0]] = elem[1];
 				line = output.readline();
 			output.close();
-		except IOError, ex:
+		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ProcInfo: cannot execute ps -A -o \"pid ppid\"");
 
 		if pidmap.has_key(parent):
@@ -441,7 +441,7 @@ class ProcInfo:
 			this.JOBS[pid]['DATA']['rss'] = rsz;
 			this.JOBS[pid]['DATA']['virtualmem'] = vsz;
 			this.JOBS[pid]['DATA']['open_files'] = fd;
-		except IOError, ex:
+		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ProcInfo: cannot execute ps --no-headers -eo \"pid ppid\"");
 	
 	# count the number of open files for the given pid
@@ -474,7 +474,7 @@ class ProcInfo:
 			DU = os.popen("du -Lsck " + workDir + " | tail -1 | cut -f 1");
 			line = DU.readline();
 			this.JOBS[pid]['DATA']['workdir_size'] = int(line) / 1024.0;
-		except IOError, ex:
+		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ERROR", "ProcInfo: cannot run du to get job's disk usage for job "+`pid`);
 		try:
 			DF = os.popen("df -k "+workDir+" | tail -1");
@@ -486,7 +486,7 @@ class ProcInfo:
 				this.JOBS[pid]['DATA']['disk_free']  = float(m.group(3)) / 1024.0;
 				this.JOBS[pid]['DATA']['disk_usage'] = float(m.group(4)) / 1024.0;
 			DF.close();
-		except IOError, ex:
+		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ERROR", "ProcInfo: cannot run df to get job's disk usage for job "+`pid`);
 
 	# create cummulative parameters based on raw params like cpu_, pages_, swap_, or ethX_

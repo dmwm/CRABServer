@@ -208,7 +208,7 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
                                 logger.info(msg)
                                 error_summary.setdefault(fjr_job_id, {})[fjr_crab_retry] = (exit_code, exit_msg, {})
                             error_summary_changed = True
-            except Exception, ex:
+            except Exception as ex:
                 logger.info(str(ex))
                 ## Write to the error summary that the job report is not valid or has no error
                 ## message, but only if the job report file we are looking at is the one
@@ -275,7 +275,7 @@ class ASOServerJob(object):
             self.logger.info("Will use ASO server at %s." % (self.aso_db_url))
             self.couch_server = CMSCouch.CouchServer(dburl = self.aso_db_url, ckey = proxy, cert = proxy)
             self.couch_database = self.couch_server.connectDatabase("asynctransfer", create = False)
-        except Exception, ex:
+        except Exception as ex:
             msg = "Failed to connect to ASO database: %s" % (str(ex))
             self.logger.exception(msg)
             raise RuntimeError, msg
@@ -619,7 +619,7 @@ class ASOServerJob(object):
                     if not needs_transfer:
                         doc['lfn'] = source_lfn.replace('/store/temp', '/store', 1)
                         doc['source_lfn'] = source_lfn.replace('/store/temp', '/store', 1)
-                except Exception, ex:
+                except Exception as ex:
                     msg = "Error loading document from ASO database: %s" % (str(ex))
                     try:
                         msg += "\n%s" % (traceback.format_exc())
@@ -744,10 +744,10 @@ class ASOServerJob(object):
         doc = None
         try:
             doc = self.couch_database.document(doc_id)
-        except CMSCouch.CouchError, cee:
+        except CMSCouch.CouchError as cee:
             msg = "Error retrieving document from ASO database for ID %s: %s" % (doc_id, str(cee))
             self.logger.error(msg)
-        except HTTPException, hte:
+        except HTTPException as hte:
             msg = "Error retrieving document from ASO database for ID %s: %s" % (doc_id, str(hte.headers))
             self.logger.error(msg)
         except Exception:
@@ -941,7 +941,7 @@ class PostJob():
         self.logpath = os.path.expanduser("~/%s" % (self.reqname))
         try:
             os.makedirs(self.logpath)
-        except OSError, ose:
+        except OSError as ose:
             if ose.errno != errno.EEXIST:
                 print "Failed to create log web-shared directory %s" % (self.logpath)
                 raise
@@ -1203,7 +1203,7 @@ class PostJob():
                 self.logger.info("====== Starting upload of logs archive file metadata.")
                 try:
                     self.upload_log_file_metadata()
-                except Exception, ex:
+                except Exception as ex:
                     retmsg = "Fatal error uploading logs archive file metadata: %s" % (str(ex))
                     self.logger.error(retmsg)
                     self.logger.info("====== Finished upload of logs archive file metadata.")
@@ -1231,7 +1231,7 @@ class PostJob():
             self.logger.info("====== Starting to check for ASO transfers.")
             try:
                 self.perform_transfers()
-            except PermanentStageoutError, pse:
+            except PermanentStageoutError as pse:
                 retmsg = "Got fatal stageout exception:\n%s" % (str(pse))
                 self.logger.error(retmsg)
                 msg = "There was at least one permanent stageout error; user will need to resubmit."
@@ -1239,14 +1239,14 @@ class PostJob():
                 self.set_dashboard_state('FAILED')
                 self.logger.info("====== Finished to check for ASO transfers.")
                 return JOB_RETURN_CODES.FATAL_ERROR, retmsg
-            except RecoverableStageoutError, rse:
+            except RecoverableStageoutError as rse:
                 retmsg = "Got recoverable stageout exception:\n%s" % (str(rse))
                 self.logger.error(retmsg)
                 msg = "These are all recoverable stageout errors; automatic resubmit is possible."
                 self.logger.error(msg)
                 self.logger.info("====== Finished to check for ASO transfers.")
                 return self.check_retry_count(), retmsg
-            except Exception, ex:
+            except Exception as ex:
                 retmsg = "Stageout failure: %s" % (str(ex))
                 self.logger.exception(retmsg)
                 self.logger.info("====== Finished to check for ASO transfers.")
@@ -1258,7 +1258,7 @@ class PostJob():
             self.logger.info("====== Starting upload of output files metadata.")
             try:
                 self.upload_output_files_metadata()
-            except Exception, ex:
+            except Exception as ex:
                 retmsg = "Fatal error uploading output files metadata: %s" % (str(ex))
                 self.logger.exception(retmsg)
                 self.logger.info("====== Finished upload of output files metadata.")
@@ -1269,7 +1269,7 @@ class PostJob():
         self.logger.info("====== Starting upload of input files metadata.")
         try:
             self.upload_input_files_metadata()
-        except Exception, ex:
+        except Exception as ex:
             retmsg = "Fatal error uploading input files metadata: %s" % (str(ex))
             self.logger.exception(retmsg)
             self.logger.info("====== Finished upload of input files metadata.")
@@ -1402,7 +1402,7 @@ class PostJob():
         self.logger.debug(msg)
         try:
             self.server.put(rest_uri, data = urllib.urlencode(configreq))
-        except HTTPException, hte:
+        except HTTPException as hte:
             msg = "Error uploading logs file metadata: %s" % (str(hte.headers))
             self.logger.error(msg)
             if not hte.headers.get('X-Error-Detail', '') == 'Object already exists' or \
@@ -1423,7 +1423,7 @@ class PostJob():
             }
             res, _, _ = self.server.get(self.rest_uri_no_api + '/filemetadata', data = configreq)
             lfns = [x['lfn'] for x in res[u'result']]
-        except HTTPException, hte:
+        except HTTPException as hte:
             msg = "Error getting list of file metadata: %s" % (str(hte.headers))
             self.logger.error(msg)
             return False
@@ -1486,7 +1486,7 @@ class PostJob():
             self.logger.debug(msg)
             try:
                 self.server.put(self.rest_uri_no_api + '/filemetadata', data = urllib.urlencode(configreq))
-            except HTTPException, hte:
+            except HTTPException as hte:
                 msg = "Error uploading input file metadata: %s" % (str(hte.headers))
                 self.logger.error(msg)
                 if not self.file_exists(lfn, 'POOLIN'):
@@ -1571,7 +1571,7 @@ class PostJob():
             self.logger.debug(msg)
             try:
                 self.server.put(rest_uri, data = urllib.urlencode(configreq))
-            except HTTPException, hte:
+            except HTTPException as hte:
                 ## BrianB. Suppressing this exception is a tough decision.
                 ## If the file made it back alright, I suppose we can proceed.
                 msg = "Error uploading output file metadata: %s" % (str(hte.headers))
@@ -1596,10 +1596,10 @@ class PostJob():
                 self.server.post(rest_uri, data = urllib.urlencode(configreq))
                 with open('output_datasets', 'w') as f:
                     f.write(' '.join(output_datasets))
-            except HTTPException, hte:
+            except HTTPException as hte:
                 msg = "Error uploading output dataset: %s" % (str(hte.headers))
                 self.logger.error(msg)
-            except IOError, ioe:
+            except IOError as ioe:
                 msq = "Error writing the output_datasets file"
                 self.logger.error(msg)
 
@@ -1616,7 +1616,7 @@ class PostJob():
         try:
             with open(job_ad_file_name) as fd:
                 self.job_ad = classad.parseOld(fd)
-        except Exception, ex:
+        except Exception as ex:
             msg = "Error parsing job ad: %s" % (str(ex))
             self.logger.exception(msg)
             return 1
@@ -1701,7 +1701,7 @@ class PostJob():
         try:
             with open(G_JOB_REPORT_NAME) as fd:
                 self.job_report = json.load(fd)
-        except Exception, ex:
+        except Exception as ex:
             msg = "Error loading job report: %s" % (str(ex))
             self.logger.exception(msg)
             return 1
@@ -1820,7 +1820,7 @@ class PostJob():
         for base_file in ["job_err", "job_out.tmp"]:
             try:
                 os.chmod("%s.%d" % (base_file, self.job_id), 0644)
-            except OSError, ose:
+            except OSError as ose:
                 if ose.errno != errno.ENOENT and ose.errno != errno.EPERM:
                     raise
 

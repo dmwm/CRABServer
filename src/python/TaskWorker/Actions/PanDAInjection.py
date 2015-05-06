@@ -260,7 +260,7 @@ class PanDAInjection(PanDAAction):
                     data = urllib.urlencode(configreq) + '' if subblocks is None else subblocks
                     self.server.put(self.resturl, data=data)
                 results.append(Result(task=kwargs['task'], result=jobsetdef))
-            except HTTPException, hte:
+            except HTTPException as hte:
                 self.logger.error("Server could not acquire any work from the server: \n" +
                                   "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown')) +
                                   "\treason: %s" %(hte.headers.get('X-Error-Detail', 'unknown')))
@@ -279,7 +279,7 @@ class PanDAInjection(PanDAAction):
                 data = urllib.urlencode(configreq) + '' if subblocks is None else subblocks
                 self.server.put(self.resturl, data=data)
                 results.append(Result(task=kwargs['task'], warn=msg))
-            except Exception, exc:
+            except Exception as exc:
                 msg = "Problem %s injecting job group from task %s reading data from blocks %s" % (str(exc), kwargs['task']['tm_taskname'], ",".join(blocks))
                 self.logger.error(msg)
                 self.logger.error(str(traceback.format_exc()))
@@ -296,7 +296,7 @@ class PanDAInjection(PanDAAction):
                     data = urllib.urlencode(configreq) + '' if subblocks is None else subblocks
                     self.server.put(self.resturl, data=data)
                     results.append(Result(task=kwargs['task'], warn=msg))
-                except HTTPException, hte:
+                except HTTPException as hte:
                     if not hte.headers.get('X-Error-Detail', '') == 'Required object is missing' or \
                        not hte.headers.get('X-Error-Http', -1) == '400':
                         self.logger.error("Server could not acquire any work from the server: \n" +

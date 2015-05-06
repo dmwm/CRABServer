@@ -42,7 +42,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
         address = ""
         try:
             schedd, address = loc.getScheddObjNew(task['tm_schedd'])
-        except Exception, exp:
+        except Exception as exp:
             msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
             self.logger.exception(msg)
             raise TaskWorkerException(msg)
@@ -140,7 +140,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
         data = urllib.urlencode(configreq)
         try:
             self.server.post(self.resturi, data = data)
-        except HTTPException, hte:
+        except HTTPException as hte:
             self.logger.error(hte.headers)
             raise TaskWorkerException("The CRAB3 server backend successfully resubmitted your task to the Grid scheduler, but was unable to update\n"+\
                                       "the task status from QUEUED to SUBMITTED. This should be a harmless (temporary) error.\n")

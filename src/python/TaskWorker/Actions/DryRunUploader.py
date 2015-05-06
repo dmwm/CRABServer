@@ -64,7 +64,7 @@ class DryRunUploader(TaskAction):
     def execute(self, *args, **kw):
         try:
             return self.executeInternal(*args, **kw)
-        except Exception, e:
+        except Exception as e:
             msg = "Failed to upload dry run tarball for %s; '%s'" % (kw['task']['tm_taskname'], str(e))
             raise TaskWorkerException(msg)
 

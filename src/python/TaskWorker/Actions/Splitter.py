@@ -61,7 +61,7 @@ class Splitter(TaskAction):
                              'warning': b64encode('The CRAB3 server backend detected lumis split across files in the input dataset.'
                                         ' Will apply the necessary corrections in the splitting algorithms. You can ignore this message.')}
                 userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
-            except HTTPException, hte:
+            except HTTPException as hte:
                 self.logger.error(hte.headers)
                 self.logger.warning("Cannot add warning to REST after finding duplicates")
 

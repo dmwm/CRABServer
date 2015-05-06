@@ -143,7 +143,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                         pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
                     else:
                         continue
-            except Exception, err:
+            except Exception as err:
                 self.logger.exception(err)
                 raise ExecutionError("Exception while contacting PhEDEX.")
 
@@ -228,7 +228,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 for run,lumis in outLumis.iteritems():
                     res['dbsOutLumilist'][run] = reduce(lambda x1,x2: x1+x2, map(lambda x: range(x[0], x[1]+1), lumis))
                 self.logger.info("Aggregated output lumilist: %s" % res['dbsOutLumilist'])
-            except Exception, ex:
+            except Exception as ex:
                 msg = "Failed to contact DBS: %s" % str(ex)
                 self.logger.exception(msg)
                 raise ExecutionError("Exception while contacting DBS. Cannot get the input/output lumi lists. You can try to execute 'crab report' with --dbs=no")
@@ -301,7 +301,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 schedd, address = locator.getScheddObj(workflow)
                 results = self.getRootTasks(workflow, schedd)
                 self.logger.info("Web status for workflow %s done" % workflow)
-            except Exception, exp:
+            except Exception as exp:
                 #when the task is submitted for the first time
                 if row.task_status in ['QUEUED']:
                     if isinstance(row.task_failure, str):
@@ -343,7 +343,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                schedd, address = locator.getScheddObjNew(row.schedd)
                results = self.getRootTasks(workflow, schedd)
                self.logger.info("Web status for workflow %s done " % workflow)
-            except Exception, exp:
+            except Exception as exp:
                 #when the task is submitted for the first time
                 if row.task_status in ['QUEUED']:
                     if isinstance(row.task_failure, str):
@@ -648,7 +648,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         server = CMSCouch.CouchServer(dburl=asourl, ckey=self.serverKey, cert=self.serverCert)
         try:
             db = server.connectDatabase('asynctransfer')
-        except Exception, ex:
+        except Exception as ex:
             msg =  "Error while connecting to asynctransfer CouchDB for workflow %s " % workflow
             self.logger.exception(msg)
             publication_info = {'error' : msg}
@@ -657,7 +657,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         try:
             publicationlist = None
             publicationlist = db.loadView('AsyncTransfer', 'PublicationStateByWorkflow', query)['rows']
-        except Exception, ex:
+        except Exception as ex:
             msg =  "Error while querying CouchDB for publication status information for workflow %s " % workflow
             self.logger.exception(msg)
             publication_info = {'error' : msg}

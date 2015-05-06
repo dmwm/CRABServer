@@ -489,7 +489,7 @@ def getFullJobStatus(baseURLSSL, ids, proxy, verbose=False):
     status,output = curl.post(url,data)
     try:
         return status,pickle.loads(output)
-    except Exception, ex:
+    except Exception as ex:
         type, value, traceBack = sys.exc_info()
         LOGGER.error("ERROR getFullJobStatus : %s %s" % (type,value))
         LOGGER.error(str(traceBack))

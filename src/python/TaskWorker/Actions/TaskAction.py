@@ -41,6 +41,6 @@ class TaskAction(object):
                          'workflow': taskname,
                          'warning': b64encode(warning)}
             userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
-        except HTTPException, hte:
+        except HTTPException as hte:
             self.logger.error(hte.headers)
             self.logger.warning("Cannot add a warning to REST interface. Warning message: %s" % warning)

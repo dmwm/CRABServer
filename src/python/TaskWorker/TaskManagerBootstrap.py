@@ -96,7 +96,7 @@ if __name__ == '__main__':
         retval = bootstrap()
         print "Ended TaskManagerBootstrap with code %s" % retval
         sys.exit(retval)
-    except Exception, e:
+    except Exception as e:
         # TODO: make this propagate somewhere machine readable
         print "Got a fatal exception: %s" % e
         raise

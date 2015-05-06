@@ -60,7 +60,7 @@ class DagmanKiller(TaskAction):
         address = ""
         try:
             self.schedd, address = loc.getScheddObjNew(self.task['tm_schedd'])
-        except Exception, exp:
+        except Exception as exp:
             msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (self.workflow, str(exp))
             self.logger.exception(msg)
             raise TaskWorkerException(msg)
@@ -114,14 +114,14 @@ class DagmanKiller(TaskAction):
         server = CMSCouch.CouchServer(dburl=ASOURL, ckey=self.proxy, cert=self.proxy)
         try:
             db = server.connectDatabase('asynctransfer')
-        except Exception, ex:
+        except Exception as ex:
             msg =  "Error while connecting to asynctransfer CouchDB"
             self.logger.exception(msg)
             raise TaskWorkerException(msg)
         self.queryKill = {'reduce':False, 'key':self.workflow, 'include_docs': True}
         try:
             filesKill = db.loadView('AsyncTransfer', 'forKill', self.queryKill)['rows']
-        except Exception, ex:
+        except Exception as ex:
             msg =  "Error while connecting to asynctransfer CouchDB"
             self.logger.exception(msg)
             raise TaskWorkerException(msg)
@@ -156,7 +156,7 @@ class DagmanKiller(TaskAction):
                 apmon.sendToML(jinfo)
             try:
                 db.makeRequest(uri = updateUri, type = "PUT", decode = False)
-            except Exception, ex:
+            except Exception as ex:
                 msg =  "Error updating document in couch"
                 msg += str(ex)
                 msg += str(traceback.format_exc())

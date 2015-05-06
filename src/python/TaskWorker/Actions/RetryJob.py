@@ -122,13 +122,13 @@ class RetryJob(object):
         try:
             with os.fdopen(os.open("task_statistics.%s.%s" % (self.site, job_status_name), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), 'a') as fd:
                 fd.write("%d\n" % (self.job_id))
-        except Exception, e:
+        except Exception as e:
             print "ERROR: %s" % str(e)
             # Swallow the exception - record_site is advisory only
         try:
             with os.fdopen(os.open("task_statistics.%s" % (job_status_name), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), 'a') as fd:
                 fd.write("%d\n" % (self.job_id))
-        except Exception, exmsg:
+        except Exception as exmsg:
             print "ERROR: %s" % (str(exmsg))
             # Swallow the exception - record_site is advisory only
 
@@ -348,7 +348,7 @@ class RetryJob(object):
             ## Raises a RecoverableError or FatalError exception depending on the exitCode
             ## saved in the job report.
             self.check_exit_code()
-        except RecoverableError, re:
+        except RecoverableError as re:
             orig_msg = str(re)
             try:
                 self.check_memory_report()
@@ -374,11 +374,11 @@ class RetryJob(object):
             job_status = self.execute_internal(*args, **kw)
             self.record_site(job_status)
             return job_status
-        except RecoverableError, remsg:
+        except RecoverableError as remsg:
             print "%s" % (remsg)
             self.record_site(JOB_RETURN_CODES.RECOVERABLE_ERROR)
             return JOB_RETURN_CODES.RECOVERABLE_ERROR
-        except FatalError, femsg:
+        except FatalError as femsg:
             print "%s" % (femsg)
             self.record_site(JOB_RETURN_CODES.FATAL_ERROR)
             return JOB_RETURN_CODES.FATAL_ERROR

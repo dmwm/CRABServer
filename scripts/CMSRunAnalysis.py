@@ -70,7 +70,7 @@ class PassThroughOptionParser(OptionParser):
         while rargs:
             try:
                 OptionParser._process_args(self, largs, rargs, values)
-            except (BadOptionError, AmbiguousOptionError), e:
+            except (BadOptionError, AmbiguousOptionError) as e:
                 largs.append(e.opt_str)
 
 
@@ -885,7 +885,7 @@ if __name__ == "__main__":
         print "Job exit code: %s" % str(jobExitCode)
         print "==== CMSSW Stack Execution FINISHING at %s ====" % time.asctime(time.gmtime())
         logCMSSW()
-    except WMExecutionFailure, WMex:
+    except WMExecutionFailure as WMex:
         print "ERROR: Caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail)
         exmsg = WMex.name
 
@@ -910,7 +910,7 @@ if __name__ == "__main__":
         handleException("FAILED", WMex.code, exmsg)
         mintime()
         sys.exit(WMex.code)
-    except Exception, ex:
+    except Exception as ex:
         #print "jobExitCode = %s" % jobExitCode
         handleException("FAILED", EC_CMSRunWrapper, "failed to generate cmsRun cfg file at runtime")
         mintime()
@@ -958,12 +958,12 @@ if __name__ == "__main__":
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             stopDashboardMonitoring(ad)
         print "==== Report file creation FINISHING at %s ====" % time.asctime(time.gmtime())
-    except FwkJobReportException, FJRex:
+    except FwkJobReportException as FJRex:
         msg = "BadFWJRXML"
         handleException("FAILED", EC_ReportHandlingErr, msg)
         mintime()
         sys.exit(EC_ReportHandlingErr)
-    except Exception, ex:
+    except Exception as ex:
         msg = "Exception while handling the job report."
         handleException("FAILED", EC_ReportHandlingErr, msg)
         mintime()
@@ -976,7 +976,7 @@ if __name__ == "__main__":
             newName = 'UNKNOWN'
             for oldName, newName in literal_eval(opts.outFiles).iteritems():
                 os.rename(oldName, newName)
-        except Exception, ex:
+        except Exception as ex:
             handleException("FAILED", EC_MoveOutErr, "Exception while moving file %s to %s." %(oldName, newName))
             mintime()
             sys.exit(EC_MoveOutErr)
