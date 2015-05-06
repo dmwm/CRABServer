@@ -107,7 +107,8 @@ class DBSDataDiscovery(DataDiscovery):
                                 "This is could be a temporary DBS glitch, please try to submit a new task (resubmit will not work)"+\
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
         if not filedetails:
-            raise TaskWorkerException("Cannot find any valid file inside the dataset. Aborting submission.")
+            raise TaskWorkerException("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, https://cmsweb.cern.ch/das.\n"+\
+                                      "Aborting submission. Resubmitting your task will not help.")
         result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'], datasetfiles = filedetails, locations = locationsMap)
         self.logger.debug("Got %s files" % len(result.result.getFiles()))
         return result
