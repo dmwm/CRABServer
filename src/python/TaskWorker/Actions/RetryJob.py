@@ -68,7 +68,9 @@ class RetryJob(object):
         except ValueError:
             pass
 
-        p = subprocess.Popen(["condor_q", "-debug", "-l", "-userlog", "job_log"], stdout=subprocess.PIPE, stderr=sys.stderr)
+        shutil.copy("job_log", "job_log.%s" % str(self.dag_jobid))
+
+        p = subprocess.Popen(["condor_q", "-debug", "-l", "-userlog", "job_log.%s" % str(self.dag_jobid), str(self.dag_jobid)], stdout=subprocess.PIPE, stderr=sys.stderr)
         output, _ = p.communicate()
         status = p.returncode
 
