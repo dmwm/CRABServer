@@ -7,6 +7,7 @@ import traceback
 import multiprocessing
 from Queue import Empty
 from base64 import b64encode
+from httplib import HTTPException
 from logging.handlers import TimedRotatingFileHandler
 
 from RESTInteractions import HTTPRequests
@@ -65,8 +66,12 @@ def processWorker(inputs, results, resthost, resturi, procnum):
 
                     server.post(resturi, data = urllib.urlencode(configreq))
                     logger.info("Error message successfully uploaded to the REST")
+                except HTTPException as hte:
+                    logger.warning("Cannot upload failure message to the REST for workflow %s. HTTP headers follows:" % task['tm_taskname'])
+                    logger.error(hte.headers)
                 except Exception as exc:
                     logger.warning("Cannot upload failure message to the REST for workflow %s.\nReason: %s" % (task['tm_taskname'], exc))
+                    logger.exception('Traceback follows:')
         t1 = time.time()
         logger.debug("%s: ...work on %s completed in %d seconds: %s" % (procName, task['tm_taskname'], t1-t0, outputs))
 
@@ -182,12 +187,12 @@ class Worker(object):
             except Empty as e:
                 pass
             if out is not None:
-               self.logger.debug('Retrieved work %s'% str(out))
-               if isinstance(out['out'], list):
-                   allout.extend(out['out'])
-               else:
-                   allout.append(out['out'])
-               del self.working[out['workid']]
+                self.logger.debug('Retrieved work %s'% str(out))
+                if isinstance(out['out'], list):
+                    allout.extend(out['out'])
+                else:
+                    allout.append(out['out'])
+                del self.working[out['workid']]
         return allout
 
     def freeSlaves(self):
