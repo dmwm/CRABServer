@@ -36,7 +36,7 @@ class DBSDataDiscovery(DataDiscovery):
         #get all the PNN that are of kind disk
         try:
             diskLocations = set([pnn['name'] for pnn in phedex.getNodeMap()['phedex']['node'] if pnn['kind']=='Disk'])
-        except HTTPException, ex:
+        except HTTPException as ex:
             self.logger.error(ex.headers)
             raise TaskWorkerException("The CRAB3 server backend could not contact phedex to get the list of site storages.\n"+\
                                 "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
@@ -76,7 +76,7 @@ class DBSDataDiscovery(DataDiscovery):
             # The WMCore DBS3 implementation makes one call to dls for each block
             # with locations = True so we are using locations=False and looking up location later
             blocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(kwargs['task']['tm_input_dataset'], locations=False)]
-        except DBSReaderError, dbsexc:
+        except DBSReaderError as dbsexc:
             #dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
                 raise TaskWorkerException("The CRAB3 server backend could not find dataset %s in this DBS instance: %s" % (kwargs['task']['tm_input_dataset'], dbsurl))
@@ -84,7 +84,7 @@ class DBSDataDiscovery(DataDiscovery):
         #Create a map for block's locations: for each block get the list of locations
         try:
             locationsMap = self.dbs.listFileBlockLocation(list(blocks), phedexNodes=True)
-        except Exception, ex: #TODO should we catch HttpException instead?
+        except Exception as ex: #TODO should we catch HttpException instead?
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
                                 "This is could be a temporary phedex/dbs glitch, please try to submit a new task (resubmit will not work)"+\
@@ -101,7 +101,7 @@ class DBSDataDiscovery(DataDiscovery):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
         try:
             filedetails = self.dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], True)
-        except Exception, ex: #TODO should we catch HttpException instead?
+        except Exception as ex: #TODO should we catch HttpException instead?
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not contact DBS to get the files deteails (Lumis, events, etc).\n"+\
                                 "This is could be a temporary DBS glitch, please try to submit a new task (resubmit will not work)"+\

@@ -22,7 +22,7 @@ class RemovetmpDir(BaseRecurringAction):
                     try:
                         self.logger.info('Removing: %s' % os.path.join(dirpath, dir))
                         shutil.rmtree(os.path.join(dirpath, dir))
-                    except Exception, e:
+                    except Exception as e:
                         self.logger.exception(e)
                     else:
                         self.logger.info('Directory removed.')

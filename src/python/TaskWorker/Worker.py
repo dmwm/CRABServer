@@ -44,10 +44,10 @@ def processWorker(inputs, results, resthost, resturi, procnum):
         try:
             msg = None
             outputs = work(resthost, resturi, WORKER_CONFIG, task, procnum, inputargs)
-        except WorkerHandlerException, we:
+        except WorkerHandlerException as we:
             outputs = Result(task=task, err=str(we))
             msg = str(we)
-        except Exception, exc:
+        except Exception as exc:
             outputs = Result(task=task, err=str(exc))
             msg = "%s: I just had a failure for %s" % (procName, str(exc))
             msg += "\n\tworkid=" + str(workid)
@@ -65,7 +65,7 @@ def processWorker(inputs, results, resthost, resturi, procnum):
 
                     server.post(resturi, data = urllib.urlencode(configreq))
                     logger.info("Error message successfully uploaded to the REST")
-                except Exception, exc:
+                except Exception as exc:
                     logger.warning("Cannot upload failure message to the REST for workflow %s.\nReason: %s" % (task['tm_taskname'], exc))
         t1 = time.time()
         logger.debug("%s: ...work on %s completed in %d seconds: %s" % (procName, task['tm_taskname'], t1-t0, outputs))
@@ -141,7 +141,7 @@ class Worker(object):
             try:
                 self.logger.debug("Putting stop message in the queue for %s " % str(x))
                 self.inputs.put(('-1', 'STOP', 'control', []))
-            except Exception, ex:
+            except Exception as ex:
                 msg =  "Hit some exception in deletion\n"
                 msg += str(ex)
                 self.logger.error(msg)
@@ -179,7 +179,7 @@ class Worker(object):
             out = None
             try:
                 out = self.results.get_nowait()
-            except Empty, e:
+            except Empty as e:
                 pass
             if out is not None:
                self.logger.debug('Retrieved work %s'% str(out))

@@ -133,7 +133,7 @@ def readFileFromTarball(file, tarball):
             f = tar_file.extractfile(file)
             content = f.read()
             break
-        except KeyError, er:
+        except KeyError as er:
             #Don`t exit due to KeyError, print error. EventBased and FileBased does not have run and lumis
             print 'Failed to get information from tarball %s and file %s. Error : %s' %(tarball, file, er)
             break

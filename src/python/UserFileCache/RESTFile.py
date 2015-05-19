@@ -223,7 +223,7 @@ class RESTInfo(RESTEntity):
 
         try:
             os.remove(filename)
-        except Exception, ex:
+        except Exception as ex:
             raise ExecutionError("Impossible to remove the file: %s" % str(ex))
 
     @restcall

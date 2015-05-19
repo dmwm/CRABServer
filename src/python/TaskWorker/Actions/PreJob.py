@@ -414,7 +414,7 @@ class PreJob:
             logpath = os.path.expanduser("~/%s" % (taskname))
             try:
                 os.makedirs(logpath)
-            except OSError, oe:
+            except OSError as oe:
                 if oe.errno != errno.EEXIST:
                     msg = "Failed to create log web-shared directory %s" % (logpath)
                     self.logger.info(msg)
@@ -454,7 +454,7 @@ class PreJob:
         logpath = os.path.join(os.getcwd(), "prejob_logs")
         try:
             os.makedirs(logpath)
-        except OSError, ose:
+        except OSError as ose:
             if ose.errno != errno.EEXIST:
                 logpath = os.getcwd()
         ## Create (open) the pre-job log file prejob.<job_id>.<crab_retry>.txt.

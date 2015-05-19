@@ -28,7 +28,7 @@ from RESTInteractions import HTTPRequests
 try:
     import classad
     import htcondor
-except ImportError, _:
+except ImportError as _:
     #pylint: disable=C0103
     classad = None
     htcondor = None
@@ -149,7 +149,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         goodSchedulers = []
         try:
             goodSchedulers = self.server.get(self.restURInoAPI + '/info', data={'subresource': 'backendurls'})[0]['result'][0]['htcondorSchedds']
-        except HTTPException, hte:
+        except HTTPException as hte:
             self.logger.error(hte.headers)
             self.logger.warning("Unable to contact cmsweb. Will use only on schedulers which was chosen by CRAB3 frontend.")
         self.logger.info("Good schedulers list got from crabserver: %s " % goodSchedulers)
@@ -188,7 +188,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             try:
                 userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
                 kw['task']['tm_schedd'] = schedd
-            except HTTPException, hte:
+            except HTTPException as hte:
                 msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
                 self.logger.warning(msg)
                 time.sleep(20)
@@ -201,7 +201,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 try:
                     execInt = self.executeInternal(*args, **kw)
                     return execInt
-                except Exception, e:
+                except Exception as e:
                     msg = "Failed to submit task %s; '%s'" % (kw['task']['tm_taskname'], str(e))
                     self.logger.error(msg)
                     retryIssues.append(msg)
@@ -236,7 +236,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         schedd = ""
         try:
             schedd, address = loc.getScheddObjNew(task['tm_schedd'])
-        except Exception, exp:
+        except Exception as exp:
             msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
             self.logger.exception(msg)
             raise TaskWorkerException(msg)
@@ -302,7 +302,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             schedd = ""
             try:
                 schedd, address = loc.getScheddObjNew(task['tm_schedd'])
-            except Exception, exp:
+            except Exception as exp:
                 msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (self.workflow, str(exp))
                 self.logger.exception(msg)
                 raise TaskWorkerException(msg)

@@ -541,7 +541,7 @@ def perform_local_stageout(local_stageout_mgr, \
         msg += " setting return code to 60403."
         print msg
         retval, retmsg = 60403, msg
-    except Exception, ex:
+    except Exception as ex:
         msg = "Error during stageout: %s" % (ex)
         print msg
         print "       <----- Stageout manager log finish"
@@ -778,19 +778,19 @@ def perform_direct_stageout(direct_stageout_impl, \
             msg += " setting return code to 60403."
             print msg
             retval, retmsg = 60403, msg
-        except Exception, ex:
+        except Exception as ex:
             msg  = "Failure in direct stage out:"
             msg += "\n%s" % (str(ex))
             try:
                 msg += "\n%s" % (traceback.format_exc())
-            except AttributeError, ex:
+            except AttributeError as ex:
                 msg += "\nTraceback unavailable\n"
             ## StageOutError.StageOutFailure has error code 60311.
             raise StageOutError.StageOutFailure(msg, Command = direct_stageout_command, Protocol = direct_stageout_protocol, \
                                                 LFN = dest_pfn, InputPFN = source_file, TargetPFN = dest_pfn)
         finally:
             signal.alarm(0)
-    except WMException.WMException, ex:
+    except WMException.WMException as ex:
         msg  = "Error during direct stageout:"
         msg += "\n%s" % (str(ex))
         print msg
@@ -1001,7 +1001,7 @@ def upload_log_file_metadata(dest_temp_lfn, dest_lfn):
     headers = {'Accept': '*/*'} #'User-agent': 'CRABClient/3.3.10'}
     try:
         server.put(rest_uri, configreq, headers)
-    except HTTPException, hte:
+    except HTTPException as hte:
         msg  = "Got HTTP exception when uploading logs archive file metadata:"
         msg += "%s \n%s" % (str(hte.headers), traceback.format_exc())
         print msg
@@ -1690,7 +1690,7 @@ def main():
                                                       output_dest_lfn, \
                                                       dest_site, is_log = False, \
                                                       inject = transfer_outputs)
-                    except Exception, ex:
+                    except Exception as ex:
                         msg  = "ERROR: Unhandled exception when performing stageout."
                         msg += "\n%s" % (traceback.format_exc())
                         print msg

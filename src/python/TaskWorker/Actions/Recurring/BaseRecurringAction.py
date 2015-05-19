@@ -30,7 +30,7 @@ class BaseRecurringAction:
             self.logger.info("Executing %s" % task)
             self._execute(resthost, resturi, config, task)
             return Result(task=task['tm_taskname'], result="OK")
-        except Exception, ex:
+        except Exception as ex:
             self.logger.error("Error while runnig recurring action.")
             self.logger.exception(ex)
             return Result(task=task['tm_taskname'], result="KO")

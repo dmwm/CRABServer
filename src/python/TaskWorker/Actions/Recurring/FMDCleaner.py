@@ -21,7 +21,7 @@ class FMDCleaner(BaseRecurringAction):
 #TODO return fro the server a value (e.g.: ["ok"]) to see if everything is ok
 #            result = server.delete('/crabserver/dev/filemetadata', data=urllib.urlencode({'hours': ONE_MONTH}))[0]['result'][0]
 #            self.logger.info('FMDCleaner, got %s' % result)
-        except HTTPException, hte:
+        except HTTPException as hte:
             self.logger.error(hte.headers)
 
 

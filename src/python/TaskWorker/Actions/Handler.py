@@ -72,15 +72,15 @@ class TaskHandler(object):
             t0 = time.time()
             try:
                 output = work.execute(nextinput, task=self._task)
-            except StopHandler, sh:
+            except StopHandler as sh:
                 msg = "Controlled stop of handler for %s on %s " % (self._task, str(sh))
                 self.logger.error(msg)
                 nextinput = Result(task=self._task, result='StopHandler exception received, controlled stop')
                 break #exit normally. Worker will not notice there was an error
-            except TaskWorkerException, twe:
+            except TaskWorkerException as twe:
                 self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
                 raise WorkerHandlerException(str(twe)) #TaskWorker error, do not add traceback to the error propagated to the REST
-            except Exception, exc:
+            except Exception as exc:
                 msg = "Problem handling %s because of %s failure, traceback follows\n" % (self._task['tm_taskname'], str(exc))
                 msg += str(traceback.format_exc())
                 self.logger.error(msg)
@@ -94,11 +94,11 @@ class TaskHandler(object):
                         ufc = UserFileCache(cacheurldict)
                         logfilename = self._task['tm_taskname'] + '_TaskWorker.log'
                         ufc.uploadLog(logpath, logfilename)
-                    except HTTPException, hte:
+                    except HTTPException as hte:
                         msg = ("Failed to upload the logfile to %s for task %s. More details in the http headers and body:\n%s\n%s" %
                                (self._task['tm_cache_url'], self._task['tm_taskname'], hte.headers, hte.result))
                         self.logger.error(msg)
-                    except Exception, e:
+                    except Exception as e:
                         msg = "Unknown error while uploading the logfile for task %s" % self._task['tm_taskname']
                         self.logger.exception(msg)
                 taskhandler.flush()
