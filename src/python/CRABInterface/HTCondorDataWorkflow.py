@@ -34,7 +34,7 @@ class HTCondorDataWorkflow(DataWorkflow):
     """
 
     successList = ['finished']
-    failedList = ['held', 'failed']
+    failedList = ['failed']
 
     @conn_handler(services=['centralconfig'])
     def chooseScheduler(self, scheddname=None, backend_urls=None):
