@@ -560,19 +560,14 @@ class DagmanCreator(TaskAction.TaskAction):
 
         os.chmod("CMSRunAnalysis.sh", 0755)
 
-        # This config setting acts as a global black / white list
-        global_whitelist = set()
+        # This config setting acts as a global black list
         global_blacklist = set()
-        if hasattr(self.config.Sites, 'available'):
-            global_whitelist = set(self.config.Sites.available)
-        if hasattr(self.config.Sites, 'banned'):
-            global_blacklist = set(self.config.Sites.banned)
+
         # This is needed for Site Metrics
         # It should not block any site for Site Metrics and if needed for other activities
         # self.config.TaskWorker.ActivitiesToRunEverywhere = ['hctest', 'hcdev']
         if hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere') and \
                    kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere:
-            global_whitelist = set()
             global_blacklist = set()
 
         sitead = classad.ClassAd()
@@ -588,7 +583,7 @@ class DagmanCreator(TaskAction.TaskAction):
             if not jobs:
                 possiblesites = []
             elif ignorelocality:
-                possiblesites = global_whitelist | whitelist
+                possiblesites = whitelist
                 if not possiblesites:
                     sbj = SiteDB.SiteDBJSON({"key":self.config.TaskWorker.cmskey,
                           "cert":self.config.TaskWorker.cmscert})
@@ -606,8 +601,6 @@ class DagmanCreator(TaskAction.TaskAction):
 
             # Apply globals
             availablesites = set(possiblesites) - global_blacklist
-            if global_whitelist:
-                availablesites &= global_whitelist
 
             if not availablesites:
                 msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. No site available for submission of task %s" % (kwargs['task']['tm_taskname'])

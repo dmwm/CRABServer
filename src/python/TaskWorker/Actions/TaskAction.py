@@ -1,3 +1,5 @@
+import os
+import json
 import urllib
 import logging
 from base64 import b64encode
@@ -44,3 +46,15 @@ class TaskAction(object):
         except HTTPException as hte:
             self.logger.error(hte.headers)
             self.logger.warning("Cannot add a warning to REST interface. Warning message: %s" % warning)
+
+    def getBlacklistedSites(self):
+        bannedSites = []
+        fileLocation = os.path.join(self.config.TaskWorker.scratchDir, "blacklistedSites.txt")
+        if os.path.isfile(fileLocation):
+            with open(fileLocation) as fd:
+                try:
+                    bannedSites = json.load(fd)
+                except ValueError as e:
+                    self.logger.error("Failed to load json from file %s. Error message: %s" % (fileLocation, e))
+                    return []
+        return bannedSites
