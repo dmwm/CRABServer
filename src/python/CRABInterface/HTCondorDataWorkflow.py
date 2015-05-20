@@ -468,7 +468,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         else:
             self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.publication, result['jobsPerStatus'].get('finished', 0)))
 
-        if len(taskStatus) == 0 and results[0]['JobStatus'] == 2:
+        if len(taskStatus) == 0 and results and results[0]['JobStatus'] == 2:
             result['status'] = 'Running (jobs not submitted)'
 
         result['jobs'] = taskStatus
