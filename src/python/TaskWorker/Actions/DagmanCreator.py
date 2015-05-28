@@ -40,24 +40,24 @@ NODE_STATUS_FILE node_state 30 ALWAYS-UPDATE
 
 # NOTE: a file must be present, but 'noop' makes it not be read.
 #FINAL FinalCleanup Job.1.submit NOOP
-#SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT %(resthost)s %(resturiwfdb)s
+#SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT {resthost} {resturiwfdb}
 
 """
 
 DAG_FRAGMENT = """
-JOB Job%(count)d Job.%(count)d.submit
-SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %(backend)s
-SCRIPT POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(taskname)s %(count)d %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
-#PRE_SKIP Job%(count)d 3
-RETRY Job%(count)d %(maxretries)d UNLESS-EXIT 2
-VARS Job%(count)d count="%(count)d" runAndLumiMask="job_lumis_%(count)d.json" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" maxRuntime="%(maxRuntime)s" eventsPerLumi="%(eventsPerLumi)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" scriptExe="%(scriptExe)s" scriptArgs="%(scriptArgs)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\"" +CRAB_Destination="\\"%(destination)s\\""
-ABORT-DAG-ON Job%(count)d 3
+JOB Job{count} Job.{count}.submit
+SCRIPT PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {taskname} {backend}
+SCRIPT POST Job{count} dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES {taskname} {count} {tempDest} {outputDest} cmsRun_{count}.log.tar.gz {remoteOutputFiles}
+#PRE_SKIP Job{count} 3
+RETRY Job{count} {maxretries} UNLESS-EXIT 2
+VARS Job{count} count="{count}" runAndLumiMask="job_lumis_{count}.json" lheInputFiles="{lheInputFiles}" firstEvent="{firstEvent}" firstLumi="{firstLumi}" lastEvent="{lastEvent}" firstRun="{firstRun}" maxRuntime="{maxRuntime}" eventsPerLumi="{eventsPerLumi}" seeding="{seeding}" inputFiles="{inputFiles}" scriptExe="{scriptExe}" scriptArgs="{scriptArgs}" +CRAB_localOutputFiles="\\"{localOutputFiles}\\"" +CRAB_DataBlock="\\"{block}\\"" +CRAB_Destination="\\"{destination}\\""
+ABORT-DAG-ON Job{count} 3
 
 """
 
 SUBDAG_FRAGMENT = """
-SUBDAG EXTERNAL Job%(count)d_0 RunJob%(count)d.subdag
-PARENT Job%(count)d CHILD Job%(count)d_0
+SUBDAG EXTERNAL Job{count}_0 RunJobs{count}.subdag
+PARENT Job{count} CHILD Job{count}_0
 
 """
 
@@ -644,13 +644,13 @@ class DagmanCreator(TaskAction.TaskAction):
             dagSpecs += jobgroupDagSpecs
 
         ## Write down the DAG as needed by DAGMan.
-        dag = DAG_HEADER % {'resthost': kwargs['task']['resthost'], 'resturiwfdb': kwargs['task']['resturinoapi'] + '/workflowdb'}
+        dag = DAG_HEADER.format(resthost=kwargs['task']['resthost'], resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
         for dagSpec in dagSpecs:
-            dag += DAG_FRAGMENT % dagSpec
-            dag += SUBDAG_FRAGMENT % dagSpec
+            dag += DAG_FRAGMENT.format(**dagSpec)
+            dag += SUBDAG_FRAGMENT.format(**dagSpec)
 
             ## Create an empty SUBDAG
-            subdag = "RunJob{0}.subdag".format(dagSpec['count'])
+            subdag = "RunJobs{0}.subdag".format(dagSpec['count'])
             with open(subdag, "w") as fd:
                 fd.write("")
             subdags.append(subdag)
