@@ -1079,9 +1079,6 @@ class PostJob():
 
         ## Parse the job ad.
         job_ad_file_name = os.environ.get("_CONDOR_JOB_AD", ".job.ad")
-        self.logger.info("ARGH!")
-        self.logger.info(os.listdir(os.path.dirname(job_ad_file_name)))
-        self.logger.info(os.listdir('.'))
         self.logger.info("====== Starting to parse job ad file %s." % (job_ad_file_name))
         if self.parse_job_ad(job_ad_file_name):
             self.set_dashboard_state('FAILED')
