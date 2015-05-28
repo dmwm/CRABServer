@@ -298,6 +298,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         taskStatus = {}
         jobList = []
         results = {}
+        pool = ""
         #Add scheduler and collector to return information
         if row.schedd:
             result['schedd'] = row.schedd
