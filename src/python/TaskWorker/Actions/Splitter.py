@@ -67,7 +67,7 @@ class Splitter(TaskAction):
                 self.logger.error(hte.headers)
                 self.logger.warning("Cannot add warning to REST after finding duplicates")
 
-        return Result(task = kwargs['task'], result = factory)
+        return Result(task = kwargs['task'], result = (factory, args[0]))
 
 
 if __name__ == '__main__':

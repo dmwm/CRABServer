@@ -581,7 +581,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         sitead = classad.ClassAd()
         siteinfo = {'groups': {}}
-        for jobgroup in splitterResult:
+        for jobgroup in splitterResult[0]:
             jobs = jobgroup.getJobs()
 
             whitelist = set(kwargs['task']['tm_site_whitelist'])
