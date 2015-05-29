@@ -117,7 +117,7 @@ def earlyDashboardMonitoring(myad):
         'WNHostName': socket.getfqdn(),
         'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":")),
         'SyncSite': myad['JOB_CMSSite'],
-        'SyncCE': myad['Used_Gatekeeper'].split(":")[0],
+        'SyncCE': myad['Used_Gatekeeper'].split(":")[0].split(" ")[0],
         'OverflowFlag': calcOverflowFlag(myad),
     }
     populateDashboardMonitorInfo(myad, params)
