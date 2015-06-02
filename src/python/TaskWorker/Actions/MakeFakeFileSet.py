@@ -32,12 +32,9 @@ class MakeFakeFileSet(TaskAction):
         #MC comes with only one MCFakeFile
         singleMCFileset = Fileset(name = "MCFakeFileSet")
         newFile = File("MCFakeFile", size = 1000, events = totalevents)
-        if hasattr(self.config.Sites, 'available'):
-            newFile.setLocation(self.config.Sites.available)
-        else:
-            sbj = SiteDBJSON({"key":self.config.TaskWorker.cmskey,
-                              "cert":self.config.TaskWorker.cmscert})
-            newFile.setLocation(sbj.getAllCMSNames())
+        sbj = SiteDBJSON({"key":self.config.TaskWorker.cmskey,
+                          "cert":self.config.TaskWorker.cmscert})
+        newFile.setLocation(sbj.getAllCMSNames())
         newFile.addRun(Run(1, *range(firstLumi, lastLumi + 1)))
         newFile["block"] = 'MCFackBlock'
         newFile["first_event"] = firstEvent

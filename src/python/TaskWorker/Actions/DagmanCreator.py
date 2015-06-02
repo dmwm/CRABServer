@@ -561,7 +561,7 @@ class DagmanCreator(TaskAction.TaskAction):
         os.chmod("CMSRunAnalysis.sh", 0755)
 
         # This config setting acts as a global black list
-        global_blacklist = set()
+        global_blacklist = set(self.getBlacklistedSites())
 
         # This is needed for Site Metrics
         # It should not block any site for Site Metrics and if needed for other activities
