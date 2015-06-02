@@ -318,7 +318,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         # Use new logic to get task status fron scheduler
         # In case it will fail, old logic will be used.
         # User web directory is needed for getting files from scheduler
-        useOldLogic = False
+        useOldLogic = True
         if row.user_webdir and verbose != 2:
            self.logger.info("Getting status for workflow %s using node_state file" % workflow)
            try:
