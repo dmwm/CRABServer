@@ -907,6 +907,7 @@ class PostJob():
         self.logger.addHandler(handler)
         self.logger.setLevel(logging.DEBUG)
         self.logger.propagate = False
+        self.retryjob_retval = None
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1092,21 +1093,20 @@ class PostJob():
         ## If the retry-job returns non 0 (meaning there was an error), report the state
         ## to dashboard and exit the post-job.
         retry = RetryJob()
-        retryjob_retval = None
         if not os.environ.get('TEST_POSTJOB_DISABLE_RETRIES', False):
             print "       -----> RetryJob log start -----"
-            retryjob_retval = retry.execute(self.reqname, self.job_return_code, \
+            self.retryjob_retval = retry.execute(self.reqname, self.job_return_code, \
                                             self.crab_retry, self.job_id, \
                                             self.dag_jobid)
             print "       <----- RetryJob log finish ----"
-        if retryjob_retval:
-            if retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:
+        if self.retryjob_retval:
+            if self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:
                 msg = "The retry handler indicated this was a fatal error."
                 self.logger.info(msg)
                 self.set_dashboard_state('FAILED')
                 self.logger.info("====== Finished to analyze job exit status.")
                 return JOB_RETURN_CODES.FATAL_ERROR, ""
-            elif retryjob_retval == JOB_RETURN_CODES.RECOVERABLE_ERROR:
+            elif self.retryjob_retval == JOB_RETURN_CODES.RECOVERABLE_ERROR:
                 if self.dag_retry >= self.max_retries:
                     msg  = "The retry handler indicated this was a recoverable error,"
                     msg += " but the maximum number of retries was already hit."
@@ -1123,7 +1123,7 @@ class PostJob():
                     self.logger.info("====== Finished to analyze job exit status.")
                     return JOB_RETURN_CODES.RECOVERABLE_ERROR, ""
             else:
-                msg  = "The retry handler returned an unexpected value (%d)." % (retryjob_retval)
+                msg  = "The retry handler returned an unexpected value (%d)." % (self.retryjob_retval)
                 msg += " Will consider this as a fatal error. DAGMan will not retry."
                 self.logger.info(msg)
                 self.set_dashboard_state('FAILED')
@@ -1854,6 +1854,29 @@ class PostJob():
             setDashboardLogs(params, self.job_ad['CRAB_UserWebDir'], self.job_id, self.crab_retry)
         else:
            print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir in myad."
+        ## Take exit code from job_fjr.<job_id>.<retry_id>.json and report final exit code to Dashboard.
+        ## Only taken if RetryJob think it is FATAL_ERROR.
+        if self.retryjob_retval and self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:
+            try:
+                with open(G_JOB_REPORT_NAME_NEW, 'r') as fd:
+                    try:
+                        report = json.load(fd)
+                        if 'exitCode' in report:
+                            params['JobExitCode'] = report['exitCode']
+                            params['ExeExitCode'] = report['exitCode']
+                    except ValueError as e:
+                        self.logger.debug("Not able to load the fwjr because of a ValueError %s. \
+                                           Not setting exit code for dashboard. Continuing normally" % (e))
+                        ## Means that file exists, but failed to load json
+                        ## Don`t fail and go ahead with reporting to dashboard
+                        pass
+            except IOError as e:
+                ## File does not exist. Don`t fail and go ahead with reporting to dashboard
+                self.logger.debug("Not able to load the fwjr because of a IOError %s. \
+                                   Not setting exitcode for dashboard. Continuing normally" % (e))
+                pass
+        else:
+            self.logger.debug("Dashboard exit code already set on the worker node. Continuing normally")
         ## Unfortunately, Dashboard only has 1-second resolution; we must separate all
         ## updates by at least 1s in order for it to get the correct ordering.
         time.sleep(1)
