@@ -12,6 +12,7 @@ import string
 import tarfile
 import hashlib
 import commands
+import pickle
 import tempfile
 from ast import literal_eval
 from httplib import HTTPException
@@ -676,8 +677,12 @@ class DagmanCreator(TaskAction.TaskAction):
             json.dump(siteinfo, fd)
 
         ## Cache data discovery
-        with open("datadiscovery.json", "w") as fd:
-            json.dump(splitterResult[1], fd)
+        with open("datadiscovery.pkl", "wb") as fd:
+            pickle.dump(splitterResult[1], fd)
+
+        ## Cache task information
+        with open("taskinformation.json", "w") as fd:
+            json.dump(kwargs['task'], fd)
 
         task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
         userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
@@ -781,7 +786,7 @@ class DagmanCreator(TaskAction.TaskAction):
             params = self.sendDashboardTask()
 
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', \
-                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.json', 'run_and_lumis.tar.gz']
+                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.json', 'run_and_lumis.tar.gz']
         if kw['task'].get('tm_user_sandbox') == 'sandbox.tar.gz':
             inputFiles.append('sandbox.tar.gz')
         if os.path.exists("CMSRunAnalysis.tar.gz"):

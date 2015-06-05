@@ -63,6 +63,7 @@ import uuid
 import glob
 import fcntl
 import errno
+import pickle
 import pprint
 import random
 import shutil
@@ -87,6 +88,10 @@ from ServerUtilities import setDashboardLogs
 from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
+from TaskWorker.Actions.Splitter import Splitter
+from TaskWorker.WorkerExceptions import TaskWorkerException
+
+from WMCore.Configuration import Configuration, ConfigSection
 
 
 ASO_JOB = None
@@ -1166,17 +1171,45 @@ class PostJob():
             with open(os.path.join(tmpdir, fn)) as fd:
                 injson = json.load(fd)
                 inlumis = LumiList(compactList=injson)
-
-            outlumis = LumiList()
-            for input in self.job_report['steps']['cmsRun']['input']['source']:
-                outlumis += LumiList(runsAndLumis=input['runs'])
-
-            self.logger.info("Lumis expected to be processed: {0}".format(len(inlumis.getLumis())))
-            self.logger.info("Lumis actually processed:       {0}".format(len(outlumis.getLumis())))
-            self.logger.info("Difference in lumis:            {0}".format(len((inlumis - outlumis).getLumis())))
         finally:
             f.close()
             shutil.rmtree(tmpdir)
+
+        outlumis = LumiList()
+        for input in self.job_report['steps']['cmsRun']['input']['source']:
+            outlumis += LumiList(runsAndLumis=input['runs'])
+
+        self.logger.info("Lumis expected to be processed: {0}".format(len(inlumis.getLumis())))
+        self.logger.info("Lumis actually processed:       {0}".format(len(outlumis.getLumis())))
+        self.logger.info("Difference in lumis:            {0}".format(len((inlumis - outlumis).getLumis())))
+
+        missing = inlumis - outlumis
+        missing_compact = missing.getCompactList()
+
+        runs = missing.getRuns()
+        lumis = [",".join(map(str, reduce(lambda x, y: x + y, missing_compact[run]))) for run in runs]
+
+        with open('datadiscovery.pkl', 'rb') as fd:
+            dataset = pickle.load(fd)
+
+        with open('taskinformation.json') as fd:
+            task = json.load(fd)
+
+        task['tm_split_args']['runs'] = runs
+        task['tm_split_args']['lumis'] = lumis
+
+        try:
+            config = Configuration()
+            config.TaskWorker = ConfigSection(name="TaskWorker")
+
+            splitter = Splitter(config)
+            split_result = splitter.execute(dataset, task=task)
+
+            self.logger.info("Splitting results:")
+            for g in split_result.result[0]:
+                self.logger.error("Created jobgroup with length {0}".format(len(g.getJobs())))
+        except TaskWorkerException as e:
+            self.logger.error("Error during splitting")
 
         ## AndresT. We don't need this method IMHO. See note I made in the method.
         self.fix_job_logs_permissions()
