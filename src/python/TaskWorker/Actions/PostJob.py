@@ -1037,6 +1037,11 @@ class PostJob():
 
         self.create_job_and_json_logs()
 
+        ## Print a message about what job retry number are we on.
+        msg  = "This is job retry number %d." % (self.dag_retry) #MarcoM: why not self.crab_retry ?
+        msg += " The maximum allowed number of retries is %d." % (self.max_retries)
+        self.logger.info(msg)
+
         ## Call execute_internal().
         retval = 1
         retmsg = "Failure during post-job execution."
@@ -1093,11 +1098,6 @@ class PostJob():
         (injections to ASO database, monitoring transfers, file metadata upload)
         are done from here.
         """
-
-        ## Print a message about what job retry number are we on.
-        msg  = "This is job retry number %d." % (self.dag_retry) #MarcoM: why not self.crab_retry ?
-        msg += " The maximum allowed number of retries is %d." % (self.max_retries)
-        self.logger.info(msg)
 
         ## Make sure the location of the user's proxy file is set in the environment.
         if 'X509_USER_PROXY' not in os.environ:
@@ -1182,6 +1182,7 @@ class PostJob():
                     self.logger.info("====== Finished to analyze job exit status.")
                     return JOB_RETURN_CODES.RECOVERABLE_ERROR, ""
             else:
+                #MarcoM: this should never happen
                 msg  = "The retry handler returned an unexpected value (%d)." % (self.retryjob_retval)
                 msg += " Will consider this as a fatal error. DAGMan will not retry."
                 self.logger.info(msg)
