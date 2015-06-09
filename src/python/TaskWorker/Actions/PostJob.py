@@ -1088,8 +1088,10 @@ class PostJob():
             try:
                 os.symlink(os.path.abspath(os.path.join(".", G_JOB_REPORT_NAME_NEW)), \
                            os.path.join(self.logpath, G_JOB_REPORT_NAME_NEW))
-            except:
-                pass
+            except Exception as e:
+                msg = "Cannot create symbolic link to the jobreport json.\n Details follow:"
+                self.logger.exception(msg)
+                self.logger.info("Continuing since this is not a critical error")
 
         ## Print a message about what job retry number are we on.
         msg  = "This is job retry number %d." % (self.dag_retry)
