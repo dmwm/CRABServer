@@ -943,6 +943,8 @@ class PostJob():
         self.job_return_code = int(self.job_return_code)
         self.crab_retry = self.calculate_crab_retry()
         if self.crab_retry is None:
+            #XXX Consider to make this a fatal error: I think the only way self.crab_retry
+            #    could be None is through a bug
             self.crab_retry = self.dag_retry
 
         ## Create the task web directory in the schedd.
@@ -1990,10 +1992,11 @@ class PostJob():
             try:
                 with open(fname, 'r') as fd:
                     retry_info = json.load(fd)
-            except:
+            except Exception as e:
                 msg  = "Unable to calculate post-job retry count."
                 msg += " Failed to load file %s." % (fname)
-                self.logger.warning(msg)
+                msg += "\nDetails follow:"
+                self.logger.exception(msg)
                 return None
         else:
             retry_info = {'pre': 0, 'post': 0}
@@ -2009,10 +2012,12 @@ class PostJob():
             with open(fname + '.tmp', 'w') as fd:
                 json.dump(retry_info, fd)
             os.rename(fname + '.tmp', fname)
-        except Exception:
+        except Exception as e:
             msg = "Failed to update file %s with increased post-job count by +1."
+            msg += "\nDetails follow:"
             msg = msg % (fname)
-            self.logger.warning(msg)
+            self.logger.exception(msg)
+            return None
         return crab_retry
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
