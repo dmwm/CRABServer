@@ -950,30 +950,8 @@ class PostJob():
             ##    could be None is through a bug or wrong schedd setup (e.g.: permissions)
             self.crab_retry = self.dag_retry
 
-        ## Create (open) the post-job log file postjob.<job_id>.<crab_retry>.txt.
-        postjob_log_file_name = "postjob.%d.%d.txt" % (self.job_id, self.crab_retry)
-        fd_postjob_log = os.open(postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
-        os.chmod(postjob_log_file_name, 0644)
-        ## Redirect stdout and stderr to the post-job log file.
-        if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
-            print "Post-job started with no output redirection."
-        else:
-            os.dup2(fd_postjob_log, 1)
-            os.dup2(fd_postjob_log, 2)
-            msg = "Post-job started with output redirected to %s." % (postjob_log_file_name)
-            self.logger.info(msg)
-        ## Create a symbolic link in the task web directory to the post-job log file.
-        ## The pre-job creates already the symlink, but the post-job has to do it by
-        ## its own in case the pre-job was not executed (e.g. when DAGMan restarts a
-        ## post-job).
-        msg = "Creating symbolic link in task web directory to post-job log file: %s -> %s" \
-            % (os.path.join(self.logpath, postjob_log_file_name), postjob_log_file_name)
-        self.logger.debug(msg)
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", postjob_log_file_name)), \
-                       os.path.join(self.logpath, postjob_log_file_name))
-        except:
-            pass
+        #it needs the crab_retry and an existing webdir
+        self.handle_logfile()
 
         ## Now that we have the job id and retry, we can set the job report file
         ## names.
@@ -1363,6 +1341,33 @@ class PostJob():
             if ose.errno != errno.EEXIST:
                 print "Failed to create log web-shared directory %s" % (self.logpath)
                 raise
+
+    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def handle_logfile(self):
+        ## Create (open) the post-job log file postjob.<job_id>.<crab_retry>.txt.
+        postjob_log_file_name = "postjob.%d.%d.txt" % (self.job_id, self.crab_retry)
+        fd_postjob_log = os.open(postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
+        os.chmod(postjob_log_file_name, 0644)
+        ## Redirect stdout and stderr to the post-job log file.
+        if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
+            print "Post-job started with no output redirection."
+        else:
+            os.dup2(fd_postjob_log, 1)
+            os.dup2(fd_postjob_log, 2)
+            msg = "Post-job started with output redirected to %s." % (postjob_log_file_name)
+            self.logger.info(msg)
+        ## Create a symbolic link in the task web directory to the post-job log file.
+        ## The pre-job creates already the symlink, but the post-job has to do it by
+        ## its own in case the pre-job was not executed (e.g. when DAGMan restarts a
+        ## post-job).
+        msg = "Creating symbolic link in task web directory to post-job log file: %s -> %s" % (os.path.join(self.logpath, postjob_log_file_name), postjob_log_file_name)
+        self.logger.debug(msg)
+        try:
+            os.symlink(os.path.abspath(os.path.join(".", postjob_log_file_name)), os.path.join(self.logpath, postjob_log_file_name))
+        except Exception as e:
+            msg = "Cannot create symbolic link to the postjob log.\n Details follow:"
+            self.logger.exception(msg)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
