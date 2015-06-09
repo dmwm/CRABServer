@@ -957,6 +957,42 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    def create_job_and_json_logs(self):
+        ## Copy the job's stdout file job_out.<job_id> to the schedd web directory,
+        ## naming it job_out.<job_id>.<crab_retry>.txt.
+        ## NOTE: We now redirect stdout -> stderr; hence, we don't keep stderr in
+        ## the webdir.
+        stdout = "job_out.%d" % (self.job_id)
+        stdout_tmp = "job_out.tmp.%d" % (self.job_id)
+        if os.path.exists(stdout):
+            os.rename(stdout, stdout_tmp)
+            fname = "job_out.%d.%d.txt" % (self.job_id, self.crab_retry)
+            fname = os.path.join(self.logpath, fname)
+            msg = "Copying job stdout from %s to %s." % (stdout, fname)
+            self.logger.debug(msg)
+            shutil.copy(stdout_tmp, fname)
+            fd_stdout = open(stdout_tmp, 'w')
+            fd_stdout.truncate(0)
+            fd_stdout.close()
+            os.chmod(fname, 0644) ## Copy the json job report file jobReport.json.<job_id> to
+        ## job_fjr.<job_id>.<crab_retry>.json and create a symbolic link in the task web
+        ## directory to the new job report file.
+        if os.path.exists(G_JOB_REPORT_NAME):
+            msg = "Copying job report from %s to %s." % (G_JOB_REPORT_NAME, G_JOB_REPORT_NAME_NEW)
+            self.logger.debug(msg)
+            shutil.copy(G_JOB_REPORT_NAME, G_JOB_REPORT_NAME_NEW)
+            os.chmod(G_JOB_REPORT_NAME_NEW, 0644)
+            msg = "Creating symbolic link in task web directory to job report file: %s -> %s" % (os.path.join(self.logpath, G_JOB_REPORT_NAME_NEW), G_JOB_REPORT_NAME_NEW)
+            self.logger.debug(msg)
+            try:
+                os.symlink(os.path.abspath(os.path.join(".", G_JOB_REPORT_NAME_NEW)), os.path.join(self.logpath, G_JOB_REPORT_NAME_NEW))
+            except Exception as e:
+                msg = "Cannot create symbolic link to the jobreport json.\n Details follow:"
+                self.logger.exception(msg)
+                self.logger.info("Continuing since this is not a critical error")
+
+    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
     def execute(self, *args, **kw):
         """
         The execute method of PostJob.
@@ -998,6 +1034,8 @@ class PostJob():
         G_JOB_REPORT_NAME = "jobReport.json.%d" % (self.job_id)
         global G_JOB_REPORT_NAME_NEW
         G_JOB_REPORT_NAME_NEW = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry)
+
+        self.create_job_and_json_logs()
 
         ## Call execute_internal().
         retval = 1
@@ -1056,45 +1094,8 @@ class PostJob():
         are done from here.
         """
 
-        ## Copy the job's stdout file job_out.<job_id> to the schedd web directory,
-        ## naming it job_out.<job_id>.<crab_retry>.txt.
-        ## NOTE: We now redirect stdout -> stderr; hence, we don't keep stderr in
-        ## the webdir.
-        stdout = "job_out.%d" % (self.job_id)
-        stdout_tmp = "job_out.tmp.%d" % (self.job_id)
-        if os.path.exists(stdout):
-            os.rename(stdout, stdout_tmp)
-            fname = "job_out.%d.%d.txt" % (self.job_id, self.crab_retry)
-            fname = os.path.join(self.logpath, fname)
-            msg = "Copying job stdout from %s to %s." % (stdout, fname)
-            self.logger.debug(msg)
-            shutil.copy(stdout_tmp, fname)
-            fd_stdout = open(stdout_tmp, 'w')
-            fd_stdout.truncate(0)
-            fd_stdout.close()
-            os.chmod(fname, 0644)
-
-        ## Copy the json job report file jobReport.json.<job_id> to
-        ## job_fjr.<job_id>.<crab_retry>.json and create a symbolic link in the task web
-        ## directory to the new job report file.
-        if os.path.exists(G_JOB_REPORT_NAME):
-            msg = "Copying job report from %s to %s." % (G_JOB_REPORT_NAME, G_JOB_REPORT_NAME_NEW)
-            self.logger.debug(msg)
-            shutil.copy(G_JOB_REPORT_NAME, G_JOB_REPORT_NAME_NEW)
-            os.chmod(G_JOB_REPORT_NAME_NEW, 0644)
-            msg = "Creating symbolic link in task web directory to job report file: %s -> %s" \
-                % (os.path.join(self.logpath, G_JOB_REPORT_NAME_NEW), G_JOB_REPORT_NAME_NEW)
-            self.logger.debug(msg)
-            try:
-                os.symlink(os.path.abspath(os.path.join(".", G_JOB_REPORT_NAME_NEW)), \
-                           os.path.join(self.logpath, G_JOB_REPORT_NAME_NEW))
-            except Exception as e:
-                msg = "Cannot create symbolic link to the jobreport json.\n Details follow:"
-                self.logger.exception(msg)
-                self.logger.info("Continuing since this is not a critical error")
-
         ## Print a message about what job retry number are we on.
-        msg  = "This is job retry number %d." % (self.dag_retry)
+        msg  = "This is job retry number %d." % (self.dag_retry) #MarcoM: why not self.crab_retry ?
         msg += " The maximum allowed number of retries is %d." % (self.max_retries)
         self.logger.info(msg)
 
