@@ -941,20 +941,14 @@ class PostJob():
         for i in xrange(9, len(args)):
             self.output_files_names.append(args[i])
         self.job_return_code = int(self.job_return_code)
+
+        self.create_taskwebdir()
+
         self.crab_retry = self.calculate_crab_retry()
         if self.crab_retry is None:
-            #XXX Consider to make this a fatal error: I think the only way self.crab_retry
-            #    could be None is through a bug
+            ##XXX Consider to make this a fatal error: I think the only way self.crab_retry
+            ##    could be None is through a bug or wrong schedd setup (e.g.: permissions)
             self.crab_retry = self.dag_retry
-
-        ## Create the task web directory in the schedd.
-        self.logpath = os.path.expanduser("~/%s" % (self.reqname))
-        try:
-            os.makedirs(self.logpath)
-        except OSError as ose:
-            if ose.errno != errno.EEXIST:
-                print "Failed to create log web-shared directory %s" % (self.logpath)
-                raise
 
         ## Create (open) the post-job log file postjob.<job_id>.<crab_retry>.txt.
         postjob_log_file_name = "postjob.%d.%d.txt" % (self.job_id, self.crab_retry)
@@ -1357,6 +1351,18 @@ class PostJob():
         else:
             self.logger.debug("------ Job ad is not available. Continue")
             self.logger.debug("-"*100)
+
+    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def create_taskwebdir(self):
+        ## Create the task web directory in the schedd.
+        self.logpath = os.path.expanduser("~/%s" % (self.reqname))
+        try:
+            os.makedirs(self.logpath)
+        except OSError as ose:
+            if ose.errno != errno.EEXIST:
+                print "Failed to create log web-shared directory %s" % (self.logpath)
+                raise
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
