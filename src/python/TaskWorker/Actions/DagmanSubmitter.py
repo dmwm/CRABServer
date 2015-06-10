@@ -314,13 +314,16 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 raise TaskWorkerException("Unable to get schedd address for task %s" % (task['tm_taskname']))
             #try to connect
             if hasattr(self.config.MyProxy, 'uisource'):
-                ret = subprocess.call(["sh","-c","export X509_USER_PROXY=%s; source %s; gsissh -o ConnectTimeout=60 -o PasswordAuthentication=no %s pwd" %\
+                ret = subprocess.call(["sh","-c","export X509_USER_PROXY=%s; source %s; timeout 60 gsissh -o ConnectTimeout=60 -o PasswordAuthentication=no %s pwd" %\
                                                     (task['user_proxy'], self.config.MyProxy.uisource, scheddAddress)])
             else:
-                ret = subprocess.call(["sh","-c","export X509_USER_PROXY=%s; gsissh -o ConnectTimeout=60 -o PasswordAuthentication=no %s pwd" %\
+                ret = subprocess.call(["sh","-c","export X509_USER_PROXY=%s; timeout 60 gsissh -o ConnectTimeout=60 -o PasswordAuthentication=no %s pwd" %\
                                                     (task['user_proxy'], scheddAddress)])
             if ret:
-                raise TaskWorkerException("Cannot gsissh to %s. Taskname %s" % (scheddAddress, task['tm_taskname']))
+                msg = "Cannot gsissh to %s. Taskname %s." % (scheddAddress, task['tm_taskname'])
+                if ret == 124:
+                    msg += "\n Timeout executing the command gsissh."
+                raise TaskWorkerException(msg)
 
             if address:
                 self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
