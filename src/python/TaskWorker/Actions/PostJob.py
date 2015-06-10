@@ -1863,7 +1863,8 @@ class PostJob():
                         report = json.load(fd)
                         if 'exitCode' in report:
                             params['JobExitCode'] = report['exitCode']
-                            params['ExeExitCode'] = report['exitCode']
+                        if 'jobExitCode' in report:
+                            params['ExeExitCode'] = report['jobExitCode']
                     except ValueError as e:
                         self.logger.debug("Not able to load the fwjr because of a ValueError %s. \
                                            Not setting exit code for dashboard. Continuing normally" % (e))

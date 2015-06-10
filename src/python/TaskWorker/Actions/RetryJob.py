@@ -136,12 +136,16 @@ class RetryJob(object):
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def create_fake_fjr(self, exitMsg, exitCode):
+    def create_fake_fjr(self, exitMsg, exitCode, jobExitCode = None):
         """If FatalError is got, fjr is not generated and it is needed for error_summary"""
 
         fake_fjr = {}
-        fake_fjr['exitCode'] = exitCode
         fake_fjr['exitMsg'] = exitMsg
+        if jobExitCode:
+            fake_fjr['jobExitCode'] = jobExitCode
+            fake_fjr['exitCode'] = jobExitCode
+        else:
+            fake_fjr['exitCode'] = exitCode
         jobReport = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry)
         if os.path.isfile(jobReport) and os.path.getsize(jobReport) > 0:
             #File exists and it is not empty
@@ -166,7 +170,8 @@ class RetryJob(object):
         """
         # If job was killed on the worker node, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to wall clock limit"):
-            self.create_fake_fjr("Not retrying job due to wall clock limit (job automatically killed on the worker node)", 50664)
+            exitMsg = "Not retrying job due to wall clock limit (job automatically killed on the worker node)"
+            self.create_fake_fjr(exitMsg, 50664, 50664)
         subreport = self.report
         for attr in ['steps', 'cmsRun', 'performance', 'cpu', 'TotalJobTime']:
             subreport = subreport.get(attr, None)
@@ -198,7 +203,8 @@ class RetryJob(object):
         """
         # If job was killed on the worker node, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to memory use"):
-            self.create_fake_fjr("Not retrying job due to excessive memory use (job automatically killed on the worker node)", 50660)
+            exitMsg = "Not retrying job due to excessive memory use (job automatically killed on the worker node)"
+            self.create_fake_fjr(exitMsg, 50660, 50660)
         subreport = self.report
         for attr in ['steps', 'cmsRun', 'performance', 'memory', 'PeakValueRss']:
             subreport = subreport.get(attr, None)
@@ -223,7 +229,7 @@ class RetryJob(object):
         # If job was killed on the WN, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to disk usage"):
             exitMsg = "Not retrying job due to excessive disk usage (job automatically killed on the worker node)"
-            self.create_fake_fjr(exitMsg, 50662)
+            self.create_fake_fjr(exitMsg, 50662, 50662)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
