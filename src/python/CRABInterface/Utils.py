@@ -131,6 +131,7 @@ def conn_handler(services):
         def wrapped_func(*args, **kwargs):
             if 'sitedb' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
                 args[0].allCMSNames = CMSSitesCache(sites=SiteDBJSON(config={'cert': serverCert, 'key': serverKey}).getAllCMSNames(), cachetime=mktime(gmtime()))
+                args[0].allPNNNames = CMSSitesCache(sites=SiteDBJSON(config={'cert': serverCert, 'key': serverKey}).getAllPhEDExNodeNames(), cachetime=mktime(gmtime()))
             if 'phedex' in services and not args[0].phedex:
                 phdict = args[0].phedexargs
                 phdict.update({'cert': serverCert, 'key': serverKey})
