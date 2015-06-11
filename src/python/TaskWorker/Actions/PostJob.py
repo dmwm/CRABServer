@@ -937,6 +937,10 @@ class PostJob():
             os.dup2(fd_postjob_log, 2)
             msg = "Post-job started with output redirected to %s." % (postjob_log_file_name)
             self.logger.info(msg)
+
+    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def handle_webdir(self):
         ## Create a symbolic link in the task web directory to the post-job log file.
         ## The pre-job creates already the symlink, but the post-job has to do it by
         ## its own in case the pre-job was not executed (e.g. when DAGMan restarts a
@@ -948,10 +952,6 @@ class PostJob():
         except Exception as e:
             msg = "Cannot create symbolic link to the postjob log.\n Details follow:"
             self.logger.exception(msg)
-
-    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-    def create_job_and_json_logs(self):
         ## Copy the job's stdout file job_out.<job_id> to the schedd web directory,
         ## naming it job_out.<job_id>.<crab_retry>.txt.
         ## NOTE: We now redirect stdout -> stderr; hence, we don't keep stderr in
@@ -1029,7 +1029,7 @@ class PostJob():
         global G_JOB_REPORT_NAME_NEW
         G_JOB_REPORT_NAME_NEW = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry)
 
-        self.create_job_and_json_logs()
+        self.handle_webdir()
 
         ## Print a message about what job retry number are we on.
         msg  = "This is job retry number %d." % (self.dag_retry) #MarcoM: why not self.crab_retry ?
