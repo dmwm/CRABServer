@@ -1214,9 +1214,6 @@ class PostJob():
             return JOB_RETURN_CODES.FATAL_ERROR, retmsg
         self.logger.info("====== Finished to parse job report.")
 
-        ## AndresT. We don't need this method IMHO. See note I made in the method.
-        self.fix_job_logs_permissions()
-
         ## If the flag CRAB_NoWNStageout is set, we finish the post-job here.
         ## (I didn't remove this yet, because even if the transfer of the logs and
         ## outputs is off, in a user analysis task it still makes sense to do the
@@ -1901,25 +1898,6 @@ class PostJob():
             else:
                 msg = "Output file info for %s not found in job report." % (orig_file_name)
                 self.logger.error(msg)
-
-    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-    ## job_err is empty because we redirect stderr to stdout, and job_out.tmp is
-    ## empty because we truncate it to 0 after copying it to the web directory.
-    ## So we don't need this method IMHO. AndresT.
-    def fix_job_logs_permissions(self):
-        """
-        HTCondor will default to a umask of 0077 for stdout/err. When the DAG finishes,
-        the schedd will chown the sandbox to the user which runs HTCondor.
-        This prevents the user who owns the DAGs from retrieving the job output as they
-        are no longer world-readable.
-        """
-        for base_file in ["job_err", "job_out.tmp"]:
-            try:
-                os.chmod("%s.%d" % (base_file, self.job_id), 0644)
-            except OSError as ose:
-                if ose.errno != errno.ENOENT and ose.errno != errno.EPERM:
-                    raise
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
