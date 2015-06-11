@@ -300,15 +300,7 @@ class ASOServerJob(object):
         if self.aso_start_timestamp:
             starttime = self.aso_start_timestamp
         self.logger.info("====== Starting to monitor ASO transfers.")
-        ## This call to get_transfers_statuses() is only to make a first call to
-        ## the couch view in order to reduce the probability of getting a stale
-        ## result when calling the view inside the while loop below.
-        self.get_transfers_statuses()
         while True:
-            ## Sleep is done before calling get_transfers_statuses(), in order to
-            ## give some time to couch to load the view after the above call to
-            ## get_transfers_statuses().
-            time.sleep(self.sleep + random.randint(0, 60))
             ## Get the transfer status in all documents listed in self.docs_in_transfer.
             transfers_statuses = self.get_transfers_statuses()
             msg = "Got statuses: %s; %.1f hours since transfer submit." 
@@ -396,6 +388,8 @@ class ASOServerJob(object):
                 self.logger.info("====== Finished to cancel ongoing ASO transfers.")
                 self.logger.info("====== Finished to monitor ASO transfers.")
                 return 1
+            ## sleep anche check the status later
+            time.sleep(self.sleep + random.randint(0, 60))
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
