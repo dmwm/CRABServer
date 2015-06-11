@@ -1200,10 +1200,6 @@ class PostJob():
                 return JOB_RETURN_CODES.FATAL_ERROR, ""
         else:
             self.logger.info("====== Finished to analyze job exit status.")
-        ## If CRAB_ASOTimeout was not defined in the job ad, get here the ASO timeout
-        ## from the retry-job.
-        if self.retry_timeout is None:
-            self.retry_timeout = retry.get_aso_timeout()
 
         ## Parse the job report.
         self.logger.info("====== Starting to parse job report file %s." % (G_JOB_REPORT_NAME))
@@ -1741,6 +1737,9 @@ class PostJob():
         ## If self.job_ad['CRAB_ASOTimeout'] = 0, will use default timeout logic.
         if 'CRAB_ASOTimeout' in self.job_ad and int(self.job_ad['CRAB_ASOTimeout']) > 0:
             self.retry_timeout = int(self.job_ad['CRAB_ASOTimeout'])
+        else:
+            ## If CRAB_ASOTimeout was not defined in the job ad, use a default of 6 hours
+            self.retry_timeout = 6 * 3600
         return 0
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

@@ -47,13 +47,6 @@ class RetryJob(object):
         self.validreport         = True
         self.integrated_job_time = 0
 
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-    def get_aso_timeout(self):
-        """
-        Need a doc string here.
-        """
-        return min(max(self.integrated_job_time/4, 4*3600), 6*3600)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
