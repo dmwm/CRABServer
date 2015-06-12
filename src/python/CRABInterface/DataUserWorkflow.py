@@ -97,6 +97,7 @@ class DataUserWorkflow(object):
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
            :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication;
+           :arg str publishgroupname: add groupname or username to publishname;
            :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;

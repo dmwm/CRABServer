@@ -250,3 +250,4 @@ class Task(dict):
         self['tm_ignore_locality'] = task[54]
         self['tm_fail_limit'] = task[55]
         self['tm_one_event_mode'] = task[56]
+        self['tm_publish_groupname'] = task[57]
