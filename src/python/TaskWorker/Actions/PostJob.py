@@ -239,9 +239,9 @@ class ASOServerJob(object):
     """
     Class used to inject transfer requests to ASO database.
     """
-    def __init__(self, logger, dest_site, source_dir, dest_dir, source_sites, \
-                 count, filenames, reqname, log_size, log_needs_transfer, \
-                 job_report_output, job_ad, crab_retry, retry_timeout, \
+    def __init__(self, logger, aso_start_time, aso_start_timestamp, dest_site, source_dir,
+                 dest_dir, source_sites, count, filenames, reqname, log_size,
+                 log_needs_transfer, job_report_output, job_ad, crab_retry, retry_timeout, \
                  job_failed, transfer_logs, transfer_outputs):
         """
         ASOServerJob constructor.
@@ -268,7 +268,8 @@ class ASOServerJob(object):
         self.transfer_outputs = transfer_outputs
         self.job_ad = job_ad
         self.failures = {}
-        self.aso_start_timestamp = None
+        self.aso_start_time = aso_start_time
+        self.aso_start_timestamp = aso_start_timestamp
         proxy = os.environ.get('X509_USER_PROXY', None)
         self.aso_db_url = self.job_ad['CRAB_ASOURL']
         try:
@@ -404,20 +405,9 @@ class ASOServerJob(object):
         now = str(datetime.datetime.now())
         last_update = int(time.time())
 
-        ## Get the aso_start_timestamp and aso_start_time from the job report (these
-        ## flags are written by cmscp at the moment it does the first injection to ASO
-        ## database; if cmscp fails to do the local transfers, it doesn't inject to ASO
-        ## database and therefore it doesn't write the flags). If the flags are not in
-        ## the job report, define them to the current time.
-        aso_start_time = None
-        try:
-            with open(G_JOB_REPORT_NAME) as fd:
-                job_report = json.load(fd)
-            self.aso_start_timestamp = job_report.get("aso_start_timestamp")
-            aso_start_time = job_report.get("aso_start_time")
-        except Exception:
+        if self.aso_start_timestamp==None or self.aso_start_time==None:
             self.aso_start_timestamp = last_update
-            aso_start_time = now
+            self.aso_start_time = now
             msg  = "Unable to determine ASO start time from job report."
             msg += " Will use ASO start time = %s (%s)."
             msg  = msg % (aso_start_time, self.aso_start_timestamp)
@@ -899,6 +889,8 @@ class PostJob():
         self.server              = None
         ## Path to the task web directory.
         self.logpath             = None
+        self.aso_start_time      = None
+        self.aso_start_timestamp = None
         ## Set a logger for the post-job.
         self.logger = logging.getLogger()
         handler = logging.StreamHandler(sys.stdout)
@@ -1377,6 +1369,7 @@ class PostJob():
 
         global ASO_JOB
         ASO_JOB = ASOServerJob(self.logger, \
+                               self.aso_start_time, self.aso_start_time, \
                                self.dest_site, self.source_dir, self.dest_dir, \
                                source_sites, self.job_id, log_and_output_files_names, \
                                self.reqname, self.log_size, \
@@ -1820,8 +1813,9 @@ class PostJob():
         if self.job_failed:
             self.source_dir = os.path.join(self.source_dir, 'failed')
             self.dest_dir = os.path.join(self.dest_dir, 'failed')
-        ## Fill self.output_files_info by parsing the job report.
-        self.fill_output_files_info()
+        self.fill_output_files_info () ## Fill self.output_files_info by parsing the job report.
+        self.aso_start_time = job_report.get("aso_start_time", None)
+        self.aso_start_timestamp = job_report.get("aso_start_timestamp", None)
         return 0
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
