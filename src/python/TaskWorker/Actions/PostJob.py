@@ -97,8 +97,8 @@ def sighandler(*args):
     if ASO_JOB:
         ASO_JOB.cancel()
 
-signal.signal(signal.SIGHUP,  sighandler)
-signal.signal(signal.SIGINT,  sighandler)
+signal.signal(signal.SIGHUP, sighandler)
+signal.signal(signal.SIGINT, sighandler)
 signal.signal(signal.SIGTERM, sighandler)
 
 ##==============================================================================
@@ -304,7 +304,7 @@ class ASOServerJob(object):
         while True:
             ## Get the transfer status in all documents listed in self.docs_in_transfer.
             transfers_statuses = self.get_transfers_statuses()
-            msg = "Got statuses: %s; %.1f hours since transfer submit." 
+            msg = "Got statuses: %s; %.1f hours since transfer submit."
             msg = msg % (", ".join(transfers_statuses), (time.time()-starttime)/3600.0)
             self.logger.info(msg)
             all_transfers_finished = True
@@ -405,12 +405,12 @@ class ASOServerJob(object):
         now = str(datetime.datetime.now())
         last_update = int(time.time())
 
-        if self.aso_start_timestamp==None or self.aso_start_time==None:
+        if self.aso_start_timestamp == None or self.aso_start_time == None:
             self.aso_start_timestamp = last_update
             self.aso_start_time = now
             msg  = "Unable to determine ASO start time from job report."
             msg += " Will use ASO start time = %s (%s)."
-            msg  = msg % (aso_start_time, self.aso_start_timestamp)
+            msg  = msg % (self.aso_start_time, self.aso_start_timestamp)
             self.logger.warning(msg)
 
         if str(self.job_ad['CRAB_UserRole']).lower() != 'undefined':
@@ -539,7 +539,7 @@ class ASOServerJob(object):
                     ## uploaded from the WN in the current job retry or in a previous job retry,
                     ## or by the postjob in a previous job retry.
                     transfer_status = doc.get('state')
-                    if doc.get('start_time') == aso_start_time:
+                    if doc.get('start_time') == self.aso_start_time:
                         ## The document was uploaded from the WN in the current job retry, so we don't
                         ## upload a new document. (If the transfer is done or ongoing, then of course we
                         ## don't want to re-inject the transfer request. OTOH, if the transfer has
@@ -933,6 +933,8 @@ class PostJob():
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def handle_webdir(self):
+        ## Just need the name for the printouts
+        postjob_log_file_name = "postjob.%d.%d.txt" % (self.job_id, self.crab_retry)
         ## Create a symbolic link in the task web directory to the post-job log file.
         ## The pre-job creates already the symlink, but the post-job has to do it by
         ## its own in case the pre-job was not executed (e.g. when DAGMan restarts a
@@ -1049,7 +1051,7 @@ class PostJob():
             pass
         job_report['postjob'] = {'exitCode': retval, 'exitMsg': retmsg}
         with open(G_JOB_REPORT_NAME_NEW, 'w') as fd:
-           json.dump(job_report, fd)
+            json.dump(job_report, fd)
 
         ## Prepare the error report. Enclosing it in a try except as we don't want to
         ## fail jobs because this fails.
@@ -1369,7 +1371,7 @@ class PostJob():
 
         global ASO_JOB
         ASO_JOB = ASOServerJob(self.logger, \
-                               self.aso_start_time, self.aso_start_time, \
+                               self.aso_start_time, self.aso_start_timestamp, \
                                self.dest_site, self.source_dir, self.dest_dir, \
                                source_sites, self.job_id, log_and_output_files_names, \
                                self.reqname, self.log_size, \
@@ -1814,8 +1816,8 @@ class PostJob():
             self.source_dir = os.path.join(self.source_dir, 'failed')
             self.dest_dir = os.path.join(self.dest_dir, 'failed')
         self.fill_output_files_info () ## Fill self.output_files_info by parsing the job report.
-        self.aso_start_time = job_report.get("aso_start_time", None)
-        self.aso_start_timestamp = job_report.get("aso_start_timestamp", None)
+        self.aso_start_time = self.job_report.get("aso_start_time", None)
+        self.aso_start_timestamp = self.job_report.get("aso_start_timestamp", None)
         return 0
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -1915,7 +1917,7 @@ class PostJob():
         if 'CRAB_UserWebDir' in self.job_ad:
             setDashboardLogs(params, self.job_ad['CRAB_UserWebDir'], self.job_id, self.crab_retry)
         else:
-           print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir in myad."
+            print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir in myad."
         ## Take exit code from job_fjr.<job_id>.<retry_id>.json and report final exit code to Dashboard.
         ## Only taken if RetryJob think it is FATAL_ERROR.
         if self.retryjob_retval and self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:
