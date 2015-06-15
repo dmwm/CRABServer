@@ -167,28 +167,6 @@ class RetryJob(object):
         # If job was killed on the worker node, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to wall clock limit"):
             self.create_fake_fjr("Not retrying job due to wall clock limit (job automatically killed on the worker node)", 50664)
-        subreport = self.report
-        for attr in ['steps', 'cmsRun', 'performance', 'cpu', 'TotalJobTime']:
-            subreport = subreport.get(attr, None)
-            if subreport is None:
-                return
-        total_job_time = self.report['steps']['cmsRun']['performance']['cpu']['TotalJobTime']
-        try:
-            total_job_time = float(total_job_time)
-        except ValueError:
-            return
-        integrated_job_time = 0
-        for ad in self.ads:
-            if 'RemoteWallClockTime' in ad:
-                integrated_job_time += ad['RemoteWallClockTime']
-        self.integrated_job_time = integrated_job_time
-        # TODO: Compare the job against its requested walltime, not a hardcoded max.
-        if total_job_time > MAX_WALLTIME:
-            exitMsg = "Not retrying a long running job (job ran for %d hours)" % (total_job_time / 3600)
-            self.create_fake_fjr(exitMsg, 50664)
-        if integrated_job_time > 1.5*MAX_WALLTIME:
-            exitMsg = "Not retrying a job because the integrated time (across all retries) is %d hours." % (integrated_job_time / 3600)
-            self.create_fake_fjr(exitMsg, 50664)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -199,20 +177,6 @@ class RetryJob(object):
         # If job was killed on the worker node, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to memory use"):
             self.create_fake_fjr("Not retrying job due to excessive memory use (job automatically killed on the worker node)", 50660)
-        subreport = self.report
-        for attr in ['steps', 'cmsRun', 'performance', 'memory', 'PeakValueRss']:
-            subreport = subreport.get(attr, None)
-            if subreport is None:
-                return
-        total_job_memory = self.report['steps']['cmsRun']['performance']['memory']['PeakValueRss']
-        try:
-            total_job_memory = float(total_job_memory)
-        except ValueError:
-            return
-        # TODO: Compare the job against its requested memory, not a hardcoded max.
-        if total_job_memory > MAX_MEMORY:
-            exitMsg = "Not retrying job due to excessive memory use (%d MB)" % (total_job_memory)
-            self.create_fake_fjr(exitMsg, 50660)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
