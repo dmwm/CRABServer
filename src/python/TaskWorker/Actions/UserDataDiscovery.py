@@ -24,10 +24,7 @@ class UserDataDiscovery(DataDiscovery):
     def execute(self, *args, **kwargs):
         self.logger.info("Data discovery and splitting for %s using user-provided files" % kwargs['task']['tm_taskname'])
 
-        if 'tm_user_files' in kwargs['task'] and kwargs['task']['tm_user_files']:
-            userfiles = kwargs['task']['tm_user_files']
-        else: ## For backward compatibility only.
-            userfiles = kwargs['task']['tm_arguments'].get('userfiles')
+        userfiles = kwargs['task']['tm_user_files']
         splitting = kwargs['task']['tm_split_algo']
         total_units = kwargs['task']['tm_totalunits']
         if not userfiles or splitting != 'FileBased':

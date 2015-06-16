@@ -176,10 +176,7 @@ def makeLFNPrefixes(task):
         hash_input += "," + task['tm_user_group']
     if 'tm_user_role' in task and task['tm_user_role']:
         hash_input += "," + task['tm_user_role']
-    lfn = task['tm_output_lfn'] if 'tm_output_lfn' in task else ''
-    ## For backward compatibility: old tasks were putting the outLFN in tm_arguments.
-    if not lfn:
-        lfn = task.get('tm_arguments', {}).get('lfn', '')
+    lfn = task['tm_output_lfn']
     hash = hashlib.sha1(hash_input).hexdigest()
     user = task['tm_username']
     tmp_user = "%s.%s" % (user, hash)
@@ -411,10 +408,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['addoutputfiles'] = task['tm_outfiles']
         info['tfileoutfiles'] = task['tm_tfile_outfiles']
         info['edmoutfiles'] = task['tm_edm_outfiles']
-        if ('tm_one_event_mode' in info) and info['tm_one_event_mode'] is not None:
-            info['oneEventMode'] = 1 if info['tm_one_event_mode'] == 'T' else 0
-        else: ## For backward compatilibity only.
-            info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
+        info['oneEventMode'] = 1 if info['tm_one_event_mode'] == 'T' else 0
         info['ASOURL'] = task['tm_asourl']
         info['taskType'] = self.getDashboardTaskType()
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
@@ -426,16 +420,10 @@ class DagmanCreator(TaskAction.TaskAction):
         # TODO: pass through these correctly.
         info['runs'] = []
         info['lumis'] = []
-        if ('tm_transfer_outputs' in info) and info['tm_transfer_outputs'] is not None:
-            info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
-        else: ## For backward compatilibity only.
-            info['saveoutput'] = 1 if task.get('tm_arguments', {}).get('saveoutput', 'T') == 'T' else 0
+        info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
         info['accounting_group'] = 'analysis.%s' % info['userhn']
         info = transform_strings(info)
-        if ('tm_fail_limit' in info): ## We are not using faillimit currently, so it should be save to just ask if 'tm_fail_limit' is in info.
-            info['faillimit'] = info['tm_fail_limit']
-        else: ## For backward compatilibity only.
-            info['faillimit'] = task.get('tm_arguments', {}).get('faillimit')
+        info['faillimit'] = task['tm_fail_limit']
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
         if info['jobarch_flatten'].startswith("slc6_"):
             info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
@@ -576,10 +564,7 @@ class DagmanCreator(TaskAction.TaskAction):
             jobs = jobgroup.getJobs()
 
             whitelist = set(kwargs['task']['tm_site_whitelist'])
-            if 'tm_ignore_locality' in kwargs['task'] and kwargs['task']['tm_ignore_locality'] is not None:
-                ignorelocality = kwargs['task']['tm_ignore_locality'] == 'T'
-            else: ## For backward compatibility only.
-                ignorelocality = kwargs['task'].get('tm_arguments', {}).get('ignorelocality', 'F') == 'T'
+            ignorelocality = kwargs['task']['tm_ignore_locality'] == 'T'
             if not jobs:
                 possiblesites = []
             elif ignorelocality:
