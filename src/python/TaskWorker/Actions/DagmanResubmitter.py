@@ -41,7 +41,8 @@ class DagmanResubmitter(TaskAction.TaskAction):
         schedd = ""
         address = ""
         try:
-            schedd, address = loc.getScheddObjNew(task['tm_schedd'])
+            with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
+                schedd, address = loc.getScheddObjNew(task['tm_schedd'])
         except Exception as exp:
             msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
             self.logger.exception(msg)
