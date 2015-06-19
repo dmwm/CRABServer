@@ -1075,15 +1075,44 @@ class PostJob():
             self.logger.error(retmsg)
             return 10, retmsg
 
-        ## Parse the job ad.
-        job_ad_file_name = os.environ.get("_CONDOR_JOB_AD", ".job.ad")
+        ## Parse the job ad and use it if possible.
+        ## If not, use main ROOT job ad and for job ad information use condor_q
+        ## Please see: https://github.com/dmwm/CRABServer/issues/4618
+        used_job_ad = False
+        condor_history_dir = os.environ.get("_CONDOR_PER_JOB_HISTORY_DIR", "")
+        job_ad_file_name = os.path.join(condor_history_dir, str("history." + str(self.dag_jobid)))
+        counter = 0
         self.logger.info("====== Starting to parse job ad file %s." % (job_ad_file_name))
-        if self.parse_job_ad(job_ad_file_name):
-            self.set_dashboard_state('FAILED')
-            self.logger.info("====== Finished to parse job ad.")
-            retmsg = "Failure parsing the job ad."
-            return JOB_RETURN_CODES.FATAL_ERROR, retmsg
-        self.logger.info("====== Finished to parse job ad.")
+        while counter < 5:
+            self.logger.info("       -----> Started %s time out of %s -----" % (str(counter), "5"))
+            parse_job_ad_exit = self.parse_job_ad(job_ad_file_name)
+            if not parse_job_ad_exit:
+                used_job_ad = True
+                self.logger.info("       -----> Succeeded to parse job ad file -----")
+                try:
+                    shutil.copy2(job_ad_file_name, './finished_jobs/')
+                    job_ad_source = os.path.join('./finished_jobs/', str("history." + str(self.dag_jobid)))
+                    job_ad_symlink_ = '.'.join(['./finished_jobs/job', str(self.job_id), str(self.crab_retry)])
+                    os.symlink(job_ad_source, job_ad_symlink)
+                except:
+                    self.logger.info("       -----> Failed to copy job ad file. Continuing")
+                    pass
+                self.logger.info("====== Finished to parse job ad.")
+                break
+            counter += 1
+            self.logger.info("       -----> Failed to parse job ad file -----")
+            time.sleep(5)
+
+        if not used_job_ad:
+            ## Parse the main taks job ad and use it
+            job_ad_file_name = os.environ.get("_CONDOR_JOB_AD", ".job.ad")
+            self.logger.info("====== Starting to parse ROOT job ad file %s." % (job_ad_file_name))
+            if self.parse_job_ad(job_ad_file_name):
+                self.set_dashboard_state('FAILED')
+                self.logger.info("====== Finished to parse ROOT job ad.")
+                retmsg = "Failure parsing the ROOT job ad."
+                return JOB_RETURN_CODES.FATAL_ERROR, retmsg
+            self.logger.info("====== Finished to parse ROOT job ad.")
 
         self.logger.info("====== Starting to analyze job exit status.")
         ## Execute the retry-job. The retry-job decides whether an error is recoverable
@@ -1097,7 +1126,7 @@ class PostJob():
             print "       -----> RetryJob log start -----"
             self.retryjob_retval = retry.execute(self.reqname, self.job_return_code, \
                                             self.crab_retry, self.job_id, \
-                                            self.dag_jobid)
+                                            self.dag_jobid, self.job_ad, used_job_ad)
             print "       <----- RetryJob log finish ----"
         if self.retryjob_retval:
             if self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:

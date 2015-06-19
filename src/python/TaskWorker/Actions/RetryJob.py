@@ -57,7 +57,7 @@ class RetryJob(object):
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def get_job_ad(self):
+    def get_job_ad_from_condor_q(self):
         """
         Need a doc string here.
         """
@@ -90,8 +90,32 @@ class RetryJob(object):
             if ad:
                 self.ads.append(ad)
         self.ad = self.ads[-1]
-        if 'JOBGLIDEIN_CMSSite' in self.ad:
-            self.site = self.ad['JOBGLIDEIN_CMSSite']
+
+    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def get_job_ad_from_file(self):
+        """
+        Need a doc string here
+        """
+        self.ads = []
+        self.ads.append(self.ad)
+        if self.crab_retry == 0:
+            print 'Job is retry num 0. Will not try to search and load previous job ads.'
+            return
+        for crab_retry in range(1, int(self.crab_retry + 1)):
+            job_ad_file = "./finished_jobs/job.%d.%d" % (self.job_id, crab_retry)
+            if os.path.isfile(job_ad_file):
+                with open(job_ad_file, "r") as fd:
+                    text_ad = fd.read_lines()
+                try:
+                    ad = classad.parseOld(text_ad)
+                except SyntaxError as e:
+                    print 'Unable to parse classads from file %s' % job_Ad
+                    continue
+                if ad:
+                    self.ads.append(ad)
+            else:
+                print 'File %s does not exist. Continuing' % job_ad_file
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -182,7 +206,6 @@ class RetryJob(object):
             if 'RemoteWallClockTime' in ad:
                 integrated_job_time += ad['RemoteWallClockTime']
         self.integrated_job_time = integrated_job_time
-        # TODO: Compare the job against its requested walltime, not a hardcoded max.
         if total_job_time > MAX_WALLTIME:
             exitMsg = "Not retrying a long running job (job ran for %d hours)" % (total_job_time / 3600)
             self.create_fake_fjr(exitMsg, 50664)
@@ -209,7 +232,6 @@ class RetryJob(object):
             total_job_memory = float(total_job_memory)
         except ValueError:
             return
-        # TODO: Compare the job against its requested memory, not a hardcoded max.
         if total_job_memory > MAX_MEMORY:
             exitMsg = "Not retrying job due to excessive memory use (%d MB)" % (total_job_memory)
             self.create_fake_fjr(exitMsg, 50660)
@@ -328,7 +350,7 @@ class RetryJob(object):
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def execute_internal(self, reqname, job_return_code, crab_retry, job_id, dag_jobid):
+    def execute_internal(self, reqname, job_return_code, crab_retry, job_id, dag_jobid, job_ad, used_job_ad):
         """
         Need a doc string here.
         """
@@ -338,7 +360,32 @@ class RetryJob(object):
         self.job_id          = job_id
         self.dag_jobid       = dag_jobid
 
-        self.get_job_ad()
+        if used_job_ad:
+            #We can determine walltime and max memory from job ad.
+            global MAX_WALLTIME
+            global MAX_MEMORY
+            self.ad = job_ad
+            if 'MaxWallTimeMins' in self.ad:
+                try:
+                    MAX_WALLTIME = int(self.ad['MaxWallTimeMins']) * 60
+                except:
+                    print 'Unable to get MaxWallTimeMins from job classads. Using default'
+            if 'RequestMemory' in self.ad:
+                try:
+                    MAX_MEMORY = int(self.ad['RequestMemory'])
+                except:
+                    print 'Unable to get RequestMemory from job classads. Unsing default'
+            print 'Job ads already present. Will not use condor_q, but will load previous jobs ads'
+            self.get_job_ad_from_file()
+        else:
+            print 'Will use condor_q command to get finished job ads'
+            self.get_job_ad_from_condor_q()
+
+        ## Do we still need identification of site in self.get_report()?
+        ## We can always get it from job ad.
+        if 'JOBGLIDEIN_CMSSite' in self.ad:
+            self.site = self.ad['JOBGLIDEIN_CMSSite']
+
         self.get_report()
 
         if self.ad.get("RemoveReason", "").startswith("Removed due to job being held"):
