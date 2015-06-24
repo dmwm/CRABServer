@@ -529,7 +529,6 @@ class DagmanCreator(TaskAction.TaskAction):
                         'lheInputFiles'     : 'tm_generator' in task and task['tm_generator'] == 'lhe',
                         'eventsPerLumi'     : task['tm_events_per_lumi'],
                         'sw'                : task['tm_job_sw'],
-                        'outputData'        : task['tm_publish_name'],
                         'block'             : block,
                         'destination'       : pfns,
                         'scriptExe'         : task['tm_scriptexe'],
