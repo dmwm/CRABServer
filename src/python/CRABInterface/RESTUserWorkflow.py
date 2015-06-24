@@ -29,6 +29,7 @@ class RESTUserWorkflow(RESTEntity):
         self.logger = logging.getLogger("CRABLogger.RESTUserWorkflow")
         self.userworkflowmgr = DataUserWorkflow()
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
+        self.allPNNNames = CMSSitesCache(cachetime=0, sites={})
         self.centralcfg = centralcfg
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
 
@@ -160,7 +161,7 @@ class RESTUserWorkflow(RESTEntity):
             raise InvalidParameter(msg)
 
     def _checkASODestination(self, site):
-        self._checkSite(site)
+        self._checkSite(site, pnn = True)
         if site in self.centralcfg.centralconfig.get('banned-out-destinations', []):
             excasync = ValueError("Remote output data site is banned")
             invalidp = InvalidParameter("The output site you specified in the Site.storageSite parameter (%s) is blacklisted (banned sites: %s)" %\
@@ -168,10 +169,11 @@ class RESTUserWorkflow(RESTEntity):
             setattr(invalidp, 'trace', '')
             raise invalidp
 
-    def _checkSite(self, site):
-        if site not in self.allCMSNames.sites:
+    def _checkSite(self, site, pnn = False):
+        sites = self.allPNNNames.sites if pnn else self.allCMSNames.sites
+        if site not in sites:
             excasync = ValueError("A site name you specified is not valid")
-            invalidp = InvalidParameter("The parameter %s is not in the list of known CMS sites %s" % (site, self.allCMSNames.sites), errobj = excasync)
+            invalidp = InvalidParameter("The parameter %s is not in the list of known CMS sites %s" % (site, sites), errobj = excasync)
             setattr(invalidp, 'trace', '')
             raise invalidp
 
