@@ -172,11 +172,11 @@ def addReportInfo(params, fjr):
             if fjr['performance']['memory'].get("PeakValueRss"):
                 params['CRABUserPeakRss'] = float(fjr['performance']['memory']['PeakValueRss'])
     # Num Events Statistics
-    inputEvents = 0
+    params['NEventsProcessed'] = 0
     if 'input' in fjr and 'source' in fjr['input']:
         for info in fjr['input']['source']:
             if 'events' in info:
-                params['NEventsProcessed'] = info['events']
+                params['NEventsProcessed'] += info['events']
 
 
 def reportPopularity(monitorId, monitorJobId, myad, fjr):
