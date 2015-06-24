@@ -116,7 +116,7 @@ class DataWorkflow(object):
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, scriptexe=None, scriptargs=None, scheddname=None,
-               extrajdl=None, collector=None, dryrun=False, publishgroupname=False):
+               extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -125,6 +125,7 @@ class DataWorkflow(object):
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
            :arg str inputdata: input dataset;
+           :arg str nonvaliddata: allow invalid input dataset;
            :arg int use_parent: add the parent dataset as secondary input;
            :arg str generator: event generator for MC production;
            :arg int events_per_lumi: number of events per lumi to generate
@@ -212,6 +213,7 @@ class DataWorkflow(object):
                             job_sw          = [jobsw],
                             job_arch        = [jobarch],
                             input_dataset   = [inputdata],
+                            nonvalid_data   = ['T' if nonvaliddata else 'F'],
                             use_parent      = [use_parent],
                             generator       = [generator],
                             events_per_lumi = [events_per_lumi],

@@ -57,3 +57,5 @@ alter table tasks add (tm_one_event_mode VARCHAR(1));
 --Changes that will be needed for version 3.3.1507
 alter table tasks add (tm_publish_groupname VARCHAR(1) DEFAULT 'F');
 alter table tasks add constraint check_tm_publish_groupname check (tm_publish_groupname IN ('T', 'F')) ENABLE;
+alter table tasks add (tm_nonvalid_input_dataset VARCHAR(1) DEFAULT = 'T');
+alter table tasks add constraint check_tm_nonvalid_input_dataset check (tm_nonvalid_input_dataset IN ('T', 'F')) ENABLE;
