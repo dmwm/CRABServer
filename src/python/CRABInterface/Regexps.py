@@ -22,7 +22,7 @@ RX_PUBLISH   = re.compile('^'+pNameRE+'$')
 #RX_LFN       = re.compile(r'^(?=.{0,500}$)/store/(temp/)?(user|group)/%(hnName)s/%(primDS)s/%(publishname)s/%(psethash)s/%(counter)s/(log/)?%(filename)s+$' % lfnParts)
 RX_LFN       = re.compile(r'^(?=[a-zA-Z0-9\-\._/]{0,500}$)/store/(temp/)?(user/%(hnName)s|group|local)/?' % lfnParts)
 RX_PARENTLFN = re.compile(r'^(/[a-zA-Z0-9\-_\.]+/?)+$')
-RX_OUTDSLFN  = re.compile(r'^(?=.{0,500}$)/%(primDS)s/%(hnName)s-%(publishname)s-%(psethash)s/USER$' % lfnParts)
+RX_OUTDSLFN  = re.compile(r'^(?=.{0,500}$)/%(primDS)s/(%(hnName)s|%(physics_group)s)-%(publishname)s-%(psethash)s/USER$' % lfnParts)
 RX_CAMPAIGN  = RX_UNIQUEWF
 RX_JOBTYPE   = re.compile(r"^(?=.{0,255}$)[A-Za-z]*$")
 RX_GENERATOR = re.compile(r'^(lhe|pythia)$')

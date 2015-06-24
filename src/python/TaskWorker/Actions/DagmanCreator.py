@@ -65,6 +65,7 @@ CRAB_HEADERS = \
 +CRAB_InputData = %(inputdata)s
 +CRAB_DBSURL = %(dbsurl)s
 +CRAB_PublishName = %(publishname)s
++CRAB_PublishGroupName = %(publishgroupname)s
 +CRAB_Publish = %(publication)s
 +CRAB_PublishDBSURL = %(publishdbsurl)s
 +CRAB_ISB = %(cacheurl)s
@@ -216,7 +217,7 @@ def transform_strings(input):
         else:
             info[var] = json.dumps(val)
 
-    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries':
+    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'publishgroupname':
         info[var] = int(input[var])
 
     for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', 'tfileoutfiles', 'edmoutfiles':
@@ -395,6 +396,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['cacheurl'] = info['tm_cache_url']
         info['userhn'] = info['tm_username']
         info['publishname'] = info['tm_publish_name']
+        info['publishgroupname'] = 1 if info['tm_publish_groupname'] == 'T' else 0
         info['asyncdest'] = info['tm_asyncdest']
         info['dbsurl'] = info['tm_dbs_url']
         info['publishdbsurl'] = info['tm_publish_dbs_url']

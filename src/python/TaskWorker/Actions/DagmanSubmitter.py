@@ -80,6 +80,7 @@ SUBMIT_INFO = [ \
             ('CRAB_InputData', 'inputdata'),
             ('CRAB_DBSURL', 'dbsurl'),
             ('CRAB_PublishName', 'publishname'),
+            ('CRAB_PublishGroupName', 'publishgroupname'),
             ('CRAB_Publish', 'publication'),
             ('CRAB_PublishDBSURL', 'publishdbsurl'),
             ('CRAB_ISB', 'cacheurl'),

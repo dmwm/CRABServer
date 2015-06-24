@@ -1515,7 +1515,7 @@ class PostJob():
             if 'pset_hash' in file_info:
                 publishname = "%s-%s" % (publishname.rsplit('-', 1)[0], file_info['pset_hash'])
             ## CMS convention for output dataset name:
-            ## /primarydataset>/<username>-<publish_data_name>-<PSETHASH>/USER
+            ## /<primarydataset>/<username>-<publish_data_name>-<PSETHASH>/USER
             if file_info['filetype'] == 'EDM':
                 if multiple_edm and file_info.get('module_label'):
                     left, right = publishname.rsplit('-', 1)
@@ -1527,7 +1527,11 @@ class PostJob():
                 ## this (define a primary dataset parameter in the job ad and in the
                 ## rest interface).
                 primary_dataset_name = self.input_dataset.split('/')[1]
-                outdataset = os.path.join('/' + primary_dataset_name, self.job_ad['CRAB_UserHN'] + '-' + publishname, 'USER')
+                group_user_prefix = self.job_ad['CRAB_UserHN']
+                if 'CRAB_PublishGroupName' in self.job_ad and self.job_ad['CRAB_PublishGroupName']:
+                    if file_info['outlfn'].startswith('/store/group/') and file_info['outlfn'].split('/')[3]:
+                        group_user_prefix = file_info['outlfn'].split('/')[3]
+                outdataset = os.path.join('/' + primary_dataset_name, group_user_prefix + '-' + publishname, 'USER')
                 output_datasets.add(outdataset)
             else:
                 outdataset = '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER'

@@ -116,7 +116,7 @@ class DataWorkflow(object):
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, scriptexe=None, scriptargs=None, scheddname=None,
-               extrajdl=None, collector=None, dryrun=False):
+               extrajdl=None, collector=None, dryrun=False, publishgroupname=False):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -140,6 +140,7 @@ class DataWorkflow(object):
            :arg str userhn: hyper new name of the user doing the request;
            :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication;
+           :arg str publishgroupname: add groupname or username to publishname;
            :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
@@ -231,6 +232,7 @@ class DataWorkflow(object):
                             ## if the user defines Data.publishDataName, and publishname = <isbchecksum> otherwise.
                             ## (The PostJob replaces then the isbchecksum by the psethash.)
                             publish_name    = [(workflow.replace(":", "_") + '-' + publishname) if publishname.find('-')==-1 else publishname],
+                            publish_groupname = ['T' if publishgroupname else 'F'],
                             asyncdest       = [asyncdest],
                             dbs_url         = [dbsurl],
                             publish_dbs_url = [publishdbsurl],

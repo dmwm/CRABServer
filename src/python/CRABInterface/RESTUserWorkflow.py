@@ -72,7 +72,7 @@ class RESTUserWorkflow(RESTEntity):
             if not checkOutLFN(kwargs['lfn'], username):
                 raise InvalidParameter(msg)
 
-    def _checkPublishDataName(self, kwargs):
+    def _checkPublishDataName(self, kwargs, outlfn):
         """
         Validate the (user specified part of the) output dataset name for publication
         using the WMCore.Lexicon method userprocdataset(), which does the same
@@ -96,22 +96,34 @@ class RESTUserWorkflow(RESTEntity):
         ## in this way (without "username-"), and that's what is used later by
         ## PostJob to define the output dataset name.
         if kwargs['publishname'].find('-') == -1:
-            publishDataNameToCheck = "username-%s-%s" % (kwargs['workflow'].replace(':','_'), kwargs['publishname'])
+            publishDataNameToCheck = "%s-%s" % (kwargs['workflow'].replace(':','_'), kwargs['publishname'])
         else:
-            publishDataNameToCheck = "username-%s" % (kwargs['publishname'])
+            publishDataNameToCheck = "%s" % (kwargs['publishname'])
+        if kwargs['publishgroupname']:
+            if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
+                msg  = "Invalid CRAB configuration."
+                msg += " Parameter Data.publishWithGroupName is True,"
+                msg += " but Data.outLFNDirBase does not start with '/store/group/<groupname>'."
+                raise InvalidParameter(msg)
+            group_user_prefix = outlfn.split('/')[3]
+        else:
+            username = cherrypy.request.user['login']
+            group_user_prefix = username
+        publishDataNameToCheck = "%s-%s" % (group_user_prefix, publishDataNameToCheck)
         try:
             userprocdataset(publishDataNameToCheck)
         except AssertionError:
             ## The messages below are more descriptive than if we would use
             ## the message from AssertionError exception.
             if kwargs['publishname'].find('-') == -1:
-                msg  = "Invalid CRAB configuration parameter General.requestName."
-                msg += " The parameter should not have more than 152 characters"
-                msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
+                param = 'General.requestName'
+                extrastr = 'crab_'
             else:
-                msg  = "Invalid CRAB configuration parameter Data.publishDataName."
-                msg += " The parameter should not have more than 157 characters"
-                msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
+                param = 'Data.publishDataName'
+                extrastr = ''
+            msg  = "Invalid CRAB configuration parameter %s." % (param)
+            msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (group_user_prefix, extrastr, param)
+            msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
             raise InvalidParameter(msg)
 
     def _checkPrimaryDataset(self, kwargs):
@@ -242,7 +254,7 @@ class RESTUserWorkflow(RESTEntity):
                 ## we have below. Not sure why RX_PUBLISH was introduced in CRAB, but
                 ## it is not the correct regular expression for publication dataset
                 ## name validation.
-                self._checkPublishDataName(param.kwargs)
+                self._checkPublishDataName(param.kwargs, safe.kwargs['lfn'])
                 ## 'publishname' was already validated above in _checkPublishDataName().
                 ## But I am not sure if we can skip the validate_str('publishname', ...)
                 ## or we need it so that all parameters are moved from param to safe.
@@ -263,6 +275,7 @@ class RESTUserWorkflow(RESTEntity):
             else:
                 ## Not sure if we need to match publishname against RX_PUBLISH...
                 validate_str("publishname", param, safe, RX_PUBLISH, optional=False)
+            validate_num("publishgroupname", param, safe, optional=True)
             ## This line must come after _checkPublishDataName()
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
             if jobtype == 'Analysis':
@@ -367,7 +380,7 @@ class RESTUserWorkflow(RESTEntity):
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, useparent, generator, eventsperlumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
-                savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
+                savelogsflag, publication, publishname, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
                 faillimit, ignorelocality, userfiles, asourl, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun):
         """Perform the workflow injection
@@ -393,6 +406,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str userhn: hyper new name of the user doing the request;
            :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication;
+           :arg str publishgroupname: add groupname or username to publishname;
            :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
@@ -430,7 +444,7 @@ class RESTUserWorkflow(RESTEntity):
                                        cachefilename=cachefilename, cacheurl=cacheurl,
                                        addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
                                        userhn=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
-                                       publication=publication, publishname=publishname, asyncdest=asyncdest,
+                                       publication=publication, publishname=publishname, publishgroupname=publishgroupname, asyncdest=asyncdest,
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfn=lfn,
@@ -468,7 +482,7 @@ class RESTUserWorkflow(RESTEntity):
                     the requested subresource."""
         result = []
         if workflow:
-            userdn=cherrypy.request.headers['Cms-Authn-Dn']
+            userdn = cherrypy.request.headers['Cms-Authn-Dn']
             # if have the wf then retrieve the wf status summary
             if not subresource:
                 result = self.userworkflowmgr.status(workflow, verbose=verbose, userdn=userdn)
