@@ -148,7 +148,8 @@ def startDashboardMonitoring(myad):
 def addReportInfo(params, fjr):
     if 'exitCode' in fjr:
         params['JobExitCode'] = fjr['exitCode']
-        params['ExeExitCode'] = fjr['exitCode']
+    if 'jobExitCode' in report:
+        params['ExeExitCode'] = fjr['jobExitCode']
     if 'steps' not in fjr or 'cmsRun' not in fjr['steps']:
         return
     fjr = fjr['steps']['cmsRun']
