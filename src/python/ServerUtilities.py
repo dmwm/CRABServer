@@ -4,7 +4,7 @@ This contains some utility methods to share between the server and the client, o
 
 import os
 import re
-
+import subprocess
 
 def checkOutLFN(lfn, username):
     if lfn.startswith('/store/user/'):
@@ -38,3 +38,15 @@ def getWebdirForDb(reqname, storage_rules):
     val = storage_re.sub(sinfo[1], path)
 
     return val
+
+def cmd_exist(cmd):
+    """
+    Check if linux command exist
+    """
+    try:
+        null = open("/dev/null", "w")
+        subprocess.Popen("/usr/bin/which %s" % cmd, stdout=null, stderr=null)
+        null.close()
+        return True
+    except OSError:
+        return False

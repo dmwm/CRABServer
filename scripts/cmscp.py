@@ -16,6 +16,7 @@ import tarfile
 import datetime
 import traceback
 import hashlib
+from ServerUtilities import cmd_exist
 
 ## Bootstrap the CMS_PATH variable; the StageOutMgr will need it.
 if 'CMS_PATH' not in os.environ:
@@ -1478,6 +1479,9 @@ def main():
     direct_stageout_impl = None
     direct_stageout_command = "srmv2-lcg"
     direct_stageout_protocol = "srmv2"
+    if cmd_exist("gfal-copy"):
+        print 'Will use gfal2 commands for direct stageout.'
+        direct_stageout_command = "gfal2"
     condition = ('remote' in stageout_policy and condition_stageout)
     if skip['init_direct_stageout_impl']:
         msg  = "WARNING: Internal wrapper flag skip['init_direct_stageout_impl'] is True."
