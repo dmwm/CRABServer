@@ -140,6 +140,16 @@ export _condor_DAGMAN_CONDOR_RM_EXE=$PWD/condor_rm_fix
 export _CONDOR_DAGMAN_LOG=$PWD/$1.dagman.out
 export _CONDOR_MAX_DAGMAN_LOG=0
 
+# Export path where final job is written. This requires enable the PER_JOB_HISTORY_DIR
+# feature in HTCondor configuration. In case this feature is not turn on, CRAB3
+# will use old logic to get final job ads.
+# New logic: Read job ad file which is written by HTCondor to a dictionary
+# Old logic: Use condor_q -debug -userlog <user_log_file>.
+# Please remember that any condor_q command is expensive to scheduler.
+# See: https://github.com/dmwm/CRABServer/issues/4618
+export _CONDOR_PER_JOB_HISTORY_DIR=`condor_config_val PER_JOB_HISTORY_DIR`
+mkdir -p finished_jobs
+
 CONDOR_VERSION=`condor_version | head -n 1`
 PROC_ID=`grep '^ProcId =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
 CLUSTER_ID=`grep '^ClusterId =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
