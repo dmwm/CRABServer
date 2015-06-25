@@ -1018,6 +1018,13 @@ class PostJob():
         ## the jobs has failed).
         retval = self.check_abort_dag(retval)
 
+        ## If return value is not 0 (success) write env variables to a file if it is not
+        ## present and print job ads in PostJob log file.
+        ## All this information is useful for debugging purpose.
+        if retval != 0:
+            #Print system environment and job classads
+            self.print_env_and_ads()
+
         return retval
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -1279,6 +1286,36 @@ class PostJob():
         self.set_dashboard_state('FINISHED')
 
         return 0, ""
+
+    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def print_env_and_ads(self):
+        """
+        Save environment variables which are used in postjob_env.txt if file is not
+        present yet. Environment variables for all PostJobs should be the same and
+        no need to save for each.
+        Print final job ads in PostJob. This is useful for debugging purposes.
+        """
+        env_file = "postjob_env.txt"
+        if not os.path.exists(env_file) or not os.stat(env_file).st_size:
+            self.logger.info("Will write env variables to %s file." % env_file)
+            try:
+                with open(env_file, "w") as fd:
+                    fd.write("------ Environment variables:\n")
+                    for key in sorted(os.environ.keys()):
+                        fd.write("%30s    %s\n" % (key,os.environ[key]))
+        else:
+            self.logger.info("Will not write %s file. Continue." % env_file)
+        # if job_ad is available, write it output to PostJob log file
+        if self.job_ad:
+            self.logger.debug("------ Job classad values for debug purposes:")
+            self.logger.debug("-"*100)
+            for key in sorted(self.job_ad.keys(),  key=lambda v: (v.upper(), v[0].islower())):
+                print "%35s    %s" % (key,self.job_ad[key])
+            self.logger.debug("-"*100)
+        else:
+            self.logger.debug("------ Job ad is not available. Continue")
+            self.logger.debug("-"*100)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
