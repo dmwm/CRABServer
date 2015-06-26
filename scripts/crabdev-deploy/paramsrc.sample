@@ -1,0 +1,10 @@
+#GISTEXTURL=https://gist.githubusercontent.com/talamoig/a46f05a991df431febb2/raw/gistfile1.txt
+ORACLEUSER=crab3_username
+ORACLEPASS=password
+GITUSER=userongithub
+# setting INITDB enables DB initialization
+#INITDB=
+REST_HOSTNAME=my-crabserver.cern.ch
+# TW_HOSTNAME needs to be defined only if different from the REST_HOSTNAME
+#TW_HOSTNAME=my-taskworer.cern.ch
+HGVER=HG1506f
