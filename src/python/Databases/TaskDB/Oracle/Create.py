@@ -43,6 +43,7 @@ class Create(DBCreator):
         tm_job_sw VARCHAR(255) NOT NULL,
         tm_job_arch VARCHAR(255),
         tm_input_dataset VARCHAR(500),
+        tm_nonvalid_input_dataset VARCHAR(1),
         tm_use_parent NUMBER(1),
         tm_site_whitelist VARCHAR(4000),
         tm_site_blacklist VARCHAR(4000),
@@ -101,6 +102,7 @@ class Create(DBCreator):
         CONSTRAINT check_tm_transfer_outputs CHECK (tm_transfer_outputs IN ('T', 'F')),
         CONSTRAINT check_tm_ignore_locality CHECK (tm_ignore_locality IN ('T', 'F')),
         CONSTRAINT check_tm_one_event_mode CHECK (tm_one_event_mode IN ('T', 'F'))
+        CONSTRAINT check_tm_nonvalid_input_dataset CHECK (tm_nonvalid_input_dataset IN ('T', 'F'))
         )
         """
         self.create['c_jobgroups'] = """

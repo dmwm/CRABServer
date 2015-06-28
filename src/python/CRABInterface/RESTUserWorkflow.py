@@ -290,6 +290,7 @@ class RESTUserWorkflow(RESTEntity):
                 validate_str("inputdata", param, safe, RX_ANYTHING, optional=False)
             else:
                 validate_str("inputdata", param, safe, RX_DATASET, optional=True)
+            validate_num("nonvaliddata", param, safe, optional=True)
             #if one and only one between publishDataName and publishDbsUrl is set raise an error (we need both or none of them)
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkASODestination(safe.kwargs['asyncdest'])
@@ -381,7 +382,8 @@ class RESTUserWorkflow(RESTEntity):
 
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
-    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, useparent, generator, eventsperlumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
+    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, nonvaliddata, useparent, generator, eventsperlumi, \
+                siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                 savelogsflag, publication, publishname, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
                 faillimit, ignorelocality, userfiles, asourl, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun):
@@ -393,6 +395,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
            :arg str inputdata: input dataset;
+           :arg str nonvaliddata: allow invalid input dataset;
            :arg int useparent: add the parent dataset as secondary input;
            :arg str generator: event generator for MC production;
            :arg str eventsperlumi: how many events to generate per lumi;
@@ -441,7 +444,7 @@ class RESTUserWorkflow(RESTEntity):
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
         return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch,
-                                       inputdata=inputdata, use_parent=useparent, generator=generator, events_per_lumi=eventsperlumi,
+                                       inputdata=inputdata, nonvaliddata=nonvaliddata, use_parent=useparent, generator=generator, events_per_lumi=eventsperlumi,
                                        siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, splitalgo=splitalgo, algoargs=algoargs,
                                        cachefilename=cachefilename, cacheurl=cacheurl,
                                        addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],

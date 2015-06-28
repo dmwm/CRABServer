@@ -82,6 +82,7 @@ class DataUserWorkflow(object):
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
            :arg str inputdata: input dataset;
+           :arg str nonvaliddata: allow invalid input dataset;
            :arg int use_parent: add the parent dataset as secondary input;
            :arg str generator: event generator for MC production;
            :arg int events_per_lumi: events to generate per lumi;
