@@ -3,15 +3,14 @@
 This repo contains scripts to build a CRAB 3 development testbed, assuming you're working on CERN lxplus system and interacting with the Openstack facility.
 
 The typical workflow of the first time you use this script collection is:
-  * `git clone https://github.com/talamoig/crab-testbed # in an area that will be accessible by your VMs later on, eg. on afs`
-  * `cd crab-testbed/`
+  * `cd CRABServer/scripts/crabdev-deploy/`
   * `cp paramsrc.sample paramsrc`
   * customize `paramsrc` (read below)
   * put a host certificate and key in the `certs` directory. the file have to be named `my-host-certificate.pem` and `my-host-key.pem`
   * `./vm-deploy.sh my-crab-server 'SLC6 CERN Server - x86_64 [2015-02-10]' # consider that if the vm already exists it will be reinstalled from scratch`
   *  wait until you can ssh to the VM
   * `ssh my-crab-server`
-  * `cd path/to/crab-testbed`
+  * `cd path/to/crabdev-deploy`
   * `./crabserver-install-part1.sh # at the end will reboot automatically`
   * `ssh my-crab-server`
   * `./crabserver-install-part2.sh`

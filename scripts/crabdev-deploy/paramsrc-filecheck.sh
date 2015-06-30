@@ -50,12 +50,8 @@ then
 {
     "cmsweb-dev": {
         "delegate-dn": [
-            "/DC=ch/DC=cern/OU=computers/CN=vocms(045|052|021|031).cern.ch|/DC=ch/DC=cern/OU=computers/CN=talamoig-taskworker.cern.ch|/DC=ch/DC=cern/OU=computers/CN=$TW_HOSTNAME"
+            "/DC=ch/DC=cern/OU=computers/CN=vocms(045|052|021|031).cern.ch|/DC=ch/DC=cern/OU=computers/CN=$TW_HOSTNAME"
         ],
-        "transformation": {
-            "Analysis": "http://common-analysis-framework.cern.ch/CMSRunAnaly.sh",
-            "PrivateMC": "http://common-analysis-framework.cern.ch/CMSRunMCProd.sh"
-        },
         "backend-urls" : {
             "cacheSSL" : "https://cmsweb-testbed.cern.ch/crabcache",
             "baseURL" : "https://cmsweb-testbed.cern.ch/crabcache",
