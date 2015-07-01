@@ -3,6 +3,8 @@
 ORACLEUSER=crab3_username
 ORACLEPASS=password
 GITUSER=userongithub
+COMPREPO=comp.pre
+ARCH=slc6_amd64_gcc481
 # setting INITDB enables DB initialization
 #INITDB=
 REST_HOSTNAME=my-crabserver.cern.ch

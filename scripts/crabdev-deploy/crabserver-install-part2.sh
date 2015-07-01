@@ -14,9 +14,9 @@ HGVER=`git tag -l 'HG*'|tail -1`
 fi
 
 git reset --hard $HGVER
-REPO="-r comp=comp.pre" A=/data/cfg/admin
+REPO="-r comp=$COMPREPO" A=/data/cfg/admin
 cd /data
-$A/InstallDev -R comp@$HGVER -A slc6_amd64_gcc481 -s image -v $HGVER $REPO -p "admin/devtools frontend crabserver crabcache"
+$A/InstallDev -R comp@$HGVER -A $ARCH -s image -v $HGVER $REPO -p "admin/devtools frontend crabserver crabcache"
 
 echo "Setting data.extconfigurl to $GISTEXTURL"
 sed -i "s|data.extconfigurl.*|data.extconfigurl = '$GISTEXTURL'|" /data/srv/current/config/crabserver/config.py
@@ -69,8 +69,8 @@ then
     git remote add upstream https://github.com/dmwm/WMCore
 fi
 
-CRABVERSION=`ls /data/srv/current/sw.pre/slc6_amd64_gcc481/cms/crabserver`
-INITFILE=/data/srv/current/sw.pre/slc6_amd64_gcc481/cms/crabserver/$CRABVERSION/etc/profile.d/init.sh
+CRABVERSION=`ls /data/srv/current/sw.pre/$ARCH/cms/crabserver`
+INITFILE=/data/srv/current/sw.pre/$ARCH/cms/crabserver/$CRABVERSION/etc/profile.d/init.sh
 sed -i 's/\(.*PYTHON_LIB.*\)/#\1/' $INITFILE
 echo 'export PYTHONPATH=/data/user/CRABServer/src/python/:/data/user/WMCore/src/python/:$PYTHONPATH' >> $INITFILE
 sudo yum -y install python-sqlalchemy
@@ -86,7 +86,7 @@ config.CoreDatabase.connectUrl = 'oracle://$ORACLEUSER:$ORACLEPASS@devdb11'
 EOF
 fi
 
-source /data/srv/current/sw.pre/slc6_amd64_gcc481/cms/crabserver/$CRABVERSION/etc/profile.d/init.sh 
+source /data/srv/current/sw.pre/$ARCH/cms/crabserver/$CRABVERSION/etc/profile.d/init.sh 
 source /afs/cern.ch/project/oracle/script/setoraenv.sh -s prod
 if [ "string$INITDB" != 'string' ]
 then
