@@ -221,26 +221,13 @@ class DagmanSubmitter(TaskAction.TaskAction):
         raise TaskWorkerException(msg)
 
 
-    def duplicateCheck(self, task):
+    def duplicateCheck(self, task, schedd):
         """
         Look to see if the task we are about to submit is already in the schedd.
         If so, assume that this task in TaskWorker was run successfully, but killed
         before it could update the frontend.
         """
         workflow = task['tm_taskname']
-
-        if task['tm_collector']:
-            self.backendurls['htcondorPool'] = task['tm_collector']
-        loc = HTCondorLocator.HTCondorLocator(self.backendurls)
-
-        address = ""
-        schedd = ""
-        try:
-            schedd, address = loc.getScheddObjNew(task['tm_schedd'])
-        except Exception as exp:
-            msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
-            self.logger.exception(msg)
-            raise TaskWorkerException(msg)
 
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
 
@@ -278,13 +265,29 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dashboard_params = args[0][2]
         inputFiles = args[0][3]
 
-        dup = self.duplicateCheck(task)
+        # Get scheduler object
+        # DagmanSubmitter uses python bindings to submit to scheduler
+        if task['tm_collector']:
+            self.backendurls['htcondorPool'] = task['tm_collector']
+        loc = HTCondorLocator.HTCondorLocator(self.backendurls)
+        address = ""
+        schedd = ""
+        try:
+            with HTCondorUtils.AuthenticatedSubprocess(task['user_proxy']) as (parent, rpipe):
+                schedd, address = loc.getScheddObjNew(task['tm_schedd'])
+        except Exception as exp:
+            msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
+            self.logger.exception(msg)
+            raise TaskWorkerException(msg)
+
+        dup = self.duplicateCheck(task, schedd)
         if dup != None:
             return dup
 
         cwd = os.getcwd()
         os.chdir(tempDir)
 
+        info['remote_condor_setup'] = ''
         info['inputFilesString'] = ", ".join(inputFiles)
         outputFiles = ["RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001"]
         info['outputFilesString'] = ", ".join(outputFiles)
@@ -295,19 +298,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         info['resturinoapi'] = '"%s"' % (self.restURInoAPI)
 
         try:
-            info['remote_condor_setup'] = ''
-            if task['tm_collector']:
-                self.backendurls['htcondorPool'] = task['tm_collector']
-            loc = HTCondorLocator.HTCondorLocator(self.backendurls)
-            address = ""
-            schedd = ""
-            try:
-                schedd, address = loc.getScheddObjNew(task['tm_schedd'])
-            except Exception as exp:
-                msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (self.workflow, str(exp))
-                self.logger.exception(msg)
-                raise TaskWorkerException(msg)
-
             #try to gsissh in order to create the home directory (and check if we can connect to the schedd)
             try:
                 scheddAddress = loc.scheddAd['Machine']
