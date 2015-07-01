@@ -1333,6 +1333,9 @@ class PostJob():
                     fd.write("------ Environment variables:\n")
                     for key in sorted(os.environ.keys()):
                         fd.write("%30s    %s\n" % (key,os.environ[key]))
+            except:
+                self.logger.info("Not able to write ENV variables to a file. Continuing")
+                pass
         else:
             self.logger.info("Will not write %s file. Continue." % env_file)
         # if job_ad is available, write it output to PostJob log file
