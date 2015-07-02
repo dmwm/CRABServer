@@ -692,13 +692,10 @@ def AddChecksums(report):
                     fileInfo['pfn'] = fileInfo['fileName']
                 else:
                     continue
-            print "==== Checksum cksum STARTING at %s ====" % time.asctime(time.gmtime())
+            print "==== Checksum STARTING at %s ====" % time.asctime(time.gmtime())
             print "== Filename: %s" % fileInfo['pfn']
-            cksum = FileInfo.readCksum(fileInfo['pfn'])
-            print "==== Checksum finishing FINISHING at %s ====" % time.asctime(time.gmtime())
-            print "==== Checksum adler32 STARTING at %s ====" % time.asctime(time.gmtime())
-            adler32 = FileInfo.readAdler32(fileInfo['pfn'])
-            print "==== Checksum adler32 FINISHING at %s ====" % time.asctime(time.gmtime())
+            (adler32, cksum) = calculateChecksums(fileInfo['pfn'])
+            print "==== Checksum FINISHING at %s ====" % time.asctime(time.gmtime())
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
@@ -819,7 +816,7 @@ if __name__ == "__main__":
         from WMCore.FwkJobReport.Report import Report
         from WMCore.FwkJobReport.Report import FwkJobReportException
         from WMCore.WMSpec.Steps.WMExecutionFailure import WMExecutionFailure
-        import WMCore.FwkJobReport.FileInfo as FileInfo
+        from WMCore.Algorithms.BasicAlgos import calculateChecksums
         from WMCore.WMSpec.Steps.Executors.CMSSW import CMSSW
         from WMCore.Configuration import Configuration
         from WMCore.WMSpec.WMStep import WMStep
@@ -862,7 +859,7 @@ if __name__ == "__main__":
             directory = os.getcwd(),
             architecture = opts.scramArch,
             )
-            
+
         print "==== SCRAM Obj CREATED at %s ====" % time.asctime(time.gmtime())
         if scram.project() or scram.runtime(): #if any of the two commands fail...
             msg = scram.diagnostic()
