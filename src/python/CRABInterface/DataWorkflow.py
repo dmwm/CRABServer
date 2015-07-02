@@ -1,4 +1,5 @@
 import time
+import copy
 import random
 import logging
 import cherrypy
@@ -169,7 +170,7 @@ class DataWorkflow(object):
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
         requestname = ""
         schedd_name = ""
-        backend_urls = self.centralcfg.centralconfig.get("backend-urls", {})
+        backend_urls = copy.deepcopy(self.centralcfg.centralconfig.get("backend-urls", {}))
         if collector:
             backend_urls['htcondorPool'] = collector
         else:
