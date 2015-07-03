@@ -42,5 +42,5 @@ config.Site.storageSite = 'CHANGE'
 #Debug Section
 config.section_("Debug")
 #config.Debug.extraJDL = ['+CRAB_NoWNStageout=1', '+CRAB_HC=True'] # %%HammerCloud%%
-#config.Debug.extraJDL = ['CRAB_StageoutPolicy = "remote"'] # %%stageout%%
+#config.Debug.extraJDL = ['CRAB_StageoutPolicy="remote"'] # %%stageout%%
 
