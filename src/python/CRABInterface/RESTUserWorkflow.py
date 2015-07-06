@@ -100,7 +100,7 @@ class RESTUserWorkflow(RESTEntity):
             publishDataNameToCheck = "%s-%s" % (kwargs['workflow'].replace(':','_'), kwargs['publishname'])
         else:
             publishDataNameToCheck = "%s" % (kwargs['publishname'])
-        if int(kwargs['publishgroupname']):
+        if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
             if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
                 msg  = "Invalid CRAB configuration."
                 msg += " Parameter Data.publishWithGroupName is True,"
