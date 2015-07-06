@@ -24,7 +24,7 @@ class DBSDataDiscovery(DataDiscovery):
         self.logger.info("Input dataset details: %s" % pprint.pformat(res))
         accessType = res['dataset_access_type']
         if accessType != 'VALID':
-            msg = "The dataset you are analyzing is not 'VALID' but '%s'. CRAB3 will try to see if there is any valid file" % accessType
+            msg = "The dataset you are analyzing is not 'VALID' but '%s'. CRAB will see if there are any valid files" % accessType
             if accessType == 'DEPRECATED': #as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
                 msg += ". Please, contact your physics group if you think the dataset should not be deprecated"
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
@@ -101,11 +101,11 @@ class DBSDataDiscovery(DataDiscovery):
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
         try:
-            filedetails = self.dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], True)
+            filedetails = self.dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], getParents=True, validFileOnly=0)
         except Exception as ex: #TODO should we catch HttpException instead?
             self.logger.exception(ex)
-            raise TaskWorkerException("The CRAB3 server backend could not contact DBS to get the files deteails (Lumis, events, etc).\n"+\
-                                "This is could be a temporary DBS glitch, please try to submit a new task (resubmit will not work)"+\
+            raise TaskWorkerException("The CRAB3 server backend could not contact DBS to get the files details (Lumis, events, etc).\n"+\
+                                "This is could be a temporary DBS glitch. Please try to submit a new task (resubmit will not work)"+\
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
         if not filedetails:
             raise TaskWorkerException("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, https://cmsweb.cern.ch/das.\n"+\
