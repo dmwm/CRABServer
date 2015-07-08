@@ -101,7 +101,7 @@ class Create(DBCreator):
         CONSTRAINT check_tm_dry_run CHECK (tm_dry_run IN ('T', 'F')),
         CONSTRAINT check_tm_transfer_outputs CHECK (tm_transfer_outputs IN ('T', 'F')),
         CONSTRAINT check_tm_ignore_locality CHECK (tm_ignore_locality IN ('T', 'F')),
-        CONSTRAINT check_tm_one_event_mode CHECK (tm_one_event_mode IN ('T', 'F'))
+        CONSTRAINT check_tm_one_event_mode CHECK (tm_one_event_mode IN ('T', 'F')),
         CONSTRAINT check_tm_nonvalid_input_dataset CHECK (tm_nonvalid_input_dataset IN ('T', 'F'))
         )
         """
