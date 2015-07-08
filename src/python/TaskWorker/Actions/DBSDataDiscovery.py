@@ -24,11 +24,22 @@ class DBSDataDiscovery(DataDiscovery):
         self.logger.info("Input dataset details: %s" % pprint.pformat(res))
         accessType = res['dataset_access_type']
         if accessType != 'VALID':
-            msg = "The dataset you are analyzing is not 'VALID' but '%s'. CRAB will see if there are any valid files" % accessType
-            if accessType == 'DEPRECATED': #as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
-                msg += ". Please, contact your physics group if you think the dataset should not be deprecated"
+            #as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
+            msgForDeprecDS = "Please contact your physics group if you think the dataset should not be deprecated"
+            if kwargs['task']['tm_nonvalid_input_dataset'] != 'T':
+                msg  = "CRAB refuses to proceed in getting the details of the dataset %s from DBS, because the dataset is not 'VALID' but '%s'." % (dataset, accessType)
+                if accessType == 'DEPRECATED':
+                    msg += " (%s.)" % (msgForDeprecDS)
+                msg += " To allow CRAB to consider a dataset that is not 'VALID', set Data.allowNonValidInputDataset = True in the CRAB configuration."
+                msg += " Notice that this will not force CRAB to run over all files in the dataset;"
+                msg += " CRAB will still check if there are any valid files in the dataset and run only over those files."
+                raise TaskWorkerException(msg)
+            msg  = "The input dataset %s is not 'VALID' but '%s'." % (dataset, accessType)
+            msg += " CRAB will check if there are any valid files in the dataset and run only over those files"
+            if accessType == 'DEPRECATED':
+                msg += ". %s" % (msgForDeprecDS)
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
-        return accessType
+        return
 
 
     def keepOnlyDisks(self, locationsMap):
@@ -71,7 +82,7 @@ class DBSDataDiscovery(DataDiscovery):
         else:
             del os.environ['X509_USER_KEY']
         self.logger.debug("Data discovery through %s for %s" %(self.dbs, kwargs['task']['tm_taskname']))
-        datasetStatus = self.checkDatasetStatus(kwargs['task']['tm_input_dataset'], kwargs)
+        self.checkDatasetStatus(kwargs['task']['tm_input_dataset'], kwargs)
         try:
             # Get the list of blocks for the locations and then call dls.
             # The WMCore DBS3 implementation makes one call to dls for each block
@@ -110,10 +121,6 @@ class DBSDataDiscovery(DataDiscovery):
         if not filedetails:
             raise TaskWorkerException("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, https://cmsweb.cern.ch/das.\n"+\
                                       "Aborting submission. Resubmitting your task will not help.")
-        if datasetStatus != 'VALID' and kwargs['task']['tm_nonvalid_input_dataset'] != 'T':
-            msg  = "CRAB refuses to run over the input dataset %s, because it is flagged as '%s' in DBS." % (kwargs['task']['tm_input_dataset'], datasetStatus)
-            msg += " To allow CRAB to run over a dataset that is not flagged as 'VALID', set Data.allowNonValidInputDataset = True in the CRAB configuration."
-            raise TaskWorkerException(msg)
         result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'], datasetfiles = filedetails, locations = locationsMap)
         self.logger.debug("Got %s files" % len(result.result.getFiles()))
         return result
