@@ -62,7 +62,8 @@ def processWorker(inputs, results, resthost, resturi, procnum):
                     configreq = {  'workflow': task['tm_taskname'],
                                    'status': "FAILED",
                                    'subresource': 'failure',
-                                   'failure': b64encode(msg)}
+                                   #limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
+                                   'failure': b64encode(msg[:7500])}
 
                     server.post(resturi, data = urllib.urlencode(configreq))
                     logger.info("Error message successfully uploaded to the REST")
