@@ -181,11 +181,11 @@ class Worker(object):
             return []
         allout = []
         self.logger.info("%d work on going, checking if some has finished" % len(self.working.keys()))
-        for i in xrange(len(self.working.keys())):
+        for _ in xrange(len(self.working.keys())):
             out = None
             try:
                 out = self.results.get_nowait()
-            except Empty as e:
+            except Empty:
                 pass
             if out is not None:
                 self.logger.debug('Retrieved work %s'% str(out))
