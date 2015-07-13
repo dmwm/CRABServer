@@ -15,7 +15,7 @@ fi
 sudo yum -y install git.x86_64
 mkdir -p /tmp/foo
 cd /tmp/foo
-git clone git://github.com/dmwm/deployment.git cfg
-yes | cfg/Deploy -t dummy -s post $PWD system/devvm
+git clone git://github.com/talamoig/deployment.git cfg
+cfg/Deploy -b -t dummy -s post $PWD system/devvm
 echo 'you can now reboot and then launch crabserver-install-part2.sh'
 

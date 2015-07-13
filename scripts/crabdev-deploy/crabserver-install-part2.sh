@@ -6,7 +6,7 @@ CRABINIT=/data/crabserver.sh
 
 source $RCFILE
 
-git clone git://github.com/dmwm/deployment.git /data/cfg
+git clone git://github.com/talamoig/deployment.git /data/cfg
 cd /data/cfg
 if [ "string" == "string${HGVER}"]
 then
