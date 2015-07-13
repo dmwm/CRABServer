@@ -31,3 +31,13 @@ Consider that you should have:
 
   * a oracle account;
   *  `CRABServer` and `WMCore` repositories forked on your account.
+
+
+The files are:
+
+  * `openstack-init.sh`: creates the `~/.openrc` file to interact with CERN Openstack from the command line;
+  * `vm-deploy.sh`: to build (and rebuild) CERN Openstack VMs from the command line;
+  * `crabserver-install-part1.sh`: to do the first part of the installation of a crab server (steps 1 and 2 of https://cms-http-group.web.cern.ch/cms-http-group/tutorials/environ/vm-setup.html);
+  * `crabserver-install-part2.sh`: to do the second part of the installation (from "Machine Preparation" until the end in https://twiki.cern.ch/twiki/bin/view/CMSPublic/CMSCrabRESTInterface)
+  * `paramsrc.sample`: a sample file with parameters necessary for the installation (rename it to `paramsrc`);
+  * `paramsrc-filecheck.sh`: script for checking that all needed parameters are present in `paramsrc`.
