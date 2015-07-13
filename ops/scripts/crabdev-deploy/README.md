@@ -2,6 +2,8 @@
 
 This repo contains scripts to build a CRAB 3 development testbed, assuming you're working on CERN lxplus system and interacting with the Openstack facility.
 
+## Usage
+
 The typical workflow of the first time you use this script collection is:
   * `cd CRABServer/scripts/crabdev-deploy/`
   * `cp paramsrc.sample paramsrc`
@@ -14,6 +16,8 @@ The typical workflow of the first time you use this script collection is:
   * `./crabserver-install-part1.sh # at the end will reboot automatically`
   * `ssh my-crab-server`
   * `./crabserver-install-part2.sh`
+
+## Configuration
 
 During `crabserver-install-part2.sh` the configuration file `paramsrc` is used where shell-variable have to be defined. The paramaters are:
 
@@ -32,6 +36,8 @@ Consider that you should have:
   * a oracle account;
   *  `CRABServer` and `WMCore` repositories forked on your account.
 
+
+## Content of the directory
 
 The files are:
 
