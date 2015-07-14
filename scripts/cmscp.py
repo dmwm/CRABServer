@@ -16,6 +16,7 @@ import tarfile
 import datetime
 import traceback
 import hashlib
+from ServerUtilities import cmd_exist
 
 ## Bootstrap the CMS_PATH variable; the StageOutMgr will need it.
 if 'CMS_PATH' not in os.environ:
@@ -175,46 +176,6 @@ def parse_job_ad():
                 except ValueError:
                     continue
             G_JOB_AD[info[0]] = val
-
-## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-def report_failure_to_dashboard(exit_code):
-    """
-    Report failure to Dashboard.
-    """
-    if os.environ.get('TEST_CMSCP_NO_STATUS_UPDATE', False):
-        msg  = "Environment flag TEST_CMSCP_NO_STATUS_UPDATE is set."
-        msg += " Will not send report to dashbaord."
-        print msg
-        return
-    if not G_JOB_AD:
-        try:
-            parse_job_ad()
-        except Exception:
-            msg  = "ERROR: Unable to parse job's HTCondor ClassAd."
-            msg += "\nWill not report stageout failure to Dashboard."
-            msg += "\n%s" % (traceback.format_exc())
-            print msg
-            return
-    for attr in ['CRAB_Id', 'CRAB_ReqName', 'CRAB_Retry']:
-        if attr not in G_JOB_AD:
-            msg  = "ERROR: Job's HTCondor ClassAd is missing attribute %s." % (attr)
-            msg += "\nWill not report stageout failure to Dashboard."
-            print msg
-            return
-    params = {
-        'MonitorID': G_JOB_AD['CRAB_ReqName'],
-        'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%d' % \
-                        (G_JOB_AD['CRAB_Id'],
-                         G_JOB_AD['CRAB_Id'],
-                         G_JOB_AD['CRAB_ReqName'].replace("_", ":"),
-                         G_JOB_AD['CRAB_Retry']),
-        'JobExitCode': exit_code
-    }
-    msg = "Dashboard stageout failure parameters: %s" % (str(params))
-    print msg
-    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
-    DashboardAPI.apmonFree()
 
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1518,6 +1479,9 @@ def main():
     direct_stageout_impl = None
     direct_stageout_command = "srmv2-lcg"
     direct_stageout_protocol = "srmv2"
+    if cmd_exist("gfal-copy"):
+        print 'Will use gfal2 commands for direct stageout.'
+        direct_stageout_command = "gfal2"
     condition = ('remote' in stageout_policy and condition_stageout)
     if skip['init_direct_stageout_impl']:
         msg  = "WARNING: Internal wrapper flag skip['init_direct_stageout_impl'] is True."
@@ -1959,12 +1923,16 @@ if __name__ == '__main__':
     else:
         CMSCP_EXIT_CODE = JOB_STGOUT_WRAPPER_EXIT_INFO['exit_code']
     if CMSCP_EXIT_CODE != 0:
-        if G_JOB_AD:
+        if os.environ.get('TEST_CMSCP_NO_STATUS_UPDATE', False):
+            MSG  = "Environment flag TEST_CMSCP_NO_STATUS_UPDATE is set."
+            MSG += " Will not send report to dashbaord."
+            print MSG
+        elif G_JOB_AD:
             try:
                 MSG  = "Stageout wrapper finished with exit code %s." % (CMSCP_EXIT_CODE)
                 MSG += " Will report failure to Dashboard."
                 print MSG
-                report_failure_to_dashboard(CMSCP_EXIT_CODE)
+                DashboardAPI.reportFailureToDashboard(CMSCP_EXIT_CODE, G_JOB_AD)
             except:
                 MSG  = "ERROR: Unhandled exception when reporting failure to dashboard."
                 MSG += "\n%s" % (traceback.format_exc())

@@ -298,7 +298,6 @@ class HTCondorDataWorkflow(DataWorkflow):
         taskStatus = {}
         jobList = []
         results = {}
-        pool = ""
         #Add scheduler and collector to return information
         if row.schedd:
             result['schedd'] = row.schedd
@@ -324,7 +323,7 @@ class HTCondorDataWorkflow(DataWorkflow):
            try:
                DBResults = {}
                DBResults['CRAB_UserWebDir'] = row.user_webdir
-               taskStatus, pool = self.taskWebStatus(DBResults, verbose=verbose)
+               taskStatus = self.taskWebStatus(DBResults, verbose=verbose)
                #Check timestamp, if older then 2 minutes, use old logic
                nodeStateUpd = int(taskStatus.get('DagStatus', {}).get("Timestamp", 0))
                epochTime = int(time.time())
@@ -409,7 +408,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                     return [result]
 
             try:
-                taskStatus, pool = self.taskWebStatus(results[0], verbose=verbose)
+                taskStatus = self.taskWebStatus(results[0], verbose=verbose)
             except MissingNodeStatus:
                 result['status'] = "UNKNOWN"
                 result['taskFailureMsg'] = "Node status file not currently available. Retry in a minute if you just submitted the task"
@@ -473,7 +472,6 @@ class HTCondorDataWorkflow(DataWorkflow):
             result['status'] = 'Running (jobs not submitted)'
 
         result['jobs'] = taskStatus
-        result['pool'] = pool
         result['publication'] = publication_info
         result['outdatasets'] = outdatasets
 
@@ -507,10 +505,18 @@ class HTCondorDataWorkflow(DataWorkflow):
         #curl.setopt(pycurl.ENCODING, 'gzip, deflate')
         return curl
 
+    def cleanTempFileAndBuff(self, fp, hbuf):
+        """
+        Go to the beginning of temp file
+        Truncate buffer and file and return
+        """
+        fp.seek(0)
+        fp.truncate(0)
+        hbuf.truncate(0)
+        return fp, hbuf
 
     def taskWebStatus(self, task_ad, verbose):
         nodes = {}
-        pool_info = {}
 
         url = task_ad['CRAB_UserWebDir']
 
@@ -519,106 +525,87 @@ class HTCondorDataWorkflow(DataWorkflow):
         curl.setopt(pycurl.WRITEFUNCTION, fp.write)
         hbuf = StringIO.StringIO()
         curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
-        self.logger.debug("Retrieving task status from web with verbosity %d." % verbose)
-        if verbose == 1:
-            jobs_url = url + "/jobs_log.txt"
-            curl.setopt(pycurl.URL, jobs_url)
-            self.logger.info("Starting download of job log")
-            curl.perform()
-            self.logger.info("Finished download of job log")
-            header = ResponseHeader(hbuf.getvalue())
-            if header.status == 200:
-                fp.seek(0)
-                self.logger.debug("Starting parse of job log")
-                self.parseJobLog(fp, nodes)
-                self.logger.debug("Finished parse of job log")
-                fp.truncate(0)
-                hbuf.truncate(0)
-            else:
-                raise ExecutionError("Cannot get jobs log file. Retry in a minute if you just submitted the task")
-        elif verbose == 2:
-            site_url = url + "/site_ad.txt"
-            curl.setopt(pycurl.URL, site_url)
-            self.logger.debug("Starting download of site ad")
-            curl.perform()
-            self.logger.debug("Finished download of site ad")
-            header = ResponseHeader(hbuf.getvalue())
-            if header.status == 200:
-                fp.seek(0)
-                self.logger.debug("Starting parse of site ad")
-                self.parseSiteAd(fp, task_ad, nodes)
-                self.logger.debug("Finished parse of site ad")
-                fp.truncate(0)
-                hbuf.truncate(0)
-            else:
-                raise ExecutionError("Cannot get site ad. Retry in a minute if you just submitted the task")
-            pool_info_url = self.centralcfg.centralconfig["backend-urls"].get("poolInfo")
-            if pool_info_url:
-                fp2 = StringIO.StringIO()
-                curl.setopt(pycurl.WRITEFUNCTION, fp2.write)
-                curl.setopt(pycurl.URL, pool_info_url)
-                self.logger.debug("Starting download of pool info from %s" % pool_info_url)
+        try:
+            self.logger.debug("Retrieving task status from web with verbosity %d." % verbose)
+            if verbose == 1:
+                jobs_url = url + "/jobs_log.txt"
+                curl.setopt(pycurl.URL, jobs_url)
+                self.logger.info("Starting download of job log")
                 curl.perform()
-                curl.setopt(pycurl.WRITEFUNCTION, fp.write)
-                self.logger.debug("Finished download of pool info")
+                self.logger.info("Finished download of job log")
                 header = ResponseHeader(hbuf.getvalue())
                 if header.status == 200:
-                    fp2.seek(0)
-                    self.logger.debug("Starting parse of pool info")
-                    pool_info = json.load(fp2)
-                    self.logger.debug("Finished parse of pool info")
-                    hbuf.truncate(0)
+                    fp.seek(0)
+                    self.logger.debug("Starting parse of job log")
+                    self.parseJobLog(fp, nodes)
+                    self.logger.debug("Finished parse of job log")
                 else:
-                    raise ExecutionError("Cannot get pool info file. Retry in a minute if you just submitted the task")
-        nodes_url = url + "/node_state.txt"
-        curl.setopt(pycurl.URL, nodes_url)
-        fp.seek(0)
-        self.logger.debug("Starting download of node state")
-        curl.perform()
-        self.logger.debug("Finished download of node state")
-        header = ResponseHeader(hbuf.getvalue())
-        if header.status == 200:
-            fp.seek(0)
-            self.logger.debug("Starting parse of node state")
-            self.parseNodeState(fp, nodes)
-            self.logger.debug("Finished parse of node state")
-            fp.truncate(0)
-            hbuf.truncate(0)
-        else:
-            raise MissingNodeStatus("Cannot get node state log. Retry in a minute if you just submitted the task")
+                    raise ExecutionError("Cannot get jobs log file. Retry in a minute if you just submitted the task")
+            elif verbose == 2:
+                site_url = url + "/site_ad.txt"
+                curl.setopt(pycurl.URL, site_url)
+                self.logger.debug("Starting download of site ad")
+                curl.perform()
+                self.logger.debug("Finished download of site ad")
+                header = ResponseHeader(hbuf.getvalue())
+                if header.status == 200:
+                    fp.seek(0)
+                    self.logger.debug("Starting parse of site ad")
+                    self.parseSiteAd(fp, task_ad, nodes)
+                    self.logger.debug("Finished parse of site ad")
+                else:
+                    raise ExecutionError("Cannot get site ad. Retry in a minute if you just submitted the task")
+            nodes_url = url + "/node_state.txt"
+            curl.setopt(pycurl.URL, nodes_url)
+            # Before executing any new curl, truncate and clean temp file
+            fp, hbuf = self.cleanTempFileAndBuff(fp, hbuf)
+            self.logger.debug("Starting download of node state")
+            curl.perform()
+            self.logger.debug("Finished download of node state")
+            header = ResponseHeader(hbuf.getvalue())
+            if header.status == 200:
+                fp.seek(0)
+                self.logger.debug("Starting parse of node state")
+                self.parseNodeState(fp, nodes)
+                self.logger.debug("Finished parse of node state")
+            else:
+                raise MissingNodeStatus("Cannot get node state log. Retry in a minute if you just submitted the task")
 
-        site_url = url + "/error_summary.json"
-        fp2 = StringIO.StringIO()
-        curl.setopt(pycurl.WRITEFUNCTION, fp2.write)
-        curl.setopt(pycurl.URL, site_url)
-        self.logger.debug("Starting download of error summary file")
-        curl.perform()
-        self.logger.debug("Finished download of error summary file")
-        header = ResponseHeader(hbuf.getvalue())
-        if header.status == 200:
-            fp2.seek(0)
-            self.logger.debug("Starting parse of summary file")
-            self.parseErrorReport(fp2, nodes)
-            self.logger.debug("Finished parse of summary file")
-        else:
-            self.logger.debug("No error summary available")
+            site_url = url + "/error_summary.json"
+            # Before executing any new curl, truncate and clean temp file
+            fp, hbuf = self.cleanTempFileAndBuff(fp, hbuf)
+            curl.setopt(pycurl.URL, site_url)
+            self.logger.debug("Starting download of error summary file")
+            curl.perform()
+            self.logger.debug("Finished download of error summary file")
+            header = ResponseHeader(hbuf.getvalue())
+            if header.status == 200:
+                fp.seek(0)
+                self.logger.debug("Starting parse of summary file")
+                self.parseErrorReport(fp, nodes)
+                self.logger.debug("Finished parse of summary file")
+            else:
+                self.logger.debug("No error summary available")
 
-        fp3 = StringIO.StringIO();
-        curl.setopt(pycurl.WRITEFUNCTION, fp3.write)
-        aso_url = url + "/aso_status.json"
-        curl.setopt(pycurl.URL, aso_url)
-        self.logger.debug("Starting download of aso state")
-        curl.perform()
-        self.logger.debug("Finished download of aso state")
-        header = ResponseHeader(hbuf.getvalue())
-        if header.status == 200:
-            self.logger.debug("Starting parsing of aso state")
-            self.parseASOState(fp3, nodes)
-            self.logger.debug("Finished parsing of aso state")
-        else:
-            self.logger.debug("No aso state file available")
-
-        return nodes, pool_info
+            # Before executing any new curl, truncate and clean temp file
+            fp, hbuf = self.cleanTempFileAndBuff(fp, hbuf)
+            aso_url = url + "/aso_status.json"
+            curl.setopt(pycurl.URL, aso_url)
+            self.logger.debug("Starting download of aso state")
+            curl.perform()
+            self.logger.debug("Finished download of aso state")
+            header = ResponseHeader(hbuf.getvalue())
+            if header.status == 200:
+                fp.seek(0)
+                self.logger.debug("Starting parsing of aso state")
+                self.parseASOState(fp, nodes)
+                self.logger.debug("Finished parsing of aso state")
+            else:
+                self.logger.debug("No aso state file available")
+            return nodes
+        finally:
+            fp.close()
+            hbuf.close()
 
     def publicationStatus(self, workflow, asourl):
         publication_info = {}
@@ -774,7 +761,6 @@ class HTCondorDataWorkflow(DataWorkflow):
 
 
     def parseASOState(self, fp, nodes):
-        fp.seek(0)
         data = json.load(fp)
         for _, result in data['results'].items():
             if 'state' in result['value']: #this if is for backward compatibility with old postjobs
@@ -918,8 +904,4 @@ class HTCondorDataWorkflow(DataWorkflow):
             sites -= (blacklist-whitelist)
             info = nodes.setdefault(nodeid, {})
             info['AvailableSites'] = list([i.eval() for i in sites])
-
-
-    def parsePoolAd(self, fp):
-        pool_ad = classad.parse(fp)
 

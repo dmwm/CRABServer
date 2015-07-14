@@ -26,8 +26,9 @@ class DBSDataDiscovery(DataDiscovery):
         if accessType != 'VALID':
             msg = "The dataset you are analyzing is not 'VALID' but '%s'. CRAB3 will try to see if there is any valid file" % accessType
             if accessType == 'DEPRECATED': #as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
-                msg += "Please, contact your physics group if you think the dataset should not be deprecated"
+                msg += ". Please, contact your physics group if you think the dataset should not be deprecated"
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+        return accessType
 
 
     def keepOnlyDisks(self, locationsMap):
@@ -70,7 +71,7 @@ class DBSDataDiscovery(DataDiscovery):
         else:
             del os.environ['X509_USER_KEY']
         self.logger.debug("Data discovery through %s for %s" %(self.dbs, kwargs['task']['tm_taskname']))
-        self.checkDatasetStatus(kwargs['task']['tm_input_dataset'], kwargs)
+        datasetStatus = self.checkDatasetStatus(kwargs['task']['tm_input_dataset'], kwargs)
         try:
             # Get the list of blocks for the locations and then call dls.
             # The WMCore DBS3 implementation makes one call to dls for each block
@@ -109,6 +110,10 @@ class DBSDataDiscovery(DataDiscovery):
         if not filedetails:
             raise TaskWorkerException("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, https://cmsweb.cern.ch/das.\n"+\
                                       "Aborting submission. Resubmitting your task will not help.")
+        if datasetStatus != 'VALID' and kwargs['task']['tm_nonvalid_input_dataset'] != 'T':
+            msg  = "CRAB refuses to run over the input dataset %s, because it is flagged as '%s' in DBS." % (kwargs['task']['tm_input_dataset'], datasetStatus)
+            msg += " To allow CRAB to run over a dataset that is not flagged as 'VALID', set Data.allowNonValidInputDataset = True in the CRAB configuration."
+            raise TaskWorkerException(msg)
         result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'], datasetfiles = filedetails, locations = locationsMap)
         self.logger.debug("Got %s files" % len(result.result.getFiles()))
         return result
@@ -125,7 +130,7 @@ if __name__ == '__main__':
     from WMCore.Configuration import Configuration
     config = Configuration()
     config.section_("Services")
-    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'
+    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSReader'
 
 #    config.Services.DBSUrl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
 #    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/'
@@ -137,7 +142,8 @@ if __name__ == '__main__':
     fileset = DBSDataDiscovery(config)
 #    dataset = '/QCD_Pt-1800_Tune4C_13TeV_pythia8/Spring14dr-castor_PU_S14_POSTLS170_V6-v1/GEN-SIM-RECODEBUG'
     dataset = '/MB8TeVEtanoCasHFShoLib/Summer12-EflowHpu_NoPileUp_START53_V16-v1/RECODEBUG'
-    fileset.execute(task={'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
+    dataset = '/GenericTTbar/atanasi-140429_131619_crab_AprilTest_3000jbsOf3hrs-95e5dc29a1ac0766eb8514eb5d4ff77a/USER'
+    fileset.execute(task={'tm_nonvalid_input_dataset' : 'T', 'tm_use_parent' : 0, 'user_proxy' : os.environ["X509_USER_PROXY"], 'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
 
 #    dataset = '/DoubleElectron/Run2012C-22Jan2013-v1/RECO' #not in FNAL_DISK
 #    fileset = DBSDataDiscovery(config)

@@ -72,6 +72,7 @@ CRAB_HEADERS = \
 +CRAB_InputData = %(inputdata)s
 +CRAB_DBSURL = %(dbsurl)s
 +CRAB_PublishName = %(publishname)s
++CRAB_PublishGroupName = %(publishgroupname)s
 +CRAB_Publish = %(publication)s
 +CRAB_PublishDBSURL = %(publishdbsurl)s
 +CRAB_ISB = %(cacheurl)s
@@ -183,10 +184,7 @@ def makeLFNPrefixes(task):
         hash_input += "," + task['tm_user_group']
     if 'tm_user_role' in task and task['tm_user_role']:
         hash_input += "," + task['tm_user_role']
-    lfn = task['tm_output_lfn'] if 'tm_output_lfn' in task else ''
-    ## For backward compatibility: old tasks were putting the outLFN in tm_arguments.
-    if not lfn:
-        lfn = task.get('tm_arguments', {}).get('lfn', '')
+    lfn = task['tm_output_lfn']
     hash = hashlib.sha1(hash_input).hexdigest()
     user = task['tm_username']
     tmp_user = "%s.%s" % (user, hash)
@@ -226,7 +224,7 @@ def transform_strings(input):
         else:
             info[var] = json.dumps(val)
 
-    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries':
+    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'publishgroupname':
         info[var] = int(input[var])
 
     for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', 'tfileoutfiles', 'edmoutfiles':
@@ -405,6 +403,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['cacheurl'] = info['tm_cache_url']
         info['userhn'] = info['tm_username']
         info['publishname'] = info['tm_publish_name']
+        info['publishgroupname'] = 1 if info['tm_publish_groupname'] == 'T' else 0
         info['asyncdest'] = info['tm_asyncdest']
         info['dbsurl'] = info['tm_dbs_url']
         info['publishdbsurl'] = info['tm_publish_dbs_url']
@@ -418,10 +417,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['addoutputfiles'] = task['tm_outfiles']
         info['tfileoutfiles'] = task['tm_tfile_outfiles']
         info['edmoutfiles'] = task['tm_edm_outfiles']
-        if ('tm_one_event_mode' in info) and info['tm_one_event_mode'] is not None:
-            info['oneEventMode'] = 1 if info['tm_one_event_mode'] == 'T' else 0
-        else: ## For backward compatilibity only.
-            info['oneEventMode'] = 1 if task.get('tm_arguments', {}).get('oneEventMode', 'F') == 'T' else 0
+        info['oneEventMode'] = 1 if info['tm_one_event_mode'] == 'T' else 0
         info['ASOURL'] = task['tm_asourl']
         info['taskType'] = self.getDashboardTaskType()
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
@@ -433,16 +429,10 @@ class DagmanCreator(TaskAction.TaskAction):
         # TODO: pass through these correctly.
         info['runs'] = []
         info['lumis'] = []
-        if ('tm_transfer_outputs' in info) and info['tm_transfer_outputs'] is not None:
-            info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
-        else: ## For backward compatilibity only.
-            info['saveoutput'] = 1 if task.get('tm_arguments', {}).get('saveoutput', 'T') == 'T' else 0
+        info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
         info['accounting_group'] = 'analysis.%s' % info['userhn']
         info = transform_strings(info)
-        if ('tm_fail_limit' in info): ## We are not using faillimit currently, so it should be save to just ask if 'tm_fail_limit' is in info.
-            info['faillimit'] = info['tm_fail_limit']
-        else: ## For backward compatilibity only.
-            info['faillimit'] = task.get('tm_arguments', {}).get('faillimit')
+        info['faillimit'] = task['tm_fail_limit']
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
         if info['jobarch_flatten'].startswith("slc6_"):
             info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
@@ -537,7 +527,6 @@ class DagmanCreator(TaskAction.TaskAction):
                         'eventsPerLumi'     : task['tm_events_per_lumi'],
                         'maxRuntime'        : task['max_runtime'],
                         'sw'                : task['tm_job_sw'],
-                        'outputData'        : task['tm_publish_name'],
                         'block'             : block,
                         'destination'       : pfns,
                         'scriptExe'         : task['tm_scriptexe'],
@@ -586,10 +575,7 @@ class DagmanCreator(TaskAction.TaskAction):
             jobs = jobgroup.getJobs()
 
             whitelist = set(kwargs['task']['tm_site_whitelist'])
-            if 'tm_ignore_locality' in kwargs['task'] and kwargs['task']['tm_ignore_locality'] is not None:
-                ignorelocality = kwargs['task']['tm_ignore_locality'] == 'T'
-            else: ## For backward compatibility only.
-                ignorelocality = kwargs['task'].get('tm_arguments', {}).get('ignorelocality', 'F') == 'T'
+            ignorelocality = kwargs['task']['tm_ignore_locality'] == 'T'
             if not jobs:
                 possiblesites = []
             elif ignorelocality:

@@ -43,6 +43,7 @@ class Create(DBCreator):
         tm_job_sw VARCHAR(255) NOT NULL,
         tm_job_arch VARCHAR(255),
         tm_input_dataset VARCHAR(500),
+        tm_nonvalid_input_dataset VARCHAR(1),
         tm_use_parent NUMBER(1),
         tm_site_whitelist VARCHAR(4000),
         tm_site_blacklist VARCHAR(4000),
@@ -57,6 +58,7 @@ class Create(DBCreator):
         tm_user_role VARCHAR(255),
         tm_user_group VARCHAR(255),
         tm_publish_name VARCHAR(500),
+        tm_publish_groupname VARCHAR(1),
         tm_asyncdest VARCHAR(255) NOT NULL,
         tm_dbs_url VARCHAR(255) NOT NULL,
         tm_publish_dbs_url VARCHAR(255),
@@ -94,11 +96,13 @@ class Create(DBCreator):
         tm_one_event_mode VARCHAR(1),
         CONSTRAINT taskname_pk PRIMARY KEY(tm_taskname),
         CONSTRAINT check_tm_publication CHECK (tm_publication IN ('T', 'F')),
+        CONSTRAINT check_tm_publish_groupname CHECK (tm_publish_groupname IN ('T', 'F')),
         CONSTRAINT check_tm_save_logs CHECK (tm_save_logs IN ('T', 'F')),
         CONSTRAINT check_tm_dry_run CHECK (tm_dry_run IN ('T', 'F')),
         CONSTRAINT check_tm_transfer_outputs CHECK (tm_transfer_outputs IN ('T', 'F')),
         CONSTRAINT check_tm_ignore_locality CHECK (tm_ignore_locality IN ('T', 'F')),
-        CONSTRAINT check_tm_one_event_mode CHECK (tm_one_event_mode IN ('T', 'F'))
+        CONSTRAINT check_tm_one_event_mode CHECK (tm_one_event_mode IN ('T', 'F')),
+        CONSTRAINT ck_tm_nonvalid_input_dataset CHECK (tm_nonvalid_input_dataset IN ('T', 'F'))
         )
         """
         self.create['c_jobgroups'] = """

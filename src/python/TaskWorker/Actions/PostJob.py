@@ -1025,6 +1025,13 @@ class PostJob():
         ## the jobs has failed).
         retval = self.check_abort_dag(retval)
 
+        ## If return value is not 0 (success) write env variables to a file if it is not
+        ## present and print job ads in PostJob log file.
+        ## All this information is useful for debugging purpose.
+        if retval != 0:
+            #Print system environment and job classads
+            self.print_env_and_ads()
+
         return retval
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -1082,15 +1089,44 @@ class PostJob():
             self.logger.error(retmsg)
             return 10, retmsg
 
-        ## Parse the job ad.
-        job_ad_file_name = os.environ.get("_CONDOR_JOB_AD", ".job.ad")
+        ## Parse the job ad and use it if possible.
+        ## If not, use main ROOT job ad and for job ad information use condor_q
+        ## Please see: https://github.com/dmwm/CRABServer/issues/4618
+        used_job_ad = False
+        condor_history_dir = os.environ.get("_CONDOR_PER_JOB_HISTORY_DIR", "")
+        job_ad_file_name = os.path.join(condor_history_dir, str("history." + str(self.dag_jobid)))
+        counter = 0
         self.logger.info("====== Starting to parse job ad file %s." % (job_ad_file_name))
-        if self.parse_job_ad(job_ad_file_name):
-            self.set_dashboard_state('FAILED')
-            self.logger.info("====== Finished to parse job ad.")
-            retmsg = "Failure parsing the job ad."
-            return JOB_RETURN_CODES.FATAL_ERROR, retmsg
-        self.logger.info("====== Finished to parse job ad.")
+        while counter < 5:
+            self.logger.info("       -----> Started %s time out of %s -----" % (str(counter), "5"))
+            parse_job_ad_exit = self.parse_job_ad(job_ad_file_name)
+            if not parse_job_ad_exit:
+                used_job_ad = True
+                self.logger.info("       -----> Succeeded to parse job ad file -----")
+                try:
+                    shutil.copy2(job_ad_file_name, './finished_jobs/')
+                    job_ad_source = os.path.join('./finished_jobs/', str("history." + str(self.dag_jobid)))
+                    job_ad_symlink = '.'.join(['./finished_jobs/job', str(self.job_id), str(self.crab_retry)])
+                    os.symlink(job_ad_source, job_ad_symlink)
+                except:
+                    self.logger.info("       -----> Failed to copy job ad file. Continuing")
+                    pass
+                self.logger.info("====== Finished to parse job ad.")
+                break
+            counter += 1
+            self.logger.info("       -----> Failed to parse job ad file -----")
+            time.sleep(5)
+
+        if not used_job_ad:
+            ## Parse the main taks job ad and use it
+            job_ad_file_name = os.environ.get("_CONDOR_JOB_AD", ".job.ad")
+            self.logger.info("====== Starting to parse ROOT job ad file %s." % (job_ad_file_name))
+            if self.parse_job_ad(job_ad_file_name):
+                self.set_dashboard_state('FAILED')
+                self.logger.info("====== Finished to parse ROOT job ad.")
+                retmsg = "Failure parsing the ROOT job ad."
+                return JOB_RETURN_CODES.FATAL_ERROR, retmsg
+            self.logger.info("====== Finished to parse ROOT job ad.")
 
         self.logger.info("====== Starting to analyze job exit status.")
         ## Execute the retry-job. The retry-job decides whether an error is recoverable
@@ -1104,7 +1140,7 @@ class PostJob():
             print "       -----> RetryJob log start -----"
             self.retryjob_retval = retry.execute(self.reqname, self.job_return_code, \
                                             self.crab_retry, self.job_id, \
-                                            self.dag_jobid)
+                                            self.dag_jobid, self.job_ad, used_job_ad)
             print "       <----- RetryJob log finish ----"
         if self.retryjob_retval:
             if self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:
@@ -1336,6 +1372,39 @@ class PostJob():
         self.set_dashboard_state('FINISHED')
 
         return 0, ""
+
+    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def print_env_and_ads(self):
+        """
+        Save environment variables which are used in postjob_env.txt if file is not
+        present yet. Environment variables for all PostJobs should be the same and
+        no need to save for each.
+        Print final job ads in PostJob. This is useful for debugging purposes.
+        """
+        env_file = "postjob_env.txt"
+        if not os.path.exists(env_file) or not os.stat(env_file).st_size:
+            self.logger.info("Will write env variables to %s file." % env_file)
+            try:
+                with open(env_file, "w") as fd:
+                    fd.write("------ Environment variables:\n")
+                    for key in sorted(os.environ.keys()):
+                        fd.write("%30s    %s\n" % (key,os.environ[key]))
+            except:
+                self.logger.info("Not able to write ENV variables to a file. Continuing")
+                pass
+        else:
+            self.logger.info("Will not write %s file. Continue." % env_file)
+        # if job_ad is available, write it output to PostJob log file
+        if self.job_ad:
+            self.logger.debug("------ Job classad values for debug purposes:")
+            self.logger.debug("-"*100)
+            for key in sorted(self.job_ad.keys(),  key=lambda v: (v.upper(), v[0].islower())):
+                print "%35s    %s" % (key,self.job_ad[key])
+            self.logger.debug("-"*100)
+        else:
+            self.logger.debug("------ Job ad is not available. Continue")
+            self.logger.debug("-"*100)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1572,7 +1641,7 @@ class PostJob():
             if 'pset_hash' in file_info:
                 publishname = "%s-%s" % (publishname.rsplit('-', 1)[0], file_info['pset_hash'])
             ## CMS convention for output dataset name:
-            ## /primarydataset>/<username>-<publish_data_name>-<PSETHASH>/USER
+            ## /<primarydataset>/<username>-<publish_data_name>-<PSETHASH>/USER
             if file_info['filetype'] == 'EDM':
                 if multiple_edm and file_info.get('module_label'):
                     left, right = publishname.rsplit('-', 1)
@@ -1584,7 +1653,11 @@ class PostJob():
                 ## this (define a primary dataset parameter in the job ad and in the
                 ## rest interface).
                 primary_dataset_name = self.input_dataset.split('/')[1]
-                outdataset = os.path.join('/' + primary_dataset_name, self.job_ad['CRAB_UserHN'] + '-' + publishname, 'USER')
+                group_user_prefix = self.job_ad['CRAB_UserHN']
+                if 'CRAB_PublishGroupName' in self.job_ad and self.job_ad['CRAB_PublishGroupName']:
+                    if file_info['outlfn'].startswith('/store/group/') and file_info['outlfn'].split('/')[3]:
+                        group_user_prefix = file_info['outlfn'].split('/')[3]
+                outdataset = os.path.join('/' + primary_dataset_name, group_user_prefix + '-' + publishname, 'USER')
                 output_datasets.add(outdataset)
             else:
                 outdataset = '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER'
@@ -1920,7 +1993,8 @@ class PostJob():
                         report = json.load(fd)
                         if 'exitCode' in report:
                             params['JobExitCode'] = report['exitCode']
-                            params['ExeExitCode'] = report['exitCode']
+                        if 'jobExitCode' in report:
+                            params['ExeExitCode'] = report['jobExitCode']
                     except ValueError as e:
                         self.logger.debug("Not able to load the fwjr because of a ValueError %s. \
                                            Not setting exit code for dashboard. Continuing normally" % (e))

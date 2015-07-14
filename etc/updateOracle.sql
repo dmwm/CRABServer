@@ -36,20 +36,26 @@ alter table tasks modify(tm_task_warnings DEFAULT '[]');
 ALTER TABLE tasks ADD(tm_output_dataset CLOB);
 UPDATE filemetadata SET fmd_tmplfn=fmd_lfn WHERE fmd_tmplfn is NULL or fmd_tmplfn='';
 
---Changes that will be needed for version 3.4.13
+--Changes that will be needed for version 3.3.13
 alter table tasks add (tm_collector VARCHAR(1000));
 ALTER TABLE tasks DROP column tm_transformation;
 
---Changes that will be needed for version 3.4.14
+--Changes that will be needed for version 3.3.14
 ALTER TABLE tasks ADD (tm_schedd VARCHAR(255));
 
---Changes that will be needed for version 3.4.15
+--Changes that will be needed for version 3.3.15
 alter table tasks add (tm_dry_run VARCHAR(1)); --for issue ##4462
 
---Changes that will be needed for version 3.4.16
+--Changes that will be needed for version 3.3.16
 alter table tasks add (tm_user_files CLOB DEFAULT '[]');
 alter table tasks add (tm_transfer_outputs VARCHAR(1));
 alter table tasks add (tm_output_lfn VARCHAR(1000));
 alter table tasks add (tm_ignore_locality VARCHAR(1));
 alter table tasks add (tm_fail_limit NUMBER(38));
 alter table tasks add (tm_one_event_mode VARCHAR(1));
+
+--Changes that will be needed for version 3.3.1507
+alter table tasks add (tm_publish_groupname VARCHAR(1) DEFAULT 'F');
+alter table tasks add constraint check_tm_publish_groupname check (tm_publish_groupname IN ('T', 'F')) ENABLE;
+alter table tasks add (tm_nonvalid_input_dataset VARCHAR(1) DEFAULT 'T');
+alter table tasks add constraint ck_tm_nonvalid_input_dataset check (tm_nonvalid_input_dataset IN ('T', 'F')) ENABLE;

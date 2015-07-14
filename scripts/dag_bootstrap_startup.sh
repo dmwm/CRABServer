@@ -140,6 +140,16 @@ export _condor_DAGMAN_CONDOR_RM_EXE=$PWD/condor_rm_fix
 export _CONDOR_DAGMAN_LOG=$PWD/$1.dagman.out
 export _CONDOR_MAX_DAGMAN_LOG=0
 
+# Export path where final job is written. This requires enable the PER_JOB_HISTORY_DIR
+# feature in HTCondor configuration. In case this feature is not turn on, CRAB3
+# will use old logic to get final job ads.
+# New logic: Read job ad file which is written by HTCondor to a dictionary
+# Old logic: Use condor_q -debug -userlog <user_log_file>.
+# Please remember that any condor_q command is expensive to scheduler.
+# See: https://github.com/dmwm/CRABServer/issues/4618
+export _CONDOR_PER_JOB_HISTORY_DIR=`condor_config_val PER_JOB_HISTORY_DIR`
+mkdir -p finished_jobs
+
 CONDOR_VERSION=`condor_version | head -n 1`
 PROC_ID=`grep '^ProcId =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
 CLUSTER_ID=`grep '^ClusterId =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
@@ -166,7 +176,7 @@ else
     # see subsections 2.10.9 "The Rescue DAG" and 2.10.10 "DAG Recovery".
     #
     # Re-nice the process so, even when we churn through lots of processes, we never starve the schedd or shadows for cycles.
-    exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -DoRecov -AutoRescue 0 -MaxPre 20 -MaxIdle 400 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
+    exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -DoRecov -AutoRescue 0 -MaxPre 20 -MaxIdle 1000 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
     EXIT_STATUS=$?
 fi
 exit $EXIT_STATUS

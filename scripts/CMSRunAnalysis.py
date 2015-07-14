@@ -148,7 +148,8 @@ def startDashboardMonitoring(myad):
 def addReportInfo(params, fjr):
     if 'exitCode' in fjr:
         params['JobExitCode'] = fjr['exitCode']
-        params['ExeExitCode'] = fjr['exitCode']
+    if 'jobExitCode' in report:
+        params['ExeExitCode'] = fjr['jobExitCode']
     if 'steps' not in fjr or 'cmsRun' not in fjr['steps']:
         return
     fjr = fjr['steps']['cmsRun']
@@ -172,11 +173,11 @@ def addReportInfo(params, fjr):
             if fjr['performance']['memory'].get("PeakValueRss"):
                 params['CRABUserPeakRss'] = float(fjr['performance']['memory']['PeakValueRss'])
     # Num Events Statistics
-    inputEvents = 0
+    params['NEventsProcessed'] = 0
     if 'input' in fjr and 'source' in fjr['input']:
         for info in fjr['input']['source']:
             if 'events' in info:
-                params['NEventsProcessed'] = info['events']
+                params['NEventsProcessed'] += info['events']
 
 
 def reportPopularity(monitorId, monitorJobId, myad, fjr):
@@ -700,13 +701,10 @@ def AddChecksums(report):
                     fileInfo['pfn'] = fileInfo['fileName']
                 else:
                     continue
-            print "==== Checksum cksum STARTING at %s ====" % time.asctime(time.gmtime())
+            print "==== Checksum STARTING at %s ====" % time.asctime(time.gmtime())
             print "== Filename: %s" % fileInfo['pfn']
-            cksum = FileInfo.readCksum(fileInfo['pfn'])
-            print "==== Checksum finishing FINISHING at %s ====" % time.asctime(time.gmtime())
-            print "==== Checksum adler32 STARTING at %s ====" % time.asctime(time.gmtime())
-            adler32 = FileInfo.readAdler32(fileInfo['pfn'])
-            print "==== Checksum adler32 FINISHING at %s ====" % time.asctime(time.gmtime())
+            (adler32, cksum) = calculateChecksums(fileInfo['pfn'])
+            print "==== Checksum FINISHING at %s ====" % time.asctime(time.gmtime())
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
@@ -827,7 +825,7 @@ if __name__ == "__main__":
         from WMCore.FwkJobReport.Report import Report
         from WMCore.FwkJobReport.Report import FwkJobReportException
         from WMCore.WMSpec.Steps.WMExecutionFailure import WMExecutionFailure
-        import WMCore.FwkJobReport.FileInfo as FileInfo
+        from WMCore.Algorithms.BasicAlgos import calculateChecksums
         from WMCore.WMSpec.Steps.Executors.CMSSW import CMSSW
         from WMCore.Configuration import Configuration
         from WMCore.WMSpec.WMStep import WMStep
@@ -870,7 +868,7 @@ if __name__ == "__main__":
             directory = os.getcwd(),
             architecture = opts.scramArch,
             )
-            
+
         print "==== SCRAM Obj CREATED at %s ====" % time.asctime(time.gmtime())
         if scram.project() or scram.runtime(): #if any of the two commands fail...
             msg = scram.diagnostic()

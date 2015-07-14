@@ -82,6 +82,7 @@ class DataUserWorkflow(object):
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
            :arg str inputdata: input dataset;
+           :arg str nonvaliddata: allow invalid input dataset;
            :arg int use_parent: add the parent dataset as secondary input;
            :arg str generator: event generator for MC production;
            :arg int events_per_lumi: events to generate per lumi;
@@ -97,6 +98,7 @@ class DataUserWorkflow(object):
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
            :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication;
+           :arg str publishgroupname: add groupname or username to publishname;
            :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
