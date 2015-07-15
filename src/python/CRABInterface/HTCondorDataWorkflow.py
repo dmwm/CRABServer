@@ -1,6 +1,7 @@
 import re
 import json
 import time
+import copy
 import hashlib
 import StringIO
 import tempfile
@@ -11,15 +12,15 @@ import pycurl
 import classad
 import htcondor
 
-from WMCore.REST.Error import ExecutionError, InvalidParameter
+import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.WMSpec.WMTask import buildLumiMask
+from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.DBS.DBSReader import DBSReader
 from CRABInterface.DataWorkflow import DataWorkflow
+from WMCore.Services.pycurl_manager import ResponseHeader
+from WMCore.REST.Error import ExecutionError, InvalidParameter
 from CRABInterface.Utils import conn_handler, global_user_throttle
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
-from WMCore.Services.pycurl_manager import ResponseHeader
-from WMCore.DataStructs.LumiList import LumiList
-import WMCore.Database.CMSCouch as CMSCouch
 
 import HTCondorUtils
 import HTCondorLocator
@@ -358,7 +359,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         if useOldLogic:
             self.logger.info("Will get status using condor_q")
-            backend_urls = self.centralcfg.centralconfig["backend-urls"]
+            backend_urls = copy.deepcopy(self.centralcfg.centralconfig["backend-urls"])
             if row.collector:
                 backend_urls['htcondorPool'] = row.collector
             self.logger.info("Getting status for workflow %s, looking for schedd %s" % (workflow, row.schedd))
