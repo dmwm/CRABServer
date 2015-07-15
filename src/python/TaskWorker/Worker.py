@@ -18,6 +18,18 @@ from TaskWorker.WorkerExceptions import WorkerHandlerException
 global WORKER_CONFIG
 
 
+def truncateError(msg):
+    """Truncate the error message to the first 7400 chars if needed, and add a message if we truncate it.
+       See https://github.com/dmwm/CRABServer/pull/4867#commitcomment-12086393
+    """
+    MSG_LIMIT = 7500
+    if len(msg) > MSG_LIMIT:
+        truncMsg = msg[:MSG_LIMIT - 100]
+        truncMsg += "\n[... message truncated to the first 7400 chars ...]"
+        return truncMsg
+    else:
+        return msg
+
 def processWorker(inputs, results, resthost, resturi, procnum):
     """Wait for an reference to appear in the input queue, call the referenced object
        and write the output in the output queue.
@@ -59,11 +71,12 @@ def processWorker(inputs, results, resthost, resturi, procnum):
                 try:
                     logger.info("Uploading error message to REST: %s" % msg)
                     server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey, retry = 2)
+                    truncMsg = truncateError(msg)
                     configreq = {  'workflow': task['tm_taskname'],
                                    'status': "FAILED",
                                    'subresource': 'failure',
                                    #limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
-                                   'failure': b64encode(msg[:7500])}
+                                   'failure': b64encode(truncMsg)}
 
                     server.post(resturi, data = urllib.urlencode(configreq))
                     logger.info("Error message successfully uploaded to the REST")
