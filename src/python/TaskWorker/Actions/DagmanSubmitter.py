@@ -236,7 +236,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
         address = ""
         schedd = ""
         try:
+            self.logger.debug("Duplicate check is getting the schedd obj. Collector is: %s" % task['tm_collector'])
             schedd, address = loc.getScheddObjNew(task['tm_schedd'])
+            self.logger.debug("Got schedd obj for %s " % task['tm_schedd'])
         except Exception as exp:
             msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
             self.logger.exception(msg)
@@ -244,7 +246,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
 
+        self.logger.debug("Duplicate check is querying the schedd: %s" % rootConst)
         results = list(schedd.xquery(rootConst, []))
+        self.logger.debug("Schedd queried %s" % results)
 
         if not results:
             # Task not already in schedd
@@ -278,7 +282,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dashboard_params = args[0][2]
         inputFiles = args[0][3]
 
+        self.logger.debug("Starting duplicate check")
         dup = self.duplicateCheck(task)
+        self.logger.debug("Duplicate check finished %s" % dup)
         if dup != None:
             return dup
 
@@ -302,7 +308,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
             address = ""
             schedd = ""
             try:
+                self.logger.debug("Getting schedd object")
                 schedd, address = loc.getScheddObjNew(task['tm_schedd'])
+                self.logger.debug("Got schedd object")
             except Exception as exp:
                 msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (self.workflow, str(exp))
                 self.logger.exception(msg)
@@ -314,23 +322,27 @@ class DagmanSubmitter(TaskAction.TaskAction):
             except:
                 raise TaskWorkerException("Unable to get schedd address for task %s" % (task['tm_taskname']))
             #try to connect
+            self.logger.debug("gsissh-ing to schedd %s" % scheddAddress)
             if hasattr(self.config.MyProxy, 'uisource'):
                 ret = subprocess.call(["sh","-c","export X509_USER_PROXY=%s; source %s; timeout 60 gsissh -o ConnectTimeout=60 -o PasswordAuthentication=no %s pwd" %\
                                                     (task['user_proxy'], self.config.MyProxy.uisource, scheddAddress)])
             else:
                 ret = subprocess.call(["sh","-c","export X509_USER_PROXY=%s; timeout 60 gsissh -o ConnectTimeout=60 -o PasswordAuthentication=no %s pwd" %\
                                                     (task['user_proxy'], scheddAddress)])
+            self.logger.debug("gsissh done")
             if ret:
                 msg = "Cannot gsissh to %s. Taskname %s." % (scheddAddress, task['tm_taskname'])
                 if ret == 124:
                     msg += "\n Timeout executing the command gsissh."
                 raise TaskWorkerException(msg)
 
+            self.logger.debug("Finally submitting to the schedd")
             if address:
                 self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
             else:
                 jdl = MASTER_DAG_SUBMIT_FILE % info
                 schedd.submitRaw(task['tm_taskname'], jdl, task['user_proxy'], inputFiles)
+            self.logger.debug("Submission finished")
         finally:
             os.chdir(cwd)
 
