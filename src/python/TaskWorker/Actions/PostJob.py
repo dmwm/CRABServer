@@ -616,6 +616,13 @@ class ASOServerJob(object):
                            'type'                    : file_type,
                            'publish'                 : publish,
                           }
+                    ## TODO: We do the following, only because that's what ASO does when a file has
+                    ## been successfully transferred. But this modified LFN makes no sence when it
+                    ## starts with /store/temp/user/, because the modified LFN is then 
+                    ## /store/user/<username>.<hash>/bla/blabla, i.e. it contains the <hash>, which
+                    ## is never part of a destination LFN, but only of temp source LFNs.
+                    ## Once ASO uses the source_lfn and the destination_lfn instead of only the lfn,
+                    ## this should not be needed anymore.
                     if not needs_transfer:
                         doc['lfn'] = source_lfn.replace('/store/temp', '/store', 1)
                         doc['source_lfn'] = source_lfn.replace('/store/temp', '/store', 1)
