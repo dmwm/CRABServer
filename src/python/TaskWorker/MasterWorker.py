@@ -28,7 +28,7 @@ from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
 ## This is a list because we want to preserve the order
 STATE_ACTIONS_MAP = [("NEW", handleNewTask), ("KILL", handleKill), ("RESUBMIT", handleResubmit)]
 def states():
-    for st in STATE_ACTIONS_MAP:
+    for st in sorted(STATE_ACTIONS_MAP, key=lambda k: random.random()):
         yield st
 
 def handler(status):
