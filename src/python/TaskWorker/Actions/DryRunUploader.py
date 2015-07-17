@@ -30,7 +30,7 @@ class DryRunUploader(TaskAction):
     def executeInternal(self, *args, **kw):
         tempDir = args[0][0]
         inputFiles = args[0][3]
-        splitterResult = args[0][4]
+        splitterResult = args[0][4][0]
 
         cwd = os.getcwd()
         try:

@@ -17,6 +17,7 @@ import tempfile
 from ast import literal_eval
 from httplib import HTTPException
 
+from ServerUtilities import getLockedFile
 import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
 import TaskWorker.Actions.TaskAction as TaskAction
@@ -57,8 +58,8 @@ ABORT-DAG-ON Job{count} 3
 """
 
 SUBDAG_FRAGMENT = """
-SUBDAG EXTERNAL Job{count}_0 RunJobs{count}.subdag
-PARENT Job{count} CHILD Job{count}_0
+SUBDAG EXTERNAL Job{parent}SubJobs RunJobs{parent}.subdag
+PARENT Job{count} CHILD Job{parent}SubJobs
 
 """
 
@@ -389,7 +390,8 @@ class DagmanCreator(TaskAction.TaskAction):
         """
 
         if os.path.exists("Job.submit"):
-            return
+            return {}
+
         # From here on out, we convert from tm_* names to the DataWorkflow names
         info = dict(task)
         info['workflow'] = task['tm_taskname']
@@ -460,7 +462,9 @@ class DagmanCreator(TaskAction.TaskAction):
         return info
 
 
-    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid):
+    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid, subjob=None):
+        self.logger.debug('makeDagSpecs called, args are:')
+        self.logger.debug(str([task, sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid, subjob]))
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
@@ -484,17 +488,22 @@ class DagmanCreator(TaskAction.TaskAction):
             lastEvent = str(job['mask']['LastEvent'])
             firstLumi = str(job['mask']['FirstLumi'])
             firstRun = str(job['mask']['FirstRun'])
-            i += 1
-            sitead['Job%d' % i] = list(availablesites)
+            if subjob is None:
+                i += 1
+                count = str(i)
+            else:
+                subjob += 1
+                count = '{parent}-{subjob}'.format(parent=i, subjob=subjob)
+            sitead['Job{0}'.format(count)] = list(availablesites)
             siteinfo[i] = groupid
             remoteOutputFiles = []
             localOutputFiles = []
             for origFile in outfiles:
                 info = origFile.rsplit(".", 1)
                 if len(info) == 2:
-                    fileName = "%s_%d.%s" % (info[0], i, info[1])
+                    fileName = "%s_%s.%s" % (info[0], count, info[1])
                 else:
-                    fileName = "%s_%d" % (origFile, i)
+                    fileName = "%s_%s" % (origFile, count)
                 remoteOutputFiles.append("%s" % fileName)
                 localOutputFiles.append("%s=%s" % (origFile, fileName))
             remoteOutputFilesStr = " ".join(remoteOutputFiles)
@@ -507,7 +516,8 @@ class DagmanCreator(TaskAction.TaskAction):
                 lastDirectDest = directDest
             pfns = ["log/cmsRun_%d.log.tar.gz" % i] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
-            nodeSpec = {'count'             : i,
+            nodeSpec = {'count'             : count,
+                        'parent'            : str(i),
                         'maxretries'        : task['numautomjobretries'],
                         'taskname'          : task['tm_taskname'],
                         'backend'           : os.environ.get('HOSTNAME',''),
@@ -539,9 +549,11 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def createSubdag(self, splitterResult, **kwargs):
 
-        startjobid = 0
+        startjobid = kwargs.get('startjobid', 0)
+        subjob = kwargs.get('subjob', None)
+        self.logger.debug('starting createSubdag, kwargs are:')
+        self.logger.debug(str(kwargs))
         dagSpecs = []
-        subdags = []
 
         if hasattr(self.config.TaskWorker, 'stageoutPolicy'):
             kwargs['task']['stageoutpolicy'] = ",".join(self.config.TaskWorker.stageoutPolicy)
@@ -559,6 +571,8 @@ class DagmanCreator(TaskAction.TaskAction):
 
         os.chmod("CMSRunAnalysis.sh", 0755)
 
+        sitead = kwargs.get('sitead', classad.ClassAd())
+        siteinfo = kwargs.get('siteinfo', {'groups': {}})
         # This config setting acts as a global black list
         global_blacklist = set(self.getBlacklistedSites())
 
@@ -634,26 +648,43 @@ class DagmanCreator(TaskAction.TaskAction):
         dag = DAG_HEADER.format(resthost=kwargs['task']['resthost'], resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
         for dagSpec in dagSpecs:
             dag += DAG_FRAGMENT.format(**dagSpec)
-            dag += SUBDAG_FRAGMENT.format(**dagSpec)
-
-            ## Create an empty SUBDAG
-            subdag = "RunJobs{0}.subdag".format(dagSpec['count'])
-            with open(subdag, "w") as fd:
-                fd.write("")
-            subdags.append(subdag)
+            if subjob is None:
+                dag += SUBDAG_FRAGMENT.format(**dagSpec)
 
         ## Create a tarball with all the job lumi files.
-        run_and_lumis_tar = tarfile.open("run_and_lumis.tar.gz", "w:gz")
-        for dagSpec in dagSpecs:
-            job_lumis_file = 'job_lumis_'+ str(dagSpec['count']) +'.json'
-            with open(job_lumis_file, "w") as fd:
-                fd.write(str(dagSpec['runAndLumiMask']))
-            run_and_lumis_tar.add(job_lumis_file)
-            os.remove(job_lumis_file)
-        run_and_lumis_tar.close()
+        with getLockedFile('run_and_lumis.tar.gz', 'a') as fd:
+            self.logger.debug("Acquired lock on run and lumi tarball")
+
+            try:
+                tempDir = tempfile.mkdtemp()
+                tfd = tarfile.open('run_and_lumis.tar.gz', 'r:gz')
+                tfd.extractall(tempDir)
+                tfd.close()
+                tfd = tarfile.open('run_and_lumis.tar.gz', 'w:gz')
+                for dagSpec in dagSpecs:
+                    job_lumis_file = os.path.join(tempDir, 'job_lumis_'+ str(dagSpec['count']) +'.json')
+                    with open(job_lumis_file, "w") as fd:
+                        fd.write(str(dagSpec['runAndLumiMask']))
+
+            finally:
+                tfd.add(tempDir, arcname='')
+                tfd.close()
+                shutil.rmtree(tempDir)
+
+        if subjob is None:
+            name = "RunJobs.dag"
+            ## Cache data discovery
+            with open("datadiscovery.pkl", "wb") as fd:
+                pickle.dump(splitterResult[1], fd)
+
+            ## Cache task information
+            with open("taskinformation.json", "w") as fd:
+                json.dump(kwargs['task'], fd)
+        else:
+            name = "RunJobs{0}.subdag".format(dagSpec['parent'])
 
         ## Save the DAG into a file.
-        with open("RunJobs.dag", "w") as fd:
+        with open(name, "w") as fd:
             fd.write(dag)
 
         with open("site.ad", "w") as fd:
@@ -661,14 +692,6 @@ class DagmanCreator(TaskAction.TaskAction):
 
         with open("site.ad.json", "w") as fd:
             json.dump(siteinfo, fd)
-
-        ## Cache data discovery
-        with open("datadiscovery.pkl", "wb") as fd:
-            pickle.dump(splitterResult[1], fd)
-
-        ## Cache task information
-        with open("taskinformation.json", "w") as fd:
-            json.dump(kwargs['task'], fd)
 
         task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
         userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
@@ -724,7 +747,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 self.logger.error("Failed to record the number of jobs.")
                 return 1
 
-        return info, splitterResult, subdags
+        return info, splitterResult
 
 
     def executeInternal(self, *args, **kw):

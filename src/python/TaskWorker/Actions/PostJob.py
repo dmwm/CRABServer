@@ -86,6 +86,8 @@ from WMCore.DataStructs.LumiList import LumiList
 
 from ServerUtilities import setDashboardLogs
 from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
+from TaskWorker.Actions.DagmanCreator import DagmanCreator
+from TaskWorker.Actions.DagmanCreator import SPLIT_ARG_MAP
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 from TaskWorker.Actions.Splitter import Splitter
@@ -1233,12 +1235,17 @@ class PostJob():
 
         task['tm_split_args']['runs'] = runs
         task['tm_split_args']['lumis'] = lumis
+        for algorithm, units in SPLIT_ARG_MAP.items():
+            if task['tm_split_algo'] == algorithm:
+                task['tm_split_args'][units] /= 4
+        self.logger.info("dataset: %s" % str(dataset))
+        self.logger.info("task: %s" % str(task))
 
         try:
             config = Configuration()
             config.TaskWorker = ConfigSection(name="TaskWorker")
 
-            splitter = Splitter(config)
+            splitter = Splitter(config, server=None, resturi='')
             split_result = splitter.execute(dataset, task=task)
 
             self.logger.info("Splitting results:")
@@ -1246,6 +1253,19 @@ class PostJob():
                 self.logger.error("Created jobgroup with length {0}".format(len(g.getJobs())))
         except TaskWorkerException as e:
             self.logger.error("Error during splitting")
+
+        try:
+            creator = DagmanCreator(config, server=None, resturi='')
+            with open('site.ad') as fd:
+                sitead = classad.parse(fd)
+            availablesites = sitead['Job%d' % self.job_id]
+            self.logger.error('found available sites: %s' % str(availablesites))
+            self.logger.error(str(type(availablesites)))
+            with open('site.ad.json') as fd:
+                siteinfo = json.load(fd)
+            creator.createSubdag(split_result.result, task=task, sitead=sitead, availablesites=availablesites, siteinfo=siteinfo, startjobid=self.job_id, subjob=0)
+        except TaskWorkerException as e:
+            self.logger.error('Error during subdag creation')
 
         ## AndresT. We don't need this method IMHO. See note I made in the method.
         self.fix_job_logs_permissions()

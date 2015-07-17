@@ -1,10 +1,18 @@
 """
 This contains some utility methods to share between the server and the client, or by the server components themself
 """
-
+import contextlib
+import fcntl
 import os
 import re
+<<<<<<< Updated upstream
 import subprocess
+=======
+import shutil
+import tarfile
+import tempfile
+import time
+>>>>>>> Stashed changes
 
 def checkOutLFN(lfn, username):
     if lfn.startswith('/store/user/'):
@@ -30,7 +38,6 @@ def setDashboardLogs(params, webdir, jobid, retry):
         log_files[i] = log_file_name
     params['StatusLogFile'] = ",".join(log_files)
 
-
 def getWebdirForDb(reqname, storage_rules):
     path = os.path.expanduser("~/%s" % reqname)
     sinfo = storage_rules.split(",")
@@ -50,3 +57,51 @@ def cmd_exist(cmd):
         return True
     except OSError:
         return False
+
+@contextlib.contextmanager
+def getLockedFile(name, mode, retries=5, sleep=0.5):
+    try:
+        fd = open(name, mode)
+        fcntl.flock(fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
+    except:
+        if retries == 0:
+            raise Exception('unable to access locked file {0}'.format(name))
+        time.sleep(sleep)
+        with getLockedFile(name, mode, retries-1) as fd:
+            yield fd
+
+    try:
+        yield fd
+
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        fd.close()
+
+@contextlib.contextmanager
+def getLockedAppendableTarFile(name, mode, retries=5, sleep=0.5):
+    try:
+        fd = open(name, 'a') # use open() because tarfile.open() objects do not have fileno() (needed for flock)
+        fcntl.flock(fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
+    except:
+        if retries == 0:
+            raise Exception('unable to access locked file {0}'.format(name))
+        time.sleep(sleep)
+        with getLockedAppendableTarFile(name, mode, retries-1) as tfd:
+            yield tfd
+
+    try:
+        tempDir = tempfile.mkdtemp()
+        tfd = tarfile.open(name, mode.replace('w', 'r'))
+        tfd.extractall(tempDir)
+        tfd.close()
+        tfd = tarfile.open(name, mode)
+
+        yield tfd
+
+    finally:
+        tfd.add(tempDir, arcname='')
+        tfd.close()
+        shutil.rmtree(tempDir)
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        fd.close()
+
