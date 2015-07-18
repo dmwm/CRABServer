@@ -11,13 +11,18 @@ for FILE in $1.dagman.out RunJobs.dag RunJobs.dag.dagman.out dbs_discovery.err d
     touch $FILE
 done
 
-# Add in python paths for UCSD and CERN submit hosts.  We'll get RemoteCondorSetup working again in the future.
 export PATH="/opt/glidecondor/bin:/opt/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export PATH="/data/srv/glidecondor/bin:/data/srv/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export PYTHONPATH=/opt/glidecondor/lib/python:$PYTHONPATH
 export PYTHONPATH=/data/srv/glidecondor/lib/python2.6:$PYTHONPATH
 export LD_LIBRARY_PATH=/opt/glidecondor/lib:/opt/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/data/srv/glidecondor/lib:/data/srv/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
+
+#Sourcing Remote Condor setup
+source_script=`grep '^RemoteCondorSetup =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
+if [ "X$source_script" != "X" ] && [ -e $source_script ]; then
+    source $source_script
+fi
 
 mkdir -p retry_info
 mkdir -p resubmit_info
@@ -45,12 +50,6 @@ if [ $(cat $_CONDOR_JOB_AD | wc -l) -lt 3 ]; then
         echo "Error: dag_bootstrap_startup requires ClassAds for execution." >&2
         exit 1
     fi
-fi
-
-#Sourcing Remote Condor setup
-source_script=`grep '^RemoteCondorSetup =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
-if [ "X$source_script" != "X" ] && [ -e $source_script ]; then
-    source $source_script
 fi
 
 #MAX_POST is set in TaskWorker configuration.
