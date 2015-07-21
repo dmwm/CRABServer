@@ -40,6 +40,11 @@ class TaskHandler(object):
         self._work = []
         self._task = task
 
+    def removeTaskLogHandler(taskhandler):
+        taskhandler.flush()
+        taskhandler.close()
+        self.logger.removeHandler(taskhandler)
+
     def addWork(self, work):
         """Appending a new action to be performed on the task
 
@@ -79,11 +84,13 @@ class TaskHandler(object):
                 break #exit normally. Worker will not notice there was an error
             except TaskWorkerException as twe:
                 self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
+                self.removeTaskLogHandler(taskhandler)
                 raise WorkerHandlerException(str(twe)) #TaskWorker error, do not add traceback to the error propagated to the REST
             except Exception as exc:
                 msg = "Problem handling %s because of %s failure, traceback follows\n" % (self._task['tm_taskname'], str(exc))
                 msg += str(traceback.format_exc())
                 self.logger.error(msg)
+                self.removeTaskLogHandler(taskhandler)
                 raise WorkerHandlerException(msg) #Errors not foreseen. Print everything!
             finally:
                 #upload logfile of the task to the crabcache
@@ -101,9 +108,6 @@ class TaskHandler(object):
                     except Exception as e:
                         msg = "Unknown error while uploading the logfile for task %s" % self._task['tm_taskname']
                         self.logger.exception(msg)
-                taskhandler.flush()
-                taskhandler.close()
-                self.logger.removeHandler(taskhandler)
             t1 = time.time()
             self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1-t0))
             try:
@@ -111,8 +115,7 @@ class TaskHandler(object):
             except AttributeError:
                 nextinput = output
 
-        taskhandler.close()
-        self.logger.removeHandler(taskhandler)
+        self.removeTaskLogHandler(taskhandler)
 
         return nextinput
 
