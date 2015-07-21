@@ -145,9 +145,8 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
         """Performs the injection of a new task into Glidein
         :arg WMCore.Configuration config: input configuration"""
         handler.addWork( DagmanCreator(config=config, server=server, resturi=resturi, procnum=procnum) )
-        if task['tm_dry_run'] == 'T':
-            handler.addWork( DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum) )
-        else:
+        handler.addWork( DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum) )
+        if task['tm_dry_run'] == 'F':
             handler.addWork( DagmanSubmitter(config=config, server=server, resturi=resturi, procnum=procnum) )
 
     def panda(config):

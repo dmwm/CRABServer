@@ -77,11 +77,13 @@ class SplittingSummary(object):
         self.algo = algo
         self.lumisPerJob = []
         self.eventsPerJob = []
+        self.filesPerJob = []
 
     def addJobs(self, jobs):
         if self.algo == 'FileBased':
             self.lumisPerJob += [sum([x.get('lumiCount', 0) for x in job['input_files']]) for job in jobs]
             self.eventsPerJob += [sum([x['events'] for x in job['input_files']]) for job in jobs]
+            self.filesPerJob += [len(job['input_files']) for job in jobs]
         elif self.algo == 'EventBased':
             self.lumisPerJob += [job['mask']['LastLumi'] - job['mask']['FirstLumi'] for job in jobs]
             self.eventsPerJob += [job['mask']['LastEvent'] - job['mask']['FirstEvent'] for job in jobs]
@@ -107,6 +109,11 @@ class SplittingSummary(object):
                    'avg_events': sum(self.eventsPerJob)/float(len(self.eventsPerJob)),
                    'min_lumis': min(self.lumisPerJob),
                    'min_events': min(self.eventsPerJob)}
+        if len(self.filesPerJob) > 0:
+            summary.update({'total_files': sum(self.filesPerJob),
+                            'max_files': max(self.filesPerJob),
+                            'avg_files': sum(self.filesPerJob)/float(len(self.filesPerJob)),
+                            'min_files': min(self.filesPerJob)})
 
         with open(outname, 'wb') as f:
             json.dump(summary, f)
