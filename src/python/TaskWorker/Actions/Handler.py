@@ -40,7 +40,7 @@ class TaskHandler(object):
         self._work = []
         self._task = task
 
-    def removeTaskLogHandler(taskhandler):
+    def removeTaskLogHandler(self, taskhandler):
         taskhandler.flush()
         taskhandler.close()
         self.logger.removeHandler(taskhandler)
