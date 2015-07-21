@@ -336,6 +336,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     msg += "\n Timeout executing the command gsissh."
                 raise TaskWorkerException(msg)
 
+            # Get location of schedd-specific environment script from schedd ad.
+            info['remote_condor_setup'] = loc.scheddAd.get("RemoteCondorSetup", "")
+
             self.logger.debug("Finally submitting to the schedd")
             if address:
                 self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
