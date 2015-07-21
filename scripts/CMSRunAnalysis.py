@@ -494,6 +494,7 @@ def parseArgs():
     return opts
 
 
+#TODO: MM I do not believe this is necessary at all
 def prepSandbox(opts):
     print "==== Sandbox preparation STARTING at %s ====" % time.asctime(time.gmtime())
     os.environ['WMAGENTJOBDIR'] = os.getcwd()
@@ -543,6 +544,11 @@ def prepSandbox(opts):
             os.rename(myfile, destDir + '/' + myfile)
     print "==== WMCore filesystem preparation FINISHING at %s ====" % time.asctime(time.gmtime())
 
+
+def extractUserSandbox(archiveJob, cmsswVersion):
+    os.chdir(cmsswVersion)
+    print commands.getoutput('tar xvfzm %s ' % os.path.join('..', opts.archiveJob))
+    os.chdir('..')
 
 def getProv(filename, scram):
     ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd(), logName="edmProvDumpOutput.log")
@@ -866,6 +872,8 @@ if __name__ == "__main__":
             handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
             mintime()
             sys.exit(EC_CMSMissingSoftware)
+
+        extractUserSandbox(opts.archiveJob, opts.cmsswVersion)
 
         try:
             jobExitCode = None
