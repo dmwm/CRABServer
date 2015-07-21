@@ -12,6 +12,7 @@ import pycurl
 import classad
 import htcondor
 
+from ServerUtilities import FEEDBACKMAIL
 import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.WMSpec.WMTask import buildLumiMask
 from WMCore.DataStructs.LumiList import LumiList
@@ -24,6 +25,7 @@ from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTas
 
 import HTCondorUtils
 import HTCondorLocator
+
 
 JOB_KILLED_HOLD_REASON = "Python-initiated action."
 
@@ -352,10 +354,11 @@ class HTCondorDataWorkflow(DataWorkflow):
                # Node_status file is not ready or task is too old
                # Will use old logic.
                useOldLogic = True
-           except ExecutionError:
-               # ExecutionError will be raised if it is not possible to retrieve job_log or site.ad
-               # Not return results as good and use old logic.
-               useOldLogic = True
+           except ExecutionError as e:
+               #The old logic will call again taskWebStatus probably failing for the same reason
+               result['status'] = "UNKNOWN"
+               result['taskFailureMsg'] = e.info
+               return [result]
 
         if useOldLogic:
             self.logger.info("Will get status using condor_q")
@@ -413,6 +416,10 @@ class HTCondorDataWorkflow(DataWorkflow):
             except MissingNodeStatus:
                 result['status'] = "UNKNOWN"
                 result['taskFailureMsg'] = "Node status file not currently available. Retry in a minute if you just submitted the task"
+                return [result]
+            except ExecutionError as e:
+                result['status'] = "UNKNOWN"
+                result['taskFailureMsg'] = e.info
                 return [result]
 
             taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
@@ -516,6 +523,15 @@ class HTCondorDataWorkflow(DataWorkflow):
         hbuf.truncate(0)
         return fp, hbuf
 
+    def myPerform(self, curl, url):
+        try:
+            curl.perform()
+        except pycurl.error as e:
+            raise ExecutionError(("Failed to contact Grid scheduler when getting URL %s. "
+                                  "This might be a temporary error, please retry later and "
+                                  "contact %s if the error persist. Error from curl: %s"
+                                  % (url, FEEDBACKMAIL, str(e))))
+
     def taskWebStatus(self, task_ad, verbose):
         nodes = {}
 
@@ -532,7 +548,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 jobs_url = url + "/jobs_log.txt"
                 curl.setopt(pycurl.URL, jobs_url)
                 self.logger.info("Starting download of job log")
-                curl.perform()
+                self.myPerform(curl, jobs_url)
                 self.logger.info("Finished download of job log")
                 header = ResponseHeader(hbuf.getvalue())
                 if header.status == 200:
@@ -546,7 +562,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 site_url = url + "/site_ad.txt"
                 curl.setopt(pycurl.URL, site_url)
                 self.logger.debug("Starting download of site ad")
-                curl.perform()
+                self.myPerform(curl, site_url)
                 self.logger.debug("Finished download of site ad")
                 header = ResponseHeader(hbuf.getvalue())
                 if header.status == 200:
@@ -561,7 +577,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             # Before executing any new curl, truncate and clean temp file
             fp, hbuf = self.cleanTempFileAndBuff(fp, hbuf)
             self.logger.debug("Starting download of node state")
-            curl.perform()
+            self.myPerform(curl, nodes_url)
             self.logger.debug("Finished download of node state")
             header = ResponseHeader(hbuf.getvalue())
             if header.status == 200:
@@ -577,7 +593,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             fp, hbuf = self.cleanTempFileAndBuff(fp, hbuf)
             curl.setopt(pycurl.URL, site_url)
             self.logger.debug("Starting download of error summary file")
-            curl.perform()
+            self.myPerform(curl, site_url)
             self.logger.debug("Finished download of error summary file")
             header = ResponseHeader(hbuf.getvalue())
             if header.status == 200:

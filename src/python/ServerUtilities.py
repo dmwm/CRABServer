@@ -6,6 +6,8 @@ import os
 import re
 import subprocess
 
+FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
+
 def checkOutLFN(lfn, username):
     if lfn.startswith('/store/user/'):
         if lfn.split('/')[3] != username:
