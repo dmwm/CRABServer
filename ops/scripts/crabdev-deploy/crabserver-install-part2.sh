@@ -1,22 +1,38 @@
 #!/bin/bash
 
+ME=$USER
+
+voms-proxy-init --valid 168:00
+
+G="_config,_sw,_auth,_frontend,_admin,_crabserver,_crabcache"
+sudo usermod -G $G $ME
+sudo chown $ME /etc/grid-security/host{cert,key}.pem
+
+# cambiare permessi:
+#sudo chown talamoig:zh /data/srv/state/frontend/etc/authmap.json
+
+sudo chown talamoig:zh /data
+sudo rm -fr /data/{cfg,dbconfig.py,srv,user}
+
 RCFILE=$PWD/paramsrc-filecheck.sh
 CRABAUTH=/data/srv/current/auth/crabserver/CRABServerAuth.py
 CRABINIT=/data/crabserver.sh
 
 source $RCFILE
-
+sudo chmod 777 /data
 git clone git://github.com/talamoig/deployment.git /data/cfg
 cd /data/cfg
-if [ "string" == "string${HGVER}"]
+if [ "string" == "string${HGVER}" ]
 then
-HGVER=`git tag -l 'HG*'|tail -1`
+    HGVER=`git tag -l 'HG*'|tail -1`
 fi
-
-git reset --hard $HGVER
+git reset --hard $HGVER-unattended
+#-unattended
 REPO="-r comp=$COMPREPO" A=/data/cfg/admin
 cd /data
-$A/InstallDev -R comp@$HGVER -A $ARCH -s image -v $HGVER $REPO -p "admin/devtools frontend crabserver crabcache"
+$A/InstallDev -R comp@$HGVER -A $ARCH -s image -v $HGVER $REPO -p "admin/devtools frontend crabserver@$CRABSERVER_RELEASE crabcache"
+#HGVER="HG1505c"
+#$A/InstallDev -R comp@$HGVER -A $ARCH -s image -v $HGVER $REPO -p "admin/devtools frontend crabserver@$CRABSERVER_RELEASE crabcache"
 
 echo "Setting data.extconfigurl to $GISTEXTURL"
 sed -i "s|data.extconfigurl.*|data.extconfigurl = '$GISTEXTURL'|" /data/srv/current/config/crabserver/config.py
@@ -45,14 +61,11 @@ sudo mv /tmp/CRABServerAuth.py $CRABAUTH
 sudo chmod 440 $CRABAUTH
 sudo chown  _sw:_config $CRABAUTH
 
-if [ ! -f /data/srv/current/auth/crabserver/dmwm-service-cert.pem ]
-then
-    echo "Creating service certificate"    
-    voms-proxy-init --valid 168:00
-    sudo cp /tmp/x509up_u$UID /data/srv/current/auth/crabserver/dmwm-service-cert.pem
-    sudo cp /tmp/x509up_u$UID /data/srv/current/auth/crabserver/dmwm-service-key.pem
-fi
+echo "Creating service certificate"    
+sudo cp /tmp/x509up_u$UID /data/srv/current/auth/crabserver/dmwm-service-cert.pem
+sudo cp /tmp/x509up_u$UID /data/srv/current/auth/crabserver/dmwm-service-key.pem
 
+mkdir /data/user
 if [ ! -d /data/user/CRABServer ]
 then
     cd /data/user/
@@ -110,4 +123,4 @@ EOF
 
 chmod +x $CRABINIT
 
-source $CRABINIT start
+$CRABINIT start
