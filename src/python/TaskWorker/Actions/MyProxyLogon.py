@@ -1,12 +1,8 @@
-import urllib
-from httplib import HTTPException
-from base64 import b64encode
-
 from WMCore.Credential.Proxy import Proxy
 
-from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.DataObjects.Result import Result
-from TaskWorker.WorkerExceptions import StopHandler
+from TaskWorker.Actions.TaskAction import TaskAction
+from TaskWorker.WorkerExceptions import TaskWorkerException
 
 # We won't do anything if the proxy is shorted then 1 hour
 # NB: in the PoC we had 24 hours, but does that make sense
@@ -14,6 +10,8 @@ from TaskWorker.WorkerExceptions import StopHandler
 MINPROXYLENGTH = 60 * 60 * 1
 
 class MyProxyLogon(TaskAction):
+    """ Retrieves the user proxy from myproxy
+    """
 
     def __init__(self, config, server, resturi, procnum=-1, myproxylen=MINPROXYLENGTH):
         TaskAction.__init__(self, config, server, resturi, procnum)
@@ -42,15 +40,8 @@ class MyProxyLogon(TaskAction):
         proxy.logonRenewMyProxy()
         timeleft = proxy.getTimeLeft(userproxy)
         if timeleft is None or timeleft <= 0:
-            msg = "Impossible to retrieve proxy from %s for %s." %(proxycfg['myProxySvr'], proxycfg['userDN'])
-            self.logger.error("Setting %s as failed" % str(kwargs['task']['tm_taskname']))
-            configreq = {'workflow': kwargs['task']['tm_taskname'],
-                         'status': "FAILED",
-                         'subresource': 'failure',
-                         'failure': b64encode(msg)}
-            self.logger.error(str(configreq))
-            self.server.post(self.resturi, data = urllib.urlencode(configreq))
-            raise StopHandler(msg)
+            msg = "Impossible to retrieve proxy from %s for %s." % (proxycfg['myProxySvr'], proxycfg['userDN'])
+            raise TaskWorkerException(msg)
         else:
             kwargs['task']['user_proxy'] = userproxy
             result = Result(task=kwargs['task'], result='OK')

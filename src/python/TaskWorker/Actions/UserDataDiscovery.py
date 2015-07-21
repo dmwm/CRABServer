@@ -1,19 +1,11 @@
-
-import os
-import urllib
-import logging
-from httplib import HTTPException
-from base64 import b64encode
-
-from WMCore.WorkQueue.WorkQueueUtils import get_dbs
-from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
+from WMCore.DataStructs.Run import Run
 from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
-from WMCore.DataStructs.Run import Run
+from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 
-from TaskWorker.Actions.DataDiscovery import DataDiscovery
-from TaskWorker.WorkerExceptions import StopHandler
 from TaskWorker.DataObjects.Result import Result
+from TaskWorker.Actions.DataDiscovery import DataDiscovery
+from TaskWorker.WorkerExceptions import TaskWorkerException
 
 
 class UserDataDiscovery(DataDiscovery):
@@ -32,13 +24,7 @@ class UserDataDiscovery(DataDiscovery):
                 msg = "No files specified to process for task %s." % kwargs['task']['tm_taskname']
             if splitting != 'FileBased':
                 msg = "Data.splitting must be set to 'FileBased' when using a custom set of files."
-            self.logger.error("Setting %s as failed: %s" % (kwargs['task']['tm_taskname'], msg))
-            configreq = {'workflow': kwargs['task']['tm_taskname'],
-                         'status': "FAILED",
-                         'subresource': 'failure',
-                         'failure': b64encode(msg)}
-            self.server.post(self.resturi, data = urllib.urlencode(configreq))
-            raise StopHandler(msg)
+            raise TaskWorkerException(msg)
 
         if hasattr(self.config.Sites, 'available'):
             locations = self.config.Sites.available
