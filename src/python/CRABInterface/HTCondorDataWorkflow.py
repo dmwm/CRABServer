@@ -449,31 +449,30 @@ class HTCondorDataWorkflow(DataWorkflow):
             jobList.append((status, job))
         result['jobsPerStatus'] = jobsPerStatus
         result['jobList'] = jobList
+        result['jobs'] = taskStatus
 
-        ## Publication information will go here.
-        publication_info = {}
-
-        ## The output datasets are written into the Task DB by the post-job
-        ## when uploading the output files metadata.
-        outdatasets = literal_eval(row.output_dataset.read() if row.output_dataset else 'None')
+        if len(taskStatus) == 0 and results and results[0]['JobStatus'] == 2:
+            result['status'] = 'Running (jobs not submitted)'
 
         #Always returning ASOURL also, it is required for kill, resubmit
         self.logger.info("ASO: %s" % row.asourl)
         result['ASOURL'] = row.asourl
 
+        ## Retrieve publication information.
+        publicationInfo = {}
         if (row.publication == 'T' and 'finished' in result['jobsPerStatus']):
-            publication_info = self.publicationStatus(workflow, row.asourl)
+            publicationInfo = self.publicationStatus(workflow, row.asourl)
             self.logger.info("Publication status for workflow %s done" % workflow)
         elif (row.publication == 'F'):
-            publication_info = {'disabled': []}
+            publicationInfo['status'] = {'disabled': []}
         else:
             self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.publication, result['jobsPerStatus'].get('finished', 0)))
+        result['publication'] = publicationInfo.get('status', {})
+        result['publicationFailures'] = publicationInfo.get('failure_reasons', {})
 
-        if len(taskStatus) == 0 and results and results[0]['JobStatus'] == 2:
-            result['status'] = 'Running (jobs not submitted)'
-
-        result['jobs'] = taskStatus
-        result['publication'] = publication_info
+        ## The output datasets are written into the Task DB by the post-job
+        ## when uploading the output files metadata.
+        outdatasets = literal_eval(row.output_dataset.read() if row.output_dataset else 'None')
         result['outdatasets'] = outdatasets
 
         return [result]
@@ -608,32 +607,57 @@ class HTCondorDataWorkflow(DataWorkflow):
             fp.close()
             hbuf.close()
 
+
     def publicationStatus(self, workflow, asourl):
-        publication_info = {}
+        publicationInfo = {'status': {}, 'failure_reasons': {}}
         if not asourl:
             raise ExecutionError("This CRAB server is not configured to publish; no publication status is available.")
         server = CMSCouch.CouchServer(dburl=asourl, ckey=self.serverKey, cert=self.serverCert)
         try:
             db = server.connectDatabase('asynctransfer')
         except Exception as ex:
-            msg =  "Error while connecting to asynctransfer CouchDB for workflow %s " % workflow
+            msg = "Error while connecting to asynctransfer CouchDB for workflow %s " % (workflow)
             self.logger.exception(msg)
-            publication_info = {'error' : msg}
-            return  publication_info
+            publicationInfo['status'] = {'error': msg}
+            return publicationInfo
+        ## Get the publication status for the given workflow. The next query to the
+        ## CouchDB view returns a list of 1 dictionary (row) with:
+        ## 'key'   : workflow,
+        ## 'value' : a dictionary with possible publication statuses as keys and the
+        ##           counts as values.
         query = {'reduce': True, 'key': workflow, 'stale': 'update_after'}
         try:
-            publicationlist = None
-            publicationlist = db.loadView('AsyncTransfer', 'PublicationStateByWorkflow', query)['rows']
+            publicationList = db.loadView('AsyncTransfer', 'PublicationStateByWorkflow', query)['rows']
         except Exception as ex:
-            msg =  "Error while querying CouchDB for publication status information for workflow %s " % workflow
+            msg = "Error while querying CouchDB for publication status information for workflow %s " % (workflow)
             self.logger.exception(msg)
-            publication_info = {'error' : msg}
-            return  publication_info
+            publicationInfo['status'] = {'error': msg}
+            return publicationInfo
+        if publicationList:
+            publicationStatusDict = publicationList[0]['value']
+            publicationInfo['status'] = publicationStatusDict
+            ## Get the publication failure reasons for the given workflow. The next query to
+            ## the CouchDB view returns a list of N_different_publication_failures
+            ## dictionaries (rows) with:
+            ## 'key'   : [workflow, publication failure],
+            ## 'value' : count.
+            numFailedPublications = publicationStatusDict['publication_failed']
+            if numFailedPublications:
+                query = {'group': True, 'startkey': [workflow], 'endkey': [workflow, {}], 'stale': 'update_after'}
+                try:
+                    publicationFailedList = db.loadView('DBSPublisher', 'PublicationFailedByWorkflow', query)['rows']
+                except Exception as ex:
+                    msg = "Error while querying CouchDB for publication failures information for workflow %s " % (workflow)
+                    self.logger.exception(msg)
+                    publicationInfo['failure_reasons']['error'] = msg
+                    return publicationInfo
+                publicationInfo['failure_reasons']['result'] = []
+                for publicationFailed in publicationFailedList:
+                    failureReason = publicationFailed['key'][1]
+                    numFailedFiles = publicationFailed['value']
+                    publicationInfo['failure_reasons']['result'].append((failureReason, numFailedFiles))
 
-        if publicationlist and ('value' in publicationlist[0]):
-            publication_info.update(publicationlist[0]['value'])
-
-        return publication_info
+        return publicationInfo
 
 
     node_name_re = re.compile("DAG Node: Job(\d+)")
