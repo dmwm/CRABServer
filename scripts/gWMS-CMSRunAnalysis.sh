@@ -5,6 +5,27 @@
 # We changed this because HTCondor tosses the stdout/err, making the plugins
 # difficult-to-impossible to run.
 #
+
+# Saving START_TIME and when job finishes, check if runtime is not lower than 20m
+# If it is lower, sleep the difference. Will not sleep if CRAB3_RUNTIME_DEBUG is set.
+START_TIME=$(date +%s)
+function finish {
+  END_TIME=$(date +%s)
+  DIFF_TIME=$((END_TIME-START_TIME))
+  echo "Job Running time in seconds: " $DIFF_TIME
+  if [ "X$CRAB3_RUNTIME_DEBUG" != "X" ];
+  then
+    if [ $DIFF_TIME -lt 1200];
+    then
+      SLEEP_TIME=$((1200 - DIFF_TIME))
+      echo "Job runtime is less than 20minutes. Sleeping " $SLEEP_TIME
+      sleep $SLEEP_TIME
+    fi
+  fi
+}
+# Trap all exits and execute finish function
+trap finish EXIT
+
 echo "======== gWMS-CMSRunAnalysis.sh STARTING at $(TZ=GMT date) on $(hostname) ========"
 echo "Local time : $(date)"
 echo "Current system : $(uname -a)"
@@ -22,7 +43,6 @@ then
     if [ "X$CRAB_Dest" = "X" ];
     then
         print "Unable to determine CRAB output destination directory"
-        sleep 20m
         exit 2
     fi
     ONE_EVENT_TEST=$(grep '^CRAB_oneEventMode =' $_CONDOR_JOB_AD | awk '{print $NF;}')
@@ -37,7 +57,6 @@ then
     if [ "X$CRAB_Id" = "X" ];
     then
         print "Unable to determine CRAB Id."
-        sleep 20m
         exit 2
     fi
    echo "CRAB ID: $CRAB_Id"
@@ -63,11 +82,6 @@ echo "======== CMSRunAnalysis.sh at $(TZ=GMT date) STARTING ========"
 time sh ./CMSRunAnalysis.sh "$@" --oneEventMode=$CRAB_oneEventMode
 EXIT_STATUS=$?
 echo "CMSRunAnalysis.sh complete at $(TZ=GMT date) with (short) exit status $EXIT_STATUS"
-# Protect against missing *.sh initialization scripts.
-if [[ $EXIT_STATUS == 1 ]]
-then
-  sleep 20m
-fi
 
 echo "======== CMSRunAnalsysis.sh at $(TZ=GMT date) FINISHING ========"
 
@@ -105,7 +119,6 @@ else
 	echo "Error: OSG_APP nor VO_CMS_SW_DIR environment variables were set" >&2
 	echo "Error: CVMFS is not present" >&2
 	echo "Error: Because of this, we can't bootstrap to attempt stageout." >&2
-        sleep 20m
 	exit 2
 fi
 
@@ -129,7 +142,6 @@ if [[ $rc != 0 ]]
 then
 	echo "Error: Python2.6 isn't available on this worker node." >&2
 	echo "Error: execution of job stageout wrapper REQUIRES python2.6" >&2
-	sleep 20m
         exec sh ./DashboardFailure.sh 10043
 else
 	echo "Found python2.6 at:"
@@ -149,7 +161,6 @@ STAGEOUT_EXIT_STATUS=$?
 if [ ! -e wmcore_initialized ];
 then
     echo "======== ERROR: Unable to initialize WMCore at $(TZ=GMT date) ========"
-    sleep 20m
     exec sh ./DashboardFailure.sh 10043
 fi
 

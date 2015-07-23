@@ -46,8 +46,7 @@ then
     rc=$?
     if [[ $rc != 0 ]]
     then
-        echo "==== Sourcing cmsset_default.sh failed at $(TZ=GMT date).  Sleeping for 20 minutes. ===="
-        sleep 20m
+        echo "==== Sourcing cmsset_default.sh failed at $(TZ=GMT date). ===="
         tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
         exec sh ./DashboardFailure.sh 10032
     fi
@@ -70,15 +69,13 @@ then
 else
 	echo "Error: neither OSG_APP, CVMFS, nor VO_CMS_SW_DIR environment variables were set" >&2
 	echo "Error: Because of this, we can't load CMSSW. Not good." >&2
-	sleep 20m
         tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
 	exec sh ./DashboardFailure.sh 10031
 fi
 set +x
 if [[ $rc != 0 ]]
 then
-    echo "==== Sourcing cmsset_default.sh failed at $(TZ=GMT date).  Sleeping for 20 minutes. ===="
-    sleep 20m
+    echo "==== Sourcing cmsset_default.sh failed at $(TZ=GMT date). ===="
     tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
     exec sh ./DashboardFailure.sh 10032
 else
@@ -91,7 +88,6 @@ N_PYTHON26=${#VERSIONS[*]}
 if [ $N_PYTHON26 -lt 1 ]; then
     echo "Error: Unable to find a CMS version of python."
     echo "CRAB3 requires the CMS version of python to function."
-    sleep 20m
     exec sh ./DashboardFailure.sh 10043
 else
     VERSION=${VERSIONS[0]}
@@ -103,7 +99,6 @@ else
     if [[ $? != 0 ]]
     then
         echo "Error: Unable to source python environment setup."
-        sleep 20m
         exec sh ./DashboardFailure.sh 10043
     fi
 fi
@@ -114,7 +109,6 @@ if [[ $rc != 0 ]]
 then
 	echo "Error: Python wasn't found on this worker node after source CMS version." >&2
 	echo "Error: job execution REQUIRES a working python" >&2
-	sleep 20m
 	exec sh ./DashboardFailure.sh 10043
 else
 	echo "I found python at.."
@@ -125,7 +119,6 @@ rc=$?
 if [[ $rc != 0 ]]
 then
 	echo "Error: python is not functional."
-	sleep 20m
 	exec sh ./DashboardFailure.sh 10043
 fi
 
@@ -195,7 +188,6 @@ fi
 if [ ! -e wmcore_initialized ];
 then
     echo "======== ERROR: Unable to initialize WMCore at $(TZ=GMT date) ========"
-    sleep 20m
     exec sh ./DashboardFailure.sh 10043
 fi
 
