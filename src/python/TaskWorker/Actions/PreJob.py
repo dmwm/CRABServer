@@ -301,14 +301,22 @@ class PreJob:
         if numcores is not None:
             new_submit_text += '+RequestCpus = %s\n' % (str(numcores))
         if priority is not None:
-            if self.job_id <= 5:
-                priority += 10
-            priority += crab_retry
             new_submit_text += '+JobPrio = %s\n' % (str(priority))
+
+        ## Within the schedd, order the first few jobs in the task before all other tasks of the same priority.
+        pre_job_prio = 1
+        if self.job_id <= 5:
+            pre_job_prio = 0
+        new_submit_text += '+PreJobPrio1 = %d\n' % pre_job_prio
+
         ## The schedd will use PostJobPrio1 as a secondary job-priority sorting key: it
         ## will first run jobs by JobPrio; then, for jobs with the same JobPrio, it will
         ## run the job with the higher PostJobPrio1.
         new_submit_text += '+PostJobPrio1 = -%s\n' % str(self.task_ad.lookup('QDate'))
+
+        ## Order retries before all other jobs in this task
+        new_submit_text += '+PostJobPrio2 = %d\n' % crab_retry
+
         ## This is used to send to dashbord the location of the logfiles
         try:
             storage_rules = htcondor.param['CRAB_StorageRules']
