@@ -2034,6 +2034,7 @@ class PostJob():
                                      ".*operation not permitted*",
                                      ".*mkdir\(\) fail.*",
                                      ".*open/create error.*",
+                                     ".*mkdir\: cannot create directory.*",
                                      #".*failed to get source file size.*",
                                     ]
         reason = str(reason).lower()
