@@ -180,12 +180,30 @@ class DagmanKiller(TaskAction):
 
     def killAll(self):
 
-        # Search for and hold the DAG
+        # We need to keep ROOT DAG in hold until periodic remove kicks in.
+        # See DagmanSubmitter.py#L390 (dagAd["PeriodicRemove"])
+        # This is needed in case user wants to resubmit.
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(self.workflow)
+        # Holding DAG job does not mean that it will remove all jobs
+        # and this must be done separately
+        # --------------------------------------
+        # From HTCondor documentation
+        # http://research.cs.wisc.edu/htcondor/manual/v8.3/2_10DAGMan_Applications.html#SECTION003107000000000000000
+        # --------------------------------------
+        # After placing the condor_dagman job on hold, no new node jobs will be submitted,
+        # and no PRE or POST scripts will be run. Any node jobs already in the HTCondor queue
+        # will continue undisturbed. If the condor_dagman job is left on hold, it will remain
+        # in the HTCondor queue after all of the currently running node jobs are finished.
+        # --------------------------------------
+        # TODO: Remove jobConst query when htcondor ticket is solved
+        # https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=5175
+        jobConst = "TaskType =!= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(self.workflow)
 
         with HTCondorUtils.AuthenticatedSubprocess(self.proxy) as (parent, rpipe):
             if not parent:
-                self.schedd.act(htcondor.JobAction.Hold, rootConst)
+                with self.schedd.transaction() as tsc:
+                    self.schedd.act(htcondor.JobAction.Hold, rootConst)
+                    self.schedd.act(htcondor.JobAction.Remove, jobConst)
         results = rpipe.read()
         if results != "OK":
             raise TaskWorkerException("The CRAB3 server backend could not kill the task because the Grid scheduler answered with an error\n"\
