@@ -625,7 +625,6 @@ class ASOServerJob(object):
                     ## this should not be needed anymore.
                     if not needs_transfer:
                         doc['lfn'] = source_lfn.replace('/store/temp', '/store', 1)
-                        doc['source_lfn'] = source_lfn.replace('/store/temp', '/store', 1)
                 except Exception as ex:
                     msg = "Error loading document from ASO database: %s" % (str(ex))
                     try:
