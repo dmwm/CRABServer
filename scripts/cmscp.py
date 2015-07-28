@@ -1167,6 +1167,16 @@ def main():
     dest_temp_dir = G_JOB_AD['CRAB_Dest']
     dest_files = split_re.split(G_JOB_AD['CRAB_Destination'])
     dest_site = G_JOB_AD['CRAB_AsyncDest']
+    ## Check if Exe Site == Dest Site, if true - stageout directly
+    if 'JOB_CMSSite' in G_JOB_AD and dest_site == G_JOB_AD['JOB_CMSSite']:
+        # Make sure two policies are used (local, remote) and we can change it
+        # It can be that only one policy is specified. See TW configuration file.
+        if stageout_policy == ["local", "remote"]:
+            print 'Job execution site is the same as destination site. Changing stageout policy.'
+            stageout_policy = ["remote", "local"]
+            print 'New stageout policy: %s' % (", ".join(stageout_policy))
+        else:
+            print 'Not rewriting stageout policy. Continue with %s stageout policy.' % (", ".join(stageout_policy))
     ##--------------------------------------------------------------------------
     ## Finish PARSE JOB AD
     ##--------------------------------------------------------------------------
