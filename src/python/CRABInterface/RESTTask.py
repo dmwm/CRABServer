@@ -3,11 +3,14 @@ from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
 from WMCore.REST.Error import InvalidParameter,ExecutionError
 
+from CRABInterface.Utils import conn_handler
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
 from CRABInterface.Regexps import RX_SUBRES_TASK, RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_OUT_DATASET, RX_URL, RX_OUT_DATASET, RX_SCHEDD_NAME
 
 # external dependecies here
+import re
+import logging
 import cherrypy
 from ast import literal_eval
 from base64 import b64decode
@@ -16,10 +19,15 @@ from base64 import b64decode
 class RESTTask(RESTEntity):
     """REST entity to handle interactions between CAFTaskWorker and TaskManager database"""
 
+    @staticmethod
+    def globalinit(centralcfg=None):
+        RESTTask.centralcfg = centralcfg
+
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
         self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
+        self.logger = logging.getLogger("CRABLogger.RESTTask")
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
@@ -73,7 +81,7 @@ class RESTTask(RESTEntity):
             raise InvalidParameter("Task name not found in the input parameters")
 
         try:
-           row = self.api.query(None, None, self.Task.QuickSearch_sql, taskname=kwargs["workflow"]).next()
+            row = self.api.query(None, None, self.Task.QuickSearch_sql, taskname=kwargs["workflow"]).next()
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"])
 
@@ -100,8 +108,47 @@ class RESTTask(RESTEntity):
         if 'workflow' not in kwargs or not kwargs['workflow']:
             raise InvalidParameter("Task name not found in the input parameters")
         workflow = kwargs['workflow']
-        row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
+        try:
+            row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
+        except StopIteration:
+            raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"])
         yield row.user_webdir
+
+
+    @conn_handler(services=['centralconfig'])
+    def webdirprx(self, **kwargs):
+        """ Returns the proxied url for the schedd if the schedd has any, returns an empty list instead. Raises in case of other errors.
+            To test it use:
+            curl -X GET 'https://mmascher-dev6.cern.ch/crabserver/dev/task?subresource=webdirprx&workflow=150224_230633:mmascher_crab_testecmmascher-dev6_3'\
+                -k --key /tmp/x509up_u8440 --cert /tmp/x509up_u8440 -v
+        """
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+        workflow = kwargs['workflow']
+        self.logger.info("Getting proxied url for %s" % workflow)
+
+        try:
+            row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
+        except StopIteration:
+            raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"])
+
+        if row.user_webdir:
+            suffix = re.search(r"(/[^/]+/[^/]+/?)$", row.user_webdir).group(0)
+        else:
+            raise ExecutionError("Webdir not set in the database. Cannot build proxied webdir")
+
+        #extract /cms1425/taskname from the user webdir
+        scheddsObj = self.centralcfg.centralconfig['backend-urls'].get('htcondorSchedds', {})
+        self.logger.debug("ScheddObj is: %s" % workflow)
+        #be careful that htcondorSchedds could be a list (backward compatibility). We might want to remove this in the future
+        if row.schedd in list(scheddsObj) and isinstance(scheddsObj, dict):
+            self.logger.debug("Found schedd %s" % row.schedd)
+            proxiedurlbase = scheddsObj[row.schedd].get('proxiedurl')
+            self.logger.debug("Proxied url base is %s" % proxiedurlbase)
+            if proxiedurlbase:
+                yield proxiedurlbase + suffix
+
+        self.logger.info("Could not determine proxied url for task %s" % workflow)
 
 
     def counttasksbystatus(self, **kwargs):
@@ -225,4 +272,5 @@ class RESTTask(RESTEntity):
         self.api.modify(self.Task.SetUpdateOutDataset_sql, tm_output_dataset=[outputdatasets], tm_taskname=[workflow])
 
         return []
+
 
