@@ -2,9 +2,15 @@
 This contains some utility methods to share between the server and the client, or by the server components themself
 """
 
+from __future__ import print_function
+
 import os
 import re
+import traceback
 import subprocess
+from httplib import HTTPException
+
+from RESTInteractions import HTTPRequests
 
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
 
@@ -18,6 +24,25 @@ def checkOutLFN(lfn, username):
     else:
         return False
     return True
+
+
+def getProxiedWebDir(task, host, uri, cert, logFunction = print):
+    data = { 'subresource' : 'webdirprx',
+         'workflow' : task,
+       }
+
+    res = None
+    try:
+        server = HTTPRequests(host, cert, cert, retry = 2)
+        dictresult, _, _ = server.get(uri, data = data) #the second and third parameters are deprecated
+        res = dictresult['result'][0]
+    except HTTPException as hte:
+        logFunction(traceback.format_exc())
+        logFunction(hte.headers)
+        logFunction(hte.result)
+
+    return res
+
 
 
 #setDashboardLogs function is shared between the postjob and the job wrapper. Sharing it here
