@@ -276,7 +276,8 @@ def main():
     """
     Need a doc string here.
     """
-    ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
+    with open(os.environ['_CONDOR_JOB_AD']) as fd:
+        ad = classad.parseOld(fd)
     makeWebDir(ad)
 
     retries = 0
