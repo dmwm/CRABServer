@@ -2032,11 +2032,11 @@ class PostJob():
             params['StatusValueReason'] = reason
         ## List with the log files that we want to make available in dashboard.
         if 'CRAB_UserWebDirPrx' in self.job_ad and self.job_ad['CRAB_UserWebDirPrx']:
-            setDashboardLogs(params, self.job_ad['CRAB_UserWebDirPrx'], self.job_ad['CRAB_Id'], self.job_ad['CRAB_Retry'])
+            setDashboardLogs(params, self.job_ad['CRAB_UserWebDirPrx'], self.job_id, self.crab_retry)
         elif 'CRAB_UserWebDir' in self.job_ad:
             setDashboardLogs(params, self.job_ad['CRAB_UserWebDir'], self.job_id, self.crab_retry)
         else:
-            print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir in myad."
+            print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx in self.job_ad."
         ## Take exit code from job_fjr.<job_id>.<retry_id>.json and report final exit code to Dashboard.
         ## Only taken if RetryJob think it is FATAL_ERROR.
         if self.retryjob_retval and self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:

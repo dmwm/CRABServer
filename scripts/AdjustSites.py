@@ -96,9 +96,9 @@ def adjustPostScriptExitStatus(resubmitJobIds):
                 ra_buffer = []
         elif len(ra_buffer) == 3:
             m = node_re.search(line)
-            print("%s %s %s %s" % (line, m, m.groups(), resubmitJobIds))
+            printLog("%s %s %s %s" % (line, m, m.groups(), resubmitJobIds))
             if m and (resubmitAllFailed or (m.groups()[0] in resubmitJobIds)):
-                print("%s %s" % (m.groups()[0], resubmitJobIds))
+                printLog("%s %s" % (m.groups()[0], resubmitJobIds))
                 adjustedJobIds.append(m.groups()[0])
                 for l in ra_buffer:
                     output += l
@@ -312,7 +312,7 @@ def clearAutomaticBlacklist():
         try:
             os.unlink(file)
         except Exception as e:
-            print("ERROR when clearing statistics: %s" % str(e))
+            printLog("ERROR when clearing statistics: %s" % str(e))
 
 
 def main():

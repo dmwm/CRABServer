@@ -26,6 +26,10 @@ def checkOutLFN(lfn, username):
 
 
 def getProxiedWebDir(task, host, uri, cert, logFunction = print):
+    """ The function smply queries the REST interface specified to get the proxied webdir to use
+        for the task. Returns None in case the API could not find the url (either an error or the schedd
+        is not configured)
+    """
     #This import is here because SeverUtilities is also used on the worker nodes,
     #and I want to avoid the dependency to pycurl right now. We should actually add it one day
     #so that other code in cmscp that uses Requests.py from WMCore can be migrated to RESTInteractions
@@ -45,7 +49,6 @@ def getProxiedWebDir(task, host, uri, cert, logFunction = print):
         logFunction(hte.result)
 
     return res
-
 
 
 #setDashboardLogs function is shared between the postjob and the job wrapper. Sharing it here

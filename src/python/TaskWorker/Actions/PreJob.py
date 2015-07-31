@@ -327,8 +327,9 @@ class PreJob:
             with open('proxied_webdir') as fd:
                 proxied_webdir = fd.read()
             new_submit_text += '+CRAB_UserWebDirPrx = "%s"\n' % proxied_webdir
-        except IOError:
-            self.logger("")
+        except IOError as e:
+            self.logger(("'I/O error(%s): %s', when looking for the proxied_webdir file. Might be normal"
+                         " if the schedd does not have a proxiedurl in the REST external config." % (e.errno, e.strerror)))
         ## Add the site black- and whitelists and the DESIRED_SITES to the
         ## Job.<job_id>.submit content.
         new_submit_text = self.redo_sites(new_submit_text, crab_retry, use_resubmit_info)

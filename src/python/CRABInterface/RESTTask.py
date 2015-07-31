@@ -133,11 +133,22 @@ class RESTTask(RESTEntity):
             raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"])
 
         if row.user_webdir:
+            #extract /cms1425/taskname from the user webdir
             suffix = re.search(r"(/[^/]+/[^/]+/?)$", row.user_webdir).group(0)
         else:
             raise ExecutionError("Webdir not set in the database. Cannot build proxied webdir")
 
-        #extract /cms1425/taskname from the user webdir
+        #=============================================================================
+        # scheddObj is a dictionary composed like this (see the value of htcondorSchedds):
+        # "htcondorSchedds": {
+        #  "crab3-5@vocms059.cern.ch": {
+        #      "proxiedurl": "https://cmsweb.cern.ch/scheddmon/5"
+        #  },
+        #  ...
+        # }
+        # so that they have a "proxied URL" to be used in case the schedd is
+        # behind a firewall.
+        #=============================================================================
         scheddsObj = self.centralcfg.centralconfig['backend-urls'].get('htcondorSchedds', {})
         self.logger.debug("ScheddObj is: %s" % workflow)
         #be careful that htcondorSchedds could be a list (backward compatibility). We might want to remove this in the future
