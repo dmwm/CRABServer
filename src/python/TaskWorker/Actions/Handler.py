@@ -50,7 +50,7 @@ class TaskHandler(object):
 
         :arg callable work: a new callable to be called :)"""
         if work not in self._work:
-            self._work.append( work )
+            self._work.append(work)
 
     def getWorks(self):
         """Retrieving the queued actions
@@ -105,7 +105,7 @@ class TaskHandler(object):
                         msg = ("Failed to upload the logfile to %s for task %s. More details in the http headers and body:\n%s\n%s" %
                                (self._task['tm_cache_url'], self._task['tm_taskname'], hte.headers, hte.result))
                         self.logger.error(msg)
-                    except Exception as e:
+                    except Exception:
                         msg = "Unknown error while uploading the logfile for task %s" % self._task['tm_taskname']
                         self.logger.exception(msg)
             t1 = time.time()
@@ -129,32 +129,31 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the handler."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry = 2)
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=2)
     handler = TaskHandler(task, procnum)
-    handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60*60*24) )
-    if task['tm_job_type'] == 'Analysis': 
+    handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60*60*24))
+    if task['tm_job_type'] == 'Analysis':
         if task.get('tm_user_files'):
-            handler.addWork( UserDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum) )
+            handler.addWork(UserDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum))
         else:
-            handler.addWork( DBSDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum) )
+            handler.addWork(DBSDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum))
     elif task['tm_job_type'] == 'PrivateMC':
-        handler.addWork( MakeFakeFileSet(config=config, server=server, resturi=resturi, procnum=procnum) )
-    handler.addWork( Splitter(config=config, server=server, resturi=resturi, procnum=procnum) )
+        handler.addWork(MakeFakeFileSet(config=config, server=server, resturi=resturi, procnum=procnum))
+    handler.addWork(Splitter(config=config, server=server, resturi=resturi, procnum=procnum))
 
     def glidein(config):
         """Performs the injection of a new task into Glidein
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( DagmanCreator(config=config, server=server, resturi=resturi, procnum=procnum) )
-        if task['tm_dry_run'] == 'T':
-            handler.addWork( DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum) )
-        else:
-            handler.addWork( DagmanSubmitter(config=config, server=server, resturi=resturi, procnum=procnum) )
+        handler.addWork(DagmanCreator(config=config, server=server, resturi=resturi, procnum=procnum))
+        handler.addWork(DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum))
+        if task['tm_dry_run'] == 'F':
+            handler.addWork(DagmanSubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
 
     def panda(config):
         """Performs the injection into PanDA of a new task
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( PanDABrokerage(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
-        handler.addWork( PanDAInjection(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
+        handler.addWork(PanDABrokerage(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
+        handler.addWork(PanDAInjection(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
 
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args)
@@ -169,21 +168,21 @@ def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
     :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry = 2)
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=2)
     handler = TaskHandler(task, procnum)
-    handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60*60*24) )
+    handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60*60*24))
     def glidein(config):
         """Performs the re-injection into Glidein
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum) )
+        handler.addWork(DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
 
     def panda(config):
         """Performs the re-injection into PanDA
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( PanDAgetSpecs(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
-        handler.addWork( PanDASpecs2Jobs(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
-        handler.addWork( PanDABrokerage(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
-        handler.addWork( PanDAInjection(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
+        handler.addWork(PanDAgetSpecs(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
+        handler.addWork(PanDASpecs2Jobs(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
+        handler.addWork(PanDABrokerage(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
+        handler.addWork(PanDAInjection(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
 
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args)
@@ -198,18 +197,18 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
     :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry = 2)
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=2)
     handler = TaskHandler(task, procnum)
-    handler.addWork( MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60*5) )
+    handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60*5))
     def glidein(config):
         """Performs kill of jobs sent through Glidein
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum) )
+        handler.addWork(DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum))
 
     def panda(config):
         """Performs the re-injection into PanDA
         :arg WMCore.Configuration config: input configuration"""
-        handler.addWork( PanDAKill(pandaconfig=config, server=server, resturi=resturi, procnum=procnum) )
+        handler.addWork(PanDAKill(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
 
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)
