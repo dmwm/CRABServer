@@ -146,8 +146,8 @@ class DagmanKiller(TaskAction):
             jobid = str(jobid)
             jobretry = str(jobretry)
             if jobid and jobretry != None:
-                jinfo = {'jobId': ("%s_https://glidein.cern.ch/%s/%s_%s" % (jobid, jobid, self.workflow, jobretry)),
-                         'sid': "https://glidein.cern.ch/%s%s" % (jobid, self.workflow),
+                jinfo = {'jobId': ("%s_https://glidein.cern.ch/%s/%s_%s" % (jobid, jobid, self.workflow.replace("_", ":"), jobretry)),
+                         'sid': "https://glidein.cern.ch/%s%s" % (jobid, self.workflow.replace("_", ":")),
                          'broker': hostname,
                          'bossId': jobid,
                          'StatusValue' : 'killed',
