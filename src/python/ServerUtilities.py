@@ -10,7 +10,6 @@ import traceback
 import subprocess
 from httplib import HTTPException
 
-from RESTInteractions import HTTPRequests
 
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
 
@@ -27,6 +26,10 @@ def checkOutLFN(lfn, username):
 
 
 def getProxiedWebDir(task, host, uri, cert, logFunction = print):
+    #This import is here because SeverUtilities is also used on the worker nodes,
+    #and I want to avoid the dependency to pycurl right now. We should actually add it one day
+    #so that other code in cmscp that uses Requests.py from WMCore can be migrated to RESTInteractions
+    from RESTInteractions import HTTPRequests
     data = { 'subresource' : 'webdirprx',
          'workflow' : task,
        }
