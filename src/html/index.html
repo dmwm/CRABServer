@@ -1,155 +1,221 @@
-<!doctype html>
-<html lang = "en" ng-app = "CRABMonitor">
-    <head>
-        <meta charset="utf-8">
-        <title>CRAB3 Monitor</title>
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="description" content="CRAB3 monitory page">
-        <meta name="author" content="CMS CRAB3 Team">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+	<meta name="description" content="">
+	<meta name="author" content="">
+	<link rel="icon" href="../../favicon.ico">
+	<title>CRABMonitor</title>
+	<!-- Bootstrap core CSS -->
+	<link href="/crabserver/ui/static?css/bootstrap.min.css" rel="stylesheet">
+	<!-- Custom styles for this template -->
+	<link href="/crabserver/ui/static?css/starter-template.css" rel="stylesheet">
+	<link href="/crabserver/ui/static?css/custom.css" rel="stylesheet">
+	<!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+		<!--[if lt IE 9]>
+		<script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+		<script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+		<![endif]-->
+	</head>
+	<body>
+		<nav class="navbar navbar-inverse navbar-static-top">
+			<div class="container">
+				<div class="navbar-header">
+					<button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+						<span class="sr-only">Toggle navigation</span>
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+					</button>
+					<a class="navbar-brand" href="#">CRABMonitor</a>
+				</div>
+				<div id="navbar" class="collapse navbar-collapse">
+					<ul class="nav navbar-nav">
+						<li class="active"><a href="#">Task info</a>
+						</li>
+					</ul>
+				</div>
+				<!--/.nav-collapse -->
+			</div>
+		</nav>
 
-        <!-- Bootstrap core CSS -->
-        <link href="/crabserver/ui/static?css/bootstrap.min.css" rel="stylesheet">
-        <link href="/crabserver/ui/static?css/bootstrap-theme.min.css" rel="stylesheet">
 
-        <!-- Custom styles for this template -->
-        <link href="/crabserver/ui/static?css/app.css" rel="stylesheet">
+		<div class="container">
+			<div class="padded-form col-md-12"> <!-- Task search form -->
+				<div class="row">
+					<form class="padded-form" id="task-search-form" name="searchForm" role="form">
+						<div class="input-group">
+							<input id="task-search-form-input" type="text" class="form-control" autofocus="" placeholder="Enter task name...">
 
-        <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
-        <!--[if lt IE 9]>
-            <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
-            <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
-        <![endif]-->
-    </head>
-    <body>
 
-        <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation" id="main-nav">
-            <div class="container-fluid">
-                <div class="navbar-header">
-                    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
-                        <span class="sr-only">Toggle navigation</span>
-                        <span class="icon-bar"></span>
-                        <span class="icon-bar"></span>
-                        <span class="icon-bar"></span>
-                    </button>
-                    <a class="navbar-brand" href="#">CRAB3 monitoring page</a>
-                </div>
-                <div class="navbar-collapse collapse">
-                    <ul class="nav navbar-nav navbar-left">
-                        <li class="active"><a href="#" >Crab Monitor</a></li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
-        <section id  = "main-pane" class = "container-fluid" >
-            <aside id = "aside-left" class = "container-fluid">
-                <!--QUICK SEARCH PANEL -->
-                <div class="panel panel-default" ng-controller = "SearchCtrl">
-                    <div class = "panel-heading">Quick Search</div>
-                    <div class = "panel-body">
-                        <div class = "row" style="margin-bottom: 10px;">
-                            <div class = "col-lg-12">
-                                <span class= "span">Search task by task name:</span>
-                                <div class = "input-group">
-                                    <input type="text" class="form-control" autofocus ng-model = "taskname" ng-keyup = "taskSearch(taskname, $event)">
-                                    <span class = "input-group-btn">
-                                        <button class="btn btn-default" type="button" ng-click = "taskSearch(taskname)">Go!</button>
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <!--OPERATORS LINKS -->
-                <div class = "panel panel-default">
-                    <div class = "panel-heading">Monitoring links</div>                
-                <div class = "panel-body">
-                    <!--TO DO GOES HERE -->
-                    <ul class = "nav nav-bar">
-                        <li><a target = "_blank" href = "http://vocms31.cern.ch:5984/asynctransfer/_design/monitor/index.html">ASO (Production)</a></li>
-                        <li><a target = "_blank" href = "http://vocms33.cern.ch:5984/asynctransfer/_design/monitor/index.html">ASO (Pre-production)</a></li>
-                        <li><a target = "_blank"  href = "http://dashb-cms-jobsmry.cern.ch/dashboard/request.py/dailysummary#button=jobstatus&sites[]=All+T3210&activities[]=analysistest&sitesSort=7&start=null&end=null&timerange=last48&granularity=Hourly&generic=0&sortby=0&series=All">Dashboard Analysis last 48 hours</a></li>
-                        <li><a target = "_blank" href = "https://lemonweb.cern.ch/lemon-web/info.php?time=0.2&offset=0&entity=vocms133&detailed=yes">TestBed CouchDB</a></li>
-                        <li><a target = "_blank" href = "https://lemonweb.cern.ch/lemon-web/info.php?time=0.2&offset=0&entity=vocms140&detailed=yes">CMWweb CouchDB</a></li>
-                        <li><a target = "_blank" href = "https://lemonweb.cern.ch/lemon-web/info.php?time=3&offset=0&entity=vocms20&detailed=yes">vocms20 (schedd: vocms20)</a></li>
-                        <li><a target = "_blank" href = "https://lemonweb.cern.ch/lemon-web/info.php?entity=p01001456119982&type=host&detailed=yes">vocms95 (schedd: crab3test-2)</a></li>
-                        <li><a target = "_blank" href = "https://lemonweb.cern.ch/lemon-web/info.php?entity=p01001456783585&type=host&detailed=yes">vocms95 (schedd: crab3test-2)</a></li>
-                        <li><a target = "_blank" href = "https://lemonweb.cern.ch/lemon-web/info.php?entity=p01001456783585&type=host&detailed=yes">vocms96 (schedd: crab3test-3)</a></li>
-                        <li><a target = "_blank" href = "https://sentry.t2.ucsd.edu/cacti/graph_view.php?action=tree&tree_id=15&leaf_id=172">submit5 (schedd: crab3test-1 )</a></li>
-                        <li><a target = "_blank" href = "http://submit-3.t2.ucsd.edu/CSstoragePath/UserPrio/UserPrio-dev.html">User Prio-dev</a></li>
-                    </ul>
-                </div>
-            </div>
-            </aside>
-            <div id  = "work-pane" class = "container-fluid" ng-view >
-            </div>            
-            <aside id = "aside-right" class = "container-fluid">
-            
-        <!--CRAB SERVER PANEL -->
-        <div class="panel panel-default" ng-controller = "ServerCtrl">
-            <div class = "panel-heading">CRAB Server</div>
-            <div class = "panel-body">
-                <span class="input-group-btn">
-                    <button class="btn btn-default col-lg-12" ng-click = "userList()">List all users</button>
-                </span>
-                <div style="margin-top: 20px;">
-                    <span><input class="form-control col-lg-12" placeholder="filter" list = "users" ng-model = srvSearch ng-keyup = "loadUsers(srvSearch, $event)"></span>
-                    <datalist id = "users">
-                        <option ng-repeat = "user in serverData.users | filter:srvSearch">{{user}}</option>
-                    </datalist>
-                </div>
-                <div class = "user-list">
-                    <ul class = "nav nav-sidebar">
-                        <li ng-repeat = "user in serverData.users| filter: svrSearch"  ng-class='{active: $index === selectedRow}'>
-                            <a href="#/latest-tasks" ng-click = "selectUser(user, $index)">{{user}}</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-            <!--CRAB CACHE PANEL -->
-                <div class="panel panel-default" ng-controller = "CacheCtrl">
-                    <div class = "panel-heading">CRAB Cache</div>
-                    <div class = "panel-body">
-                    <span class="input-group-btn">
-                        <button class="btn btn-default col-lg-12" ng-click = "userList()">List all users</button>
-                     </span>
 
-                        <div style="margin-top: 20px;">
-                            <span><input class="form-control col-lg-12" type = "text" list = "cacheUsers" placeholder="filter" ng-keyup = "loadCacheUsers($event,search)" ng-model = "search"></span>
-                            <datalist id="cacheUsers">
-                                <option ng-repeat = "cacheUser in cacheData.users | filter: search" >{{cacheUser}}</option>
-                            </datalist> 
-                        </div>
-                        <div class = "user-list">
-                            <ul class = "nav nav-sidebar">
-                                <li ng-repeat = "cacheUser in cacheData.users| filter: search" ng-click = "selectUser(cacheUser, $index)" ng-class='{active: $index === selectedRow}'>
-                                <a href="#/task-view">{{cacheUser}}</a></li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </aside>
-        </section>
+							<div class="input-group-btn" id="db-selector">
+								<select class="form-control" id="db-selector-box">
+									<option value="prod">prod</option>
+									<option value="preprod">preprod</option>
+									<option value="dev">dev</option>
+								</select>
+							</div>
 
-        <!-- Placed at the end of the document so the pages load faster -->
-        <script src="/crabserver/ui/static?script/jquery/jquery.min.js"></script>
-        <script src="/crabserver/ui/static?script/misc/bootstrap.min.js"></script>
-        <script src="/crabserver/ui/static?script/ang/angular.js"></script>
-        <script src="/crabserver/ui/static?script/ang/angular-route.js"></script>
-        <script src="/crabserver/ui/static?script/ang/angular-resource.js"></script>
-        <script src="/crabserver/ui/static?script/monitor.js"></script>
-        <script src="/crabserver/ui/static?script/cacheJS/cacheData.js"></script>
-        <script src="/crabserver/ui/static?script/cacheJS/cacheUrls.js"></script>
-        <script src="/crabserver/ui/static?script/cacheJS/cacheFuncs.js"></script>
-        <script src="/crabserver/ui/static?script/cacheJS/cacheCtrl.js"></script>
-        <script src="/crabserver/ui/static?script/serverJS/serverData.js"></script>
-        <script src="/crabserver/ui/static?script/serverJS/serverUrls.js"></script>
-        <script src="/crabserver/ui/static?script/serverJS/serverFuncs.js"></script>
-        <script src="/crabserver/ui/static?script/serverJS/serverCtrl.js"></script>
-        <script src="/crabserver/ui/static?script/searchJS/searchData.js"></script>
-        <script src="/crabserver/ui/static?script/searchJS/searchFuncs.js"></script>
-        <script src="/crabserver/ui/static?script/searchJS/searchCtrl.js"></script>
-        <script src="/crabserver/ui/static?script/cacheJS/config.js"></script>
-    </body>
-</html>
 
+							<div class="input-group-btn">
+
+
+
+								<button class="btn btn-default" type="submit">Go</button>
+							</div>
+
+
+
+						</div>
+						<!-- /input-group -->
+					</form>
+					<!-- /.col-lg-6 -->
+				</div>
+			</div> <!--/ Task search form -->
+
+
+
+			<!-- Nav tabs -->
+			<ul class="nav nav-tabs" role="tablist" id="task-nav-tabs">
+				<li role="presentation" class="active">
+					<a href="#main" aria-controls="main" role="tab" data-toggle="tab">Main</a>
+				</li>
+				<li role="presentation">
+					<a href="#task-info" aria-controls="task-info-tab" role="tab" data-toggle="tab">Task Info</a>
+				</li>
+				<li role="presentation">
+					<a href="#task-config" aria-controls="task-config" role="tab" data-toggle="tab">Config</a>
+				</li>
+				<li role="presentation">
+					<a href="#task-pset" aria-controls="task-pset" role="tab" data-toggle="tab">PSet</a>
+				</li>
+				<li role="presentation">
+					<a href="#taskworker-log" aria-controls="taskworker-log" role="tab" data-toggle="tab">TaskWorker log</a>
+				</li>
+				<li role="presentation">
+					<a href="#upload-log" aria-controls="upload-log" role="tab" data-toggle="tab">Upload log</a>
+				</li>
+				<li role="presentation">
+					<a href="#script-exe" aria-controls="script-exe" role="tab" data-toggle="tab">Script Exe</a>
+				</li>
+			</ul>
+
+
+			<!-- Tab panes -->
+			<div class="tab-content">
+
+
+				<div role="tabpanel" class="tab-pane active" id="main">
+					<div ><div id="main-error-box" class="alert alert-warning" role="alert">...</div></div>
+
+					<h3>Main</h3>
+
+					<p id="main-paragraph">
+						<div class="btn-group btn-group-justified" role="group">
+							<a id="main-dashboard-link" class="btn btn-default" href="#">Link to dashboard</a>
+							<a id="main-webdir-link" class="btn btn-default"  href="#">Link to webdir</a>
+							<a id="main-das-link" class="btn btn-default" href="#">Link to DAS</a>
+						</div>
+						<div id="main-status-info"></div>
+					</p>
+
+					<div id="main-status-info-table"> <!-- Task info table -->
+						<table class="table">
+							<thead>
+								<tr>
+									<th></th>
+									<th></th>
+								</tr>
+							</thead>
+							<tbody class="dynamic-content">
+							</tbody>
+						</table>
+					</div> <!--/ Task info table -->
+
+				</div>
+
+				<div role="tabpanel" class="tab-pane" id="task-info">
+
+					<!-- Error box -->
+					<div  id="task-info-error-box" class="alert alert-warning" role="alert"></div>
+
+					<h3>Task Info</h3>
+
+					<div id="task-info-table"> <!-- Task info table -->
+						<table class="table table-condensed">
+							<thead>
+								<tr>
+									<th>Name</th>
+									<th>Value</th>
+								</tr>
+							</thead>
+							<tbody class="dynamic-content">
+							</tbody>
+						</table>
+					</div> <!--/ Task info table -->
+
+				</div>
+
+				<div role="tabpanel" class="tab-pane" id="task-config">
+					<div ><div id="task-config-error-box" class="alert alert-warning" role="alert">...</div></div>
+
+					<h3>Task config</h3>
+
+					<pre>
+						<p class="dynamic-content" id="task-config-paragraph"></p>
+					</pre>
+
+				</div>
+				<div role="tabpanel" class="tab-pane" id="task-pset">
+					<div ><div id="task-pset-error-box" class="alert alert-warning" role="alert">...</div></div>
+
+					<h3>Task PSet</h3>
+
+					<pre>
+						<p class="dynamic-content" id="task-pset-paragraph"></p>
+					</pre>
+				</div>
+				<div role="tabpanel" class="tab-pane" id="taskworker-log">
+					<div ><div id="taskworker-log-error-box" class="alert alert-warning" role="alert">...</div></div>
+
+					<h3>TaskWorker log</h3>
+
+					<pre>
+						<p class="dynamic-content" id="taskworker-log-paragraph"></p>
+					</pre>
+				</div>
+				<div role="tabpanel" class="tab-pane" id="upload-log">
+					<div><div id="upload-log-error-box" class="alert alert-warning" role="alert">...</div></div>
+
+					<h3>Upload log</h3>
+
+					<pre>
+						<p class="dynamic-content" id="upload-log-paragraph"></p>
+					</pre>
+				</div>
+				<div role="tabpanel" class="tab-pane" id="script-exe">
+					<div><div id="script-exe-error-box" class="alert alert-warning" role="alert">...</div></div>
+
+					<h3>Script Exe</h3>
+
+					<pre>
+						<p class="dynamic-content" id="script-exe-paragraph"></p>
+					</pre>
+				</div>
+			</div>
+		</div>
+
+		<!-- /.container -->
+<!-- Bootstrap core JavaScript
+	================================================== -->
+	<!-- Placed at the end of the document so the pages load faster -->
+	<script type="text/javascript" src="/crabserver/ui/static?script/jquerhy/jqery.min.js"></script>
+	<script type="text/javascript" src="/crabserver/ui/static?script/misc/bootstrap.min.js"></script>
+	<script type="text/javascript" src="/crabserver/ui/static?script/task_info.js"></script>
+	<script type="text/javascript" src="/crabserver/ui/static?script/gzip.js"></script>
+</body>
+</html
