@@ -150,6 +150,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         goodSchedulers = []
         try:
             goodSchedulers = self.server.get(self.restURInoAPI + '/info', data={'subresource': 'backendurls'})[0]['result'][0]['htcondorSchedds']
+            goodSchedulers = list(goodSchedulers) #we do not care about
         except HTTPException as hte:
             self.logger.error(hte.headers)
             self.logger.warning("Unable to contact cmsweb. Will use only on schedulers which was chosen by CRAB3 frontend.")
@@ -204,7 +205,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     return execInt
                 except Exception as e:
                     msg = "Failed to submit task %s; '%s'" % (kw['task']['tm_taskname'], str(e))
-                    self.logger.error(msg)
+                    self.logger.exception(msg)
                     retryIssues.append(msg)
                     if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
                         self.logger.error("Will retry in %s seconds." % str(self.config.TaskWorker.retry_interval[retry]))
