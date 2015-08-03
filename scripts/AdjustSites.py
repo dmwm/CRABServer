@@ -2,11 +2,17 @@ import os
 import re
 import sys
 import time
-import shutil
-import traceback
 import glob
+import shutil
+import urllib
 import classad
 import htcondor
+import traceback
+from datetime import datetime
+from httplib import HTTPException
+
+from RESTInteractions import HTTPRequests
+from ServerUtilities import getProxiedWebDir
 
 
 if '_CONDOR_JOB_AD' not in os.environ or not os.path.exists(os.environ["_CONDOR_JOB_AD"]):
@@ -19,6 +25,10 @@ if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
     os.dup2(fd, 1)
     os.dup2(fd, 2)
 os.close(fd)
+
+
+def printLog(msg):
+    print("%s: %s" % (datetime.utcnow(), msg))
 
 
 def adjustPostScriptExitStatus(resubmitJobIds):
@@ -86,9 +96,9 @@ def adjustPostScriptExitStatus(resubmitJobIds):
                 ra_buffer = []
         elif len(ra_buffer) == 3:
             m = node_re.search(line)
-            print line, m, m.groups(), resubmitJobIds
+            printLog("%s %s %s %s" % (line, m, m.groups(), resubmitJobIds))
             if m and (resubmitAllFailed or (m.groups()[0] in resubmitJobIds)):
-                print m.groups()[0], resubmitJobIds
+                printLog("%s %s" % (m.groups()[0], resubmitJobIds))
                 adjustedJobIds.append(m.groups()[0])
                 for l in ra_buffer:
                     output += l
@@ -233,6 +243,8 @@ def makeWebDir(ad):
     storage_re = re.compile(sinfo[0])
     val = storage_re.sub(sinfo[1], path)
     ad['CRAB_UserWebDir'] = val
+    #This condor_edit is required because in the REST interface we look for the webdir if the DB upload failed (or in general if we use the "old logic")
+    #See https://github.com/dmwm/CRABServer/blob/3.3.1507.rc8/src/python/CRABInterface/HTCondorDataWorkflow.py#L398
     dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
     try:
         htcondor.Schedd().edit([dagJobId], 'CRAB_UserWebDir', ad.lookup('CRAB_UserWebDir'))
@@ -251,15 +263,46 @@ def updateWebDir(ad):
     data['webdirurl'] = ad['CRAB_UserWebDir']
     cert = ad['X509UserProxy']
     try:
-        from RESTInteractions import HTTPRequests
-        import urllib
         server = HTTPRequests(host, cert, cert)
         server.post(uri, data = urllib.urlencode(data))
         return 0
-    except:
-        print traceback.format_exc()
+    except HTTPException as hte:
+        printLog(traceback.format_exc())
+        printLog(hte.headers)
+        printLog(hte.result)
         return 1
 
+
+def saveProxiedWebdir(ad):
+    """ The function queries the REST interface to get the proxied webdir and sets
+        a classad so that we report this to the dashboard isntead of the regular URL
+
+        The proxied_url (if exist) is written to a file named proxied_webdir so that
+        prejobs can read it and report to dashboard. If the url does not exist
+        (i.e.: schedd not at CERN), the file is not written and we report the usual
+        webdir
+
+        See https://github.com/dmwm/CRABServer/issues/4883
+    """
+    # Get the proxied webdir from the REST itnerface
+    task = ad['CRAB_ReqName']
+    host = ad['CRAB_RestHost']
+    uri = ad['CRAB_RestURInoAPI'] + '/task'
+    cert = ad['X509UserProxy']
+    res = getProxiedWebDir(task, host, uri, cert, logFunction = printLog)
+
+    # We need to use a file to communicate this to the prejob. I tried things like:
+    #    htcondor.Schedd().edit([dagJobId], 'CRAB_UserWebDirPrx', ad.lookup('CRAB_UserWebDir'))
+    # but the prejob read the classads from the file, not querying the schedd.and we can't update
+    # the classad file since it's owned by user condor
+    if res:
+        with open("proxied_webdir", "w") as fd:
+            fd.write(res)
+    else:
+        printLog("Cannot get proxied webdir from the server. Maybe the schedd does not have one in the REST configuration?")
+        return 1
+
+    return 0
 
 def clearAutomaticBlacklist():
     """
@@ -269,15 +312,22 @@ def clearAutomaticBlacklist():
         try:
             os.unlink(file)
         except Exception as e:
-            print "ERROR when clearing statistics: %s" % str(e)
+            printLog("ERROR when clearing statistics: %s" % str(e))
 
 
 def main():
     """
     Need a doc string here.
     """
-    ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
+    printLog("Starting AdjustSites")
+
+    with open(os.environ['_CONDOR_JOB_AD']) as fd:
+        ad = classad.parseOld(fd)
+    printLog("Parsed ad: %s" % ad)
+
     makeWebDir(ad)
+
+    printLog("Webdir has been set up. Uploading the webdir URL to the REST")
 
     retries = 0
     exitCode = 1
@@ -286,6 +336,13 @@ def main():
         if exitCode != 0:
             time.sleep(retries*20)
         retries += 1
+
+    printLog("Webdir URL has been uploaded, exit code is %s. Setting the classad for the proxied webdir" % exitCode)
+
+    saveProxiedWebdir(ad)
+
+    printLog(("Proxied webdir saved. Clearing the automatic blacklist and handling RunJobs.dag.nodes.log"
+             "for resubmissions"))
 
     clearAutomaticBlacklist()
 
@@ -323,6 +380,8 @@ def main():
         siteAd.update(newSiteAd)
         with open("site.ad", "w") as fd:
             fd.write(str(siteAd))
+
+    printLog("Exiting AdjustSite")
 
 if __name__ == '__main__':
     main()

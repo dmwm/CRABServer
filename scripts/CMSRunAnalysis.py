@@ -95,10 +95,12 @@ def parseAd():
 def populateDashboardMonitorInfo(myad, params):
     params['MonitorID'] = myad['CRAB_ReqName']
     params['MonitorJobID'] = '%d_https://glidein.cern.ch/%d/%s_%d' % (myad['CRAB_Id'], myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":"), myad['CRAB_Retry'])
-    if 'CRAB_UserWebDir' in myad:
+    if 'CRAB_UserWebDirPrx' in myad and myad['CRAB_UserWebDirPrx']:
+        setDashboardLogs(params, myad['CRAB_UserWebDirPrx'], myad['CRAB_Id'], myad['CRAB_Retry'])
+    elif 'CRAB_UserWebDir' in myad:
         setDashboardLogs(params, myad['CRAB_UserWebDir'], myad['CRAB_Id'], myad['CRAB_Retry'])
     else:
-        print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir in myad."
+        print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx in myad."
 
 
 def calcOverflowFlag(myad):

@@ -319,7 +319,6 @@ class ASOServerJob(object):
         if self.aso_start_timestamp:
             starttime = self.aso_start_timestamp
         self.logger.info("====== Starting to monitor ASO transfers.")
-#        while True:
         ## Get the transfer status in all documents listed in self.docs_in_transfer.
         transfers_statuses = self.get_transfers_statuses()
         msg = "Got statuses: %s; %.1f hours since transfer submit."
@@ -636,7 +635,7 @@ class ASOServerJob(object):
                           }
                     ## TODO: We do the following, only because that's what ASO does when a file has
                     ## been successfully transferred. But this modified LFN makes no sence when it
-                    ## starts with /store/temp/user/, because the modified LFN is then 
+                    ## starts with /store/temp/user/, because the modified LFN is then
                     ## /store/user/<username>.<hash>/bla/blabla, i.e. it contains the <hash>, which
                     ## is never part of a destination LFN, but only of temp source LFNs.
                     ## Once ASO uses the source_lfn and the destination_lfn instead of only the lfn,
@@ -2032,11 +2031,12 @@ class PostJob():
         if reason:
             params['StatusValueReason'] = reason
         ## List with the log files that we want to make available in dashboard.
-        ## Disabling, The one in CMSRunAnalysis should be enough
-        if 'CRAB_UserWebDir' in self.job_ad:
+        if 'CRAB_UserWebDirPrx' in self.job_ad and self.job_ad['CRAB_UserWebDirPrx']:
+            setDashboardLogs(params, self.job_ad['CRAB_UserWebDirPrx'], self.job_id, self.crab_retry)
+        elif 'CRAB_UserWebDir' in self.job_ad:
             setDashboardLogs(params, self.job_ad['CRAB_UserWebDir'], self.job_id, self.crab_retry)
         else:
-            print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir in myad."
+            print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx in self.job_ad."
         ## Take exit code from job_fjr.<job_id>.<retry_id>.json and report final exit code to Dashboard.
         ## Only taken if RetryJob think it is FATAL_ERROR.
         if self.retryjob_retval and self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:
