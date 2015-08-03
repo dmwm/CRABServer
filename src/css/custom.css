@@ -1,0 +1,53 @@
+/* hiding things before there is any data to display */
+#task-info-error-box, #task-config-error-box,
+#task-pset-error-box, #taskworker-log-error-box,
+#upload-log-error-box, #main-error-box {
+	display: none;
+}
+
+#task-search-error-box {
+	padding-top: 1em;
+}
+
+#task-info-error-box, #taskworker-log-error-box {
+	white-space: pre-wrap;
+}
+
+
+ /*some space between the task info tabs and search box */
+/*.padded-form {
+	padding-top: 1em;
+}
+*/
+#task-nav-tabs {
+	padding-top: 4em;
+}
+
+/* to prevent the scrollbar from slightly shifting page content */
+html {
+  overflow-y: scroll;
+}
+
+#error-box {
+	padding-top: 1em;
+}
+
+/* Formatting the error boxes.*/
+#spaced-span {
+	float: left;
+	width: 8em;
+}
+
+body {
+	padding-top: 0px;
+}
+
+/* for preventing a double border between form input and selector */
+#task-search-form-input {
+	width: 101%;
+}
+#db-selector{
+	width: 8%;
+	/*margin-left: -1px;*/
+
+}
