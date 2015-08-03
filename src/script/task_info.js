@@ -436,10 +436,8 @@ $(document).ready(function() {
             case "cmsweb-testbed.cern.ch":
                 $("#db-selector-box").val("preprod");
                 break;
-            case "mmascher-mon.cern.ch":
-                $("#db-selector-box").val("dev")
-                break;
             default:
+                $("#db-selector-box").val("dev")
                 break;
 
         }
