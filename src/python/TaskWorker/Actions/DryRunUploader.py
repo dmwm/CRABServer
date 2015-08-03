@@ -59,7 +59,7 @@ class DryRunUploader(TaskAction):
         finally:
             os.chdir(cwd)
 
-        return Result(task=kw['task'], result=(-1))
+        return Result(task=kw['task'], result=args[0])
 
     def execute(self, *args, **kw):
         try:
