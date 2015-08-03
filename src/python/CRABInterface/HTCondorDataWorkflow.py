@@ -778,16 +778,28 @@ class HTCondorDataWorkflow(DataWorkflow):
 
 
     def parseASOState(self, fp, nodes):
+        """ Parse aso_status and for each job change the job status from 'transferring'
+            to 'transferred' in case all files in the job have already been successfully
+            transferred.
+        """
+        transfers = {}
         data = json.load(fp)
-        for _, result in data['results'].items():
+        for docid, result in data['results'].items():
             if 'state' in result['value']: #this if is for backward compatibility with old postjobs
-                state = result['value']['state']
                 jobid = str(result['value']['jobid'])
-                if nodes[jobid]['State'] == 'transferring' and state == 'done':
-                    nodes[jobid]['State'] = 'transferred'
+                if nodes[jobid]['State'] == 'transferring':
+                    transfers.setdefault(jobid, {})[docid] = result['value']['state']
             else:
                 self.logger.warning("It seems that the aso_status file has been generated with an old version of the postjob")
-                break
+                return
+        for jobid in transfers:
+            ## The aso_status file is created/updated by the post-jobs when monitoring the
+            ## transfers, i.e. after all transfer documents for the given job have been
+            ## successfully inserted into the ASO database. Thus, if aso_status contains N
+            ## documents for a given job_id it means there are exactly N files to transfer
+            ## for that job.
+            if set(transfers[jobid].values()) == set(['done']):
+                nodes[jobid]['State'] = 'transferred'
 
 
     def parseErrorReport(self, fp, nodes):
