@@ -150,7 +150,7 @@ class RESTTask(RESTEntity):
         # behind a firewall.
         #=============================================================================
         scheddsObj = self.centralcfg.centralconfig['backend-urls'].get('htcondorSchedds', {})
-        self.logger.debug("ScheddObj is: %s" % workflow)
+        self.logger.info("ScheddObj for task %s is: %s\nSchedd used for submission %s" % (workflow, scheddsObj, row.schedd))
         #be careful that htcondorSchedds could be a list (backward compatibility). We might want to remove this in the future
         if row.schedd in list(scheddsObj) and isinstance(scheddsObj, dict):
             self.logger.debug("Found schedd %s" % row.schedd)
@@ -158,8 +158,8 @@ class RESTTask(RESTEntity):
             self.logger.debug("Proxied url base is %s" % proxiedurlbase)
             if proxiedurlbase:
                 yield proxiedurlbase + suffix
-
-        self.logger.info("Could not determine proxied url for task %s" % workflow)
+        else:
+            self.logger.info("Could not determine proxied url for task %s" % workflow)
 
 
     def counttasksbystatus(self, **kwargs):
