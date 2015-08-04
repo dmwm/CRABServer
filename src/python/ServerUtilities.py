@@ -13,6 +13,19 @@ from httplib import HTTPException
 
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
 
+
+## These are all possible statuses of a task in the TaskDB.
+## 'FAILED' is a status used to mark a task for which a failure occurred when
+## doing a submission, resubmission or kill. It is not a status a task can get
+## due to having (some) failed jobs.
+TASKDBSTATUSES = ['NEW', 'QUEUED', 'UPLOADED', 'SUBMITTED', 'KILL', 'KILLED', 'KILLFAILED', 'RESUBMIT', 'RESUBMITTED', 'FAILED'] # would like to add RESUBMITFAILED
+
+## These are all possible statuses of a task as returned by the `status' API.
+## 'COMPLETED' is a status the `status' makes up combining information from the
+## TaskDB and the DAG status.
+TASKSTATUSES = TASKDBSTATUSES + ['COMPLETED']
+
+
 def checkOutLFN(lfn, username):
     if lfn.startswith('/store/user/'):
         if lfn.split('/')[3] != username:
