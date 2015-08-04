@@ -646,6 +646,12 @@ class HTCondorDataWorkflow(DataWorkflow):
                 query = {'group': True, 'startkey': [workflow], 'endkey': [workflow, {}], 'stale': 'update_after'}
                 try:
                     publicationFailedList = db.loadView('DBSPublisher', 'PublicationFailedByWorkflow', query)['rows']
+                except CMSCouch.CouchBadRequestError: ## This is for backward compatibility, as the old view needs a different query: {'key': workflow, 'stale': 'update_after'}.
+                                                      ## But anyway, the old view doesn't return the publication failure reason.
+                    msg  = "Error while querying CouchDB for publication failures information for workflow %s." % (workflow)
+                    msg += " Seems the 'PublicationFailedByWorkflow' view in %s was not yet update to return the publication failures." % (asourl)
+                    self.logger.error(msg)
+                    return publicationInfo
                 except Exception as ex:
                     msg = "Error while querying CouchDB for publication failures information for workflow %s " % (workflow)
                     self.logger.exception(msg)
