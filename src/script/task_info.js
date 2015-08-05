@@ -4,8 +4,16 @@ $(document).ready(function() {
 
     // Task info is stored upon displaying it. Required for the tm_user_webdir value, which is needed
     // for loading the config and pset files.
-    var taskInfo = "", dbVersion = "", taskInfoUrl = "", taskStatusUrl = "",
-        cacheUrl = "", username = "", userWebDir = "", scriptExe = "", inputDataset = "";
+    var taskInfo = "",
+        dbVersion = "",
+        taskInfoUrl = "",
+        taskStatusUrl = "",
+        cacheUrl = "",
+        sandboxApiUrl = "",
+        username = "",
+        userWebDir = "",
+        scriptExe = "",
+        inputDataset = "";
 
     // In most cases the user won't want to override the default database
     setDefaultDbVersionSelector();
@@ -94,7 +102,7 @@ $(document).ready(function() {
                     for (i = 0; i < data.desc.columns.length; i++) {
                         $("#task-info-table tbody")
                             .append("<tr><td>" + data.desc.columns[i] + "</td><td>" + data.result[i] + "</td></tr>");
-            }
+                    }
                 } else {
                     var headers = xmlhttp.getAllResponseHeaders().toLowerCase();
                     // console.log("throwing exception");
@@ -124,12 +132,46 @@ $(document).ready(function() {
         }
 
         var urlEnd = "/sandbox.tar.gz";
-        var urlMiddle = userWebDir.split("mon")[1];
-        var urlStart = "https://mmascher-mon.cern.ch/scheddmon/5";
+        // var urlMiddle = userWebDir.split("mon")[1];
+        // var urlStart = "https://mmascher-mon.cern.ch/scheddmon/5";
 
-        var url = urlStart + urlMiddle + urlEnd;
+        // var url = urlStart + urlMiddle + urlEnd;
 
-        var tgz = TarGZ.stream(url, function(f, h) {
+
+        sandboxUrl = getSandboxUrl();
+
+        if (sandboxUrl === "undefined" || sandboxUrl === "") {
+            sandboxUrl = userWebDir;
+        } else {
+            // else get proxied url
+            
+            var xmlhttp = new XMLHttpRequest();
+
+            xmlhttp.onreadystatechange = function() {
+                if (xmlhttp.readyState == 4) {
+                    var headers = xmlhttp.getAllResponseHeaders().toLowerCase();
+                    sandboxUrl = processRedirectHeaders(headers);
+                }
+            }
+
+
+            function processRedirectHeaders(headers) {
+                var headerArray = headers.split("\r\n");
+
+                for (var i = 0; i < headerArray.length; i++) {
+                    var str = headerArray[i];
+                    if (str.search("location: " != -1)) {
+                        return str.split("location: ");
+                    }
+                }
+                return "";
+            }
+
+        }
+
+        console.log("sand:" + sandboxUrl);
+
+        var tgz = TarGZ.stream(sandboxUrl + urlEnd, function(f, h) {
             if (f.filename == "debug/crabConfig.py") {
                 $("#task-config-paragraph").text(f.data);
             }
@@ -138,6 +180,30 @@ $(document).ready(function() {
                 $("#task-pset-paragraph").text(f.data);
             }
         }, null, handleTarGZCallbackErr);
+
+
+        // Queries the proxy api. It returns a url where the sandbox is located. If it returns empty, then the 
+        // url found in TaskInfo should be used.
+        function getSandboxUrl() {
+            var foundUrl = ""
+            var xmlhttp = new XMLHttpRequest();
+            xmlhttp.onreadystatechange = function() {
+                if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                    var data = JSON.parse(xmlhttp.response);
+                    foundUrl = data.result[0];
+                } else {
+                    var headers = xmlhttp.getAllResponseHeaders().toLowerCase();
+                    // errHandler(new TaskInfoUndefinedError());
+                    foundUrl = "";
+                }
+            }
+
+            xmlhttp.open("GET", sandboxApiUrl + inputTaskName, false);
+            xmlhttp.send();
+
+            // TODO delete this and add null check on function call
+            return foundUrl;
+        }
     }
 
 
@@ -237,15 +303,11 @@ $(document).ready(function() {
     function displayMainPage(errHandler) {
 
 
-        if (userWebDir !== "" && userWebDir !== "undefined"
-            && inputTaskName !== "" && inputTaskName !== "undefined") {
+        if (userWebDir !== "" && userWebDir !== "undefined" && inputTaskName !== "" && inputTaskName !== "undefined") {
 
-            var dashboardUrl = "http://dashb-cms-job.cern.ch/dashboard/templates/"
-                + "task-analysis/#user=default&refresh=0&table=Jobs&p=1&records=25"
-                + "&activemenu=2&status=&site=&tid=" + inputTaskName;
+            var dashboardUrl = "http://dashb-cms-job.cern.ch/dashboard/templates/" + "task-analysis/#user=default&refresh=0&table=Jobs&p=1&records=25" + "&activemenu=2&status=&site=&tid=" + inputTaskName;
 
-            var dasUrl = "https://cmsweb.cern.ch/das/request?view=list&limit=50"
-                + "&instance=prod%2Fglobal&input=" + inputDataset;
+            var dasUrl = "https://cmsweb.cern.ch/das/request?view=list&limit=50" + "&instance=prod%2Fglobal&input=" + inputDataset;
 
             $("#main-dashboard-link").attr("href", dashboardUrl);
 
@@ -414,14 +476,17 @@ $(document).ready(function() {
             case "prod":
                 taskInfoUrl = "https://" + document.domain + "/crabserver/prod/task?subresource=search&workflow=";
                 taskStatusUrl = "https://" + document.domain + "/crabserver/prod/workflow?workflow=";
+                sandboxApiUrl = "https://" + document.domain + "/crabserver/prod/task?subresource=webdirprx&workflow="
                 break;
             case "preprod":
                 taskInfoUrl = "https://" + document.domain + "/crabserver/preprod/task?subresource=search&workflow=";
                 taskStatusUrl = "https://" + document.domain + "/crabserver/preprod/workflow?workflow=";
+                sandboxApiUrl = "https://" + document.domain + "/crabserver/preprod/task?subresource=webdirprx&workflow="
                 break;
             case "dev":
                 taskInfoUrl = "https://" + document.domain + "/crabserver/dev/task?subresource=search&workflow=";
                 taskStatusUrl = "https://" + document.domain + "/crabserver/dev/workflow?workflow=";
+                sandboxApiUrl = "https://" + document.domain + "/crabserver/dev/task?subresource=webdirprx&workflow="
                 break;
             default:
                 break;
