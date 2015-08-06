@@ -219,10 +219,10 @@ class DagmanKiller(TaskAction):
             #XXX what's the difference of outting this here or in the else?
             if kw['task']['kill_all']:
                 configreq = {'workflow': kw['task']['tm_taskname'], 'status': "KILLED"}
-                self.server.post(self.resturi, data = urllib.urlencode(configreq), retry = 2, logger = self.logger)
+                self.server.post(self.resturi, data = urllib.urlencode(configreq))
             else:
                 configreq = {'workflow': kw['task']['tm_taskname'], 'status': "SUBMITTED"}
-                self.server.post(self.resturi, data = urllib.urlencode(configreq), retry = 2, logger = self.logger)
+                self.server.post(self.resturi, data = urllib.urlencode(configreq))
         finally:
             apmon.free()
 

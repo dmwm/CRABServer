@@ -32,11 +32,12 @@ DEFAULT_BACKEND = 'panda'
 class TaskHandler(object):
     """Handling the set of operations to be performed."""
 
-    def __init__(self, task, procnum):
+    def __init__(self, task, procnum, server):
         """Initializer
 
         :arg TaskWorker.DataObjects.Task task: the task to work on."""
         self.logger = logging.getLogger(str(procnum))
+        self.server = server
         self._work = []
         self._task = task
 
@@ -71,6 +72,7 @@ class TaskHandler(object):
         taskhandler = FileHandler(taskdirname + self._task['tm_taskname'] + '.log')
         taskhandler.setLevel(logging.DEBUG)
         self.logger.addHandler(taskhandler)
+        self.server.logger = self.logger
 
         for work in self.getWorks():
             self.logger.debug("Starting %s on %s" % (str(work), self._task['tm_taskname']))
@@ -109,7 +111,7 @@ class TaskHandler(object):
                         msg = "Unknown error while uploading the logfile for task %s" % self._task['tm_taskname']
                         self.logger.exception(msg)
             t1 = time.time()
-            self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1-t0))
+            self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1 - t0))
             try:
                 nextinput = output.result
             except AttributeError:
@@ -130,8 +132,8 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     :*args and *kwargs: extra parameters currently not defined
     :return: the handler."""
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=2)
-    handler = TaskHandler(task, procnum)
-    handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60*60*24))
+    handler = TaskHandler(task, procnum, server)
+    handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
     if task['tm_job_type'] == 'Analysis':
         if task.get('tm_user_files'):
             handler.addWork(UserDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum))
@@ -170,8 +172,8 @@ def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=2)
-    handler = TaskHandler(task, procnum)
-    handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60*60*24))
+    handler = TaskHandler(task, procnum, server)
+    handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
     def glidein(config):
         """Performs the re-injection into Glidein
         :arg WMCore.Configuration config: input configuration"""
@@ -199,8 +201,8 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=2)
-    handler = TaskHandler(task, procnum)
-    handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60*5))
+    handler = TaskHandler(task, procnum, server)
+    handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 5))
     def glidein(config):
         """Performs kill of jobs sent through Glidein
         :arg WMCore.Configuration config: input configuration"""

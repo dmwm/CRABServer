@@ -139,7 +139,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
         self.logger.debug("Setting the task as successfully resubmitted with %s " % str(configreq))
         data = urllib.urlencode(configreq)
         try:
-            self.server.post(self.resturi, data = data, retry = 2, logger = self.logger)
+            self.server.post(self.resturi, data = data)
         except HTTPException as hte:
             self.logger.error(hte.headers)
             raise TaskWorkerException("The CRAB3 server backend successfully resubmitted your task to the Grid scheduler, but was unable to update\n"+\

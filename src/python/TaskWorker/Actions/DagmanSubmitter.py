@@ -144,7 +144,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
     """
 
     def execute(self, *args, **kw):
-        userServer = HTTPRequests(self.server['host'], kw['task']['user_proxy'], kw['task']['user_proxy'], retry=2)
+        userServer = HTTPRequests(self.server['host'], kw['task']['user_proxy'], kw['task']['user_proxy'], retry=2, logger=self.logger)
         retryIssues = []
         retryIssuesBySchedd = {}
         goodSchedulers = []
@@ -188,7 +188,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                          'subresource': 'updateschedd',
                          'scheddname': schedd}
             try:
-                userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq), retry = 2, logger = self.logger)
+                userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
                 kw['task']['tm_schedd'] = schedd
             except HTTPException as hte:
                 msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
@@ -262,7 +262,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     }
         self.logger.warning("Task %s already submitted to HTCondor; pushing information centrally: %s" % (workflow, str(configreq)))
         data = urllib.urlencode(configreq)
-        self.server.post(self.resturi, data = data, retry = 2, logger = self.logger)
+        self.server.post(self.resturi, data = data)
 
         # Note that we don't re-send Dashboard jobs; we assume this is a rare occurrance and
         # don't want to upset any info already in the Dashboard.
@@ -356,7 +356,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                      'subresource': 'success',}
         self.logger.debug("Pushing information centrally %s" %(str(configreq)))
         data = urllib.urlencode(configreq)
-        self.server.post(self.resturi, data = data, retry = 2, logger = self.logger)
+        self.server.post(self.resturi, data = data)
 
         self.sendDashboardJobs(dashboard_params, info['apmon'])
 
