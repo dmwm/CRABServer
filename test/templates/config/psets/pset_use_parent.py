@@ -7,7 +7,11 @@ process.source = cms.Source('PoolSource',
         ),
 )
 
-process.dump = cms.EDAnalyzer("Validation")
+process.dump = cms.EDAnalyzer(
+    "DumpFEDRawDataProduct",
+    label = cms.untracked.string("rawDataCollector"),
+    feds = cms.untracked.vint32(0)
+)
 
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.MessageLogger.cerr.FwkReport.reportEvery = 1
