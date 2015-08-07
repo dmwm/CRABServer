@@ -1,4 +1,3 @@
-
 """
 CMSRunAnalysis.py - the runtime python portions to launch a CRAB3 / cmsRun job.
 """
@@ -444,9 +443,6 @@ def parseArgs():
                       dest='seeding',
                       type='string',
                       default=None)
-    parser.add_option('--userFiles',
-                      dest='userFiles',
-                      type='string')
     parser.add_option('--oneEventMode',
                       dest='oneEventMode',
                       default=0)
@@ -481,7 +477,6 @@ def parseArgs():
         print "lastEvent:     ", opts.lastEvent
         print "firstRun:      ", opts.firstRun
         print "seeding:       ", opts.seeding
-        print "userFiles:     ", opts.userFiles
         print "oneEventMode:  ", opts.oneEventMode
         print "scriptExe:     ", opts.scriptExe
         print "scriptArgs:    ", opts.scriptArgs
@@ -506,10 +501,6 @@ def prepareWMCore(opts):
     os.rename('PSet.py', destDir + '/PSet.py')
     open('WMTaskSpace/__init__.py','w').close()
     open(destDir + '/__init__.py','w').close()
-    #move the additional user files in the right place
-    if opts.userFiles:
-        for myfile in opts.userFiles.split(','):
-            os.rename(myfile, destDir + '/' + myfile)
     print "==== WMCore filesystem preparation FINISHING at %s ====" % time.asctime(time.gmtime())
 
 
@@ -517,6 +508,7 @@ def extractUserSandbox(archiveJob, cmsswVersion):
     os.chdir(cmsswVersion)
     print commands.getoutput('tar xvfzm %s ' % os.path.join('..', opts.archiveJob))
     os.chdir('..')
+
 
 def getProv(filename, scram):
     ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd(), logName="edmProvDumpOutput.log")
@@ -609,7 +601,7 @@ def executeCMSSWStack(opts, scram):
         getattr(cmssw.step.output.modules, output).dataTier         = ''
     #cmssw.step.application.command.arguments = '' #TODO
     cmssw.step.user.inputSandboxes = [opts.archiveJob]
-    cmssw.step.user.userFiles = opts.userFiles or ''
+    cmssw.step.user.userFiles = ''
     #Setting the following job attribute is required because in the CMSSW executor there is a call to analysisFileLFN to set up some attributes for TFiles.
     #Same for lfnbase. We actually don't use these information so I am setting these to dummy values. Next: fix and use this lfn or drop WMCore runtime..
     cmssw.job = {'counter' : 0, 'workflow' : 'unused'}
