@@ -496,41 +496,7 @@ def parseArgs():
     return opts
 
 
-#TODO: MM I do not believe this is necessary at all
-def prepSandbox(opts):
-    print "==== Sandbox preparation STARTING at %s ====" % time.asctime(time.gmtime())
-    os.environ['WMAGENTJOBDIR'] = os.getcwd()
-    if opts.archiveJob and not "CRAB3_RUNTIME_DEBUG" in os.environ:
-        if os.path.exists(opts.archiveJob):
-            print "Sandbox %s already exists, skipping" % opts.archiveJob
-        elif opts.sourceURL == 'LOCAL' and not os.path.exists(opts.archiveJob):
-            print "ERROR: Requested for condor to transfer the tarball, but it didn't show up"
-            handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: could not get jobO files from panda server')
-            sys.exit(EC_WGET)
-        else:
-            print "--- wget for jobO ---"
-            output = commands.getoutput('wget -h')
-            wgetCommand = 'wget'
-            for line in output.split('\n'):
-                if re.search('--no-check-certificate', line) != None:
-                    wgetCommand = 'wget --no-check-certificate'
-                    break
-            com = '%s %s/cache/%s' % (wgetCommand, opts.sourceURL, opts.archiveJob)
-            nTry = 3
-            for iTry in range(nTry):
-                print 'Try : %s' % iTry
-                status, output = commands.getstatusoutput(com)
-                print output
-                if status == 0:
-                    break
-                if iTry+1 == nTry:
-                    print "ERROR : cound not get jobO files from panda server"
-                    handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: could not get jobO files from panda server')
-                    sys.exit(EC_WGET)
-                time.sleep(30)
-        print commands.getoutput('tar xvfzm %s' % opts.archiveJob)
-    print "==== Sandbox preparation FINISHING at %s ====" % time.asctime(time.gmtime())
-
+def prepareWMCore(opts):
     #move the pset in the right place
     print "==== WMCore filesystem preparation STARTING at %s ====" % time.asctime(time.gmtime())
     destDir = 'WMTaskSpace/cmsRun'
@@ -819,7 +785,7 @@ if __name__ == "__main__":
     # Note that we may fail in the imports - hence we try to report to Dashboard first
     try:
         opts = parseArgs()
-        prepSandbox(opts)
+        prepareWMCore(opts)
         from WMCore.WMRuntime.Bootstrap import setupLogging
         from WMCore.FwkJobReport.Report import Report
         from WMCore.FwkJobReport.Report import FwkJobReportException
