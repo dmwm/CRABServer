@@ -104,7 +104,7 @@ def _check_file(argname, val):
         filesize, realfile = file_size(val.file)
         if realfile:
             if filesize > FILE_SIZE_LIMIT:
-                raise InvalidParameter('File is bigger then allowed limit of %dB' % FILE_SIZE_LIMIT)
+                raise InvalidParameter("File size is %sB. This is bigger than the maximum allowed size of %sB." % (filesize, FILE_SIZE_LIMIT))
         elif filesize > FILE_MEMORY_LIMIT:
             raise InvalidParameter('File too large to be completely loaded into memory.')
 
