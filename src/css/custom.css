@@ -49,5 +49,9 @@ body {
 #db-selector{
 	width: 8%;
 	/*margin-left: -1px;*/
+}
 
+#taskworker-log-link, #upload-log-link {
+	text-decoration: underline;
+	color: #333333;
 }
