@@ -1149,6 +1149,7 @@ def main():
     ## or transfer_outputs) is True.
     ## List of attributes that the code must be able to get from the job ad.
     job_ad_required_attrs = ['CRAB_Id', \
+                             'CRAB_JobSW',
                              'CRAB_StageoutPolicy', \
                              'CRAB_Destination', \
                              'CRAB_Dest', \
@@ -1180,6 +1181,12 @@ def main():
     ##--------------------------------------------------------------------------
     ## Finish PARSE JOB AD
     ##--------------------------------------------------------------------------
+
+
+    ##--------------------------------------------------------------------------
+    ## Changing directory and going to the CMSSW working direcotry
+    ##--------------------------------------------------------------------------
+    os.chdir(G_JOB_AD['CRAB_JobSW'])
 
     ##--------------------------------------------------------------------------
     ## Start JOB REPORT VALIDATION

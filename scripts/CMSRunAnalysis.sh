@@ -11,7 +11,9 @@ sigterm() {
   echo "Logging disk usage in directory:"
   du -h
   exec sh ./DashboardFailure.sh 50669
-  if [ ! -e logCMSSWSaved.txt ];
+  #logCMSSWSaved.txt should be in $CRAB_JobSW unless the job was killed before this:
+  #[github link to the os.chdir in CMSRunAnalysis]
+  if [ ! -e logCMSSWSaved.txt ] || [ ! -e $CRAB_JobSW/logCMSSWSaved.txt ];
   then
     python -c "import CMSRunAnalysis; logCMSSW()"
   fi
@@ -175,14 +177,6 @@ if [[ $jobrc == 137 ]]
 then
   echo "Job was killed. Check Postjob for kill reason."
   sigterm
-fi
-
-if [ -e scramOutput.log ]; then
-  echo "==== SCRAM interaction log contents dump STARTING ===="
-  cat scramOutput.log
-  echo "==== SCRAM interaction log contents dump FINISHING ===="
-else
-  echo "ERROR: scramOutput.log does not exist."
 fi
 
 if [ ! -e wmcore_initialized ];

@@ -296,45 +296,55 @@ def stopDashboardMonitoring(myad):
     DashboardAPI.apmonFree()
 
 
+#TODO should probably rename this to logRuntime
 def logCMSSW():
     global logCMSSWSaved
     if logCMSSWSaved:
         return
+
+    if not os.path.exists("TewakPSet-stdout.log"):
+        print "ERROR: Cannot dump TewakPSet stdout; perhaps it was never executed"
+        logCMSSWSaved = True
+        open('logCMSSWSaved.txt', 'a').close()
+        os.utime('logCMSSWSaved.txt', None)
+        return
+
+    #if TwakPSet has been executed worth checking the CMSSW std out
     if not os.path.exists("cmsRun-stdout.log"):
         print "ERROR: Cannot dump CMSSW stdout; perhaps CMSSW never executed (e.g.: scriptExe was set)?"
         logCMSSWSaved = True
         open('logCMSSWSaved.txt', 'a').close()
         os.utime('logCMSSWSaved.txt', None)
         return
-    print "======== CMSSW OUTPUT STARTING ========"
 
-    outfile = "cmsRun-stdout.log"
-
-    # check size of outfile
+    outfiles = [ ("TewakPSet-stdout.log", "TWEAKPSET"), ( "cmsRun-stdout.log", "CMSSW")]
     keepAtStart = 1000
     keepAtEnd   = 3000
     maxLines    = keepAtStart + keepAtEnd
-    numLines = sum(1 for line in open(outfile))
-    tooBig = numLines > maxLines
-    if tooBig :
-        print "WARNING: CMSSW output more then %d lines; truncating to first %d and last %d" % (maxLines, keepAtStart, keepAtEnd)
-        print "Use 'crab getlog' to retrieve full output of this job from storage."
-        print "======================================="
-        with open(outfile) as fp:
-            for nl, line in enumerate(fp):
-                if nl < keepAtStart:
-                    print "== CMSSW: ", line,
-                if nl == keepAtStart+1:
-                    print "== CMSSW: "
-                    print "== CMSSW: [...BIG SNIP...]"
-                    print "== CMSSW: "
-                if numLines-nl <= keepAtEnd:
-                    print "== CMSSW: ", line,
-    else:
-        for line in open(outfile):
-            print "== CMSSW: ", line,
+    for outfile, logtype in outfiles:
+        print "======== %s OUTPUT STARTING ========" % logtype
+        # check size of outfile
+        numLines = sum(1 for line in open(outfile))
+        tooBig = numLines > maxLines
+        if tooBig :
+            print "WARNING: %s output more then %d lines; truncating to first %d and last %d" % (logtype, maxLines, keepAtStart, keepAtEnd)
+            print "Use 'crab getlog' to retrieve full output of this job from storage."
+            print "======================================="
+            with open(outfile) as fp:
+                for nl, line in enumerate(fp):
+                    if nl < keepAtStart:
+                        print "== %s: " % logtype, line,
+                    if nl == keepAtStart+1:
+                        print "== %s: " % logtype
+                        print "== %s: [...BIG SNIP...]" % logtype
+                        print "== %s: " % logtype
+                    if numLines-nl <= keepAtEnd:
+                        print "== %s: " % logtype, line,
+        else:
+            for line in open(outfile):
+                print "== %s: " % logtype, line,
+        print "======== %s OUTPUT FINSHING ========" % logtype
 
-    print "======== CMSSW OUTPUT FINSHING ========"
     logCMSSWSaved = True
     open('logCMSSWSaved.txt', 'a').close()
     os.utime('logCMSSWSaved.txt', None)
@@ -488,10 +498,14 @@ def parseArgs():
         mintime()
         sys.exit(EC_MissingArg)
 
+    #TODO this is not nice: who creates the command line arguments should put --scriptExe= instead of --scriptExe=None
+    if opts.scriptExe=='None':
+        opts.scriptExe = None
+
     return opts
 
 
-def prepareWMCore(opts):
+def prepareWMCore():
     #move the pset in the right place
     print "==== WMCore filesystem preparation STARTING at %s ====" % time.asctime(time.gmtime())
     destDir = 'WMTaskSpace/cmsRun'
@@ -504,10 +518,13 @@ def prepareWMCore(opts):
     print "==== WMCore filesystem preparation FINISHING at %s ====" % time.asctime(time.gmtime())
 
 
-def extractUserSandbox(archiveJob, cmsswVersion):
-    os.chdir(cmsswVersion)
-    print commands.getoutput('tar xvfzm %s ' % os.path.join('..', opts.archiveJob))
-    os.chdir('..')
+
+def extractUserSandbox(archiveJob):
+    """ The function take the user input sandbox as an argument (archiveJob) and
+        extracts it sandbox into this directory (cmsswVersion).
+    """
+
+    print commands.getoutput('tar xvfzm %s ' % os.path.join('..', archiveJob))
 
 
 def getProv(filename, scram):
@@ -523,11 +540,8 @@ def getProv(filename, scram):
     return output
 
 
-def executeScriptExe(opts, scram):
-    #make scriptexe executable
-    st = os.stat(opts.scriptExe)
-    os.chmod(opts.scriptExe, st.st_mode | stat.S_IEXEC)
-
+def executePayload(opts, scram):
+    tweakPSetLocation = os.path.dirname(os.getcwd()) #parent directory
     command_ = ('python %s/TweakPSet.py --location=%s '+
                                                           '--inputFile=\'%s\' '+
                                                           '--runAndLumis=\'%s\' '+
@@ -539,7 +553,7 @@ def executeScriptExe(opts, scram):
                                                           '--lheInputFiles=%s '+
                                                           '--oneEventMode=%s ' +
                                                           '--eventsPerLumi=%s') %\
-                                             (os.getcwd(), os.getcwd(),
+                                             (tweakPSetLocation, os.getcwd(),
                                                            opts.inputFile,
                                                            opts.runAndLumis,
                                                            opts.firstEvent,
@@ -550,14 +564,18 @@ def executeScriptExe(opts, scram):
                                                            opts.lheInputFiles,
                                                            opts.oneEventMode,
                                                            opts.eventsPerLumi)
-    ret = scram(command_, runtimeDir = os.getcwd(), logName='scramOutput.log')
+
+    ret = scram(command_, runtimeDir = os.getcwd(), logName='TewakPSet-stdout.log')
     if ret > 0:
         msg = scram.diagnostic()
         handleException("FAILED", EC_CMSRunWrapper, 'Error executing TeakPSet.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
         mintime()
         sys.exit(EC_CMSRunWrapper)
 
-    command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
+    if opts.scriptExe:
+        command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
+    else:
+        command_ = "cmsRun  -j FrameworkJobReport.xml PSet.py"
 
     ret = scram(command_, runtimeDir = os.getcwd(), logName = 'cmsRun-stdout.log', cleanEnv = False)#logName=subprocess.PIPE) for printing to the stdout
     if ret > 0:
@@ -565,80 +583,8 @@ def executeScriptExe(opts, scram):
         handleException("FAILED", EC_CMSRunWrapper, 'Error executing scriptExe.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
         mintime()
         sys.exit(EC_CMSRunWrapper)
+
     return ret
-
-
-def executeCMSSWStack(opts, scram):
-
-    def getOutputModules():
-        pythonScript = "from PSetTweaks.WMTweak import makeTweak;"+\
-                       "config = __import__(\"WMTaskSpace.cmsRun.PSet\", globals(), locals(), [\"process\"], -1);"+\
-                       "tweakJson = makeTweak(config.process).jsondictionary();"+\
-                       "print tweakJson[\"process\"][\"outputModules_\"]"
-        ret = scram("python -c '%s'" % pythonScript, logName=subprocess.PIPE, runtimeDir=os.getcwd())
-        if ret > 0:
-            msg = scram.diagnostic()
-            handleException("FAILED", EC_CMSRunWrapper, 'Error getting output modules from the pset.\n\tScram Env %s\n\tCommand:%s' % (msg, pythonScript))
-            mintime()
-            sys.exit(EC_CMSRunWrapper)
-        return literal_eval(scram.stdout)
-
-    cmssw = CMSSW()
-    cmssw.stepName = "cmsRun"
-    cmssw.step = WMStep(cmssw.stepName)
-    CMSSWTemplate().install(cmssw.step)
-    cmssw.task = makeWMTask(cmssw.stepName)
-    cmssw.workload = newWorkload(cmssw.stepName)
-    cmssw.step.application.setup.softwareEnvironment = ''
-    cmssw.step.application.setup.scramArch = opts.scramArch
-    cmssw.step.application.setup.cmsswVersion = opts.cmsswVersion
-    cmssw.step.application.configuration.section_("arguments")
-    cmssw.step.application.configuration.arguments.globalTag = ""
-    for output in getOutputModules():
-        cmssw.step.output.modules.section_(output)
-        getattr(cmssw.step.output.modules, output).primaryDataset   = ''
-        getattr(cmssw.step.output.modules, output).processedDataset = ''
-        getattr(cmssw.step.output.modules, output).dataTier         = ''
-    #cmssw.step.application.command.arguments = '' #TODO
-    cmssw.step.user.inputSandboxes = [opts.archiveJob]
-    cmssw.step.user.userFiles = ''
-    #Setting the following job attribute is required because in the CMSSW executor there is a call to analysisFileLFN to set up some attributes for TFiles.
-    #Same for lfnbase. We actually don't use these information so I am setting these to dummy values. Next: fix and use this lfn or drop WMCore runtime..
-    cmssw.job = {'counter' : 0, 'workflow' : 'unused'}
-    cmssw.step.user.lfnBase = '/store/temp/user/'
-    cmssw.step.section_("builder")
-    cmssw.step.builder.workingDir = os.getcwd()
-    cmssw.step.runtime.invokeCommand = 'python'
-    cmssw.step.runtime.scramPreDir = os.getcwd()
-    cmssw.step.runtime.preScripts = []
-
-
-    cmssw.step.runtime.scramPreScripts = [('%s/TweakPSet.py --location=%s '+
-                                                          '--inputFile=\'%s\' '+
-                                                          '--runAndLumis=\'%s\' '+
-                                                          '--firstEvent=%s '+
-                                                          '--lastEvent=%s '+
-                                                          '--firstLumi=%s '+
-                                                          '--firstRun=%s '+
-                                                          '--seeding=%s '+
-                                                          '--lheInputFiles=%s '+
-                                                          '--oneEventMode=%s ' +
-                                                          '--eventsPerLumi=%s') %
-                                             (os.getcwd(), os.getcwd(),
-                                                           opts.inputFile,
-                                                           opts.runAndLumis,
-                                                           opts.firstEvent,
-                                                           opts.lastEvent,
-                                                           opts.firstLumi,
-                                                           opts.firstRun,
-                                                           opts.seeding,
-                                                           opts.lheInputFiles,
-                                                           opts.oneEventMode,
-                                                           opts.eventsPerLumi)]
-    cmssw.step.section_("execution") #exitStatus of cmsRun is set here
-    cmssw.report = Report("cmsRun") #report is loaded and put here
-    cmssw.execute()
-    return cmssw
 
 
 def AddChecksums(report):
@@ -660,6 +606,7 @@ def AddChecksums(report):
                     continue
             print "==== Checksum STARTING at %s ====" % time.asctime(time.gmtime())
             print "== Filename: %s" % fileInfo['pfn']
+            #TODO we only care about adler32
             (adler32, cksum) = calculateChecksums(fileInfo['pfn'])
             print "==== Checksum FINISHING at %s ====" % time.asctime(time.gmtime())
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
@@ -777,7 +724,6 @@ if __name__ == "__main__":
     # Note that we may fail in the imports - hence we try to report to Dashboard first
     try:
         opts = parseArgs()
-        prepareWMCore(opts)
         from WMCore.WMRuntime.Bootstrap import setupLogging
         from WMCore.FwkJobReport.Report import Report
         from WMCore.FwkJobReport.Report import FwkJobReportException
@@ -808,49 +754,55 @@ if __name__ == "__main__":
         fd.write("wmcore initialized.\n")
 
     try:
-        setupLogging('.')
-
-        # Also add stdout to the logging
-        logHandler = logging.StreamHandler(sys.stdout)
-        logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
-        logging.Formatter.converter = time.gmtime
-        logHandler.setFormatter(logFormatter)
-        logging.getLogger().addHandler(logHandler)
-
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             startDashboardMonitoring(ad)
         print "==== CMSSW Stack Execution STARTING at %s ====" % time.asctime(time.gmtime())
+        #we need this otherwise we wont be able to import the PSet executing TweakPSet
+        pythonPathDir = os.path.join(os.getcwd(), opts.cmsswVersion)
         scram = Scram(
             version = opts.cmsswVersion,
             directory = os.getcwd(),
             architecture = opts.scramArch,
+            envCmd = 'export PYTHONPATH=%s:$PYTHONPATH' % pythonPathDir
             )
 
-        print "==== SCRAM Obj CREATED at %s ====" % time.asctime(time.gmtime())
+        print "==== STARTING CREATION OF CMSSW ENV at %s ====" % time.asctime(time.gmtime())
         if scram.project() or scram.runtime(): #if any of the two commands fail...
             msg = scram.diagnostic()
             handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
             mintime()
             sys.exit(EC_CMSMissingSoftware)
+        print "==== CMSSW ENV CREATED CREATED at %s ====" % time.asctime(time.gmtime())
 
-        extractUserSandbox(opts.archiveJob, opts.cmsswVersion)
+        #that should not happend, but just in case...
+        if not os.path.isdir(opts.cmsswVersion):
+            raise Exception("Cannot find directory %s. CWD: %s" % (cmsswVersion, os.getcwd()))
 
+        #make scriptexe executable
+        if opts.scriptExe:
+            st = os.stat(opts.scriptExe)
+            os.chmod(opts.scriptExe, st.st_mode | stat.S_IEXEC)
+
+        #From now on everything will be executed in the cmssw area
+        os.chdir(opts.cmsswVersion)
         try:
             jobExitCode = None
-            if opts.scriptExe=='None':
-                print "==== CMSSW JOB Execution started at %s ====" % time.asctime(time.gmtime())
-                cmssw = executeCMSSWStack(opts, scram)
-                jobExitCode = cmssw.step.execution.exitStatus
-            else:
+            extractUserSandbox(opts.archiveJob)
+            prepareWMCore()
+            shutil.copyfile('../run_and_lumis.tar.gz', 'run_and_lumis.tar.gz')
+            #TODO: add the input files once is https://github.com/dmwm/CRABServer/issues/4872 done
+            if opts.scriptExe:
                 print "==== ScriptEXE Execution started at %s ====" % time.asctime(time.gmtime())
-                jobExitCode = executeScriptExe(opts, scram)
+            else:
+                print "==== CMSSW JOB Execution started at %s ====" % time.asctime(time.gmtime())
+            jobExitCode = executePayload(opts, scram)
+            print "==== CMSSW Stack Execution FINISHING at %s ====" % time.asctime(time.gmtime())
         except:
             print "==== CMSSW Stack Execution FAILED at %s ====" % time.asctime(time.gmtime())
-            logCMSSW()
             raise
-        print "Job exit code: %s" % str(jobExitCode)
-        print "==== CMSSW Stack Execution FINISHING at %s ====" % time.asctime(time.gmtime())
-        logCMSSW()
+        finally:
+            print "Job exit code: %s" % str(jobExitCode)
+            logCMSSW()
     except WMExecutionFailure as WMex:
         print "ERROR: Caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail)
         exmsg = WMex.name

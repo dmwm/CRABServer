@@ -53,6 +53,8 @@ then
     fi
     CRAB_localOutputFiles=`grep '^CRAB_localOutputFiles =' $_CONDOR_JOB_AD | tr -d '"' | tr -d ',' | sed 's/CRAB_localOutputFiles = //'`
     CRAB_Id=`grep '^CRAB_Id =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
+    #CRAB_JobSW is used in CMSRunAnalysis.sh to get the CMSSW working  direcotry, and find the logfiles
+    export CRAB_JobSW=`grep '^CRAB_JobSW =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
     JOB_CMSSite=`grep '^JOB_CMSSite =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
     if [ "X$CRAB_Id" = "X" ];
     then
@@ -60,6 +62,7 @@ then
         exit 2
     fi
    echo "CRAB ID: $CRAB_Id"
+   echo "CMSSW Version: $CRAB_JobSW"
    echo "Execution site: $JOB_CMSSite"
    echo "Current hostname: $(hostname)"
    echo "Destination site: $CRAB_Dest"
