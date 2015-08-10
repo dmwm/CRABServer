@@ -42,6 +42,7 @@ class RetryJob(object):
         self.job_id              = None
         self.dag_jobid           = None
         self.site                = None
+        self.ads                 = []
         self.ad                  = {}
         self.report              = {}
         self.validreport         = True
@@ -74,7 +75,7 @@ class RetryJob(object):
 
         if status:
             raise FatalError("Failed to query condor user log:\n%s" % output)
-        self.ads = []
+
         for text_ad in output.split("\n\n"):
             try:
                 ad = classad.parseOld(text_ad)
@@ -90,7 +91,6 @@ class RetryJob(object):
         """
         Need a doc string here
         """
-        self.ads = []
         self.ads.append(self.ad)
         if self.crab_retry == 0:
             print 'Job is retry num 0. Will not try to search and load previous job ads.'
