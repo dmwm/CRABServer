@@ -84,6 +84,7 @@ class DataUserWorkflow(object):
            :arg str inputdata: input dataset;
            :arg str nonvaliddata: allow invalid input dataset;
            :arg int use_parent: add the parent dataset as secondary input;
+           :arg str secondarydata: secondary input dataset
            :arg str generator: event generator for MC production;
            :arg int events_per_lumi: events to generate per lumi;
            :arg str list siteblacklist: black list of sites, with CMS name;

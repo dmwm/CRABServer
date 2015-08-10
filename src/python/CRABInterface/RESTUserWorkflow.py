@@ -224,6 +224,7 @@ class RESTUserWorkflow(RESTEntity):
                 self._checkReleases(safe.kwargs['jobarch'], safe.kwargs['jobsw'])
             jobtype = safe.kwargs.get('jobtype', None)
             validate_num("useparent", param, safe, optional=True)
+            validate_str("secondarydata", param, safe, RX_DATASET, optional=True)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
             safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
@@ -382,7 +383,7 @@ class RESTUserWorkflow(RESTEntity):
 
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
-    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, nonvaliddata, useparent, generator, eventsperlumi, \
+    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, nonvaliddata, useparent, secondarydata, generator, eventsperlumi, \
                 siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
                 savelogsflag, publication, publishname, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
@@ -397,6 +398,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str inputdata: input dataset;
            :arg str nonvaliddata: allow invalid input dataset;
            :arg int useparent: add the parent dataset as secondary input;
+           :arg str secondarydata: optional secondary intput dataset;
            :arg str generator: event generator for MC production;
            :arg str eventsperlumi: how many events to generate per lumi;
            :arg str list siteblacklist: black list of sites, with CMS name;
@@ -444,7 +446,7 @@ class RESTUserWorkflow(RESTEntity):
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
         return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch,
-                                       inputdata=inputdata, nonvaliddata=nonvaliddata, use_parent=useparent, generator=generator, events_per_lumi=eventsperlumi,
+                                       inputdata=inputdata, nonvaliddata=nonvaliddata, use_parent=useparent, secondarydata=secondarydata, generator=generator, events_per_lumi=eventsperlumi,
                                        siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, splitalgo=splitalgo, algoargs=algoargs,
                                        cachefilename=cachefilename, cacheurl=cacheurl,
                                        addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
