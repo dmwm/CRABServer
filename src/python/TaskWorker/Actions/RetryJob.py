@@ -38,9 +38,11 @@ class RetryJob(object):
         self.logger              = None
         self.reqname             = None
         self.job_return_code     = None
+        self.dag_retry           = None
         self.crab_retry          = None
         self.job_id              = None
         self.dag_jobid           = None
+        self.dag_clusterid       = None
         self.site                = None
         self.ads                 = []
         self.ad                  = {}
@@ -54,12 +56,8 @@ class RetryJob(object):
         """
         Need a doc string here.
         """
-        try:
-            dag_clusterid = int(self.dag_jobid.split(".")[0])
-            if dag_clusterid == -1:
-                return
-        except ValueError:
-            pass
+        if self.dag_clusterid == -1:
+            return
 
         shutil.copy("job_log", "job_log.%s" % str(self.dag_jobid))
 
@@ -91,12 +89,12 @@ class RetryJob(object):
         Need a doc string here
         """
         self.ads.append(self.ad)
-        if self.crab_retry == 0:
+        if self.dag_retry == 0:
             msg = "This is job retry number 0. Will not try to search and load previous job ads."
             self.logger.info(msg)
             return
-        for crab_retry in range(self.crab_retry):
-            job_ad_file = os.path.join(".", "finished_jobs", "job.%d.%d" % (self.job_id, crab_retry))
+        for dag_retry in range(self.dag_retry):
+            job_ad_file = os.path.join(".", "finished_jobs", "job.%d.%d" % (self.job_id, dag_retry))
             if os.path.isfile(job_ad_file):
                 try:
                     with open(job_ad_file) as fd:
@@ -268,19 +266,19 @@ class RetryJob(object):
         if 'exitCode' not in self.report:
             msg = "'exitCode' key not found in job report."
             self.logger.warning(msg)
-            return
+            return 1
         try:
             exitCode = int(self.report['exitCode'])
         except ValueError:
             msg = "Unable to extract job's wrapper exit code from job report."
             self.logger.warning(msg)
-            return
+            return 1
         exitMsg = self.report.get("exitMsg", "UNKNOWN")
 
         if exitCode == 0:
             msg = "Job and stageout wrappers finished successfully (exit code %d)." % (exitCode)
             self.logger.info(msg)
-            return
+            return 0
 
         msg  = "Job or stageout wrapper finished with exit code %d." % (exitCode)
         msg += " Trying to determine the meaning of the exit code and if it is a recoverable or fatal error."
@@ -355,6 +353,8 @@ class RetryJob(object):
         if exitCode:
             raise FatalError("Job wrapper finished with exit code %d.\nExit message:\n  %s" % (exitCode, exitMsg.replace('\n', '\n  ')))
 
+        return 0
+
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
  
     def check_empty_report(self):
@@ -366,16 +366,22 @@ class RetryJob(object):
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def execute_internal(self, logger, reqname, job_return_code, crab_retry, job_id, dag_jobid, job_ad, used_job_ad):
+    def execute_internal(self, logger, reqname, job_return_code, dag_retry, crab_retry, job_id, dag_jobid, job_ad, used_job_ad):
         """
         Need a doc string here.
         """
         self.logger          = logger
         self.reqname         = reqname
         self.job_return_code = job_return_code
+        self.dag_retry       = dag_retry
         self.crab_retry      = crab_retry
         self.job_id          = job_id
         self.dag_jobid       = dag_jobid
+
+        try:
+            self.dag_clusterid = int(self.dag_jobid.split(".")[0])
+        except ValueError:
+            pass
 
         if used_job_ad:
             #We can determine walltime and max memory from job ad.
@@ -417,7 +423,7 @@ class RetryJob(object):
             self.check_empty_report()
             ## Raises a RecoverableError or FatalError exception depending on the exitCode
             ## saved in the job report.
-            self.check_exit_code()
+            check_exit_code_retval = self.check_exit_code()
         except RecoverableError as re:
             orig_msg = str(re)
             try:
@@ -431,8 +437,26 @@ class RetryJob(object):
                 raise
             raise
 
-        if self.job_return_code != JOB_RETURN_CODES.OK: # Probably means stageout failed!
-            raise RecoverableError("Payload job was successful, but wrapper exited with non-zero status %d (stageout failure)?" % (self.job_return_code))
+        ## The fact that check_exit_code() has not raised RecoverableError or FatalError
+        ## doesn't necessarily mean that the job was successful; check_exit_code() reads
+        ## the job exit code from the job report and it might be that the exit code is
+        ## not there, in which case check_exit_code() returns silently. So as a safety
+        ## measure we check here the job return code passed to the post-job via the
+        ## DAGMan $RETURN argument macro. This is equal to the return code of the job
+        ## when the job was executed, and is equal to -100[1,2,3,4] when ["job failed to
+        ## be submitted to the batch system", "job externally removed from the batch
+        ## system queue", "error in the job log monitor", "job not executed because PRE
+        ## script returned non-zero"] respectively. In the particular case of job return
+        ## code = -1004 and job exit code from (previous job retry) job report = 0, we
+        ## should continue and not do the check. The reason is: the pre-job is not
+        ## expected to fail; if the pre-job returned non-zero we assume it was done so
+        ## in order to intentionally skip the job execution.
+        if not (self.job_return_code == -1004 and check_exit_code_retval == 0):
+            if self.job_return_code != JOB_RETURN_CODES.OK: # Probably means stageout failed!
+                msg = "Payload job was successful, but wrapper exited with non-zero status %d" % (self.job_return_code)
+                if self.job_return_code > 0:
+                    msg += " (stageout failure)?"
+                raise RecoverableError(msg)
 
         return JOB_RETURN_CODES.OK
 
