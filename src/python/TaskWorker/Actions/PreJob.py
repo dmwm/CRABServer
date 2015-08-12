@@ -79,6 +79,18 @@ class PreJob:
         ## been ran.
         crab_retry = retry_info['post']
 
+        ## The CRAB retry should never be smaller than the DAG retry by definition, as the
+        ## CRAB retry counts what the DAG retry plus the post-job restarts. The reason why
+        ## it can be crab_retry < dag_retry here is because the post-job failed to update
+        ## the 'post' count in the retry_info dictionary.
+        if crab_retry < self.dag_retry:
+            retmsg += "\n\tWarning: CRAB retry (= %d) < DAG retry (= %d)." % (crab_retry, self.dag_retry)
+            retmsg += " Will set CRAB Retry = DAG retry = %d." % (self.dag_retry)
+            retry_info['post'] += self.dag_retry - crab_retry
+            retry_info['pre']  += self.dag_retry - crab_retry
+            retmsg += "\n\tUpdated retry_info = %s" % (retry_info)
+            crab_retry = self.dag_retry
+
         ## The next (first) if statement is trying to catch the case in which the job or
         ## the pre-job was re-started before the post-job started to run ...
         job_out_file_name = "job_out.%d" % (self.job_id)
@@ -86,11 +98,10 @@ class PreJob:
             ## If job_out exists, then the job was likely submitted and we should run the
             ## post-job.
             if os.path.exists(job_out_file_name):
-                retmsg += "\n\tFile %s already exists" % (job_out_file_name)
+                retmsg += "\n\tFile %s already exists." % (job_out_file_name)
                 retmsg += "\n\tIt seems the job has already been submitted."
-                retmsg += "\n\tExiting the pre-job with exit code 1"
+                retmsg += "\n\tSetting the pre-job exit code to 1."
                 self.prejob_exit_code = 1
-                return crab_retry, retmsg
         ## ... or not.
         else:
             ## If the job_out doesn't exist, then this is certainly (ok, 99.99% certainly)
@@ -101,10 +112,10 @@ class PreJob:
             ## the post-job runs.
             if not os.path.exists(job_out_file_name):
                 retry_info['pre'] = retry_info['post'] + 1
+                retmsg += "\n\tUpdated retry_info = %s" % (retry_info)
 
-        retmsg += "\n\tUpdated retry_info = %s" % (retry_info)
-
-        ## Save the retry_info.
+        ## Save the retry_info dictionary to file.
+        retmsg += "\n\tSaving retry_info = %s to %s" % (retry_info, retry_info_file_name)
         try:
             with open(retry_info_file_name + ".tmp", 'w') as fd:
                 json.dump(retry_info, fd)
