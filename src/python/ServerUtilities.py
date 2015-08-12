@@ -91,7 +91,7 @@ def cmd_exist(cmd):
     """
     try:
         null = open("/dev/null", "w")
-        subprocess.Popen("/usr/bin/which %s" % cmd, stdout=null, stderr=null)
+        subprocess.Popen("/usr/bin/which %s" % cmd, stdout=null, stderr=null, shell=True)
         null.close()
         return True
     except OSError:
