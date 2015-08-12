@@ -95,15 +95,15 @@ class RetryJob(object):
         if self.crab_retry == 0:
             print 'Job is retry num 0. Will not try to search and load previous job ads.'
             return
-        for crab_retry in range(1, int(self.crab_retry + 1)):
-            job_ad_file = "./finished_jobs/job.%d.%d" % (self.job_id, crab_retry)
+        for crab_retry in range(self.crab_retry):
+            job_ad_file = os.path.join(".", "finished_jobs", "job.%d.%d" % (self.job_id, crab_retry))
             if os.path.isfile(job_ad_file):
                 with open(job_ad_file, "r") as fd:
                     text_ad = fd.read_lines()
                 try:
                     ad = classad.parseOld(text_ad)
                 except SyntaxError as e:
-                    print 'Unable to parse classads from file %s' % job_Ad
+                    print 'Unable to parse classads from file %s' % job_ad_file
                     continue
                 if ad:
                     self.ads.append(ad)
@@ -373,7 +373,7 @@ class RetryJob(object):
                 try:
                     MAX_MEMORY = int(self.ad['RequestMemory'])
                 except:
-                    print 'Unable to get RequestMemory from job classads. Unsing default'
+                    print 'Unable to get RequestMemory from job classads. Using default'
             print 'Job ads already present. Will not use condor_q, but will load previous jobs ads'
             self.get_job_ad_from_file()
         else:
