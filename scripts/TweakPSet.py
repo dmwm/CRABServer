@@ -1,9 +1,26 @@
 """
+It is possible to run this TweakPSet script standalone. These are the requirements:
+
+1) You need to set up the CMSSW environment (cmsenv)
+2) Due to a restriction in WMCore [1] the PSet file should be called PSet.py and should be placed in `pwd`/WMTaskSpace/cmsRun/PSet.py where `pwd` is the location where you are running TweakPSet
+    2a) If you are testing a CRAB3 PSet which .py version simply loads the PSet.pkl file [2] then you have to make sure that the PSet.pkl file is also located in `pwd`
+
+[1] https://github.com/dmwm/WMCore/blob/c7603bc0d243947e3a766bd2b38acb92e91dd767/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L226
+[2] https://github.com/dmwm/CRABClient/blob/3.3.1509.rc3/src/python/CRABClient/JobType/CMSSWConfig.py#L70-L91
+
+3) The output PSet.py and PSet.pkl are placed in the directory indicated by the --location param
+
 Can be tested with something like:
-python /afs/cern.ch/user/m/mmascher/transformation/tmp/TweakPSet.py --location=/afs/cern.ch/user/m/mmascher/transformation/tmp --inputFile='["/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0010/EA00B1E8-F8AD-E111-90C5-5404A6388697.root"]' --runAndLumis='job_lumis_1.json' --firstEvent=0 --lastEvent=-1 --firstLumi=None --firstRun=None --seeding=None --lheInputFiles=False --oneEventMode=0
+4) Set up the pythonpath correctly. You need to include the current working directory (before we go into WMTaskSpace/cmsRun in the next step)
+mkdir -p WMTaskSpace/cmsRun
+mv <path-to-pset>/PSet.p* WMTaskSpace/cmsRun
+cd  WMTaskSpace/cmsRun
+python <path-to-TweakPSet>/TweakPSet.py --location=<path-to-output> --inputFile='job_input_file_list_1.json' --runAndLumis='job_lumis_1.json' --firstEvent=0 --lastEvent=-1 --firstLumi=None --firstRun=1 --seeding=None --lheInputFiles=False --oneEventMode=0
 
 job_lumis_1.json content:
-'{"1": [[669684, 669684]]}'
+{"1": [[669684, 669684]]}
+job_input_file_list_1.json content:
+["1.root"]
 On Worker nodes it has a tarball with all files. but for debugging purpose it is also available to read directly from file
 """
 
@@ -169,8 +186,10 @@ if opts.oneEventMode:
 runAndLumis = {}
 if opts.runAndLumis:
     runAndLumis = readFileFromTarball(opts.runAndLumis, 'run_and_lumis.tar.gz')
-
-pset = SetupCMSSWPsetCore( opts.location, literal_eval(opts.inputFile), runAndLumis, agentNumber, lfnBase, outputMods,\
+inputFile = {}
+if opts.inputFile:
+    inputFile = readFileFromTarball(opts.inputFile, 'input_files.tar.gz')
+pset = SetupCMSSWPsetCore( opts.location, inputFile, runAndLumis, agentNumber, lfnBase, outputMods,\
                            literal_eval(opts.firstEvent), literal_eval(opts.lastEvent), literal_eval(opts.firstLumi),\
                            literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode, literal_eval(opts.eventsPerLumi))
 
