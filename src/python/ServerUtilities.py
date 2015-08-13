@@ -92,11 +92,14 @@ def cmd_exist(cmd):
     """
     try:
         null = open("/dev/null", "w")
-        subprocess.Popen("/usr/bin/which %s" % cmd, stdout=null, stderr=null, shell=True)
+        p = subprocess.Popen("/usr/bin/which %s" % cmd, stdout=null, stderr=null, shell=True)
+        p.communicate()
         null.close()
-        return True
+        if p.returncode == 0:
+            return True
     except OSError:
         return False
+    return False
 
 def getCheckWriteCommand(proxy, logger):
     """
