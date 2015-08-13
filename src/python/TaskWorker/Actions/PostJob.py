@@ -81,7 +81,7 @@ from httplib import HTTPException
 import DashboardAPI
 import WMCore.Database.CMSCouch as CMSCouch
 
-from ServerUtilities import setDashboardLogs
+from ServerUtilities import setDashboardLogs, isFailurePermanent
 from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
@@ -1528,7 +1528,8 @@ class PostJob():
                 failures[doc_id]['reasons'] = [failures[doc_id]['reasons']]
             if type(failures[doc_id]['reasons']) == list:
                 last_failure_reason = failures[doc_id]['reasons'][-1]
-                if self.is_failure_permanent(last_failure_reason):
+                permanent, _ = isFailurePermanent(last_failure_reason)
+                if permanent:
                     num_permanent_failures += 1
                     failures[doc_id]['severity'] = 'permanent'
                 else:
@@ -1548,6 +1549,13 @@ class PostJob():
                 msg += "\n  <----- %s log finish ----" % (str(failures[doc_id]['app']).upper())
             if failures[doc_id]['severity']:
                 msg += "\n  The last failure reason is %s." % (str(failures[doc_id]['severity']).lower())
+
+        #If CRAB is configured not to retry on ASO failures, any failure is permanent
+        if int(self.job_ad['CRAB_RetryOnASOFailures']) == 0:
+            msg_retry  = "Considering transfer error as a permanent failure"
+            msg_retry += " because CRAB_RetryOnASOFailures = 0 in the job ad."
+            self.logger.debug(msg_retry)
+            num_permanent_failures += 1
         ## Raise stageout exception.
         if num_permanent_failures:
             raise PermanentStageoutError(msg)
@@ -2121,36 +2129,6 @@ class PostJob():
                 self.logger.exception(msg)
                 return None
         return crab_retry
-
-    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-    def is_failure_permanent(self, reason):
-        """
-        Method that decides whether a failure reason should be considered as a
-        permanent failure or as a recoverable failure.
-        """
-        if int(self.job_ad['CRAB_RetryOnASOFailures']) == 0:
-            msg  = "Considering transfer error as a permanent failure"
-            msg += " because CRAB_RetryOnASOFailures = 0 in the job ad."
-            self.logger.debug(msg)
-            return True
-        permanent_failure_reasons = [
-                                     ".*cancelled aso transfer after timeout.*",
-                                     ".*permission denied.*",
-                                     ".*disk quota exceeded.*",
-                                     ".*operation not permitted*",
-                                     ".*mkdir\(\) fail.*",
-                                     ".*open/create error.*",
-                                     ".*mkdir\: cannot create directory.*",
-                                     ".*does not have enough space.*",
-                                     ".*reports could not open connection to.*",
-                                     #".*failed to get source file size.*",
-                                    ]
-        reason = str(reason).lower()
-        for permanent_failure_reason in permanent_failure_reasons:
-            if re.match(permanent_failure_reason, reason):
-                return True
-        return False
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 

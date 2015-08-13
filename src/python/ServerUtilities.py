@@ -6,10 +6,11 @@ from __future__ import print_function
 
 import os
 import re
+import datetime
 import traceback
 import subprocess
 from httplib import HTTPException
-
+from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
 
@@ -96,3 +97,98 @@ def cmd_exist(cmd):
         return True
     except OSError:
         return False
+
+def getCheckWriteCommand(proxy, logger):
+    """
+    Return prepared gfal or lcg commands for checkwrite
+    """
+    cpCmd = None
+    rmCmd = None
+    append = ""
+    if cmd_exist("gfal-copy") and cmd_exist("gfal-rm"):
+        logger.info("Will use GFAL2 commands for checking write permissions")
+        cpCmd = "env -i X509_USER_PROXY=%s gfal-copy -v -p -t 180 " % os.path.abspath(proxy)
+        rmCmd = "env -i X509_USER_PROXY=%s gfal-rm -v -t 180 " % os.path.abspath(proxy)
+        append = "file://"
+    elif cmd_exist("lcg-cp") and cmd_exist("lcg-del"):
+        logger.info("Will use LCG commands for checking write permissions")
+        cpCmd = "lcg-cp -v -b -D srmv2 --connect-timeout 180 "
+        rmCmd = "lcg-del --connect-timeout 180 -b -l -D srmv2 "
+    return cpCmd, rmCmd, append
+
+def createDummyFile(filename, logger):
+    """
+    Create dummy file for checking write permissions
+    """
+    abspath = os.path.abspath(filename)
+    try:
+        with open(abspath, 'w') as fd:
+            fd.write('This is a dummy file created by the crab checkwrite command on %s' % str(datetime.datetime.now().strftime('%d/%m/%Y at %H:%M:%S')))
+    except IOError as er:
+        logger.info('Error: Failed to create file %s localy.' % filename)
+        raise
+
+def removeDummyFile(filename, logger):
+    """
+    Remove created dummy file
+    """
+    abspath = os.path.abspath(filename)
+    try:
+        os.remove(abspath)
+    except:
+        logger.info('Warning: Failed to delete file %s' % filename)
+
+def getPFN(proxy, lfnsaddprefix, filename, sitename, logger):
+
+        phedex = PhEDEx({"cert": proxy, "key": proxy, "logger": logger})
+        lfnsadd = os.path.join(lfnsaddprefix, filename)
+        try:
+            pfndict = phedex.getPFN(nodes = [sitename], lfns = [lfnsadd])
+            pfn = pfndict[(sitename, lfnsadd)]
+            if not pfn:
+                logger.info('Error: Failed to get PFN from the site. Please check the site status')
+                return False
+        except HTTPException as errormsg:
+            logger.info('Error: Failed to contact PhEDEx or wrong PhEDEx node name is used')
+            logger.info('Result: %s\nStatus :%s\nURL :%s' % (errormsg.result, errormsg.status, errormsg.url))
+            raise HTTPException, errormsg
+        return pfn
+
+def executeCommand(command):
+    """
+    Execute passed bash command. There is no check for command success or failure. Who`s calling
+    this command, has to check exitcode, out and err
+    """
+    process = subprocess.Popen(command, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
+    out, err = process.communicate()
+    exitcode = process.returncode
+    return out, err, exitcode
+
+def isFailurePermanent(reason, gridJob=False):
+    """
+    Method that decides whether a failure reason should be considered as a
+    permanent failure and submit task or not.
+    # TODO reuse it in PostJob
+    """
+    checkQuota = " Please check if you have access to write to destination site and your quota does not exceeded."
+    refuseToSubmit = " CRAB3 refuses to send jobs to scheduler because of failure to transfer files to destination site."
+    if gridJob:
+        refuseToSubmit = ""
+    permanentFailureReasons = {
+                               ".*cancelled aso transfer after timeout.*" : "Transfer canceled due to timeout.",
+                               ".*permission denied.*" : "Permission denied.",
+                               ".*disk quota exceeded.*" : "Disk quota exceeded.",
+                               ".*operation not permitted*" : "Operation not allowed.",
+                               ".*mkdir\(\) fail.*" : "Can`t create directory.",
+                               ".*open/create error.*" : "Can`t create directory/file on destination site.",
+                               ".*mkdir\: cannot create directory.*" : "Can`t create directory.",
+                               ".*does not have enough space.*" : "User quota exceeded.",
+                               ".*reports could not open connection to.*" : "Storage element is not accessible.",
+                               ".*530-login incorrect.*" : "Permission denied to write to destination site."
+                              }
+    reason = str(reason).lower()
+    for failureReason in permanentFailureReasons:
+        if re.match(failureReason, reason):
+            reason = permanentFailureReasons[failureReason] + checkQuota + refuseToSubmit
+            return True, reason
+    return False, ""
