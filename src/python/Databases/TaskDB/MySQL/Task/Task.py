@@ -5,37 +5,6 @@ import logging
 class Task(object):
     """
     """
-    GetFailedTasks_sql = "SELECT tm_taskname, tm_task_status FROM tasks WHERE tm_task_status = 'FAILED'"
-
-    GetInjectedTasks_sql = "SELECT tm_taskname, tm_task_status FROM tasks WHERE \
-    		        tm_task_status = 'INJECTED'"
-
-    GetKillTasks_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, \
-                   tm_start_time, tm_start_injection, tm_end_injection, \
-                   tm_task_failure, tm_job_sw, tm_job_arch, tm_input_dataset, \
-                   tm_site_whitelist, tm_site_blacklist, tm_split_algo, tm_split_args, \
-                   tm_totalunits, tm_user_sandbox, tm_cache_url, tm_username, tm_user_dn, tm_user_vo, \
-                   tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \
-                   tm_publish_dbs_url, tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
-                   tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, \
-                   tm_user_infiles, tw_name, tm_dry_run, \
-                   tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode, \
-                   tm_publish_groupname, tm_nonvalid_input_dataset \
-                   FROM tasks WHERE tm_task_status = 'KILL' """
-
-    GetNewResubmit_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, \
-                   tm_start_time, tm_start_injection, tm_end_injection, \
-                   tm_task_failure, tm_job_sw, tm_job_arch, tm_input_dataset, \
-                   tm_site_whitelist, tm_site_blacklist, tm_split_algo, tm_split_args, \
-                   tm_totalunits, tm_user_sandbox, tm_cache_url, tm_username, tm_user_dn, tm_user_vo, \
-                   tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \
-                   tm_publish_dbs_url, tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
-                   tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, \
-                   tm_user_infiles, tw_name, tm_dry_run, \
-                   tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode, \
-                   tm_publish_groupname, tm_nonvalid_input_dataset \
-                   FROM tasks WHERE tm_task_status = 'NEW' OR tm_task_status = 'RESUBMIT' """
-
     GetReadyTasks_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, \
                    tm_start_time, tm_start_injection, tm_end_injection, \
                    tm_task_failure, tm_job_sw, tm_job_arch, tm_input_dataset, \
