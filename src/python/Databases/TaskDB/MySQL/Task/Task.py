@@ -16,7 +16,8 @@ class Task(object):
                    tm_user_infiles, tw_name, tm_dry_run, \
                    tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode, \
                    tm_publish_groupname, tm_nonvalid_input_dataset \
-                   FROM tasks WHERE tm_task_status = %(get_status)s AND tw_name = %(tw_name)s limit %(limit)s """
+                   FROM tasks WHERE tm_task_status = %(get_status)s AND tw_name = %(tw_name)s limit %(limit)s
+                   ORDER BY tm_start_time ASC"""
 
     GetUserFromID_sql = "SELECT tm_username FROM tasks WHERE tm_taskname=%(taskname)s"
 
