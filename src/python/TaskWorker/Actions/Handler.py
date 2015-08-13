@@ -16,6 +16,7 @@ from TaskWorker.Actions.DagmanKiller import DagmanKiller
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.Actions.PanDAgetSpecs import PanDAgetSpecs
+from TaskWorker.Actions.StageoutCheck import StageoutCheck
 from TaskWorker.Actions.PanDABrokerage import PanDABrokerage
 from TaskWorker.Actions.PanDAInjection import PanDAInjection
 from TaskWorker.Actions.DryRunUploader import DryRunUploader
@@ -134,6 +135,7 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=2)
     handler = TaskHandler(task, procnum, server)
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
+    handler.addWork(StageoutCheck(config=config, server=server, resturi=resturi, procnum=procnum))
     if task['tm_job_type'] == 'Analysis':
         if task.get('tm_user_files'):
             handler.addWork(UserDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum))
