@@ -100,7 +100,7 @@ def populateDashboardMonitorInfo(myad, params):
     elif 'CRAB_UserWebDir' in myad:
         setDashboardLogs(params, myad['CRAB_UserWebDir'], myad['CRAB_Id'], myad['CRAB_Retry'])
     else:
-        print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx in myad."
+        print "Not setting dashboard logfiles as cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx in myad."
 
 
 def calcOverflowFlag(myad):

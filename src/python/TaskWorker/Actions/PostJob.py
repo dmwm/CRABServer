@@ -76,6 +76,7 @@ import unittest
 import datetime
 import tempfile
 import traceback
+import logging.handlers
 from httplib import HTTPException
 
 import DashboardAPI
@@ -923,17 +924,22 @@ class PostJob():
         self.logpath             = None
         self.aso_start_time      = None
         self.aso_start_timestamp = None
-        ## Set a logger for the post-job.
-        self.logger = logging.getLogger()
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", \
-                                      datefmt = "%a, %d %b %Y %H:%M:%S %Z(%z)")
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+        self.retryjob_retval     = None
+        self.defer_num           = -1
+
+        ## Set a logger for the post-job. Use a memory handler by default. Once we know
+        ## the name of the log file where all the logging should go, we will flush the
+        ## memory handler there, remove the memory handler and add a file handler. Or we
+        ## add a stream handler to stdout if no redirection to a log file was requested.
+        self.logger = logging.getLogger('PostJob')
         self.logger.setLevel(logging.DEBUG)
+        self.memory_handler = logging.handlers.MemoryHandler(capacity = 1024*10, flushLevel = logging.CRITICAL + 10)
+        self.logging_formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", \
+                                                   datefmt = "%a, %d %b %Y %H:%M:%S %Z(%z)")
+        self.memory_handler.setFormatter(self.logging_formatter)
+        self.memory_handler.setLevel(logging.DEBUG)
+        self.logger.addHandler(self.memory_handler)
         self.logger.propagate = False
-        self.retryjob_retval = None
-        self.defer_num = -1
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
         
@@ -984,24 +990,36 @@ class PostJob():
             os.makedirs(self.logpath)
         except OSError as ose:
             if ose.errno != errno.EEXIST:
-                print "Failed to create log web-shared directory %s" % (self.logpath)
+                msg = "Failed to create log web-shared directory %s" % (self.logpath)
+                self.logger.error(msg)
                 raise
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def handle_logfile(self):
-        ## Create (open) the post-job log file postjob.<job_id>.<crab_retry>.txt.
-        postjob_log_file_name = "postjob.%d.%d.txt" % (self.job_id, self.crab_retry)
-        fd_postjob_log = os.open(postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0644)
-        os.chmod(postjob_log_file_name, 0644)
-        ## Redirect stdout and stderr to the post-job log file.
+        ## Create a file handler (or a stream handler to stdout), flush the memory
+        ## handler content to the file (or stdout) and remove the memory handler.
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
-            print "Post-job started with no output redirection."
+            handler = logging.StreamHandler(sys.stdout)    
         else:
+            print "Wrinting post-job output to %s." % (self.postjob_log_file_name)
+            postjob_log_file_name = "postjob.%d.%d.txt" % (self.job_id, self.crab_retry)
+            mode = 'w' if self.first_pj_execution() else 'a'
+            handler = logging.FileHandler(filename=postjob_log_file_name, mode=mode)
+        handler.setFormatter(self.logging_formatter)
+        handler.setLevel(logging.DEBUG)
+        self.logger.addHandler(handler)
+        self.memory_handler.setTarget(handler)
+        self.memory_handler.close()
+        self.logger.removeHandler(self.memory_handler)
+        ## Unhandled exceptions are catched in TaskManagerBootstrap and printed. So we
+        ## need to redirect stdout/err to the post-job log file if we want to see the
+        ## unhandled exceptions.
+        if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
+            fd_postjob_log = os.open(self.postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0644)
+            os.chmod(self.postjob_log_file_name, 0644)
             os.dup2(fd_postjob_log, 1)
             os.dup2(fd_postjob_log, 2)
-            msg = "Post-job started with output redirected to %s." % (postjob_log_file_name)
-            self.logger.info(msg)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1096,11 +1114,14 @@ class PostJob():
 
         self.create_taskwebdir()
 
+        ## Get/update the crab retry.
         self.crab_retry = self.calculate_crab_retry()
         if self.crab_retry is None:
             ##XXX Consider to make this a fatal error: I think the only way self.crab_retry
             ##    could be None is through a bug or wrong schedd setup (e.g.: permissions)
             self.crab_retry = self.dag_retry
+
+        self.defer_num = self.get_defer_num()
 
         #it needs the crab_retry and an existing webdir
         self.handle_logfile()
@@ -1111,8 +1132,6 @@ class PostJob():
         G_JOB_REPORT_NAME = "jobReport.json.%d" % (self.job_id)
         global G_JOB_REPORT_NAME_NEW
         G_JOB_REPORT_NAME_NEW = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry)
-
-        self.defer_num = self.get_defer_num()
 
         if self.first_pj_execution():
             self.handle_webdir()
@@ -1127,7 +1146,7 @@ class PostJob():
         try:
             retval, retmsg = self.execute_internal()
             if retval == 4:
-                msg = "Defering the execution of the postjob"
+                msg = "Defering the execution of the post-job."
                 self.logger.info(msg)
                 return retval
             msg = "Post-job finished executing with status code %d." % (retval)
@@ -1189,10 +1208,10 @@ class PostJob():
         self.logger.info("====== Starting to analyze job exit status.")
         retry = RetryJob()
         if not os.environ.get('TEST_POSTJOB_DISABLE_RETRIES', False):
-            print "       -----> RetryJob log start -----"
-            self.retryjob_retval = retry.execute(self.reqname, self.job_return_code, self.crab_retry, self.job_id, 
+            self.logger.info("       -----> RetryJob log start -----")
+            self.retryjob_retval = retry.execute(self.logger, self.reqname, self.job_return_code, self.crab_retry, self.job_id, 
                 self.dag_jobid, self.job_ad, used_job_ad)
-            print "       <----- RetryJob log finish ----"
+            self.logger.info("       <----- RetryJob log finish ----")
         if self.retryjob_retval:
             if self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:
                 msg = "The retry handler indicated this was a fatal error."
@@ -1456,9 +1475,10 @@ class PostJob():
         # if job_ad is available, write it output to PostJob log file
         if self.job_ad:
             self.logger.debug("------ Job classad values for debug purposes:")
-            self.logger.debug("-"*100)
-            for key in sorted(self.job_ad.keys(),  key=lambda v: (v.upper(), v[0].islower())):
-                print "%35s    %s" % (key,self.job_ad[key])
+            msg = "-"*100
+            for key in sorted(self.job_ad.keys(), key=lambda v: (v.upper(), v[0].islower())):
+                msg += "\n%35s    %s" % (key,self.job_ad[key])
+            self.logger.debug(msg)
             self.logger.debug("-"*100)
         else:
             self.logger.debug("------ Job ad is not available. Continue")
@@ -2036,7 +2056,7 @@ class PostJob():
         elif 'CRAB_UserWebDir' in self.job_ad:
             setDashboardLogs(params, self.job_ad['CRAB_UserWebDir'], self.job_id, self.crab_retry)
         else:
-            print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx in self.job_ad."
+            self.logger.debug("Not setting dashboard logfiles as cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx in self.job_ad.")
         ## Take exit code from job_fjr.<job_id>.<retry_id>.json and report final exit code to Dashboard.
         ## Only taken if RetryJob think it is FATAL_ERROR.
         if self.retryjob_retval and self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:
