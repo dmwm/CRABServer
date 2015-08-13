@@ -50,7 +50,7 @@ SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %
 SCRIPT DEFER 4 1800 POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(taskname)s %(count)d %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d %(maxretries)d UNLESS-EXIT 2
-VARS Job%(count)d count="%(count)d" runAndLumiMask="job_lumis_%(count)d.json" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" eventsPerLumi="%(eventsPerLumi)s" seeding="%(seeding)s" inputFiles="%(inputFiles)s" scriptExe="%(scriptExe)s" scriptArgs="%(scriptArgs)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\"" +CRAB_Destination="\\"%(destination)s\\""
+VARS Job%(count)d count="%(count)d" runAndLumiMask="job_lumis_%(count)d.json" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" eventsPerLumi="%(eventsPerLumi)s" seeding="%(seeding)s" inputFiles="job_input_file_list_%(count)d.txt" scriptExe="%(scriptExe)s" scriptArgs="%(scriptArgs)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\"" +CRAB_Destination="\\"%(destination)s\\""
 ABORT-DAG-ON Job%(count)d 3
 
 """
@@ -446,6 +446,7 @@ class DagmanCreator(TaskAction.TaskAction):
         if os.path.exists("sandbox.tar.gz"):
             info['additional_input_file'] += ", sandbox.tar.gz"
         info['additional_input_file'] += ", run_and_lumis.tar.gz"
+        info['additional_input_file'] += ", input_files.tar.gz"
 
         with open("Job.submit", "w") as fd:
             fd.write(JOB_SUBMIT % info)
@@ -469,9 +470,9 @@ class DagmanCreator(TaskAction.TaskAction):
                         'parents': [{'lfn': parentfile} for parentfile in inputfile['parents']]
                     }
                     for inputfile in job['input_files']
-                ]).replace('"', r'\"\"')
+                ])
             else:
-                inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']]).replace('"', r'\"\"')
+                inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']])
             runAndLumiMask = json.dumps(job['mask']['runAndLumis'])
             firstEvent = str(job['mask']['FirstEvent'])
             lastEvent = str(job['mask']['LastEvent'])
@@ -627,13 +628,22 @@ class DagmanCreator(TaskAction.TaskAction):
 
         ## Create a tarball with all the job lumi files.
         run_and_lumis_tar = tarfile.open("run_and_lumis.tar.gz", "w:gz")
+        ## Also creating a tarball with the dataset input files.
+        ## Each .txt file in the tarball contains a list of dataset files to be used for the job.
+        input_files_tar = tarfile.open("input_files.tar.gz", "w:gz")
         for dagSpec in dagSpecs:
             job_lumis_file = 'job_lumis_'+ str(dagSpec['count']) +'.json'
+            job_input_file_list = 'job_input_file_list_' + str(dagSpec['count']) + '.txt'
             with open(job_lumis_file, "w") as fd:
                 fd.write(str(dagSpec['runAndLumiMask']))
+            with open(job_input_file_list, "w") as fd:
+                fd.write(str(dagSpec['inputFiles']))
             run_and_lumis_tar.add(job_lumis_file)
+            input_files_tar.add(job_input_file_list)
             os.remove(job_lumis_file)
+            os.remove(job_input_file_list)
         run_and_lumis_tar.close()
+        input_files_tar.close()
 
         ## Save the DAG into a file.
         with open("RunJobs.dag", "w") as fd:
@@ -747,7 +757,7 @@ class DagmanCreator(TaskAction.TaskAction):
             params = self.sendDashboardTask()
 
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', \
-                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'run_and_lumis.tar.gz']
+                'AdjustSites.py', 'site.ad', 'site.ad.json', 'run_and_lumis.tar.gz', 'input_files.tar.gz']
         if kw['task'].get('tm_user_sandbox') == 'sandbox.tar.gz':
             inputFiles.append('sandbox.tar.gz')
         if os.path.exists("CMSRunAnalysis.tar.gz"):
