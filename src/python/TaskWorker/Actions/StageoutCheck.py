@@ -41,7 +41,7 @@ class StageoutCheck(TaskAction):
                 # Unknown error. Operators should check it from time to time and add failures if they are permanent.
                 self.logger.warning("CRAB3 was not able to identify if failure is permanent. Err: %s Out: %s ExitCode: %s" %(err, out, exitcode))
                 # Upload warning to user about not being able to check stageout
-                msg = "CRAB3 was not able to check write permissions to destination site. If there is stageout problems, please contact experts."
+                msg = "The CRAB3 server got a non-critical error while checking stageout permissions. Please use checkwrite to check if everything is fine"
                 self.uploadWarning(msg, self.task['user_proxy'], self.task['tm_taskname'])
                 self.logger.info("UNKNOWN ERROR. Operator should check if it is permanent, but for now we go ahead and submit a task.")
                 return
