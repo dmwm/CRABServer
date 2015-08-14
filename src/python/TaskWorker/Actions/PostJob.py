@@ -1110,6 +1110,9 @@ class PostJob():
             self.output_files_names.append(args[i])
         self.job_return_code = int(self.job_return_code)
 
+        ## Get/update the post-job deferral number.
+        self.defer_num = self.get_defer_num()
+
         ## Create the task web directory in the schedd. Ignored it is exists already.
         self.create_taskwebdir()
 
@@ -1119,8 +1122,6 @@ class PostJob():
             ##XXX Consider to make this a fatal error: I think the only way self.crab_retry
             ##    could be None is through a bug or wrong schedd setup (e.g.: permissions)
             self.crab_retry = self.dag_retry
-
-        self.defer_num = self.get_defer_num()
 
         ## Define the name of the post-job log file.
         self.postjob_log_file_name = "postjob.%d.%d.txt" % (self.job_id, self.crab_retry)
