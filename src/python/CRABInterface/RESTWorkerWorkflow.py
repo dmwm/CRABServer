@@ -252,3 +252,4 @@ class Task(dict):
         self['tm_one_event_mode'] = task[56]
         self['tm_publish_groupname'] = task[57]
         self['tm_nonvalid_input_dataset'] = task[58]
+        self['tm_secondary_input_dataset'] = task[59]

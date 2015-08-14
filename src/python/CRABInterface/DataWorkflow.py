@@ -113,7 +113,7 @@ class DataWorkflow(object):
         raise NotImplementedError
 
     @conn_handler(services=['centralconfig'])
-    def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, use_parent, generator, events_per_lumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
+    def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, use_parent, secondarydata, generator, events_per_lumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                userhn, userdn, savelogsflag, publication, publishname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, scriptexe=None, scriptargs=None, scheddname=None,
@@ -128,6 +128,7 @@ class DataWorkflow(object):
            :arg str inputdata: input dataset;
            :arg str nonvaliddata: allow invalid input dataset;
            :arg int use_parent: add the parent dataset as secondary input;
+           :arg str secondarydata: optional secondary dataset;
            :arg str generator: event generator for MC production;
            :arg int events_per_lumi: number of events per lumi to generate
            :arg str list siteblacklist: black list of sites, with CMS name;
@@ -216,6 +217,7 @@ class DataWorkflow(object):
                             input_dataset   = [inputdata],
                             nonvalid_data   = ['T' if nonvaliddata else 'F'],
                             use_parent      = [use_parent],
+                            secondary_dataset = [secondarydata],
                             generator       = [generator],
                             events_per_lumi = [events_per_lumi],
                             site_whitelist  = [dbSerializer(sitewhitelist)],
