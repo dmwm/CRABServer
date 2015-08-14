@@ -400,9 +400,6 @@ class RetryJob(object):
             hold_reason = self.ad.get("HoldReason", self.ad.get("LastHoldReason", "Unknown"))
             raise RecoverableError("Will retry held job; last hold reason: %s" % (hold_reason))
 
-        #if self.ad.get("RemoveReason", "").startswith("Removed due to idle time limit"):
-        #    raise FatalError("Aborting since the job was idle for the last 7 days")
-
         try:
             self.check_empty_report()
             ## Raises a RecoverableError or FatalError exception depending on the exitCode
