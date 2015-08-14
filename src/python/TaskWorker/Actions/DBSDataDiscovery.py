@@ -115,20 +115,22 @@ class DBSDataDiscovery(DataDiscovery):
         try:
             filedetails = self.dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], getParents=True, validFileOnly=0)
 
-            secondary = kwargs['task']['tm_secondary_input_dataset']
+            secondary = kwargs['task'].get('tm_secondary_input_dataset', None)
             if secondary:
                 moredetails = self.dbs.listDatasetFileDetails(secondary, getParents=False, validFileOnly=0)
 
                 for secfilename, secinfos in moredetails.items():
                     secinfos['lumiobj'] = LumiList(runsAndLumis=secinfos['Lumis'])
 
+                self.logger.info("Beginning to match files from secondary dataset")
                 for filename, infos in filedetails.items():
                     infos['Parents'] = []
                     lumis = LumiList(runsAndLumis=infos['Lumis'])
                     for secfilename, secinfos in moredetails.items():
                         if len(lumis and secinfos['lumiobj']) > 0:
                             infos['Parents'].append(secfilename)
-            kwargs['task']['tm_use_parent'] = 1
+                self.logger.info("Done matching files from secondary dataset")
+                kwargs['task']['tm_use_parent'] = 1
         except Exception as ex: #TODO should we catch HttpException instead?
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not contact DBS to get the files details (Lumis, events, etc).\n"+\
