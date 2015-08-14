@@ -2130,8 +2130,8 @@ class PostJob():
             msg = msg % (fname)
             self.logger.warning(msg)
             return None
-        crab_retry = retry_info['post']
         if self.first_pj_execution():
+            crab_retry = retry_info['post']
             retry_info['post'] += 1
             try:
                 with open(fname + '.tmp', 'w') as fd:
@@ -2143,6 +2143,8 @@ class PostJob():
                 msg = msg % (fname)
                 self.logger.exception(msg)
                 return None
+        else:
+            crab_retry = retry_info['post'] - 1
         return crab_retry
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
