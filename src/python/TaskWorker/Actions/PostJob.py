@@ -114,8 +114,6 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
     job_id = str(job_id)
     crab_retry = str(crab_retry)
 
-    logger.info("====== Starting to prepare error report.")
-
     error_summary = {}
     error_summary_changed = False
 
@@ -232,7 +230,6 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
     if error_summary_changed:
         fsummary.truncate(0)
         json.dump(error_summary, fsummary)
-    logger.info("====== Finished to prepare error report.")
 
 ##==============================================================================
 
@@ -1113,6 +1110,9 @@ class PostJob():
         ## Get/update the post-job deferral number.
         self.defer_num = self.get_defer_num()
 
+        if self.first_pj_execution():
+            self.logger.info("======== Starting post-job execution.")
+
         ## Create the task web directory in the schedd. Ignored it is exists already.
         self.create_taskwebdir()
 
@@ -1144,7 +1144,7 @@ class PostJob():
             self.logger.info(msg)
 
         ## Call execute_internal().
-        retval = 1
+        retval = JOB_RETURN_CODES.RECOVERABLE_ERROR
         retmsg = "Failure during post-job execution."
         try:
             retval, retmsg = self.execute_internal()
@@ -1152,8 +1152,6 @@ class PostJob():
                 msg = "Defering the execution of the post-job."
                 self.logger.info(msg)
                 return retval
-            msg = "Post-job finished executing with status code %d." % (retval)
-            self.logger.info(msg)
         except:
             self.logger.exception(retmsg)
         finally:
@@ -1172,15 +1170,17 @@ class PostJob():
 
         ## Prepare the error report. Enclosing it in a try except as we don't want to
         ## fail jobs because this fails.
+        self.logger.info("====== Starting to prepare error report.")
         try:
             with open(G_ERROR_SUMMARY_FILE_NAME, "a+") as fsummary:
-                self.logger.debug("Acquiring lock on error summary file")
+                self.logger.debug("Acquiring lock on error summary file.")
                 fcntl.flock(fsummary.fileno(), fcntl.LOCK_EX)
-                self.logger.debug("Acquired lock on error summary file")
+                self.logger.debug("Acquired lock on error summary file.")
                 prepareErrorSummary(self.logger, fsummary, self.job_id, self.crab_retry)
         except:
             msg = "Unknown error while preparing the error report."
             self.logger.exception(msg)
+        self.logger.info("====== Finished to prepare error report.")
 
         ## Decide if the whole task should be aborted (in case a significant fraction of
         ## the jobs has failed).
@@ -1189,11 +1189,21 @@ class PostJob():
         ## If return value is not 0 (success) write env variables to a file if it is not
         ## present and print job ads in PostJob log file.
         ## All this information is useful for debugging purpose.
-        if retval != 0:
+        if retval != JOB_RETURN_CODES.OK:
             #Print system environment and job classads
             self.print_env_and_ads()
 
+        self.log_finish_msg(retval)
+
         return retval
+
+    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def log_finish_msg(self, retval):
+        """
+        Logs a message with the post-job return code.
+        """
+        self.logger.info("======== Finished post-job execution with status code %s." % (retval))
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -2045,6 +2055,7 @@ class PostJob():
         """
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
+        self.logger.info("====== Starting to prepare/send report to dashboard.")
         states_dict = {'COOLOFF'      : 'Cooloff',
                        'TRANSFERRING' : 'Transferring',
                        'FAILED'       : 'Aborted',
@@ -2088,16 +2099,17 @@ class PostJob():
             except IOError as e:
                 ## File does not exist. Don`t fail and go ahead with reporting to dashboard
                 self.logger.debug("Not able to load the fwjr because of a IOError %s. \
-                                   Not setting exitcode for dashboard. Continuing normally" % (e))
+                                   Not setting exitcode for dashboard. Continuing normally." % (e))
                 pass
         else:
-            self.logger.debug("Dashboard exit code already set on the worker node. Continuing normally")
+            self.logger.debug("Dashboard exit code already set on the worker node. Continuing normally.")
         ## Unfortunately, Dashboard only has 1-second resolution; we must separate all
         ## updates by at least 1s in order for it to get the correct ordering.
         time.sleep(1)
         msg += " Dashboard parameters: %s" % (str(params))
         self.logger.info(msg)
         DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+        self.logger.info("====== Finished to prepare/send report to dashboard.")
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
