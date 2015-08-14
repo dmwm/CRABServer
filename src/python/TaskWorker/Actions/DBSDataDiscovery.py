@@ -19,7 +19,7 @@ class DBSDataDiscovery(DataDiscovery):
         if len(res) > 1:
             raise TaskWorkerException("Found more than one dataset while checking in DBS the status of %s" % dataset)
         if len(res) == 0:
-            raise TaskWorkerException("Cannot find dataset %s in DBS" % dataset)
+            raise TaskWorkerException("Cannot find dataset %s in %s DBS instance" % (dataset, self.dbs.dbs.serverinfo()["dbs_instance"]))
         res = res[0]
         self.logger.info("Input dataset details: %s" % pprint.pformat(res))
         accessType = res['dataset_access_type']
