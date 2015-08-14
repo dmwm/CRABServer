@@ -257,7 +257,6 @@ class ASOServerJob(object):
         self.retry_timeout = retry_timeout
         self.couch_server = None
         self.couch_database = None
-        self.sleep = 300
         self.count = count
         self.dest_site = dest_site
         self.source_dir = source_dir
@@ -416,6 +415,7 @@ class ASOServerJob(object):
         ## defer the execution of the postjob
         return 4
 
+    ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def run(self):
         """
@@ -1568,15 +1568,21 @@ class PostJob():
         else:
             aso_job_retval = ASO_JOB.check_transfers()
 
+        ## Defer the post-job execution if necessary.
+        if aso_job_retval == 4:
+            if os.environ.get('TEST_POSTJOB_NO_DEFERRAL', False):
+                while aso_job_retval == 4:
+                    self.logger.debug("Sleeping for 1 minute...")
+                    time.sleep(60)
+                    aso_job_retval = ASO_JOB.check_transfers()
+            else:
+                ASO_JOB = None
+                return 4
+
         ## If no transfers failed, return success immediately.
         if aso_job_retval == 0:
             ASO_JOB = None
             return 0
-
-        #Defer the postjob execution if necessary
-        if aso_job_retval == 4:
-            ASO_JOB = None
-            return 4
 
         ## Return code 2 means post-job timed out waiting for transfer to complete and
         ## not all the transfers could be cancelled.
