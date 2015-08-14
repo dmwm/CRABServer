@@ -1021,23 +1021,28 @@ class PostJob():
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def handle_webdir(self):
-        ## Create a symbolic link in the task web directory to the post-job log file.
-        ## The pre-job creates already the symlink, but the post-job has to do it by
-        ## its own in case the pre-job was not executed (e.g. when DAGMan restarts a
-        ## post-job).
-        msg = "Creating symbolic link in task web directory to post-job log file: %s -> %s" % (os.path.join(self.logpath, self.postjob_log_file_name), self.postjob_log_file_name)
-        self.logger.debug(msg)
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", self.postjob_log_file_name)), os.path.join(self.logpath, self.postjob_log_file_name))
-        except OSError as ose:
-            if ose.errno != 17: #ignore the error if the symlink was already there
+        ## If the post-job log file exists, create a symbolic link in the task web
+        ## directory. The pre-job creates already the symlink, but the post-job has to
+        ## do it by its own in case the pre-job was not executed (e.g. when DAGMan
+        ## restarts a post-job).
+        if os.path.isfile(self.postjob_log_file_name):
+            msg = "Creating symbolic link in task web directory to post-job log file: %s -> %s" % (os.path.join(self.logpath, self.postjob_log_file_name), self.postjob_log_file_name)
+            self.logger.debug(msg)
+            try:
+                os.symlink(os.path.abspath(os.path.join(".", self.postjob_log_file_name)), os.path.join(self.logpath, self.postjob_log_file_name))
+            except OSError as ose:
+                if ose.errno != 17: #ignore the error if the symlink was already there
+                    msg = "Cannot create symbolic link to the postjob log.\n Details follow:"
+                    self.logger.exception(msg)
+                    self.logger.info("Continuing since this is not a critical error")
+            except Exception as e:
                 msg = "Cannot create symbolic link to the postjob log.\n Details follow:"
                 self.logger.exception(msg)
                 self.logger.info("Continuing since this is not a critical error")
-        except Exception as e:
-            msg = "Cannot create symbolic link to the postjob log.\n Details follow:"
-            self.logger.exception(msg)
-            self.logger.info("Continuing since this is not a critical error")
+        else:
+            msg  = "Post-job log file %s doesn't exist." % (self.postjob_log_file_name)
+            msg += " Will not (re)create the symbolic link in the task web directory."
+            self.logger.warning(msg)
         ## Copy the job's stdout file job_out.<job_id> to the schedd web directory,
         ## naming it job_out.<job_id>.<crab_retry>.txt.
         ## NOTE: We now redirect stdout -> stderr; hence, we don't keep stderr in
