@@ -1118,21 +1118,32 @@ class PostJob():
         if self.first_pj_execution():
             self.logger.info("======== Starting post-job execution.")
 
-        ## Create the task web directory in the schedd. Ignored it is exists already.
+        ## Create the task web directory in the schedd. Ignore if it exists already.
         self.create_taskwebdir()
 
         ## Get/update the crab retry.
         self.crab_retry = self.calculate_crab_retry()
-        if self.crab_retry is None:
-            ##XXX Consider to make this a fatal error: I think the only way self.crab_retry
-            ##    could be None is through a bug or wrong schedd setup (e.g.: permissions)
-            self.crab_retry = self.dag_retry
 
         ## Define the name of the post-job log file.
-        self.postjob_log_file_name = "postjob.%d.%d.txt" % (self.job_id, self.crab_retry)
+        if self.crab_retry is None:
+            self.postjob_log_file_name = "postjob.%d.error.txt" % (self.job_id)
+        else:
+            self.postjob_log_file_name = "postjob.%d.%d.txt" % (self.job_id, self.crab_retry)
 
         #it needs an existing webdir and the postjob_log_file_name
         self.handle_logfile()
+
+        ## Fail the post-job if an error occurred when getting/updating the crab retry.
+        ## MM: I think the only way self.crab_retry could be None is through a bug or
+        ## wrong schedd setup (e.g.: permissions).
+        if self.crab_retry is None:
+            msg  = "Error in getting or updating the crab retry count."
+            msg += " Making this a fatal error."
+            self.logger.error(msg)
+            retval = JOB_RETURN_CODES.FATAL_ERROR 
+            self.log_finish_msg(retval)
+            self.set_dashboard_state('FAILED')
+            return retval
 
         ## Now that we have the job id and retry, we can set the job report file
         ## names.
