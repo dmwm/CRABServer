@@ -104,6 +104,13 @@ signal.signal(signal.SIGTERM, sighandler)
 
 ##==============================================================================
 
+DEFER_NUM = -1
+
+def first_pj_execution():
+    return DEFER_NUM == 0
+
+##==============================================================================
+
 def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
     """ Load the current error_summary.json and do the equivalent of an 'ls job_fjr.*.json' to get the completed jobs.
         Then, add the error reason of the job that are not in errorReport.json
@@ -271,7 +278,8 @@ class ASOServerJob(object):
         proxy = os.environ.get('X509_USER_PROXY', None)
         self.aso_db_url = self.job_ad['CRAB_ASOURL']
         try:
-            self.logger.info("Will use ASO server at %s." % (self.aso_db_url))
+            if first_pj_execution():
+                self.logger.info("Will use ASO server at %s." % (self.aso_db_url))
             self.couch_server = CMSCouch.CouchServer(dburl = self.aso_db_url, ckey = proxy, cert = proxy)
             self.couch_database = self.couch_server.connectDatabase("asynctransfer", create = False)
         except Exception as ex:
@@ -316,7 +324,8 @@ class ASOServerJob(object):
         #TODO assicurarsi che self.aso_Start_time sia settato quando runno la seconda volta
         if self.aso_start_timestamp:
             starttime = self.aso_start_timestamp
-        self.logger.info("====== Starting to monitor ASO transfers.")
+        if first_pj_execution():
+            self.logger.info("====== Starting to monitor ASO transfers.")
         ## Get the transfer status in all documents listed in self.docs_in_transfer.
         transfers_statuses = self.get_transfers_statuses()
         msg = "Got statuses: %s; %.1f hours since transfer submit."
@@ -720,7 +729,7 @@ class ASOServerJob(object):
                 json.dump(aso_info, fd)
             os.rename(tmp_fname, "aso_status.json")
         else:
-            self.logger.debug("Using cached results.")
+            self.logger.debug("Using cached ASO results.")
         if not aso_info:
             return self.get_transfers_statuses_fallback()
         statuses = []
@@ -922,7 +931,6 @@ class PostJob():
         self.aso_start_time      = None
         self.aso_start_timestamp = None
         self.retryjob_retval     = None
-        self.defer_num           = -1
 
         ## Set a logger for the post-job. Use a memory handler by default. Once we know
         ## the name of the log file where all the logging should go, we will flush the
@@ -1001,7 +1009,7 @@ class PostJob():
             handler = logging.StreamHandler(sys.stdout)    
         else:
             print "Wrinting post-job output to %s." % (self.postjob_log_file_name)
-            mode = 'w' if self.first_pj_execution() else 'a'
+            mode = 'w' if first_pj_execution() else 'a'
             handler = logging.FileHandler(filename=self.postjob_log_file_name, mode=mode)
         handler.setFormatter(self.logging_formatter)
         handler.setLevel(logging.DEBUG)
@@ -1082,11 +1090,6 @@ class PostJob():
                 self.logger.info("Continuing since this is not a critical error")
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-    def first_pj_execution(self):
-        return self.defer_num == 0
-
-    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
     
     def execute(self, *args, **kw):
         """
@@ -1113,9 +1116,10 @@ class PostJob():
         self.job_return_code = int(self.job_return_code)
 
         ## Get/update the post-job deferral number.
-        self.defer_num = self.get_defer_num()
+        global DEFER_NUM
+        DEFER_NUM = self.get_defer_num()
 
-        if self.first_pj_execution():
+        if first_pj_execution():
             self.logger.info("======== Starting post-job execution.")
 
         ## Create the task web directory in the schedd. Ignore if it exists already.
@@ -1152,7 +1156,7 @@ class PostJob():
         global G_JOB_REPORT_NAME_NEW
         G_JOB_REPORT_NAME_NEW = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry)
 
-        if self.first_pj_execution():
+        if first_pj_execution():
             self.handle_webdir()
             ## Print a message about what job retry number are we on.
             msg  = "This is job retry number %d." % (self.dag_retry) #MarcoM: why not self.crab_retry ?
@@ -1299,6 +1303,9 @@ class PostJob():
             self.logger.error(retmsg)
             return 10, retmsg
 
+        ## If this is a deferred post-job execution, reduce the log level to WARNING. 
+        if not first_pj_execution():
+            self.logger.setLevel(logging.WARNING)
         ## Parse the job ad and use it if possible.
         ## If not, use main ROOT job ad and for job ad information use condor_q
         ## Please see: https://github.com/dmwm/CRABServer/issues/4618
@@ -1326,7 +1333,6 @@ class PostJob():
             counter += 1
             self.logger.info("       -----> Failed to parse job ad file -----")
             time.sleep(5)
-
         if not used_job_ad:
             ## Parse the main taks job ad and use it
             job_ad_file_name = os.environ.get("_CONDOR_JOB_AD", ".job.ad")
@@ -1337,12 +1343,23 @@ class PostJob():
                 retmsg = "Failure parsing the ROOT job ad."
                 return JOB_RETURN_CODES.FATAL_ERROR, retmsg
             self.logger.info("====== Finished to parse ROOT job ad.")
+        ## If this is a deferred post-job execution, put back the log level to DEBUG.
+        if not first_pj_execution():
+            self.logger.setLevel(logging.DEBUG)
+            if used_job_ad:
+                msg = "(Parsed job ad.)"
+            else:
+                msg = "(Parsed ROOT job ad.)"
+            self.logger.debug(msg)
 
-        if self.first_pj_execution():
+        if first_pj_execution():
             pj_error, msg = self.check_exit_code(used_job_ad)
             if pj_error:
                 return pj_error, msg
 
+        ## If this is a deferred post-job execution, reduce the log level to ERROR.
+        if not first_pj_execution():
+            self.logger.setLevel(logging.ERROR)
         ## Parse the job report.
         self.logger.info("====== Starting to parse job report file %s." % (G_JOB_REPORT_NAME))
         if self.parse_job_report():
@@ -1351,6 +1368,9 @@ class PostJob():
             retmsg = "Failure parsing the job report."
             return JOB_RETURN_CODES.FATAL_ERROR, retmsg
         self.logger.info("====== Finished to parse job report.")
+        ## If this is a deferred post-job execution, put back the log level to DEBUG.
+        if not first_pj_execution():
+            self.logger.setLevel(logging.DEBUG)
 
         ## If the flag CRAB_NoWNStageout is set, we finish the post-job here.
         ## (I didn't remove this yet, because even if the transfer of the logs and
@@ -1365,27 +1385,30 @@ class PostJob():
             self.set_dashboard_state('FINISHED')
             return 0, ""
 
-        #TODO: we should only print this once
-        if not self.transfer_logs:
-            msg  = "The user has not specified to transfer the log files."
-            msg += " No log files stageout (nor log files metadata upload) will be performed."
-            self.logger.info(msg)
-        if len(self.output_files_names) == 0:
-            if not self.transfer_outputs:
-                msg  = "Post-job got an empty list of output files (i.e. no output file) to work on."
-                msg += " In any case, the user has specified to not transfer output files."
+        ## Give a message about the transfer flags.
+        if first_pj_execution():
+            if not self.transfer_logs:
+                msg  = "The user has not specified to transfer the log files."
+                msg += " No log files stageout (nor log files metadata upload) will be performed."
                 self.logger.info(msg)
+            if len(self.output_files_names) == 0:
+                if not self.transfer_outputs:
+                    msg  = "Post-job got an empty list of output files (i.e. no output file) to work on."
+                    msg += " In any case, the user has specified to not transfer output files."
+                    self.logger.info(msg)
+                else:
+                    msg  = "The transfer of output files flag in on,"
+                    msg += " but the post-job got an empty list of output files (i.e. no output file) to work on."
+                    msg += " Turning off the transfer of output files flag."
+                    self.logger.info(msg)
             else:
-                msg  = "The transfer of output files flag in on,"
-                msg += " but the post-job got an empty list of output files (i.e. no output file) to work on."
-                msg += " Turning off the transfer of output files flag."
-                self.logger.info(msg)
-                self.transfer_outputs = 0
-        else:
-            if not self.transfer_outputs:
-                msg  = "The user has specified to not transfer the output files."
-                msg += " No output files stageout (nor output files metadata upload) will be performed."
-                self.logger.info(msg)
+                if not self.transfer_outputs:
+                    msg  = "The user has specified to not transfer the output files."
+                    msg += " No output files stageout (nor output files metadata upload) will be performed."
+                    self.logger.info(msg)
+        ## Turn off the transfer of output files if the are no output files to transfer.
+        if len(self.output_files_names) == 0:
+            self.transfer_outputs = 0
 
         ## Initialize the object we will use for making requests to the REST interface.
         self.server = HTTPRequests(self.rest_host, \
@@ -1394,7 +1417,7 @@ class PostJob():
                                    retry = 2, logger = self.logger)
 
         ## Upload the logs archive file metadata if it was not already done from the WN.
-        if self.transfer_logs and self.first_pj_execution():
+        if self.transfer_logs and first_pj_execution():
             if self.log_needs_file_metadata_upload:
                 self.logger.info("====== Starting upload of logs archive file metadata.")
                 try:
@@ -1410,21 +1433,23 @@ class PostJob():
                 msg += " having been uploaded already from the worker node."
                 self.logger.info(msg)
 
-        ## Just an info message.
-        if self.transfer_logs or self.transfer_outputs:
-            msg = "Preparing to transfer "
-            msgadd = []
-            if self.transfer_logs:
-                msgadd.append("the logs archive file")
-            if self.transfer_outputs:
-                msgadd.append("%d output files" % (len(self.output_files_names)))
-            msg = msg + ' and '.join(msgadd) + '.'
-            self.logger.info(msg)
+        ## Give a message about how many files will be transferred.
+        if first_pj_execution():
+            if self.transfer_logs or self.transfer_outputs:
+                msg = "Preparing to transfer "
+                msgadd = []
+                if self.transfer_logs:
+                    msgadd.append("the logs archive file")
+                if self.transfer_outputs:
+                    msgadd.append("%d output files" % (len(self.output_files_names)))
+                msg = msg + ' and '.join(msgadd) + '.'
+                self.logger.info(msg)
 
         ## Do the transfers (inject to ASO database if needed, and monitor the transfers
         ## statuses until they reach a terminal state).
         if self.transfer_logs or self.transfer_outputs:
-            self.logger.info("====== Starting to check for ASO transfers.")
+            if first_pj_execution():
+                self.logger.info("====== Starting to check for ASO transfers.")
             try:
                 ret_code = self.perform_transfers()
                 if ret_code == 4:
@@ -1538,7 +1563,7 @@ class PostJob():
                                self.job_ad, self.crab_retry, \
                                self.retry_timeout, self.job_failed, \
                                self.transfer_logs, self.transfer_outputs)
-        if self.first_pj_execution():
+        if first_pj_execution():
             aso_job_retval = ASO_JOB.run()
         else:
             aso_job_retval = ASO_JOB.check_transfers()
@@ -1982,7 +2007,7 @@ class PostJob():
         if self.job_failed:
             self.source_dir = os.path.join(self.source_dir, 'failed')
             self.dest_dir = os.path.join(self.dest_dir, 'failed')
-        self.fill_output_files_info () ## Fill self.output_files_info by parsing the job report.
+        self.fill_output_files_info() ## Fill self.output_files_info by parsing the job report.
         self.aso_start_time = self.job_report.get("aso_start_time", None)
         self.aso_start_timestamp = self.job_report.get("aso_start_timestamp", None)
         return 0
@@ -2158,7 +2183,7 @@ class PostJob():
             msg = msg % (fname)
             self.logger.warning(msg)
             return None
-        if self.first_pj_execution():
+        if first_pj_execution():
             crab_retry = retry_info['post']
             retry_info['post'] += 1
             try:
