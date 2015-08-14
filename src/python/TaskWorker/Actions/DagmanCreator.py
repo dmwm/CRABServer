@@ -139,19 +139,26 @@ use_x509userproxy = true
 Requirements = ((target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)) %(opsys_req)s
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
 # Remove if we've been in the 'held' status for more than 7 minutes, OR
+# if job is idle more than 7 days, OR
 # We are running AND
 #  Over memory use OR
 #  Over wall clock limit
+
 periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) || \
+                  ((JobStatus =?= 1) && (time() - EnteredCurrentStatus > 7*24*60*60)) || \
                   ((JobStatus =?= 2) && ( \
                      (MemoryUsage > RequestMemory) || \
                      (MaxWallTimeMins*60 < time() - EnteredCurrentStatus) || \
                      (DiskUsage > 100000000))) || \
                   ((JobStatus =?= 1) && (time() > (x509UserProxyExpiration + 86400)))
-+PeriodicRemoveReason = ifThenElse(MemoryUsage > RequestMemory, "Removed due to memory use", \
-                          ifThenElse(MaxWallTimeMins*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
-                            ifThenElse(DiskUsage > 100000000, "Removed due to disk usage", \
-                              ifThenElse(time() > x509UserProxyExpiration, "Removed job due to proxy expiration", "Removed due to job being held"))))
+
++PeriodicRemoveReason = ifThenElse(time() - EnteredCurrentStatus > 7*24*60*60 && isUndefined(MemoryUsage), "Removed due to idle time limit", \
+                          ifThenElse(time() > x509UserProxyExpiration, "Removed job due to proxy expiration", \
+                            ifThenElse(MemoryUsage > RequestMemory, "Removed due to memory use", \
+                              ifThenElse(MaxWallTimeMins*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
+                                ifThenElse(DiskUsage > 100000000, "Removed due to disk usage", \
+                                  "Removed due to job being held")))))
+
 %(extra_jdl)s
 queue
 """

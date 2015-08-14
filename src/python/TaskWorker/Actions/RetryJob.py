@@ -42,7 +42,6 @@ class RetryJob(object):
         self.job_id              = None
         self.dag_jobid           = None
         self.site                = None
-        self.ads                 = []
         self.ad                  = {}
         self.report              = {}
         self.validreport         = True
@@ -75,7 +74,7 @@ class RetryJob(object):
 
         if status:
             raise FatalError("Failed to query condor user log:\n%s" % output)
-
+        self.ads = []
         for text_ad in output.split("\n\n"):
             try:
                 ad = classad.parseOld(text_ad)
@@ -91,6 +90,7 @@ class RetryJob(object):
         """
         Need a doc string here
         """
+        self.ads = []
         self.ads.append(self.ad)
         if self.crab_retry == 0:
             print 'Job is retry num 0. Will not try to search and load previous job ads.'
@@ -247,6 +247,15 @@ class RetryJob(object):
             self.create_fake_fjr(exitMsg, 50662, 50662)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    def check_expired_report(self):
+        """
+        If a job was removed due to MAX_IDLE_TIME_REACHED don't retry
+        """
+        if self.ad.get("RemoveReason", "").startswith("Removed due to idle time limit"):
+            exitMsg = "Not retrying job due to excessive idle time (job automatically killed on the grid scheduler)"
+            self.create_fake_fjr(exitMsg, 50665, 50665)
+
+    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_exit_code(self):
         """
@@ -391,6 +400,9 @@ class RetryJob(object):
             hold_reason = self.ad.get("HoldReason", self.ad.get("LastHoldReason", "Unknown"))
             raise RecoverableError("Will retry held job; last hold reason: %s" % (hold_reason))
 
+        #if self.ad.get("RemoveReason", "").startswith("Removed due to idle time limit"):
+        #    raise FatalError("Aborting since the job was idle for the last 7 days")
+
         try:
             self.check_empty_report()
             ## Raises a RecoverableError or FatalError exception depending on the exitCode
@@ -402,6 +414,7 @@ class RetryJob(object):
                 self.check_memory_report()
                 self.check_cpu_report()
                 self.check_disk_report()
+                self.check_expired_report()
             except:
                 print "Original error: %s" % (orig_msg)
                 raise
