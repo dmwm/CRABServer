@@ -79,13 +79,16 @@ class RESTUserWorkflow(RESTEntity):
         using the WMCore.Lexicon method userprocdataset(), which does the same
         validation as DBS (see discussion with Yuyi Guo in following github CRABClient
         issue: https://github.com/dmwm/CRABClient/issues/4257).
+
+        This function will get deprecated in the 1509 release. We are keeping it around
+        for backward compatibility but I would like to remove it at some point
         """
-        ## These if statements should actually never evaluate to True, because
-        ## the client always defines kwargs['publishname'] and kwargs['workflow'].
         if 'publishname' not in kwargs:
+            ## This now can be undefined since new clients use publishname2
             msg  = "Server parameter 'publishname' is not defined."
-            msg += " Unable to validate the publication dataset name."
-            raise InvalidParameter(msg)
+            msg += " It is possible that old client is being used."
+            self.logger.info(msg)
+            return
         if kwargs['publishname'].find('-') == -1 and 'workflow' not in kwargs:
             msg  = "Server parameter 'workflow' is not defined."
             msg += " Unable to validate the publication dataset name."
@@ -93,13 +96,12 @@ class RESTUserWorkflow(RESTEntity):
         ## The client defines kwargs['publishname'] = <Data.publishDataName>-<isbchecksum>
         ## if the user defines Data.publishDataName, and kwargs['publishname'] = <isbchecksum> otherwise.
         ## (The PostJob replaces then the isbchecksum by the psethash.)
-        ## In DataWorkflow.py, the publish_name column of the TaskDB is defined
-        ## in this way (without "username-"), and that's what is used later by
-        ## PostJob to define the output dataset name.
+        ## Here we add the workflow name if the user did not specify the publishname
         if kwargs['publishname'].find('-') == -1:
             publishDataNameToCheck = "%s-%s" % (kwargs['workflow'].replace(':','_'), kwargs['publishname'])
         else:
             publishDataNameToCheck = "%s" % (kwargs['publishname'])
+        kwargs['publishname'] = publishDataNameToCheck #that's what the version earlier than 1509 were putting in the DB
         if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
             if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
                 msg  = "Invalid CRAB configuration."
@@ -126,6 +128,58 @@ class RESTUserWorkflow(RESTEntity):
             msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (group_user_prefix, extrastr, param)
             msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
             raise InvalidParameter(msg)
+
+
+    ## Basically copy and pasted from _checkPublishDataName which will be eventually removed
+    def _checkPublishDataName2(self, kwargs, outlfn):
+        """
+        Validate the (user specified part of the) output dataset name for publication
+        using the WMCore.Lexicon method userprocdataset(), which does the same
+        validation as DBS (see discussion with Yuyi Guo in following github CRABClient
+        issue: https://github.com/dmwm/CRABClient/issues/4257).
+        """
+
+        if 'publishname2' not in kwargs or not kwargs['publishname2']:
+            ## provide the default publication name if it was not specified in the client
+            publishDataNameToCheck = kwargs['workflow'].replace(':','_')
+        else:
+            publishDataNameToCheck = kwargs['publishname2']
+
+        ## Add the isbchecksum placeholder
+        publishDataNameToCheck += "-" + "0" * 32
+
+        #saves that in kwargs since it's what we want
+        kwargs['publishname2'] = publishDataNameToCheck
+
+        ##Determine if it's a dataset that will go into a group space and therefore the (group)username prefix it will be used
+        if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
+            if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
+                msg  = "Invalid CRAB configuration."
+                msg += " Parameter Data.publishWithGroupName is True,"
+                msg += " but Data.outLFNDirBase does not start with '/store/group/<groupname>'."
+                raise InvalidParameter(msg)
+            group_user_prefix = outlfn.split('/')[3]
+        else:
+            username = cherrypy.request.user['login']
+            group_user_prefix = username
+
+        publishDataNameToCheck = "%s-%s" % (group_user_prefix, publishDataNameToCheck)
+        try:
+            userprocdataset(publishDataNameToCheck)
+        except AssertionError:
+            ## The messages below are more descriptive than if we would use
+            ## the message from AssertionError exception.
+            if not kwargs['publishname2']:
+                param = 'General.requestName'
+                extrastr = 'crab_'
+            else:
+                param = 'Data.publishDataName'
+                extrastr = ''
+            msg  = "Invalid CRAB configuration parameter %s." % (param)
+            msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (group_user_prefix, extrastr, param)
+            msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
+            raise InvalidParameter(msg)
+
 
     def _checkPrimaryDataset(self, kwargs):
         """
@@ -248,22 +302,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
             validate_num("publication", param, safe, optional=False)
             validate_str("publishdbsurl", param, safe, RX_DBSURL, optional=(not bool(safe.kwargs['publication'])))
-            ## Validations needed in case publication is on.
             if safe.kwargs['publication']:
-                ## The (user specified part of the) publication dataset name must be
-                ## specified and must pass DBS validation. Since this is the correct
-                ## validation function, it must be done before the
-                ## validate_str("workflow", ...) and validate_str("publishname", ...)
-                ## we have below. Not sure why RX_PUBLISH was introduced in CRAB, but
-                ## it is not the correct regular expression for publication dataset
-                ## name validation.
-                self._checkPublishDataName(param.kwargs, safe.kwargs['lfn'])
-                ## 'publishname' was already validated above in _checkPublishDataName().
-                ## But I am not sure if we can skip the validate_str('publishname', ...)
-                ## or we need it so that all parameters are moved from param to safe.
-                ## Therefore, I didn't remove the validate_str('publishname', ...),
-                ## but only changed RX_PUBLISH -> RX_ANYTHING.
-                validate_str('publishname', param, safe, RX_ANYTHING, optional=False)
                 ## If this is a MC generation job type, the primary dataset name will
                 ## be used to define the primary dataset field in the publication
                 ## dataset name. Therefore, the primary dataset name must pass DBS
@@ -275,9 +314,34 @@ class RESTUserWorkflow(RESTEntity):
                 ## the primary dataset name.
                 if jobtype == 'PrivateMC':
                     self._checkPrimaryDataset(param.kwargs)
+
+            ## We might want to remove publishname once the backward compatibility
+            ## wont be needed anymore. Then we can just keep publishname2
+            ## NB: AFAIK the only client not using the CRABLibrary but direct cutl is HC,
+            ## therefore we will need to make sure we do not break it!
+            ## The following two lines will be removed in the future once we will
+            ## not need backward compatibility anymore
+            self._checkPublishDataName(param.kwargs, safe.kwargs['lfn'])
+            validate_str('publishname', param, safe, RX_ANYTHING, optional=True)
+
+            ##And this if as well, just do self._checkPublishDataName2(param.kwargs, safe.kwargs['lfn'])
+            if not safe.kwargs["publishname"]: #new clients won't define this anymore
+                ## The (user specified part of the) publication dataset name must be
+                ## specified and must pass DBS validation. Since this is the correct
+                ## validation function, it must be done before the
+                ## validate_str("workflow", ...) and validate_str("publishname", ...)
+                ## we have below. Not sure why RX_PUBLISH was introduced in CRAB, but
+                ## it is not the correct regular expression for publication dataset
+                ## name validation.
+                self._checkPublishDataName2(param.kwargs, safe.kwargs['lfn'])
             else:
-                ## Not sure if we need to match publishname against RX_PUBLISH...
-                validate_str("publishname", param, safe, RX_PUBLISH, optional=False)
+                param.kwargs["publishname2"] = safe.kwargs["publishname"]
+
+            ## 'publishname' was already validated above in _checkPublishDataName().
+            ## Calling validate_str with a fake regexp to move the param to the
+            ## list of validated inputs
+            validate_str("publishname2", param, safe, RX_ANYTHING, optional=True)
+
             validate_num("publishgroupname", param, safe, optional=True)
             ## This line must come after _checkPublishDataName()
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
@@ -383,9 +447,10 @@ class RESTUserWorkflow(RESTEntity):
 
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
-    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, nonvaliddata, useparent, secondarydata, generator, eventsperlumi, \
-                siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,\
-                savelogsflag, publication, publishname, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles, runs, lumis,\
+    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, nonvaliddata, useparent, secondarydata, generator, eventsperlumi,
+                siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
+                savelogsflag, publication, publishname, publishname2, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
+                tfileoutfiles, edmoutfiles, runs, lumis,
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
                 faillimit, ignorelocality, userfiles, asourl, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun):
         """Perform the workflow injection
@@ -412,7 +477,8 @@ class RESTUserWorkflow(RESTEntity):
            :arg str userdn: DN of user doing the request;
            :arg str userhn: hyper new name of the user doing the request;
            :arg int publication: flag enabling or disabling data publication;
-           :arg str publishname: name to use for data publication;
+           :arg str publishname: name to use for data publication; deprecated
+           :arg str publishname2: name to use for data publication;
            :arg str publishgroupname: add groupname or username to publishname;
            :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg str dbsurl: dbs url where the input dataset is published;
@@ -451,7 +517,7 @@ class RESTUserWorkflow(RESTEntity):
                                        cachefilename=cachefilename, cacheurl=cacheurl,
                                        addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
                                        userhn=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
-                                       publication=publication, publishname=publishname, publishgroupname=publishgroupname, asyncdest=asyncdest,
+                                       publication=publication, publishname=publishname, publishname2=publishname2, publishgroupname=publishgroupname, asyncdest=asyncdest,
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfn=lfn,
