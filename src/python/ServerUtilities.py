@@ -187,7 +187,8 @@ def isFailurePermanent(reason, gridJob=False):
                                ".*mkdir\: cannot create directory.*" : "Can`t create directory.",
                                ".*does not have enough space.*" : "User quota exceeded.",
                                ".*reports could not open connection to.*" : "Storage element is not accessible.",
-                               ".*530-login incorrect.*" : "Permission denied to write to destination site."
+                               ".*530-login incorrect.*" : "Permission denied to write to destination site.",
+                               ".*451 operation failed\: all pools are full.*": "Destination site does not have enough space on their storage."
                               }
     reason = str(reason).lower()
     for failureReason in permanentFailureReasons:
