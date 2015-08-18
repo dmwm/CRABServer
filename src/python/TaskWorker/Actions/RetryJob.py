@@ -251,6 +251,16 @@ class RetryJob(object):
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    def check_expired_report(self):
+        """
+        If a job was removed because it stay idle more than a week don't retry
+        """
+        if self.ad.get("RemoveReason", "").startswith("Removed due to idle time limit"):
+            exitMsg = "Not retrying job due to excessive idle time (job automatically killed on the grid scheduler)"
+            self.create_fake_fjr(exitMsg, 50665, 50665)
+
+    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
     def check_exit_code(self):
         """
         Using the exit code saved in the json job report, decide whether it corresponds
@@ -415,6 +425,7 @@ class RetryJob(object):
                 self.check_memory_report()
                 self.check_cpu_report()
                 self.check_disk_report()
+                self.check_expired_report()
             except:
                 msg = "Original error: %s" % (orig_msg)
                 self.logger.error(msg)
