@@ -465,7 +465,7 @@ $(document).ready(function() {
             case "dev":
                 taskInfoUrl = "https://" + document.domain + "/crabserver/dev/task?subresource=search&workflow=";
                 taskStatusUrl = "https://" + document.domain + "/crabserver/dev/workflow?workflow=";
-                sandboxApiUrl = "https://" + document.domain + "/rabserver/dev/task?subresource=webdirprx&workflow="
+                sandboxApiUrl = "https://" + document.domain + "/crabserver/dev/task?subresource=webdirprx&workflow="
                 break;
             default:
                 break;
