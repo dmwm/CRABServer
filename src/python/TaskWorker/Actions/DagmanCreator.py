@@ -77,7 +77,6 @@ CRAB_HEADERS = \
 +CRAB_UserDN = %(userdn)s
 +CRAB_UserHN = %(userhn)s
 +CRAB_AsyncDest = %(asyncdest)s
-+CRAB_BlacklistT1 = %(blacklistT1)s
 +CRAB_StageoutPolicy = %(stageoutpolicy)s
 +CRAB_UserRole = %(tm_user_role)s
 +CRAB_UserGroup = %(tm_user_group)s

@@ -1,4 +1,5 @@
 import os
+import sys
 import pprint
 import logging
 from httplib import HTTPException
@@ -20,7 +21,7 @@ class DBSDataDiscovery(DataDiscovery):
         if len(res) > 1:
             raise TaskWorkerException("Found more than one dataset while checking in DBS the status of %s" % dataset)
         if len(res) == 0:
-            raise TaskWorkerException("Cannot find dataset %s in %s DBS instance" % (dataset, self.dbs.dbs.serverinfo()["dbs_instance"]))
+            raise TaskWorkerException("Cannot find dataset %s in %s DBS instance" % (dataset, self.dbsInstance))
         res = res[0]
         self.logger.info("Input dataset details: %s" % pprint.pformat(res))
         accessType = res['dataset_access_type']
@@ -73,6 +74,7 @@ class DBSDataDiscovery(DataDiscovery):
         if kwargs['task']['tm_dbs_url']:
             dbsurl = kwargs['task']['tm_dbs_url']
         self.dbs = get_dbs(dbsurl)
+        self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
         #
         if old_cert_val != None:
             os.environ['X509_USER_CERT'] = old_cert_val
@@ -137,42 +139,63 @@ class DBSDataDiscovery(DataDiscovery):
                                 "This is could be a temporary DBS glitch. Please try to submit a new task (resubmit will not work)"+\
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
         if not filedetails:
-            raise TaskWorkerException("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, https://cmsweb.cern.ch/das.\n"+\
-                                      "Aborting submission. Resubmitting your task will not help.")
+            raise TaskWorkerException(("Cannot find any file inside the dataset. Please, check your dataset in DAS, %s.\n"
+                                      "Aborting submission. Resubmitting your task will not help.") %
+                                      ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
+                                      (self.dbsInstance, kwargs['task']['tm_input_dataset']))
+
+        ## Format the output creating the data structures required by wmcore. Filters out invalid files,
+        ## files whose block has no location, and figures out the PSN
         result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'], datasetfiles = filedetails, locations = locationsMap)
+
+        if not result.result:
+            raise TaskWorkerException(("Cannot find any file inside the dataset. Please, check your dataset in DAS, %s.\n"
+                                      "Aborting submission. Resubmitting your task will not help.") %
+                                      ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
+                                      (self.dbsInstance, kwargs['task']['tm_input_dataset']))
+
         self.logger.debug("Got %s files" % len(result.result.getFiles()))
         return result
 
 if __name__ == '__main__':
+    """ Usage: python DBSDataDiscovery.py dbs_instance dataset
+        where dbs_instance should be either prod or phys03
+
+        Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py phys03 /MinBias/jmsilva-crab_scale_70633-3d12352c28d6995a3700097dc8082c04/USER
+
+        Note: self.uploadWarning is failing, I usually comment it when I run this script standalone
+    """
+    dbsInstance = sys.argv[1]
+    dataset = sys.argv[2]
+
     logging.basicConfig(level = logging.DEBUG)
     from WMCore.Configuration import Configuration
     config = Configuration()
     config.section_("Services")
-    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSReader'
-    #config.Services.DBSUrl = 'http://cmsdbsprod.cern.ch/cms_dbs_prod_global/servlet/DBSServlet'
-    #config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/'
+    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/%s/DBSWriter/' % dbsInstance
     config.section_("TaskWorker")
     # will use X509_USER_PROXY var for this test
     config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
     config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
 
     fileset = DBSDataDiscovery(config)
-    #dataset = '/QCD_Pt-1800_Tune4C_13TeV_pythia8/Spring14dr-castor_PU_S14_POSTLS170_V6-v1/GEN-SIM-RECODEBUG'
-    #dataset = '/SingleMu/Run2012D-22Jan2013-v1/AOD' #invalid file: /store/data/Run2012D/SingleMu/AOD/22Jan2013-v1/20001/7200FA02-CC85-E211-9966-001E4F3F165E.root
-    #dataset = '/MB8TeVEtanoCasHFShoLib/Summer12-EflowHpu_NoPileUp_START53_V16-v1/RECODEBUG'
-    #dataset = '/DoubleElectron/Run2012C-22Jan2013-v1/RECO' #not in FNAL_DISK
-    dataset = '/GenericTTbar/atanasi-140429_131619_crab_AprilTest_3000jbsOf3hrs-95e5dc29a1ac0766eb8514eb5d4ff77a/USER' # This dataset is INVALID, but has 1 valid file: /store/user/atanasi/GenericTTbar/140429_131619_crab_AprilTest_3000jbsOf3hrs/140429_131619/0000/MyTTBarTauolaTest_1.root, which belongs to block /GenericTTbar/atanasi-140429_131619_crab_AprilTest_3000jbsOf3hrs-95e5dc29a1ac0766eb8514eb5d4ff77a/USER#c4dea6b6-3e26-4d3a-a6c4-ab1a5b0a5f4c, which has 65 files (64 are invalid).
-    #dataset = '/SingleMu/atanasi-CRAB3-tutorial_Data-analysis_LumiList-f765a0f4fbf582146a505cfe3fd08f3e/USER'
-    fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': os.environ["X509_USER_PROXY"], 'tm_input_dataset': dataset, 'tm_taskname': 'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
+    fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': os.environ["X509_USER_PROXY"],
+                          'tm_input_dataset': dataset, 'tm_taskname': 'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
 
-    datasets = ['/GenericTTbar/HC-CMSSW_5_3_1_START53_V5-v1/GEN-SIM-RECO',
-                '/GenericTTbar/HC-CMSSW_5_3_1_START53_V5-v1/GEN-SIM-RECO',
-                '/SingleMu/Run2012C-PromptReco-v2/AOD',
-                '/SingleMu/Run2012D-PromptReco-v1/AOD',
-                '/DYJetsToLL_M-50_TuneZ2Star_8TeV-madgraph-tarball/Summer12_DR53X-PU_S10_START53_V7A-v1/AODSIM',
-                '/WJetsToLNu_TuneZ2Star_8TeV-madgraph-tarball/Summer12_DR53X-PU_S10_START53_V7A-v2/AODSIM',
-                '/TauPlusX/Run2012D-PromptReco-v1/AOD']
-    for dataset in datasets:
-        fileset = DBSDataDiscovery(config)
-        print fileset.execute(task={'tm_nonvalid_input_dataset' : 'T', 'tm_use_parent' : 0, 'user_proxy' : os.environ["X509_USER_PROXY"], 'tm_input_dataset':dataset, 'tm_taskname':'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
-
+#===============================================================================
+#    Some interesting datasets that were hardcoded here (MM I am not using them actually, maybe we could delete them?)
+#    dataset = '/QCD_Pt-1800_Tune4C_13TeV_pythia8/Spring14dr-castor_PU_S14_POSTLS170_V6-v1/GEN-SIM-RECODEBUG'
+#    dataset = '/SingleMu/Run2012D-22Jan2013-v1/AOD' #invalid file: /store/data/Run2012D/SingleMu/AOD/22Jan2013-v1/20001/7200FA02-CC85-E211-9966-001E4F3F165E.root
+#    dataset = '/MB8TeVEtanoCasHFShoLib/Summer12-EflowHpu_NoPileUp_START53_V16-v1/RECODEBUG'
+#    dataset = '/DoubleElectron/Run2012C-22Jan2013-v1/RECO' #not in FNAL_DISK
+#    dataset = '/GenericTTbar/atanasi-140429_131619_crab_AprilTest_3000jbsOf3hrs-95e5dc29a1ac0766eb8514eb5d4ff77a/USER' # This dataset is INVALID, but has 1 valid file: /store/user/atanasi/GenericTTbar/140429_131619_crab_AprilTest_3000jbsOf3hrs/140429_131619/0000/MyTTBarTauolaTest_1.root, which belongs to block /GenericTTbar/atanasi-140429_131619_crab_AprilTest_3000jbsOf3hrs-95e5dc29a1ac0766eb8514eb5d4ff77a/USER#c4dea6b6-3e26-4d3a-a6c4-ab1a5b0a5f4c, which has 65 files (64 are invalid).
+#    dataset = '/MinBias/jmsilva-crab_scale_70633-3d12352c28d6995a3700097dc8082c04/USER'
+#    dataset = '/SingleMu/atanasi-CRAB3-tutorial_Data-analysis_LumiList-f765a0f4fbf582146a505cfe3fd08f3e/USER'
+#    datasets = ['/GenericTTbar/HC-CMSSW_5_3_1_START53_V5-v1/GEN-SIM-RECO',
+#                '/GenericTTbar/HC-CMSSW_5_3_1_START53_V5-v1/GEN-SIM-RECO',
+#                '/SingleMu/Run2012C-PromptReco-v2/AOD',
+#                '/SingleMu/Run2012D-PromptReco-v1/AOD',
+#                '/DYJetsToLL_M-50_TuneZ2Star_8TeV-madgraph-tarball/Summer12_DR53X-PU_S10_START53_V7A-v1/AODSIM',
+#                '/WJetsToLNu_TuneZ2Star_8TeV-madgraph-tarball/Summer12_DR53X-PU_S10_START53_V7A-v2/AODSIM',
+#                '/TauPlusX/Run2012D-PromptReco-v1/AOD']
+#===============================================================================
