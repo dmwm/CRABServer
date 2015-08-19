@@ -15,7 +15,7 @@ Can be tested with something like:
 mkdir -p WMTaskSpace/cmsRun
 mv <path-to-pset>/PSet.p* WMTaskSpace/cmsRun
 cd  WMTaskSpace/cmsRun
-python <path-to-TweakPSet>/TweakPSet.py --location=<path-to-output> --inputFile='job_input_file_list_1.json' --runAndLumis='job_lumis_1.json' --firstEvent=0 --lastEvent=-1 --firstLumi=None --firstRun=1 --seeding=None --lheInputFiles=False --oneEventMode=0
+python <path-to-TweakPSet>/TweakPSet.py --location=<path-to-output> --inputFile='job_input_file_list_1.txt' --runAndLumis='job_lumis_1.json' --firstEvent=0 --lastEvent=-1 --firstLumi=None --firstRun=1 --seeding=None --lheInputFiles=False --oneEventMode=0
 
 job_lumis_1.json content:
 {"1": [[669684, 669684]]}
