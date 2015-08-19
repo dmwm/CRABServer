@@ -92,7 +92,6 @@ SUBMIT_INFO = [ \
             ('CRAB_UserDN', 'userdn'),
             ('CRAB_UserHN', 'userhn'),
             ('CRAB_AsyncDest', 'asyncdest'),
-            ('CRAB_BlacklistT1', 'blacklistT1'),
             #('CRAB_StageoutPolicy', 'stageoutpolicy'),
             ('CRAB_UserRole', 'tm_user_role'),
             ('CRAB_UserGroup', 'tm_user_group'),
