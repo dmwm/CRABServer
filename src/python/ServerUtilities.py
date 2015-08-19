@@ -39,7 +39,7 @@ def checkOutLFN(lfn, username):
 
 
 def getProxiedWebDir(task, host, uri, cert, logFunction = print):
-    """ The function smply queries the REST interface specified to get the proxied webdir to use
+    """ The function simply queries the REST interface specified to get the proxied webdir to use
         for the task. Returns None in case the API could not find the url (either an error or the schedd
         is not configured)
     """
@@ -55,7 +55,8 @@ def getProxiedWebDir(task, host, uri, cert, logFunction = print):
     try:
         server = HTTPRequests(host, cert, cert, retry = 2)
         dictresult, _, _ = server.get(uri, data = data) #the second and third parameters are deprecated
-        res = dictresult['result'][0]
+        if dictresult.get('result'):
+            res = dictresult['result'][0]
     except HTTPException as hte:
         logFunction(traceback.format_exc())
         logFunction(hte.headers)

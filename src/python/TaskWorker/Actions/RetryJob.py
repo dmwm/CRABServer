@@ -99,7 +99,7 @@ class RetryJob(object):
             job_ad_file = os.path.join(".", "finished_jobs", "job.%d.%d" % (self.job_id, crab_retry))
             if os.path.isfile(job_ad_file):
                 with open(job_ad_file, "r") as fd:
-                    text_ad = fd.read_lines()
+                    text_ad = fd.readlines()
                 try:
                     ad = classad.parseOld(text_ad)
                 except SyntaxError as e:
@@ -248,6 +248,16 @@ class RetryJob(object):
         if self.ad.get("RemoveReason", "").startswith("Removed due to disk usage"):
             exitMsg = "Not retrying job due to excessive disk usage (job automatically killed on the worker node)"
             self.create_fake_fjr(exitMsg, 50662, 50662)
+
+    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def check_expired_report(self):
+        """
+        If a job was removed because it stay idle more than a week don't retry
+        """
+        if self.ad.get("RemoveReason", "").startswith("Removed due to idle time limit"):
+            exitMsg = "Not retrying job due to excessive idle time (job automatically killed on the grid scheduler)"
+            self.create_fake_fjr(exitMsg, 50665, 50665)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -415,6 +425,7 @@ class RetryJob(object):
                 self.check_memory_report()
                 self.check_cpu_report()
                 self.check_disk_report()
+                self.check_expired_report()
             except:
                 msg = "Original error: %s" % (orig_msg)
                 self.logger.error(msg)

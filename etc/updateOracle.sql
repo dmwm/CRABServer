@@ -60,4 +60,5 @@ alter table tasks add constraint check_tm_publish_groupname check (tm_publish_gr
 alter table tasks add (tm_nonvalid_input_dataset VARCHAR(1) DEFAULT 'T');
 alter table tasks add constraint ck_tm_nonvalid_input_dataset check (tm_nonvalid_input_dataset IN ('T', 'F')) ENABLE;
 
+--Changes that will be needed for version 3.3.1509
 alter table tasks add (tm_secondary_input_dataset VARCHAR(500));
