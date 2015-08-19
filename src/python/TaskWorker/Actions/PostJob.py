@@ -1322,8 +1322,8 @@ class PostJob():
                 self.logger.info("       -----> Succeeded to parse job ad file -----")
                 try:
                     shutil.copy2(job_ad_file_name, './finished_jobs/')
-                    job_ad_source = os.path.join('./finished_jobs/', str("history." + str(self.dag_jobid)))
-                    job_ad_symlink = '.'.join(['./finished_jobs/job', str(self.job_id), str(self.crab_retry)])
+                    job_ad_source = "history.%s" % (self.dag_jobid)
+                    job_ad_symlink = os.path.join(".", "finished_jobs", "job.%s.%s" % (self.job_id, self.crab_retry))
                     os.symlink(job_ad_source, job_ad_symlink)
                 except:
                     self.logger.info("       -----> Failed to copy job ad file. Continuing")
