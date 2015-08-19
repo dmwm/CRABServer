@@ -98,11 +98,10 @@ class RetryJob(object):
         for crab_retry in range(self.crab_retry):
             job_ad_file = os.path.join(".", "finished_jobs", "job.%d.%d" % (self.job_id, crab_retry))
             if os.path.isfile(job_ad_file):
-                with open(job_ad_file, "r") as fd:
-                    text_ad = fd.readlines()
                 try:
-                    ad = classad.parseOld(text_ad)
-                except SyntaxError as e:
+                    with open(job_ad_file) as fd:
+                        ad = classad.parseOld(fd)
+                except Exception:
                     msg = "Unable to parse classads from file %s. Continuing." % (job_ad_file)
                     self.logger.warning(msg)
                     continue
