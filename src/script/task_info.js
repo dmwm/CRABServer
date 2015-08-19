@@ -130,6 +130,10 @@ $(document).ready(function() {
         if (userWebDir === undefined || userWebDir === "") {
             errHandler(new TaskInfoUndefinedError());
             return;
+        } if (sandboxUrl === "") {
+            // In case proxy api returned empty or failed
+            errHandler(new SandboxNotLoadedError);
+            return;
         }
 
         var urlEnd = "/sandbox.tar.gz";
@@ -144,6 +148,8 @@ $(document).ready(function() {
                 $("#task-pset-paragraph").text(f.data);
             }
         }, null, handleTarGZCallbackErr);
+        $("#task-config-link").attr("href", userWebDir + urlEnd);
+        $("#task-pset-link").attr("href", userWebDir + urlEnd);
     }
 
     function querySandboxApi() {
@@ -152,8 +158,8 @@ $(document).ready(function() {
             .done(function(data) {
                 sandboxUrl = data.result[0];
 
-                if (sandboxUrl === undefined || sandboxUrl === "" || sandboxUrl == "None") {
-                    sandboxUrl = userWebDir;
+                if (sandboxUrl === undefined || sandboxUrl == "None") {
+                    sandboxUrl = "";
                 }
 
                 displayConfigAndPSet(handleConfigPSetErr);
@@ -162,7 +168,7 @@ $(document).ready(function() {
             .fail(function(xhr) {
                 // TODO process error?
                 console.log("error querying sandbox api");
-                sandboxUrl = userWebDir;
+                sandboxUrl = "";
                 displayConfigAndPSet(handleConfigPSetErr);
                 displayScriptExe(handleScriptExeErr);
             });
@@ -237,9 +243,16 @@ $(document).ready(function() {
         } else if (scriptExe === "None") {
             errHandler(new ScriptExeNotUsedError);
             return;
+        } else if (sandboxUrl === "") {
+            // In case proxy api returned empty or failed
+            errHandler(new SandboxNotLoadedError);
+            return;
         }
 
+
         var urlEnd = "/sandbox.tar.gz";
+
+
 
         var tgz = TarGZ.stream(sandboxUrl + urlEnd, function(f, h) {
             if (f.filename == scriptExe) {
@@ -247,6 +260,8 @@ $(document).ready(function() {
                 console.log(f.data);
             }
         }, null, handleScriptExeCallbackErr);
+        $("#script-exe-link").attr("href", userWebDir + urlEnd);
+
     }
 
     function displayMainPage(errHandler) {
@@ -324,7 +339,7 @@ $(document).ready(function() {
                     $("#upload-log-error-box").append("<span id=\"spaced-span\">" + headerArray[i].substr(0, colonIndex + 1) + "</span><span>" + headerArray[i].substr(colonIndex + 1) + "</span><br/>");
                 }
             } else {
-                $("#upload-log-error-box").css("display", "inherit").text("Network error");
+                $("#upload-log-error-box").css("display", "inherit").text("Couldn't load UploadLog, you can download it from the link below.");
             }
 
         }
@@ -362,7 +377,7 @@ $(document).ready(function() {
                     $("#taskworker-log-error-box").append("<span id=\"spaced-span\">" + headerArray[i].substr(0, colonIndex + 1) + "</span><span>" + headerArray[i].substr(colonIndex + 1) + "</span>\n");
                 }
             } else {
-                $("#taskworker-log-error-box").css("display", "inherit").text("Network error");
+                $("#taskworker-log-error-box").css("display", "inherit").text("Couldn't load TaskWorker log, you can download it from the link below.");
             }
         } else if (err instanceof TaskInfoUndefinedError) {
             $("#taskworker-log-error-box").empty().css("display", "inherit").text("Task info not loaded");
@@ -370,13 +385,23 @@ $(document).ready(function() {
     }
 
     function handleConfigPSetErr(err) {
-        $("#task-config-error-box").css("display", "inherit").text("Task Info not loaded, can't get config");
-        $("#task-pset-error-box").css("display", "inherit").text("Task Info not loaded, can't get PSet")
+        if (err instanceof SandboxNotLoadedError) {
+            $("#task-config-error-box").css("display", "inherit").text("Couldn't load config, please open sandbox.tar.gz " + 
+                "from the link below and look for it under debug/originalConfig.py");
+            $("#task-pset-error-box").css("display", "inherit").text("Couldn't load PSet, please open sandbox.tar.gz " + 
+                "from the link below and look for it under debug/originalPset.py");
+        } else if (err instanceof TaskInfoUndefinedError) {
+            $("#task-config-error-box").css("display", "inherit").text("Task Info not loaded, can't get config");
+            $("#task-pset-error-box").css("display", "inherit").text("Task Info not loaded, can't get PSet")
+        }
     }
 
     function handleScriptExeErr(err) {
         if (err instanceof ScriptExeNotUsedError) {
             $("#script-exe-error-box").css("display", "inherit").text("ScriptExe was not used");
+        } else if (err instanceof SandboxNotLoadedError) {
+            $("#script-exe-error-box").css("display", "inherit").text("Couldn't load ScriptExe, please open sandbox.tar.gz " +
+                "from the link below and look for " + scriptExe);
         } else if (err instanceof TaskInfoUndefinedError) {
             $("#script-exe-error-box").css("display", "inherit").text("Task info not loaded");
         }
@@ -421,6 +446,10 @@ $(document).ready(function() {
         this.name = "ScriptExeNotUsedError";
     }
 
+    function SandboxNotLoadedError() {
+        this.name = "SandboxNotLoadedError";
+    }
+
     function setUrls(dbVersion) {
         switch (dbVersion) {
             case "prod":
@@ -436,7 +465,7 @@ $(document).ready(function() {
             case "dev":
                 taskInfoUrl = "https://" + document.domain + "/crabserver/dev/task?subresource=search&workflow=";
                 taskStatusUrl = "https://" + document.domain + "/crabserver/dev/workflow?workflow=";
-                sandboxApiUrl = "https://" + document.domain + "/crabserver/dev/task?subresource=webdirprx&workflow="
+                sandboxApiUrl = "https://" + document.domain + "/rabserver/dev/task?subresource=webdirprx&workflow="
                 break;
             default:
                 break;
