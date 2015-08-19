@@ -99,7 +99,7 @@ class RetryJob(object):
             job_ad_file = os.path.join(".", "finished_jobs", "job.%d.%d" % (self.job_id, crab_retry))
             if os.path.isfile(job_ad_file):
                 with open(job_ad_file, "r") as fd:
-                    text_ad = fd.read_lines()
+                    text_ad = fd.readlines()
                 try:
                     ad = classad.parseOld(text_ad)
                 except SyntaxError as e:
