@@ -149,7 +149,7 @@ class DBSDataDiscovery(DataDiscovery):
         result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'], datasetfiles = filedetails, locations = locationsMap)
 
         if not result.result:
-            raise TaskWorkerException(("Cannot find any file inside the dataset. Please, check your dataset in DAS, %s.\n"
+            raise TaskWorkerException(("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, %s.\n"
                                       "Aborting submission. Resubmitting your task will not help.") %
                                       ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
                                       (self.dbsInstance, kwargs['task']['tm_input_dataset']))
