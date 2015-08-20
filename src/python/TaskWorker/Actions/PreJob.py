@@ -10,7 +10,7 @@ from ast import literal_eval
 
 from ApmonIf import ApmonIf
 
-from ServerUtilities import getWebdirForDb
+from ServerUtilities import getWebdirForDb, setDashboardLogs
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import CMSGroupMapper
@@ -142,7 +142,31 @@ class PreJob:
                   'broker': self.backend,
                   'bossId': str(self.job_id),
                   'localId' : '',
+                  'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (self.job_id, self.task_ad['CRAB_ReqName'].replace("_", ":")),
                  }
+
+        storage_rules = htcondor.param['CRAB_StorageRules']
+        userWebDir = getWebdirForDb(str(self.task_ad.get('CRAB_ReqName')), storage_rules)
+        
+        userWebDirPrx = ""
+        try:
+            with open('proxied_webdir') as fd:
+                proxied_webdir = fd.read()
+            userWebDirPrx = proxied_webdir
+        except IOError as e:
+            self.logger.error(("'I/O error(%s): %s', when looking for the proxied_webdir file. Might be normal"
+                         " if the schedd does not have a proxiedurl in the REST external config." % (e.errno, e.strerror))) 
+
+        self.logger.info("User web dir proxy: " + userWebDirPrx)
+        self.logger.info("web dir: " + userWebDir)
+
+        if userWebDirPrx:
+            setDashboardLogs(params, userWebDirPrx, self.job_id, crab_retry)
+        elif userWebDir:
+            setDashboardLogs(params, userWebDir, self.job_id, crab_retry)
+        else:
+            print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx."
+
         apmon = ApmonIf()
         self.logger.debug("Dashboard task info: %s" % str(params))
         apmon.sendToML(params)
@@ -316,20 +340,6 @@ class PreJob:
         ## Order retries before all other jobs in this task
         new_submit_text += '+PostJobPrio2 = %d\n' % crab_retry
 
-        ## This is used to send to dashbord the location of the logfiles
-        try:
-            storage_rules = htcondor.param['CRAB_StorageRules']
-        except:
-            storage_rules = "^/home/remoteGlidein,http://submit-5.t2.ucsd.edu/CSstoragePath"
-        new_submit_text += '+CRAB_UserWebDir = "%s"\n' % getWebdirForDb(str(self.task_ad.get('CRAB_ReqName')), storage_rules)
-
-        try:
-            with open('proxied_webdir') as fd:
-                proxied_webdir = fd.read()
-            new_submit_text += '+CRAB_UserWebDirPrx = "%s"\n' % proxied_webdir
-        except IOError as e:
-            self.logger.error(("'I/O error(%s): %s', when looking for the proxied_webdir file. Might be normal"
-                         " if the schedd does not have a proxiedurl in the REST external config." % (e.errno, e.strerror)))
         ## Add the site black- and whitelists and the DESIRED_SITES to the
         ## Job.<job_id>.submit content.
         new_submit_text = self.redo_sites(new_submit_text, crab_retry, use_resubmit_info)
@@ -512,8 +522,7 @@ class PreJob:
         sleep_time = int(self.dag_retry)*60
         if old_time:
             sleep_time = int(max(1, sleep_time - old_time))
-        if crab_retry != 0:
-            self.update_dashboard(crab_retry)
+        self.update_dashboard(crab_retry)
         msg = "Finished pre-job execution. Sleeping %s seconds..." % (sleep_time)
         self.logger.info(msg)
         os.close(fd_prejob_log)
