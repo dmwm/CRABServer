@@ -3,9 +3,13 @@ This module aims to contain the method specific to the REST interface.
 These are extensions which are not directly contained in WMCore.REST module.
 Collecting all here since aren't supposed to be many.
 """
+
+from ServerUtilities import USER_SANDBOX_EXCLUSIONS
+
 # WMCore dependecies here
 from WMCore.REST.Validation import _validate_one
 from WMCore.REST.Error import RESTError, InvalidParameter
+from WMCore.Services.UserFileCache.UserFileCache import calculateChecksum
 
 # external dependecies here
 import tarfile
@@ -126,10 +130,7 @@ def _check_tarfile(argname, val, hashkey):
 
     digest = None
     try:
-        tar = tarfile.open(fileobj=val.file, mode='r')
-        lsl = [(x.name, int(x.size), int(x.mtime), x.uname) for x in tar.getmembers()]
-        hasher = hashlib.sha256(str(lsl))
-        digest = hasher.hexdigest()
+        digest = calculateChecksum(val.file, exclude=USER_SANDBOX_EXCLUSIONS)
     except tarfile.ReadError:
         raise InvalidParameter('File is not a .tgz file.')
     if not digest or hashkey != digest:
