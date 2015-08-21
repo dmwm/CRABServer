@@ -2,6 +2,8 @@ $(document).ready(function() {
     // Task name that was entered by the user, is set on form submission
     var inputTaskName = "";
 
+    var DB_VERSIONS = ["prod", "preprod", "dev"];   
+
     // Task info is stored upon displaying it. Required for the tm_user_webdir value, which is needed
     // for loading the config and pset files.
     var taskInfo = "",
@@ -16,7 +18,7 @@ $(document).ready(function() {
         inputDataset = "";
 
     // In most cases the user won't want to override the default database
-    setDefaultDbVersionSelector();
+    // setDefaultDbVersionSelector();
 
     // If a parameter "task" exists, tries to load task info the same way a form submit loads it.
     processPageUrl();
@@ -35,19 +37,18 @@ $(document).ready(function() {
         taskInfo = "";
 
         // Change the URL so that it can be copied/pasted more easily
-        var temp = window.location.href.split("/ui/")[0] + "/ui/task/" + inputTaskName;
-        //window.location.href = temp;
+        var temp = window.location.href.split("/ui")[0] + "/ui/task/" + inputTaskName;
 
-        // TODO - is this hack ok?
+        // If default db versin is overriden, add it to url parameters
+        if (getDbVersionSelector() !== getDefaultDbVersion()) {
+            temp += "/dbver/" + getDbVersionSelector();
+        }
+
         window.history.pushState("", "", temp);
         console.log("test");
 
         clearPreviousContent();
-        displayTaskInfo(handleTaskInfoErr);
-        // loadContent();
-
-        // displayUploadLog();
-        //document.location.hash = "/task/" + inputTaskName;
+        displayTaskInfo(handleTaskInfoErr);;
     });
 
     // Has to be run after displayTaskInfo
@@ -76,7 +77,6 @@ $(document).ready(function() {
                 }
             }
         }
-
     }
 
     /**
@@ -487,23 +487,55 @@ $(document).ready(function() {
         }
     }
 
-    // Loads a task based on the name parameter the url contains.
-    function processPageUrl() {
-        var re = /\/task\/(.+)/;
+    function getDbVersionSelector() {
+        return $("#db-selector-box").val();
+    }
 
-        var result = re.exec(window.location.href);
-        if (result !== undefined && result !== null) {
-            inputTaskName = result[1];
-            console.log(inputTaskName);
-
-            // Set on pageload by setDefaultDnVersionSelector()
-            dbVersion = $("#db-selector-box").val();
-            setUrls(dbVersion);
-
-            $("#task-search-form-input").val(inputTaskName);
-            displayTaskInfo(handleTaskInfoErr);
-            clearPreviousContent();
+    function getDefaultDbVersion() {
+        switch (document.domain) {
+            case "cmsweb.cern.ch":
+                return "prod";
+            case "cmsweb-testbed.cern.ch":
+                return "preprod";
+            default:
+                return "dev";
         }
+    }
+
+    /**
+     * Processes a page url based on the parameters it contains.
+     * If a /task/<taskname> parameter is found, tries to load a task from the database
+     * If a /dbver/<dbversion> parameter is found, sets the specified db version to use in queries
+     */
+    function processPageUrl() {
+        var urlArray = window.location.href.split("\/");
+        console.log(urlArray);
+        var taskIndex = $.inArray("task", urlArray);
+
+        var dbVersionIndex = $.inArray("dbver", urlArray);
+
+        if (dbVersionIndex != -1 && urlArray.length > dbVersionIndex && urlArray[dbVersionIndex + 1] !== ""
+                && $.inArray(urlArray[dbVersionIndex + 1], DB_VERSIONS) !== -1) {
+            dbVersion = urlArray[dbVersionIndex + 1];
+            $("#db-selector-box").val(dbVersion);
+        } else {
+            setDefaultDbVersionSelector();
+            dbVersion = getDbVersionSelector();            
+        }
+
+        if (taskIndex != -1 && urlArray.length > taskIndex && urlArray[taskIndex + 1] !== "") {
+            inputTaskName = urlArray[taskIndex + 1];
+            $("#task-search-form-input").val(inputTaskName);
+
+            setUrls(dbVersion);
+            clearPreviousContent();
+            displayTaskInfo(handleTaskInfoErr);
+        } else {
+            dbVersion = getDbVersionSelector();
+            setUrls(dbVersion);
+        }   
+
+        
     }
 
     function loadOtherData() {
