@@ -889,11 +889,13 @@ class PostJob():
         PostJob constructor.
         """
         ## These attributes are set from arguments passed to the post-job (see
-        ## RunJobs.dag file).
-        self.dag_jobid           = None
-        self.job_return_code     = None
-        self.dag_retry           = None
-        self.max_retries         = None
+        ## RunJobs.dag file). The first four arguments correspond to special script
+        ## argument macros set by DAGMan. Documentation about these four arguments in
+        ## http://research.cs.wisc.edu/htcondor/manual/v8.2/2_10DAGMan_Applications.html
+        self.dag_jobid           = None ## $JOBID
+        self.job_return_code     = None ## $RETURN
+        self.dag_retry           = None ## $RETRY
+        self.max_retries         = None ## $MAX_RETRIES
         self.reqname             = None
         self.job_id              = None
         self.source_dir          = None
@@ -923,14 +925,21 @@ class PostJob():
         self.executed_site       = None
         self.job_failed          = None
         self.output_files_info   = []
-        ## Object we will use for making requests to the REST interface (uploading logs
-        ## archive and output files matadata).
+        ## Object we will use for making requests to the CRAB REST interface (uploading
+        ## logs archive and output files matadata).
         self.server              = None
         ## Path to the task web directory.
         self.logpath             = None
+        ## Time-stamps of when transfer documents were inserted into ASO database.
         self.aso_start_time      = None
         self.aso_start_timestamp = None
+        ## The return value of the retry-job.
         self.retryjob_retval     = None
+        ## The DAG cluster ID of the job to which this post-job is associated. If the
+        ## job hasn't run (because the pre-job return value was != 0), the DAG cluster
+        ## ID is -1 (and the $RETURN argument macro is -1004). This is just the first
+        ## number in self.dag_jobid.
+        self.dag_clusterid       = None
 
         ## Set a logger for the post-job. Use a memory handler by default. Once we know
         ## the name of the log file where all the logging should go, we will flush the
@@ -1040,21 +1049,23 @@ class PostJob():
                 os.symlink(os.path.abspath(os.path.join(".", self.postjob_log_file_name)), os.path.join(self.logpath, self.postjob_log_file_name))
             except OSError as ose:
                 if ose.errno != 17: #ignore the error if the symlink was already there
-                    msg = "Cannot create symbolic link to the postjob log.\n Details follow:"
+                    msg  = "Cannot create symbolic link to the postjob log."
+                    msg += "\nDetails follow:"
                     self.logger.exception(msg)
-                    self.logger.info("Continuing since this is not a critical error")
+                    self.logger.info("Continuing since this is not a critical error.")
             except Exception as e:
-                msg = "Cannot create symbolic link to the postjob log.\n Details follow:"
+                msg  = "Cannot create symbolic link to the postjob log."
+                msg += "\nDetails follow:"
                 self.logger.exception(msg)
-                self.logger.info("Continuing since this is not a critical error")
+                self.logger.info("Continuing since this is not a critical error.")
         else:
             msg  = "Post-job log file %s doesn't exist." % (self.postjob_log_file_name)
             msg += " Will not (re)create the symbolic link in the task web directory."
             self.logger.warning(msg)
         ## Copy the job's stdout file job_out.<job_id> to the schedd web directory,
         ## naming it job_out.<job_id>.<crab_retry>.txt.
-        ## NOTE: We now redirect stdout -> stderr; hence, we don't keep stderr in
-        ## the webdir.
+        ## NOTE: We now redirect stdout -> stderr; hence, we don't keep stderr in the
+        ## webdir.
         stdout = "job_out.%d" % (self.job_id)
         stdout_tmp = "job_out.tmp.%d" % (self.job_id)
         if os.path.exists(stdout):
@@ -1067,7 +1078,8 @@ class PostJob():
             fd_stdout = open(stdout_tmp, 'w')
             fd_stdout.truncate(0)
             fd_stdout.close()
-            os.chmod(fname, 0644) ## Copy the json job report file jobReport.json.<job_id> to
+            os.chmod(fname, 0644)
+        ## Copy the json job report file jobReport.json.<job_id> to
         ## job_fjr.<job_id>.<crab_retry>.json and create a symbolic link in the task web
         ## directory to the new job report file.
         if os.path.exists(G_JOB_REPORT_NAME):
@@ -1081,13 +1093,15 @@ class PostJob():
                 os.symlink(os.path.abspath(os.path.join(".", G_JOB_REPORT_NAME_NEW)), os.path.join(self.logpath, G_JOB_REPORT_NAME_NEW))
             except OSError as ose:
                 if ose.errno != 17: #ignore the error if the symlink was already there
-                    msg = "Cannot create symbolic link to the postjob log.\n Details follow:"
+                    msg  = "Cannot create symbolic link to the postjob log."
+                    msg += "\nDetails follow:"
                     self.logger.exception(msg)
-                    self.logger.info("Continuing since this is not a critical error")
+                    self.logger.info("Continuing since this is not a critical error.")
             except Exception as e:
-                msg = "Cannot create symbolic link to the jobreport json.\n Details follow:"
+                msg  = "Cannot create symbolic link to the jobreport json."
+                msg += "\nDetails follow:"
                 self.logger.exception(msg)
-                self.logger.info("Continuing since this is not a critical error")
+                self.logger.info("Continuing since this is not a critical error.")
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
     
@@ -1097,7 +1111,7 @@ class PostJob():
         """
         ## Put the arguments to PostJob into class variables.
         self.dag_jobid           = args[0] ## = ClusterId.ProcId
-        self.job_return_code     = args[1]
+        self.job_return_code     = int(args[1])
         self.dag_retry           = int(args[2])
         self.max_retries         = int(args[3])
         ## TODO: Why not get the request name from the job ad?
@@ -1113,7 +1127,12 @@ class PostJob():
         self.output_files_names  = []
         for i in xrange(9, len(args)):
             self.output_files_names.append(args[i])
-        self.job_return_code = int(self.job_return_code)
+
+        ## Get the DAG cluster ID. Needed to know whether the job has run or not.
+        try:
+            self.dag_clusterid = int(self.dag_jobid.split('.')[0])
+        except ValueError:
+            pass
 
         ## Get/update the post-job deferral number.
         global DEFER_NUM
@@ -1126,7 +1145,7 @@ class PostJob():
         self.create_taskwebdir()
 
         ## Get/update the crab retry.
-        self.crab_retry = self.calculate_crab_retry()
+        calculate_crab_retry_retval, self.crab_retry = self.calculate_crab_retry()
 
         ## Define the name of the post-job log file.
         if self.crab_retry is None:
@@ -1140,13 +1159,14 @@ class PostJob():
         ## Fail the post-job if an error occurred when getting/updating the crab retry.
         ## MM: I think the only way self.crab_retry could be None is through a bug or
         ## wrong schedd setup (e.g.: permissions).
-        if self.crab_retry is None:
+        if calculate_crab_retry_retval:
             msg  = "Error in getting or updating the crab retry count."
             msg += " Making this a fatal error."
             self.logger.error(msg)
+            if self.crab_retry is not None:
+                self.set_dashboard_state('FAILED')
             retval = JOB_RETURN_CODES.FATAL_ERROR 
             self.log_finish_msg(retval)
-            self.set_dashboard_state('FAILED')
             return retval
 
         ## Now that we have the job id and retry, we can set the job report file
@@ -1158,10 +1178,35 @@ class PostJob():
 
         if first_pj_execution():
             self.handle_webdir()
-            ## Print a message about what job retry number are we on.
-            msg  = "This is job retry number %d." % (self.dag_retry) #MarcoM: why not self.crab_retry ?
+            ## Print a message about what job retry number are we on. Here what matters is
+            ## the DAGMan retry count (i.e. dag_retry), which counts how many times the full
+            ## cycle [pre-job + job + post-job] has been run. OTOH the crab_retry includes
+            ## also post-job restarts from condor. If the post-job exits with return code 1,
+            ## DAGMan will resubmit the job unless the maximum allowed number of retries has
+            ## been reached already (DAGMan compares the DAGMan retry count against the
+            ## maximum allowed number of retries).
+            msg  = "This is job retry number %d." % (self.dag_retry)
             msg += " The maximum allowed number of retries is %d." % (self.max_retries)
             self.logger.info(msg)
+            ## Print a message about the DAG cluster ID of the job, which can be -1 when the
+            ## job has not been executed. The later can happen when a DAG node is restarted
+            ## after the job has finished, but before the post-job started. In such a case
+            ## the pre-job will detect that the 'pre' count in the retry_info dictionary is
+            ## greater than the 'post' count and, if the job log file exists already, it
+            ## will exit with return code 1 so that the job execution is skipped and the
+            ## post-job is executed. When the job is skipped because of a failure in the PRE
+            ## script, the job_return_code (i.e. the $RETURN argument macro) is -1004.
+            if self.dag_clusterid == -1:
+                msg = "Condor ID is -1 (and $RETURN argument macro is %d)," % (self.job_return_code)
+                if self.job_return_code == -1004:
+                    msg += " meaning that the job was (intentionally?) skipped."
+                else:
+                    msg += " meaning that the job has not run." #AndresT: Consider making this a fatal error.
+                msg += " Will continue with the post-job execution."
+                self.logger.warning(msg)
+            else:
+                msg = "This post-job corresponds to job with Condor ID %s." % (self.dag_clusterid)
+                self.logger.debug(msg)
 
         ## Call execute_internal().
         retval = JOB_RETURN_CODES.RECOVERABLE_ERROR
@@ -1242,8 +1287,10 @@ class PostJob():
         retry = RetryJob()
         if not os.environ.get('TEST_POSTJOB_DISABLE_RETRIES', False):
             self.logger.info("       -----> RetryJob log start -----")
-            self.retryjob_retval = retry.execute(self.logger, self.reqname, self.job_return_code, self.crab_retry, self.job_id, 
-                self.dag_jobid, self.job_ad, used_job_ad)
+            self.retryjob_retval = retry.execute(self.logger, self.reqname, self.job_return_code,
+                                                 self.dag_retry, self.crab_retry,
+                                                 self.job_id, self.dag_jobid,
+                                                 self.job_ad, used_job_ad)
             self.logger.info("       <----- RetryJob log finish ----")
         if self.retryjob_retval:
             if self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:
@@ -1307,11 +1354,14 @@ class PostJob():
         if not first_pj_execution():
             self.logger.setLevel(logging.WARNING)
         ## Parse the job ad and use it if possible.
-        ## If not, use main ROOT job ad and for job ad information use condor_q
+        ## If not, use the main ROOT job ad and for job ad information use condor_q.
         ## Please see: https://github.com/dmwm/CRABServer/issues/4618
         used_job_ad = False
-        condor_history_dir = os.environ.get("_CONDOR_PER_JOB_HISTORY_DIR", "")
-        job_ad_file_name = os.path.join(condor_history_dir, str("history." + str(self.dag_jobid)))
+        if self.dag_clusterid == -1:
+            job_ad_file_name = os.path.join(".", "finished_jobs", "job.%d.%d" % (self.job_id, self.dag_retry))
+        else:
+            condor_history_dir = os.environ.get("_CONDOR_PER_JOB_HISTORY_DIR", "")
+            job_ad_file_name = os.path.join(condor_history_dir, str("history." + str(self.dag_jobid)))
         counter = 0
         self.logger.info("====== Starting to parse job ad file %s." % (job_ad_file_name))
         while counter < 5:
@@ -1320,21 +1370,31 @@ class PostJob():
             if not parse_job_ad_exit:
                 used_job_ad = True
                 self.logger.info("       -----> Succeeded to parse job ad file -----")
-                try:
-                    shutil.copy2(job_ad_file_name, './finished_jobs/')
-                    job_ad_source = "history.%s" % (self.dag_jobid)
-                    job_ad_symlink = os.path.join(".", "finished_jobs", "job.%s.%s" % (self.job_id, self.crab_retry))
-                    os.symlink(job_ad_source, job_ad_symlink)
-                except:
-                    self.logger.info("       -----> Failed to copy job ad file. Continuing")
-                    pass
+                if self.dag_clusterid != -1:
+                    try:
+                        shutil.copy2(job_ad_file_name, './finished_jobs/')
+                        job_ad_source = "history.%s" % (self.dag_jobid)
+                        job_ad_symlink = os.path.join(".", "finished_jobs", "job.%d.%d" % (self.job_id, self.dag_retry))
+                        os.symlink(job_ad_source, job_ad_symlink)
+                        self.logger.info("       -----> Succeeded to copy job ad file.")
+                    except:
+                        self.logger.info("       -----> Failed to copy job ad file. Continuing")
+                        pass
                 self.logger.info("====== Finished to parse job ad.")
                 break
             counter += 1
             self.logger.info("       -----> Failed to parse job ad file -----")
             time.sleep(5)
         if not used_job_ad:
-            ## Parse the main taks job ad and use it
+            ## Parse the main ROOT job ad. This job ad is created when the main ROOT job is
+            ## submitted to DAGMan; and is never modified. Of course that means that this
+            ## job ad doesn't have information of parameters that change at a per job or per
+            ## job retry basis. For these parameters one has to use the job ads. Note that
+            ## the main ROOT job ad is owned by user 'condor' and therefore it can not be
+            ## updated (by user 'cmsxxxx'), as we would like to do in e.g. AdjustSites.py to
+            ## add some global parameters in it. Fortunately, here in the post-job we need
+            ## only (actually almost only) global parameters that are available in the main
+            ## ROOT job ad, so we can fallback to read this main ROOT job ad here.
             job_ad_file_name = os.environ.get("_CONDOR_JOB_AD", ".job.ad")
             self.logger.info("====== Starting to parse ROOT job ad file %s." % (job_ad_file_name))
             if self.parse_job_ad(job_ad_file_name):
@@ -1933,7 +1993,7 @@ class PostJob():
         if 'CRAB_ASOTimeout' in self.job_ad and int(self.job_ad['CRAB_ASOTimeout']) > 0:
             self.retry_timeout = int(self.job_ad['CRAB_ASOTimeout'])
         else:
-            ## If CRAB_ASOTimeout was not defined in the job ad, use a default of 6 hours
+            ## If CRAB_ASOTimeout was not defined in the job ad, use a default of 6 hours.
             self.retry_timeout = 6 * 3600
         return 0
 
@@ -2188,15 +2248,14 @@ class PostJob():
                 msg += " Failed to load file %s." % (fname)
                 msg += "\nDetails follow:"
                 self.logger.exception(msg)
-                return None
+                return 1, None
         else:
             retry_info = {'pre': 0, 'post': 0}
         if 'pre' not in retry_info or 'post' not in retry_info:
             msg  = "Unable to calculate post-job retry count."
-            msg += " File %s doesn't contain the expected information."
-            msg = msg % (fname)
+            msg += " File %s doesn't contain the expected information." % (fname)
             self.logger.warning(msg)
-            return None
+            return 1, None
         if first_pj_execution():
             crab_retry = retry_info['post']
             retry_info['post'] += 1
@@ -2205,14 +2264,13 @@ class PostJob():
                     json.dump(retry_info, fd)
                 os.rename(fname + '.tmp', fname)
             except Exception as e:
-                msg = "Failed to update file %s with increased post-job count by +1."
+                msg  = "Failed to update file %s with increased post-job count by +1." % (fname)
                 msg += "\nDetails follow:"
-                msg = msg % (fname)
                 self.logger.exception(msg)
-                return None
+                return 1, crab_retry
         else:
             crab_retry = retry_info['post'] - 1
-        return crab_retry
+        return 0, crab_retry
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
