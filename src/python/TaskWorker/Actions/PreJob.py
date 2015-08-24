@@ -10,7 +10,7 @@ from ast import literal_eval
 
 from ApmonIf import ApmonIf
 
-from ServerUtilities import getWebdirForDb
+from ServerUtilities import getWebdirForDb, insertJobIdSid
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import CMSGroupMapper
@@ -137,12 +137,11 @@ class PreJob:
                   'datasetFull': self.task_ad['CRAB_InputData'],
                   'resubmitter': self.task_ad['CRAB_UserHN'],
                   'exe': 'cmsRun',
-                  'jobId': ("%d_https://glidein.cern.ch/%d/%s_%d" % (self.job_id, self.job_id, self.task_ad['CRAB_ReqName'].replace("_", ":"), crab_retry)),
-                  'sid': "https://glidein.cern.ch/%d/%s" % (self.job_id, self.task_ad['CRAB_ReqName'].replace("_", ":")),
                   'broker': self.backend,
                   'bossId': str(self.job_id),
                   'localId' : '',
                  }
+        insertJobIdSid(params, self.job_id, self.task_ad['CRAB_ReqName'], crab_retry)
         apmon = ApmonIf()
         self.logger.debug("Dashboard task info: %s" % str(params))
         apmon.sendToML(params)
