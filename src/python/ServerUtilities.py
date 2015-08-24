@@ -77,6 +77,13 @@ def setDashboardLogs(params, webdir, jobid, retry):
         log_files[i] = log_file_name
     params['StatusLogFile'] = ",".join(log_files)
 
+def insertJobIdSid(jinfo, jobid, workflow, jobretry):
+    """
+    Modifies passed dictionary (jinfo) to contain jobId and sid keys and values.
+    Used when creating dashboard reports.
+    """
+    jinfo['jobId'] = "%s_https://glidein.cern.ch/%s/%s_%s" % (jobid, jobid, workflow.replace("_", ":"), jobretry)
+    jinfo['sid'] = "https://glidein.cern.ch/%s%s" % (jobid, workflow.replace("_", ":"))
 
 def getWebdirForDb(reqname, storage_rules):
     path = os.path.expanduser("~/%s" % reqname)

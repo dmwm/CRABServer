@@ -14,6 +14,7 @@ from ServerUtilities import FEEDBACKMAIL
 import TaskWorker.WorkerExceptions
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
+from ServerUtilities import insertJobIdSid
 
 import HTCondorLocator
 import HTCondorUtils
@@ -84,12 +85,11 @@ class DagmanKiller(TaskAction):
                     continue
                 jobid = str(ad.eval('CRAB_Id'))
                 jobretry = str(ad.eval('CRAB_Retry'))
-                jinfo = {'jobId': ("%s_https://glidein.cern.ch/%s/%s_%s" % (jobid, jobid, self.workflow.replace("_", ":"), jobretry)),
-                         'sid': "https://glidein.cern.ch/%s%s" % (jobid, self.workflow.replace("_", ":")),
-                         'broker': hostname,
+                jinfo = {'broker': hostname,
                          'bossId': jobid,
                          'StatusValue' : 'killed',
                         }
+                insertJobIdSid(jinfo, jobid, self.workflow, jobretry)
                 self.logger.info("Sending kill info to Dashboard: %s" % str(jinfo))
                 apmon.sendToML(jinfo)
         except:
@@ -151,12 +151,11 @@ class DagmanKiller(TaskAction):
             jobid = str(jobid)
             jobretry = str(jobretry)
             if jobid and jobretry != None:
-                jinfo = {'jobId': ("%s_https://glidein.cern.ch/%s/%s_%s" % (jobid, jobid, self.workflow.replace("_", ":"), jobretry)),
-                         'sid': "https://glidein.cern.ch/%s%s" % (jobid, self.workflow.replace("_", ":")),
-                         'broker': hostname,
+                jinfo = {'broker': hostname,
                          'bossId': jobid,
                          'StatusValue' : 'killed',
                         }
+                insertJobIdSid(jinfo, jobid, self.workflow, jobretry)
                 self.logger.info("Sending kill info to Dashboard: %s" % str(jinfo))
                 apmon.sendToML(jinfo)
             try:
