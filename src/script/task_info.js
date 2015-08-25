@@ -127,10 +127,14 @@ $(document).ready(function() {
      */
     function displayConfigAndPSet(errHandler) {
         // var userWebDir = "";
-        if (userWebDir === undefined || userWebDir === "") {
+        if (userWebDir === "") {
             errHandler(new TaskInfoUndefinedError());
             return;
-        } if (sandboxUrl === "") {
+        } else if (userWebDir === "None") {
+            // If user webdir wasn't created at all
+            errHandler(new UserWebDirUndefinedError());
+            return;
+        } else if (sandboxUrl === "") {
             // In case proxy api returned empty or failed
             errHandler(new SandboxNotLoadedError);
             return;
@@ -243,6 +247,10 @@ $(document).ready(function() {
         } else if (scriptExe === "None") {
             errHandler(new ScriptExeNotUsedError);
             return;
+        } else if (userWebDir === "None") {
+            // If user webdir wasn't created at all
+            errHandler(new UserWebDirUndefinedError());
+            return;
         } else if (sandboxUrl === "") {
             // In case proxy api returned empty or failed
             errHandler(new SandboxNotLoadedError);
@@ -265,7 +273,7 @@ $(document).ready(function() {
     }
 
     function displayMainPage(errHandler) {
-        if (userWebDir !== "" && userWebDir !== undefined && inputTaskName !== "" && inputTaskName !== undefined) {
+        if (userWebDir !== "" && inputTaskName !== "" && inputTaskName !== undefined) {
 
             var dashboardUrl = "http://dashb-cms-job.cern.ch/dashboard/templates/" + "task-analysis/#user=default&refresh=0&table=Jobs&p=1&records=25" + "&activemenu=2&status=&site=&tid=" + inputTaskName;
 
@@ -393,6 +401,9 @@ $(document).ready(function() {
         } else if (err instanceof TaskInfoUndefinedError) {
             $("#task-config-error-box").css("display", "inherit").text("Task Info not loaded, can't get config");
             $("#task-pset-error-box").css("display", "inherit").text("Task Info not loaded, can't get PSet")
+        } else if (err instanceof UserWebDirUndefinedError) {
+            $("#task-config-error-box").css("display", "inherit").text("Task webdir is not available (maybe the task was not submitted to the schedd)");
+            $("#task-pset-error-box").css("display", "inherit").text("Task webdir is not available (maybe the task was not submitted to the schedd)")
         }
     }
 
@@ -404,6 +415,8 @@ $(document).ready(function() {
                 "from the link below and look for " + scriptExe);
         } else if (err instanceof TaskInfoUndefinedError) {
             $("#script-exe-error-box").css("display", "inherit").text("Task info not loaded");
+        } else if (err instanceof UserWebDirUndefinedError) {
+            $("#script-exe-error-box").css("display", "inherit").text("Task webdir is not available (maybe the task was not submitted to the schedd)");
         }
     }
 
@@ -448,6 +461,10 @@ $(document).ready(function() {
 
     function SandboxNotLoadedError() {
         this.name = "SandboxNotLoadedError";
+    }
+
+    function UserWebDirUndefinedError() {
+        this.name = "UserWebDirUndefinedError";
     }
 
     function setUrls(dbVersion) {
