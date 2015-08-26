@@ -153,7 +153,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.logger.error(hte.headers)
             self.logger.warning("Unable to contact cmsweb. Will use only on schedulers which was chosen by CRAB3 frontend.")
         self.logger.info("Good schedulers list got from crabserver: %s " % goodSchedulers)
-        submissionFailure = False
         if kwargs['task']['tm_schedd'] not in goodSchedulers:
             self.logger.info("Scheduler which is chosen is not in crabserver output %s." % goodSchedulers)
             self.logger.info("No late binding of schedd. Will use %s for submission." % kwargs['task']['tm_schedd'])
@@ -202,8 +201,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
             retryIssues = []
             for retry in range(self.config.TaskWorker.max_retry + 1): #max_retry can be 0
                 self.logger.debug("Trying to submit task %s %s time." % (kwargs['task']['tm_taskname'], str(retry)))
-                submissionFailure = False
-                execInt = ""
                 try:
                     execInt = self.executeInternal(*args, **kwargs)
                     return execInt
@@ -214,11 +211,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
                         self.logger.error("Will retry in %s seconds." % str(self.config.TaskWorker.retry_interval[retry]))
                         time.sleep(self.config.TaskWorker.retry_interval[retry])
-                    submissionFailure = True
-            if submissionFailure:
-                ## All the submission retries to the current schedd have failed. Record the
-                ## failures.
-                retryIssuesBySchedd[schedd] = retryIssues
+            ## All the submission retries to the current schedd have failed. Record the
+            ## failures.
+            retryIssuesBySchedd[schedd] = retryIssues
 
         msg = "The CRAB3 server backend could not submit your jobs to the Grid schedulers. This could be a temporary glitch, please retry again later and contact"+\
               " the experts if the error persist. The submission was retried %s times on %s schedulers, these are the failures: %s" \
