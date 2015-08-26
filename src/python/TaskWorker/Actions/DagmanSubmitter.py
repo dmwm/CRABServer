@@ -15,6 +15,7 @@ import CMSGroupMapper
 import HTCondorLocator
 
 from httplib import HTTPException
+from ServerUtilities import FEEDBACKMAIL
 import TaskWorker.Actions.TaskAction as TaskAction
 import TaskWorker.DataObjects.Result as Result
 from TaskWorker.Actions.DagmanCreator import CRAB_HEADERS
@@ -214,10 +215,12 @@ class DagmanSubmitter(TaskAction.TaskAction):
             ## All the submission retries to the current schedd have failed. Record the
             ## failures.
             retryIssuesBySchedd[schedd] = retryIssues
-
-        msg = "The CRAB3 server backend could not submit your jobs to the Grid schedulers. This could be a temporary glitch, please retry again later and contact"+\
-              " the experts if the error persist. The submission was retried %s times on %s schedulers, these are the failures: %s" \
-               % (sum(map(len, retryIssuesBySchedd.values())), len(retryIssuesBySchedd), str(retryIssuesBySchedd))
+        ## All the submission retries to all possible schedds have failed.
+        msg  = "The CRAB server backend was not able to submit the jobs to the Grid schedulers."
+        msg += " This could be a temporary glitch. Please try again later."
+        msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+        msg += " The submission was retried %s times on %s schedulers." % (sum(map(len, retryIssuesBySchedd.values())), len(retryIssuesBySchedd))
+        msg += " These are the failures per Grid scheduler: %s" % (str(retryIssuesBySchedd))
         self.logger.error(msg)
         raise TaskWorkerException(msg)
 
@@ -241,8 +244,11 @@ class DagmanSubmitter(TaskAction.TaskAction):
             schedd, address = loc.getScheddObjNew(task['tm_schedd'])
             self.logger.debug("Got schedd obj for %s " % task['tm_schedd'])
         except Exception as exp:
-            msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
-            self.logger.exception(msg)
+            msg  = "The CRAB server backend was not able to contact the Grid scheduler."
+            msg += " Please try again later."
+            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+            msg += " Message from the scheduler: %s" % (str(exp))
+            self.logger.exception("%s: %s" % (workflow, msg))
             raise TaskWorkerException(msg)
 
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
@@ -313,8 +319,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 schedd, address = loc.getScheddObjNew(task['tm_schedd'])
                 self.logger.debug("Got schedd object")
             except Exception as exp:
-                msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
-                self.logger.exception(msg)
+                msg  = "The CRAB server backend was not able to contact the Grid scheduler."
+                msg += " Please try again later."
+                msg += " Message from the scheduler: %s" % (str(exp))
+                self.logger.exception("%s: %s" % (workflow, msg))
                 raise TaskWorkerException(msg)
 
             #try to gsissh in order to create the home directory (and check if we can connect to the schedd)
