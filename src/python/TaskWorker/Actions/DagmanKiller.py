@@ -212,7 +212,9 @@ class DagmanKiller(TaskAction):
 
 
     def execute(self, *args, **kwargs):
-
+        """
+        The execute method of the DagmanKiller class.
+        """
         apmon = ApmonIf.ApmonIf()
         try:
             self.executeInternal(apmon, *args, **kwargs)
