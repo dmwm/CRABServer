@@ -48,13 +48,18 @@ class DagmanResubmitter(TaskAction.TaskAction):
             raise TaskWorkerException(msg)
 
         # Check memory and walltime
-        if task['resubmit_maxjobruntime'] != None and task['resubmit_maxjobruntime'] > 2800:
-            msg = "task requests %s minutes of walltime but only %s is guaranteed to be available. Jobs may not find a site where to run. CRAB3 have changed this value to %s minutes" % (task['resubmit_maxjobruntime'], '2800', '2800')
+        stdmaxjobruntime = 2800
+        stdmaxmemory = 2500
+        if task['resubmit_maxjobruntime'] is not None and task['resubmit_maxjobruntime'] > stdmaxjobruntime:
+            msg  = "Task requests %s minutes of walltime, but only %s are guaranteed to be available." % (task['resubmit_maxjobruntime'], stdmaxjobruntime)
+            msg += " Jobs may not find a site where to run."
+            msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
             self.logger.warning(msg)
-            task['resubmit_maxjobruntime'] = '2800'
+            task['resubmit_maxjobruntime'] = str(stdmaxjobruntime)
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
-        if task['resubmit_maxmemory'] != None and task['resubmit_maxmemory'] > 2500:
-            msg = "task requests %s memory but only %s is guaranteed to be available. Jobs may not find a site where to run and stay idle forever" % (task['resubmit_maxmemory'], '2500')
+        if task['resubmit_maxmemory'] is not None and task['resubmit_maxmemory'] > stdmaxmemory:
+            msg  = "Task requests %s bytes of memory, but only %s are guaranteed to be available." % (task['resubmit_maxmemory'], stdmaxmemory)
+            msg += " Jobs may not find a site where to run and stay idle forever."
             self.logger.warning(msg)
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
