@@ -29,11 +29,11 @@ class DagmanKiller(TaskAction):
     We do not actually "kill" the task off, but put the DAG on hold.
     """
 
-    def executeInternal(self, apmon, *args, **kw):
+    def executeInternal(self, apmon, *args, **kwargs):
         #Marco: I guess these value errors only happens for development instances
-        if 'task' not in kw:
+        if 'task' not in kwargs:
             raise ValueError("No task specified.")
-        self.task = kw['task']
+        self.task = kwargs['task']
         if 'tm_taskname' not in self.task:
             raise ValueError("No taskname specified")
         self.workflow = self.task['tm_taskname']
@@ -211,17 +211,17 @@ class DagmanKiller(TaskAction):
                                       "Error reason %s" % results)
 
 
-    def execute(self, *args, **kw):
+    def execute(self, *args, **kwargs):
 
         apmon = ApmonIf.ApmonIf()
         try:
-            self.executeInternal(apmon, *args, **kw)
+            self.executeInternal(apmon, *args, **kwargs)
             #XXX what's the difference of outting this here or in the else?
-            if kw['task']['kill_all']:
-                configreq = {'workflow': kw['task']['tm_taskname'], 'status': "KILLED"}
+            if kwargs['task']['kill_all']:
+                configreq = {'workflow': kwargs['task']['tm_taskname'], 'status': "KILLED"}
                 self.server.post(self.resturi, data = urllib.urlencode(configreq))
             else:
-                configreq = {'workflow': kw['task']['tm_taskname'], 'status': "SUBMITTED"}
+                configreq = {'workflow': kwargs['task']['tm_taskname'], 'status': "SUBMITTED"}
                 self.server.post(self.resturi, data = urllib.urlencode(configreq))
         finally:
             apmon.free()
