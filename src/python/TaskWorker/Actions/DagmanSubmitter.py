@@ -144,7 +144,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
     def execute(self, *args, **kwargs):
         userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry=2, logger=self.logger)
-        retryIssues = []
         retryIssuesBySchedd = {}
         goodSchedulers = []
         try:
@@ -198,8 +197,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
                 self.logger.warning(msg)
                 time.sleep(20)
-                retryIssuesBySchedd.setdefault(schedd, []).append(msg)
+                retryIssuesBySchedd[schedd] = [msg]
                 continue
+            retryIssues = []
             for retry in range(self.config.TaskWorker.max_retry + 1): #max_retry can be 0
                 self.logger.debug("Trying to submit task %s %s time." % (kwargs['task']['tm_taskname'], str(retry)))
                 submissionFailure = False
@@ -216,12 +216,13 @@ class DagmanSubmitter(TaskAction.TaskAction):
                         time.sleep(self.config.TaskWorker.retry_interval[retry])
                     submissionFailure = True
             if submissionFailure:
-                msg = "Failed to submit task %s to %s with errors %s" % (kwargs['task']['tm_taskname'], schedd, retryIssues)
+                ## All the submission retries to the current schedd have failed. Record the
+                ## failures.
                 retryIssuesBySchedd[schedd] = retryIssues
 
         msg = "The CRAB3 server backend could not submit your jobs to the Grid schedulers. This could be a temporary glitch, please retry again later and contact"+\
               " the experts if the error persist. The submission was retried %s times on %s schedulers, these are the failures: %s" \
-               % (len(retryIssues), len(retryIssuesBySchedd), str(retryIssuesBySchedd))
+               % (sum(map(len, retryIssuesBySchedd.values())), len(retryIssuesBySchedd), str(retryIssuesBySchedd))
         self.logger.error(msg)
         raise TaskWorkerException(msg)
 
