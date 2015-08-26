@@ -10,6 +10,7 @@ import htcondor
 
 from httplib import HTTPException
 
+from ServerUtilities import FEEDBACKMAIL
 import TaskWorker.WorkerExceptions
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
@@ -24,7 +25,6 @@ import ApmonIf
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 
 class DagmanKiller(TaskAction):
-
     """
     Given a task name, kill the corresponding task in HTCondor.
 
@@ -63,8 +63,11 @@ class DagmanKiller(TaskAction):
         try:
             self.schedd, address = loc.getScheddObjNew(self.task['tm_schedd'])
         except Exception as exp:
-            msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (self.workflow, str(exp))
-            self.logger.exception(msg)
+            msg  = "The CRAB server backend was not able to contact the Grid scheduler."
+            msg += " Please try again later."
+            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+            msg += " Message from the scheduler: %s" % (str(exp))
+            self.logger.exception("%s: %s" % (self.workflow, msg))
             raise TaskWorkerException(msg)
 
         ad = classad.ClassAd()
@@ -175,9 +178,12 @@ class DagmanKiller(TaskAction):
                 self.schedd.act(htcondor.JobAction.Remove, const)
         results = rpipe.read()
         if results != "OK":
-            raise TaskWorkerException("The CRAB3 server backend could not kill jobs [%s]. because the Grid scheduler answered with an error\n" % ", ".join(ids)+\
-                                      "This is probably a temporary glitch, please try it again and contact an expert if the error persist\n"+\
-                                      "Error reason %s" % results)
+            msg  = "The CRAB server backend was not able to kill these jobs (%s)," % (", ".join(ids))
+            msg += " because the Grid scheduler answered with an error."
+            msg += " This is probably a temporary glitch. Please try again later."
+            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+            msg += " Error reason: %s" % (results)
+            raise TaskWorkerException(msg)
 
 
     def killAll(self):
@@ -208,9 +214,12 @@ class DagmanKiller(TaskAction):
                     self.schedd.act(htcondor.JobAction.Remove, jobConst)
         results = rpipe.read()
         if results != "OK":
-            raise TaskWorkerException("The CRAB3 server backend could not kill the task because the Grid scheduler answered with an error\n"\
-                                      "This is probably a temporary glitch, please try it again and contact an expert if the error persist\n"+\
-                                      "Error reason %s" % results)
+            msg  = "The CRAB server backend was not able to kill the task,"
+            msg += " because the Grid scheduler answered with an error."
+            msg += " This is probably a temporary glitch. Please try again later."
+            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+            msg += " Error reason: %s" % (results)
+            raise TaskWorkerException(msg)
 
 
     def execute(self, *args, **kwargs):
