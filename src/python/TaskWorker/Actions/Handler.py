@@ -30,6 +30,7 @@ from TaskWorker.WorkerExceptions import WorkerHandlerException, StopHandler, Tas
 
 DEFAULT_BACKEND = 'panda'
 
+
 class TaskHandler(object):
     """Handling the set of operations to be performed."""
 
@@ -122,6 +123,7 @@ class TaskHandler(object):
 
         return nextinput
 
+
 def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     """Performs the injection of a new task
 
@@ -144,7 +146,6 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     elif task['tm_job_type'] == 'PrivateMC':
         handler.addWork(MakeFakeFileSet(config=config, server=server, resturi=resturi, procnum=procnum))
     handler.addWork(Splitter(config=config, server=server, resturi=resturi, procnum=procnum))
-
     def glidein(config):
         """Performs the injection of a new task into Glidein
         :arg WMCore.Configuration config: input configuration"""
@@ -153,15 +154,14 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
             handler.addWork(DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum))
         else:
             handler.addWork(DagmanSubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
-
     def panda(config):
         """Performs the injection into PanDA of a new task
         :arg WMCore.Configuration config: input configuration"""
         handler.addWork(PanDABrokerage(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
         handler.addWork(PanDAInjection(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
-
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
-    return handler.actionWork(args)
+    return handler.actionWork(args, kwargs)
+
 
 def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
     """Performs the re-injection of failed jobs
@@ -180,7 +180,6 @@ def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
         """Performs the re-injection into Glidein
         :arg WMCore.Configuration config: input configuration"""
         handler.addWork(DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
-
     def panda(config):
         """Performs the re-injection into PanDA
         :arg WMCore.Configuration config: input configuration"""
@@ -188,9 +187,9 @@ def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
         handler.addWork(PanDASpecs2Jobs(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
         handler.addWork(PanDABrokerage(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
         handler.addWork(PanDAInjection(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
-
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
-    return handler.actionWork(args)
+    return handler.actionWork(args, kwargs)
+
 
 def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
     """Asks to kill jobs
@@ -209,14 +208,13 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
         """Performs kill of jobs sent through Glidein
         :arg WMCore.Configuration config: input configuration"""
         handler.addWork(DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum))
-
     def panda(config):
         """Performs the re-injection into PanDA
         :arg WMCore.Configuration config: input configuration"""
         handler.addWork(PanDAKill(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
-
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)
+
 
 if __name__ == '__main__':
     print "New task"
