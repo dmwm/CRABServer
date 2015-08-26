@@ -313,7 +313,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 schedd, address = loc.getScheddObjNew(task['tm_schedd'])
                 self.logger.debug("Got schedd object")
             except Exception as exp:
-                msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (self.workflow, str(exp))
+                msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
                 self.logger.exception(msg)
                 raise TaskWorkerException(msg)
 
