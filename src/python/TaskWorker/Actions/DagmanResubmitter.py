@@ -7,6 +7,7 @@ import htcondor
 import HTCondorLocator
 import HTCondorUtils
 
+from ServerUtilities import FEEDBACKMAIL
 import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
@@ -43,8 +44,11 @@ class DagmanResubmitter(TaskAction.TaskAction):
         try:
             schedd, address = loc.getScheddObjNew(task['tm_schedd'])
         except Exception as exp:
-            msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
-            self.logger.exception(msg)
+            msg  = "The CRAB server backend was not able to contact the Grid scheduler."
+            msg += " Please try again later."
+            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+            msg += " Message from the scheduler: %s" % (str(exp))
+            self.logger.exception("%s: %s" % (workflow, msg))
             raise TaskWorkerException(msg)
 
         # Check memory and walltime
@@ -130,9 +134,12 @@ class DagmanResubmitter(TaskAction.TaskAction):
 
         results = rpipe.read()
         if results != "OK":
-            raise TaskWorkerException("The CRAB3 server backend could not resubmit your task because the Grid scheduler answered with an error.\n"+\
-                                      "This is probably a temporary glitch, please try it again and contact an expert if the error persist.\n"+\
-                                      "Error reason: %s" % (results))
+            msg  = "The CRAB server backend was not able to resubmit the task,"
+            msg += " because the Grid scheduler answered with an error."
+            msg += " This is probably a temporary glitch. Please try again later."
+            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+            msg += " Error reason: %s" % (results)
+            raise TaskWorkerException(msg)
 
 
     def execute(self, *args, **kwargs):
@@ -148,8 +155,11 @@ class DagmanResubmitter(TaskAction.TaskAction):
             self.server.post(self.resturi, data = urllib.urlencode(configreq))
         except HTTPException as hte:
             self.logger.error(hte.headers)
-            raise TaskWorkerException("The CRAB3 server backend successfully resubmitted your task to the Grid scheduler, but was unable to update\n"+\
-                                      "the task status from QUEUED to SUBMITTED. This should be a harmless (temporary) error.\n")
+            msg  = "The CRAB server successfully resubmitted the task to the Grid scheduler,"
+            msg += " but was unable to update the task status to %s in the database." % (configreq['status'])
+            msg += " This should be a harmless (temporary) error."
+            raise TaskWorkerException(msg)
+
 
 if __name__ == "__main__":
     import os
