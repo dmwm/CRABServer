@@ -19,7 +19,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
     Internally, we simply release the failed DAG.
     """
 
-    def execute_internal(self, *args, **kwargs):
+    def executeInternal(self, *args, **kwargs):
         #Marco: I guess these value errors only happens for development instances
         if 'task' not in kwargs:
             raise ValueError("No task specified.")
@@ -134,7 +134,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
         """
         The execute method of the DagmanResubmitter class.
         """
-        self.execute_internal(*args, **kwargs)
+        self.executeInternal(*args, **kwargs)
         configreq = {'workflow': kwargs['task']['tm_taskname'],
                      'status': "SUBMITTED",
                      'jobset': "-1",
