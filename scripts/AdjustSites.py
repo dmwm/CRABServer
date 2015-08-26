@@ -275,7 +275,7 @@ def updateWebDir(ad):
 
 def saveProxiedWebdir(ad):
     """ The function queries the REST interface to get the proxied webdir and sets
-        a classad so that we report this to the dashboard isntead of the regular URL
+        a classad so that we report this to the dashboard instead of the regular URL
 
         The proxied_url (if exist) is written to a file named proxied_webdir so that
         prejobs can read it and report to dashboard. If the url does not exist
@@ -341,8 +341,7 @@ def main():
 
     saveProxiedWebdir(ad)
 
-    printLog(("Proxied webdir saved. Clearing the automatic blacklist and handling RunJobs.dag.nodes.log"
-             "for resubmissions"))
+    printLog("Proxied webdir saved. Clearing the automatic blacklist and handling RunJobs.dag.nodes.log for resubmissions")
 
     clearAutomaticBlacklist()
 
