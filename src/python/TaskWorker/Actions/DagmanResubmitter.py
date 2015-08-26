@@ -19,11 +19,11 @@ class DagmanResubmitter(TaskAction.TaskAction):
     Internally, we simply release the failed DAG.
     """
 
-    def execute_internal(self, *args, **kw):
+    def execute_internal(self, *args, **kwargs):
         #Marco: I guess these value errors only happens for development instances
-        if 'task' not in kw:
+        if 'task' not in kwargs:
             raise ValueError("No task specified.")
-        task = kw['task']
+        task = kwargs['task']
         if 'tm_taskname' not in task:
             raise ValueError("No taskname specified.")
         workflow = str(task['tm_taskname'])
@@ -52,11 +52,11 @@ class DagmanResubmitter(TaskAction.TaskAction):
             msg = "task requests %s minutes of walltime but only %s is guaranteed to be available. Jobs may not find a site where to run. CRAB3 have changed this value to %s minutes" % (task['resubmit_maxjobruntime'], '2800', '2800')
             self.logger.warning(msg)
             task['resubmit_maxjobruntime'] = '2800'
-            self.uploadWarning(msg, kw['task']['user_proxy'], kw['task']['tm_taskname'])
+            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
         if task['resubmit_maxmemory'] != None and task['resubmit_maxmemory'] > 2500:
             msg = "task requests %s memory but only %s is guaranteed to be available. Jobs may not find a site where to run and stay idle forever" % (task['resubmit_maxmemory'], '2500')
             self.logger.warning(msg)
-            self.uploadWarning(msg, kw['task']['user_proxy'], kw['task']['tm_taskname'])
+            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
         # Release the DAG
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(workflow)
