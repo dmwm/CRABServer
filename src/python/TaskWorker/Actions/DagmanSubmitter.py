@@ -171,13 +171,18 @@ class DagmanSubmitter(TaskAction.TaskAction):
         #Check memory and walltime and if user requires too much:
         # upload warning back to crabserver
         # change walltime to max 47h Issue: #4742
-        if kwargs['task']['tm_maxjobruntime'] > 2800:
-            msg = "task requests %s minutes of runtime but only %s is guaranteed to be available. Jobs may not find a site where to run. CRAB3 have changed this value to %s minutes" % (kwargs['task']['tm_maxjobruntime'], '2800', '2800')
+        stdmaxjobruntime = 2800
+        stdmaxmemory = 2500
+        if kwargs['task']['tm_maxjobruntime'] > stdmaxjobruntime:
+            msg  = "Task requests %s minutes of runtime, but only %s minutes are guaranteed to be available." % (kwargs['task']['tm_maxjobruntime'], stdmaxjobruntime)
+            msg += " Jobs may not find a site where to run."
+            msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
             self.logger.warning(msg)
-            args[0][1]['tm_maxjobruntime'] = '2800'
+            args[0][1]['tm_maxjobruntime'] = str(stdmaxjobruntime)
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
-        if kwargs['task']['tm_maxmemory'] > 2500:
-            msg = "task requests %s memory but only %s is guaranteed to be available. Jobs may not find a site where to run and stay idle forever" % (kwargs['task']['tm_maxmemory'], '2500')
+        if kwargs['task']['tm_maxmemory'] > stdmaxmemory:
+            msg  = "Task requests %s bytes of memory, but only %s bytes are guaranteed to be available." % (kwargs['task']['tm_maxmemory'], stdmaxmemory)
+            msg += " Jobs may not find a site where to run and stay idle forever."
             self.logger.warning(msg)
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
