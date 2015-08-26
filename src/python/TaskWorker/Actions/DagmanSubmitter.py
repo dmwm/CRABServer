@@ -142,8 +142,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
     Submit a DAG to a HTCondor schedd
     """
 
-    def execute(self, *args, **kw):
-        userServer = HTTPRequests(self.server['host'], kw['task']['user_proxy'], kw['task']['user_proxy'], retry=2, logger=self.logger)
+    def execute(self, *args, **kwargs):
+        userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry=2, logger=self.logger)
         retryIssues = []
         retryIssuesBySchedd = {}
         goodSchedulers = []
@@ -155,40 +155,40 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.logger.warning("Unable to contact cmsweb. Will use only on schedulers which was chosen by CRAB3 frontend.")
         self.logger.info("Good schedulers list got from crabserver: %s " % goodSchedulers)
         submissionFailure = False
-        if kw['task']['tm_schedd'] not in goodSchedulers:
+        if kwargs['task']['tm_schedd'] not in goodSchedulers:
             self.logger.info("Scheduler which is chosen is not in crabserver output %s." % goodSchedulers)
-            self.logger.info("No late binding of schedd. Will use %s for submission." % kw['task']['tm_schedd'])
-            goodSchedulers = [kw['task']['tm_schedd']]
+            self.logger.info("No late binding of schedd. Will use %s for submission." % kwargs['task']['tm_schedd'])
+            goodSchedulers = [kwargs['task']['tm_schedd']]
         else:
             #Make sure that first scheduler is used which is chosen by HTCondorLocator
             try:
-                goodSchedulers.remove(kw['task']['tm_schedd'])
+                goodSchedulers.remove(kwargs['task']['tm_schedd'])
             except ValueError:
                 pass
-            goodSchedulers.insert(0,kw['task']['tm_schedd'])
+            goodSchedulers.insert(0, kwargs['task']['tm_schedd'])
         self.logger.info("Final good schedulers list after shuffle: %s " % goodSchedulers)
 
         #Check memory and walltime and if user requires too much:
         # upload warning back to crabserver
         # change walltime to max 47h Issue: #4742
-        if kw['task']['tm_maxjobruntime'] > 2800:
-            msg = "task requests %s minutes of runtime but only %s is guaranteed to be available. Jobs may not find a site where to run. CRAB3 have changed this value to %s minutes" % (kw['task']['tm_maxjobruntime'], '2800', '2800')
+        if kwargs['task']['tm_maxjobruntime'] > 2800:
+            msg = "task requests %s minutes of runtime but only %s is guaranteed to be available. Jobs may not find a site where to run. CRAB3 have changed this value to %s minutes" % (kwargs['task']['tm_maxjobruntime'], '2800', '2800')
             self.logger.warning(msg)
             args[0][1]['tm_maxjobruntime'] = '2800'
-            self.uploadWarning(msg, kw['task']['user_proxy'], kw['task']['tm_taskname'])
-        if kw['task']['tm_maxmemory'] > 2500:
-            msg = "task requests %s memory but only %s is guaranteed to be available. Jobs may not find a site where to run and stay idle forever" % (kw['task']['tm_maxmemory'], '2500')
+            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+        if kwargs['task']['tm_maxmemory'] > 2500:
+            msg = "task requests %s memory but only %s is guaranteed to be available. Jobs may not find a site where to run and stay idle forever" % (kwargs['task']['tm_maxmemory'], '2500')
             self.logger.warning(msg)
-            self.uploadWarning(msg, kw['task']['user_proxy'], kw['task']['tm_taskname'])
+            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
         for schedd in goodSchedulers:
             #If submission failure is true, trying to change a scheduler
-            configreq = {'workflow': kw['task']['tm_taskname'],
+            configreq = {'workflow': kwargs['task']['tm_taskname'],
                          'subresource': 'updateschedd',
                          'scheddname': schedd}
             try:
                 userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
-                kw['task']['tm_schedd'] = schedd
+                kwargs['task']['tm_schedd'] = schedd
             except HTTPException as hte:
                 msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
                 self.logger.warning(msg)
@@ -196,14 +196,14 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 retryIssuesBySchedd.setdefault(schedd, []).append(msg)
                 continue
             for retry in range(self.config.TaskWorker.max_retry + 1): #max_retry can be 0
-                self.logger.debug("Trying to submit task %s %s time." % (kw['task']['tm_taskname'], str(retry)))
+                self.logger.debug("Trying to submit task %s %s time." % (kwargs['task']['tm_taskname'], str(retry)))
                 submissionFailure = False
                 execInt = ""
                 try:
-                    execInt = self.executeInternal(*args, **kw)
+                    execInt = self.executeInternal(*args, **kwargs)
                     return execInt
                 except Exception as e:
-                    msg = "Failed to submit task %s; '%s'" % (kw['task']['tm_taskname'], str(e))
+                    msg = "Failed to submit task %s; '%s'" % (kwargs['task']['tm_taskname'], str(e))
                     self.logger.exception(msg)
                     retryIssues.append(msg)
                     if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
@@ -211,7 +211,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                         time.sleep(self.config.TaskWorker.retry_interval[retry])
                     submissionFailure = True
             if submissionFailure:
-                msg = "Failed to submit task %s to %s with errors %s" % (kw['task']['tm_taskname'], schedd, retryIssues)
+                msg = "Failed to submit task %s to %s with errors %s" % (kwargs['task']['tm_taskname'], schedd, retryIssues)
                 retryIssuesBySchedd[schedd] = retryIssues
 
         msg = "The CRAB3 server backend could not submit your jobs to the Grid schedulers. This could be a temporary glitch, please retry again later and contact"+\
@@ -269,12 +269,12 @@ class DagmanSubmitter(TaskAction.TaskAction):
         return Result.Result(task=task, result=(-1))
 
 
-    def executeInternal(self, *args, **kw):
+    def executeInternal(self, *args, **kwargs):
 
         if not htcondor:
             raise Exception("Unable to import HTCondor module")
 
-        task = kw['task']
+        task = kwargs['task']
         workflow = task['tm_taskname']
         tempDir = args[0][0]
         info = args[0][1]
@@ -349,7 +349,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         finally:
             os.chdir(cwd)
 
-        configreq = {'workflow': kw['task']['tm_taskname'],
+        configreq = {'workflow': kwargs['task']['tm_taskname'],
                      'status': "SUBMITTED",
                      'jobset': "-1",
                      'subresource': 'success',}
@@ -359,7 +359,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         self.sendDashboardJobs(dashboard_params, info['apmon'])
 
-        return Result.Result(task=kw['task'], result=(-1))
+        return Result.Result(task=kwargs['task'], result=(-1))
 
 
     def submitDirect(self, schedd, cmd, arg, info): #pylint: disable=R0201
