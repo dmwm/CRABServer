@@ -131,6 +131,9 @@ class DagmanResubmitter(TaskAction.TaskAction):
 
 
     def execute(self, *args, **kwargs):
+        """
+        The execute method of the DagmanResubmitter class.
+        """
         self.execute_internal(*args, **kwargs)
         configreq = {'workflow': kwargs['task']['tm_taskname'],
                      'status': "SUBMITTED",
