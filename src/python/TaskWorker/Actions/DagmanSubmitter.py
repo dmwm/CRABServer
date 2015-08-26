@@ -149,7 +149,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         goodSchedulers = []
         try:
             goodSchedulers = self.server.get(self.restURInoAPI + '/info', data={'subresource': 'backendurls'})[0]['result'][0]['htcondorSchedds']
-            goodSchedulers = list(goodSchedulers) #we do not care about
+            goodSchedulers = list(set(goodSchedulers)) #we do not care about
         except HTTPException as hte:
             self.logger.error(hte.headers)
             self.logger.warning("Unable to contact cmsweb. Will use only on schedulers which was chosen by CRAB3 frontend.")
