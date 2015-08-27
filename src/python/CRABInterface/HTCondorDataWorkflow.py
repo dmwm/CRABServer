@@ -286,19 +286,22 @@ class HTCondorDataWorkflow(DataWorkflow):
         result["taskWarningMsg"] = taskWarnings
         result["saveLogs"] = row.save_logs
 
-        if row.task_status not in ['SUBMITTED', 'KILLFAILED', 'KILLED', 'QUEUED']:
-            if isinstance(row.task_failure, str):
-                taskFailureMsg = row.task_failure
-            elif row.task_failure == None:
-                taskFailureMsg = ""
-            else:
-                taskFailureMsg = row.task_failure.read()
+        ## Helper function to add the task status and the failure message (both as taken
+        ## from the TaskDB) to the result dictionary.
+        def addStatusAndFailureFromDB(result, row):
             result['status'] = row.task_status
-            result['taskFailureMsg'] = taskFailureMsg
+            if row.task_failure is not None:
+                if isinstance(row.task_failure, str):
+                    result['taskFailureMsg'] = row.task_failure
+                else:
+                    result['taskFailureMsg'] = row.task_failure.read()
+
+        if row.task_status not in ['SUBMITTED', 'KILLFAILED', 'KILLED', 'QUEUED']:
+            addStatusAndFailureFromDB(result, row)
             self.logger.debug("Detailed result for workflow %s: %s\n" % (workflow, result))
             return [result]
 
-        ## Add scheduler and collector to the return information.
+        ## Add scheduler and collector to the result dictionary.
         if row.schedd:
             result['schedd'] = row.schedd
         if row.collector:
