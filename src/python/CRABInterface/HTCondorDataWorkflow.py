@@ -280,7 +280,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         if verbose == None:
             verbose = 0
         self.logger.info("Status result for workflow %s: %s (detail level %d)" % (workflow, row.task_status, verbose))
-        #Apply taskWarning and savelogs flags to output
+
+        ## Apply taskWarning and savelogs flags to output.
         taskWarnings = literal_eval(row.task_warnings if isinstance(row.task_warnings, str) else row.task_warnings.read())
         result["taskWarningMsg"] = taskWarnings
         result["saveLogs"] = row.save_logs
@@ -318,12 +319,13 @@ class HTCondorDataWorkflow(DataWorkflow):
         # 5 = STATUS_DONE (Means that task is Done)
         # 6 = STATUS_ERROR (Means that task is Failed/Killed)
         dagman_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 3: 'SUBMITTED', 4: 'SUBMITTED', 5: 'COMPLETED', 6: 'FAILED'}
-        # Use new logic to get task status fron scheduler
+
+        # Use new logic to get task status from scheduler.
         # In case it will fail, old logic will be used.
-        # User web directory is needed for getting files from scheduler
+        # User web directory is needed for getting files from scheduler.
         useOldLogic = True
         if row.user_webdir and verbose != 2:
-           self.logger.info("Getting status for workflow %s using node_state file" % workflow)
+           self.logger.info("Getting status for workflow %s using node state file." % workflow)
            try:
                DBResults = {}
                DBResults['CRAB_UserWebDir'] = row.user_webdir
@@ -349,14 +351,15 @@ class HTCondorDataWorkflow(DataWorkflow):
                    else:
                        result['status'] = dagman_codes[DAGStatus]
                else:
-                   self.logger.info("Node state file is too old or did not provided update time. Use condor_q to get status")
+                   self.logger.info("Node state file is too old or does not have an update time. Will use condor_q to get the workflow status.")
                    useOldLogic = True
            except MissingNodeStatus:
                # Node_status file is not ready or task is too old
                # Will use old logic.
                useOldLogic = True
            except ExecutionError as e:
-               #The old logic will call again taskWebStatus probably failing for the same reason
+               ## The old logic will call again taskWebStatus, probably failing for the same
+               ## reason. So no need to try the old logic; we can already return.
                result['status'] = "UNKNOWN"
                result['taskFailureMsg'] = e.info
                return [result]
@@ -368,13 +371,13 @@ class HTCondorDataWorkflow(DataWorkflow):
                 backend_urls['htcondorPool'] = row.collector
             self.logger.info("Getting status for workflow %s, looking for schedd %s" % (workflow, row.schedd))
             try:
-               locator  = HTCondorLocator.HTCondorLocator(backend_urls)
+               locator = HTCondorLocator.HTCondorLocator(backend_urls)
                self.logger.debug("Will talk to %s." % locator.getCollector())
                self.logger.debug("Schedd name %s." % row.schedd)
                schedd, address = locator.getScheddObjNew(row.schedd)
                results = self.getRootTasks(workflow, schedd)
                self.logger.info("Web status for workflow %s done " % workflow)
-            except Exception as exp:
+            except Exception as exp: # Empty results is catched here, because getRootTasks raises InvalidParameter exception.
                 #when the task is submitted for the first time
                 if row.task_status in ['QUEUED']:
                     if isinstance(row.task_failure, str):
@@ -409,14 +412,14 @@ class HTCondorDataWorkflow(DataWorkflow):
                     return [result]
                 else:
                     result['status'] = "SUBMITTED"
-                    result['taskWarningMsg'] = ["Task has not yet bootstrapped. Retry in a minute if you just submitted the task"] + result['taskWarningMsg']
+                    result['taskWarningMsg'] = ["Task has not yet bootstrapped. Retry in a minute if you just submitted the task."] + result['taskWarningMsg']
                     return [result]
 
             try:
                 taskStatus = self.taskWebStatus(results[0], verbose=verbose)
             except MissingNodeStatus:
                 result['status'] = "UNKNOWN"
-                result['taskFailureMsg'] = "Node status file not currently available. Retry in a minute if you just submitted the task"
+                result['taskFailureMsg'] = "Node status file not currently available. Retry in a minute if you just submitted the task."
                 return [result]
             except ExecutionError as e:
                 result['status'] = "UNKNOWN"
