@@ -408,12 +408,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                     self.logger.exception("%s: %s" % (workflow, msg))
                     addStatusAndFailure(result, status = 'UNKNOWN', failure = msg)
                 return [result]
-            if not results:
-                msg = ("The CRAB3 server frontend cannot find any information about your jobs in the Grid scheduler."
-                       "Remember, jobs are only kept for a limited amount of time on the scheduler (30 days)")
-                result['status'] = "UNKNOWN"
-                result['taskFailureMsg'] = str(msg)
-                return [result]
 
             taskStatusCode = int(results[-1]['JobStatus'])
             if 'CRAB_UserWebDir' not in results[-1]:
