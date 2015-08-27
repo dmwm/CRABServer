@@ -432,12 +432,13 @@ class HTCondorDataWorkflow(DataWorkflow):
             result['status'] = task_status
             # HoldReasonCode == 1 indicates that the TW killed the task; perhaps the DB was not properly updated afterward?
             if taskStatusCode == 5:
-                if row.task_status != "KILLED" and results[-1]['HoldReasonCode'] == 1:
-                    result['status'] = 'KILLED'
-                elif results[-1]['HoldReasonCode'] == 16:
+                if results[-1]['HoldReasonCode'] == 16:
                     result['status'] = 'InTransition'
-                elif row.task_status != "KILLED":
-                    result['status'] = 'FAILED'
+                elif row.task_status != 'KILLED':
+                    if results[-1]['HoldReasonCode'] == 1:
+                        result['status'] = 'KILLED'
+                    else:
+                        result['status'] = 'FAILED'
 
             taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
             result['jobSetID'] = workflow
