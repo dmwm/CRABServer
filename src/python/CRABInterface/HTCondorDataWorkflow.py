@@ -308,10 +308,11 @@ class HTCondorDataWorkflow(DataWorkflow):
                 #else:
                 #    result['statusFailureMsg'] += "\n%s" % (failure)
 
-        if row.task_status not in ['SUBMITTED', 'KILLFAILED', 'KILLED', 'QUEUED']:
+        if row.task_status in ['NEW', 'HOLDING', 'UPLOADED', 'SUBMITFAILED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']:
             addStatusAndFailureFromDB(result, row)
-            self.logger.debug("Detailed result for workflow %s: %s\n" % (workflow, result))
-            return [result]
+            if row.task_status in ['NEW', 'UPLOADED', 'SUBMITFAILED']:
+                self.logger.debug("Detailed result for workflow %s: %s\n" % (workflow, result))
+                return [result]
 
         ## Add scheduler and collector to the result dictionary.
         if row.schedd:
@@ -336,7 +337,6 @@ class HTCondorDataWorkflow(DataWorkflow):
         # 5 = STATUS_DONE (Means that task is Done)
         # 6 = STATUS_ERROR (Means that task is Failed/Killed)
         dagman_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 3: 'SUBMITTED', 4: 'SUBMITTED', 5: 'COMPLETED', 6: 'FAILED'}
-
         # Use new logic to get task status from scheduler.
         # In case it will fail, old logic will be used.
         # User web directory is needed for getting files from scheduler.
@@ -356,7 +356,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                    self.logger.info(taskStatus)
                    useOldLogic = False
                    DAGStatus = taskStatus.get('DagStatus', {}).get('DagStatus', -1)
-                   if row.task_status in ['QUEUED', 'KILLED']:
+                   if row.task_status in ['QUEUED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']:
                        result['status'] = row.task_status
                    else:
                        result['status'] = dagman_codes.get(DAGStatus, row.task_status)
@@ -427,7 +427,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
             if row.task_status in ['QUEUED']:
                 result['status'] = row.task_status
-            else:
+            elif not result['status']:
                 result['status'] = task_codes.get(taskStatusCode, 'UNKNOWN')
             # HoldReasonCode == 1 indicates that the TW killed the task; perhaps the DB was not properly updated afterward?
             if taskStatusCode == 5:
@@ -436,7 +436,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 elif row.task_status != 'KILLED':
                     if results[-1]['HoldReasonCode'] == 1:
                         result['status'] = 'KILLED'
-                    else:
+                    elif not result['status']:
                         result['status'] = 'FAILED'
 
             taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
@@ -538,9 +538,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
     def taskWebStatus(self, task_ad, verbose):
         nodes = {}
-
         url = task_ad['CRAB_UserWebDir']
-
         curl = self.prepareCurl()
         fp = tempfile.TemporaryFile()
         curl.setopt(pycurl.WRITEFUNCTION, fp.write)
@@ -576,6 +574,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                     self.logger.debug("Finished parse of site ad")
                 else:
                     raise ExecutionError("Cannot get site ad. Retry in a minute if you just submitted the task")
+
             nodes_url = url + "/node_state.txt"
             curl.setopt(pycurl.URL, nodes_url)
             # Before executing any new curl, truncate and clean temp file
