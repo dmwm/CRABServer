@@ -251,6 +251,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         result = {"status"           : '',
                   "taskFailureMsg"   : '',
                   "taskWarningMsg"   : '',
+                  "statusFailureMsg" : '',
                   "jobSetID"         : '',
                   "jobsPerStatus"    : {},
                   "failedJobdefs"    : 0,
@@ -295,6 +296,17 @@ class HTCondorDataWorkflow(DataWorkflow):
                     result['taskFailureMsg'] = row.task_failure
                 else:
                     result['taskFailureMsg'] = row.task_failure.read()
+
+        ## Helper function to add a failure message in retrieving the task/jobs status
+        ## (and eventually a task status if there was none) to the result dictionary.
+        def addStatusAndFailure(result, status, failure = None):
+            if not result['status']:
+                result['status'] = status
+            if failure:
+                #if not result['statusFailureMsg']:
+                result['statusFailureMsg'] = failure
+                #else:
+                #    result['statusFailureMsg'] += "\n%s" % (failure)
 
         if row.task_status not in ['SUBMITTED', 'KILLFAILED', 'KILLED', 'QUEUED']:
             addStatusAndFailureFromDB(result, row)
@@ -362,11 +374,10 @@ class HTCondorDataWorkflow(DataWorkflow):
                # Node_status file is not ready or task is too old
                # Will use old logic.
                useOldLogic = True
-           except ExecutionError as e:
+           except ExecutionError as ee:
                ## The old logic will call again taskWebStatus, probably failing for the same
                ## reason. So no need to try the old logic; we can already return.
-               result['status'] = "UNKNOWN"
-               result['taskFailureMsg'] = e.info
+               addStatusAndFailure(result, status = 'UNKNOWN', failure = ee.info)
                return [result]
 
         if useOldLogic:
@@ -385,20 +396,17 @@ class HTCondorDataWorkflow(DataWorkflow):
             except Exception as exp: # Empty results is catched here, because getRootTasks raises InvalidParameter exception.
                 #when the task is submitted for the first time
                 if row.task_status in ['QUEUED']:
-                    if isinstance(row.task_failure, str):
-                        taskFailureMsg = row.task_failure
-                    elif row.task_failure == None:
-                        taskFailureMsg = ""
-                    else:
-                        taskFailureMsg = row.task_failure.read()
                     result['status'] = row.task_status
-                    result['taskFailureMsg'] = taskFailureMsg
-                    return [result]
-                msg = ("%s: The CRAB3 server frontend is not able to find your task in the Grid scheduler (remember tasks older than 30 days are automatically removed)."
-                       " If your task is a recent one, this could mean there is a temporary glitch. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
-                self.logger.exception(msg)
-                result['status'] = "UNKNOWN"
-                result['taskFailureMsg'] = str(msg)
+                else:
+                    msg  = "The CRAB server frontend was not able to find the task in the Grid scheduler"
+                    msg += " (remember, tasks older than 30 days are automatically removed)."
+                    msg += " If the task is a recent one, this could mean there is a temporary glitch."
+                    msg += " Please try again later."
+                    msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+                    if str(exp):
+                        msg += " Message from the scheduler: %s" % (str(exp))
+                    self.logger.exception("%s: %s" % (workflow, msg))
+                    addStatusAndFailure(result, status = 'UNKNOWN', failure = msg)
                 return [result]
             if not results:
                 msg = ("The CRAB3 server frontend cannot find any information about your jobs in the Grid scheduler."
@@ -414,23 +422,20 @@ class HTCondorDataWorkflow(DataWorkflow):
                     msg  = "The task failed to bootstrap on the Grid scheduler %s." % (address)
                     msg += " Please send an e-mail to %s." % (FEEDBACKMAIL)
                     msg += " Hold reason: %s" % (DagmanHoldReason)
-                    result['status'] = "UNKNOWN"
-                    result['taskFailureMsg'] = str(msg)
-                    return [result]
+                    addStatusAndFailure(result, status = 'UNKNOWN', failure = msg)
                 else:
-                    result['status'] = "SUBMITTED"
+                    addStatusAndFailure(result, status = 'SUBMITTED')
                     result['taskWarningMsg'] = ["Task has not yet bootstrapped. Retry in a minute if you just submitted the task."] + result['taskWarningMsg']
-                    return [result]
+                return [result]
 
             try:
                 taskStatus = self.taskWebStatus(results[-1], verbose=verbose)
             except MissingNodeStatus:
-                result['status'] = "UNKNOWN"
-                result['taskFailureMsg'] = "Node status file not currently available. Retry in a minute if you just submitted the task."
+                msg = "Node status file not currently available. Retry in a minute if you just submitted the task."
+                addStatusAndFailure(result, status = 'UNKNOWN', failure = msg)
                 return [result]
-            except ExecutionError as e:
-                result['status'] = "UNKNOWN"
-                result['taskFailureMsg'] = e.info
+            except ExecutionError as ee:
+                addStatusAndFailure(result, status = 'UNKNOWN', failure = ee.info)
                 return [result]
 
             taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
