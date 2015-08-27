@@ -426,10 +426,9 @@ class HTCondorDataWorkflow(DataWorkflow):
                 return [result]
 
             if row.task_status in ['QUEUED']:
-                task_status = 'QUEUED'
+                result['status'] = row.task_status
             else:
-                task_status = task_codes.get(taskStatusCode, 'UNKNOWN')
-            result['status'] = task_status
+                result['status'] = task_codes.get(taskStatusCode, 'UNKNOWN')
             # HoldReasonCode == 1 indicates that the TW killed the task; perhaps the DB was not properly updated afterward?
             if taskStatusCode == 5:
                 if results[-1]['HoldReasonCode'] == 16:
