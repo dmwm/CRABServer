@@ -149,9 +149,9 @@ class MasterWorker(object):
         return getattr(mod, actionName)()
 
     def _lockWork(self, limit, getstatus, setstatus):
-        """Today this is alays returning true, because we do not want the worker to day if
+        """Today this is always returning true, because we do not want the worker to die if
            the server endpoint is not avaialable.
-           Prints a log entry if answer is greater then 400:
+           Prints a log entry if answer is greater than 400:
             * the server call succeeded or
             * the server could not find anything to update or
             * the server has an internal error"""
@@ -203,8 +203,8 @@ class MasterWorker(object):
         self.logger.info("Received kill request. Waiting for the workers...")
         self.STOP = True
 
-    def updateWork(self, task, status):
-        configreq = {'workflow': task, 'status': status, 'subresource': 'state'}
+    def updateWork(self, taskname, status):
+        configreq = {'workflow': taskname, 'status': status, 'subresource': 'state'}
         retry = True
         while retry:
             try:
@@ -244,7 +244,7 @@ class MasterWorker(object):
                 pendingwork = self._getWork(limit=limit, getstatus='HOLDING')
                 self.logger.info("Retrieved a total of %d %s works" %(len(pendingwork), worktype))
                 self.logger.debug("Retrieved the following works: \n%s" %(str(pendingwork)))
-                self.slaves.injectWorks([(worktype, work, None) for work in pendingwork])
+                self.slaves.injectWorks([(worktype, task, None) for task in pendingwork])
                 for task in pendingwork:
                     self.updateWork(task['tm_taskname'], 'QUEUED')
 

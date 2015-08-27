@@ -225,7 +225,7 @@ class Worker(object):
 
     def queueableTasks(self):
         """Depending on the queue size limit
-           return the number of free solts in
+           return the number of free slots in
            the working queue.
 
            :return int: number of acquirable tasks."""
