@@ -356,17 +356,10 @@ class HTCondorDataWorkflow(DataWorkflow):
                    self.logger.info(taskStatus)
                    useOldLogic = False
                    DAGStatus = taskStatus.get('DagStatus', {}).get('DagStatus', -1)
-                   if row.task_status == "QUEUED":
-                       result['status'] = "QUEUED"
-                   elif row.task_status == "KILLED" and DAGStatus != 6:
-                       #TW killed the task, but node state will be updated in next 30s.
-                       result['status'] == row.task_status
-                   elif DAGStatus not in dagman_codes:
+                   if row.task_status in ['QUEUED', 'KILLED']:
                        result['status'] = row.task_status
-                   elif row.task_status == "KILLED" and DAGStatus == 6:
-                       result['status'] = "KILLED"
                    else:
-                       result['status'] = dagman_codes[DAGStatus]
+                       result['status'] = dagman_codes.get(DAGStatus, row.task_status)
                else:
                    self.logger.info("Node state file is too old or does not have an update time. Will use condor_q to get the workflow status.")
                    useOldLogic = True
