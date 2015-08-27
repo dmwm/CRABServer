@@ -248,18 +248,19 @@ class HTCondorDataWorkflow(DataWorkflow):
            :return: a workflow status summary document"""
 
         #Empty results
-        result = {"status" : '',
-                   "taskFailureMsg"  : '',
-                   "taskWarningMsg"  : '',
-                   "jobSetID"        : '',
-                   "jobsPerStatus"   : {},
-                   "failedJobdefs"   : 0,
-                   "totalJobdefs"    : 0,
-                   "jobdefErrors"    : [],
-                   "jobList"         : [],
-                   "saveLogs"        : 0,
-                   "schedd"          : '',
-                   "collector"       : '' }
+        result = {"status"           : '',
+                  "taskFailureMsg"   : '',
+                  "taskWarningMsg"   : '',
+                  "jobSetID"         : '',
+                  "jobsPerStatus"    : {},
+                  "failedJobdefs"    : 0,
+                  "totalJobdefs"     : 0,
+                  "jobdefErrors"     : [],
+                  "jobList"          : [],
+                  "saveLogs"         : 0,
+                  "schedd"           : '',
+                  "collector"        : '' }
+
         # First, verify the task has been submitted by the backend.
         self.logger.info("Got status request for workflow %s" % workflow)
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
