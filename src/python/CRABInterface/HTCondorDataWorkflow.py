@@ -411,7 +411,9 @@ class HTCondorDataWorkflow(DataWorkflow):
             if 'CRAB_UserWebDir' not in results[-1]:
                 if taskStatusCode != 1 and taskStatusCode != 2:
                     DagmanHoldReason = results[-1]['DagmanHoldReason'] if 'DagmanHoldReason' in results[-1] else None
-                    msg = "Your task failed to bootstrap on the Grid scheduler %s. Please contact an expert. Hold Reason: %s" % (address, DagmanHoldReason)
+                    msg  = "The task failed to bootstrap on the Grid scheduler %s." % (address)
+                    msg += " Please send an e-mail to %s." % (FEEDBACKMAIL)
+                    msg += " Hold reason: %s" % (DagmanHoldReason)
                     result['status'] = "UNKNOWN"
                     result['taskFailureMsg'] = str(msg)
                     return [result]
