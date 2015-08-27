@@ -33,6 +33,7 @@ DEFAULT_BACKEND = 'panda'
 class TaskHandler(object):
     """Handling the set of operations to be performed."""
 
+
     def __init__(self, task, procnum, server):
         """Initializer
 
@@ -42,29 +43,8 @@ class TaskHandler(object):
         self._work = []
         self._task = task
 
-    def removeTaskLogHandler(self, taskhandler):
-        taskhandler.flush()
-        taskhandler.close()
-        self.logger.removeHandler(taskhandler)
 
-    def addWork(self, work):
-        """Appending a new action to be performed on the task
-
-        :arg callable work: a new callable to be called :)"""
-        if work not in self._work:
-            self._work.append(work)
-
-    def getWorks(self):
-        """Retrieving the queued actions
-
-        :return: generator of actions to be performed."""
-        for w in self._work:
-            yield w
-
-    def actionWork(self, *args, **kwargs):
-        """Performing the set of actions"""
-        nextinput = args
-
+    def addTaskLogHandler(self):
         #set the logger to save the tasklog
         formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
         taskdirname = "logs/tasks/%s/" % self._task['tm_username']
@@ -74,6 +54,37 @@ class TaskHandler(object):
         taskhandler.setLevel(logging.DEBUG)
         self.logger.addHandler(taskhandler)
         self.server.logger = self.logger
+
+        return taskhandler
+
+
+    def removeTaskLogHandler(self, taskhandler):
+        taskhandler.flush()
+        taskhandler.close()
+        self.logger.removeHandler(taskhandler)
+
+
+    def addWork(self, work):
+        """Appending a new action to be performed on the task
+
+        :arg callable work: a new callable to be called :)"""
+        if work not in self._work:
+            self._work.append(work)
+
+
+    def getWorks(self):
+        """Retrieving the queued actions
+
+        :return: generator of actions to be performed."""
+        for w in self._work:
+            yield w
+
+
+    def actionWork(self, *args, **kwargs):
+        """Performing the set of actions"""
+        nextinput = args
+
+        taskhandler = self.addTaskLogHandler()
 
         for work in self.getWorks():
             self.logger.debug("Starting %s on %s" % (str(work), self._task['tm_taskname']))
@@ -121,6 +132,7 @@ class TaskHandler(object):
         self.removeTaskLogHandler(taskhandler)
 
         return nextinput
+
 
 def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     """Performs the injection of a new task
