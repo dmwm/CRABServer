@@ -298,16 +298,18 @@ class HTCondorDataWorkflow(DataWorkflow):
             self.logger.debug("Detailed result for workflow %s: %s\n" % (workflow, result))
             return [result]
 
+        ## Add scheduler and collector to the return information.
+        if row.schedd:
+            result['schedd'] = row.schedd
+        if row.collector:
+            result['collector'] = row.collector
+
+        ## Here we start to retrieve the jobs statuses.
         jobsPerStatus = {}
         taskJobCount = 0
         taskStatus = {}
         jobList = []
         results = {}
-        #Add scheduler and collector to return information
-        if row.schedd:
-            result['schedd'] = row.schedd
-        if row.collector:
-            result['collector'] = row.collector
         codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'finished', 5: 'held'}
         # task_codes are used if condor_q command is done to retrieve task status
         task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
