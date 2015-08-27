@@ -187,18 +187,13 @@ def makeLFNPrefixes(task):
     tmp_user = "%s.%s" % (user, hash)
     publish_info = task['tm_publish_name'].rsplit('-', 1) #publish_info[0] is the publishname or the taskname
     timestamp = getCreateTimestamp(task['tm_taskname'])
-    if lfn:
-        splitlfn = lfn.split('/')
-        if splitlfn[2] == 'user':
-            #join:                    /       store    /temp      /user  /mmascher.1234    /lfn          /GENSYM    /publishname     /120414_1634
-            temp_dest = os.path.join('/', splitlfn[1], 'temp', splitlfn[2], tmp_user, *( splitlfn[4:] + [primaryds, publish_info[0], timestamp] ))
-        else:
-            temp_dest = os.path.join('/', splitlfn[1], 'temp', splitlfn[2], *( splitlfn[3:] + [primaryds, publish_info[0], timestamp] ))
-        dest = os.path.join(lfn, primaryds, publish_info[0], timestamp)
+    splitlfn = lfn.split('/')
+    if splitlfn[2] == 'user':
+        #join:                    /       store    /temp   /user  /mmascher.1234    /lfn          /GENSYM    /publishname     /120414_1634
+        temp_dest = os.path.join('/', splitlfn[1], 'temp', 'user', tmp_user, *( splitlfn[4:] + [primaryds, publish_info[0], timestamp] ))
     else:
-        #publish_info[0] will either be the unique taskname (stripped by the username) or the publishname
-        temp_dest = os.path.join("/store/temp/user", tmp_user, primaryds, publish_info[0], timestamp)
-        dest = os.path.join("/store/user", user, primaryds, publish_info[0], timestamp)
+        temp_dest = os.path.join('/', splitlfn[1], 'temp', 'user', tmp_user, *( splitlfn[3:] + [primaryds, publish_info[0], timestamp] ))
+    dest = os.path.join(lfn, primaryds, publish_info[0], timestamp)
 
     return temp_dest, dest
 
