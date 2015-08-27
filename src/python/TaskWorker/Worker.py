@@ -240,9 +240,9 @@ class Worker(object):
 
            :return int: number of tasks waiting
                         in the queue."""
-        if len(self.working) <= len(self.pool):
+        if self.queuedTasks() <= len(self.pool):
             return 0
-        return len(self.working) - len(self.pool)
+        return self.queuedTasks() - len(self.pool)
 
 
 if __name__ == '__main__':
