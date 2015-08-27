@@ -312,7 +312,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         taskJobCount = 0
         taskStatus = {}
         jobList = []
-        results = {}
+        results = []
         codes = {1: 'idle', 2: 'running', 3: 'killing', 4: 'finished', 5: 'held'}
         # task_codes are used if condor_q command is done to retrieve task status
         task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
@@ -421,7 +421,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                     return [result]
 
             try:
-                taskStatus = self.taskWebStatus(results[0], verbose=verbose)
+                taskStatus = self.taskWebStatus(results[-1], verbose=verbose)
             except MissingNodeStatus:
                 result['status'] = "UNKNOWN"
                 result['taskFailureMsg'] = "Node status file not currently available. Retry in a minute if you just submitted the task."
@@ -467,7 +467,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         result['jobList'] = jobList
         result['jobs'] = taskStatus
 
-        if len(taskStatus) == 0 and results and results[0]['JobStatus'] == 2:
+        if len(taskStatus) == 0 and results and results[-1]['JobStatus'] == 2:
             result['status'] = 'Running (jobs not submitted)'
 
         #Always returning ASOURL also, it is required for kill, resubmit
