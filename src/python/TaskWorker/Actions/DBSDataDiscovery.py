@@ -172,7 +172,7 @@ if __name__ == '__main__':
     from WMCore.Configuration import Configuration
     config = Configuration()
     config.section_("Services")
-    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/%s/DBSWriter/' % dbsInstance
+    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/%s/DBSReader/' % dbsInstance
     config.section_("TaskWorker")
     # will use X509_USER_PROXY var for this test
     config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
