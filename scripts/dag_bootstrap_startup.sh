@@ -26,6 +26,8 @@ fi
 
 mkdir -p retry_info
 mkdir -p resubmit_info
+mkdir -p defer_info
+mkdir -p transfer_info
 
 # Note that the scheduler universe populate the .job.ad from 8.3.2 version.
 # Before it was written by this script using condor_q (This command is expensive to Scheduler)
