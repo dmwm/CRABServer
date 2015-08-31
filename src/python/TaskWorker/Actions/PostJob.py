@@ -245,7 +245,7 @@ class ASOServerJob(object):
     Class used to inject transfer requests to ASO database.
     """
     def __init__(self, logger, aso_start_time, aso_start_timestamp, dest_site, source_dir,
-                 dest_dir, source_sites, count, filenames, reqname, log_size,
+                 dest_dir, source_sites, job_id, filenames, reqname, log_size,
                  log_needs_transfer, job_report_output, job_ad, crab_retry, retry_timeout, \
                  job_failed, transfer_logs, transfer_outputs):
         """
@@ -257,7 +257,7 @@ class ASOServerJob(object):
         self.retry_timeout = retry_timeout
         self.couch_server = None
         self.couch_database = None
-        self.count = count
+        self.job_id = job_id
         self.dest_site = dest_site
         self.source_dir = source_dir
         self.dest_dir = dest_dir
@@ -293,7 +293,8 @@ class ASOServerJob(object):
             we do not have to query couch to get this list every time the postjob is restarted.
         """
         try:
-            with open('docs_in_transfer.json', 'w') as fd:
+            filename = 'transfer_info/docs_in_transfer.%d.%d.json' % (self.job_id, self.crab_retry)
+            with open(filename, 'w') as fd:
                 json.dump(self.docs_in_transfer, fd)
         except:
             #Only printing a generic message, the full stacktrace is printed in execute()
@@ -306,7 +307,8 @@ class ASOServerJob(object):
         """ Function that loads the object saved as a json by save_docs_in_transfer 
         """
         try:
-            with open('docs_in_transfer.json') as fd:
+            filename = 'transfer_info/docs_in_transfer.%d.%d.json' % (self.job_id, self.crab_retry)
+            with open(filename) as fd:
                 self.docs_in_transfer = json.load(fd)
         except:
             #Only printing a generic message, the full stacktrace is printed in execute()
@@ -634,7 +636,7 @@ class ASOServerJob(object):
                            'role'                    : role,
                            'dbs_url'                 : str(self.job_ad['CRAB_DBSURL']),
                            'workflow'                : self.reqname,
-                           'jobid'                   : self.count,
+                           'jobid'                   : self.job_id,
                            'publication_state'       : 'not_published',
                            'publication_retry_count' : [],
                            'type'                    : file_type,
@@ -959,11 +961,6 @@ class PostJob():
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
         
     def get_defer_num(self):
-        try:
-            os.mkdir('defer_info')
-        except OSError as ose:
-            if ose.errno != 17: #ignore the "Directory already exists error"
-                self.logger.error("Cannot create the defer_info directory. Error message: %s" % str(ose))
 
         DEFER_INFO_FILE = 'defer_info/defer_num.%d.%d.txt' % (self.job_id, self.dag_retry)
         defer_num = 0
