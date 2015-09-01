@@ -549,7 +549,7 @@ def prepSandbox(opts):
 
 def extractUserSandbox(archiveJob, cmsswVersion):
     os.chdir(cmsswVersion)
-    print commands.getoutput('tar xvfzm %s ' % os.path.join('..', opts.archiveJob))
+    print commands.getoutput('tar xvfzm %s ' % os.path.join('..', archiveJob))
     os.chdir('..')
 
 def getProv(filename, scram):
