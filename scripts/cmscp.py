@@ -453,7 +453,7 @@ def perform_stageout(local_stageout_mgr, direct_stageout_impl, \
                      direct_stageout_command, direct_stageout_protocol, \
                      policy, \
                      source_file, dest_temp_lfn, dest_pfn, dest_lfn, dest_site, \
-                     is_log, inject):
+                     source_site, is_log, inject):
     """
     Wrapper for local and direct stageouts.
     """
@@ -461,7 +461,7 @@ def perform_stageout(local_stageout_mgr, direct_stageout_impl, \
         retval, retmsg = perform_local_stageout(local_stageout_mgr, \
                                                 source_file, dest_temp_lfn, \
                                                 dest_lfn, dest_site, \
-                                                is_log, inject)
+                                                source_site, is_log, inject)
     elif policy == 'remote':
         ## Can return 60311, 60307 or 60403.
         retval, retmsg = perform_direct_stageout(direct_stageout_impl, \
@@ -479,7 +479,7 @@ def perform_stageout(local_stageout_mgr, direct_stageout_impl, \
 
 def perform_local_stageout(local_stageout_mgr, \
                            source_file, dest_temp_lfn, dest_lfn, dest_site, \
-                           is_log, inject):
+                           source_site, is_log, inject):
     """
     Wrapper for local stageouts.
     """
@@ -512,16 +512,20 @@ def perform_local_stageout(local_stageout_mgr, \
     if retval == 0:
         dest_temp_file_name = os.path.split(dest_temp_lfn)[-1]
         dest_temp_se = stageout_info['SEName']
-        dest_temp_site = G_NODE_MAP.get(dest_temp_se, 'unknown')
+        
+        ## Fallback to previous behaviour where phedex is queried for location
+        if source_site == 'unknown':
+            source_site = G_NODE_MAP.get(dest_temp_se, 'unknown')
+
         sites_added_ok = add_sites_to_job_report(dest_temp_file_name, \
-                                                 is_log, dest_temp_site, \
+                                                 is_log, source_site, \
                                                  dest_site if inject else 'unknown', \
                                                  True, None)
         if not sites_added_ok:
             msg = "WARNING: Ignoring failure in adding the above information to the job report."
             print msg
         if inject:
-            file_transfer_info = {'source'             : {'lfn': dest_temp_lfn, 'site': dest_temp_site},
+            file_transfer_info = {'source'             : {'lfn': dest_temp_lfn, 'site': source_site},
                                   'destination'        : {'lfn': dest_lfn,      'site': dest_site     },
                                   'is_log'             : is_log,
                                   'local_stageout_mgr' : local_stageout_mgr,
@@ -1167,16 +1171,6 @@ def main():
     dest_temp_dir = G_JOB_AD['CRAB_Dest']
     dest_files = split_re.split(G_JOB_AD['CRAB_Destination'])
     dest_site = G_JOB_AD['CRAB_AsyncDest']
-    ## Check if Exe Site == Dest Site, if true - stageout directly
-    if 'JOB_CMSSite' in G_JOB_AD and dest_site == G_JOB_AD['JOB_CMSSite']:
-        # Make sure two policies are used (local, remote) and we can change it
-        # It can be that only one policy is specified. See TW configuration file.
-        if stageout_policy == ["local", "remote"]:
-            print 'Job execution site is the same as destination site. Changing stageout policy.'
-            stageout_policy = ["remote", "local"]
-            print 'New stageout policy: %s' % (", ".join(stageout_policy))
-        else:
-            print 'Not rewriting stageout policy. Continue with %s stageout policy.' % (", ".join(stageout_policy))
     ##--------------------------------------------------------------------------
     ## Finish PARSE JOB AD
     ##--------------------------------------------------------------------------
@@ -1261,6 +1255,19 @@ def main():
     ##--------------------------------------------------------------------------
     ## Finish JOB REPORT VALIDATION
     ##--------------------------------------------------------------------------
+
+    source_site = str(get_from_job_report('phedex_node', 'unknown'))
+    ## Check if Exe Site == Dest Site, if true - stageout directly
+    if source_site == dest_site:
+        # Make sure two policies are used (local, remote) and we can change it
+        # It can be that only one policy is specified. See TW configuration file.
+        if stageout_policy == ["local", "remote"]:
+            print 'Job execution site is the same as destination site. Changing stageout policy.'
+            stageout_policy = ["remote", "local"]
+            print 'New stageout policy: %s' % (", ".join(stageout_policy))
+        else:
+            print 'Not rewriting stageout policy. Continue with %s stageout policy.' % (", ".join(stageout_policy))
+
 
     ## Modify the stageout temporary directory by:
     ## a) adding a four-digit counter;
@@ -1476,10 +1483,14 @@ def main():
     ##--------------------------------------------------------------------------
 
     ## Fill in the G_NODE_MAP dictionary with the mapping of node storage
-    ## storage name to site name. Currently only used to translate the SE name
-    ## returned by the local stageout manager into a site name. 
-    if cmscp_status['init_local_stageout_mgr']['return_code'] == 0:
-        make_node_map()
+    ## name to site name. Currently only used to translate the SE name
+    ## returned by the local stageout manager into a site name.
+    if source_site == 'unknown':
+        msg  = "Temp site name not found (likely not present in site-local-config.xml or job report). "
+        msg += "Falling back to querying the phedex for site name."
+        print msg
+        if cmscp_status['init_local_stageout_mgr']['return_code'] == 0:
+            make_node_map()
 
     ##--------------------------------------------------------------------------
     ## Start DIRECT STAGEOUT IMPLEMENTATION INITIALIZATION
@@ -1574,8 +1585,8 @@ def main():
                                                                       logs_arch_dest_temp_lfn, \
                                                                       logs_arch_dest_pfn, \
                                                                       logs_arch_dest_lfn, \
-                                                                      dest_site, is_log = True, \
-                                                                      inject = transfer_logs)
+                                                                      dest_site, source_site, \
+                                                                      is_log = True, inject = transfer_logs)
             except Exception:
                 msg  = "ERROR: Unhandled exception when performing stageout of user logs archive file."
                 msg += "\n%s" % (traceback.format_exc())
@@ -1662,8 +1673,8 @@ def main():
                                                       output_dest_temp_lfn, \
                                                       output_dest_pfn, \
                                                       output_dest_lfn, \
-                                                      dest_site, is_log = False, \
-                                                      inject = transfer_outputs)
+                                                      dest_site, source_site, \
+                                                      is_log = False, inject = transfer_outputs)
                     except Exception as ex:
                         msg  = "ERROR: Unhandled exception when performing stageout."
                         msg += "\n%s" % (traceback.format_exc())

@@ -958,6 +958,8 @@ if __name__ == "__main__":
 
         slc = SiteLocalConfig.loadSiteLocalConfig()
         report['executed_site'] = slc.siteName
+        if 'phedex-node' in slc.localStageOut:
+            report['phedex_node'] = slc.localStageOut['phedex-node']
         print "== Execution site from site-local-config.xml: %s" % slc.siteName
         with open('jobReport.json','w') as of:
             json.dump(report, of)
