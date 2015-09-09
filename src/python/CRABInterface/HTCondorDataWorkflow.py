@@ -329,13 +329,18 @@ class HTCondorDataWorkflow(DataWorkflow):
                taskStatus = self.taskWebStatus(DBResults, verbose=verbose)
                #Check timestamp, if older then 2 minutes, use old logic
                nodeStateUpd = int(taskStatus.get('DagStatus', {}).get("Timestamp", 0))
+               DAGStatus = int(taskStatus.get('DagStatus', {}).get('DagStatus', -1))
                epochTime = int(time.time())
-               if (nodeStateUpd > 0 and (int(nodeStateUpd - epochTime) > 60)):
+               # If DAGStatus is 5 or 6, it means it is final state and node_state file will not be updated anymore
+               # and there is no need to query schedd to get information about task.
+               # If not, we check when the last time file was updated. It should update every 30s, which is set in
+               # job classad:
+               # https://github.com/dmwm/CRABServer/blob/5caac0d379f5e4522f026eeaf3621f7eb5ced98e/src/python/TaskWorker/Actions/DagmanCreator.py#L39
+               if (nodeStateUpd > 0 and (int(nodeStateUpd - epochTime) > 60)) or DAGStatus in [5, 6]:
                    self.logger.info("Node state is up to date, using it")
                    taskJobCount = int(taskStatus.get('DagStatus', {}).get('NodesTotal'))
                    self.logger.info(taskStatus)
                    useOldLogic = False
-                   DAGStatus = taskStatus.get('DagStatus', {}).get('DagStatus', -1)
                    if row.task_status == "QUEUED":
                        result['status'] = "QUEUED"
                    elif row.task_status == "KILLED" and DAGStatus != 6:
