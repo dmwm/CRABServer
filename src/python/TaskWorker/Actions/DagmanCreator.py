@@ -326,9 +326,6 @@ class DagmanCreator(TaskAction.TaskAction):
         """
         lfns = [dest_dir]
         dest_sites_ = [dest_site]
-        if dest_site.startswith("T1_"):
-            dest_sites_.append(dest_site + "_Buffer")
-            dest_sites_.append(dest_site + "_Disk")
         try:
             pfn_info = self.phedex.getPFN(nodes=dest_sites_, lfns=lfns)
         except HTTPException as ex:
@@ -339,11 +336,10 @@ class DagmanCreator(TaskAction.TaskAction):
         results = []
         for lfn in lfns:
             found_lfn = False
-            for suffix in ["", "_Disk", "_Buffer"]:
-                if (dest_site + suffix, lfn) in pfn_info:
-                    results.append(pfn_info[dest_site + suffix, lfn]) 
-                    found_lfn = True
-                    break
+            if (dest_site, lfn) in pfn_info:
+                results.append(pfn_info[dest_site, lfn])
+                found_lfn = True
+                break
             if not found_lfn:
                 raise TaskWorker.WorkerExceptions.NoAvailableSite("The CRAB3 server backend could not map LFN %s at site %s" % (lfn, dest_site)+\
                                 "This is a fatal error. Please, contact the experts")
