@@ -33,7 +33,7 @@ class RESTUserWorkflow(RESTEntity):
         self.centralcfg = centralcfg
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
 
-    def _expandSites(self, sites):
+    def _expandSites(self, sites, pnn=False):
         """Check if there are sites cotaining the '*' wildcard and convert them in the corresponding list
            Raise exception if any wildcard site does expand to an empty list
         """
@@ -41,7 +41,8 @@ class RESTUserWorkflow(RESTEntity):
         for site in sites:
             if '*' in site:
                 sitere = re.compile(site.replace('*','.*'))
-                expanded = map(str, filter(sitere.match, self.allCMSNames.sites))
+                expanded = map(str, filter(sitere.match,
+                    self.allPNNNames.sites if pnn else self.allCMSNames.sites))
                 self.logger.debug("Site %s expanded to %s during validate" % (site, expanded))
                 if not expanded:
                     excasync = ValueError("Remote output data site not valid")
@@ -50,7 +51,7 @@ class RESTUserWorkflow(RESTEntity):
                     raise invalidp
                 res = res.union(expanded)
             else:
-                self._checkSite(site)
+                self._checkSite(site, pnn)
                 res.add(site)
         return list(res)
 
@@ -215,8 +216,11 @@ class RESTUserWorkflow(RESTEntity):
             raise InvalidParameter(msg)
 
     def _checkASODestination(self, site):
-        self._checkSite(site, pnn = True)
-        if site in self.centralcfg.centralconfig.get('banned-out-destinations', []):
+        self._checkSite(site, pnn=True)
+        bannedDestinations = self._expandSites(
+            self.centralcfg.centralconfig.get('banned-out-destinations', []),
+            pnn=True)
+        if site in bannedDestinations:
             excasync = ValueError("Remote output data site is banned")
             invalidp = InvalidParameter("The output site you specified in the Site.storageSite parameter (%s) is blacklisted (banned sites: %s)" %\
                             (site, self.centralcfg.centralconfig['banned-out-destinations']), errobj = excasync)
