@@ -112,6 +112,7 @@ class DataWorkflow(object):
         # probably we need to explicitely select the schema parameters to return
         raise NotImplementedError
 
+
     @conn_handler(services=['centralconfig'])
     def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, use_parent, secondarydata, generator, events_per_lumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                userhn, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
@@ -269,6 +270,7 @@ class DataWorkflow(object):
 
         return [{'RequestName': requestname}]
 
+
     def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, force, userdn, userproxy):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
@@ -281,7 +283,7 @@ class DataWorkflow(object):
         ## Get the status of the task/jobs.
         statusRes = self.status(workflow, userdn, userproxy)[0]
         ## We allow resubmission of jobs only if the task status is one of these:
-        allowedTaskStates = ['SUBMITTED', 'KILLED', 'FAILED', 'KILLFAILED']
+        allowedTaskStates = ['SUBMITTED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
         ## If the user wants to resubmit a specific set of jobs, then we also accept the
         ## task to be in COMPLETED state. This is because we want to allow resubmission
         ## of successfully finished jobs if the user explicitly gave the job id.
@@ -380,6 +382,7 @@ class DataWorkflow(object):
            :return: a workflow status summary document"""
         raise NotImplementedError
 
+
     @conn_handler(services=['centralconfig'])
     def kill(self, workflow, force, jobids, userdn, userproxy=None):
         """Request to Abort a workflow.
@@ -394,7 +397,7 @@ class DataWorkflow(object):
         # Hm...
         dbSerializer = str
 
-        if statusRes['status'] in ['SUBMITTED', 'KILLFAILED', 'FAILED']:
+        if statusRes['status'] in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']:
             killList = [jobid for jobstatus, jobid in statusRes['jobList'] if jobstatus not in self.successList]
             if jobids:
                 #if the user wants to kill specific jobids make the intersection
@@ -415,6 +418,7 @@ class DataWorkflow(object):
             raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
 
         return [{"result":retmsg}]
+
 
     def proceed(self, workflow):
         """Continue a task which was initialized with 'crab submit --dryrun'.

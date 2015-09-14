@@ -42,7 +42,9 @@ def processWorker(inputs, results, resthost, resturi, procnum):
     procName = "Process-%s" % procnum
     while True:
         try:
-            workid, work, task, inputargs = inputs.get()
+            ## Get (and remove) an item from the input queue. If the queue is empty, wait
+            ## until an item is available.
+            workid, work, task, failstatus, inputargs = inputs.get()
         except (EOFError, IOError):
             crashMessage = "Hit EOF/IO in getting new work\n"
             crashMessage += "Assuming this is a graceful break attempt.\n"
@@ -72,12 +74,11 @@ def processWorker(inputs, results, resthost, resturi, procnum):
                     logger.info("Uploading error message to REST: %s" % msg)
                     server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey, retry = 2)
                     truncMsg = truncateError(msg)
-                    configreq = {  'workflow': task['tm_taskname'],
-                                   'status': "FAILED",
-                                   'subresource': 'failure',
-                                   #limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
-                                   'failure': b64encode(truncMsg)}
-
+                    configreq = {'workflow': task['tm_taskname'],
+                                 'status': failstatus,
+                                 'subresource': 'failure',
+                                 #limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
+                                 'failure': b64encode(truncMsg)}
                     server.post(resturi, data = urllib.urlencode(configreq))
                     logger.info("Error message successfully uploaded to the REST")
                 except HTTPException as hte:
@@ -158,7 +159,7 @@ class Worker(object):
         self.logger.debug("Ready to close all %i started processes " % len(self.pool))
         for x in self.pool:
             try:
-                self.logger.debug("Putting stop message in the queue for %s " % str(x))
+                self.logger.debug("Putting stop message in the queue for %s " % str(x)) # AndresT: How can we be sure the stop message is for process x?
                 self.inputs.put(('-1', 'STOP', 'control', []))
             except Exception as ex:
                 msg =  "Hit some exception in deletion\n"
@@ -179,8 +180,8 @@ class Worker(object):
         self.logger.debug("Ready to inject %d items"%len(items))
         workid = 0 if len(self.working.keys()) == 0 else max(self.working.keys()) + 1
         for work in items:
-            worktype, task, arguments = work
-            self.inputs.put((workid, worktype, task, arguments))
+            worktype, task, failstatus, arguments = work
+            self.inputs.put((workid, worktype, task, failstatus, arguments))
             self.working[workid] = {'workflow': task['tm_taskname'], 'injected': time.time()}
             self.logger.info('Injecting work %d: %s' % (workid, task['tm_taskname']))
             workid += 1
@@ -225,7 +226,7 @@ class Worker(object):
 
     def queueableTasks(self):
         """Depending on the queue size limit
-           return the number of free solts in
+           return the number of free slots in
            the working queue.
 
            :return int: number of acquirable tasks."""
@@ -240,9 +241,9 @@ class Worker(object):
 
            :return int: number of tasks waiting
                         in the queue."""
-        if len(self.working) <= len(self.pool):
+        if self.queuedTasks() <= len(self.pool):
             return 0
-        return len(self.working) - len(self.pool)
+        return self.queuedTasks() - len(self.pool)
 
 
 if __name__ == '__main__':
@@ -251,7 +252,7 @@ if __name__ == '__main__':
 
     a = Worker()
     a.begin()
-    a.injectWorks([(Task(), handleNewTask, 'pippo'),({'tm_taskname': 'pippo'}, handleNewTask, 'pippo')])
+    a.injectWorks([(handleNewTask, Task(), 'SUBMITFAILED', 'pippo'), (handleNewTask, {'tm_taskname': 'pippo'}, 'SUBMITFAILED', 'pippo')])
     while(True):
         out = a.checkFinished()
         time.sleep(1)

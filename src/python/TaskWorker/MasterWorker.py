@@ -25,8 +25,11 @@ from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
 from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
 
 ## NOW placing this here, then to be verified if going into Action.Handler, or TSM
-## This is a list because we want to preserve the order
-STATE_ACTIONS_MAP = [("NEW", handleNewTask), ("KILL", handleKill), ("RESUBMIT", handleResubmit)]
+## The meaning of the elements in the 3-tuples are as follows:
+## 1st) the status of the tasks on which a work should be done;
+## 2nd) the work that should be do;
+## 3nd) the new status that the task should get in case of failure.
+STATE_ACTIONS_MAP = [('NEW', handleNewTask, 'SUBMITFAILED'), ('KILL', handleKill, 'KILLFAILED'), ('RESUBMIT', handleResubmit, 'RESUBMITFAILED')]
 def states():
     for st in sorted(STATE_ACTIONS_MAP, key=lambda k: random.random()):
         yield st
@@ -144,14 +147,16 @@ class MasterWorker(object):
         recurringActionsNames = getattr(self.config.TaskWorker, 'recurringActions', [])
         self.recurringActions = [self.getRecurringActionInst(name) for name in recurringActionsNames]
 
+
     def getRecurringActionInst(self, actionName):
         mod = __import__('TaskWorker.Actions.Recurring.%s' % actionName, fromlist=actionName)
         return getattr(mod, actionName)()
 
+
     def _lockWork(self, limit, getstatus, setstatus):
-        """Today this is alays returning true, because we do not want the worker to day if
+        """Today this is always returning true, because we do not want the worker to die if
            the server endpoint is not avaialable.
-           Prints a log entry if answer is greater then 400:
+           Prints a log entry if answer is greater than 400:
             * the server call succeeded or
             * the server could not find anything to update or
             * the server has an internal error"""
@@ -179,6 +184,7 @@ class MasterWorker(object):
 
         return True
 
+
     def _getWork(self, limit, getstatus):
         configreq = {'limit': limit, 'workername': self.config.TaskWorker.name, 'getstatus': getstatus}
         pendingwork = []
@@ -199,12 +205,14 @@ class MasterWorker(object):
             self.logger.error(traceback.format_exc())
         return pendingwork
 
+
     def quit(self, code, traceback_):
         self.logger.info("Received kill request. Waiting for the workers...")
         self.STOP = True
 
-    def updateWork(self, task, status):
-        configreq = {'workflow': task, 'status': status, 'subresource': 'state'}
+
+    def updateWork(self, taskname, status):
+        configreq = {'workflow': taskname, 'status': status, 'subresource': 'state'}
         retry = True
         while retry:
             try:
@@ -231,20 +239,24 @@ class MasterWorker(object):
                 self.logger.error(msg + traceback.format_exc())
                 retry = False
 
+
     def algorithm(self):
         """I'm the intelligent guy taking care of getting the work
            and distribuiting it to the slave processes."""
 
         self.logger.debug("Starting")
         while(not self.STOP):
-            for status, worktype in states():
+            for status, worktype, failstatus in states():
                 limit = self.slaves.queueableTasks()
                 if not self._lockWork(limit=limit, getstatus=status, setstatus='HOLDING'):
                     continue
+                ## Warning: If we fail to retrieve tasks on HOLDING (e.g. because cmsweb is down)
+                ## we may end up executing the wrong worktype later on. A solution would be to
+                ## save the previous task state in a new column of the TaskDB.
                 pendingwork = self._getWork(limit=limit, getstatus='HOLDING')
                 self.logger.info("Retrieved a total of %d %s works" %(len(pendingwork), worktype))
                 self.logger.debug("Retrieved the following works: \n%s" %(str(pendingwork)))
-                self.slaves.injectWorks([(worktype, work, None) for work in pendingwork])
+                self.slaves.injectWorks([(worktype, task, failstatus, None) for task in pendingwork])
                 for task in pendingwork:
                     self.updateWork(task['tm_taskname'], 'QUEUED')
 
@@ -252,16 +264,17 @@ class MasterWorker(object):
                 if action.isTimeToGo():
                     #Maybe we should use new slaves and not reuse the ones used for the tasks
                     self.logger.debug("Injecting recurring action: \n%s" %(str(action.__module__)))
-                    self.slaves.injectWorks([(handleRecurring, {'tm_taskname' : action.__module__}, action.__module__)])
+                    self.slaves.injectWorks([(handleRecurring, {'tm_taskname' : action.__module__}, 'FAILED', action.__module__)])
 
             self.logger.info('Master Worker status:')
             self.logger.info(' - free slaves: %d' % self.slaves.freeSlaves())
             self.logger.info(' - acquired tasks: %d' % self.slaves.queuedTasks())
             self.logger.info(' - tasks pending in queue: %d' % self.slaves.pendingTasks())
 
+            time.sleep(self.config.TaskWorker.polling)
+
             finished = self.slaves.checkFinished()
 
-            time.sleep(self.config.TaskWorker.polling)
         self.logger.debug("Master Worker Exiting Main Cycle")
 
 #    def __del__(self):
