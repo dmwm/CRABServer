@@ -27,19 +27,19 @@ class DBSDataDiscovery(DataDiscovery):
         accessType = res['dataset_access_type']
         if accessType != 'VALID':
             #as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
-            msgForDeprecDS = "Please contact your physics group if you think the dataset should not be deprecated"
+            msgForDeprecDS = "Please contact your physics group if you think the dataset should not be deprecated."
             if kwargs['task']['tm_nonvalid_input_dataset'] != 'T':
                 msg  = "CRAB refuses to proceed in getting the details of the dataset %s from DBS, because the dataset is not 'VALID' but '%s'." % (dataset, accessType)
                 if accessType == 'DEPRECATED':
-                    msg += " (%s.)" % (msgForDeprecDS)
+                    msg += " (%s)" % (msgForDeprecDS)
                 msg += " To allow CRAB to consider a dataset that is not 'VALID', set Data.allowNonValidInputDataset = True in the CRAB configuration."
                 msg += " Notice that this will not force CRAB to run over all files in the dataset;"
                 msg += " CRAB will still check if there are any valid files in the dataset and run only over those files."
                 raise TaskWorkerException(msg)
             msg  = "The input dataset %s is not 'VALID' but '%s'." % (dataset, accessType)
-            msg += " CRAB will check if there are any valid files in the dataset and run only over those files"
+            msg += " CRAB will check if there are any valid files in the dataset and run only over those files."
             if accessType == 'DEPRECATED':
-                msg += ". %s" % (msgForDeprecDS)
+                msg += " %s" % (msgForDeprecDS)
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
         return
 
