@@ -20,6 +20,7 @@ import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
 import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
+from ServerUtilities import insertJobIdSid
 
 import WMCore.WMSpec.WMTask
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
@@ -686,15 +687,14 @@ class DagmanCreator(TaskAction.TaskAction):
             target_se += site
         ml_info = info.setdefault('apmon', [])
         for idx in range(1, info['jobcount']+1):
-            taskid = kwargs['task']['tm_taskname'].replace("_", ":")
-            jinfo = {'jobId': ("%d_https://glidein.cern.ch/%d/%s_0" % (idx, idx, taskid)),
-                     'sid': "https://glidein.cern.ch/%d/%s" % (idx, taskid),
-                     'broker': os.environ.get('HOSTNAME',''),
+            taskid = kwargs['task']['tm_taskname']
+            jinfo = {'broker': os.environ.get('HOSTNAME',''),
                      'bossId': str(idx),
                      'TargetSE': target_se,
                      'localId' : '',
                      'StatusValue' : 'pending',
                     }
+            insertJobIdSid(jinfo, idx, taskid, 0) 
             ml_info.append(jinfo)
 
         # When running in standalone mode, we want to record the number of jobs in the task

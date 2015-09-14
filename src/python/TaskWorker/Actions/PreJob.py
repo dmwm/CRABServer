@@ -10,7 +10,15 @@ from ast import literal_eval
 
 from ApmonIf import ApmonIf
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 from ServerUtilities import getWebdirForDb, setDashboardLogs
+=======
+from ServerUtilities import getWebdirForDb, insertJobIdSid
+>>>>>>> Helper function for creating dashboard reports. #4903
+=======
+from ServerUtilities import getWebdirForDb, insertJobIdSid
+>>>>>>> 7b1eb3919010f62d8f74778aeb853e5e9af77751
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import CMSGroupMapper
@@ -148,8 +156,6 @@ class PreJob:
                   'datasetFull': self.task_ad['CRAB_InputData'],
                   'resubmitter': self.task_ad['CRAB_UserHN'],
                   'exe': 'cmsRun',
-                  'jobId': ("%d_https://glidein.cern.ch/%d/%s_%d" % (self.job_id, self.job_id, self.task_ad['CRAB_ReqName'].replace("_", ":"), crab_retry)),
-                  'sid': "https://glidein.cern.ch/%d/%s" % (self.job_id, self.task_ad['CRAB_ReqName'].replace("_", ":")),
                   'broker': self.backend,
                   'bossId': str(self.job_id),
                   'localId' : '',
@@ -178,6 +184,7 @@ class PreJob:
         else:
             print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx."
 
+        insertJobIdSid(params, self.job_id, self.task_ad['CRAB_ReqName'], crab_retry)
         apmon = ApmonIf()
         self.logger.debug("Dashboard task info: %s" % str(params))
         apmon.sendToML(params)
