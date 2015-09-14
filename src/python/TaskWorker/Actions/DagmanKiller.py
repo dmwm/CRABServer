@@ -8,6 +8,9 @@ import traceback
 import classad
 import htcondor
 
+from httplib import HTTPException
+
+from ServerUtilities import FEEDBACKMAIL
 import TaskWorker.WorkerExceptions
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
@@ -22,18 +25,17 @@ import ApmonIf
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 
 class DagmanKiller(TaskAction):
-
     """
     Given a task name, kill the corresponding task in HTCondor.
 
     We do not actually "kill" the task off, but put the DAG on hold.
     """
 
-    def executeInternal(self, apmon, *args, **kw):
+    def executeInternal(self, apmon, *args, **kwargs):
         #Marco: I guess these value errors only happens for development instances
-        if 'task' not in kw:
+        if 'task' not in kwargs:
             raise ValueError("No task specified.")
-        self.task = kw['task']
+        self.task = kwargs['task']
         if 'tm_taskname' not in self.task:
             raise ValueError("No taskname specified")
         self.workflow = self.task['tm_taskname']
@@ -61,8 +63,11 @@ class DagmanKiller(TaskAction):
         try:
             self.schedd, address = loc.getScheddObjNew(self.task['tm_schedd'])
         except Exception as exp:
-            msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (self.workflow, str(exp))
-            self.logger.exception(msg)
+            msg  = "The CRAB server backend was not able to contact the Grid scheduler."
+            msg += " Please try again later."
+            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+            msg += " Message from the scheduler: %s" % (str(exp))
+            self.logger.exception("%s: %s" % (self.workflow, msg))
             raise TaskWorkerException(msg)
 
         ad = classad.ClassAd()
@@ -173,9 +178,12 @@ class DagmanKiller(TaskAction):
                 self.schedd.act(htcondor.JobAction.Remove, const)
         results = rpipe.read()
         if results != "OK":
-            raise TaskWorkerException("The CRAB3 server backend could not kill jobs [%s]. because the Grid scheduler answered with an error\n" % ", ".join(ids)+\
-                                      "This is probably a temporary glitch, please try it again and contact an expert if the error persist\n"+\
-                                      "Error reason %s" % results)
+            msg  = "The CRAB server backend was not able to kill these jobs (%s)," % (", ".join(ids))
+            msg += " because the Grid scheduler answered with an error."
+            msg += " This is probably a temporary glitch. Please try again later."
+            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+            msg += " Error reason: %s" % (results)
+            raise TaskWorkerException(msg)
 
 
     def killAll(self):
@@ -206,23 +214,43 @@ class DagmanKiller(TaskAction):
                     self.schedd.act(htcondor.JobAction.Remove, jobConst)
         results = rpipe.read()
         if results != "OK":
-            raise TaskWorkerException("The CRAB3 server backend could not kill the task because the Grid scheduler answered with an error\n"\
-                                      "This is probably a temporary glitch, please try it again and contact an expert if the error persist\n"+\
-                                      "Error reason %s" % results)
+            msg  = "The CRAB server backend was not able to kill the task,"
+            msg += " because the Grid scheduler answered with an error."
+            msg += " This is probably a temporary glitch. Please try again later."
+            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+            msg += " Error reason: %s" % (results)
+            raise TaskWorkerException(msg)
 
 
-    def execute(self, *args, **kw):
-
+    def execute(self, *args, **kwargs):
+        """
+        The execute method of the DagmanKiller class.
+        """
         apmon = ApmonIf.ApmonIf()
         try:
-            self.executeInternal(apmon, *args, **kw)
-            #XXX what's the difference of outting this here or in the else?
-            if kw['task']['kill_all']:
-                configreq = {'workflow': kw['task']['tm_taskname'], 'status': "KILLED"}
+            self.executeInternal(apmon, *args, **kwargs)
+            try:
+                ## AndresT: If a task was in FAILED status before the kill, then the new status
+                ## after killing some jobs should be FAILED again, not SUBMITTED. However, in
+                ## the long term we would like to introduce a final node in the DAG, and I think
+                ## the idea would be that the final node will put the task status into FAILED or
+                ## COMPLETED (in the TaskDB) once all jobs are finished. In that case I think
+                ## also the status method from HTCondorDataWorkflow would not have to return any
+                ## adhoc task status anymore (it would just return what is in the TaskDB) and
+                ## that also means that FAILED task status would only be a terminal status that
+                ## I guess should not accept a kill (because it doesn't make sense to kill a
+                ## task for which all jobs have already finished -successfully or not-).
+                configreq = {'subresource': 'state',
+                             'workflow': kwargs['task']['tm_taskname'],
+                             'status': 'KILLED' if kwargs['task']['kill_all'] else 'SUBMITTED'}
+                self.logger.debug("Setting the task as successfully killed with %s" % (str(configreq)))
                 self.server.post(self.resturi, data = urllib.urlencode(configreq))
-            else:
-                configreq = {'workflow': kw['task']['tm_taskname'], 'status': "SUBMITTED"}
-                self.server.post(self.resturi, data = urllib.urlencode(configreq))
+            except HTTPException as hte:
+                self.logger.error(hte.headers)
+                msg  = "The CRAB server successfully killed the task,"
+                msg += " but was unable to update the task status to %s in the database." % (configreq['status'])
+                msg += " This should be a harmless (temporary) error."
+                raise TaskWorkerException(msg)
         finally:
             apmon.free()
 
