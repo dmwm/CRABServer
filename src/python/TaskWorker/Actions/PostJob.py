@@ -82,11 +82,11 @@ from httplib import HTTPException
 import DashboardAPI
 import WMCore.Database.CMSCouch as CMSCouch
 
-from ServerUtilities import setDashboardLogs, isFailurePermanent
+from TaskWorker import __version__
 from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
-
+from ServerUtilities import setDashboardLogs, isFailurePermanent
 
 ASO_JOB = None
 config = None
@@ -1136,7 +1136,7 @@ class PostJob():
         DEFER_NUM = self.get_defer_num()
 
         if first_pj_execution():
-            self.logger.info("======== Starting post-job execution.")
+            self.logger.info("======== Starting post-job execution. Version %s" % __version__)
 
         ## Create the task web directory in the schedd. Ignore if it exists already.
         self.create_taskwebdir()

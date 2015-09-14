@@ -5,9 +5,7 @@ _Worker_
 TaskWorker component
 """
 
-__version__ = 'development'
-
-#the __version__ will be automatically be change according to rpm for production
-
 __all__ = []
 
+#the __version__ will be automatically be change according to rpm for production
+__version__ = 'development'
