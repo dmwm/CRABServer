@@ -12,7 +12,7 @@ config.General.instance = 'preprod'
 #Job Type Section
 config.section_("JobType")
 config.JobType.pluginName = 'Analysis'
-config.JobType.psetName = 'psets/pset_parent_analysis.py'
+config.JobType.psetName = 'psets/pset_use_parent.py'
 
 #Data Section
 config.section_("Data")
