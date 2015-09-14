@@ -11,10 +11,14 @@ from ast import literal_eval
 from ApmonIf import ApmonIf
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 from ServerUtilities import getWebdirForDb, setDashboardLogs
 =======
 from ServerUtilities import getWebdirForDb, insertJobIdSid
 >>>>>>> Helper function for creating dashboard reports. #4903
+=======
+from ServerUtilities import getWebdirForDb, insertJobIdSid
+>>>>>>> 7b1eb3919010f62d8f74778aeb853e5e9af77751
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import CMSGroupMapper
