@@ -7,6 +7,7 @@ import htcondor
 import HTCondorLocator
 import HTCondorUtils
 
+from ServerUtilities import FEEDBACKMAIL
 import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
@@ -19,11 +20,11 @@ class DagmanResubmitter(TaskAction.TaskAction):
     Internally, we simply release the failed DAG.
     """
 
-    def execute_internal(self, *args, **kw):
+    def executeInternal(self, *args, **kwargs):
         #Marco: I guess these value errors only happens for development instances
-        if 'task' not in kw:
+        if 'task' not in kwargs:
             raise ValueError("No task specified.")
-        task = kw['task']
+        task = kwargs['task']
         if 'tm_taskname' not in task:
             raise ValueError("No taskname specified.")
         workflow = str(task['tm_taskname'])
@@ -43,20 +44,28 @@ class DagmanResubmitter(TaskAction.TaskAction):
         try:
             schedd, address = loc.getScheddObjNew(task['tm_schedd'])
         except Exception as exp:
-            msg = ("%s: The CRAB3 server backend is not able to contact Grid scheduler. Please, retry later. Message from the scheduler: %s") % (workflow, str(exp))
-            self.logger.exception(msg)
+            msg  = "The CRAB server backend was not able to contact the Grid scheduler."
+            msg += " Please try again later."
+            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+            msg += " Message from the scheduler: %s" % (str(exp))
+            self.logger.exception("%s: %s" % (workflow, msg))
             raise TaskWorkerException(msg)
 
         # Check memory and walltime
-        if task['resubmit_maxjobruntime'] != None and task['resubmit_maxjobruntime'] > 2800:
-            msg = "task requests %s minutes of walltime but only %s is guaranteed to be available. Jobs may not find a site where to run. CRAB3 have changed this value to %s minutes" % (task['resubmit_maxjobruntime'], '2800', '2800')
+        stdmaxjobruntime = 2800
+        stdmaxmemory = 2500
+        if task['resubmit_maxjobruntime'] is not None and task['resubmit_maxjobruntime'] > stdmaxjobruntime:
+            msg  = "Task requests %s minutes of walltime, but only %s are guaranteed to be available." % (task['resubmit_maxjobruntime'], stdmaxjobruntime)
+            msg += " Jobs may not find a site where to run."
+            msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
             self.logger.warning(msg)
-            task['resubmit_maxjobruntime'] = '2800'
-            self.uploadWarning(msg, kw['task']['user_proxy'], kw['task']['tm_taskname'])
-        if task['resubmit_maxmemory'] != None and task['resubmit_maxmemory'] > 2500:
-            msg = "task requests %s memory but only %s is guaranteed to be available. Jobs may not find a site where to run and stay idle forever" % (task['resubmit_maxmemory'], '2500')
+            task['resubmit_maxjobruntime'] = str(stdmaxjobruntime)
+            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+        if task['resubmit_maxmemory'] is not None and task['resubmit_maxmemory'] > stdmaxmemory:
+            msg  = "Task requests %s bytes of memory, but only %s are guaranteed to be available." % (task['resubmit_maxmemory'], stdmaxmemory)
+            msg += " Jobs may not find a site where to run and stay idle forever."
             self.logger.warning(msg)
-            self.uploadWarning(msg, kw['task']['user_proxy'], kw['task']['tm_taskname'])
+            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
         # Release the DAG
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(workflow)
@@ -125,25 +134,32 @@ class DagmanResubmitter(TaskAction.TaskAction):
 
         results = rpipe.read()
         if results != "OK":
-            raise TaskWorkerException("The CRAB3 server backend could not resubmit your task because the Grid scheduler answered with an error.\n"+\
-                                      "This is probably a temporary glitch, please try it again and contact an expert if the error persist.\n"+\
-                                      "Error reason: %s" % (results))
+            msg  = "The CRAB server backend was not able to resubmit the task,"
+            msg += " because the Grid scheduler answered with an error."
+            msg += " This is probably a temporary glitch. Please try again later."
+            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+            msg += " Error reason: %s" % (results)
+            raise TaskWorkerException(msg)
 
 
     def execute(self, *args, **kwargs):
-        self.execute_internal(*args, **kwargs)
-        configreq = {'workflow': kwargs['task']['tm_taskname'],
-                     'status': "SUBMITTED",
-                     'jobset': "-1",
-                     'subresource': 'success',}
-        self.logger.debug("Setting the task as successfully resubmitted with %s " % str(configreq))
-        data = urllib.urlencode(configreq)
+        """
+        The execute method of the DagmanResubmitter class.
+        """
+        self.executeInternal(*args, **kwargs)
         try:
-            self.server.post(self.resturi, data = data)
+            configreq = {'subresource': 'state',
+                         'workflow': kwargs['task']['tm_taskname'],
+                         'status': 'SUBMITTED'}
+            self.logger.debug("Setting the task as successfully resubmitted with %s" % (str(configreq)))
+            self.server.post(self.resturi, data = urllib.urlencode(configreq))
         except HTTPException as hte:
             self.logger.error(hte.headers)
-            raise TaskWorkerException("The CRAB3 server backend successfully resubmitted your task to the Grid scheduler, but was unable to update\n"+\
-                                      "the task status from QUEUED to SUBMITTED. This should be a harmless (temporary) error.\n")
+            msg  = "The CRAB server successfully resubmitted the task to the Grid scheduler,"
+            msg += " but was unable to update the task status to %s in the database." % (configreq['status'])
+            msg += " This should be a harmless (temporary) error."
+            raise TaskWorkerException(msg)
+
 
 if __name__ == "__main__":
     import os
