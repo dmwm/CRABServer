@@ -458,8 +458,8 @@ class DagmanCreator(TaskAction.TaskAction):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
-        groupid = len(siteinfo['groups'])
-        siteinfo['groups'][groupid] = list(availablesites)
+        groupid = len(siteinfo['group_sites'])
+        siteinfo['group_sites'][groupid] = list(availablesites)
         lastDirectDest = None
         lastDirectPfn = None
         for job in jobgroup.getJobs():
@@ -561,7 +561,7 @@ class DagmanCreator(TaskAction.TaskAction):
             global_blacklist = set()
 
         sitead = classad.ClassAd()
-        siteinfo = {'groups': {}}
+        siteinfo = {'group_sites': {}}
         for jobgroup in splitterResult:
             jobs = jobgroup.getJobs()
 

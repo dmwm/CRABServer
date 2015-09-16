@@ -419,7 +419,7 @@ class PreJob:
             with open("site.ad.json") as fd:
                 site_info = json.load(fd)
             group = site_info[str(self.job_id)]
-            available = set(site_info['groups'][str(group)])
+            available = set(site_info['group_sites'][str(group)])
         else:
             with open("site.ad") as fd:
                 site_ad = classad.parse(fd)
