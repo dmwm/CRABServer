@@ -454,12 +454,13 @@ class DagmanCreator(TaskAction.TaskAction):
         return info
 
 
-    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid):
+    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
         groupid = len(siteinfo['group_sites'])
         siteinfo['group_sites'][groupid] = list(availablesites)
+        siteinfo['group_datasites'][groupid] = list(datasites)
         lastDirectDest = None
         lastDirectPfn = None
         for job in jobgroup.getJobs():
@@ -561,7 +562,7 @@ class DagmanCreator(TaskAction.TaskAction):
             global_blacklist = set()
 
         sitead = classad.ClassAd()
-        siteinfo = {'group_sites': {}}
+        siteinfo = {'group_sites': {}, 'group_datasites': {}}
         for jobgroup in splitterResult:
             jobs = jobgroup.getJobs()
 
@@ -616,9 +617,10 @@ class DagmanCreator(TaskAction.TaskAction):
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             availablesites = [str(i) for i in availablesites]
+            datasites = jobs[0]['input_files'][0]['locations']
             self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
 
-            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid)
+            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid)
             dagSpecs += jobgroupDagSpecs
 
         ## Write down the DAG as needed by DAGMan.

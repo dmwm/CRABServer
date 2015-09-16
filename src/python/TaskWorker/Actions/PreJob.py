@@ -420,6 +420,7 @@ class PreJob:
                 site_info = json.load(fd)
             group = site_info[str(self.job_id)]
             available = set(site_info['group_sites'][str(group)])
+            datasites = set(site_info['group_datasites'][str(group)])
         else:
             with open("site.ad") as fd:
                 site_ad = classad.parse(fd)
@@ -435,6 +436,7 @@ class PreJob:
         available -= (siteblacklist - sitewhitelist)
         ## Add DESIRED_SITES to the Job.<job_id>.submit content.
         new_submit_text = '+DESIRED_SITES="%s"\n%s' % (",".join(available), new_submit_text)
+        new_submit_text = '+CRAB_DataLocations="%s"\n%s' % (",".join(datasites), new_submit_text)
         return new_submit_text
 
 
