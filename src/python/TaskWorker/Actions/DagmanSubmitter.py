@@ -5,9 +5,7 @@ Submit a DAG directory created by the DagmanCreator component.
 
 import os
 import time
-import random
 import urllib
-import traceback
 import subprocess
 
 import HTCondorUtils
@@ -16,8 +14,8 @@ import HTCondorLocator
 
 from httplib import HTTPException
 from ServerUtilities import FEEDBACKMAIL
-import TaskWorker.Actions.TaskAction as TaskAction
 import TaskWorker.DataObjects.Result as Result
+import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.Actions.DagmanCreator import CRAB_HEADERS
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
