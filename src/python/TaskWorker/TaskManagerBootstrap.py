@@ -50,7 +50,7 @@ def bootstrap():
     ad['tm_taskname'] = ad.eval("CRAB_Workflow")
     ad['tm_split_algo'] = ad.eval("CRAB_SplitAlgo")
     ad['tm_dbs_url'] = ad.eval("CRAB_DBSURL")
-    ad['tm_input_dataset'] = ad.eval("CRAB_InputData")
+    ad['tm_input_dataset'] = ad.eval("DESIRED_CMSDataset")
     ad['tm_outfiles'] = HTCondorUtils.unquote(ad.eval("CRAB_AdditionalOutputFiles"))
     ad['tm_tfile_outfiles'] = HTCondorUtils.unquote(ad.eval("CRAB_TFileOutputFiles"))
     ad['tm_edm_outfiles'] = HTCondorUtils.unquote(ad.eval("CRAB_EDMOutputFiles"))

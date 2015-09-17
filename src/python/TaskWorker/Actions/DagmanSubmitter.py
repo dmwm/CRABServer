@@ -76,7 +76,7 @@ SUBMIT_INFO = [ \
             ('CRAB_JobType', 'jobtype'),
             ('CRAB_JobSW', 'jobsw'),
             ('CRAB_JobArch', 'jobarch'),
-            ('CRAB_InputData', 'inputdata'),
+            ('DESIRED_CMSDataset', 'inputdata'),
             ('CRAB_DBSURL', 'dbsurl'),
             ('CRAB_PublishName', 'publishname'),
             ('CRAB_PublishGroupName', 'publishgroupname'),

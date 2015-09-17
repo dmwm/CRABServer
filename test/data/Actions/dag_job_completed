@@ -130,7 +130,7 @@ RemoteWallClockTime = 263.000000
 OnExitRemove = true
 Arguments = "-o {} -a 4a33f5de-69b3-4dee-81b8-9d6b62044cccdefault.tgz --sourceURL=https://voatlas294.cern.ch:25443 --inputFile=[\"/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0011/384BD7FE-1EAE-E111-9722-003048D2E834.root\",' '\"/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0011/EC70A4EE-1EAE-E111-A01B-003048F1C45A.root\"] --runAndLumis={\"1\":' '[[671579,' '671579],' '[671585,' '671586],' '[671588,' '671589],' '[671591,' '671594],' '[671600,' '671601],' '[671603,' '671604],' '[671607,' '671607],' '[671610,' '671611],' '[671613,' '671614],' '[671625,' '671625],' '[671627,' '671627],' '[671630,' '671630],' '[671632,' '671633],' '[671616,' '671616],' '[671654,' '671654],' '[671663,' '671663],' '[672278,' '672278],' '[672286,' '672286],' '[672288,' '672288],' '[672292,' '672294],' '[672297,' '672298],' '[672300,' '672300],' '[672304,' '672304],' '[672308,' '672308],' '[672310,' '672311],' '[672316,' '672320],' '[672322,' '672322],' '[672324,' '672324],' '[672334,' '672334],' '[672339,' '672339],' '[672341,' '672342]]} --cmsswVersion=CMSSW_5_3_7 --scramArch=slc5_amd64_gcc462 --jobNumber=111"
 SpooledOutputFiles = "jobReport.json.111"
-CRAB_InputData = "/GenericTTbar/HC-CMSSW_5_3_1_START53_V5-v1/GEN-SIM-RECO"
+DESIRED_CMSDataset = "/GenericTTbar/HC-CMSSW_5_3_1_START53_V5-v1/GEN-SIM-RECO"
 CRAB_ReqName = "glidein.unl.edu:glidein.unl.edu_130610_142808_bbockelm.nocern_crab_bbockelm_crab3_4"
 ResidentSetSize = 3000
 StreamOut = false
