@@ -233,6 +233,10 @@ def makeWebDir(ad):
             shutil.copy2(os.path.join(".", "sandbox.tar.gz"), os.path.join(path, "sandbox.tar.gz"))
         except:
             pass
+        try:
+            os.symlink(os.path.abspath(os.path.join(".", "debug")), os.path.join(path, "debug"))
+        except:
+            pass
     except OSError:
         pass
     try:
