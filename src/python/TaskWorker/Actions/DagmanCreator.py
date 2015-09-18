@@ -710,6 +710,36 @@ class DagmanCreator(TaskAction.TaskAction):
 
         return info, splitterResult
 
+    def extractMonitorFiles(self, inputFiles, **kw):
+        """
+        Ops mon needs access to some files from sandbox.tar.gz. 
+        It's impractical to extract those files on the user's browser, therefore
+        the files are extracted here to the debug folder to be later sent to the schedd.
+        
+        Also modified inputFiles list by appending a debug folder if extraction succeeds.
+        """
+        try:
+            sandboxTar = tarfile.open('sandbox.tar.gz')
+            sandboxTar.extract('debug/crabConfig.py')
+            sandboxTar.extract('debug/originalPSet.py')
+            scriptExeName = kw['task'].get('tm_scriptexe')
+            if scriptExeName != None:
+                sandboxTar.extract(scriptExeName)
+                shutil.copy(scriptExeName, 'debug/' + scriptExeName)
+            sandboxTar.close()
+        except Exception as ex:
+            self.logger.exception(ex)
+            self.uploadWarning("Extracting files from sandbox failed, ops monitor will not work.", \
+                    kw['task']['user_proxy'], kw['task']['tm_taskname'])
+        
+        inputFiles.append('debug')
+
+        # Change permissions of extracted files to allow Ops mon to read them.
+        for _, _, filenames in os.walk('debug'):
+            for f in filenames:
+                os.chmod('debug/' + f, 0o644)
+
+        return
 
     def executeInternal(self, *args, **kw):
         # FIXME: In PanDA, we provided the executable as a URL.
@@ -757,6 +787,9 @@ class DagmanCreator(TaskAction.TaskAction):
 
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', \
                 'AdjustSites.py', 'site.ad', 'site.ad.json', 'run_and_lumis.tar.gz', 'input_files.tar.gz']
+
+        self.extractMonitorFiles(inputFiles, **kw)     
+        
         if kw['task'].get('tm_user_sandbox') == 'sandbox.tar.gz':
             inputFiles.append('sandbox.tar.gz')
         if os.path.exists("CMSRunAnalysis.tar.gz"):
