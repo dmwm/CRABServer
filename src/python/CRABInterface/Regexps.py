@@ -79,7 +79,7 @@ RX_USERNAME = re.compile(r"^[A-Za-z_]{1,20}$")
 RX_DATE = re.compile(r"^(19|20)\d\d[- /.](0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|3[01])$")
 
 ## need to be careful with this
-RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s\=\+]{0,10000}$")
+RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s\=\+/]{0,10000}$")
 ## user dn
 RX_DN = re.compile(r"^/(?:C|O|DC)=.*/CN=.")
 ## worker subresources
