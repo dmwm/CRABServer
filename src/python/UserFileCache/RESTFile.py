@@ -53,6 +53,7 @@ class RESTFile(RESTEntity):
 
         if method in ['PUT']:
             validate_str("hashkey", param, safe, RX_HASH, optional=False)
+            validate_num("newchecksum", param, safe, optional=True)
             validate_tarfile("inputfile", param, safe, 'hashkey', optional=False)
         if method in ['GET']:
             validate_str("hashkey", param, safe, RX_HASH, optional=False)
@@ -61,7 +62,7 @@ class RESTFile(RESTEntity):
                 authz_operator(safe.kwargs['username'])
 
     @restcall
-    def put(self, inputfile, hashkey):
+    def put(self, inputfile, hashkey, newchecksum):
         """Allow to upload a tarball file to be written in the local filesystem.
            Base path of the local filesystem is configurable.
 

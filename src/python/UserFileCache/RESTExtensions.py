@@ -115,7 +115,7 @@ def _check_file(argname, val):
     return val
 
 
-def _check_tarfile(argname, val, hashkey):
+def _check_tarfile(argname, val, hashkey, newchecksum):
     """Check that `argname` `val` is a tar file and that provided 'hashkey`
        matches with the hashkey calculated on the `val`.
 
@@ -130,7 +130,15 @@ def _check_tarfile(argname, val, hashkey):
 
     digest = None
     try:
-        digest = calculateChecksum(val.file, exclude=USER_SANDBOX_EXCLUSIONS)
+        #This newchecksum param and the "else" branch is there for backward compatibility.
+        #We can remove the whole commit at some point in the future
+        if newchecksum:
+            digest = calculateChecksum(val.file, exclude=USER_SANDBOX_EXCLUSIONS)
+        else:
+            tar = tarfile.open(fileobj=val.file, mode='r')
+            lsl = [(x.name, int(x.size), int(x.mtime), x.uname) for x in tar.getmembers()]
+            hasher = hashlib.sha256(str(lsl))
+            digest = hasher.hexdigest()
     except tarfile.ReadError:
         raise InvalidParameter('File is not a .tgz file.')
     if not digest or hashkey != digest:
@@ -154,7 +162,7 @@ def validate_tarfile(argname, param, safe, hashkey, optional=False):
     If `optional` is True, the argument is not required to exist in
     `param.kwargs`; None is then inserted into `safe.kwargs`. Otherwise
     a missing value raises an exception."""
-    _validate_one(argname, param, safe, _check_tarfile, optional, safe.kwargs[hashkey])
+    _validate_one(argname, param, safe, _check_tarfile, optional, safe.kwargs[hashkey], safe.kwargs['newchecksum'])
 
 def validate_file(argname, param, safe, hashkey, optional=False):
     """Validates that an argument is a file and matches the hashkey.

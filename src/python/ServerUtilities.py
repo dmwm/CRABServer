@@ -37,6 +37,7 @@ def USER_SANDBOX_EXCLUSIONS(tarmembers):
         https://github.com/dmwm/CRABServer/issues/4948#issuecomment-132984687
     """
     if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers):
+        #exclude the pickle pset if the dumpPython PSet is there
         return ['PSet.py', 'PSet.pkl', 'debug/crabConfig.py', 'debug/originalPSet.py.py']
     else:
         return ['debug/crabConfig.py', 'debug/originalPSet.py.py']
