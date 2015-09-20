@@ -11,6 +11,7 @@ import traceback
 import subprocess
 from httplib import HTTPException
 
+BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
 
 
@@ -19,6 +20,22 @@ TASKDBSTATUSES = ['NEW', 'HOLDING', 'QUEUED', 'UPLOADED', 'SUBMITTED', 'SUBMITFA
 
 ## These are all possible statuses of a task as returned by the `status' API.
 TASKSTATUSES = TASKDBSTATUSES + ['COMPLETED', 'UNKNOWN', 'InTransition']
+
+
+def USER_SANDBOX_EXCLUSIONS(tarmembers):
+    """ The function is used by both the client and the crabcache to get a list of files to exclude during the
+        calculation of the checksum of the user input sandbox.
+
+        In particular the client tries to put the process object obtained with dumpPython in the sandbox, so that
+        this can be used to calculate the checksum. If we used the process object saved with pickle.dump we would
+        run into a problem since the same process objects have different dumps, see:
+        https://github.com/dmwm/CRABServer/issues/4948#issuecomment-132984687
+    """
+    if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers):
+        #exclude the pickle pset if the dumpPython PSet is there
+        return ['PSet.py', 'PSet.pkl', 'debug/crabConfig.py', 'debug/originalPSet.py.py']
+    else:
+        return ['debug/crabConfig.py', 'debug/originalPSet.py.py']
 
 
 def checkOutLFN(lfn, username):
