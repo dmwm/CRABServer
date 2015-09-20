@@ -63,7 +63,6 @@ CRAB_HEADERS = \
 +CRAB_JobType = %(jobtype)s
 +CRAB_JobSW = %(jobsw)s
 +CRAB_JobArch = %(jobarch)s
-+CRAB_InputData = %(inputdata)s
 +CRAB_DBSURL = %(dbsurl)s
 +CRAB_PublishName = %(publishname)s
 +CRAB_PublishGroupName = %(publishgroupname)s
@@ -109,6 +108,7 @@ CRAB_Id = $(count)
 +DESIRED_OpSyses = %(desired_opsys)s
 +DESIRED_OpSysMajorVers = %(desired_opsysvers)s
 +DESIRED_Archs = %(desired_arch)s
++DESIRED_CMSDataset = %(inputdata)s
 
 +JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
 job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, RemoteSysCpu, RemoteUserCpu
@@ -454,12 +454,13 @@ class DagmanCreator(TaskAction.TaskAction):
         return info
 
 
-    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid):
+    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
-        groupid = len(siteinfo['groups'])
-        siteinfo['groups'][groupid] = list(availablesites)
+        groupid = len(siteinfo['group_sites'])
+        siteinfo['group_sites'][groupid] = list(availablesites)
+        siteinfo['group_datasites'][groupid] = list(datasites)
         lastDirectDest = None
         lastDirectPfn = None
         for job in jobgroup.getJobs():
@@ -561,7 +562,7 @@ class DagmanCreator(TaskAction.TaskAction):
             global_blacklist = set()
 
         sitead = classad.ClassAd()
-        siteinfo = {'groups': {}}
+        siteinfo = {'group_sites': {}, 'group_datasites': {}}
         for jobgroup in splitterResult:
             jobs = jobgroup.getJobs()
 
@@ -616,9 +617,10 @@ class DagmanCreator(TaskAction.TaskAction):
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             availablesites = [str(i) for i in availablesites]
+            datasites = jobs[0]['input_files'][0]['locations']
             self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
 
-            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid)
+            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid)
             dagSpecs += jobgroupDagSpecs
 
         ## Write down the DAG as needed by DAGMan.

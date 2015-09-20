@@ -145,7 +145,7 @@ class PreJob:
                   'CMSUser': self.task_ad['CRAB_UserHN'],
                   'user': self.task_ad['CRAB_UserHN'],
                   'taskId': self.task_ad['CRAB_ReqName'],
-                  'datasetFull': self.task_ad['CRAB_InputData'],
+                  'datasetFull': self.task_ad['DESIRED_CMSDataset'],
                   'resubmitter': self.task_ad['CRAB_UserHN'],
                   'exe': 'cmsRun',
                   'broker': self.backend,
@@ -419,7 +419,8 @@ class PreJob:
             with open("site.ad.json") as fd:
                 site_info = json.load(fd)
             group = site_info[str(self.job_id)]
-            available = set(site_info['groups'][str(group)])
+            available = set(site_info['group_sites'][str(group)])
+            datasites = set(site_info['group_datasites'][str(group)])
         else:
             with open("site.ad") as fd:
                 site_ad = classad.parse(fd)
@@ -435,6 +436,7 @@ class PreJob:
         available -= (siteblacklist - sitewhitelist)
         ## Add DESIRED_SITES to the Job.<job_id>.submit content.
         new_submit_text = '+DESIRED_SITES="%s"\n%s' % (",".join(available), new_submit_text)
+        new_submit_text = '+DESIRED_CMSDataLocations="%s"\n%s' % (",".join(datasites), new_submit_text)
         return new_submit_text
 
 

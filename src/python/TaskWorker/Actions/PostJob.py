@@ -624,7 +624,7 @@ class ASOServerJob(object):
                     if publication_msg:
                         self.logger.info(publication_msg)
                     doc = {'_id'                     : doc_id,
-                           'inputdataset'            : str(self.job_ad['CRAB_InputData']),
+                           'inputdataset'            : str(self.job_ad['DESIRED_CMSDataset']),
                            'rest_host'               : str(self.job_ad['CRAB_RestHost']),
                            'rest_uri'                : str(self.job_ad['CRAB_RestURInoAPI']),
                            'lfn'                     : source_lfn,
@@ -1967,7 +1967,7 @@ class PostJob():
             return 1
         ## Set some class variables using the job ad.
         self.dest_site        = str(self.job_ad['CRAB_AsyncDest'])
-        self.input_dataset    = str(self.job_ad['CRAB_InputData'])
+        self.input_dataset    = str(self.job_ad['DESIRED_CMSDataset'])
         self.job_sw           = str(self.job_ad['CRAB_JobSW'])
         self.publish_name     = str(self.job_ad['CRAB_PublishName'])
         self.rest_host        = str(self.job_ad['CRAB_RestHost'])
@@ -2003,7 +2003,7 @@ class PostJob():
         required_job_ad_attrs = ['CRAB_ASOURL',
                                  'CRAB_AsyncDest',
                                  'CRAB_DBSURL',
-                                 'CRAB_InputData',
+                                 'DESIRED_CMSDataset',
                                  'CRAB_JobSW',
                                  'CRAB_Publish',
                                  'CRAB_PublishName',

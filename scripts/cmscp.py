@@ -540,7 +540,7 @@ def inject_to_aso(file_transfer_info):
     """
     Inject a document to the ASO database.
     """
-    for attr in ['CRAB_ASOURL', 'CRAB_AsyncDest', 'CRAB_InputData', \
+    for attr in ['CRAB_ASOURL', 'CRAB_AsyncDest', 'DESIRED_CMSDataset', \
                  'CRAB_UserGroup', 'CRAB_UserRole', 'CRAB_DBSURL', \
                  'CRAB_ReqName', 'CRAB_UserHN', 'CRAB_Publish', \
                  'CRAB_RestHost', 'CRAB_RestURInoAPI']:
@@ -663,7 +663,7 @@ def inject_to_aso(file_transfer_info):
                'jobid'                   : G_JOB_AD['CRAB_Id'],
                'rest_host'               : G_JOB_AD['CRAB_RestHost'],
                'rest_uri'                : G_JOB_AD['CRAB_RestURInoAPI'],
-               'inputdataset'            : G_JOB_AD['CRAB_InputData'],
+               'inputdataset'            : G_JOB_AD['DESIRED_CMSDataset'],
                'dbs_url'                 : str(G_JOB_AD['CRAB_DBSURL']),
                'lfn'                     : file_transfer_info['source']['lfn'],
                'source_lfn'              : file_transfer_info['source']['lfn'],
