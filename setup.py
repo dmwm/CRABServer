@@ -44,6 +44,7 @@ systems = \
   },
   'All':
   {
+    'py_modules' : ['ServerUtilities'],
     'python': ['TaskWorker', 'CRABInterface', 'UserFileCache', 'CRABClient']
   }
 }
