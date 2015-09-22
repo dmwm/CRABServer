@@ -62,7 +62,7 @@ then
    echo "CRAB ID: $CRAB_Id"
    echo "Execution site: $JOB_CMSSite"
    echo "Current hostname: $(hostname)"
-   echo "Destination site: $CRAB_Dest"
+   echo "Destination temp dir: $CRAB_Dest"
    echo "Output files: $CRAB_localOutputFiles"
    echo "==== HTCONDOR JOB AD CONTENTS START ===="
    while read i; do
