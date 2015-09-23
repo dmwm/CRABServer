@@ -39,12 +39,12 @@ systems = \
   },
   'UserFileCache':
   {
-    'py_modules' : [''],
+    'py_modules' : ['ServerUtilities'],
     'python': ['UserFileCache']
   },
   'All':
   {
-    'py_modules' : ['ServerUtilities'],
+    'py_modules' : [''],
     'python': ['TaskWorker', 'CRABInterface', 'UserFileCache', 'CRABClient']
   }
 }
