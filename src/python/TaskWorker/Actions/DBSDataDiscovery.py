@@ -96,7 +96,10 @@ class DBSDataDiscovery(DataDiscovery):
             if str(dbsexc).find('No matching data'):
                 raise TaskWorkerException("The CRAB3 server backend could not find dataset %s in this DBS instance: %s" % (kwargs['task']['tm_input_dataset'], dbsurl))
             raise
-        #Create a map for block's locations: for each block get the list of locations
+        ## Create a map for block's locations: for each block get the list of locations.
+        ## Note: listFileBlockLocation() gets first the locations from PhEDEx, and if no
+        ## locations are found it gets the original locations from DBS. So it should
+        ## never be the case at this point that some blocks have no locations.
         try:
             locationsMap = self.dbs.listFileBlockLocation(list(blocks), phedexNodes=True)
         except Exception as ex: #TODO should we catch HttpException instead?
