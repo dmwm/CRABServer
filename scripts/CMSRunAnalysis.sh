@@ -133,11 +133,7 @@ echo "======== Current environment dump FINISHING ========"
 echo "======== Tarball initialization STARTING at $(TZ=GMT date) ========"
 set -x
 if [[ "X$CRAB3_RUNTIME_DEBUG" == "X" ]]; then
-    if [[ "X$CRAB_RUNTIME_TARBALL" == "X" ]]; then
-        # Didn't ask to bring a tarball with us
-        wget http://common-analysis-framework.cern.ch/CMSRunAnaly.tgz || exit 10042
-        tar xvfzm CMSRunAnaly.tgz || exit 10042
-    elif [[ $CRAB_RUNTIME_TARBALL == "local" ]]; then
+    if [[ $CRAB_RUNTIME_TARBALL == "local" ]]; then
         # Tarball was shipped with condor
         tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
     else
