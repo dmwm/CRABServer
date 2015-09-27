@@ -589,7 +589,7 @@ def executeScriptExe(opts, scram):
     ret = scram(command_, runtimeDir = os.getcwd(), logName='scramOutput.log')
     if ret > 0:
         msg = scram.diagnostic()
-        handleException("FAILED", EC_CMSRunWrapper, 'Error executing TeakPSet.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
+        handleException("FAILED", EC_CMSRunWrapper, 'Error executing TweakPSet.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
         mintime()
         sys.exit(EC_CMSRunWrapper)
 
