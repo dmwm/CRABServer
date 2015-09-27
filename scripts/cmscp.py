@@ -18,15 +18,6 @@ import traceback
 import hashlib
 from ServerUtilities import cmd_exist
 
-## Bootstrap the CMS_PATH variable; the StageOutMgr will need it.
-if 'CMS_PATH' not in os.environ:
-    if 'VO_CMS_SW_DIR' in os.environ:
-        os.environ['CMS_PATH'] = os.environ['VO_CMS_SW_DIR']
-    elif 'OSG_APP' in os.environ:
-        os.environ['CMS_PATH'] = os.path.join(os.environ['OSG_APP'], 'cmssoft', 'cms')
-    elif os.path.exists('/cvmfs/cms.cern.ch'):
-        os.environ['CMS_PATH'] = '/cvmfs/cms.cern.ch'
-
 if os.path.exists("WMCore.zip") and "WMCore.zip" not in sys.path:
     sys.path.append("WMCore.zip")
 

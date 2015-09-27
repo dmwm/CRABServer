@@ -98,22 +98,25 @@ fi
 echo "======== python2.6 bootstrap for stageout at $(TZ=GMT date) STARTING ========"
 set -x
 ### Need python2.6 for stageout also
-if [ "x" != "x$VO_CMS_SW_DIR" ]
+## CMS_PATH env is needed for WMCore stageout plugins.
+if [ -f "$VO_CMS_SW_DIR"/cmsset_default.sh ]
 then
     set +x
-	. $VO_CMS_SW_DIR/cmsset_default.sh
+    export CMS_PATH=$VO_CMS_SW_DIR
+    . $VO_CMS_SW_DIR/cmsset_default.sh
     set -x
-#   OSG style --
-elif [ "x" != "x$OSG_APP" ]
+elif [ -f "$OSG_APP"/cmssoft/cms/cmsset_default.sh ]
 then
     set +x
-	. $OSG_APP/cmssoft/cms/cmsset_default.sh CMSSW_3_3_2
+    export CMS_PATH=$OSG_APP/cmssoft/cms/
+    . $OSG_APP/cmssoft/cms/cmsset_default.sh CMSSW_3_3_2
     set -x
-elif [ -e /cvmfs/cms.cern.ch ]
+elif [ -f /cvmfs/cms.cern.ch/cmsset_default.sh ]
 then
-	export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
+    export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
+    export CMS_PATH=$VO_CMS_SW_DIR
     set +x
-	. $VO_CMS_SW_DIR/cmsset_default.sh
+    . $VO_CMS_SW_DIR/cmsset_default.sh
     set -x
 else
 	echo "Error: OSG_APP nor VO_CMS_SW_DIR environment variables were set" >&2
