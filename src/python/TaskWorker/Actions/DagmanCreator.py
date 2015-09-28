@@ -682,7 +682,7 @@ class DagmanCreator(TaskAction.TaskAction):
             availablesites = [str(i) for i in availablesites]
             self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
 
-            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, block, availablesites, outfiles, startjobid)
+            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, list(blocks)[0], availablesites, outfiles, startjobid)
             dagSpecs += jobgroupDagSpecs
 
         if not dagSpecs:
