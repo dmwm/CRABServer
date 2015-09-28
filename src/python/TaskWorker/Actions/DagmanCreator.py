@@ -558,65 +558,139 @@ class DagmanCreator(TaskAction.TaskAction):
 
         sitead = classad.ClassAd()
         siteinfo = {'group_sites': {}, 'group_datasites': {}}
+       
+        blocksWithNoLocations = set()
+
+        siteWhitelist = set(kwargs['task']['tm_site_whitelist'])
+        siteBlacklist = set(kwargs['task']['tm_site_blacklist'])
+
+        if siteWhitelist & global_blacklist:
+            msg  = "The following sites from the user site whitelist are blacklisted by the CRAB server: %s." % (map(str, list(siteWhitelist & global_blacklist)))
+            msg += " Since the CRAB server blacklist has precedence, these sites are not considered in the user whitelist."
+            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+            self.logger.warning(msg)
+            
+        if siteBlacklist & siteWhitelist:
+            msg  = "The following sites appear in both the user site blacklist and whitelist: %s." % (map(str, list(siteBlacklist & siteWhitelist)))
+            msg += " Since the whitelist has precedence, these sites are not considered in the blacklist."
+            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+            self.logger.warning(msg)
+
+        ignoreLocality = kwargs['task']['tm_ignore_locality'] == 'T'
+        self.logger.debug("Ignore locality: %s" % (ignoreLocality))
+
         for jobgroup in splitterResult:
             jobs = jobgroup.getJobs()
 
-            whitelist = set(kwargs['task']['tm_site_whitelist'])
-            ignorelocality = kwargs['task']['tm_ignore_locality'] == 'T'
+            blocks = set()
+            for job in jobs:
+                for inputfile in job['input_files']:
+                    blocks.add(inputfile['block'])
+            self.logger.debug("Blocks: %s" % list(blocks))
+
             if not jobs:
-                possiblesites = []
-            elif ignorelocality:
-                possiblesites = whitelist
+                locations = set()
+            else:
+                locations = set(jobs[0]['input_files'][0]['locations'])
+            self.logger.debug("Locations: %s" % map(str, list(locations)))
+
+            ## Discard the blocks that have no locations. This can happen when a block is
+            ## still open in PhEDEx. Newly created datasets from T0 (at least) have a large
+            ## chance of having some block which is closed in DBS but not in PhEDEx.
+            ## This is how a block is constructed during data taking:
+            ## 1) an open block in T0 is injected in PhEDEx;
+            ## 2) files are being added to the block in T0;
+            ## 3) data are transferred by PhEDEx if a subscription is present;
+            ## 4) once the block is finished:
+            ##   a) the block is inserted into DBS as a closed block (before this, DBS has
+            ##      no knowledge about the block);
+            ##   b) block is closed in PhEDEx.
+            if not locations and not ignoreLocality:
+                blocksWithNoLocations = blocksWithNoLocations.union(blocks)
+                continue
+
+            if ignoreLocality:
+                possiblesites = siteWhitelist
                 if not possiblesites:
                     sbj = SiteDB.SiteDBJSON({"key":self.config.TaskWorker.cmskey,
-                          "cert":self.config.TaskWorker.cmscert})
+                                             "cert":self.config.TaskWorker.cmscert})
                     try:
                         possiblesites = set(sbj.getAllCMSNames())
                     except Exception as ex:
-                        raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not contact sitedb to get the list of all CMS sites.\n"+\
-                            "This is could be a temporary sitedb glitch, please try to submit a new task (resubmit will not work)"+\
-                            " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO add the sitedb url so the user can check themselves!
+                        msg  = "The CRAB3 server backend could not contact SiteDB to get the list of all CMS sites."
+                        msg += " This could be a temporary SiteDB glitch."
+                        msg += " Please try to submit a new task (resubmit will not work)"
+                        msg += " and contact the experts if the error persists."
+                        msg += "\nError reason: %s" % (str(ex)) #TODO add the sitedb url so the user can check themselves!
+                        raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
             else:
-                possiblesites = jobs[0]['input_files'][0]['locations']
-            block = jobs[0]['input_files'][0]['block']
-            self.logger.debug("Block name: %s" % block)
-            self.logger.debug("Possible sites: %s" % possiblesites)
+                possiblesites = locations
+            ## At this point 'possiblesites' should never be empty.
+            self.logger.debug("Possible sites: %s" % map(str, list(possiblesites)))
 
-            # Apply globals
-            availablesites = set(possiblesites) - global_blacklist
+            ## Apply the global site blacklist.
+            availablesites = possiblesites - global_blacklist
 
+            ## TODO: The messsages below do not clarify that here it only matters the part
+            ## of the dataset that passed the lumi-mask/run-range selection.
+
+            ## Abort the submission of the task if (part of?) the dataset is available only
+            ## on sites that are blacklisted by the CRAB server.
+            ## Or should we submit at least the jobs on the part of the dataset that
+            ## survives the blacklisting? Comment S.Belforte Sep,2015: So far DDM policy
+            ## is to replicate entire datasets, not scatter them around. Once we will have
+            ## very large datasets that can happen, but it is not the case now.  
             if not availablesites:
-                msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
-                if global_blacklist and set(possiblesites).issubset(global_blacklist):
-                    msg += "\n\t\t\t\tThe sites available for submission of task %s might be blacklisted."  % (kwargs['task']['tm_taskname'])
-                    msg += "\n\t\t\t\tThis is the list of sites that are blacklisted by CRAB3 server: %s" % (list(global_blacklist))
+                msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler."
+                msg += " No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
+                msg += "\n\t\t\t\tThe sites available for submission of task %s are blacklisted by the CRAB3 server." % (kwargs['task']['tm_taskname'])
+                msg += "\n\t\t\t\tThis is the list of in principle available sites: %s" % (map(str, list(possiblesites)))
+                msg += "\n\t\t\t\tThis is the list of sites that are blacklisted by the CRAB3 server: %s" % (map(str, list(global_blacklist)))
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
+            ## Abort the submission of the task if (part of?) the dataset is available only
+            ## on sites that are removed after applying the user site blacklist/whitelist.
+            ## Or should we submit at least the jobs on the part of the dataset that
+            ## survives the blacklisting/whitelisting? (See S.Belforte comment above.)
             # NOTE: User can still shoot themselves in the foot with the resubmit blacklist
             # However, this is the last chance we have to warn the users about an impossible task at submit time.
-            blacklist = set(kwargs['task']['tm_site_blacklist'])
             available = set(availablesites)
-            if whitelist:
-                available &= whitelist
+            if siteWhitelist:
+                available &= siteWhitelist
                 if not available:
-                    msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. You put (%s) as site whitelist, but the input dataset %s can only be " \
-                          "accessed at these sites: %s. Please check your whitelist." % (", ".join(whitelist), \
-                          kwargs['task']['tm_input_dataset'], ", ".join(availablesites))
+                    msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler."
+                    msg += " You put %s as site whitelist," % (list(siteWhitelist))
+                    msg += " but the input dataset '%s' can only be accessed at these sites: %s." % (kwargs['task']['tm_input_dataset'], map(str, list(availablesites)))
+                    msg += " Please check your site whitelist."
                     raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
-
-            available -= (blacklist-whitelist)
+            available -= (siteBlacklist - siteWhitelist)
             if not available:
-                msg = "The CRAB3 server backend refuses to send jobs to the Grid scheduler. You put (%s) in the site blacklist, but your task %s can only run in "\
-                      "(%s). Please check in das the locations of your datasets. Hint: the ignoreLocality option might help" % (", ".join(blacklist),\
-                      kwargs['task']['tm_taskname'], ", ".join(availablesites))
+                msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler."
+                msg += " You put %s as site blacklist," % (list(siteBlacklist - siteWhitelist))
+                msg += " when the input dataset '%s' can actually only be accessed at these sites: %s." % (kwargs['task']['tm_input_dataset'], map(str, list(availablesites)))
+                msg += " Please check in DAS the locations of the input dataset."
+                msg += " Hint: the ignoreLocality option might help."
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             availablesites = [str(i) for i in availablesites]
             datasites = jobs[0]['input_files'][0]['locations']
-            self.logger.info("Resulting available sites: %s" % ", ".join(availablesites))
+            self.logger.info("Resulting available sites: %s" % map(str, list(availablesites)))
 
-            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid)
+            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, list(blocks)[0], availablesites, datasites, outfiles, startjobid)
             dagSpecs += jobgroupDagSpecs
+
+        if not dagSpecs:
+            msg = "No jobs created for task %s." % (kwargs['task']['tm_taskname'])
+            if blocksWithNoLocations:
+                msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler."
+                msg += " No locations found for dataset '%s'" % (kwargs['task']['tm_input_dataset'])
+                msg += " (or at least for the part of the dataset that passed the lumi-mask and/or run-range selection)."
+            raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+        if blocksWithNoLocations:
+            msg  = "The following blocks from dataset '%s' were skipped," % (kwargs['task']['tm_input_dataset'])
+            msg += " because they have no locations: %s." % (sorted(list(blocksWithNoLocations)))
+            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+            self.logger.warning(msg)
 
         ## Write down the DAG as needed by DAGMan.
         dag = DAG_HEADER % {'resthost': kwargs['task']['resthost'], 'resturiwfdb': kwargs['task']['resturinoapi'] + '/workflowdb'}
