@@ -26,7 +26,7 @@ echo "Current system : $(uname -a)"
 #   LCG style --
 echo "==== CMSSW pre-execution environment bootstrap STARTING ===="
 set -x
-if [ "x" != "x$VO_CMS_SW_DIR" ]
+if [ -f "$VO_CMS_SW_DIR"/cmsset_default.sh ]
 then
     echo 'LCG style'
     set +x
@@ -38,7 +38,7 @@ then
     PY_PATH=$VO_CMS_SW_DIR/$SCRAM_ARCH/external/python
     echo 'python version: ' $VERSIONS
 #   OSG style --
-elif [ "x" != "x$OSG_APP" ]
+elif [ -f "$OSG_APP"/cmssoft/cms/cmsset_default.sh ]
 then
     echo 'OSG style'  
     set +x
@@ -55,8 +55,9 @@ then
     VERSIONS=($(ls $OSG_APP/cmssoft/cms/$SCRAM_ARCH/external/python | egrep '2.[67]'))
     PY_PATH=$OSG_APP/cmssoft/cms/$SCRAM_ARCH/external/python 
     echo 'python version: ' $VERSIONS
-elif [ -e /cvmfs/cms.cern.ch ]
+elif [ -f /cvmfs/cms.cern.ch/cmsset_default.sh ]
 then
+    echo 'CVMFS style'
     export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
     set +x
     . $VO_CMS_SW_DIR/cmsset_default.sh
