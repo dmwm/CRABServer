@@ -597,6 +597,8 @@ class DagmanCreator(TaskAction.TaskAction):
             ## Discard the blocks that have no locations. This can happen when a block is
             ## still open in PhEDEx. Newly created datasets from T0 (at least) have a large
             ## chance of having some block which is closed in DBS but not in PhEDEx.
+            ## Open blocks in PhEDEx can have a location; it is WMCore who is returning no
+            ## location.
             ## This is how a block is constructed during data taking:
             ## 1) an open block in T0 is injected in PhEDEx;
             ## 2) files are being added to the block in T0;

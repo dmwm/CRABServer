@@ -177,7 +177,7 @@ class DagmanKiller(TaskAction):
                 self.schedd.act(htcondor.JobAction.Remove, const)
         results = rpipe.read()
         if results != "OK":
-            msg  = "The CRAB server backend was not able to kill these jobs (%s)," % (", ".join(ids))
+            msg  = "The CRAB server backend was not able to kill these jobs %s," % (ids)
             msg += " because the Grid scheduler answered with an error."
             msg += " This is probably a temporary glitch. Please try again later."
             msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
