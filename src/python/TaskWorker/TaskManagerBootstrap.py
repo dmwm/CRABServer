@@ -3,8 +3,6 @@ from __future__ import print_function
 import os
 import sys
 import json
-import errno
-import types
 import pickle
 import pprint
 
@@ -29,8 +27,9 @@ def bootstrap():
         return PreJob.PreJob().execute(*sys.argv[2:])
     elif command == "FINAL":
         return Final.Final().execute(*sys.argv[2:])
-    elif command == "ASO":
-        return ASO.async_stageout(*sys.argv[2:])
+# This does not exist...
+#    elif command == "ASO":
+#        return ASO.async_stageout(*sys.argv[2:])
 
     infile, outfile = sys.argv[2:]
 

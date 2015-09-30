@@ -48,7 +48,7 @@ class TaskHandler(object):
 
     def addTaskLogHandler(self):
         #set the logger to save the tasklog
-        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
+        logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
         taskdirname = "logs/tasks/%s/" % self._task['tm_username']
         if not os.path.isdir(taskdirname):
             os.mkdir(taskdirname)
@@ -84,12 +84,13 @@ class TaskHandler(object):
 
     def actionWork(self, *args, **kwargs):
         """Performing the set of actions"""
+        # pylint: disable=W0613
         nextinput = args
 
         taskhandler = self.addTaskLogHandler()
 
         for work in self.getWorks():
-            self.logger.debug("Starting %s on %s" % (str(work), self._task['tm_taskname']))
+            self.logger.debug("Starting %s on %s", work, self._task['tm_taskname'])
             t0 = time.time()
             try:
                 output = work.execute(nextinput, task=self._task)
@@ -125,7 +126,7 @@ class TaskHandler(object):
                         msg = "Unknown error while uploading the logfile for task %s" % self._task['tm_taskname']
                         self.logger.exception(msg)
             t1 = time.time()
-            self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1 - t0))
+            self.logger.info("Finished %s on %s in %d seconds", work, self._task['tm_taskname'], t1 - t0)
             try:
                 nextinput = output.result
             except AttributeError:

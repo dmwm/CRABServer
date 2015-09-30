@@ -1,3 +1,5 @@
+# Whats wrong with using map?
+#pylint: disable=W0141
 """
 It is possible to run this TweakPSet script standalone. These are the requirements:
 
@@ -33,6 +35,7 @@ from WMCore.WMRuntime.ScriptInterface import ScriptInterface
 
 class jobDict(dict):
     def __init__(self, lheInputFiles, seeding):
+        super.__init__()
         self.lheInputFiles = lheInputFiles
         self.seeding = seeding
     def getBaggage(self):
@@ -42,13 +45,13 @@ class jobDict(dict):
         return confSect
 
 class StepConfiguration(Configuration):
-    def __init__(self, lfnBase, outputMods):
+    def __init__(self, lfnBaseStep, outputModsStep):
         Configuration.__init__(self)
         for out in outputMods:
             setattr(self, out, ConfigSection("output"))
             getattr(self, out)._internal_name = "output"
-            getattr(self,out).lfnBase = lfnBase #'/store/temp/user/mmascher/RelValProdTTbar/mc/v6'
-        StepConfiguration.outputMods = outputMods
+            getattr(self, out).lfnBase = lfnBaseStep #'/store/temp/user/mmascher/RelValProdTTbar/mc/v6'
+        StepConfiguration.outputMods = outputModsStep
 
     def getTypeHelper(self):
         return self
@@ -131,7 +134,6 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
 
 import os
 import sys
-import json
 import tarfile
 from ast import literal_eval
 
@@ -161,7 +163,6 @@ def readFileFromTarball(file, tarball):
 print("Beginning TweakPSet")
 print(" arguments: %s" % sys.argv)
 agentNumber = 0
-#lfnBase = '/store/temp/user/mmascher/RelValProdTTbar/mc/v6' #TODO how is this built?
 lfnBase = None
 outputMods = [] #Don't need to tweak this as the client looks for the ouput names and pass them to the job wrapper which moves them
 

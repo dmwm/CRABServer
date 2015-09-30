@@ -1,4 +1,6 @@
-
+#pylint: skip-file
+# Is this code still in use?!
+# This was done for Panda and I have never touched it.
 import os
 import json
 import types

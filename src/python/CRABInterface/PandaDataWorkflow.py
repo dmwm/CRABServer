@@ -1,3 +1,5 @@
+#pylint: skip-file
+# Is this code still in use?!
 import re
 from ast import literal_eval
 import PandaServerInterface as pserver

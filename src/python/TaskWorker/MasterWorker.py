@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #external dependencies
 from __future__ import print_function
-import os
+import os, sys
 import time
 import urllib
 import signal
@@ -9,7 +9,6 @@ import random
 import logging
 import traceback
 from httplib import HTTPException
-from logging.handlers import TimedRotatingFileHandler
 
 #WMcore dependencies
 from WMCore.Configuration import loadConfigurationFile, Configuration
@@ -17,11 +16,10 @@ from WMCore.Configuration import loadConfigurationFile, Configuration
 #CAFUtilities dependencies
 from RESTInteractions import HTTPRequests
 
-from TaskWorker.WorkerExceptions import *
+from TaskWorker.WorkerExceptions import ConfigException, NoAvailableSite
 from TaskWorker.TestWorker import TestWorker
 from MultiProcessingLog import MultiProcessingLog
 from TaskWorker.Worker import Worker, setProcessLogger
-import TaskWorker.Actions.Recurring.BaseRecurringAction
 from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
 from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
 
@@ -111,8 +109,8 @@ class MasterWorker(object):
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
             logger = setProcessLogger("master")
-            logger.debug("PID %s." % os.getpid())
-            logger.debug("Logging level initialized to %s." % loglevel)
+            logger.debug("PID %s.", os.getpid())
+            logger.debug("Logging level initialized to %s.", loglevel)
             return logger
 
         self.STOP = False
@@ -132,7 +130,7 @@ class MasterWorker(object):
         if resthost is None:
             raise ConfigException("No correct mode provided: need to specify config.TaskWorker.mode in the configuration")
         self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry = 2)
-        self.logger.debug("Hostcert: %s, hostkey: %s" %(str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey)))
+        self.logger.debug("Hostcert: %s, hostkey: %s", str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey))
         # Retries for any failures
         if not hasattr(self.config.TaskWorker, 'max_retry'):
             self.config.TaskWorker.max_retry = 0
@@ -148,7 +146,7 @@ class MasterWorker(object):
         recurringActionsNames = getattr(self.config.TaskWorker, 'recurringActions', [])
         self.recurringActions = [self.getRecurringActionInst(name) for name in recurringActionsNames]
 
-
+    @classmethod
     def getRecurringActionInst(self, actionName):
         mod = __import__('TaskWorker.Actions.Recurring.%s' % actionName, fromlist=actionName)
         return getattr(mod, actionName)()
@@ -192,22 +190,23 @@ class MasterWorker(object):
         try:
             pendingwork = self.server.get(self.restURInoAPI + '/workflowdb', data = configreq)[0]['result']
         except HTTPException as hte:
-            self.logger.error("HTTP Error during _getWork: %s" % str(hte))
+            self.logger.error("HTTP Error during _getWork: %s", str(hte))
             self.logger.error("Could not get any work from the server: \n" +
                               "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown')) +
                               "\treason: %s" %(hte.headers.get('X-Error-Detail', 'unknown')))
             if hte.headers.get('X-Error-Http', 'unknown') in ['unknown']:
                 self.logger.error("Server could not acquire any work from the server:")
-                self.logger.error("%s " %(str(traceback.format_exc())))
-                self.logger.error("\turl: %s\n" %(getattr(hte, 'url', 'unknown')))
-                self.logger.error("\tresult: %s\n" %(getattr(hte, 'result', 'unknown')))
+                self.logger.error("%s ", str(traceback.format_exc()))
+                self.logger.error("\turl: %s\n", getattr(hte, 'url', 'unknown'))
+                self.logger.error("\tresult: %s\n", getattr(hte, 'result', 'unknown'))
         except Exception as exc:
-            self.logger.error("Server could not process the request: %s" %(str(exc)))
+            self.logger.error("Server could not process the request: %s", str(exc))
             self.logger.error(traceback.format_exc())
         return pendingwork
 
 
     def quit(self, code, traceback_):
+        # pylint: disable=W0613
         self.logger.info("Received kill request. Waiting for the workers...")
         self.STOP = True
 
@@ -233,7 +232,7 @@ class MasterWorker(object):
                     #503 - Database/Service unavailable. Maybe Intervention of CMSWEB ongoing?
                     retry = True
                     time_sleep = 30 + random.randint(10,30)
-                    self.logger.info("Sleeping %s seconds and will try to update again." % str(time_sleep))
+                    self.logger.info("Sleeping %s seconds and will try to update again.", time_sleep)
                     time.sleep(time_sleep)
             except Exception as exc:
                 msg = "Task Worker could not update a task status: %s\nConfiguration parameters=%s\n" % (str(exc), configreq)
@@ -255,8 +254,8 @@ class MasterWorker(object):
                 ## we may end up executing the wrong worktype later on. A solution would be to
                 ## save the previous task state in a new column of the TaskDB.
                 pendingwork = self._getWork(limit=limit, getstatus='HOLDING')
-                self.logger.info("Retrieved a total of %d %s works" %(len(pendingwork), worktype))
-                self.logger.debug("Retrieved the following works: \n%s" %(str(pendingwork)))
+                self.logger.info("Retrieved a total of %d %s works", len(pendingwork), worktype)
+                self.logger.debug("Retrieved the following works: \n%s", pendingwork)
                 self.slaves.injectWorks([(worktype, task, failstatus, None) for task in pendingwork])
                 for task in pendingwork:
                     self.updateWork(task['tm_taskname'], 'QUEUED')
@@ -264,17 +263,17 @@ class MasterWorker(object):
             for action in self.recurringActions:
                 if action.isTimeToGo():
                     #Maybe we should use new slaves and not reuse the ones used for the tasks
-                    self.logger.debug("Injecting recurring action: \n%s" %(str(action.__module__)))
+                    self.logger.debug("Injecting recurring action: \n%s", action.__module__)
                     self.slaves.injectWorks([(handleRecurring, {'tm_taskname' : action.__module__}, 'FAILED', action.__module__)])
 
             self.logger.info('Master Worker status:')
-            self.logger.info(' - free slaves: %d' % self.slaves.freeSlaves())
-            self.logger.info(' - acquired tasks: %d' % self.slaves.queuedTasks())
-            self.logger.info(' - tasks pending in queue: %d' % self.slaves.pendingTasks())
+            self.logger.info(' - free slaves: %d', self.slaves.freeSlaves())
+            self.logger.info(' - acquired tasks: %d', self.slaves.queuedTasks())
+            self.logger.info(' - tasks pending in queue: %d', self.slaves.pendingTasks())
 
             time.sleep(self.config.TaskWorker.polling)
 
-            finished = self.slaves.checkFinished()
+            _ = self.slaves.checkFinished()
 
         self.logger.debug("Master Worker Exiting Main Cycle")
 

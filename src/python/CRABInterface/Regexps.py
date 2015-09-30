@@ -67,7 +67,7 @@ RX_CERT = re.compile(r'^[-]{5}BEGIN CERTIFICATE[-]{5}[\w\W]+[-]{5}END CERTIFICAT
 RX_SUBRESTAT = re.compile(r"^errors|report|logs|data|resubmit|proceed$")
 
 #subresources of the ServerInfo (/info) and Task (/task) resources
-RX_SUBRES_SI = re.compile(r"^delegatedn|backendurls|version|bannedoutdest|scheddaddress|ignlocalityblacklist|$")
+RX_SUBRES_SI = re.compile(r"^delegatedn|backendurls|version|bannedoutdest|scheddaddress|$")
 RX_SUBRES_TASK = re.compile(r"^allinfo|allusers|summary|search|taskbystatus|addwarning|addwebdir|addoutputdatasets|webdir|counttasksbystatus|lastfailures|updateschedd$")
 
 #worker workflow

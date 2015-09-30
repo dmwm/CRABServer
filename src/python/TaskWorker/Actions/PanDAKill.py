@@ -1,3 +1,5 @@
+#pylint: skip-file
+# Is this code still in use?!
 from __future__ import print_function
 from PandaServerInterface import killJobs
 

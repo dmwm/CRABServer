@@ -3,7 +3,6 @@ import copy
 import random
 import logging
 import cherrypy
-from datetime import datetime
 from ast import literal_eval
 
 ## WMCore dependecies
@@ -36,10 +35,11 @@ class DataWorkflow(object):
                         "EventBased" : "events_per_job",
                         "EventAwareLumiBased": "events_per_job"}
 
-	self.Task = getDBinstance(config, 'TaskDB', 'Task')
-	self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
-	self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
+    self.Task = getDBinstance(config, 'TaskDB', 'Task')
+    self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
+    self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
 
+    @classmethod
     def updateRequest(self, workflow):
         """Provide the implementing class a chance to rename the workflow
            before it is committed to the DB.
@@ -112,7 +112,7 @@ class DataWorkflow(object):
         # probably we need to explicitely select the schema parameters to return
         raise NotImplementedError
 
-
+    # TODO too many arguments; this makes code complicated for me. 
     @conn_handler(services=['centralconfig'])
     def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, use_parent, secondarydata, generator, events_per_lumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                userhn, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
@@ -183,10 +183,10 @@ class DataWorkflow(object):
             requestname = '%s:%s_%s' % (timestamp, userhn, workflow)
             schedd_name = self.chooseScheduler(scheddname, backend_urls).split(":")[0]
         except IOError as err:
-            self.logger.debug("Failed to communicate with components %s. Request name %s: " % (str(err), str(requestname)))
+            self.logger.debug("Failed to communicate with components %s. Request name %s: ", str(err), str(requestname))
             raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")
         splitArgName = self.splitArgMap[splitalgo]
-        username = cherrypy.request.user['login']
+        _ = cherrypy.request.user['login']
         dbSerializer = str
 
         ## If these parameters were not set in the submission request, give them
@@ -279,7 +279,7 @@ class DataWorkflow(object):
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name."""
         retmsg = "ok"
-        self.logger.info("About to resubmit workflow: %s. Getting status first." % (workflow))
+        self.logger.info("About to resubmit workflow: %s. Getting status first.", workflow)
         ## Get the status of the task/jobs.
         statusRes = self.status(workflow, userdn, userproxy)[0]
         ## We allow resubmission of jobs only if the task status is one of these:
@@ -390,7 +390,7 @@ class DataWorkflow(object):
            :arg str workflow: a workflow name"""
 
         retmsg = "ok"
-        self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
+        self.logger.info("About to kill workflow: %s. Getting status first.", workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
         args = {'ASOURL' : statusRes.get("ASOURL", "")}
@@ -407,7 +407,7 @@ class DataWorkflow(object):
                     retmsg = "Cannot request kill for %s" % (set(jobids) - set(killList))
             if not killList:
                 raise ExecutionError("There are no jobs to kill. Only jobs not in %s states can be killed" % self.successList)
-            self.logger.info("Jobs to kill: %s" % killList)
+            self.logger.info("Jobs to kill: %s", killList)
 
             args.update({"killList": killList, "killAll": jobids==[]})
             self.api.modify(self.Task.SetStatusTask_sql, status = ["KILL"], taskname = [workflow])
