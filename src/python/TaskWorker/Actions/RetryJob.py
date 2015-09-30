@@ -138,13 +138,13 @@ class RetryJob(object):
             if code == job_status:
                 job_status_name = name
         try:
-            with os.fdopen(os.open("task_statistics.%s.%s" % (self.site, job_status_name), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), 'a') as fd:
+            with os.fdopen(os.open("task_statistics.%s.%s" % (self.site, job_status_name), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0o644), 'a') as fd:
                 fd.write("%d\n" % (self.job_id))
         except Exception as ex:
             self.logger.error(str(ex))
             # Swallow the exception - record_site is advisory only
         try:
-            with os.fdopen(os.open("task_statistics.%s" % (job_status_name), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0644), 'a') as fd:
+            with os.fdopen(os.open("task_statistics.%s" % (job_status_name), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0o644), 'a') as fd:
                 fd.write("%d\n" % (self.job_id))
         except Exception as ex:
             self.logger.error(str(ex))

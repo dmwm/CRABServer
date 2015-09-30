@@ -544,7 +544,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
 
-        os.chmod("CMSRunAnalysis.sh", 0755)
+        os.chmod("CMSRunAnalysis.sh", 0o755)
 
         # This config setting acts as a global black list
         global_blacklist = set(self.getBlacklistedSites())

@@ -1,3 +1,4 @@
+from __future__ import print_function
 from PandaServerInterface import killJobs
 
 from TaskWorker.Actions.PanDAAction import PanDAAction
@@ -55,4 +56,4 @@ if __name__ == '__main__':
     cfg = Config(Sites=sites)
     pk = PanDAKill(cfg)
     result = pk.execute(task=task)
-    print result
+    print(result)

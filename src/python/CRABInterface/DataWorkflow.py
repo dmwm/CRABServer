@@ -323,7 +323,7 @@ class DataWorkflow(object):
         ## same values they had in the original task submission.
         if (siteblacklist is None) or (sitewhitelist is None) or (maxjobruntime is None) or (maxmemory is None) or (numcores is None) or (priority is None):
             ## origValues = [orig_siteblacklist, orig_sitewhitelist, orig_maxjobruntime, orig_maxmemory, orig_numcores, orig_priority]
-            origValues = self.api.query(None, None, self.Task.GetResubmitParams_sql, taskname = workflow).next()
+            origValues = next(self.api.query(None, None, self.Task.GetResubmitParams_sql, taskname = workflow))
             if siteblacklist is None:
                 siteblacklist = literal_eval(origValues[0])
             if sitewhitelist is None:
@@ -425,7 +425,7 @@ class DataWorkflow(object):
 
            :arg str workflow: a workflow name
         """
-        row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
+        row = self.Task.ID_tuple(*next(self.api.query(None, None, self.Task.ID_sql, taskname=workflow)))
         if row.task_status != 'UPLOADED':
             msg = 'Can only proceed if task is in the UPLOADED state, but it is in the %s state.' % row.task_status
             raise ExecutionError(msg)

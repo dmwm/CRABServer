@@ -1,3 +1,4 @@
+from __future__ import print_function
 from PandaServerInterface import runBrokerage
 
 from TaskWorker.Actions.PanDAAction import PanDAAction
@@ -63,11 +64,11 @@ if __name__ == '__main__':
     pb = PanDABrokerage(cfg)
     result = pb.execute([jg], task=task)
     for r in result:
-        print r
+        print(r)
 
     sites = Sites(available=[])
     cfg = Config(Sites=sites)
     pb = PanDABrokerage(cfg)
     result = pb.execute([jg], task=task)
     for r in result:
-        print r
+        print(r)

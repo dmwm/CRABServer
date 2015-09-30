@@ -61,7 +61,7 @@ class DataFileMetadata(object):
                               outlfn=binds['outlfn'][0], taskname=binds['taskname'][0])
         try:
             #just one row is picked up by the previous query
-            row = row.next()
+            row = next(row)
         except StopIteration:
             #StipIteration will be raised if no rows was found
             self.logger.debug('No rows selected. Inserting new row into filemetadata')

@@ -36,7 +36,7 @@ class RESTServerInfo(RESTEntity):
         if subresource:
             return getattr(RESTServerInfo, subresource)(self, **kwargs)
         else:
-            self.api.query(None, None, "select NULL from DUAL").next() #Checking database connection
+            next(self.api.query(None, None, "select NULL from DUAL")) #Checking database connection
             return [{"crabserver":"Welcome","version":__version__}]
 
     @conn_handler(services=['centralconfig'])
@@ -60,7 +60,7 @@ class RESTServerInfo(RESTEntity):
             schedd, address = loc.getScheddObj(workflow) 
         except Exception as ex:
             self.logger.exception(ex)
-            raise ExecutionError("Unable to get schedd address for task %s" % (workflow)), ex
+            raise ExecutionError("Unable to get schedd address for task %s" % (workflow))(ex)
         yield loc.scheddAd['Machine']
 
     @conn_handler(services=['centralconfig'])

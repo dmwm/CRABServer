@@ -29,7 +29,7 @@ class TestActionHandler(unittest.TestCase):
         self.task = json.load(open(os.path.join(test_base, "test/data/Actions/task1"), "r"))
         # DBS API does not accept unicode:
         for key, val in self.task.items():
-            if isinstance(val, types.UnicodeType):
+            if isinstance(val, str):
                 self.task[key] = str(val)
         self.panda_config = WMCore.Configuration.loadConfigurationFile(os.path.abspath(os.path.join(test_base, "test/etc/panda_test.py")))
         self.gwms_config = WMCore.Configuration.loadConfigurationFile(os.path.abspath(os.path.join(test_base, "test/etc/gwms_test.py")))

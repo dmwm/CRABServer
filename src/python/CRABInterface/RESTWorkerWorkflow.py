@@ -148,7 +148,7 @@ class RESTWorkerWorkflow(RESTEntity):
             accordingly to what the TaskWorker provided
         """
         #load the task
-        task = self.api.query(None, None, self.Task.ID_sql, taskname=binds['taskname'][0]).next()
+        task = next(self.api.query(None, None, self.Task.ID_sql, taskname=binds['taskname'][0]))
         task = self.Task.ID_tuple(*task)
         splitargs = literal_eval(task.split_args.read())
         #update the tm_splitargs

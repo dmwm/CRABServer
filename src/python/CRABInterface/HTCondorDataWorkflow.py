@@ -25,6 +25,7 @@ from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTas
 
 import HTCondorUtils
 import HTCondorLocator
+from functools import reduce
 
 
 JOB_KILLED_HOLD_REASON = "Python-initiated action."
@@ -65,7 +66,7 @@ class HTCondorDataWorkflow(DataWorkflow):
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
 
-        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
+        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
         row = self.Task.ID_tuple(*row)
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
@@ -80,7 +81,7 @@ class HTCondorDataWorkflow(DataWorkflow):
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
         self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
 
-        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
+        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
         row = self.Task.ID_tuple(*row)
 
         statusRes = self.status(workflow, userdn, userproxy)[0]
@@ -178,7 +179,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         statusRes = self.status(workflow, userdn)[0]
 
         #get the information we need from the taskdb/initilize variables
-        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow).next()
+        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
         row = self.Task.ID_tuple(*row)
         inputDataset = row.input_dataset
         outputDatasets = literal_eval(row.output_dataset.read() if row.output_dataset else 'None')
@@ -267,7 +268,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         try:
             #just one row is picked up by the previous query
-            row = self.Task.ID_tuple(*row.next())
+            row = self.Task.ID_tuple(*next(row))
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % workflow)
 

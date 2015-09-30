@@ -22,7 +22,7 @@ class PandaDataWorkflow(DataWorkflow):
            :return: a workflow status summary document"""
         self.logger.debug("Getting status for workflow %s" % workflow)
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
-        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, _ = row.next() #just one row is picked up by the previous query
+        _, jobsetid, status, vogroup, vorole, taskFailure, splitArgs, resJobs, saveLogs, _ = next(row) #just one row is picked up by the previous query
         resJobs = literal_eval(resJobs.read())
         self.logger.info("Status result for workflow %s: %s. JobsetID: %s" % (workflow, status, jobsetid))
         self.logger.debug("User vogroup=%s and user vorole=%s" % (vogroup, vorole))

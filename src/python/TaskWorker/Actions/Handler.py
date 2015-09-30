@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import time
 import logging
@@ -228,9 +229,9 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
 
 
 if __name__ == '__main__':
-    print "New task"
+    print("New task")
     handleNewTask(None, None, None, task={})
-    print "\nResubmit task"
+    print("\nResubmit task")
     handleResubmit(None, None, None, task={})
-    print "\nKill task"
+    print("\nKill task")
     handleKill(None, None, None, task={})

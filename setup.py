@@ -2,6 +2,7 @@
 """
     NOTE: This is intended to run automagically. Keep the deps minimal
 """
+from __future__ import print_function
 import sys, os, os.path, re, shutil, string
 from distutils.core import setup, Command
 from distutils.command.build import build
@@ -144,7 +145,7 @@ class BuildCommand(Command):
 
   def finalize_options(self):
     if self.system not in systems:
-      print "System %s unrecognised, please use '-s CRABInterface'" % self.system
+      print("System %s unrecognised, please use '-s CRABInterface'" % self.system)
       sys.exit(1)
 
     # Expand various sources and maybe do the c++ build.
@@ -189,10 +190,10 @@ class InstallCommand(install):
   def finalize_options(self):
     # Check options.
     if self.system not in systems:
-      print "System %s unrecognised, please use '-s CRABInterface'" % self.system
+      print("System %s unrecognised, please use '-s CRABInterface'" % self.system)
       sys.exit(1)
     if self.patch and not os.path.isdir("%s/xbin" % self.prefix):
-      print "Patch destination %s does not look like a valid location." % self.prefix
+      print("Patch destination %s does not look like a valid location." % self.prefix)
       sys.exit(1)
 
     # Expand various sources, but don't build anything from c++ now.
