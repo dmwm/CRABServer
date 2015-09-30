@@ -351,12 +351,17 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
             if jobtype == 'Analysis':
                 validate_str("inputdata", param, safe, RX_DATASET, optional=False)
-            ## Added this if, because in this case 'inputdata' was already validated
-            ## above in _checkPrimaryDataset(), and I am not sure if we can skip the
-            ## validate_str('inputdata', ...) or we need it so that all parameters
-            ## are moved from param to safe.
-            elif jobtype == 'PrivateMC' and safe.kwargs['publication']:
-                validate_str("inputdata", param, safe, RX_ANYTHING, optional=False)
+            ## In case of PrivateMC with publication, 'inputdata' was already validated
+            ## above in _checkPrimaryDataset(), but I am not sure if we can skip the
+            ## validate_str('inputdata', ...) or we need it so that all parameters are
+            ## moved from param to safe.
+            ## In case of PrivateMC with no publication, 'inputdata' is optional, but if
+            ## given it is used only for the primary dataset part in the output LFN.
+            elif jobtype == 'PrivateMC':
+                if safe.kwargs['publication']:
+                    validate_str("inputdata", param, safe, RX_ANYTHING, optional=False)
+                else:
+                    validate_str("inputdata", param, safe, RX_LFNPRIMDS, optional=True)
             else:
                 validate_str("inputdata", param, safe, RX_DATASET, optional=True)
             validate_num("nonvaliddata", param, safe, optional=True)
