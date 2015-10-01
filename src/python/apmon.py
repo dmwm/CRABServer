@@ -1,4 +1,4 @@
-
+#pylint: skip-file
 """
  * ApMon - Application Monitoring Tool
  * Version: 2.2.4
