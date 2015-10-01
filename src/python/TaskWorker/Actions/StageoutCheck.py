@@ -75,14 +75,20 @@ class StageoutCheck(TaskAction):
             return
         filename = re.sub("[:-_]", "", self.task['tm_taskname']) + '_crab3check.tmp'
         try:
-            createDummyFile(filename, self.logger)
             pfn = getPFN(self.proxy, self.task['tm_output_lfn'], filename, self.task['tm_asyncdest'], self.logger)
             cpCmd += append + os.path.abspath(filename) + " " + pfn
             rmCmd += " " + pfn
-            self.logger.info("Executing cp command: %s " % cpCmd)
-            self.checkPermissions(cpCmd)
-            self.logger.info("Executing rm command: %s " % rmCmd)
-            self.checkPermissions(rmCmd)
+            createDummyFile(filename, self.logger)
+            try:
+                self.logger.info("Executing cp command: %s " % cpCmd)
+                self.checkPermissions(cpCmd)
+            except:
+                raise
+            else
+                self.logger.info("Executing rm command: %s " % rmCmd)
+                self.checkPermissions(rmCmd)
+            finally:
+                removeDummyFile(filename, self.logger)
         except IOError as er:
             self.logger.info('IOError %s. CRAB3 backend disk is full. Please report to experts. Task will not be submitted' % er)
             raise
