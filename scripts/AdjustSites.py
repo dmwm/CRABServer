@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import re
 import sys
@@ -20,7 +21,7 @@ if '_CONDOR_JOB_AD' not in os.environ or not os.path.exists(os.environ["_CONDOR_
 
 
 newstdout = "adjust_out.txt"
-fd = os.open(newstdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
+fd = os.open(newstdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
 if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
     os.dup2(fd, 1)
     os.dup2(fd, 2)
@@ -253,7 +254,7 @@ def makeWebDir(ad):
     try:
         htcondor.Schedd().edit([dagJobId], 'CRAB_UserWebDir', ad.lookup('CRAB_UserWebDir'))
     except RuntimeError as reerror:
-        print str(reerror)
+        print(str(reerror))
 
 
 def updateWebDir(ad):

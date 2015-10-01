@@ -23,14 +23,14 @@ class ApmonIf:
         # taskId
         if self.taskId is not None :
             taskId = self.taskId
-        if params.has_key('taskId') :
+        if 'taskId' in params :
             taskId = params['taskId']
         if taskid is not None :
             taskId = taskid
         # jobId
         if self.jobId is not None :
             jobId = self.jobId
-        if params.has_key('jobId') :
+        if 'jobId' in params :
             jobId = params['jobId']
         if jobid is not None :
             jobId = jobid

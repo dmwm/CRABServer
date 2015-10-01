@@ -37,7 +37,7 @@ def authz_owner_match(dbapi, workflows, Task):
     for wf in workflows:
         wfrow = None
         try:
-            wfrow = dbapi.query(None, None, Task.GetUserFromID_sql, taskname = wf).next()
+            wfrow = next(dbapi.query(None, None, Task.GetUserFromID_sql, taskname = wf))
         except Exception as ex:
             excauthz = RuntimeError("The document '%s' is not retrievable '%s'" % (wf, str(ex)))
             raise MissingObject("The resource requested does not exist", trace=traceback.format_exc(), errobj = excauthz)

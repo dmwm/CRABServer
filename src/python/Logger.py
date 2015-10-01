@@ -1,4 +1,4 @@
-
+#pylint: skip-file
 """
  * ApMon - Application Monitoring Tool
  * Version: 2.2.1
@@ -30,6 +30,7 @@
  * OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
  * MODIFICATIONS.
 """
+from __future__ import print_function
 
 import time
 import threading
@@ -55,7 +56,7 @@ class Logger:
 		global LEVELS, FATAL, ERROR, WARNING, INFO, NOTICE, DEBUG
 		this.log_lock.acquire();
 		if(level <= this.logLevel):
-			print time.asctime() + ": ApMon["+LEVELS[level]+"]: "+message;
+			print(time.asctime() + ": ApMon["+LEVELS[level]+"]: "+message);
 		this.log_lock.release();
 
 	# Set the logging level

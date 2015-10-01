@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import print_function
 import re
 import pprint
 import optparse
@@ -61,7 +62,7 @@ class PoolStatus(object):
         try:
             jobs = schedd.query('true', ['CRAB_UserHN', 'AccountingGroup', 'JobPrio', 'BLTaskID', 'CRAB_ReqName', 'DESIRED_SEs', 'DESIRED_SITES', 'JobStatus', 'MATCH_GLIDEIN_CMSSite'])
         except IOError:
-            print "Unable to retrieve tasks from schedd %s" % schedd_ad['Name']
+            print("Unable to retrieve tasks from schedd %s" % schedd_ad['Name'])
             return
         for job in jobs:
             if 'CRAB_ReqName' in job:

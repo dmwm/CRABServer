@@ -1,11 +1,5 @@
 import logging
-import time
-import commands
-import json
 from ast import literal_eval
-
-# WMCore dependecies here
-from WMCore.REST.Error import InvalidParameter, ExecutionError, MissingObject
 
 from CRABInterface.Utils import getDBinstance
 
@@ -20,7 +14,7 @@ class DataFileMetadata(object):
         self.FileMetaData = getDBinstance(config,'FileMetaDataDB','FileMetaData')
 
     def getFiles(self, taskname, filetype):
-        self.logger.debug("Calling jobmetadata for task %s and filetype %s" % (taskname, filetype))
+        self.logger.debug("Calling jobmetadata for task %s and filetype %s", taskname, filetype)
         binds = {'taskname': taskname, 'filetype': filetype}
         rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, **binds)
         for row in rows:
@@ -47,7 +41,8 @@ class DataFileMetadata(object):
                    'tmplfn': row[18]}
 
     def inject(self, *args, **kwargs):
-        self.logger.debug("Calling jobmetadata inject with parameters %s" % kwargs)
+        # pylint: disable=W0613
+        self.logger.debug("Calling jobmetadata inject with parameters %s", kwargs)
 
         bindnames = set(kwargs.keys()) - set(['outfileruns', 'outfilelumis'])
         binds = {}
@@ -61,13 +56,13 @@ class DataFileMetadata(object):
                               outlfn=binds['outlfn'][0], taskname=binds['taskname'][0])
         try:
             #just one row is picked up by the previous query
-            row = row.next()
+            row = next(row)
         except StopIteration:
             #StipIteration will be raised if no rows was found
             self.logger.debug('No rows selected. Inserting new row into filemetadata')
             self.api.modify(self.FileMetaData.New_sql, **binds)
             return []
-        self.logger.debug('Changing filemetadata information about job %s' % row)
+        self.logger.debug('Changing filemetadata information about job %s', row)
         update_bind = {}
         update_bind['outtmplocation'] = binds['outtmplocation']
         update_bind['outsize'] = binds['outsize']
@@ -78,14 +73,15 @@ class DataFileMetadata(object):
         return []
 
     def changeState(self, *args, **kwargs):#kwargs are (taskname, outlfn, filestate)
-        self.logger.debug("Changing state of file %(outlfn)s in task %(taskname)s to %(filestate)s" % kwargs)
+        # pylint: disable=W0613
+        self.logger.debug("Changing state of file %(outlfn)s in task %(taskname)s to %(filestate)s", kwargs)
 
         self.api.modify(self.FileMetaData.ChangeFileState_sql, **dict((k, [v]) for k,v in kwargs.iteritems()))
 
     def delete(self, taskname, hours):
         if taskname:
-            self.logger.debug("Deleting all the files associated to task: %s" % taskname)
+            self.logger.debug("Deleting all the files associated to task: %s", taskname)
             self.api.modifynocheck(self.FileMetaData.DeleteTaskFiles_sql, taskname=[taskname])
         if hours:
-            self.logger.debug("Deleting all the files older than %s hours" % hours)
+            self.logger.debug("Deleting all the files older than %s hours", hours)
             self.api.modifynocheck(self.FileMetaData.DeleteFilesByTime_sql, hours=[hours])

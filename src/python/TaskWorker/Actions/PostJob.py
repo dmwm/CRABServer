@@ -53,6 +53,7 @@ about the file to the FJR. The information is:
 
 The PostJob and cmscp are the only places in CRAB3 where we should use camel_case instead of snakeCase.
 """
+from __future__ import print_function
 
 import os
 import re
@@ -284,7 +285,7 @@ class ASOServerJob(object):
         except Exception as ex:
             msg = "Failed to connect to ASO database: %s" % (str(ex))
             self.logger.exception(msg)
-            raise RuntimeError, msg
+            raise RuntimeError(msg)
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -375,7 +376,7 @@ class ASOServerJob(object):
                     self.failures[doc_id] = {'reasons': reasons, 'app': app, 'severity': severity}
             else:
                 exmsg = "Got an unknown transfer status: %s" % (transfer_status)
-                raise RuntimeError, exmsg
+                raise RuntimeError(exmsg)
         if all_transfers_finished:
             msg = "All transfers finished."
             self.logger.info(msg)
@@ -427,7 +428,7 @@ class ASOServerJob(object):
         self.docs_in_transfer = self.inject_to_aso()
         if self.docs_in_transfer == False:
             exmsg = "Couldn't upload document to ASO database"
-            raise RuntimeError, exmsg
+            raise RuntimeError(exmsg)
         if not self.docs_in_transfer:
             self.logger.info("No files to transfer via ASO. Done!")
             return 0
@@ -1014,7 +1015,7 @@ class PostJob():
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             handler = logging.StreamHandler(sys.stdout)    
         else:
-            print "Wrinting post-job output to %s." % (self.postjob_log_file_name)
+            print("Wrinting post-job output to %s." % (self.postjob_log_file_name))
             mode = 'w' if first_pj_execution() else 'a'
             handler = logging.FileHandler(filename=self.postjob_log_file_name, mode=mode)
         handler.setFormatter(self.logging_formatter)
@@ -1027,8 +1028,8 @@ class PostJob():
         ## need to redirect stdout/err to the post-job log file if we want to see the
         ## unhandled exceptions.
         if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
-            fd_postjob_log = os.open(self.postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0644)
-            os.chmod(self.postjob_log_file_name, 0644)
+            fd_postjob_log = os.open(self.postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o644)
+            os.chmod(self.postjob_log_file_name, 0o644)
             os.dup2(fd_postjob_log, 1)
             os.dup2(fd_postjob_log, 2)
 
@@ -1075,7 +1076,7 @@ class PostJob():
             fd_stdout = open(stdout_tmp, 'w')
             fd_stdout.truncate(0)
             fd_stdout.close()
-            os.chmod(fname, 0644)
+            os.chmod(fname, 0o644)
         ## Copy the json job report file jobReport.json.<job_id> to
         ## job_fjr.<job_id>.<crab_retry>.json and create a symbolic link in the task web
         ## directory to the new job report file.
@@ -1083,7 +1084,7 @@ class PostJob():
             msg = "Copying job report from %s to %s." % (G_JOB_REPORT_NAME, G_JOB_REPORT_NAME_NEW)
             self.logger.debug(msg)
             shutil.copy(G_JOB_REPORT_NAME, G_JOB_REPORT_NAME_NEW)
-            os.chmod(G_JOB_REPORT_NAME_NEW, 0644)
+            os.chmod(G_JOB_REPORT_NAME_NEW, 0o644)
             msg = "Creating symbolic link in task web directory to job report file: %s -> %s" % (os.path.join(self.logpath, G_JOB_REPORT_NAME_NEW), G_JOB_REPORT_NAME_NEW)
             self.logger.debug(msg)
             try:
@@ -2393,11 +2394,11 @@ class testServer(unittest.TestCase):
             os.write(fh, (inputString * ((size/len(inputString))+1))[:size])
             os.close(fh)
             cmd = "env -u LD_LIBRAY_PATH lcg-cp -b -D srmv2 -v file://%s %s" % (path, pfn)
-            print cmd
+            print(cmd)
             status, res = commands.getstatusoutput(cmd)
             if status:
                 exmsg = "Couldn't make file: %s" % (res)
-                raise RuntimeError, exmsg
+                raise RuntimeError(exmsg)
         finally:
             if os.path.exists(path):
                 os.unlink(path)
@@ -2438,9 +2439,9 @@ class testServer(unittest.TestCase):
 if __name__ == '__main__':
     if len(sys.argv) >= 2 and sys.argv[1] == 'UNIT_TEST':
         sys.argv = [sys.argv[0]]
-        print "Beginning testing"
+        print("Beginning testing")
         unittest.main()
-        print "Testing over"
+        print("Testing over")
         sys.exit()
     POSTJOB = PostJob()
     sys.exit(POSTJOB.execute(*sys.argv[2:]))
