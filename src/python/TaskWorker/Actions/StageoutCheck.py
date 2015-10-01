@@ -83,10 +83,11 @@ class StageoutCheck(TaskAction):
             self.checkPermissions(cpCmd)
             self.logger.info("Executing rm command: %s " % rmCmd)
             self.checkPermissions(rmCmd)
-            removeDummyFile(filename, self.logger)
         except IOError as er:
             self.logger.info('IOError %s. CRAB3 backend disk is full. Please report to experts. Task will not be submitted' % er)
             raise
         except HTTPException as er:
             self.logger.warning("CRAB3 is not able to get pfn from PhEDEx. Error %s" % er)
+        finally:
+            removeDummyFile(filename, self.logger)
         return
