@@ -323,25 +323,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 self.logger.exception("%s: %s" % (workflow, msg))
                 raise TaskWorkerException(msg)
 
-            #try to gsissh in order to create the home directory (and check if we can connect to the schedd)
             try:
                 scheddAddress = loc.scheddAd['Machine']
             except:
                 raise TaskWorkerException("Unable to get schedd address for task %s" % (task['tm_taskname']))
-            #try to connect
-            self.logger.debug("gsissh-ing to schedd %s" % scheddAddress)
-            if hasattr(self.config.MyProxy, 'uisource'):
-                ret = subprocess.call(["sh","-c","export X509_USER_PROXY=%s; source %s; timeout 60 gsissh -o ConnectTimeout=60 -o PasswordAuthentication=no %s pwd" %\
-                                                    (task['user_proxy'], self.config.MyProxy.uisource, scheddAddress)])
-            else:
-                ret = subprocess.call(["sh","-c","export X509_USER_PROXY=%s; timeout 60 gsissh -o ConnectTimeout=60 -o PasswordAuthentication=no %s pwd" %\
-                                                    (task['user_proxy'], scheddAddress)])
-            self.logger.debug("gsissh done")
-            if ret:
-                msg = "Cannot gsissh to %s. Taskname %s." % (scheddAddress, task['tm_taskname'])
-                if ret == 124:
-                    msg += "\n Timeout executing the command gsissh."
-                raise TaskWorkerException(msg)
 
             # Get location of schedd-specific environment script from schedd ad.
             info['remote_condor_setup'] = loc.scheddAd.get("RemoteCondorSetup", "")
