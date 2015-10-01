@@ -13,9 +13,9 @@ function finish {
   END_TIME=$(date +%s)
   DIFF_TIME=$((END_TIME-START_TIME))
   echo "Job Running time in seconds: " $DIFF_TIME
-  if [ "X$CRAB3_RUNTIME_DEBUG" != "X" ];
+  if [ "X$CRAB3_RUNTIME_DEBUG" = "X" ];
   then
-    if [ $DIFF_TIME -lt 1200];
+    if [ $DIFF_TIME -lt 1200 ];
     then
       SLEEP_TIME=$((1200 - DIFF_TIME))
       echo "Job runtime is less than 20minutes. Sleeping " $SLEEP_TIME
