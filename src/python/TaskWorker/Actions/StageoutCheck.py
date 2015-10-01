@@ -84,7 +84,7 @@ class StageoutCheck(TaskAction):
                 self.checkPermissions(cpCmd)
             except:
                 raise
-            else
+            else:
                 self.logger.info("Executing rm command: %s " % rmCmd)
                 self.checkPermissions(rmCmd)
             finally:
