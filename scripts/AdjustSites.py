@@ -237,6 +237,14 @@ def makeWebDir(ad):
             os.symlink(os.path.abspath(os.path.join(".", "debug")), os.path.join(path, "debug"))
         except:
             pass
+        try:
+            os.symlink(os.path.abspath(os.path.join(".", "run_and_lumis.tar.gz")), os.path.join(path, "run_and_lumis.tar.gz"))
+        except:
+            pass
+        try:
+            os.symlink(os.path.abspath(os.path.join(".", "input_files.tar.gz")), os.path.join(path, "input_files.tar.gz"))
+        except:
+            pass
     except OSError:
         pass
     try:
