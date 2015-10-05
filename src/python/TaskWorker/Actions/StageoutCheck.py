@@ -27,7 +27,8 @@ class StageoutCheck(TaskAction):
     def checkPermissions(self, Cmd):
         """
         Execute command and in case of permanent issue, raise error
-        If issue unknown, upload warning message
+        If issue unknown, upload warning message and return 1
+        Return 0 otherwise
         """
         self.logger.info("Executing command: %s " % Cmd)
         out, err, exitcode = executeCommand(Cmd)
@@ -44,7 +45,8 @@ class StageoutCheck(TaskAction):
                 msg = "The CRAB3 server got a non-critical error while checking stageout permissions. Please use checkwrite to check if everything is fine."
                 self.uploadWarning(msg, self.task['user_proxy'], self.task['tm_taskname'])
                 self.logger.info("UNKNOWN ERROR. Operator should check if it is permanent, but for now we go ahead and submit a task.")
-                return
+                return 1
+        return 0
 
 
     def execute(self, *args, **kw):
@@ -75,18 +77,23 @@ class StageoutCheck(TaskAction):
             return
         filename = re.sub("[:-_]", "", self.task['tm_taskname']) + '_crab3check.tmp'
         try:
-            createDummyFile(filename, self.logger)
             pfn = getPFN(self.proxy, self.task['tm_output_lfn'], filename, self.task['tm_asyncdest'], self.logger)
             cpCmd += append + os.path.abspath(filename) + " " + pfn
             rmCmd += " " + pfn
-            self.logger.info("Executing cp command: %s " % cpCmd)
-            self.checkPermissions(cpCmd)
-            self.logger.info("Executing rm command: %s " % rmCmd)
-            self.checkPermissions(rmCmd)
-            removeDummyFile(filename, self.logger)
+            createDummyFile(filename, self.logger)
+            try:
+                self.logger.info("Executing cp command: %s " % cpCmd)
+                res = self.checkPermissions(cpCmd)
+                if res==0:
+                    self.logger.info("Executing rm command: %s " % rmCmd)
+                    self.checkPermissions(rmCmd)
+            finally:
+                removeDummyFile(filename, self.logger)
         except IOError as er:
             self.logger.info('IOError %s. CRAB3 backend disk is full. Please report to experts. Task will not be submitted' % er)
             raise
         except HTTPException as er:
             self.logger.warning("CRAB3 is not able to get pfn from PhEDEx. Error %s" % er)
+        finally:
+            removeDummyFile(filename, self.logger)
         return

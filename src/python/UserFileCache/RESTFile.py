@@ -62,7 +62,7 @@ class RESTFile(RESTEntity):
                 authz_operator(safe.kwargs['username'])
 
     @restcall
-    def put(self, inputfile, hashkey, newchecksum):
+    def put(self, inputfile, hashkey, newchecksum=0):
         """Allow to upload a tarball file to be written in the local filesystem.
            Base path of the local filesystem is configurable.
 
