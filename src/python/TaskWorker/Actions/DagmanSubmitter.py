@@ -167,7 +167,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         #Check memory and walltime and if user requires too much:
         # upload warning back to crabserver
         # change walltime to max 47h Issue: #4742
-        stdmaxjobruntime = 2800
+        stdmaxjobruntime = 2750
         stdmaxmemory = 2500
         if kwargs['task']['tm_maxjobruntime'] > stdmaxjobruntime:
             msg = "Task requests %s minutes of runtime, but only %s minutes are guaranteed to be available." % (kwargs['task']['tm_maxjobruntime'], stdmaxjobruntime)
