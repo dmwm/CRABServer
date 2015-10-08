@@ -11,16 +11,11 @@ from RESTInteractions import HTTPRequests
 
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.DataObjects.Result import Result
-from TaskWorker.Actions.PanDAKill import PanDAKill
 from TaskWorker.Actions.DagmanKiller import DagmanKiller
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
-from TaskWorker.Actions.PanDAgetSpecs import PanDAgetSpecs
 from TaskWorker.Actions.StageoutCheck import StageoutCheck
-from TaskWorker.Actions.PanDABrokerage import PanDABrokerage
-from TaskWorker.Actions.PanDAInjection import PanDAInjection
 from TaskWorker.Actions.DryRunUploader import DryRunUploader
-from TaskWorker.Actions.PanDASpecs2Jobs import PanDASpecs2Jobs
 from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
 from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
@@ -28,7 +23,7 @@ from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
 from TaskWorker.WorkerExceptions import WorkerHandlerException, StopHandler, TaskWorkerException
 
-DEFAULT_BACKEND = 'panda'
+DEFAULT_BACKEND = 'glidein'
 
 
 class TaskHandler(object):
@@ -174,11 +169,6 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
             handler.addWork(DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum))
         else:
             handler.addWork(DagmanSubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
-    def panda(config):
-        """Performs the injection into PanDA of a new task
-        :arg WMCore.Configuration config: input configuration"""
-        handler.addWork(PanDABrokerage(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
-        handler.addWork(PanDAInjection(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)
 
@@ -200,13 +190,7 @@ def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
         """Performs the re-injection into Glidein
         :arg WMCore.Configuration config: input configuration"""
         handler.addWork(DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
-    def panda(config):
-        """Performs the re-injection into PanDA
-        :arg WMCore.Configuration config: input configuration"""
-        handler.addWork(PanDAgetSpecs(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
-        handler.addWork(PanDASpecs2Jobs(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
-        handler.addWork(PanDABrokerage(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
-        handler.addWork(PanDAInjection(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
+
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)
 
@@ -228,10 +212,6 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
         """Performs kill of jobs sent through Glidein
         :arg WMCore.Configuration config: input configuration"""
         handler.addWork(DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum))
-    def panda(config):
-        """Performs the re-injection into PanDA
-        :arg WMCore.Configuration config: input configuration"""
-        handler.addWork(PanDAKill(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)
 
