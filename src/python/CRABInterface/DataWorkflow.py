@@ -283,7 +283,7 @@ class DataWorkflow(object):
         ## Get the status of the task/jobs.
         statusRes = self.status(workflow, userdn, userproxy)[0]
         ## We allow resubmission of jobs only if the task status is one of these:
-        allowedTaskStates = ['SUBMITTED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
+        allowedTaskStates = ['SUBMITTED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'SUBMITFAILED'] #NB submitfailed goes to NEW, not RESUBMIT
         ## If the user wants to resubmit a specific set of jobs, then we also accept the
         ## task to be in COMPLETED state. This is because we want to allow resubmission
         ## of successfully finished jobs if the user explicitly gave the job id.
@@ -351,7 +351,11 @@ class DataWorkflow(object):
         ## above parameters.
         self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow], arguments = [str(arguments)])
         ## Change the status of the task in the Tasks DB to RESUBMIT.
-        self.api.modify(self.Task.SetStatusTask_sql, status = ["RESUBMIT"], taskname = [workflow])
+        if statusRes['status'] == 'SUBMITFAILED':
+            newstate = ["NEW"]
+        else:
+            newstate = ["RESUBMIT"]
+        self.api.modify(self.Task.SetStatusTask_sql, status = newstate, taskname = [workflow])
         return [{'result': retmsg}]
 
 
