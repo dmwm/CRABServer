@@ -192,7 +192,7 @@ class DataWorkflow(object):
         ## If these parameters were not set in the submission request, give them
         ## predefined default values.
         if maxjobruntime is None:
-            maxjobruntime = 1315
+            maxjobruntime = 1250
         if maxmemory is None:
             maxmemory = 2000
         if numcores is None:
