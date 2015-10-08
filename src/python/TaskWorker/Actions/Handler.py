@@ -88,7 +88,7 @@ class TaskHandler(object):
         # I know it looks like a duplicated printout from the process logs (proc.N.log) perspective.
         # Infact we have a smilar printout in the processWorker function of the Worker module, but
         # it does not go to the task logfile and it is useful imho.
-        self.logger.debug("Process %s is starting %s on task %s" % (self.procnum, self.workFunction, self._task))
+        self.logger.debug("Process %s is starting %s on task %s" % (self.procnum, self.workFunction, self._task['tm_taskname']))
 
         for work in self.getWorks():
             #Loop that iterates over the actions to be performed
