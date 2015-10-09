@@ -20,11 +20,11 @@ if '_CONDOR_JOB_AD' not in os.environ or not os.path.exists(os.environ["_CONDOR_
 
 
 newstdout = "adjust_out.txt"
-fd = os.open(newstdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
+logfd = os.open(newstdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
 if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
-    os.dup2(fd, 1)
-    os.dup2(fd, 2)
-os.close(fd)
+    os.dup2(logfd, 1)
+    os.dup2(logfd, 2)
+os.close(logfd)
 
 
 def printLog(msg):
@@ -276,7 +276,7 @@ def updateWebDir(ad):
     cert = ad['X509UserProxy']
     try:
         server = HTTPRequests(host, cert, cert)
-        server.post(uri, data = urllib.urlencode(data))
+        server.post(uri, data=urllib.urlencode(data))
         return 0
     except HTTPException as hte:
         printLog(traceback.format_exc())
@@ -301,7 +301,7 @@ def saveProxiedWebdir(ad):
     host = ad['CRAB_RestHost']
     uri = ad['CRAB_RestURInoAPI'] + '/task'
     cert = ad['X509UserProxy']
-    res = getProxiedWebDir(task, host, uri, cert, logFunction = printLog)
+    res = getProxiedWebDir(task, host, uri, cert, logFunction=printLog)
 
     # We need to use a file to communicate this to the prejob. I tried things like:
     #    htcondor.Schedd().edit([dagJobId], 'CRAB_UserWebDirPrx', ad.lookup('CRAB_UserWebDir'))
@@ -320,9 +320,9 @@ def clearAutomaticBlacklist():
     """
     Need a doc string here.
     """
-    for file in glob.glob("task_statistics.*"):
+    for filename in glob.glob("task_statistics.*"):
         try:
-            os.unlink(file)
+            os.unlink(filename)
         except Exception as e:
             printLog("ERROR when clearing statistics: %s" % str(e))
 
@@ -346,7 +346,7 @@ def main():
     while retries < 3 and exitCode != 0:
         exitCode = updateWebDir(ad)
         if exitCode != 0:
-            time.sleep(retries*20)
+            time.sleep(retries * 20)
         retries += 1
 
     printLog("Webdir URL has been uploaded, exit code is %s. Setting the classad for the proxied webdir" % exitCode)
@@ -372,7 +372,7 @@ def main():
             # file; hence, we only edit the file while holding an appropriate lock.
             # Note this lock method didn't exist until 8.1.6; prior to this, we simply
             # run dangerously.
-            with htcondor.lock(open("RunJobs.dag.nodes.log", 'a'), htcondor.LockType.WriteLock) as lock:
+            with htcondor.lock(open("RunJobs.dag.nodes.log", 'a'), htcondor.LockType.WriteLock):
                 adjustedJobIds = adjustPostScriptExitStatus(resubmitJobIds)
         else:
             adjustedJobIds = adjustPostScriptExitStatus(resubmitJobIds)

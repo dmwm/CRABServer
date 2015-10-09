@@ -3,7 +3,6 @@ import copy
 import random
 import logging
 import cherrypy
-from datetime import datetime
 from ast import literal_eval
 
 ## WMCore dependecies
@@ -36,9 +35,9 @@ class DataWorkflow(object):
                         "EventBased" : "events_per_job",
                         "EventAwareLumiBased": "events_per_job"}
 
-	self.Task = getDBinstance(config, 'TaskDB', 'Task')
-	self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
-	self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
+        self.Task = getDBinstance(config, 'TaskDB', 'Task')
+        self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
+        self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
 
     def updateRequest(self, workflow):
         """Provide the implementing class a chance to rename the workflow
@@ -67,15 +66,6 @@ class DataWorkflow(object):
         #raise NotImplementedError
         return self.api.query(None, None, self.Task.GetTasksFromUser_sql, username=username, timestamp=timestamp)
 
-    def errors(self, workflow, shortformat):
-        """Retrieves the sets of errors for a specific workflow
-
-           :arg str workflow: a workflow name
-           :arg int shortformat: a flag indicating if the user is asking for detailed
-                                 information about sites and list of errors
-           :return: a list of errors grouped by exit code, error reason, site"""
-        raise NotImplementedError
-
     def report(self, workflow):
         """Retrieves the quality of the workflow in term of what has been processed
            (eg: good lumis)
@@ -101,17 +91,6 @@ class DataWorkflow(object):
            :arg int howmany: the limit on the number of PFN to return
            :return: a generator of list of outputs"""
         raise NotImplementedError
-
-    def schema(self, workflow):
-        """Returns the workflow schema parameters.
-
-           :arg str workflow: a workflow name
-           :return: a json corresponding to the workflow schema"""
-        # it probably needs to connect to the database
-        # TODO: verify + code the above point
-        # probably we need to explicitely select the schema parameters to return
-        raise NotImplementedError
-
 
     @conn_handler(services=['centralconfig'])
     def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, use_parent, secondarydata, generator, events_per_lumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
