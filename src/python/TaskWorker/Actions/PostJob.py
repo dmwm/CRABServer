@@ -70,7 +70,6 @@ import signal
 import urllib
 import hashlib
 import logging
-import classad
 import commands
 import unittest
 import datetime
@@ -86,7 +85,7 @@ from TaskWorker import __version__
 from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
-from ServerUtilities import setDashboardLogs, isFailurePermanent
+from ServerUtilities import setDashboardLogs, isFailurePermanent, parseJobAd
 
 ASO_JOB = None
 config = None
@@ -455,13 +454,11 @@ class ASOServerJob(object):
             msg  = msg % (self.aso_start_time, self.aso_start_timestamp)
             self.logger.warning(msg)
 
-        if str(self.job_ad['CRAB_UserRole']).lower() != 'undefined':
-            role = str(self.job_ad['CRAB_UserRole'])
-        else:
+        role = str(self.job_ad['CRAB_UserRole'])
+        if str(self.job_ad['CRAB_UserRole']).lower() == 'undefined':
             role = ''
-        if str(self.job_ad['CRAB_UserGroup']).lower() != 'undefined':
-            group = str(self.job_ad['CRAB_UserGroup'])
-        else:
+        group = str(self.job_ad['CRAB_UserGroup'])
+        if str(self.job_ad['CRAB_UserGroup']).lower() == 'undefined':
             group = ''
 
         task_publish = int(self.job_ad['CRAB_Publish'])
@@ -623,8 +620,18 @@ class ASOServerJob(object):
                     self.logger.info(msg)
                     if publication_msg:
                         self.logger.info(publication_msg)
+                    input_dataset = str(self.job_ad['DESIRED_CMSDataset'])
+                    if str(self.job_ad['DESIRED_CMSDataset']).lower() == 'undefined':
+                        input_dataset = ''
+                    primary_dataset = str(self.job_ad['CRAB_PrimaryDataset'])
+                    if input_dataset:
+                        input_dataset_or_primary_dataset = input_dataset
+                    elif primary_dataset:
+                        input_dataset_or_primary_dataset = '/'+primary_dataset # Adding the '/' until we fix ASO
+                    else:
+                        input_dataset_or_primary_dataset = '/'+'NotDefined' # Adding the '/' until we fix ASO
                     doc = {'_id'                     : doc_id,
-                           'inputdataset'            : str(self.job_ad['DESIRED_CMSDataset']),
+                           'inputdataset'            : input_dataset_or_primary_dataset,
                            'rest_host'               : str(self.job_ad['CRAB_RestHost']),
                            'rest_uri'                : str(self.job_ad['CRAB_RestURInoAPI']),
                            'lfn'                     : source_lfn,
@@ -910,7 +917,6 @@ class PostJob():
         ## These attributes are read from the job ad (see parse_job_ad()).
         self.job_ad              = {}
         self.dest_site           = None
-        self.input_dataset       = None
         self.job_sw              = None
         self.publish_name        = None
         self.rest_host           = None
@@ -1864,12 +1870,12 @@ class PostJob():
                 ## '/' + primary dataset name. TODO: Some day maybe we could improve
                 ## this (define a primary dataset parameter in the job ad and in the
                 ## rest interface).
-                primary_dataset_name = self.input_dataset.split('/')[1]
+                primary_dataset = self.job_ad['CRAB_PrimaryDataset']
                 group_user_prefix = self.job_ad['CRAB_UserHN']
                 if 'CRAB_PublishGroupName' in self.job_ad and self.job_ad['CRAB_PublishGroupName']:
                     if file_info['outlfn'].startswith('/store/group/') and file_info['outlfn'].split('/')[3]:
                         group_user_prefix = file_info['outlfn'].split('/')[3]
-                outdataset = os.path.join('/' + primary_dataset_name, group_user_prefix + '-' + publishname, 'USER')
+                outdataset = os.path.join('/' + primary_dataset, group_user_prefix + '-' + publishname, 'USER')
                 output_datasets.add(outdataset)
             else:
                 outdataset = '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER'
@@ -1956,8 +1962,7 @@ class PostJob():
             self.logger.error("Missing job ad!")
             return 1
         try:
-            with open(job_ad_file_name) as fd:
-                self.job_ad = classad.parseOld(fd)
+            self.job_ad = parseJobAd(job_ad_file_name)
         except Exception as ex:
             msg = "Error parsing job ad: %s" % (str(ex))
             self.logger.exception(msg)
@@ -1967,7 +1972,6 @@ class PostJob():
             return 1
         ## Set some class variables using the job ad.
         self.dest_site        = str(self.job_ad['CRAB_AsyncDest'])
-        self.input_dataset    = str(self.job_ad['DESIRED_CMSDataset'])
         self.job_sw           = str(self.job_ad['CRAB_JobSW'])
         self.publish_name     = str(self.job_ad['CRAB_PublishName'])
         self.rest_host        = str(self.job_ad['CRAB_RestHost'])
@@ -2000,20 +2004,23 @@ class PostJob():
         """
         Check if all the required attributes from the job ad are there.
         """
-        required_job_ad_attrs = ['CRAB_ASOURL',
-                                 'CRAB_AsyncDest',
-                                 'CRAB_DBSURL',
-                                 'DESIRED_CMSDataset',
-                                 'CRAB_JobSW',
-                                 'CRAB_Publish',
-                                 'CRAB_PublishName',
-                                 'CRAB_RestHost',
-                                 'CRAB_RestURInoAPI',
-                                 'CRAB_RetryOnASOFailures',
-                                 'CRAB_SaveLogsFlag',
-                                 'CRAB_TransferOutputs',
-                                 'CRAB_UserHN',
-                                ]
+        required_job_ad_attrs = {'CRAB_UserRole'           : {'allowUndefined': True },
+                                 'CRAB_UserGroup'          : {'allowUndefined': True },
+                                 'CRAB_ASOURL'             : {'allowUndefined': False},
+                                 'CRAB_AsyncDest'          : {'allowUndefined': False},
+                                 'CRAB_DBSURL'             : {'allowUndefined': False},
+                                 'DESIRED_CMSDataset'      : {'allowUndefined': True },
+                                 'CRAB_JobSW'              : {'allowUndefined': False},
+                                 'CRAB_Publish'            : {'allowUndefined': False},
+                                 'CRAB_PublishName'        : {'allowUndefined': False},
+                                 'CRAB_PrimaryDataset'     : {'allowUndefined': False},
+                                 'CRAB_RestHost'           : {'allowUndefined': False},
+                                 'CRAB_RestURInoAPI'       : {'allowUndefined': False},
+                                 'CRAB_RetryOnASOFailures' : {'allowUndefined': False},
+                                 'CRAB_SaveLogsFlag'       : {'allowUndefined': False},
+                                 'CRAB_TransferOutputs'    : {'allowUndefined': False},
+                                 'CRAB_UserHN'             : {'allowUndefined': False},
+                                }
         missing_attrs = []
         for attr in required_job_ad_attrs:
             if attr not in self.job_ad:
@@ -2025,8 +2032,9 @@ class PostJob():
             return 1
         undefined_attrs = []
         for attr in required_job_ad_attrs:
-            if self.job_ad[attr] is None or str(self.job_ad[attr]).lower() in ['', 'undefined']:
-                undefined_attrs.append(attr)
+            if not required_job_ad_attrs[attr]['allowUndefined']:
+                if self.job_ad[attr] is None or str(self.job_ad[attr]).lower() in ['', 'undefined']:
+                    undefined_attrs.append(attr)
         if undefined_attrs:
             msg = "Could not determine the following required attributes from the job ad: %s"
             msg = msg % (undefined_attrs)

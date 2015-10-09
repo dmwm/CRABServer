@@ -101,6 +101,7 @@ CRAB_Id = $(count)
 +CRAB_Dest = "%(temp_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
 +CRAB_ASOURL = %(tm_asourl)s
++CRAB_PrimaryDataset = %(primarydataset)s
 +TaskType = "Job"
 +AccountingGroup = %(accounting_group)s
 
@@ -171,10 +172,14 @@ def getCreateTimestamp(taskname):
 
 
 def makeLFNPrefixes(task):
-    if task['tm_input_dataset']:
+    ## Once we don't care anymore about backward compatibility with crab server < 3.3.1511
+    ## we can uncomment the 1st line below and remove the next 6 lines.
+    #primaryds = task['tm_primary_dataset']
+    if task['tm_primary_dataset']:
+        primaryds = task['tm_primary_dataset']
+    elif task['tm_input_dataset']:
         primaryds = task['tm_input_dataset'].split('/')[1]
     else:
-        # For MC
         primaryds = task['tm_publish_name'].rsplit('-', 1)[0]
     hash_input = task['tm_user_dn']
     if 'tm_user_group' in task and task['tm_user_group']:
@@ -204,7 +209,7 @@ def transform_strings(input):
     for the job submit file string.
     """
     info = {}
-    for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'splitalgo', 'algoargs', \
+    for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'primarydataset', 'splitalgo', 'algoargs', \
                'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', \
@@ -385,6 +390,13 @@ class DagmanCreator(TaskAction.TaskAction):
         info['jobsw'] = info['tm_job_sw']
         info['jobarch'] = info['tm_job_arch']
         info['inputdata'] = info['tm_input_dataset']
+        ## The 1st line below is for backward compatibility with entries in the TaskDB
+        ## made by CRAB server < 3.3.1511, where tm_primary_dataset = null
+        ## and tm_input_dataset always contains at least one '/'. Once we don't
+        ## care about backward compatibility anymore, remove the 1st line and
+        ## uncomment the 2nd line.
+        info['primarydataset'] = info['tm_primary_dataset'] if info['tm_primary_dataset'] else info['tm_input_dataset'].split('/')[1]
+        #info['primarydataset'] = info['tm_primary_dataset']
         info['splitalgo'] = info['tm_split_algo']
         info['algoargs'] = info['tm_split_args']
         info['cachefilename'] = info['tm_user_sandbox']

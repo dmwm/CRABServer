@@ -82,6 +82,7 @@ class DataUserWorkflow(object):
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
            :arg str inputdata: input dataset;
+           :arg str primarydataset: primary dataset;
            :arg str nonvaliddata: allow invalid input dataset;
            :arg int use_parent: add the parent dataset as secondary input;
            :arg str secondarydata: secondary input dataset

@@ -253,3 +253,4 @@ class Task(dict):
         self['tm_publish_groupname'] = task[57]
         self['tm_nonvalid_input_dataset'] = task[58]
         self['tm_secondary_input_dataset'] = task[59]
+        self['tm_primary_dataset'] = task[60]
