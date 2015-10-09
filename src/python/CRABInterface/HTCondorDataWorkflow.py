@@ -104,7 +104,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## Check that the jobids passed by the user are in a valid state to retrieve files.
         for jobid in jobids:
             if not jobid in transferingIds + finishedIds:
-                raise InvalidParameter("The job with id %s is not in a valid state to retrieve %s files" % (file_type, jobid))
+                raise InvalidParameter("The job with id %s is not in a valid state to retrieve %s files" % (jobid, file_type))
 
         ## If the user does not give us jobids, set them to all possible ids.
         if not jobids:
