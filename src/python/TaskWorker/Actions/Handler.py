@@ -218,8 +218,8 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
 
 if __name__ == '__main__':
     print "New task"
-    handleNewTask(None, None, None, task={})
+    handleNewTask(None, None, None, task, 0)
     print "\nResubmit task"
-    handleResubmit(None, None, None, task={})
+    handleResubmit(None, None, None, task, 0)
     print "\nKill task"
-    handleKill(None, None, None, task={})
+    handleKill(None, None, None, task, 0)

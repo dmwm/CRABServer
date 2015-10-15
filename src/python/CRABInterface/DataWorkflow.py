@@ -39,11 +39,17 @@ class DataWorkflow(object):
         self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
         self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
 
-    def updateRequest(self, workflow):
+    @classmethod
+    def updateRequest(cls, workflow):
         """Provide the implementing class a chance to rename the workflow
            before it is committed to the DB.
            """
         return workflow
+
+    @classmethod
+    def chooseScheduler(cls, scheddname=None, backend_urls=None):
+        """ Has to be subclassed """
+        raise NotImplementedError
 
     def getLatests(self, username, timestamp):
         """Retrives the latest workflows for the user
@@ -165,7 +171,6 @@ class DataWorkflow(object):
             self.logger.debug("Failed to communicate with components %s. Request name %s: " % (str(err), str(requestname)))
             raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")
         splitArgName = self.splitArgMap[splitalgo]
-        username = cherrypy.request.user['login']
         dbSerializer = str
 
         ## If these parameters were not set in the submission request, give them
@@ -181,7 +186,7 @@ class DataWorkflow(object):
 
         if not asourl:
             asourl = self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", "")
-            if type(asourl)==list:
+            if isinstance(asourl, list):
                 asourl = random.choice(asourl)
 
         arguments = {}
@@ -336,26 +341,6 @@ class DataWorkflow(object):
             newstate = ["RESUBMIT"]
         self.api.modify(self.Task.SetStatusTask_sql, status = newstate, taskname = [workflow])
         return [{'result': retmsg}]
-
-
-    def _updateTaskStatus(self, workflow, status, jobsPerStatus):
-        """
-        Update the status of the task when it is finished.
-        More details: if the status of the task is submitted => all the jobs are finished then taskStatus=COMPLETED
-                                                             => all the jobs are finished or failed then taskStatus=FAILED
-        """
-        if status == 'SUBMITTED':
-            #only completed jobs
-            if not set(jobsPerStatus) - set(self.successList):
-                self.logger.debug("Changing task status to COMPLETED")
-                self.api.modify(self.Task.SetStatusTask_sql, status = ["COMPLETED"], taskname = [workflow])
-                return "COMPLETED"
-            #only failed and completed jobs (completed may not be there) => task failed
-            if not set(jobsPerStatus) - set(self.successList) - set(self.failedList):
-                self.logger.debug("Changing task status to FAILED")
-                self.api.modify(self.Task.SetStatusTask_sql, status = ["FAILED"], taskname = [workflow])
-                return "FAILED"
-        return status
 
 
     def status(self, workflow, userdn, userproxy=None):
