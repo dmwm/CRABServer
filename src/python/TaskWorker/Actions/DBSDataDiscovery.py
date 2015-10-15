@@ -101,7 +101,8 @@ class DBSDataDiscovery(DataDiscovery):
         ## locations are found it gets the original locations from DBS. So it should
         ## never be the case at this point that some blocks have no locations.
         try:
-            locationsMap = self.dbs.listFileBlockLocation(list(blocks), phedexNodes=True)
+            dbsOnly = self.dbsInstance.split('/')[1] != 'global'
+            locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly, phedexNodes=True)
         except Exception as ex: #TODO should we catch HttpException instead?
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
