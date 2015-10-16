@@ -56,7 +56,7 @@ ABORT-DAG-ON Job%(count)d 3
 
 """
 
-CRAB_HEADERS = \
+JOB_SUBMIT = \
 """
 +CRAB_ReqName = %(requestname)s
 +CRAB_Workflow = %(workflow)s
@@ -86,10 +86,6 @@ CRAB_HEADERS = \
 +CRAB_RestHost = %(resthost)s
 +CRAB_RestURInoAPI = %(resturinoapi)s
 +CRAB_NumAutomJobRetries = %(numautomjobretries)s
-"""
-
-JOB_SUBMIT = CRAB_HEADERS + \
-"""
 CRAB_Attempt = %(attempt)d
 CRAB_ISB = %(cacheurl_flatten)s
 CRAB_AdditionalOutputFiles = %(addoutputfiles_flatten)s
