@@ -11,16 +11,11 @@ from RESTInteractions import HTTPRequests
 
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.DataObjects.Result import Result
-from TaskWorker.Actions.PanDAKill import PanDAKill
 from TaskWorker.Actions.DagmanKiller import DagmanKiller
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
-from TaskWorker.Actions.PanDAgetSpecs import PanDAgetSpecs
 from TaskWorker.Actions.StageoutCheck import StageoutCheck
-from TaskWorker.Actions.PanDABrokerage import PanDABrokerage
-from TaskWorker.Actions.PanDAInjection import PanDAInjection
 from TaskWorker.Actions.DryRunUploader import DryRunUploader
-from TaskWorker.Actions.PanDASpecs2Jobs import PanDASpecs2Jobs
 from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
 from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
@@ -28,19 +23,21 @@ from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
 from TaskWorker.WorkerExceptions import WorkerHandlerException, StopHandler, TaskWorkerException
 
-DEFAULT_BACKEND = 'panda'
+DEFAULT_BACKEND = 'glidein'
 
 
 class TaskHandler(object):
     """Handling the set of operations to be performed."""
 
 
-    def __init__(self, task, procnum, server):
+    def __init__(self, task, procnum, server, workFunction):
         """Initializer
 
         :arg TaskWorker.DataObjects.Task task: the task to work on."""
         self.logger = logging.getLogger(str(procnum))
+        self.procnum = procnum
         self.server = server
+        self.workFunction = workFunction
         self._work = []
         self._task = task
 
@@ -52,6 +49,7 @@ class TaskHandler(object):
         if not os.path.isdir(taskdirname):
             os.mkdir(taskdirname)
         taskhandler = FileHandler(taskdirname + self._task['tm_taskname'] + '.log')
+        taskhandler.setFormatter(formatter)
         taskhandler.setLevel(logging.DEBUG)
         self.logger.addHandler(taskhandler)
         self.server.logger = self.logger
@@ -87,7 +85,13 @@ class TaskHandler(object):
 
         taskhandler = self.addTaskLogHandler()
 
+        # I know it looks like a duplicated printout from the process logs (proc.N.log) perspective.
+        # Infact we have a smilar printout in the processWorker function of the Worker module, but
+        # it does not go to the task logfile and it is useful imho.
+        self.logger.debug("Process %s is starting %s on task %s" % (self.procnum, self.workFunction, self._task['tm_taskname']))
+
         for work in self.getWorks():
+            #Loop that iterates over the actions to be performed
             self.logger.debug("Starting %s on %s" % (str(work), self._task['tm_taskname']))
             t0 = time.time()
             try:
@@ -146,7 +150,7 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     :*args and *kwargs: extra parameters currently not defined
     :return: the handler."""
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=2)
-    handler = TaskHandler(task, procnum, server)
+    handler = TaskHandler(task, procnum, server, 'handleNewTask')
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
     handler.addWork(StageoutCheck(config=config, server=server, resturi=resturi, procnum=procnum))
     if task['tm_job_type'] == 'Analysis':
@@ -165,11 +169,6 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
             handler.addWork(DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum))
         else:
             handler.addWork(DagmanSubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
-    def panda(config):
-        """Performs the injection into PanDA of a new task
-        :arg WMCore.Configuration config: input configuration"""
-        handler.addWork(PanDABrokerage(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
-        handler.addWork(PanDAInjection(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)
 
@@ -185,19 +184,13 @@ def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=2)
-    handler = TaskHandler(task, procnum, server)
+    handler = TaskHandler(task, procnum, server, 'handleResubmit')
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
     def glidein(config):
         """Performs the re-injection into Glidein
         :arg WMCore.Configuration config: input configuration"""
         handler.addWork(DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
-    def panda(config):
-        """Performs the re-injection into PanDA
-        :arg WMCore.Configuration config: input configuration"""
-        handler.addWork(PanDAgetSpecs(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
-        handler.addWork(PanDASpecs2Jobs(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
-        handler.addWork(PanDABrokerage(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
-        handler.addWork(PanDAInjection(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
+
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)
 
@@ -213,24 +206,20 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=2)
-    handler = TaskHandler(task, procnum, server)
+    handler = TaskHandler(task, procnum, server, 'handleKill')
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 5))
     def glidein(config):
         """Performs kill of jobs sent through Glidein
         :arg WMCore.Configuration config: input configuration"""
         handler.addWork(DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum))
-    def panda(config):
-        """Performs the re-injection into PanDA
-        :arg WMCore.Configuration config: input configuration"""
-        handler.addWork(PanDAKill(pandaconfig=config, server=server, resturi=resturi, procnum=procnum))
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)
 
 
 if __name__ == '__main__':
     print "New task"
-    handleNewTask(None, None, None, task={})
+    handleNewTask(None, None, None, task, 0)
     print "\nResubmit task"
-    handleResubmit(None, None, None, task={})
+    handleResubmit(None, None, None, task, 0)
     print "\nKill task"
-    handleKill(None, None, None, task={})
+    handleKill(None, None, None, task, 0)

@@ -1,4 +1,4 @@
-from logging.handlers import TimedRotatingFileHandler, RotatingFileHandler
+from logging.handlers import TimedRotatingFileHandler
 import multiprocessing, threading, logging, sys, traceback
 
 class MultiProcessingLog(logging.Handler):

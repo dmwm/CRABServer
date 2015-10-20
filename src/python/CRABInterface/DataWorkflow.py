@@ -3,7 +3,6 @@ import copy
 import random
 import logging
 import cherrypy
-from datetime import datetime
 from ast import literal_eval
 
 ## WMCore dependecies
@@ -36,15 +35,21 @@ class DataWorkflow(object):
                         "EventBased" : "events_per_job",
                         "EventAwareLumiBased": "events_per_job"}
 
-	self.Task = getDBinstance(config, 'TaskDB', 'Task')
-	self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
-	self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
+        self.Task = getDBinstance(config, 'TaskDB', 'Task')
+        self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
+        self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
 
-    def updateRequest(self, workflow):
+    @classmethod
+    def updateRequest(cls, workflow):
         """Provide the implementing class a chance to rename the workflow
            before it is committed to the DB.
            """
         return workflow
+
+    @classmethod
+    def chooseScheduler(cls, scheddname=None, backend_urls=None):
+        """ Has to be subclassed """
+        raise NotImplementedError
 
     def getLatests(self, username, timestamp):
         """Retrives the latest workflows for the user
@@ -66,15 +71,6 @@ class DataWorkflow(object):
         #                                          "limit": limit, })
         #raise NotImplementedError
         return self.api.query(None, None, self.Task.GetTasksFromUser_sql, username=username, timestamp=timestamp)
-
-    def errors(self, workflow, shortformat):
-        """Retrieves the sets of errors for a specific workflow
-
-           :arg str workflow: a workflow name
-           :arg int shortformat: a flag indicating if the user is asking for detailed
-                                 information about sites and list of errors
-           :return: a list of errors grouped by exit code, error reason, site"""
-        raise NotImplementedError
 
     def report(self, workflow):
         """Retrieves the quality of the workflow in term of what has been processed
@@ -101,17 +97,6 @@ class DataWorkflow(object):
            :arg int howmany: the limit on the number of PFN to return
            :return: a generator of list of outputs"""
         raise NotImplementedError
-
-    def schema(self, workflow):
-        """Returns the workflow schema parameters.
-
-           :arg str workflow: a workflow name
-           :return: a json corresponding to the workflow schema"""
-        # it probably needs to connect to the database
-        # TODO: verify + code the above point
-        # probably we need to explicitely select the schema parameters to return
-        raise NotImplementedError
-
 
     @conn_handler(services=['centralconfig'])
     def submit(self, workflow, activity, jobtype, jobsw, jobarch, use_parent, secondarydata, generator, events_per_lumi, siteblacklist,
@@ -188,13 +173,12 @@ class DataWorkflow(object):
             self.logger.debug("Failed to communicate with components %s. Request name %s: " % (str(err), str(requestname)))
             raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")
         splitArgName = self.splitArgMap[splitalgo]
-        username = cherrypy.request.user['login']
         dbSerializer = str
 
         ## If these parameters were not set in the submission request, give them
         ## predefined default values.
         if maxjobruntime is None:
-            maxjobruntime = 1315
+            maxjobruntime = 1250
         if maxmemory is None:
             maxmemory = 2000
         if numcores is None:
@@ -204,7 +188,7 @@ class DataWorkflow(object):
 
         if not asourl:
             asourl = self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", "")
-            if type(asourl)==list:
+            if isinstance(asourl, list):
                 asourl = random.choice(asourl)
 
         arguments = {}
@@ -286,7 +270,7 @@ class DataWorkflow(object):
         ## Get the status of the task/jobs.
         statusRes = self.status(workflow, userdn, userproxy)[0]
         ## We allow resubmission of jobs only if the task status is one of these:
-        allowedTaskStates = ['SUBMITTED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
+        allowedTaskStates = ['SUBMITTED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'SUBMITFAILED'] #NB submitfailed goes to NEW, not RESUBMIT
         ## If the user wants to resubmit a specific set of jobs, then we also accept the
         ## task to be in COMPLETED state. This is because we want to allow resubmission
         ## of successfully finished jobs if the user explicitly gave the job id.
@@ -354,28 +338,12 @@ class DataWorkflow(object):
         ## above parameters.
         self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow], arguments = [str(arguments)])
         ## Change the status of the task in the Tasks DB to RESUBMIT.
-        self.api.modify(self.Task.SetStatusTask_sql, status = ["RESUBMIT"], taskname = [workflow])
+        if statusRes['status'] == 'SUBMITFAILED':
+            newstate = ["NEW"]
+        else:
+            newstate = ["RESUBMIT"]
+        self.api.modify(self.Task.SetStatusTask_sql, status = newstate, taskname = [workflow])
         return [{'result': retmsg}]
-
-
-    def _updateTaskStatus(self, workflow, status, jobsPerStatus):
-        """
-        Update the status of the task when it is finished.
-        More details: if the status of the task is submitted => all the jobs are finished then taskStatus=COMPLETED
-                                                             => all the jobs are finished or failed then taskStatus=FAILED
-        """
-        if status == 'SUBMITTED':
-            #only completed jobs
-            if not set(jobsPerStatus) - set(self.successList):
-                self.logger.debug("Changing task status to COMPLETED")
-                self.api.modify(self.Task.SetStatusTask_sql, status = ["COMPLETED"], taskname = [workflow])
-                return "COMPLETED"
-            #only failed and completed jobs (completed may not be there) => task failed
-            if not set(jobsPerStatus) - set(self.successList) - set(self.failedList):
-                self.logger.debug("Changing task status to FAILED")
-                self.api.modify(self.Task.SetStatusTask_sql, status = ["FAILED"], taskname = [workflow])
-                return "FAILED"
-        return status
 
 
     def status(self, workflow, userdn, userproxy=None):

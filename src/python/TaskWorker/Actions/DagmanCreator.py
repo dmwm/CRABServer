@@ -566,7 +566,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         sitead = classad.ClassAd()
         siteinfo = {'group_sites': {}, 'group_datasites': {}}
-       
+
         blocksWithNoLocations = set()
 
         siteWhitelist = set(kwargs['task']['tm_site_whitelist'])
@@ -577,7 +577,7 @@ class DagmanCreator(TaskAction.TaskAction):
             msg += " Since the CRAB server blacklist has precedence, these sites are not considered in the user whitelist."
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
-            
+
         if siteBlacklist & siteWhitelist:
             msg  = "The following sites appear in both the user site blacklist and whitelist: %s." % (map(str, list(siteBlacklist & siteWhitelist)))
             msg += " Since the whitelist has precedence, these sites are not considered in the blacklist."
@@ -649,7 +649,7 @@ class DagmanCreator(TaskAction.TaskAction):
             ## Or should we submit at least the jobs on the part of the dataset that
             ## survives the blacklisting? Comment S.Belforte Sep,2015: So far DDM policy
             ## is to replicate entire datasets, not scatter them around. Once we will have
-            ## very large datasets that can happen, but it is not the case now.  
+            ## very large datasets that can happen, but it is not the case now.
             if not availablesites:
                 msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler."
                 msg += " No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
@@ -775,7 +775,7 @@ class DagmanCreator(TaskAction.TaskAction):
                      'localId' : '',
                      'StatusValue' : 'pending',
                     }
-            insertJobIdSid(jinfo, idx, taskid, 0) 
+            insertJobIdSid(jinfo, idx, taskid, 0)
             ml_info.append(jinfo)
 
         # When running in standalone mode, we want to record the number of jobs in the task
@@ -793,10 +793,10 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def extractMonitorFiles(self, inputFiles, **kw):
         """
-        Ops mon needs access to some files from sandbox.tar.gz. 
+        Ops mon needs access to some files from sandbox.tar.gz.
         It's impractical to extract those files on the user's browser, therefore
         the files are extracted here to the debug folder to be later sent to the schedd.
-        
+
         Also modified inputFiles list by appending a debug folder if extraction succeeds.
         """
         try:
@@ -808,17 +808,17 @@ class DagmanCreator(TaskAction.TaskAction):
                 sandboxTar.extract(scriptExeName)
                 shutil.copy(scriptExeName, 'debug/' + scriptExeName)
             sandboxTar.close()
+
+            inputFiles.append('debug')
+
+            # Change permissions of extracted files to allow Ops mon to read them.
+            for _, _, filenames in os.walk('debug'):
+                for f in filenames:
+                    os.chmod('debug/' + f, 0o644)
         except Exception as ex:
             self.logger.exception(ex)
             self.uploadWarning("Extracting files from sandbox failed, ops monitor will not work.", \
                     kw['task']['user_proxy'], kw['task']['tm_taskname'])
-        
-        inputFiles.append('debug')
-
-        # Change permissions of extracted files to allow Ops mon to read them.
-        for _, _, filenames in os.walk('debug'):
-            for f in filenames:
-                os.chmod('debug/' + f, 0o644)
 
         return
 
@@ -869,8 +869,8 @@ class DagmanCreator(TaskAction.TaskAction):
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh', \
                 'AdjustSites.py', 'site.ad', 'site.ad.json', 'run_and_lumis.tar.gz', 'input_files.tar.gz']
 
-        self.extractMonitorFiles(inputFiles, **kw)     
-        
+        self.extractMonitorFiles(inputFiles, **kw)
+
         if kw['task'].get('tm_user_sandbox') == 'sandbox.tar.gz':
             inputFiles.append('sandbox.tar.gz')
         if os.path.exists("CMSRunAnalysis.tar.gz"):
