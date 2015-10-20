@@ -45,6 +45,7 @@ SUBMIT_INFO = [ \
     ('CRAB_PublishGroupName', 'publishgroupname'),
     ('CRAB_Publish', 'publication'),
     ('CRAB_PublishDBSURL', 'publishdbsurl'),
+    ('CRAB_PrimaryDataset', 'primarydataset'),
     ('CRAB_ISB', 'cacheurl'),
     ('CRAB_SaveLogsFlag', 'savelogsflag'),
     ('CRAB_AdditionalOutputFiles', 'addoutputfiles'),

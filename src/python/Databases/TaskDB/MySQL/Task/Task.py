@@ -6,18 +6,20 @@ class Task(object):
     """
     """
     GetReadyTasks_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, \
-                   tm_start_time, tm_start_injection, tm_end_injection, \
-                   tm_task_failure, tm_job_sw, tm_job_arch, tm_input_dataset, \
-                   tm_site_whitelist, tm_site_blacklist, tm_split_algo, tm_split_args, \
-                   tm_totalunits, tm_user_sandbox, tm_cache_url, tm_username, tm_user_dn, tm_user_vo, \
-                   tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \
-                   tm_publish_dbs_url, tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
-                   tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, \
-                   tm_user_infiles, tw_name, tm_dry_run, \
-                   tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode, \
-                   tm_publish_groupname, tm_nonvalid_input_dataset \
-                   FROM tasks WHERE tm_task_status = %(get_status)s AND tw_name = %(tw_name)s limit %(limit)s
-                   ORDER BY tm_start_time ASC"""
+                       tm_start_time, tm_start_injection, tm_end_injection, \
+                       tm_task_failure, tm_job_sw, tm_job_arch, tm_input_dataset, \
+                       tm_site_whitelist, tm_site_blacklist, tm_split_algo, tm_split_args, \
+                       tm_totalunits, tm_user_sandbox, tm_cache_url, tm_username, tm_user_dn, tm_user_vo, \
+                       tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \
+                       tm_publish_dbs_url, tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
+                       tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, \
+                       tm_user_infiles, tw_name, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority, tm_activity, \
+                       tm_scriptexe, tm_scriptargs, tm_extrajdl, tm_generator, tm_asourl, tm_events_per_lumi, \
+                       tm_use_parent, tm_collector, tm_schedd, tm_dry_run, \
+                       tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode, \
+                       tm_publish_groupname, tm_nonvalid_input_dataset, tm_secondary_input_dataset, tm_primary_dataset \
+                       FROM tasks WHERE tm_task_status = %(get_status)s AND tw_name = %(tw_name)s limit %(limit)s
+                       ORDER BY tm_start_time ASC"""
 
     GetUserFromID_sql = "SELECT tm_username FROM tasks WHERE tm_taskname=%(taskname)s"
 
@@ -28,24 +30,22 @@ class Task(object):
              FROM tasks WHERE tm_taskname=%(taskname)s"
 
     New_sql = "INSERT INTO tasks ( \
-               tm_taskname,panda_jobset_id, tm_task_status, tm_start_time, tm_task_failure, \
-   	       tm_job_sw, tm_job_arch, tm_input_dataset, tm_nonvalid_input_dataset, tm_site_whitelist, tm_site_blacklist, \
-               tm_split_algo, tm_split_args, tm_totalunits, tm_user_sandbox, tm_cache_url, \
-   	       tm_username, tm_user_dn, tm_user_vo, tm_user_role, tm_user_group, tm_publish_name, tm_publish_groupname, \
-   	       tm_asyncdest, tm_dbs_url, tm_publish_dbs_url, tm_publication, tm_outfiles, \
-   	       tm_tfile_outfiles, tm_edm_outfiles, tm_job_type, tm_arguments,\
-               panda_resubmitted_jobs, tm_save_logs, tm_user_infiles, tm_maxjobruntime, \
-               tm_numcores, tm_maxmemory, tm_priority, tm_dry_run, \
-               tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode) \
-               VALUES (%(task_name)s, %(jobset_id)s, upper(%(task_status)s), UTC_TIMESTAMP(), \
-   	       %(task_failure)s, %(job_sw)s, %(job_arch)s, %(input_dataset)s, %(nonvalid_data)s, %(site_whitelist)s, \
-   	       %(site_blacklist)s, %(split_algo)s, %(split_args)s, %(total_units)s, \
-               %(user_sandbox)s, %(cache_url)s, %(username)s, %(user_dn)s, %(user_vo)s, %(user_role)s, \
-   	       %(user_group)s, %(publish_name)s, %(publish_groupname)s, %(asyncdest)s, %(dbs_url)s, %(publish_dbs_url)s, \
-               %(publication)s, %(outfiles)s, %(tfile_outfiles)s, %(edm_outfiles)s, \
-   	       %(job_type)s, %(arguments)s, %(resubmitted_jobs)s, %(save_logs)s, %(user_infiles)s, %(maxjobruntime)s, \
-               %(numcores)s, %(maxmemory)s, %(priority)s, %(dry_run)s, \
-               %(user_files)s, %(transfer_outputs)s, %(output_lfn)s, %(ignore_locality)s, %(fail_limit)s, %(one_event_mode)s)"
+              tm_taskname, tm_activity, panda_jobset_id, tm_task_status, tm_start_time, tm_task_failure, tm_job_sw, \
+              tm_job_arch, tm_input_dataset, tm_primary_dataset, tm_nonvalid_input_dataset, tm_use_parent, tm_secondary_input_dataset, tm_site_whitelist, tm_site_blacklist, \
+              tm_split_algo, tm_split_args, tm_totalunits, tm_user_sandbox, tm_cache_url, tm_username, tm_user_dn, \
+              tm_user_vo, tm_user_role, tm_user_group, tm_publish_name, tm_publish_groupname, tm_asyncdest, tm_dbs_url, tm_publish_dbs_url, \
+              tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, tm_job_type, tm_generator, tm_arguments, \
+              panda_resubmitted_jobs, tm_save_logs, tm_user_infiles, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority, \
+              tm_scriptexe, tm_scriptargs, tm_extrajdl, tm_asourl, tm_events_per_lumi, tm_collector, tm_schedd, tm_dry_run, \
+              tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode) \
+              VALUES (%(task_name)s, %(task_activity)s, %(jobset_id)s, upper(%(task_status)s), UTC_TIMESTAMP(), %(task_failure)s, %(job_sw)s, \
+              %(job_arch)s, %(input_dataset)s, %(primary_dataset)s, %(nonvalid_data)s, %(use_parent)s, %(secondary_dataset)s, %(site_whitelist)s, %(site_blacklist)s, \
+              %(split_algo)s, %(split_args)s, %(total_units)s, %(user_sandbox)s, %(cache_url)s, %(username)s, %(user_dn)s, \
+              %(user_vo)s, %(user_role)s, %(user_group)s, %(publish_name)s, %(publish_groupname)s, %(asyncdest)s, %(dbs_url)s, %(publish_dbs_url)s, \
+              %(publication)s, %(outfiles)s, %(tfile_outfiles)s, %(edm_outfiles)s, %(job_type)s, %(generator)s, %(arguments)s, \
+              %(resubmitted_jobs)s, %(save_logs)s, %(user_infiles)s, %(maxjobruntime)s, %(numcores)s, %(maxmemory)s, %(priority)s, \
+              %(scriptexe)s, %(scriptargs)s, %(extrajdl)s, %(asourl)s, %(events_per_lumi)s, %(collector)s, %(schedd_name)s, %(dry_run)s, \
+              %(user_files)s, %(transfer_outputs)s, %(output_lfn)s, %(ignore_locality)s, %(fail_limit)s, %(one_event_mode)s)"
 
     GetResubmitParams_sql = "SELECT tm_site_blacklist, tm_site_whitelist, tm_maxjobruntime, tm_maxmemory, tm_numcores, tm_priority \
                              FROM tasks \

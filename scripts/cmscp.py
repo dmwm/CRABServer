@@ -13,10 +13,11 @@ import pprint
 import signal
 import logging
 import tarfile
+import hashlib
 import datetime
 import traceback
-import hashlib
-from ServerUtilities import cmd_exist
+
+from ServerUtilities import cmd_exist, parseJobAd
 
 if os.path.exists("WMCore.zip") and "WMCore.zip" not in sys.path:
     sys.path.append("WMCore.zip")
@@ -135,7 +136,7 @@ G_DIRECT_STAGEOUTS = []
 ## the information needed by the inject_to_aso() function.
 G_ASO_TRANSFER_REQUESTS = []
 
-## Dictionary with the job's HTCondor ClassAd. Filled in by parse_job_ad().
+## Dictionary with the job's HTCondor ClassAd.
 G_JOB_AD = {}
 
 ## Dictionary with the mapping of node storage element name to site name.
@@ -145,30 +146,6 @@ G_NODE_MAP = {}
 ##==============================================================================
 ## FUNCTIONS USED BY THE CODE.
 ##------------------------------------------------------------------------------
-
-def parse_job_ad():
-    """
-    Parse the job's HTCondor ClassAd.
-    """
-    ## TODO: Why don't we use the same method as in the PostJob?
-    global G_JOB_AD
-    with open(os.environ['_CONDOR_JOB_AD']) as fd:
-        for adline in fd.readlines():
-            info = adline.split(' = ', 1)
-            if len(info) != 2:
-                continue
-            if info[1].startswith('undefined'):
-                val = info[1].strip()
-            elif info[1].startswith('"'):
-                val = info[1].strip().replace('"', '')
-            else:
-                try:
-                    val = int(info[1].strip())
-                except ValueError:
-                    continue
-            G_JOB_AD[info[0]] = val
-
-## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 def make_logs_archive(arch_file_name):
     """
@@ -534,7 +511,7 @@ def inject_to_aso(file_transfer_info):
     for attr in ['CRAB_ASOURL', 'CRAB_AsyncDest', 'DESIRED_CMSDataset', \
                  'CRAB_UserGroup', 'CRAB_UserRole', 'CRAB_DBSURL', \
                  'CRAB_ReqName', 'CRAB_UserHN', 'CRAB_Publish', \
-                 'CRAB_RestHost', 'CRAB_RestURInoAPI']:
+                 'CRAB_RestHost', 'CRAB_RestURInoAPI', 'CRAB_PrimaryDataset']:
         if attr not in G_JOB_AD:
             msg  = "ERROR: Job's HTCondor ClassAd is missing attribute %s." % (attr)
             msg += " Cannot inject to ASO."
@@ -649,12 +626,22 @@ def inject_to_aso(file_transfer_info):
         msg  = msg % (file_transfer_info['source']['lfn'], doc_id)
         msg += " Uploading new stageout request."
         print msg
+        input_dataset = G_JOB_AD['DESIRED_CMSDataset']
+        if str(G_JOB_AD['DESIRED_CMSDataset']).lower() == 'undefined':
+            input_dataset = ''
+        primary_dataset = G_JOB_AD['CRAB_PrimaryDataset']
+        if input_dataset:
+            input_dataset_or_primary_dataset = input_dataset
+        elif primary_dataset:
+            input_dataset_or_primary_dataset = '/'+primary_dataset # Adding the '/' until we fix ASO
+        else:
+            input_dataset_or_primary_dataset = '/'+'NotDefined' # Adding the '/' until we fix ASO
         doc = {'_id'                     : doc_id,
                'workflow'                : G_JOB_AD['CRAB_ReqName'],
                'jobid'                   : G_JOB_AD['CRAB_Id'],
                'rest_host'               : G_JOB_AD['CRAB_RestHost'],
                'rest_uri'                : G_JOB_AD['CRAB_RestURInoAPI'],
-               'inputdataset'            : G_JOB_AD['DESIRED_CMSDataset'],
+               'inputdataset'            : input_dataset_or_primary_dataset,
                'dbs_url'                 : str(G_JOB_AD['CRAB_DBSURL']),
                'lfn'                     : file_transfer_info['source']['lfn'],
                'source_lfn'              : file_transfer_info['source']['lfn'],
@@ -1068,11 +1055,10 @@ def main():
         print msg
         update_exit_info(exit_info, 80000, msg, True)
         return exit_info
+    global G_JOB_AD
     try:
-        parse_job_ad()
+        G_JOB_AD = parseJobAd(os.environ['_CONDOR_JOB_AD'])
     except Exception:
-        global G_JOB_AD
-        G_JOB_AD = {}
         msg  = "WARNING: Unable to parse job's HTCondor ClassAd."
         msg += "\n%s" % (traceback.format_exc())
         print msg

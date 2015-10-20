@@ -45,9 +45,12 @@ class Splitter(TaskAction):
         numJobs = sum([len(jobgroup.getJobs()) for jobgroup in factory])
         maxJobs = getattr(self.config.TaskWorker, 'maxJobsPerTask', 10000)
         if numJobs == 0:
-            raise TaskWorkerException("The CRAB3 server backend could not submit any job to the Grid scheduler:\n"+\
-                        "splitting task %s on dataset %s with %s method does not generate any job" %
-                                        (kwargs['task']['tm_taskname'], kwargs['task']['tm_input_dataset'], kwargs['task']['tm_split_algo']))
+            msg  = "The CRAB3 server backend could not submit any job to the Grid scheduler:"
+            msg += " Splitting task %s" % (kwargs['task']['tm_taskname'])
+            if kwargs['task']['tm_input_dataset']:
+                msg += " on dataset %s" % (kwargs['task']['tm_input_dataset'])
+            msg += " with %s method does not generate any job" % (kwargs['task']['tm_split_algo'])
+            raise TaskWorkerException(msg)
         elif numJobs > maxJobs:
             raise TaskWorkerException("The splitting on your task generated %s jobs. The maximum number of jobs in each task is %s" %
                                         (numJobs, maxJobs))

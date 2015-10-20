@@ -62,3 +62,6 @@ alter table tasks add constraint ck_tm_nonvalid_input_dataset check (tm_nonvalid
 
 --Changes that will be needed for version 3.3.1509
 alter table tasks add (tm_secondary_input_dataset VARCHAR(500));
+
+--Changes that will be needed for version 3.3.1511
+alter table tasks add (tm_primary_dataset VARCHAR(255));

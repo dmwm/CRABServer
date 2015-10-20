@@ -114,11 +114,12 @@ class DataWorkflow(object):
 
 
     @conn_handler(services=['centralconfig'])
-    def submit(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, use_parent, secondarydata, generator, events_per_lumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
+    def submit(self, workflow, activity, jobtype, jobsw, jobarch, use_parent, secondarydata, generator, events_per_lumi, siteblacklist,
+               sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                userhn, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, scriptexe=None, scriptargs=None, scheddname=None,
-               extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False):
+               extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -127,6 +128,7 @@ class DataWorkflow(object):
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
            :arg str inputdata: input dataset;
+           :arg str primarydataset: primary dataset;
            :arg str nonvaliddata: allow invalid input dataset;
            :arg int use_parent: add the parent dataset as secondary input;
            :arg str secondarydata: optional secondary dataset;
@@ -217,6 +219,7 @@ class DataWorkflow(object):
                             job_sw          = [jobsw],
                             job_arch        = [jobarch],
                             input_dataset   = [inputdata],
+                            primary_dataset = [primarydataset],
                             nonvalid_data   = ['T' if nonvaliddata else 'F'],
                             use_parent      = [use_parent],
                             secondary_dataset = [secondarydata],

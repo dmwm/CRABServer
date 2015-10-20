@@ -59,10 +59,9 @@ def getProxiedWebDir(task, host, uri, cert, logFunction = print):
     #and I want to avoid the dependency to pycurl right now. We should actually add it one day
     #so that other code in cmscp that uses Requests.py from WMCore can be migrated to RESTInteractions
     from RESTInteractions import HTTPRequests
-    data = { 'subresource' : 'webdirprx',
-         'workflow' : task,
-       }
-
+    data = {'subresource' : 'webdirprx',
+            'workflow' : task,
+           }
     res = None
     try:
         server = HTTPRequests(host, cert, cert, retry = 2)
@@ -89,6 +88,7 @@ def setDashboardLogs(params, webdir, jobid, retry):
         log_files[i] = log_file_name
     params['StatusLogFile'] = ",".join(log_files)
 
+
 def insertJobIdSid(jinfo, jobid, workflow, jobretry):
     """
     Modifies passed dictionary (jinfo) to contain jobId and sid keys and values.
@@ -97,13 +97,14 @@ def insertJobIdSid(jinfo, jobid, workflow, jobretry):
     jinfo['jobId'] = "%s_https://glidein.cern.ch/%s/%s_%s" % (jobid, jobid, workflow.replace("_", ":"), jobretry)
     jinfo['sid'] = "https://glidein.cern.ch/%s%s" % (jobid, workflow.replace("_", ":"))
 
+
 def getWebdirForDb(reqname, storage_rules):
     path = os.path.expanduser("~/%s" % reqname)
     sinfo = storage_rules.split(",")
     storage_re = re.compile(sinfo[0])
     val = storage_re.sub(sinfo[1], path)
-
     return val
+
 
 def cmd_exist(cmd):
     """
@@ -119,6 +120,7 @@ def cmd_exist(cmd):
     except OSError:
         return False
     return False
+
 
 def getCheckWriteCommand(proxy, logger):
     """
@@ -138,6 +140,7 @@ def getCheckWriteCommand(proxy, logger):
         rmCmd = "lcg-del --connect-timeout 180 -b -l -D srmv2 "
     return cpCmd, rmCmd, append
 
+
 def createDummyFile(filename, logger):
     """
     Create dummy file for checking write permissions
@@ -150,6 +153,7 @@ def createDummyFile(filename, logger):
         logger.info('Error: Failed to create file %s localy.' % filename)
         raise
 
+
 def removeDummyFile(filename, logger):
     """
     Remove created dummy file
@@ -159,6 +163,7 @@ def removeDummyFile(filename, logger):
         os.remove(abspath)
     except:
         logger.info('Warning: Failed to delete file %s' % filename)
+
 
 def getPFN(proxy, lfnsaddprefix, filename, sitename, logger):
     from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
@@ -177,6 +182,7 @@ def getPFN(proxy, lfnsaddprefix, filename, sitename, logger):
         raise HTTPException, errormsg
     return pfn
 
+
 def executeCommand(command):
     """
     Execute passed bash command. There is no check for command success or failure. Who`s calling
@@ -186,6 +192,7 @@ def executeCommand(command):
     out, err = process.communicate()
     exitcode = process.returncode
     return out, err, exitcode
+
 
 def isFailurePermanent(reason, gridJob=False):
     """
@@ -217,3 +224,24 @@ def isFailurePermanent(reason, gridJob=False):
             reason = permanentFailureReasons[failureReason] + checkQuota + refuseToSubmit
             return True, reason
     return False, ""
+
+
+def parseJobAd(filename):
+    jobAd = {}
+    with open(filename) as fd:
+        #classad.parseOld(fd)
+        for adline in fd.readlines():
+            info = adline.split(' = ', 1)
+            if len(info) != 2:
+                continue
+            if info[1].startswith('undefined'):
+                val = info[1].strip()
+            elif info[1].startswith('"'):
+                val = info[1].strip().replace('"', '')
+            else:
+                try:
+                    val = int(info[1].strip())
+                except ValueError:
+                    continue
+            jobAd[info[0]] = val
+    return jobAd

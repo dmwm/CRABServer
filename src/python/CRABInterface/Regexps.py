@@ -30,7 +30,7 @@ RX_LUMIEVENTS = re.compile(r'^\d+$')
 RX_CMSSW     = re.compile(r"^(?=.{0,255}$)CMSSW[a-zA-Z0-9-_]*$") #using a lookahead (?=.{0,255}$) to check maximum size of the regex
 RX_ARCH      = re.compile(r"^(?=.{0,255}$)slc[0-9]{1}_[a-z0-9]+_gcc[a-z0-9]+(_[a-z0-9]+)?$")
 RX_DATASET   = re.compile(DATASET_RE) #See https://github.com/dmwm/WMCore/issues/6054#issuecomment-135475550
-RX_LFNPRIMDS = re.compile(r"^/%(primDS)s$" % lfnParts)
+RX_LFNPRIMDS = re.compile(r"^%(primDS)s$" % lfnParts)
 RX_BLOCK     = re.compile(r"^(/[a-zA-Z0-9\.\-_]{1,100}){3}#[a-zA-Z0-9\.\-_]{1,100}$")
 RX_SPLIT     = re.compile(r"^FileBased|EventBased|LumiBased|EventAwareLumiBased$")
 RX_CACHEURL  = re.compile(r"^https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")

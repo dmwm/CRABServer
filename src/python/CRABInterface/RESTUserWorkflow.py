@@ -182,38 +182,31 @@ class RESTUserWorkflow(RESTEntity):
             raise InvalidParameter(msg)
 
 
-    def _checkPrimaryDataset(self, kwargs):
+    def _checkPrimaryDataset(self, kwargs, optional=False):
         """
         Validate the primary dataset name using the WMCore.Lexicon method primdataset(),
         which does the same validation as DBS (see discussion with Yuyi Guo in following
         github CRABClient issue: https://github.com/dmwm/CRABClient/issues/4257).
         """
-        ## This if statement should actually never evaluate to True, because
-        ## the client always defines kwargs['inputdata'].
-        if 'inputdata' not in kwargs:
-            msg  = "Server parameter 'inputdata' is not defined."
-            msg += " Unable to validate the primary dataset name."
-            raise InvalidParameter(msg)
+        if 'primarydataset' not in kwargs:
+            if optional:
+                return
+            else:
+                msg = "Missing 'primarydataset' parameter."
+                raise InvalidParameter(msg)
         try:
-            ## The client defines kwargs['inputdata'] = "/<primary-dataset-name>",
-            ## i.e. it adds a "/" at the beginning, which we should remove if we
-            ## want to do the validation of the primary dataset name only.
-            ## (The client puts the primary dataset name in kwargs['inputdata'],
-            ## because the PostJob extracts the primary dataset name from this
-            ## parameter splitting by "/" and taking the element 1, which is the
-            ## right thing to do when kwargs['inputdata'] is the input dataset in
-            ## an analysis job type.)
-            primdataset(kwargs['inputdata'][1:])
+            primdataset(kwargs['primarydataset'])
         except AssertionError:
             ## This message is more descriptive than if we would use the message
             ## from AssertionError exception, but I had to explicitely write the
             ## regular expression [a-zA-Z][a-zA-Z0-9\-_]*, which is not nice.
             ## The message from AssertionError exception would be:
-            ## "'<kwargs['inputdata'][1:]>' does not match regular expression [a-zA-Z0-9\.\-_]+".
-            msg  = "Invalid CRAB configuration parameter Data.primaryDataset."
+            ## "'<kwargs['primarydataset']>' does not match regular expression [a-zA-Z0-9\.\-_]+".
+            msg  = "Invalid 'primarydataset' parameter."
             msg += " The parameter should not have more than 99 characters"
             msg += " and should match the regular expression [a-zA-Z][a-zA-Z0-9\-_]*"
             raise InvalidParameter(msg)
+
 
     def _checkASODestination(self, site):
         self._checkSite(site, pnn=True)
@@ -280,7 +273,6 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("jobarch", param, safe, RX_ARCH, optional=False)
             if not safe.kwargs["nonprodsw"]: #if the user wants to allow non-production releases
                 self._checkReleases(safe.kwargs['jobarch'], safe.kwargs['jobsw'])
-            jobtype = safe.kwargs.get('jobtype', None)
             validate_num("useparent", param, safe, optional=True)
             validate_str("secondarydata", param, safe, RX_DATASET, optional=True)
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
@@ -306,18 +298,6 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
             validate_num("publication", param, safe, optional=False)
             validate_str("publishdbsurl", param, safe, RX_DBSURL, optional=(not bool(safe.kwargs['publication'])))
-            if safe.kwargs['publication']:
-                ## If this is a MC generation job type, the primary dataset name will
-                ## be used to define the primary dataset field in the publication
-                ## dataset name. Therefore, the primary dataset name must pass DBS
-                ## validation. Since in a MC generation job type the primary dataset
-                ## name is saved in 'inputdata', _checkPrimaryDataset() actually
-                ## validates 'inputdata'. Therefore, this function must come before
-                ## the validate_str('inputdata', ...) we have below. OTOH, matching
-                ## 'inputdata' agains RX_DATASET is not the correct validation for
-                ## the primary dataset name.
-                if jobtype == 'PrivateMC':
-                    self._checkPrimaryDataset(param.kwargs)
 
             ## We might want to remove publishname once the backward compatibility
             ## wont be needed anymore. Then we can just keep publishname2
@@ -349,21 +329,39 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("publishgroupname", param, safe, optional=True)
             ## This line must come after _checkPublishDataName()
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
-            if jobtype == 'Analysis':
-                validate_str("inputdata", param, safe, RX_DATASET, optional=False)
-            ## In case of PrivateMC with publication, 'inputdata' was already validated
-            ## above in _checkPrimaryDataset(), but I am not sure if we can skip the
-            ## validate_str('inputdata', ...) or we need it so that all parameters are
-            ## moved from param to safe.
-            ## In case of PrivateMC with no publication, 'inputdata' is optional, but if
-            ## given it is used only for the primary dataset part in the output LFN.
-            elif jobtype == 'PrivateMC':
-                if safe.kwargs['publication']:
-                    validate_str("inputdata", param, safe, RX_ANYTHING, optional=False)
-                else:
-                    validate_str("inputdata", param, safe, RX_LFNPRIMDS, optional=True)
-            else:
+
+            ## Client versions < 3.3.1511 may put in the input dataset something that is not
+            ## really an input dataset (for PrivateMC or user input files). So the only case
+            ## in which we are sure that we have to validate the input dataset is when the
+            ## workflow type is Analysis, the workflow does not run on user input files and
+            ## an input dataset is defined (scriptExe may not define an input).
+            ## Once we don't care anymore about backward compatibility with client < 3.3.1511,
+            ## we can uncomment the 1st line below and delete the next 4 lines.
+            #validate_str("inputdata", param, safe, RX_DATASET, optional=True)
+            if safe.kwargs['jobtype'] == 'Analysis' and not safe.kwargs['userfiles'] and 'inputdata' in param.kwargs:
                 validate_str("inputdata", param, safe, RX_DATASET, optional=True)
+            else:
+                validate_str("inputdata", param, safe, RX_ANYTHING, optional=True)
+
+            ## The client is not forced to define the primary dataset. So make sure to have
+            ## defaults or take it from the input dataset. The primary dataset is needed for
+            ## the LFN of the output/log files and for publication. We want to have it well
+            ## defined even if publication and/or transfer to storage are off. 
+            if safe.kwargs['inputdata']:
+                param.kwargs['primarydataset'] = safe.kwargs['inputdata'].split('/')[1]
+            if not param.kwargs.get('primarydataset', None):
+                if safe.kwargs['jobtype'] == 'PrivateMC':
+                    param.kwargs['primarydataset'] = "CRAB_PrivateMC"
+                elif safe.kwargs['jobtype'] == 'Analysis' and safe.kwargs['userfiles']:
+                    param.kwargs['primarydataset'] = "CRAB_UserFiles"
+                else:
+                    param.kwargs['primarydataset'] = "CRAB_NoInput"
+            ## We validate the primary dataset agains DBS rules even if publication is off,
+            ## because in the future we may want to give the possibility to users to publish
+            ## a posteriori.
+            self._checkPrimaryDataset(param.kwargs, optional=False)
+            validate_str("primarydataset", param, safe, RX_LFNPRIMDS, optional=False)
+
             validate_num("nonvaliddata", param, safe, optional=True)
             #if one and only one between publishDataName and publishDbsUrl is set raise an error (we need both or none of them)
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
@@ -456,7 +454,7 @@ class RESTUserWorkflow(RESTEntity):
 
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
-    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, nonvaliddata, useparent, secondarydata, generator, eventsperlumi,
+    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, primarydataset, nonvaliddata, useparent, secondarydata, generator, eventsperlumi,
                 siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                 savelogsflag, publication, publishname, publishname2, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
                 tfileoutfiles, edmoutfiles, runs, lumis,
@@ -470,6 +468,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
            :arg str inputdata: input dataset;
+           :arg str primarydataset: primary dataset;
            :arg str nonvaliddata: allow invalid input dataset;
            :arg int useparent: add the parent dataset as secondary input;
            :arg str secondarydata: optional secondary intput dataset;
@@ -521,7 +520,8 @@ class RESTUserWorkflow(RESTEntity):
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
         return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch,
-                                       inputdata=inputdata, nonvaliddata=nonvaliddata, use_parent=useparent, secondarydata=secondarydata, generator=generator, events_per_lumi=eventsperlumi,
+                                       inputdata=inputdata, primarydataset=primarydataset, nonvaliddata=nonvaliddata, use_parent=useparent,
+                                       secondarydata=secondarydata, generator=generator, events_per_lumi=eventsperlumi,
                                        siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, splitalgo=splitalgo, algoargs=algoargs,
                                        cachefilename=cachefilename, cacheurl=cacheurl,
                                        addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
