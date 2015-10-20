@@ -351,13 +351,8 @@ class RESTUserWorkflow(RESTEntity):
             if safe.kwargs['jobtype'] == 'PrivateMC':
                 if param.kwargs['inputdata']:
                     msg  = "Invalid 'inputdata' parameter."
-                    msg += " Job type PrivateMC does not take any input dataset."
+                    msg += " Job type PrivateMC does not accept an input dataset."
                     msg += " If you really intend to run over an input dataset, then you must use job type Analysis."
-                    raise InvalidParameter(msg)
-                if safe.kwargs['userfiles']:
-                    msg  = "Invalid 'userfiles' parameter."
-                    msg += " Job type PrivateMC does not take any input files."
-                    msg += " If you really intend to run over input files, then you must use job type Analysis."
                     raise InvalidParameter(msg)
 
             if jobtype == 'Analysis':
