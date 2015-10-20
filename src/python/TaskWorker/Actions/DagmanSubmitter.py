@@ -15,7 +15,6 @@ from httplib import HTTPException
 from ServerUtilities import FEEDBACKMAIL
 import TaskWorker.DataObjects.Result as Result
 import TaskWorker.Actions.TaskAction as TaskAction
-from TaskWorker.Actions.DagmanCreator import CRAB_HEADERS
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from ApmonIf import ApmonIf
@@ -32,44 +31,9 @@ except ImportError:
     htcondor = None
 
 
-CRAB_META_HEADERS = \
-"""
-+CRAB_SplitAlgo = %(splitalgo)s
-+CRAB_AlgoArgs = %(algoargs)s
-+CRAB_ConfigDoc = %(configdoc)s
-+CRAB_LumiMask = %(lumimask)s
-"""
-## This is the fragment to be used as the JDL in the schedd.submitRaw() method.
-## NOTE: Changes here must be synchronized with the submitDirect() function below.
-MASTER_DAG_SUBMIT_FILE = CRAB_HEADERS + CRAB_META_HEADERS + \
-"""
-+CRAB_Attempt = 0
-universe = local
-scratch = %(scratch)s
-bindir = %(bindir)s
-output = $(scratch)/request.out
-error = $(scratch)/request.err
-executable = $(bindir)/dag_bootstrap_startup.sh
-arguments = $(bindir)/master_dag
-transfer_input_files = %(inputFilesString)s
-transfer_output_files = %(outputFilesString)s
-leave_in_queue = (JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0)) && (time() - EnteredCurrentStatus < 14*24*60*60)
-on_exit_remove = ( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))
-+OtherJobRemoveRequirements = DAGManJobId =?= ClusterId
-remove_kill_sig = SIGUSR1
-+HoldKillSig = "SIGUSR1"
-on_exit_hold = (ExitCode =!= UNDEFINED && ExitCode != 0)
-+Environment= strcat("PATH=/usr/bin:/bin:/opt/glidecondor/bin CRAB3_VERSION=3.3.0-pre1 CONDOR_ID=", ClusterId, ".", ProcId, " %(additional_environment_options)s")
-+RemoteCondorSetup = "%(remote_condor_setup)s"
-+TaskType = "ROOT"
-X509UserProxy = %(user_proxy)s
-queue 1
-"""
-
 ## These are the CRAB attributes that we want to add to the job class ad when
 ## using the submitDirect() method.
 SUBMIT_INFO = [ \
-    ## CRAB_HEADERS
     ('CRAB_ReqName', 'requestname'),
     ('CRAB_Workflow', 'workflow'),
     ('CRAB_JobType', 'jobtype'),
@@ -99,13 +63,9 @@ SUBMIT_INFO = [ \
     ('CRAB_RestHost', 'resthost'),
     ('CRAB_RestURInoAPI', 'resturinoapi'),
     ('CRAB_NumAutomJobRetries', 'numautomjobretries'),
-    ## CRAB_META_HEADERS
     ('CRAB_SplitAlgo', 'splitalgo'),
     ('CRAB_AlgoArgs', 'algoargs'),
     ('CRAB_LumiMask', 'lumimask'),
-    ## Additional CRAB attributes (since these are not part of CRAB_HEADERS or
-    ## CRAB_META_HEADERS, they are not added by defaul to the class ad if using the
-    ## schedd.submitRaw() method).
     ('CRAB_JobCount', 'jobcount'),
     ('CRAB_UserVO', 'tm_user_vo'),
     ('CRAB_SiteBlacklist', 'siteblacklist'),
