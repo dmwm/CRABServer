@@ -105,8 +105,9 @@ class RESTUserWorkflow(RESTEntity):
         kwargs['publishname'] = publishDataNameToCheck #that's what the version earlier than 1509 were putting in the DB
         if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
             if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
-                msg  = "Parameter 'publishgroupname' is True,"
-                msg += " but parameter 'lfn' does not start with '/store/group/<groupname>'."
+                msg  = "Invalid CRAB configuration."
+                msg += " Parameter Data.publishWithGroupName is True,"
+                msg += " but Data.outLFNDirBase does not start with '/store/group/<groupname>'."
                 raise InvalidParameter(msg)
             group_user_prefix = outlfn.split('/')[3]
         else:
@@ -154,8 +155,9 @@ class RESTUserWorkflow(RESTEntity):
         ##Determine if it's a dataset that will go into a group space and therefore the (group)username prefix it will be used
         if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
             if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
-                msg  = "Parameter 'publishgroupname' is True,"
-                msg += " but parameter 'lfn' does not start with '/store/group/<groupname>'."
+                msg  = "Invalid CRAB configuration."
+                msg += " Parameter Data.publishWithGroupName is True,"
+                msg += " but Data.outLFNDirBase does not start with '/store/group/<groupname>'."
                 raise InvalidParameter(msg)
             group_user_prefix = outlfn.split('/')[3]
         else:
@@ -347,14 +349,6 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("publishgroupname", param, safe, optional=True)
             ## This line must come after _checkPublishDataName()
             validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
-
-            if safe.kwargs['jobtype'] == 'PrivateMC':
-                if param.kwargs['inputdata']:
-                    msg  = "Invalid 'inputdata' parameter."
-                    msg += " Job type PrivateMC does not accept an input dataset."
-                    msg += " If you really intend to run over an input dataset, then you must use job type Analysis."
-                    raise InvalidParameter(msg)
-
             if jobtype == 'Analysis':
                 validate_str("inputdata", param, safe, RX_DATASET, optional=False)
             ## In case of PrivateMC with publication, 'inputdata' was already validated
