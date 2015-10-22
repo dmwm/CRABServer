@@ -878,7 +878,7 @@ class DagmanCreator(TaskAction.TaskAction):
         if os.path.exists("TaskManagerRun.tar.gz"):
             inputFiles.append("TaskManagerRun.tar.gz")
 
-            info, splitterResult = self.createSubdag(*args, **kw)
+        info, splitterResult = self.createSubdag(*args, **kw)
 
         return info, params, inputFiles, splitterResult
 
