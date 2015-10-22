@@ -28,13 +28,12 @@ class DryRunUploader(TaskAction):
         dryRunSandbox.close()
 
     def executeInternal(self, *args, **kw):
-        tempDir = args[0][0]
-        inputFiles = args[0][3]
-        splitterResult = args[0][4]
+        inputFiles = args[0][2]
+        splitterResult = args[0][3]
 
         cwd = os.getcwd()
         try:
-            os.chdir(tempDir)
+            os.chdir(kw['tempDir'])
             splittingSummary = SplittingSummary(kw['task']['tm_split_algo'])
             for jobgroup in splitterResult:
                 jobs = jobgroup.getJobs()

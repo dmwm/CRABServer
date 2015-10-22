@@ -149,7 +149,9 @@ class DBSDataDiscovery(DataDiscovery):
 
         ## Format the output creating the data structures required by wmcore. Filters out invalid files,
         ## files whose block has no location, and figures out the PSN
-        result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'], datasetfiles = filedetails, locations = locationsMap)
+        result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'],
+                                   datasetfiles = filedetails, locations = locationsMap,
+                                   tempDir = kwargs['tempDir'])
 
         if not result.result:
             raise TaskWorkerException(("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, %s.\n"
