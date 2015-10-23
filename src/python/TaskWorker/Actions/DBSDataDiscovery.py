@@ -128,7 +128,7 @@ class DBSDataDiscovery(DataDiscovery):
                     secinfos['lumiobj'] = LumiList(runsAndLumis=secinfos['Lumis'])
 
                 self.logger.info("Beginning to match files from secondary dataset")
-                for filename, infos in filedetails.items():
+                for dummy_filename, infos in filedetails.items():
                     infos['Parents'] = []
                     lumis = LumiList(runsAndLumis=infos['Lumis'])
                     for secfilename, secinfos in moredetails.items():

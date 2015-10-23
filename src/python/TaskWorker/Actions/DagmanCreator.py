@@ -12,7 +12,6 @@ import string
 import tarfile
 import hashlib
 import commands
-import tempfile
 from ast import literal_eval
 from httplib import HTTPException
 

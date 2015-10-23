@@ -37,7 +37,6 @@ class DataDiscovery(TaskAction):
         wmfiles = []
         event_counter = 0
         lumi_counter = 0
-        file_counter = 0
         uniquelumis = set()
         datasetLumis = {}
         ## Loop over the sorted list of files.
@@ -74,7 +73,7 @@ class DataDiscovery(TaskAction):
                     self.logger.debug("Translating PNN %s" %pnn)
                     try:
                         pnn_psn_map[pnn] = sbj.PNNtoPSN(pnn)
-                    except KeyError as ke:
+                    except KeyError:
                         self.logger.error("Impossible translating %s to a CMS name through SiteDB" %pnn)
                         pnn_psn_map[pnn] = ''
                     except httplib.HTTPException as ex:
@@ -96,7 +95,6 @@ class DataDiscovery(TaskAction):
                     uniquelumis.add((run, lumi))
                 lumi_counter += len(lumis)
             wmfiles.append(wmfile)
-            file_counter += 1
 
         uniquelumis = len(uniquelumis)
         self.logger.debug('Tot events found: %d' % event_counter)

@@ -2,10 +2,9 @@
 Upload an archive containing all files needed to run the a to the UserFileCache (necessary for crab submit --dryrun.)
 """
 import os
+import json
 import urllib
 import tarfile
-import hashlib
-import json
 
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
