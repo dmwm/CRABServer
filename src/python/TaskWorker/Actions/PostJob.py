@@ -1948,7 +1948,7 @@ class PostJob():
                 msg = "Error uploading output dataset: %s" % (str(hte.headers))
                 self.logger.error(msg)
             except IOError as ioe:
-                msq = "Error writing the output_datasets file"
+                msg = "Error writing the output_datasets file"
                 self.logger.error(msg)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
