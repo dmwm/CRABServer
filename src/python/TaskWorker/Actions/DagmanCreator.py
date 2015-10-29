@@ -620,19 +620,17 @@ class DagmanCreator(TaskAction.TaskAction):
                 continue
 
             if ignoreLocality:
-                possiblesites = siteWhitelist
-                if not possiblesites:
-                    sbj = SiteDB.SiteDBJSON({"key":self.config.TaskWorker.cmskey,
-                                             "cert":self.config.TaskWorker.cmscert})
-                    try:
-                        possiblesites = set(sbj.getAllCMSNames())
-                    except Exception as ex:
-                        msg  = "The CRAB3 server backend could not contact SiteDB to get the list of all CMS sites."
-                        msg += " This could be a temporary SiteDB glitch."
-                        msg += " Please try to submit a new task (resubmit will not work)"
-                        msg += " and contact the experts if the error persists."
-                        msg += "\nError reason: %s" % (str(ex)) #TODO add the sitedb url so the user can check themselves!
-                        raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+                sbj = SiteDB.SiteDBJSON({"key": self.config.TaskWorker.cmskey,
+                                         "cert": self.config.TaskWorker.cmscert})
+                try:
+                    possiblesites = set(sbj.getAllCMSNames())
+                except Exception as ex:
+                    msg  = "The CRAB3 server backend could not contact SiteDB to get the list of all CMS sites."
+                    msg += " This could be a temporary SiteDB glitch."
+                    msg += " Please try to submit a new task (resubmit will not work)"
+                    msg += " and contact the experts if the error persists."
+                    msg += "\nError reason: %s" % (str(ex)) #TODO add the sitedb url so the user can check themselves!
+                    raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
             else:
                 possiblesites = locations
             ## At this point 'possiblesites' should never be empty.
