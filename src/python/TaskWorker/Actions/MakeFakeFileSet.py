@@ -36,7 +36,7 @@ class MakeFakeFileSet(TaskAction):
                           "cert":self.config.TaskWorker.cmscert})
         newFile.setLocation(sbj.getAllCMSNames())
         newFile.addRun(Run(1, *range(firstLumi, lastLumi + 1)))
-        newFile["block"] = 'MCFackBlock'
+        newFile["block"] = 'MCFakeBlock'
         newFile["first_event"] = firstEvent
         newFile["last_event"] = lastEvent
         singleMCFileset.addFile(newFile)
