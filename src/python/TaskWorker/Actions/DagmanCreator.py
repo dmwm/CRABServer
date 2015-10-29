@@ -556,6 +556,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         # This config setting acts as a global black list
         global_blacklist = set(self.getBlacklistedSites())
+        self.logger.debug("CRAB site blacklist: %s" % (list(global_blacklist)))
 
         # This is needed for Site Metrics
         # It should not block any site for Site Metrics and if needed for other activities
@@ -563,6 +564,7 @@ class DagmanCreator(TaskAction.TaskAction):
         if hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere') and \
                    kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere:
             global_blacklist = set()
+            self.logger.debug("Ignoring the CRAB site blacklist.")
 
         sitead = classad.ClassAd()
         siteinfo = {'group_sites': {}, 'group_datasites': {}}
@@ -571,15 +573,17 @@ class DagmanCreator(TaskAction.TaskAction):
 
         siteWhitelist = set(kwargs['task']['tm_site_whitelist'])
         siteBlacklist = set(kwargs['task']['tm_site_blacklist'])
+        self.logger.debug("Site whitelist: %s" % (list(siteWhitelist)))
+        self.logger.debug("Site blacklist: %s" % (list(siteBlacklist)))
 
         if siteWhitelist & global_blacklist:
-            msg  = "The following sites from the user site whitelist are blacklisted by the CRAB server: %s." % (map(str, list(siteWhitelist & global_blacklist)))
+            msg  = "The following sites from the user site whitelist are blacklisted by the CRAB server: %s." % (list(siteWhitelist & global_blacklist))
             msg += " Since the CRAB server blacklist has precedence, these sites are not considered in the user whitelist."
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
 
         if siteBlacklist & siteWhitelist:
-            msg  = "The following sites appear in both the user site blacklist and whitelist: %s." % (map(str, list(siteBlacklist & siteWhitelist)))
+            msg  = "The following sites appear in both the user site blacklist and whitelist: %s." % (list(siteBlacklist & siteWhitelist))
             msg += " Since the whitelist has precedence, these sites are not considered in the blacklist."
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
@@ -600,7 +604,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 locations = set()
             else:
                 locations = set(jobs[0]['input_files'][0]['locations'])
-            self.logger.debug("Locations: %s" % map(str, list(locations)))
+            self.logger.debug("Locations: %s" % (list(locations)))
 
             ## Discard the blocks that have no locations. This can happen when a block is
             ## still open in PhEDEx. Newly created datasets from T0 (at least) have a large
@@ -636,7 +640,7 @@ class DagmanCreator(TaskAction.TaskAction):
             else:
                 possiblesites = locations
             ## At this point 'possiblesites' should never be empty.
-            self.logger.debug("Possible sites: %s" % map(str, list(possiblesites)))
+            self.logger.debug("Possible sites: %s" % (list(possiblesites)))
 
             ## Apply the global site blacklist.
             availablesites = possiblesites - global_blacklist
@@ -654,8 +658,8 @@ class DagmanCreator(TaskAction.TaskAction):
                 msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler."
                 msg += " No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
                 msg += "\n\t\t\t\tThe sites available for submission of task %s are blacklisted by the CRAB3 server." % (kwargs['task']['tm_taskname'])
-                msg += "\n\t\t\t\tThis is the list of in principle available sites: %s" % (map(str, list(possiblesites)))
-                msg += "\n\t\t\t\tThis is the list of sites that are blacklisted by the CRAB3 server: %s" % (map(str, list(global_blacklist)))
+                msg += "\n\t\t\t\tThis is the list of in principle available sites: %s" % (list(possiblesites))
+                msg += "\n\t\t\t\tThis is the list of sites that are blacklisted by the CRAB3 server: %s" % (list(global_blacklist))
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             ## Abort the submission of the task if (part of?) the dataset is available only
@@ -670,21 +674,26 @@ class DagmanCreator(TaskAction.TaskAction):
                 if not available:
                     msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler."
                     msg += " You put %s as site whitelist," % (list(siteWhitelist))
-                    msg += " but the input dataset '%s' can only be accessed at these sites: %s." % (kwargs['task']['tm_input_dataset'], map(str, list(availablesites)))
+                    msg += " but the input dataset '%s' can only be accessed at these sites: %s." % (kwargs['task']['tm_input_dataset'], list(availablesites))
                     msg += " Please check your site whitelist."
                     raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
             available -= (siteBlacklist - siteWhitelist)
             if not available:
                 msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler."
                 msg += " You put %s as site blacklist," % (list(siteBlacklist - siteWhitelist))
-                msg += " when the input dataset '%s' can actually only be accessed at these sites: %s." % (kwargs['task']['tm_input_dataset'], map(str, list(availablesites)))
+                msg += " when the input dataset '%s' can actually only be accessed at these sites: %s." % (kwargs['task']['tm_input_dataset'], list(availablesites))
                 msg += " Please check in DAS the locations of the input dataset."
                 msg += " Hint: the ignoreLocality option might help."
                 raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
 
             availablesites = [str(i) for i in availablesites]
             datasites = jobs[0]['input_files'][0]['locations']
-            self.logger.info("Resulting available sites: %s" % map(str, list(availablesites)))
+            self.logger.info("Resulting available sites: %s" % (list(availablesites)))
+
+            if siteWhitelist or siteBlacklist:
+                msg  = "The site whitelist and blacklist will be applied by the pre-job."
+                msg += " This is expected to result in DESIRED_SITES = %s" % (list(available))
+                self.logger.debug(msg)
 
             jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, list(blocks)[0], availablesites, datasites, outfiles, startjobid)
             dagSpecs += jobgroupDagSpecs
