@@ -102,9 +102,11 @@ class DataDiscovery(TaskAction):
         self.logger.debug('Duplicate lumis found: %d' % (lumi_counter - uniquelumis))
         self.logger.debug('Tot files found: %d' % len(wmfiles))
 
+        self.logger.debug("Starting to create compact lumilists for input dataset")
         datasetLumiList = LumiList(runsAndLumis=datasetLumis)
         datasetLumis = datasetLumiList.getCompactList()
         datasetDuplicateLumis = datasetLumiList.getDuplicates().getCompactList()
+        self.logger.debug("Finished to create compact lumilists for input dataset")
         with open(os.path.join(tempDir, "input_dataset_lumis.json"), "w") as fd:
             json.dump(datasetLumis, fd)
         with open(os.path.join(tempDir, "input_dataset_duplicate_lumis.json"), "w") as fd:
