@@ -3,10 +3,11 @@ import copy
 import random
 import logging
 import cherrypy
+from Regexps import RX_WORKFLOW_LEN
 from ast import literal_eval
 
 ## WMCore dependecies
-from WMCore.REST.Error import ExecutionError
+from WMCore.REST.Error import ExecutionError, InvalidParameter
 
 ## CRAB dependencies
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
@@ -169,6 +170,8 @@ class DataWorkflow(object):
         try:
             requestname = '%s:%s_%s' % (timestamp, userhn, workflow)
             schedd_name = self.chooseScheduler(scheddname, backend_urls).split(":")[0]
+            if len(requestname) > RX_WORKFLOW_LEN:
+              raise InvalidParameter("Taskname exceed maximum allowed lenght, please review parameter requestName in your config file")
         except IOError as err:
             self.logger.debug("Failed to communicate with components %s. Request name %s: " % (str(err), str(requestname)))
             raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")

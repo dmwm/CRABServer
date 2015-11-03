@@ -327,18 +327,8 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("publishname2", param, safe, RX_ANYTHING, optional=True)
 
             validate_num("publishgroupname", param, safe, optional=True)
-
-            ## This is to take into account the username when calculate
-            ## how many chars we can use for the workflow name without 
-            ## exceed 255 chars. 
-            username = cherrypy.request.user['login']
-            availLen = int(RX_WORKFLOW_LEN - len(username))
-
-            ## Give a better error msg to user 
-            errMsg = "Taskname has to agree on this regular expression '%s'. You specified taskname: '%s'. Please double check this regular expression matching or contact experts."
-
             ## This line must come after _checkPublishDataName()
-            validate_str("workflow", param, safe, re.compile(RX_WORKFLOW_SUBMIT % availLen), optional=False, custom_err=errMsg % (RX_WORKFLOW_SUBMIT % availLen, param.kwargs['workflow']))
+            validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
 
             ## Client versions < 3.3.1511 may put in the input dataset something that is not
             ## really an input dataset (for PrivateMC or user input files). So the only case
