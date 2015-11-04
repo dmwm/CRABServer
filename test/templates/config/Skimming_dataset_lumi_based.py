@@ -24,7 +24,7 @@ config.Data.unitsPerJob = 200
 config.Data.publication = True
 config.Data.ignoreLocality = False
 config.Data.publishDBS = 'phys03'
-config.Data.publishDataName = 'CHANGE'
+config.Data.outputDatasetTag = 'CHANGE'
 
 # Site options
 config.section_("Site")

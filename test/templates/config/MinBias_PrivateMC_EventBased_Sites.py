@@ -17,14 +17,14 @@ config.JobType.psetName = 'psets/pset_tutorial_MC_generation.py'
 
 #Data Section
 config.section_("Data")
-config.Data.primaryDataset = 'MinBias'
+config.Data.outputPrimaryDataset = 'MinBias'
 config.Data.splitting = 'EventBased'
 config.Data.unitsPerJob = 100 
 config.Data.totalUnits = 1000
 config.Data.ignoreLocality = False
 config.Data.publication = True
 config.Data.publishDBS = 'phys03'
-config.Data.publishDataName = 'CHANGE'
+config.Data.outputDatasetTag = 'CHANGE'
 
 #Site Section
 config.section_("Site")
