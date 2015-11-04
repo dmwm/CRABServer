@@ -27,7 +27,8 @@ config.Data.totalUnits = 10000
 config.Data.ignoreLocality = False
 config.Data.publication = True
 config.Data.publishDBS = 'phys03'
-config.Data.publishDataName = 'CHANGE'
+config.Data.outputDatasetTag = 'CHANGE'
+config.Data.allowNonValidInputDataset =True
 
 #Site Section
 config.section_("Site")
