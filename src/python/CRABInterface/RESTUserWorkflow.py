@@ -397,6 +397,7 @@ class RESTUserWorkflow(RESTEntity):
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_str("subresource", param, safe, RX_SUBRESTAT, optional=True)
+            validate_numlist('jobids', param, safe)
             ## In a resubmission, the site black- and whitelists need to be interpreted
             ## differently than in an initial task submission. If there is no site black-
             ## or whitelist, set it to None and DataWorkflow will use the corresponding
@@ -419,12 +420,12 @@ class RESTUserWorkflow(RESTEntity):
             else:
                 validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
                 safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
-            validate_numlist('jobids', param, safe)
-            validate_num("priority", param, safe, optional=True)
             validate_num("maxjobruntime", param, safe, optional=True)
-            validate_num("numcores", param, safe, optional=True)
             validate_num("maxmemory", param, safe, optional=True)
+            validate_num("numcores", param, safe, optional=True)
+            validate_num("priority", param, safe, optional=True)
             validate_num("force", param, safe, optional=True)
+            validate_num("publication", param, safe, optional=True)
 
         elif method in ['GET']:
             validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
@@ -536,7 +537,7 @@ class RESTUserWorkflow(RESTEntity):
                                        scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun)
 
     @restcall
-    def post(self, workflow, subresource, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, force):
+    def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority):
         """Resubmit or continue an existing workflow. The caller needs to be a CMS user owner of the workflow.
 
            :arg str workflow: unique name identifier of the workflow;
@@ -545,9 +546,16 @@ class RESTUserWorkflow(RESTEntity):
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.api, [workflow], self.Task)
         if not subresource or subresource == 'resubmit':
-            return self.userworkflowmgr.resubmit(workflow=workflow, \
-                                                 siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, jobids=jobids, \
-                                                 maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, force=force, \
+            return self.userworkflowmgr.resubmit(workflow=workflow,
+                                                 publication=publication,
+                                                 jobids=jobids,
+                                                 force=force,
+                                                 siteblacklist=siteblacklist,
+                                                 sitewhitelist=sitewhitelist,
+                                                 maxjobruntime=maxjobruntime,
+                                                 maxmemory=maxmemory,
+                                                 numcores=numcores,
+                                                 priority=priority,
                                                  userdn=cherrypy.request.headers['Cms-Authn-Dn'])
         elif subresource == 'proceed':
             return self.userworkflowmgr.proceed(workflow=workflow)
