@@ -21,14 +21,14 @@ config.JobType.disableAutomaticOutputCollection = False
 
 #Data Section
 config.section_("Data")
-config.Data.primaryDataset = 'MinBias'
+config.Data.outputPrimaryDataset = 'MinBias'
 config.Data.splitting = 'EventBased'
 config.Data.unitsPerJob = 100 
 config.Data.totalUnits = 10000
 config.Data.ignoreLocality = False
 config.Data.publication = True
 config.Data.publishDBS = 'phys03'
-config.Data.publishDataName = 'CHANGE'
+config.Data.outputDatasetTag = 'CHANGE'
 
 #User Section
 config.section_("User")

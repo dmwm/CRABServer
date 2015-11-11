@@ -33,7 +33,7 @@ function sed_new_data () {
   sed --in-place "s|\.General\.workArea = .*|\.General\.workArea = '$5' |" $1
   #Publication part
   sed --in-place "s|\.Data\.publication = .*|\.Data\.publication = $6 |" $1
-  sed --in-place "s|\.Data\.publishDataName = .*|\.Data\.publishDataName = '$7' |" $1
+  sed --in-place "s|\.Data\.outputDatasetTag = .*|\.Data\.outputDatasetTag = '$7' |" $1
   #Site part
   sed --in-place "s|\.Site\.storageSite = .*|\.Site\.storageSite = '$STORAGE_SITE' |" $1
   #Data part

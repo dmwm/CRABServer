@@ -28,7 +28,7 @@ config.Data.ignoreLocality = False
 #config.Data.runRange = '193093-193999' # '193093-194075'
 config.Data.publication = True
 config.Data.publishDBS = 'phys03'
-config.Data.publishDataName = 'CHANGE'
+config.Data.outputDatasetTag = 'CHANGE'
 
 #Site Section
 config.section_("Site")

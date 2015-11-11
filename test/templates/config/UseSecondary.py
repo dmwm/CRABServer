@@ -20,7 +20,7 @@ config.Data.inputDataset = '/SingleMu/Run2015B-17Jul2015-v1/MINIAOD'
 config.Data.inputDBS = 'global'
 config.Data.splitting = 'LumiBased'
 config.Data.unitsPerJob = 20 # 200
-config.Data.secondaryDataset = '/SingleMu/Run2015B-v1/RAW'
+config.Data.secondaryInputDataset = '/SingleMu/Run2015B-v1/RAW'
 config.Data.ignoreLocality = False
 
 #Site Section
