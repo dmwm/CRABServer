@@ -1858,18 +1858,12 @@ class PostJob():
             publishname = self.publish_name
             if 'pset_hash' in file_info:
                 publishname = "%s-%s" % (publishname.rsplit('-', 1)[0], file_info['pset_hash'])
-            ## CMS convention for output dataset name:
-            ## /<primarydataset>/<username>-<publish_data_name>-<PSETHASH>/USER
+            ## Convention for output dataset name:
+            ## /<primarydataset>/<username>-<output_dataset_tag>-<PSETHASH>/USER
             if file_info['filetype'] == 'EDM':
                 if multiple_edm and file_info.get('module_label'):
                     left, right = publishname.rsplit('-', 1)
                     publishname = "%s_%s-%s" % (left, file_info['module_label'], right)
-                ## Extracting the primary dataset name from the input dataset is ok
-                ## for an analysis job type. But to make sense of this same logic in
-                ## a MC generation job type, the client defines the input dataset as
-                ## '/' + primary dataset name. TODO: Some day maybe we could improve
-                ## this (define a primary dataset parameter in the job ad and in the
-                ## rest interface).
                 primary_dataset = self.job_ad['CRAB_PrimaryDataset']
                 group_user_prefix = self.job_ad['CRAB_UserHN']
                 if 'CRAB_PublishGroupName' in self.job_ad and self.job_ad['CRAB_PublishGroupName']:
