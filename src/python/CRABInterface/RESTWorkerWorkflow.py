@@ -5,7 +5,7 @@ from WMCore.REST.Error import InvalidParameter
 
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, \
+from CRABInterface.Regexps import RX_PARTIAL_TASKNAME, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, \
                                   RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE
 
 # external dependecies here
@@ -28,14 +28,14 @@ class RESTWorkerWorkflow(RESTEntity):
                             #      Actually, maybe something even more strict is necessary (only the prod TW machine can access this resource)
 
         if method in ['PUT']:
-            validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
+            validate_str("workflow", param, safe, RX_PARTIAL_TASKNAME, optional=False)
             validate_num("subjobdef", param, safe, optional=True)
             validate_str("substatus", param, safe, RX_STATUS, optional=False)
             validate_strlist("subblocks", param, safe, RX_BLOCK)
             validate_str("subfailure", param, safe, RX_TEXT_FAIL, optional=True)
             validate_str("subuser", param, safe, RX_DN, optional=False)
         elif method in ['POST']:
-            validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
+            validate_str("workflow", param, safe, RX_PARTIAL_TASKNAME, optional=True)
             validate_str("status", param, safe, RX_STATUS, optional=True)
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
             validate_num("jobset", param, safe, optional=True)

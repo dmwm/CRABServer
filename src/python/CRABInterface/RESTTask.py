@@ -6,7 +6,7 @@ from WMCore.REST.Error import InvalidParameter,ExecutionError
 from CRABInterface.Utils import conn_handler
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
-from CRABInterface.Regexps import RX_SUBRES_TASK, RX_WORKFLOW, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_OUT_DATASET, RX_URL, RX_OUT_DATASET, RX_SCHEDD_NAME
+from CRABInterface.Regexps import RX_SUBRES_TASK, RX_PARTIAL_TASKNAME, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_OUT_DATASET, RX_URL, RX_OUT_DATASET, RX_SCHEDD_NAME
 
 # external dependecies here
 import re
@@ -34,14 +34,14 @@ class RESTTask(RESTEntity):
         authz_login_valid()
         if method in ['POST']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
-            validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
+            validate_str("workflow", param, safe, RX_PARTIAL_TASKNAME, optional=True)
             validate_str("warning", param, safe, RX_TEXT_FAIL, optional=True)
             validate_str("webdirurl", param, safe, RX_URL, optional=True)
             validate_str("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
             validate_strlist("outputdatasets", param, safe, RX_OUT_DATASET)
         elif method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
-            validate_str("workflow", param, safe, RX_WORKFLOW, optional=True)
+            validate_str("workflow", param, safe, RX_PARTIAL_TASKNAME, optional=True)
             validate_str('taskstatus', param, safe, RX_STATUS, optional=True)
             validate_str('username', param, safe, RX_USERNAME, optional=True)
             validate_str('minutes', param, safe, RX_RUNS, optional=True)

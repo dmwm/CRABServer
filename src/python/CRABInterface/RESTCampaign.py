@@ -6,7 +6,7 @@ from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 # CRABServer dependecies here
 from CRABInterface.DataCampaign import DataCampaign
 from CRABInterface.RESTExtensions import  authz_login_valid
-from CRABInterface.Regexps import RX_CAMPAIGN, RX_WORKFLOW, RX_SUBRESTAT
+from CRABInterface.Regexps import RX_CAMPAIGN, RX_PARTIAL_TASKNAME, RX_SUBRESTAT
 
 # external dependecies here
 import cherrypy
@@ -25,7 +25,7 @@ class RESTCampaign(RESTEntity):
 
         if method in ['PUT']:
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=False)
-            validate_strlist("workflow", param, safe, RX_WORKFLOW)
+            validate_strlist("workflow", param, safe, RX_PARTIAL_TASKNAME)
 
         elif method in ['POST']:
             validate_str("campaign", param, safe, RX_CAMPAIGN, optional=False)

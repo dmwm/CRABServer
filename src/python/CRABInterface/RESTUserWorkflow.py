@@ -328,7 +328,7 @@ class RESTUserWorkflow(RESTEntity):
 
             validate_num("publishgroupname", param, safe, optional=True)
             ## This line must come after _checkPublishDataName()
-            validate_str("workflow", param, safe, RX_WORKFLOW, optional=False)
+            validate_str("workflow", param, safe, RX_PARTIAL_TASKNAME, optional=False)
 
             ## Client versions < 3.3.1511 may put in the input dataset something that is not
             ## really an input dataset (for PrivateMC or user input files). So the only case

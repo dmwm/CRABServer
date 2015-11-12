@@ -14,8 +14,8 @@ lfnParts.update( {'publishname' : pNameRE,
                   'psethash'    : '[a-f0-9]+',
                   'filename'    : '[a-zA-Z0-9\-_\.]'}
 )
-RX_WORKFLOW_LEN = 232 #232 = column length in the db (255) - username (8) - timestamp (12) - unserscores (3)
-RX_WORKFLOW  = re.compile( wfBase % RX_WORKFLOW_LEN) 
+RX_PARTIAL_TASKNAME_LEN = 232 #232 = column length in the db (255) - username (8) - timestamp (12) - unserscores (3)
+RX_PARTIAL_TASKNAME = re.compile(wfBase % RX_PARTIAL_TASKNAME_LEN) 
 #analysis-crab3=prod jobs; analysistest=preprod jobs; analysis-crab3-hc=special HC tests (CSA14, AAA, ...); hctest=site readiness; test=middlewere validation
 RX_ACTIVITY  = re.compile(r'^analysis(test|-crab3(-hc)?)|hc(test|xrootd)|test|integration$')
 RX_TASKNAME  = re.compile(wfBase % 255)
