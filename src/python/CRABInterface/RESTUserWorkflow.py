@@ -94,15 +94,15 @@ class RESTUserWorkflow(RESTEntity):
             msg  = "Server parameter 'workflow' is not defined."
             msg += " Unable to validate the publication dataset name."
             raise InvalidParameter(msg)
-        ## The client defines kwargs['publishname'] = <Data.publishDataName>-<isbchecksum>
-        ## if the user defines Data.publishDataName, and kwargs['publishname'] = <isbchecksum> otherwise.
+        ## The client defines kwargs['publishname'] = <Data.outputDatasetTag>-<isbchecksum>
+        ## if the user defines Data.outputDatasetTag, and kwargs['publishname'] = <isbchecksum> otherwise.
         ## (The PostJob replaces then the isbchecksum by the psethash.)
         ## Here we add the workflow name if the user did not specify the publishname
         if kwargs['publishname'].find('-') == -1:
-            publishDataNameToCheck = "%s-%s" % (kwargs['workflow'].replace(':','_'), kwargs['publishname'])
+            outputDatasetTagToCheck = "%s-%s" % (kwargs['workflow'].replace(':','_'), kwargs['publishname'])
         else:
-            publishDataNameToCheck = "%s" % (kwargs['publishname'])
-        kwargs['publishname'] = publishDataNameToCheck #that's what the version earlier than 1509 were putting in the DB
+            outputDatasetTagToCheck = "%s" % (kwargs['publishname'])
+        kwargs['publishname'] = outputDatasetTagToCheck #that's what the version earlier than 1509 were putting in the DB
         if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
             if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
                 msg  = "Invalid CRAB configuration."
@@ -113,9 +113,9 @@ class RESTUserWorkflow(RESTEntity):
         else:
             username = cherrypy.request.user['login']
             group_user_prefix = username
-        publishDataNameToCheck = "%s-%s" % (group_user_prefix, publishDataNameToCheck)
+        outputDatasetTagToCheck = "%s-%s" % (group_user_prefix, outputDatasetTagToCheck)
         try:
-            userprocdataset(publishDataNameToCheck)
+            userprocdataset(outputDatasetTagToCheck)
         except AssertionError:
             ## The messages below are more descriptive than if we would use
             ## the message from AssertionError exception.
@@ -123,7 +123,7 @@ class RESTUserWorkflow(RESTEntity):
                 param = 'General.requestName'
                 extrastr = 'crab_'
             else:
-                param = 'Data.publishDataName'
+                param = 'Data.outputDatasetTag'
                 extrastr = ''
             msg  = "Invalid CRAB configuration parameter %s." % (param)
             msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (group_user_prefix, extrastr, param)
@@ -142,15 +142,15 @@ class RESTUserWorkflow(RESTEntity):
 
         if 'publishname2' not in kwargs or not kwargs['publishname2']:
             ## provide the default publication name if it was not specified in the client
-            publishDataNameToCheck = kwargs['workflow'].replace(':','_')
+            outputDatasetTagToCheck = kwargs['workflow'].replace(':','_')
         else:
-            publishDataNameToCheck = kwargs['publishname2']
+            outputDatasetTagToCheck = kwargs['publishname2']
 
         ## Add the isbchecksum placeholder
-        publishDataNameToCheck += "-" + "0" * 32
+        outputDatasetTagToCheck += "-" + "0" * 32
 
         #saves that in kwargs since it's what we want
-        kwargs['publishname2'] = publishDataNameToCheck
+        kwargs['publishname2'] = outputDatasetTagToCheck
 
         ##Determine if it's a dataset that will go into a group space and therefore the (group)username prefix it will be used
         if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
@@ -164,9 +164,9 @@ class RESTUserWorkflow(RESTEntity):
             username = cherrypy.request.user['login']
             group_user_prefix = username
 
-        publishDataNameToCheck = "%s-%s" % (group_user_prefix, publishDataNameToCheck)
+        outputDatasetTagToCheck = "%s-%s" % (group_user_prefix, outputDatasetTagToCheck)
         try:
-            userprocdataset(publishDataNameToCheck)
+            userprocdataset(outputDatasetTagToCheck)
         except AssertionError:
             ## The messages below are more descriptive than if we would use
             ## the message from AssertionError exception.
@@ -174,7 +174,7 @@ class RESTUserWorkflow(RESTEntity):
                 param = 'General.requestName'
                 extrastr = 'crab_'
             else:
-                param = 'Data.publishDataName'
+                param = 'Data.outputDatasetTag'
                 extrastr = ''
             msg  = "Invalid CRAB configuration parameter %s." % (param)
             msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (group_user_prefix, extrastr, param)
@@ -363,7 +363,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("primarydataset", param, safe, RX_LFNPRIMDS, optional=False)
 
             validate_num("nonvaliddata", param, safe, optional=True)
-            #if one and only one between publishDataName and publishDbsUrl is set raise an error (we need both or none of them)
+            #if one and only one between outputDatasetTag and publishDbsUrl is set raise an error (we need both or none of them)
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkASODestination(safe.kwargs['asyncdest'])
             # We no longer use this attribute, but keep it around for older client compatibility
