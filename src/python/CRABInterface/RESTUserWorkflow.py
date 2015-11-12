@@ -391,7 +391,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("dryrun", param, safe, optional=True)
 
         elif method in ['POST']:
-            validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
+            validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_str("subresource", param, safe, RX_SUBRESTAT, optional=True)
             ## In a resubmission, the site black- and whitelists need to be interpreted
             ## differently than in an initial task submission. If there is no site black-
@@ -423,7 +423,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("force", param, safe, optional=True)
 
         elif method in ['GET']:
-            validate_str("workflow", param, safe, RX_UNIQUEWF, optional=True)
+            validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
             validate_str('subresource', param, safe, RX_SUBRESTAT, optional=True)
             validate_str('username', param, safe, RX_USERNAME, optional=True)
             validate_str('timestamp', param, safe, RX_DATE, optional=True) ## inserted by eric
@@ -447,7 +447,7 @@ class RESTUserWorkflow(RESTEntity):
                 raise InvalidParameter("You need to specify the number of jobs to retrieve or their ids.")
 
         elif method in ['DELETE']:
-            validate_str("workflow", param, safe, RX_UNIQUEWF, optional=False)
+            validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_num("force", param, safe, optional=True)
             validate_numlist('jobids', param, safe)
 
