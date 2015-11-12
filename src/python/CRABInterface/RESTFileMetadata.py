@@ -26,7 +26,7 @@ class RESTFileMetadata(RESTEntity):
         if method in ['PUT']:
             #TODO check optional parameter
             #TODO check all the regexp
-            validate_str("taskname", param, safe, RX_PARTIAL_TASKNAME, optional=False)
+            validate_str("taskname", param, safe, RX_TASKNAME, optional=False)
             validate_strlist("outfilelumis", param, safe, RX_LUMILIST)
             validate_numlist("outfileruns", param, safe)
             if len(safe.kwargs["outfileruns"]) != len(safe.kwargs["outfilelumis"]):
@@ -43,7 +43,7 @@ class RESTFileMetadata(RESTEntity):
             validate_str("checksumadler32", param, safe, RX_CHECKSUM, optional=False)
             validate_str("outlocation", param, safe, RX_CMSSITE, optional=False)
             validate_str("outtmplocation", param, safe, RX_CMSSITE, optional=False)
-            validate_str("acquisitionera", param, safe, RX_PARTIAL_TASKNAME, optional=False)#TODO Do we really need this?
+            validate_str("acquisitionera", param, safe, RX_TASKNAME, optional=False)#TODO Do we really need this?
             validate_str("outdatasetname", param, safe, RX_OUTDSLFN, optional=False)#TODO temporary, need to come up with a regex
             validate_str("outlfn", param, safe, RX_PARENTLFN, optional=False)
             validate_str("outtmplfn", param, safe, RX_PARENTLFN, optional=True)
@@ -52,15 +52,15 @@ class RESTFileMetadata(RESTEntity):
             validate_num("directstageout", param, safe, optional=True)
             safe.kwargs["directstageout"] = 'T' if safe.kwargs["directstageout"] else 'F' #'F' if not provided
         elif method in ['POST']:
-            validate_str("taskname", param, safe, RX_PARTIAL_TASKNAME, optional=False)
+            validate_str("taskname", param, safe, RX_TASKNAME, optional=False)
             validate_str("outlfn", param, safe, RX_LFN, optional=False)
             validate_str("filestate", param, safe, RX_FILESTATE, optional=False)
         elif method in ['GET']:
-            validate_str("taskname", param, safe, RX_PARTIAL_TASKNAME, optional=False)
+            validate_str("taskname", param, safe, RX_TASKNAME, optional=False)
             validate_str("filetype", param, safe, RX_OUTTYPES, optional=False)
         elif method in ['DELETE']:
             authz_operator()
-            validate_str("taskname", param, safe, RX_PARTIAL_TASKNAME, optional=True)
+            validate_str("taskname", param, safe, RX_TASKNAME, optional=True)
             validate_str("hours", param, safe, RX_HOURS, optional=True)
             if bool(safe.kwargs["taskname"]) == bool(safe.kwargs["hours"]):
                raise InvalidParameter("You have to specify a taskname or a number of hours. Files of this task or created before the number of hours"+\
