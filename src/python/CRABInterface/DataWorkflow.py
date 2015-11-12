@@ -159,7 +159,7 @@ class DataWorkflow(object):
            :returns: a dict which contaians details of the request"""
 
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
-        requestname = ""
+        taskname = ""
         schedd_name = ""
         backend_urls = copy.deepcopy(self.centralcfg.centralconfig.get("backend-urls", {}))
         if collector:
@@ -168,12 +168,12 @@ class DataWorkflow(object):
             collector = backend_urls['htcondorPool']
 
         try:
-            requestname = '%s:%s_%s' % (timestamp, userhn, workflow)
+            taskname = '%s:%s_%s' % (timestamp, userhn, workflow)
             schedd_name = self.chooseScheduler(scheddname, backend_urls).split(":")[0]
-            if len(requestname) > RX_PARTIAL_TASKNAME_LEN:
-              raise InvalidParameter("Taskname exceed maximum allowed lenght, please review parameter requestName in your config file")
+            if len(taskname) > RX_PARTIAL_TASKNAME_LEN:
+                raise InvalidParameter("Taskname exceed maximum allowed lenght, please review parameter requestName in your config file")
         except IOError as err:
-            self.logger.debug("Failed to communicate with components %s. Request name %s: " % (str(err), str(requestname)))
+            self.logger.debug("Failed to communicate with components %s. Request name %s: " % (str(err), str(taskname)))
             raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")
         splitArgName = self.splitArgMap[splitalgo]
         dbSerializer = str
@@ -198,7 +198,7 @@ class DataWorkflow(object):
 
         ## Insert this new task into the Tasks DB.
         self.api.modify(self.Task.New_sql,
-                            task_name       = [requestname],
+                            task_name       = [taskname],
                             task_activity   = [activity],
                             jobset_id       = [None],
                             task_status     = ['NEW'],
@@ -258,7 +258,7 @@ class DataWorkflow(object):
                             one_event_mode   = ['T' if oneEventMode else 'F']
         )
 
-        return [{'RequestName': requestname}]
+        return [{'RequestName': taskname}]
 
 
     def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, force, userdn, userproxy):
