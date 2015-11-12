@@ -8,17 +8,22 @@ from WMCore.Lexicon import lfnParts, DATASET_RE
 RX_ANYTHING = re.compile(r"^.*$")
 # TODO: we should start replacing most of the regex here with what we have in WMCore.Lexicon
 #       (this probably requires to adapt something on Lexicon)
-wfBase = r"^[a-zA-Z0-9\-_:]{1,%s}$"
 pNameRE      = r"(?=.{0,400}$)[a-zA-Z0-9\-_.]+"
 lfnParts.update( {'publishname' : pNameRE,
                   'psethash'    : '[a-f0-9]+',
                   'filename'    : '[a-zA-Z0-9\-_\.]'}
 )
-RX_PARTIAL_TASKNAME_LEN = 232 #232 = column length in the db (255) - username (8) - timestamp (12) - unserscores (3)
+wfBase = r"^[a-zA-Z0-9\-_:]{1,%s}$"
+RX_TASKNAME  = re.compile(wfBase % 255)
+## From https://account.cern.ch/account/Help/?kbid=020015
+## - All logins must be at least 3 characters long, start with a letter and contain only letters and numbers.
+## - The maximum length of the login varies with the account type.
+## - Primary accounts logins are limited to 8 characters, to ensure compatibility with all existing applications.
+## - Secondary and Service accounts can have logins up to 15 characters, but logins longer than 8 characters could cause problems with some applications or services.
+RX_PARTIAL_TASKNAME_LEN = 225 # 225 = column length in the DB (255) - username (max 15) - timestamp (12) - unserscores (2) - colon (1)
 RX_PARTIAL_TASKNAME = re.compile(wfBase % RX_PARTIAL_TASKNAME_LEN) 
 #analysis-crab3=prod jobs; analysistest=preprod jobs; analysis-crab3-hc=special HC tests (CSA14, AAA, ...); hctest=site readiness; test=middlewere validation
 RX_ACTIVITY  = re.compile(r'^analysis(test|-crab3(-hc)?)|hc(test|xrootd)|test|integration$')
-RX_TASKNAME  = re.compile(wfBase % 255)
 RX_PUBLISH   = re.compile('^'+pNameRE+'$')
 #RX_LFN       = re.compile(r'^(?=.{0,500}$)/store/(temp/)?(user|group)/%(hnName)s/%(primDS)s/%(publishname)s/%(psethash)s/%(counter)s/(log/)?%(filename)s+$' % lfnParts)
 RX_LFN       = re.compile(r'^(?=[a-zA-Z0-9\-\._/]{0,500}$)/store/(temp/)?(user/%(hnName)s|group|local)/?' % lfnParts)
