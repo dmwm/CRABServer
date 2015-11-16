@@ -14,7 +14,8 @@ lfnParts.update( {'publishname' : pNameRE,
                   'filename'    : '[a-zA-Z0-9\-_\.]'}
 )
 wfBase = r"^[a-zA-Z0-9\-_:]{1,%s}$"
-RX_TASKNAME  = re.compile(wfBase % 255)
+RX_TASKNAME_LEN = 255
+RX_TASKNAME  = re.compile(wfBase % RX_TASKNAME_LEN)
 ## From https://account.cern.ch/account/Help/?kbid=020015
 ## - All logins must be at least 3 characters long, start with a letter and contain only letters and numbers.
 ## - The maximum length of the login varies with the account type.
