@@ -251,6 +251,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                   "taskWarningMsg"   : [],
                   "statusFailureMsg" : '',
                   "jobSetID"         : '',
+                  "taskname"         : '',
                   "jobsPerStatus"    : {},
                   "failedJobdefs"    : 0,
                   "totalJobdefs"     : 0,
@@ -277,6 +278,17 @@ class HTCondorDataWorkflow(DataWorkflow):
         self.logger.info("Status result for workflow %s: %s (detail level %d)" % (workflow, row.task_status, verbose))
 
         self.result['jobSetID'] = workflow
+        self.result['taskname'] = row.taskname
+        ## We are experiencing cases in which a user requests the status for a task, but
+        ## gets back information from another task: https://github.com/dmwm/CRABServer/issues/5066
+        ## First thing is to make sure this misbehaviour doesn't originate from a wrong
+        ## task retrieval from the TaskDB.
+        self.logger.debug("Database query result for workflow %s: %s" % (workflow, row))
+        if row.taskname != workflow:
+            msg  = "Retrieved wrong task from database!"
+            msg += " Status requested for task %s, but retrieved task %s" % (workflow, row.taskname)
+            raise ExecutionError(msg)
+
         ## Apply taskWarning and savelogs flags to output.
         taskWarnings = literal_eval(row.task_warnings if isinstance(row.task_warnings, str) else row.task_warnings.read())
         self.result["taskWarningMsg"] = taskWarnings
