@@ -250,7 +250,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                   "taskFailureMsg"   : '',
                   "taskWarningMsg"   : [],
                   "statusFailureMsg" : '',
-                  "jobSetID"         : '',
                   "jobsPerStatus"    : {},
                   "failedJobdefs"    : 0,
                   "totalJobdefs"     : 0,
@@ -276,7 +275,6 @@ class HTCondorDataWorkflow(DataWorkflow):
             verbose = 0
         self.logger.info("Status result for workflow %s: %s (detail level %d)" % (workflow, row.task_status, verbose))
 
-        self.result['jobSetID'] = workflow
         ## Apply taskWarning and savelogs flags to output.
         taskWarnings = literal_eval(row.task_warnings if isinstance(row.task_warnings, str) else row.task_warnings.read())
         self.result["taskWarningMsg"] = taskWarnings
