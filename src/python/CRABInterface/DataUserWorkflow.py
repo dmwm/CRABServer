@@ -1,14 +1,4 @@
 import logging
-import time
-import commands
-import json
-
-# WMCore dependecies here
-from WMCore.REST.Error import InvalidParameter, ExecutionError, MissingObject
-
-#CRAB dependencies
-from CRABInterface.DataWorkflow import DataWorkflow
-from CRABInterface.Utils import conn_handler, retrieveUserCert
 
 
 class DataUserWorkflow(object):

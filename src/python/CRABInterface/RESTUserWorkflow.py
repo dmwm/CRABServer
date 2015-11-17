@@ -5,15 +5,15 @@ import logging
 import cherrypy
 
 # WMCore dependecies here
+from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.REST.Server import RESTEntity, restcall, rows
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
 from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import allScramArchsAndVersions, TAG_COLLECTOR_URL
 from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
 
 # CRABServer dependecies here
+from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
-from CRABInterface.DataUserWorkflow import DataWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
 from CRABInterface.Regexps import *
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance

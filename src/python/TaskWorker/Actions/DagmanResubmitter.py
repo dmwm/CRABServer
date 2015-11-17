@@ -1,7 +1,6 @@
 import time
 import urllib
 import datetime
-import traceback
 
 import classad
 import htcondor
@@ -103,7 +102,7 @@ class DagmanResubmitter(TaskAction):
         overwrite = False
         for taskparam in params.values():
             if ('resubmit_'+taskparam in task) and task['resubmit_'+taskparam] != None:
-                if type(task['resubmit_'+taskparam]) == list:
+                if isinstance(task['resubmit_'+taskparam], list):
                     ad[taskparam] = task['resubmit_'+taskparam]
                 if taskparam != 'jobids':
                     overwrite = True
