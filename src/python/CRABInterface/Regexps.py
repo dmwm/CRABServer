@@ -8,23 +8,28 @@ from WMCore.Lexicon import lfnParts, DATASET_RE
 RX_ANYTHING = re.compile(r"^.*$")
 # TODO: we should start replacing most of the regex here with what we have in WMCore.Lexicon
 #       (this probably requires to adapt something on Lexicon)
-wfBase = r"^[a-zA-Z0-9\-_:]{1,%s}$"
 pNameRE      = r"(?=.{0,400}$)[a-zA-Z0-9\-_.]+"
 lfnParts.update( {'publishname' : pNameRE,
                   'psethash'    : '[a-f0-9]+',
                   'filename'    : '[a-zA-Z0-9\-_\.]'}
 )
-RX_WORKFLOW_LEN = 232 #232 = column length in the db (255) - username (8) - timestamp (12) - unserscores (3)
-RX_WORKFLOW  = re.compile( wfBase % RX_WORKFLOW_LEN) 
+## Although the taskname column in the TaskDB accepts tasknames of up to 255
+## characters, we limit the taskname to something less than that in order to
+## have room to define filenames based on the taskname (filenames have a limit
+## of 255 characters). The 232 we chose is a relic from releases < 3.3.1512 when
+## we were using RX_TASKNAME to validate both 'crab_<requestname>' from the
+## client and '<taskname>' (or '<workflow>') from the TaskWorker. We keep the
+## 232 to not break backward compatibility.
+RX_TASKNAME_LEN = 232
+RX_TASKNAME  = re.compile(r"^[a-zA-Z0-9\-_:]{1,%s}$" % RX_TASKNAME_LEN)
 #analysis-crab3=prod jobs; analysistest=preprod jobs; analysis-crab3-hc=special HC tests (CSA14, AAA, ...); hctest=site readiness; test=middlewere validation
 RX_ACTIVITY  = re.compile(r'^analysis(test|-crab3(-hc)?)|hc(test|xrootd)|test|integration$')
-RX_UNIQUEWF  = re.compile( wfBase % 255)
 RX_PUBLISH   = re.compile('^'+pNameRE+'$')
 #RX_LFN       = re.compile(r'^(?=.{0,500}$)/store/(temp/)?(user|group)/%(hnName)s/%(primDS)s/%(publishname)s/%(psethash)s/%(counter)s/(log/)?%(filename)s+$' % lfnParts)
 RX_LFN       = re.compile(r'^(?=[a-zA-Z0-9\-\._/]{0,500}$)/store/(temp/)?(user/%(hnName)s|group|local)/?' % lfnParts)
 RX_PARENTLFN = re.compile(r'^(/[a-zA-Z0-9\-_\.]+/?)+$')
 RX_OUTDSLFN  = re.compile(r'^(?=.{0,500}$)/%(primDS)s/(%(hnName)s|%(physics_group)s)-%(publishname)s-%(psethash)s/USER$' % lfnParts)
-RX_CAMPAIGN  = RX_UNIQUEWF
+RX_CAMPAIGN  = RX_TASKNAME
 RX_JOBTYPE   = re.compile(r"^(?=.{0,255}$)[A-Za-z]*$")
 RX_GENERATOR = re.compile(r'^(lhe|pythia)$')
 RX_LUMIEVENTS = re.compile(r'^\d+$')

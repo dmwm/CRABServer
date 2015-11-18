@@ -33,9 +33,6 @@ class HTCondorDataWorkflow(DataWorkflow):
     """ HTCondor implementation of the status command.
     """
 
-    successList = ['finished']
-    failedList = ['failed']
-
     @classmethod
     @conn_handler(services=['centralconfig'])
     def chooseScheduler(cls, scheddname=None, backend_urls=None):

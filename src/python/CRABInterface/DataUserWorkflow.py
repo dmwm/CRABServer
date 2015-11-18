@@ -76,7 +76,7 @@ class DataUserWorkflow(object):
     def submit(self, *args, **kwargs):
         """Perform the workflow injection
 
-           :arg str workflow: workflow name requested by the user;
+           :arg str workflow: workflow name;
            :arg str activity: workflow activity type, usually analysis;
            :arg str jobtype: job type of the workflow, usually Analysis;
            :arg str jobsw: software requirement;
@@ -96,7 +96,7 @@ class DataUserWorkflow(object):
            :arg str cacheurl: URL of the cache
            :arg str list addoutputfiles: list of additional output files;
            :arg str userdn: DN of user doing the request;
-           :arg str userhn: hyper new name of the user doing the request;
+           :arg str username: username of the user doing the request;
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
            :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication;
