@@ -138,7 +138,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             args[0][1]['tm_maxjobruntime'] = str(stdmaxjobruntime)
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
         if kwargs['task']['tm_maxmemory'] > stdmaxmemory:
-            msg = "Task requests %s bytes of memory, but only %s bytes are guaranteed to be available." % (kwargs['task']['tm_maxmemory'], stdmaxmemory)
+            msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (kwargs['task']['tm_maxmemory'], stdmaxmemory)
             msg += " Jobs may not find a site where to run and stay idle forever."
             self.logger.warning(msg)
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
