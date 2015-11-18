@@ -15,6 +15,9 @@ class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
        No aggregation of workflows provided here."""
 
+    successList = ['finished']
+    failedList = ['failed']
+
     @staticmethod
     def globalinit(dbapi, phedexargs=None, credpath='/tmp', centralcfg=None, config=None):
         DataWorkflow.api = dbapi
