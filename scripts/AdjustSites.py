@@ -189,64 +189,26 @@ def makeWebDir(ad):
     """
     path = os.path.expanduser("~/%s" % ad['CRAB_ReqName'])
     try:
-        try:
-            os.makedirs(path)
-        except:
-            pass
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", "job_log")), os.path.join(path, "jobs_log.txt"))
-        except:
-            pass
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", "node_state")), os.path.join(path, "node_state.txt"))
-        except:
-            pass
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", "site.ad")), os.path.join(path, "site_ad.txt"))
-        except:
-            pass
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", "aso_status.json")), os.path.join(path, "aso_status.json"))
-        except:
-            pass
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", ".job.ad")), os.path.join(path, "job_ad.txt"))
-        except:
-            pass
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", "error_summary.json")), os.path.join(path, "error_summary.json"))
-        except:
-            pass
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", "RunJobs.dag")), os.path.join(path, "RunJobs.dag"))
-        except:
-            pass
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", "RunJobs.dag.dagman.out")), os.path.join(path, "RunJobs.dag.dagman.out"))
-        except:
-            pass
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", "RunJobs.dag.nodes.log")), os.path.join(path, "RunJobs.dag.nodes.log"))
-        except:
-            pass
-        try:
-            shutil.copy2(os.path.join(".", "sandbox.tar.gz"), os.path.join(path, "sandbox.tar.gz"))
-        except:
-            pass
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", "debug")), os.path.join(path, "debug"))
-        except:
-            pass
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", "run_and_lumis.tar.gz")), os.path.join(path, "run_and_lumis.tar.gz"))
-        except:
-            pass
-        try:
-            os.symlink(os.path.abspath(os.path.join(".", "input_files.tar.gz")), os.path.join(path, "input_files.tar.gz"))
-        except:
-            pass
-    except OSError:
-        pass
+        ## Create the web directory.
+        os.makedirs(path)
+        ## Copy the sandbox to the web directory.
+        shutil.copy2(os.path.join(".", "sandbox.tar.gz"), os.path.join(path, "sandbox.tar.gz"))
+        ## Make all the necessary symbolic links in the web directory.
+        sourceLinks = ["debug",
+                       "RunJobs.dag", "RunJobs.dag.dagman.out", "RunJobs.dag.nodes.log",
+                       "input_files.tar.gz", "run_and_lumis.tar.gz",
+                       "aso_status.json", "error_summary.json",
+                      ]
+        for source in sourceLinks:
+            link = source
+            os.symlink(os.path.abspath(os.path.join(".", source)), os.path.join(path, link))
+        ## Symlinks with a different link name than source name. (I would prefer to keep the source names.)
+        os.symlink(os.path.abspath(os.path.join(".", "job_log")), os.path.join(path, "jobs_log.txt"))
+        os.symlink(os.path.abspath(os.path.join(".", "node_state")), os.path.join(path, "node_state.txt"))
+        os.symlink(os.path.abspath(os.path.join(".", "site.ad")), os.path.join(path, "site_ad.txt"))
+        os.symlink(os.path.abspath(os.path.join(".", ".job.ad")), os.path.join(path, "job_ad.txt"))
+    except Exception as ex:
+        printLog("Failed to copy/symlink files in the user web directory: %s" % str(ex))
     try:
         storage_rules = htcondor.param['CRAB_StorageRules']
     except:
@@ -261,7 +223,7 @@ def makeWebDir(ad):
     try:
         htcondor.Schedd().edit([dagJobId], 'CRAB_UserWebDir', ad.lookup('CRAB_UserWebDir'))
     except RuntimeError as reerror:
-        print str(reerror)
+        printLog(str(reerror))
 
 
 def updateWebDir(ad):
