@@ -256,7 +256,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                   "totalJobdefs"     : 0,
                   "jobdefErrors"     : [],
                   "jobList"          : [],
-                  "saveLogs"         : 0,
                   "schedd"           : '',
                   "collector"        : '' }
 
@@ -280,7 +279,6 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## Apply taskWarning and savelogs flags to output.
         taskWarnings = literal_eval(row.task_warnings if isinstance(row.task_warnings, str) else row.task_warnings.read())
         self.result["taskWarningMsg"] = taskWarnings
-        self.result["saveLogs"] = row.save_logs
 
         ## Helper function to add the task status and the failure message (both as taken
         ## from the TaskDB) to the result dictionary.
