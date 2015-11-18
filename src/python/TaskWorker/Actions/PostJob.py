@@ -55,7 +55,6 @@ The PostJob and cmscp are the only places in CRAB3 where we should use camel_cas
 """
 
 import os
-import re
 import sys
 import time
 import json
@@ -64,7 +63,6 @@ import glob
 import fcntl
 import errno
 import pprint
-import random
 import shutil
 import signal
 import urllib
@@ -85,7 +83,7 @@ from TaskWorker import __version__
 from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
-from ServerUtilities import setDashboardLogs, isFailurePermanent, parseJobAd
+from ServerUtilities import isFailurePermanent, parseJobAd
 
 ASO_JOB = None
 config = None
@@ -857,9 +855,9 @@ class ASOServerJob(object):
                 doc['end_time'] = now
                 if reason:
                     if doc['failure_reason']:
-                        if type(doc['failure_reason']) == list:
+                        if isinstance(doc['failure_reason'], list):
                             doc['failure_reason'].append(reason)
-                        elif type(doc['failure_reason']) == str:
+                        elif isinstance(doc['failure_reason'], str):
                             doc['failure_reason'] = [doc['failure_reason'], reason]
                     else:
                         doc['failure_reason'] = reason
@@ -1056,7 +1054,7 @@ class PostJob():
                     msg += "\nDetails follow:"
                     self.logger.exception(msg)
                     self.logger.info("Continuing since this is not a critical error.")
-            except Exception as e:
+            except Exception:
                 msg  = "Cannot create symbolic link to the postjob log."
                 msg += "\nDetails follow:"
                 self.logger.exception(msg)
@@ -1667,9 +1665,9 @@ class PostJob():
         num_failures = len(failures)
         num_permanent_failures = 0
         for doc_id in failures.keys():
-            if type(failures[doc_id]['reasons']) == str:
+            if isinstance(failures[doc_id]['reasons'], str):
                 failures[doc_id]['reasons'] = [failures[doc_id]['reasons']]
-            if type(failures[doc_id]['reasons']) == list:
+            if isinstance(failures[doc_id]['reasons'], list):
                 last_failure_reason = failures[doc_id]['reasons'][-1]
                 permanent, _ = isFailurePermanent(last_failure_reason)
                 if permanent:
@@ -1824,8 +1822,8 @@ class PostJob():
                 outfilelumis.append(','.join(map(str, lumis)))
             for run in outfileruns:
                 configreq.append(("outfileruns", run))
-            for lumi in outfilelumis:
-                configreq.append(("outfilelumis", lumi))
+            for lumis in outfilelumis:
+                configreq.append(("outfilelumis", lumis))
             msg = "Uploading file metadata for input file %s" % ifile['lfn']
             self.logger.debug(msg)
             try:
@@ -1897,8 +1895,8 @@ class PostJob():
                 for run in file_info['outfileruns']:
                     configreq.append(("outfileruns", run))
             if 'outfilelumis' in file_info:
-                for lumi in file_info['outfilelumis']:
-                    configreq.append(("outfilelumis", lumi))
+                for lumis in file_info['outfilelumis']:
+                    configreq.append(("outfilelumis", lumis))
             if 'inparentlfns' in file_info:
                 for lfn in file_info['inparentlfns']:
                     # If the user specified a PFN as input, then the LFN is an empty string
@@ -1941,8 +1939,8 @@ class PostJob():
             except HTTPException as hte:
                 msg = "Error uploading output dataset: %s" % (str(hte.headers))
                 self.logger.error(msg)
-            except IOError as ioe:
-                msq = "Error writing the output_datasets file"
+            except IOError:
+                msg = "Error writing the output_datasets file"
                 self.logger.error(msg)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -2235,7 +2233,7 @@ class PostJob():
             try:
                 with open(fname, 'r') as fd:
                     retry_info = json.load(fd)
-            except Exception as e:
+            except Exception:
                 msg  = "Unable to calculate post-job retry count."
                 msg += " Failed to load file %s." % (fname)
                 msg += "\nDetails follow:"
