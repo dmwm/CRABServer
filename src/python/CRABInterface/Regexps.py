@@ -13,16 +13,15 @@ lfnParts.update( {'publishname' : pNameRE,
                   'psethash'    : '[a-f0-9]+',
                   'filename'    : '[a-zA-Z0-9\-_\.]'}
 )
-wfBase = r"^[a-zA-Z0-9\-_:]{1,%s}$"
-RX_TASKNAME_LEN = 255
-RX_TASKNAME  = re.compile(wfBase % RX_TASKNAME_LEN)
-## From https://account.cern.ch/account/Help/?kbid=020015
-## - All logins must be at least 3 characters long, start with a letter and contain only letters and numbers.
-## - The maximum length of the login varies with the account type.
-## - Primary accounts logins are limited to 8 characters, to ensure compatibility with all existing applications.
-## - Secondary and Service accounts can have logins up to 15 characters, but logins longer than 8 characters could cause problems with some applications or services.
-RX_PARTIAL_TASKNAME_LEN = 225 # 225 = column length in the DB (255) - username (max 15) - timestamp (12) - unserscores (2) - colon (1)
-RX_PARTIAL_TASKNAME = re.compile(wfBase % RX_PARTIAL_TASKNAME_LEN) 
+## Although the taskname column in the TaskDB accepts tasknames of up to 255
+## characters, we limit the taskname to something less than that in order to
+## have room to define filenames based on the taskname (filenames have a limit
+## of 255 characters). The 232 we chose is a relic from releases < 3.3.1512 when
+## we were using RX_TASKNAME to validate both 'crab_<requestname>' from the
+## client and '<taskname>' (or '<workflow>') from the TaskWorker. We keep the
+## 232 to not break backward compatibility.
+RX_TASKNAME_LEN = 232
+RX_TASKNAME  = re.compile(r"^[a-zA-Z0-9\-_:]{1,%s}$" % RX_TASKNAME_LEN)
 #analysis-crab3=prod jobs; analysistest=preprod jobs; analysis-crab3-hc=special HC tests (CSA14, AAA, ...); hctest=site readiness; test=middlewere validation
 RX_ACTIVITY  = re.compile(r'^analysis(test|-crab3(-hc)?)|hc(test|xrootd)|test|integration$')
 RX_PUBLISH   = re.compile('^'+pNameRE+'$')

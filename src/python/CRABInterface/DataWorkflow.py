@@ -1,9 +1,7 @@
-import time
 import copy
 import random
 import logging
 import cherrypy
-from Regexps import RX_TASKNAME_LEN
 from ast import literal_eval
 
 ## WMCore dependecies
@@ -102,7 +100,7 @@ class DataWorkflow(object):
     @conn_handler(services=['centralconfig'])
     def submit(self, workflow, activity, jobtype, jobsw, jobarch, use_parent, secondarydata, generator, events_per_lumi, siteblacklist,
                sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
-               userhn, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
+               username, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, scriptexe=None, scriptargs=None, scheddname=None,
                extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None):
@@ -129,7 +127,7 @@ class DataWorkflow(object):
            :arg str list addoutputfiles: list of additional output files;
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
            :arg str userdn: DN of user doing the request;
-           :arg str userhn: hyper new name of the user doing the request;
+           :arg str username: username of the user doing the request;
            :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication; deprecated
            :arg str publishname: name to use for data publication;
@@ -158,23 +156,19 @@ class DataWorkflow(object):
            :arg int dryrun: enable dry run mode (initialize but do not submit task).
            :returns: a dict which contaians details of the request"""
 
-        timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
-        taskname = ""
-        schedd_name = ""
         backend_urls = copy.deepcopy(self.centralcfg.centralconfig.get("backend-urls", {}))
         if collector:
             backend_urls['htcondorPool'] = collector
         else:
             collector = backend_urls['htcondorPool']
 
+        schedd_name = ""
         try:
-            taskname = '%s:%s_%s' % (timestamp, userhn, workflow)
             schedd_name = self.chooseScheduler(scheddname, backend_urls).split(":")[0]
-            if len(taskname) > RX_TASKNAME_LEN:
-                raise InvalidParameter("Taskname exceed maximum allowed lenght, please review parameter requestName in your config file")
         except IOError as err:
-            self.logger.debug("Failed to communicate with components %s. Request name %s: " % (str(err), str(taskname)))
+            self.logger.debug("Failed to communicate with components %s. Request name %s: " % (str(err), str(workflow)))
             raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")
+
         splitArgName = self.splitArgMap[splitalgo]
         dbSerializer = str
 
@@ -198,7 +192,7 @@ class DataWorkflow(object):
 
         ## Insert this new task into the Tasks DB.
         self.api.modify(self.Task.New_sql,
-                            task_name       = [taskname],
+                            task_name       = [workflow],
                             task_activity   = [activity],
                             jobset_id       = [None],
                             task_status     = ['NEW'],
@@ -220,7 +214,7 @@ class DataWorkflow(object):
                             total_units     = [totalunits],
                             user_sandbox    = [cachefilename],
                             cache_url       = [cacheurl],
-                            username        = [userhn],
+                            username        = [username],
                             user_dn         = [userdn],
                             user_vo         = ['cms'],
                             user_role       = [vorole],
@@ -258,7 +252,7 @@ class DataWorkflow(object):
                             one_event_mode   = ['T' if oneEventMode else 'F']
         )
 
-        return [{'RequestName': taskname}]
+        return [{'RequestName': workflow}]
 
 
     def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, force, userdn, userproxy):

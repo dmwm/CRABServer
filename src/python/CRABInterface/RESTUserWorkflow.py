@@ -1,3 +1,9 @@
+# external dependecies here
+import re
+import time
+import logging
+import cherrypy
+
 # WMCore dependecies here
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.REST.Server import RESTEntity, restcall, rows
@@ -12,12 +18,6 @@ from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
 from CRABInterface.Regexps import *
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
 from ServerUtilities import checkOutLFN
-
-# external dependecies here
-import cherrypy
-import time
-import logging
-import re
 
 
 class RESTUserWorkflow(RESTEntity):
@@ -55,26 +55,24 @@ class RESTUserWorkflow(RESTEntity):
                 res.add(site)
         return list(res)
 
-    def _checkOutLFN(self, kwargs):
+    def _checkOutLFN(self, kwargs, username):
         """Check the lfn parameter: it must start with '/store/user/<username>/', '/store/group/groupname/' or '/store/local/something/',
            where username is the one registered in SiteDB (i.e. the one used in the CERN primary account).
            If lfn is not there, default to '/store/user/<username>/'.
         """
-        ## This is the username registered in SiteDB.
-        username = cherrypy.request.user['login']
         if not kwargs['lfn']:
             ## Default to '/store/user/<username>/' if the user did not specify the lfn parameter.
             kwargs['lfn'] = '/store/user/%s/' % (username)
         else:
-            msg  = "The parameter Data.outLFNDirBase in the CRAB configuration file must start with either"
-            msg += " '/store/user/<username>/' or '/store/group/<groupname>/'"
-            msg += " (or '/store/local/<something>/' if publication is off),"
-            msg += " where username is your username as registered in SiteDB"
-            msg += " (i.e. the username of your CERN primary account)."
             if not checkOutLFN(kwargs['lfn'], username):
+                msg  = "The parameter Data.outLFNDirBase in the CRAB configuration file must start with either"
+                msg += " '/store/user/<username>/' or '/store/group/<groupname>/'"
+                msg += " (or '/store/local/<something>/' if publication is off),"
+                msg += " where username is your username as registered in SiteDB"
+                msg += " (i.e. the username of your CERN primary account)."
                 raise InvalidParameter(msg)
 
-    def _checkPublishDataName(self, kwargs, outlfn):
+    def _checkPublishDataName(self, kwargs, outlfn, requestname, username):
         """
         Validate the (user specified part of the) output dataset name for publication
         using the WMCore.Lexicon method userprocdataset(), which does the same
@@ -90,16 +88,12 @@ class RESTUserWorkflow(RESTEntity):
             msg += " It is possible that old client is being used."
             self.logger.info(msg)
             return
-        if kwargs['publishname'].find('-') == -1 and 'workflow' not in kwargs:
-            msg  = "Server parameter 'workflow' is not defined."
-            msg += " Unable to validate the publication dataset name."
-            raise InvalidParameter(msg)
         ## The client defines kwargs['publishname'] = <Data.outputDatasetTag>-<isbchecksum>
         ## if the user defines Data.outputDatasetTag, and kwargs['publishname'] = <isbchecksum> otherwise.
         ## (The PostJob replaces then the isbchecksum by the psethash.)
-        ## Here we add the workflow name if the user did not specify the publishname
+        ## Here we add the requestname if the user did not specify the publishname
         if kwargs['publishname'].find('-') == -1:
-            outputDatasetTagToCheck = "%s-%s" % (kwargs['workflow'].replace(':','_'), kwargs['publishname'])
+            outputDatasetTagToCheck = "%s-%s" % (requestname.replace(':','_'), kwargs['publishname'])
         else:
             outputDatasetTagToCheck = "%s" % (kwargs['publishname'])
         kwargs['publishname'] = outputDatasetTagToCheck #that's what the version earlier than 1509 were putting in the DB
@@ -111,7 +105,6 @@ class RESTUserWorkflow(RESTEntity):
                 raise InvalidParameter(msg)
             group_user_prefix = outlfn.split('/')[3]
         else:
-            username = cherrypy.request.user['login']
             group_user_prefix = username
         outputDatasetTagToCheck = "%s-%s" % (group_user_prefix, outputDatasetTagToCheck)
         try:
@@ -132,7 +125,7 @@ class RESTUserWorkflow(RESTEntity):
 
 
     ## Basically copy and pasted from _checkPublishDataName which will be eventually removed
-    def _checkPublishDataName2(self, kwargs, outlfn):
+    def _checkPublishDataName2(self, kwargs, outlfn, requestname, username):
         """
         Validate the (user specified part of the) output dataset name for publication
         using the WMCore.Lexicon method userprocdataset(), which does the same
@@ -142,7 +135,7 @@ class RESTUserWorkflow(RESTEntity):
 
         if 'publishname2' not in kwargs or not kwargs['publishname2']:
             ## provide the default publication name if it was not specified in the client
-            outputDatasetTagToCheck = kwargs['workflow'].replace(':','_')
+            outputDatasetTagToCheck = requestname.replace(':','_')
         else:
             outputDatasetTagToCheck = kwargs['publishname2']
 
@@ -161,7 +154,6 @@ class RESTUserWorkflow(RESTEntity):
                 raise InvalidParameter(msg)
             group_user_prefix = outlfn.split('/')[3]
         else:
-            username = cherrypy.request.user['login']
             group_user_prefix = username
 
         outputDatasetTagToCheck = "%s-%s" % (group_user_prefix, outputDatasetTagToCheck)
@@ -263,6 +255,13 @@ class RESTUserWorkflow(RESTEntity):
         #authz_login_valid()
 
         if method in ['PUT']:
+            ## Define the taskname and write it in the 'workflow' parameter.
+            timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
+            username = cherrypy.request.user['login'] # username registered in SiteDB
+            requestname = param.kwargs['workflow']
+            taskname = "%s:%s_%s" % (timestamp, username, requestname)
+            param.kwargs['workflow'] = taskname
+            validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_str("activity", param, safe, RX_ACTIVITY, optional=True)
             validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
             # TODO this should be changed to be non-optional
@@ -285,7 +284,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
             validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
             validate_str("lfn", param, safe, RX_LFN, optional=True)
-            self._checkOutLFN(safe.kwargs)
+            self._checkOutLFN(safe.kwargs, username)
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE)
             validate_strlist("userfiles", param, safe, RX_USERFILE)
             validate_num("savelogsflag", param, safe, optional=False)
@@ -305,19 +304,16 @@ class RESTUserWorkflow(RESTEntity):
             ## therefore we will need to make sure we do not break it!
             ## The following two lines will be removed in the future once we will
             ## not need backward compatibility anymore
-            self._checkPublishDataName(param.kwargs, safe.kwargs['lfn'])
+            self._checkPublishDataName(param.kwargs, safe.kwargs['lfn'], requestname, username)
             validate_str('publishname', param, safe, RX_ANYTHING, optional=True)
 
-            ##And this if as well, just do self._checkPublishDataName2(param.kwargs, safe.kwargs['lfn'])
+            ##And this if as well, just do self._checkPublishDataName2(param.kwargs, safe.kwargs['lfn'], requestname, username)
             if not safe.kwargs["publishname"]: #new clients won't define this anymore
                 ## The (user specified part of the) publication dataset name must be
                 ## specified and must pass DBS validation. Since this is the correct
                 ## validation function, it must be done before the
-                ## validate_str("workflow", ...) and validate_str("publishname", ...)
-                ## we have below. Not sure why RX_PUBLISH was introduced in CRAB, but
-                ## it is not the correct regular expression for publication dataset
-                ## name validation.
-                self._checkPublishDataName2(param.kwargs, safe.kwargs['lfn'])
+                ## validate_str("publishname", ...) we have below.
+                self._checkPublishDataName2(param.kwargs, safe.kwargs['lfn'], requestname, username)
             else:
                 param.kwargs["publishname2"] = safe.kwargs["publishname"]
 
@@ -327,8 +323,6 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("publishname2", param, safe, RX_ANYTHING, optional=True)
 
             validate_num("publishgroupname", param, safe, optional=True)
-            ## This line must come after _checkPublishDataName()
-            validate_str("workflow", param, safe, RX_PARTIAL_TASKNAME, optional=False)
 
             ## Client versions < 3.3.1511 may put in the input dataset something that is not
             ## really an input dataset (for PrivateMC or user input files). So the only case
@@ -462,7 +456,7 @@ class RESTUserWorkflow(RESTEntity):
                 faillimit, ignorelocality, userfiles, asourl, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun):
         """Perform the workflow injection
 
-           :arg str workflow: workflow name requested by the user;
+           :arg str workflow: request name defined by the user;
            :arg str activity: workflow activity type, default None;
            :arg str jobtype: job type of the workflow, usually Analysis;
            :arg str jobsw: software requirement;
@@ -482,8 +476,6 @@ class RESTUserWorkflow(RESTEntity):
            :arg str cacheurl: URL of the cache
            :arg str list addoutputfiles: list of additional output files;
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
-           :arg str userdn: DN of user doing the request;
-           :arg str userhn: hyper new name of the user doing the request;
            :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication; deprecated
            :arg str publishname2: name to use for data publication;
@@ -525,7 +517,7 @@ class RESTUserWorkflow(RESTEntity):
                                        siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, splitalgo=splitalgo, algoargs=algoargs,
                                        cachefilename=cachefilename, cacheurl=cacheurl,
                                        addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
-                                       userhn=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
+                                       username=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
                                        publication=publication, publishname=publishname, publishname2=publishname2, publishgroupname=publishgroupname, asyncdest=asyncdest,
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
