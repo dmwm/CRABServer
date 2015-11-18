@@ -1,5 +1,6 @@
+import time
 import urllib
-import traceback
+import datetime
 
 import classad
 import htcondor
@@ -7,13 +8,16 @@ import htcondor
 import HTCondorLocator
 import HTCondorUtils
 
+from WMCore.Database.CMSCouch import CouchServer
+
 from ServerUtilities import FEEDBACKMAIL
-import TaskWorker.Actions.TaskAction as TaskAction
+from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from httplib import HTTPException
 
-class DagmanResubmitter(TaskAction.TaskAction):
+
+class DagmanResubmitter(TaskAction):
     """
     Given a task name, resubmit failed tasks.
 
@@ -32,8 +36,22 @@ class DagmanResubmitter(TaskAction.TaskAction):
             raise ValueError("No proxy provided")
         proxy = task['user_proxy']
 
-        self.logger.info("About to resubmit workflow: %s." % workflow)
+        if task.get('resubmit_publication', False):
+            resubmitWhat = "publications"
+        else:
+            resubmitWhat = "jobs"
+
+        self.logger.info("About to resubmit %s for workflow: %s." % (resubmitWhat, workflow))
         self.logger.info("Task info: %s" % str(task))
+
+        if task.get('resubmit_publication', False):
+            asourl = task.get('tm_asourl', None)
+            if not asourl:
+                msg = "ASO URL not set. Can not resubmit publication."
+                raise TaskWorkerException(msg)
+            self.logger.info("Will resubmit failed publications")
+            self.resubmitPublication(asourl, proxy, workflow)
+            return
 
         if task['tm_collector']:
             self.backendurls['htcondorPool'] = task['tm_collector']
@@ -60,12 +78,12 @@ class DagmanResubmitter(TaskAction.TaskAction):
             msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
             self.logger.warning(msg)
             task['resubmit_maxjobruntime'] = str(stdmaxjobruntime)
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+            self.uploadWarning(msg, proxy, kwargs['task']['tm_taskname'])
         if task['resubmit_maxmemory'] is not None and task['resubmit_maxmemory'] > stdmaxmemory:
             msg  = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (task['resubmit_maxmemory'], stdmaxmemory)
             msg += " Jobs may not find a site where to run and stay idle forever."
             self.logger.warning(msg)
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+            self.uploadWarning(msg, proxy, kwargs['task']['tm_taskname'])
 
         # Release the DAG
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(workflow)
@@ -84,7 +102,7 @@ class DagmanResubmitter(TaskAction.TaskAction):
         overwrite = False
         for taskparam in params.values():
             if ('resubmit_'+taskparam in task) and task['resubmit_'+taskparam] != None:
-                if type(task['resubmit_'+taskparam]) == list:
+                if isinstance(task['resubmit_'+taskparam], list):
                     ad[taskparam] = task['resubmit_'+taskparam]
                 if taskparam != 'jobids':
                     overwrite = True
@@ -159,6 +177,42 @@ class DagmanResubmitter(TaskAction.TaskAction):
             msg += " but was unable to update the task status to %s in the database." % (configreq['status'])
             msg += " This should be a harmless (temporary) error."
             raise TaskWorkerException(msg)
+
+
+    def resubmitPublication(self, asourl, proxy, taskname):
+        """
+        Resubmit failed publications by resetting the publication
+        status in the CouchDB documents.
+        """
+        server = CouchServer(dburl=asourl, ckey=proxy, cert=proxy)
+        try:
+            database = server.connectDatabase('asynctransfer')
+        except Exception as ex:
+            msg = "Error while trying to connect to CouchDB: %s" % (str(ex))
+            raise TaskWorkerException(msg)
+        try:
+            failedPublications = database.loadView('DBSPublisher', 'PublicationFailedByWorkflow', {'reduce': False, 'startkey': [taskname], 'endkey': [taskname, {}]})['rows']
+        except Exception as ex:
+            msg = "Error while trying to load view 'DBSPublisher.PublicationFailedByWorkflow' from CouchDB: %s" % (str(ex))
+            raise TaskWorkerException(msg)
+        msg = "There are %d failed publications to resubmit: %s" % (len(failedPublications), failedPublications)
+        self.logger.info(msg)
+        for doc in failedPublications:
+            docid = doc['id']
+            if doc['key'][0] != taskname: # this should never happen...
+                msg = "Skipping document %s as it seems to correspond to another task: %s" % (docid, doc['key'][0])
+                self.logger.warning(msg)
+                continue
+            data = {'last_update'       : time.time(),
+                    'retry'             : str(datetime.datetime.now()),
+                    'publication_state' : 'not_published',
+                   }
+            try:
+                database.updateDocument(docid, 'DBSPublisher', 'updateFile', data)
+            except Exception as ex:
+                msg = "Error updating document %s in CouchDB: %s" % (docid, str(ex))
+                self.logger.error(msg)
+        return
 
 
 if __name__ == "__main__":

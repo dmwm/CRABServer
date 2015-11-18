@@ -258,86 +258,139 @@ class DataWorkflow(object):
         return [{'RequestName': workflow}]
 
 
-    def resubmit(self, workflow, siteblacklist, sitewhitelist, jobids, maxjobruntime, numcores, maxmemory, priority, force, userdn, userproxy):
+    def resubmit(self, workflow, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority, userdn, userproxy):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
 
            :arg str workflow: a valid workflow name
            :arg str list siteblacklist: black list of sites, with CMS name;
-           :arg str list sitewhitelist: white list of sites, with CMS name."""
+           :arg str list sitewhitelist: white list of sites, with CMS name;
+           :arg int whether to resubmit publications or jobs."""
         retmsg = "ok"
-        self.logger.info("About to resubmit workflow: %s. Getting status first." % (workflow))
+        resubmitWhat = "publications" if publication else "jobs"
+
+        self.logger.info("About to resubmit %s for workflow: %s. Getting status first." % (resubmitWhat, workflow))
+
         ## Get the status of the task/jobs.
         statusRes = self.status(workflow, userdn, userproxy)[0]
-        ## We allow resubmission of jobs only if the task status is one of these:
-        allowedTaskStates = ['SUBMITTED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'SUBMITFAILED'] #NB submitfailed goes to NEW, not RESUBMIT
-        ## If the user wants to resubmit a specific set of jobs, then we also accept the
-        ## task to be in COMPLETED state. This is because we want to allow resubmission
-        ## of successfully finished jobs if the user explicitly gave the job id.
-        if jobids and force:
+
+        ## Ignore the following options if this is a publication resubmission or if the
+        ## task was never submitted.
+        if publication or statusRes['status'] == 'SUBMITFAILED':
+            jobids, force = None, False
+            siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority = None, None, None, None, None, None
+            
+        ## We allow resubmission only if the task status is one of these:
+        allowedTaskStates = ['SUBMITTED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
+        ## We allow resubmission of successfully finished jobs if the user explicitly
+        ## gave the job ids and the force option (i.e. the user knows what he/she is
+        ## doing). In that case we have to allow the task to be in COMPLETED status.
+        ## The same is true for publication resubmission.
+        if (jobids and force) or publication:
             allowedTaskStates += ['COMPLETED']
+        ## Allow resubmission of tasks in SUBMITFAILED status if this is not a
+        ## publication resubmission.
+        if not publication:
+            allowedTaskStates += ['SUBMITFAILED'] #NB submitfailed goes to NEW, not RESUBMIT
         ## If the task status is not an allowed one, fail the resubmission.
         if statusRes['status'] not in allowedTaskStates:
-            if statusRes['status'] in ['COMPLETED']:
-                msg = "Task status is COMPLETED. To resubmit jobs from a task in status COMPLETED, use the --jobids and --force options."
+            if statusRes['status'] == 'COMPLETED':
+                msg  = "Task status is COMPLETED."
+                msg += " To resubmit jobs from a task in status COMPLETED, specify the job ids and use the force option."
+                msg += " To resubmit publications use the publication option."
             else:
-                msg = "You cannot resubmit a task if it is in the %s state." % (statusRes['status'])
+                msg = "You cannot resubmit %s if the task is in status %s." % (resubmitWhat, statusRes['status'])
             raise ExecutionError(msg)
-        ## This is the list of job ids that we allow to be resubmitted.
-        ## Note: This list will be empty if statusRes['jobList'] is empty to begin with.
-        ## And statusRes['jobList'] may be empty even if jobs were created and have well
-        ## defined state. An example is when the task has status FAILED in the Task DB
-        ## because of an exception in the TaskWorker.
-        resubmitjobids = [jobid for jobstatus, jobid in statusRes['jobList'] if (jobstatus in self.failedList) or (jobids and force and jobstatus in self.successList)]
-        if statusRes['jobList'] and not resubmitjobids:
-            msg  = "There are no jobs to resubmit."
-            msg += " Only jobs in status %s can be resubmitted." % (self.failedList)
-            msg += " Jobs in status %s can also be resubmitted, but only if the jobid is specified and force = True." % (self.successList)
-            raise ExecutionError(msg)
-        ## If the user wants to resubmit a specific set of jobs ...
-        if jobids:
-            ## ... make the intersection between the "allowed" and "wanted" jobs.
-            resubmitjobids = list(set(resubmitjobids) & set(jobids))
-            ## Check if all the "wanted" jobs can be resubmitted. If not, fail the resubmission.
-            if len(resubmitjobids) != len(jobids):
-                requestedResub = list(set(jobids) - set(resubmitjobids))
-                msg  = "CRAB3 server refused to resubmit the following jobs: %s." % (str(requestedResub))
-                msg += " Only jobs in status %s can be resubmitted." % (self.failedList)
-                msg += " Jobs in status %s can also be resubmitted, but only if the jobid is specified and force = True." % (self.successList)
-                raise ExecutionError(msg) #return [{'result': msg}]
-        self.logger.info("Jobs to resubmit: %s" % (resubmitjobids))
-        ## If these parameters were not set in the resubmission request, give them the
-        ## same values they had in the original task submission.
-        if (siteblacklist is None) or (sitewhitelist is None) or (maxjobruntime is None) or (maxmemory is None) or (numcores is None) or (priority is None):
-            ## origValues = [orig_siteblacklist, orig_sitewhitelist, orig_maxjobruntime, orig_maxmemory, orig_numcores, orig_priority]
-            origValues = self.api.query(None, None, self.Task.GetResubmitParams_sql, taskname = workflow).next()
-            if siteblacklist is None:
-                siteblacklist = literal_eval(origValues[0])
-            if sitewhitelist is None:
-                sitewhitelist = literal_eval(origValues[1])
-            if maxjobruntime is None:
-                maxjobruntime = origValues[2]
-            if maxmemory is None:
-                maxmemory = origValues[3]
-            if numcores is None:
-                numcores = origValues[4]
-            if priority is None:
-                priority = origValues[5]
-        ## These are the parameters that we want to writte down in the 'tm_arguments'
-        ## column of the Tasks DB each time a resubmission is done.
-        ## DagmanResubmitter will read these parameters and write them into the task ad.
-        arguments = {'resubmit_jobids' : resubmitjobids,
-                     'site_blacklist'  : siteblacklist,
-                     'site_whitelist'  : sitewhitelist,
-                     'maxjobruntime'   : maxjobruntime,
-                     'maxmemory'       : maxmemory,
-                     'numcores'        : numcores,
-                     'priority'        : priority
-                    }
-        ## Change the 'tm_arguments' column of the Tasks DB for this task to contain the
-        ## above parameters.
-        self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow], arguments = [str(arguments)])
-        ## Change the status of the task in the Tasks DB to RESUBMIT.
+
+        if statusRes['status'] != 'SUBMITFAILED':
+            ## This is the list of job ids that we allow to be resubmitted.
+            ## Note: This list will be empty if statusRes['jobList'] is empty to begin with.
+            resubmitjobids = []
+            for jobstatus, jobid in statusRes['jobList']:
+                if (not publication and jobstatus in self.failedList) or \
+                   (((jobids and force) or publication) and jobstatus in self.successList):
+                    resubmitjobids.append(jobid)
+            if statusRes['jobList'] and not resubmitjobids:
+                msg = "There are no %s to resubmit." % (resubmitWhat)
+                if publication:
+                    msg += " Publications can only be resubmitted for jobs in status %s." % (self.successList)
+                else:
+                    msg += " Only jobs in status %s can be resubmitted." % (self.failedList)
+                    msg += " Jobs in status %s can also be resubmitted," % (self.successList)
+                    msg += " but only if the jobid is specified and the force option is set."
+                raise ExecutionError(msg)
+            ## Checks for publication resubmission.
+            if publication:
+                if 'publication' not in statusRes or not statusRes['publication']:
+                    msg  = "Cannot resubmit publication."
+                    msg += " Unable to retrieve the publication status."
+                    raise ExecutionError(msg)
+                if 'disabled' in statusRes['publication']:
+                    msg  = "Cannot resubmit publication."
+                    msg += " Publication was disabled in the CRAB configuration."
+                    raise ExecutionError(msg)
+                if 'error' in statusRes['publication']:
+                    msg  = "Cannot resubmit publication."
+                    msg += " Error in publication status: %s" % (statusRes['publication']['error'])
+                    raise ExecutionError(msg)
+                if statusRes['publication'].get('publication_failed', 0) == 0:
+                    msg = "There are no failed publications to resubmit."
+                    raise ExecutionError(msg)
+                ## Here we can add a check on the publication status of the documents
+                ## corresponding to the job ids in resubmitjobids and jobids. So far the
+                ## publication resubmission will resubmit all the failed publications.
+
+            ## If the user wants to resubmit a specific set of job ids ...
+            if jobids:
+                ## ... make the intersection between the "allowed" and "wanted" job ids.
+                resubmitjobids = list(set(resubmitjobids) & set(jobids))
+                ## Check if all the "wanted" job ids can be resubmitted. If not, fail the resubmission.
+                if len(resubmitjobids) != len(jobids):
+                    requestedResub = list(set(jobids) - set(resubmitjobids))
+                    msg  = "CRAB server refused to resubmit the following jobs: %s." % (str(requestedResub))
+                    msg += " Only jobs in status %s can be resubmitted." % (self.failedList)
+                    msg += " Jobs in status %s can also be resubmitted," % (self.successList)
+                    msg += " but only if the jobid is specified and the force option is set."
+                    raise ExecutionError(msg) #return [{'result': msg}]
+            if publication:
+                self.logger.info("Publications to resubmit if failed: %s" % (resubmitjobids))
+            else:
+                self.logger.info("Jobs to resubmit: %s" % (resubmitjobids))
+
+            ## If these parameters are not set, give them the same values they had in the
+            ## original task submission.
+            if (siteblacklist is None) or (sitewhitelist is None) or (maxjobruntime is None) or (maxmemory is None) or (numcores is None) or (priority is None):
+                ## origValues = [orig_siteblacklist, orig_sitewhitelist, orig_maxjobruntime, orig_maxmemory, orig_numcores, orig_priority]
+                origValues = self.api.query(None, None, self.Task.GetResubmitParams_sql, taskname = workflow).next()
+                if siteblacklist is None:
+                    siteblacklist = literal_eval(origValues[0])
+                if sitewhitelist is None:
+                    sitewhitelist = literal_eval(origValues[1])
+                if maxjobruntime is None:
+                    maxjobruntime = origValues[2]
+                if maxmemory is None:
+                    maxmemory = origValues[3]
+                if numcores is None:
+                    numcores = origValues[4]
+                if priority is None:
+                    priority = origValues[5]
+            ## These are the parameters that we want to writte down in the 'tm_arguments'
+            ## column of the Tasks DB each time a resubmission is done.
+            ## DagmanResubmitter will read these parameters and write them into the task ad.
+            arguments = {'resubmit_jobids' : resubmitjobids,
+                         'site_blacklist'  : siteblacklist,
+                         'site_whitelist'  : sitewhitelist,
+                         'maxjobruntime'   : maxjobruntime,
+                         'maxmemory'       : maxmemory,
+                         'numcores'        : numcores,
+                         'priority'        : priority,
+                         'resubmit_publication' : publication
+                        }
+            ## Change the 'tm_arguments' column of the Tasks DB for this task to contain the
+            ## above parameters.
+            self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow], arguments = [str(arguments)])
+
+        ## Change the status of the task in the Tasks DB to RESUBMIT (or NEW).
         if statusRes['status'] == 'SUBMITFAILED':
             newstate = ["NEW"]
         else:
