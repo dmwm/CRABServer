@@ -306,7 +306,6 @@ def logCMSSW():
         open('logCMSSWSaved.txt', 'a').close()
         os.utime('logCMSSWSaved.txt', None)
         return
-    print "======== CMSSW OUTPUT STARTING ========"
 
     outfile = "cmsRun-stdout.log"
 
@@ -314,9 +313,12 @@ def logCMSSW():
     keepAtStart = 1000
     keepAtEnd   = 3000
     maxLineLen = 3000
-    lineLenExceeded = False
     maxLines    = keepAtStart + keepAtEnd
     numLines = sum(1 for line in open(outfile))
+
+    print "======== CMSSW OUTPUT STARTING ========"
+    print "NOTICE: lines longer than %s characters will be truncated" % maxLineLen
+
     tooBig = numLines > maxLines
     if tooBig :
         print "WARNING: CMSSW output more then %d lines; truncating to first %d and last %d" % (maxLines, keepAtStart, keepAtEnd)
@@ -325,40 +327,25 @@ def logCMSSW():
         with open(outfile) as fp:
             for nl, line in enumerate(fp):
                 if nl < keepAtStart:
-                    lineLenExceeded = printCMSSWLine("== CMSSW: %s " % line, maxLineLen, lineLenExceeded)
+                    printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
                 if nl == keepAtStart+1:
                     print "== CMSSW: "
                     print "== CMSSW: [...BIG SNIP...]"
                     print "== CMSSW: "
                 if numLines-nl <= keepAtEnd:
-                    lineLenExceeded = printCMSSWLine("== CMSSW: %s " % line, maxLineLen, lineLenExceeded)
+                    printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
     else:
         for line in open(outfile):
-            lineLenExceeded = printCMSSWLine("== CMSSW: %s " % line, maxLineLen, lineLenExceeded)
+            printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
 
     print "======== CMSSW OUTPUT FINSHING ========"
-    if lineLenExceeded:
-        print 'NOTICE: Some lines have been truncated, because it was bigger than %s characters.' % maxLineLen
     logCMSSWSaved = True
     open('logCMSSWSaved.txt', 'a').close()
     os.utime('logCMSSWSaved.txt', None)
 
-def printCMSSWLine(line, lineLenLimit, lineLenExceeded):
-    """ Checks if line is not exceeding lineLimit and prints it.
-        If exceeds, line is limited. Returns true if line was truncated.
-        False - not truncated. If minimum 1 line will exceed the limit,
-        return will always be true"""
-        exceeded = False
-        if len(line) > lineLenLimit:
-            print line[:lineLenLimit]
-            exceeded = True
-        else:
-            print line
-            exceeded = False
-        if lineLenExceeded or exceeded:
-            return True
-        return False
-
+def printCMSSWLine(line, lineLenLimit):
+    """ Simple print auxiliary function that truncates lines"""
+    print line[:lineLenLimit]
 
 def handleException(exitAcronym, exitCode, exitMsg):
     #first save the traceback before it gets overwritten by other tracebacks (e.g.: wrong jobReport)
