@@ -411,7 +411,7 @@ class ProcInfo:
 			this.removeJobToMonitor(pid);
 			return;
 		try:
-			JSTATUS = os.popen("ps --no-headers --pid " + ",".join([`child` for child in  children]) + " -o pid,etime,time,%cpu,%mem,rsz,vsz,comm");
+			JSTATUS = os.popen("ps --no-headers --pid " + ",".join([repr(child) for child in  children]) + " -o pid,etime,time,%cpu,%mem,rsz,vsz,comm");
 			mem_cmd_map = {};
 			etime, cputime, pcpu, pmem, rsz, vsz, comm, fd = 0, 0, 0, 0, 0, 0, 0, 0;
 			line = JSTATUS.readline();
@@ -426,9 +426,9 @@ class ProcInfo:
 					sec = this.parsePSTime(cputime1); # times corespornding to all child processes.
 					cputime += sec;	# total cputime is the sum of cputimes for all processes.
 					pcpu += float(pcpu1); # total %cpu is the sum of all children %cpu.
-					if `pmem1`+" "+`rsz1`+" "+`vsz1`+" "+`comm1` not in mem_cmd_map:
+					if repr(pmem1)+" "+repr(rsz1)+" "+repr(vsz1)+" "+repr(comm1) not in mem_cmd_map:
 						# it's the first thread/process with this memory footprint; add it.
-						mem_cmd_map[`pmem1`+" "+`rsz1`+" "+`vsz1`+" "+`comm1`] = 1;
+						mem_cmd_map[repr(pmem1)+" "+repr(rsz1)+" "+repr(vsz1)+" "+repr(comm1)] = 1;
 						pmem += float(pmem1); rsz += int(rsz1); vsz += int(vsz1);
 						fd += this.countOpenFD(apid);
 					# else not adding memory usage
@@ -453,12 +453,12 @@ class ProcInfo:
 				open_files = len(list);
 				if pid == os.getpid():
 					open_files -= 2;
-				this.logger.log(Logger.DEBUG, "Counting open_files for "+ `pid` +": "+ str(len(list)) +" => " + `open_files` + " open_files");
+				this.logger.log(Logger.DEBUG, "Counting open_files for "+ repr(pid) +": "+ str(len(list)) +" => " + repr(open_files) + " open_files");
 				return open_files;
 			else:
-				this.logger.log(Logger.ERROR, "ProcInfo: cannot count the number of opened files for job "+`pid`);
+				this.logger.log(Logger.ERROR, "ProcInfo: cannot count the number of opened files for job "+repr(pid));
 		else:
-			this.logger.log(Logger.ERROR, "ProcInfo: job "+`pid`+" dosen't exist");
+			this.logger.log(Logger.ERROR, "ProcInfo: job "+repr(pid)+" dosen't exist");
 	
 	
 	# if there is an work directory defined, then compute the used space in that directory
@@ -475,7 +475,7 @@ class ProcInfo:
 			line = DU.readline();
 			this.JOBS[pid]['DATA']['workdir_size'] = int(line) / 1024.0;
 		except IOError as ex:
-			this.logger.log(Logger.ERROR, "ERROR", "ProcInfo: cannot run du to get job's disk usage for job "+`pid`);
+			this.logger.log(Logger.ERROR, "ERROR", "ProcInfo: cannot run du to get job's disk usage for job "+repr(pid));
 		try:
 			DF = os.popen("df -k "+workDir+" | tail -1");
 			line = DF.readline().strip();
@@ -487,7 +487,7 @@ class ProcInfo:
 				this.JOBS[pid]['DATA']['disk_usage'] = float(m.group(4)) / 1024.0;
 			DF.close();
 		except IOError as ex:
-			this.logger.log(Logger.ERROR, "ERROR", "ProcInfo: cannot run df to get job's disk usage for job "+`pid`);
+			this.logger.log(Logger.ERROR, "ERROR", "ProcInfo: cannot run df to get job's disk usage for job "+repr(pid));
 
 	# create cummulative parameters based on raw params like cpu_, pages_, swap_, or ethX_
 	def computeCummulativeParams(this, dataRef, prevDataRef):
