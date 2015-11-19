@@ -65,7 +65,7 @@ def bootstrap():
             pure_ad[key] = ad.eval(key)
             if isinstance(pure_ad[key], classad.Value):
                 del pure_ad[key]
-            if isinstance(pure_ad[key], types.ListType):
+            if isinstance(pure_ad[key], list):
                 pure_ad[key] = [i.eval() for i in pure_ad[key]]
         except:
             pass
