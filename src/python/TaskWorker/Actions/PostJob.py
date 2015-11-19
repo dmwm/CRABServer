@@ -53,6 +53,7 @@ about the file to the FJR. The information is:
 
 The PostJob and cmscp are the only places in CRAB3 where we should use camel_case instead of snakeCase.
 """
+from __future__ import print_function
 
 import os
 import sys
@@ -1018,7 +1019,7 @@ class PostJob():
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             handler = logging.StreamHandler(sys.stdout)    
         else:
-            print "Wrinting post-job output to %s." % (self.postjob_log_file_name)
+            print("Wrinting post-job output to %s." % (self.postjob_log_file_name))
             mode = 'w' if first_pj_execution() else 'a'
             handler = logging.FileHandler(filename=self.postjob_log_file_name, mode=mode)
         handler.setFormatter(self.logging_formatter)
@@ -2393,7 +2394,7 @@ class testServer(unittest.TestCase):
             os.write(fh, (inputString * ((size/len(inputString))+1))[:size])
             os.close(fh)
             cmd = "env -u LD_LIBRAY_PATH lcg-cp -b -D srmv2 -v file://%s %s" % (path, pfn)
-            print cmd
+            print(cmd)
             status, res = commands.getstatusoutput(cmd)
             if status:
                 exmsg = "Couldn't make file: %s" % (res)
@@ -2438,9 +2439,9 @@ class testServer(unittest.TestCase):
 if __name__ == '__main__':
     if len(sys.argv) >= 2 and sys.argv[1] == 'UNIT_TEST':
         sys.argv = [sys.argv[0]]
-        print "Beginning testing"
+        print("Beginning testing")
         unittest.main()
-        print "Testing over"
+        print("Testing over")
         sys.exit()
     POSTJOB = PostJob()
     sys.exit(POSTJOB.execute(*sys.argv[2:]))

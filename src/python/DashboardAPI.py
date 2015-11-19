@@ -4,6 +4,7 @@
 This is the Dashboard API Module for the Worker Node
 """
 from __future__ import absolute_import
+from __future__ import print_function
 
 from . import apmon
 import time, sys, os
@@ -188,7 +189,7 @@ def report(args) :
     logger('params : ' + repr(paramArgs))
     apmonSend(taskId, jobId, paramArgs)
     apmonFree()
-    print "Parameters sent to Dashboard."
+    print("Parameters sent to Dashboard.")
 
 #
 # PYTHON BASED JOB WRAPPER
@@ -251,20 +252,20 @@ def reportFailureToDashboard(exitCode, ad = None):
         try:
             ad = parseAd()
         except:
-            print "==== ERROR: Unable to parse job's HTCondor ClassAd ===="
-            print "Will not report failure to Dashboard"
-            print traceback.format_exc()
+            print("==== ERROR: Unable to parse job's HTCondor ClassAd ====")
+            print("Will not report failure to Dashboard")
+            print(traceback.format_exc())
             return
     for attr in ['CRAB_ReqName', 'CRAB_Id', 'CRAB_Retry']:
         if attr not in ad:
-            print "==== ERROR: HTCondor ClassAd is missing attribute %s. ====" % attr
-            print "Will not report failure to Dashboard"
+            print("==== ERROR: HTCondor ClassAd is missing attribute %s. ====" % attr)
+            print("Will not report failure to Dashboard")
     params = {
         'MonitorID': ad['CRAB_ReqName'],
         'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%d' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":"), ad['CRAB_Retry']),
         'JobExitCode': exitCode
     }
-    print "Dashboard stageout failure parameters: %s" % str(params)
+    print("Dashboard stageout failure parameters: %s" % str(params))
     apmonSend(params['MonitorID'], params['MonitorJobID'], params)
     apmonFree()
     return exitCode

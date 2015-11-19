@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import sys
 import time
@@ -174,7 +175,7 @@ class PreJob:
         elif userWebDir:
             setDashboardLogs(params, userWebDir, self.job_id, crab_retry)
         else:
-            print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx."
+            print("Not setting dashboard logfiles as I cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx.")
 
         insertJobIdSid(params, self.job_id, self.task_ad['CRAB_ReqName'], crab_retry)
         apmon = ApmonIf()
@@ -500,7 +501,7 @@ class PreJob:
         os.chmod(prejob_log_file_name, 0644)
         ## Redirect stdout and stderr to the pre-job log file.
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
-            print "Pre-job started with no output redirection."
+            print("Pre-job started with no output redirection.")
         else:
             os.dup2(fd_prejob_log, 1)
             os.dup2(fd_prejob_log, 2)

@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import re
 import sys
@@ -471,7 +472,7 @@ def killJobs(baseURLSSL, ids, proxy, code=None, verbose=True, useMailAsID=False)
     except:
         type, value, traceBack = sys.exc_info()
         errStr = "ERROR killJobs : %s %s" % (type, value)
-        print errStr
+        print(errStr)
         return EC_Failed, output+'\n'+errStr
 
 # get full job status

@@ -1,6 +1,7 @@
 """
     CRABQuality - Entry module for CRAB testing functionality
 """
+from __future__ import print_function
 import nose
 from nose.tools import with_setup
 import os
@@ -60,7 +61,7 @@ def sendTestJobsToAllSites():
     global integrationTempDir
     integrationTempDir = tempfile.mkdtemp(prefix='crab3-int')
     # make CMSSW checkout
-    print "Making CMSSW release area"
+    print("Making CMSSW release area")
     command = makeCMSSWSnippet % {'cmsswVersion' : integrationCMSSWVer}
     stdout, returncode = runCommand(command, integrationTempDir)
     if returncode != 0 or not os.path.exists("%s/%s" %
@@ -72,7 +73,7 @@ def sendTestJobsToAllSites():
     open('%s/pset.py' % integrationTempDir, 'w').write(psetSnippet)
     skipProxy = ""
     for site in sorted(allSites):
-        print "Submitting to %s" % site
+        print("Submitting to %s" % site)
         # make configuration
         configOpts = { 'requestName' : '%s_%s' % (taskNamePrefix, site),
                        'serverUrl' : 'crab3-gwms-1.cern.ch',
@@ -103,7 +104,7 @@ def cleanupTestJobs():
         if 'path' not in integrationStatus[site]:
             continue
         taskPath = integrationStatus[site]['path']
-        print "Killing task of %s" % taskPath
+        print("Killing task of %s" % taskPath)
         cmdLine = "unset LD_LIBRARY_PATH ; %s ; crab -d -p kill -t %s" % (cmsswEnv, taskPath)
         #stdout, returncode = runCommand(cmdLine, integrationTempDir)
         #if not returncode:
@@ -145,7 +146,7 @@ def getJobStatus(taskDir, timeout, isError):
     while firstLoop or time.time() < timeout:
         firstLoop = False
         cmsswEnv = getCMSSWEnvironment % {'cmsswVersion':integrationCMSSWVer}
-        print "Getting status of %s" % taskDir
+        print("Getting status of %s" % taskDir)
         cmdLine = "unset LD_LIBRARY_PATH ; %s ; crab -d -p status -t %s" % (cmsswEnv, taskDir)
         stdout, exitCode = runCommand(cmdLine, integrationTempDir)
         hasStatus = False
