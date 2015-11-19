@@ -1032,8 +1032,8 @@ class PostJob():
         ## need to redirect stdout/err to the post-job log file if we want to see the
         ## unhandled exceptions.
         if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
-            fd_postjob_log = os.open(self.postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0644)
-            os.chmod(self.postjob_log_file_name, 0644)
+            fd_postjob_log = os.open(self.postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o644)
+            os.chmod(self.postjob_log_file_name, 0o644)
             os.dup2(fd_postjob_log, 1)
             os.dup2(fd_postjob_log, 2)
 
@@ -1080,7 +1080,7 @@ class PostJob():
             fd_stdout = open(stdout_tmp, 'w')
             fd_stdout.truncate(0)
             fd_stdout.close()
-            os.chmod(fname, 0644)
+            os.chmod(fname, 0o644)
         ## Copy the json job report file jobReport.json.<job_id> to
         ## job_fjr.<job_id>.<crab_retry>.json and create a symbolic link in the task web
         ## directory to the new job report file.
@@ -1088,7 +1088,7 @@ class PostJob():
             msg = "Copying job report from %s to %s." % (G_JOB_REPORT_NAME, G_JOB_REPORT_NAME_NEW)
             self.logger.debug(msg)
             shutil.copy(G_JOB_REPORT_NAME, G_JOB_REPORT_NAME_NEW)
-            os.chmod(G_JOB_REPORT_NAME_NEW, 0644)
+            os.chmod(G_JOB_REPORT_NAME_NEW, 0o644)
             msg = "Creating symbolic link in task web directory to job report file: %s -> %s" % (os.path.join(self.logpath, G_JOB_REPORT_NAME_NEW), G_JOB_REPORT_NAME_NEW)
             self.logger.debug(msg)
             try:

@@ -287,9 +287,9 @@ class ProcInfo:
 		if new >= old:
 			return new - old;
 		else:
-			max = (1L << 31) * 2;  # 32 bits
+			max = (1 << 31) * 2;  # 32 bits
 			if old >= max:
-				max = (1L << 63) * 2;  # 64 bits
+				max = (1 << 63) * 2;  # 64 bits
 			return new - old + max;
 	
 	# read network information like transfered kBps and nr. of errors on each interface

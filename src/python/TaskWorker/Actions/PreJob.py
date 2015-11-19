@@ -497,8 +497,8 @@ class PreJob:
                 logpath = os.getcwd()
         ## Create (open) the pre-job log file prejob.<job_id>.<crab_retry>.txt.
         prejob_log_file_name = os.path.join(logpath, "prejob.%d.%d.txt" % (self.job_id, crab_retry))
-        fd_prejob_log = os.open(prejob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
-        os.chmod(prejob_log_file_name, 0644)
+        fd_prejob_log = os.open(prejob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
+        os.chmod(prejob_log_file_name, 0o644)
         ## Redirect stdout and stderr to the pre-job log file.
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             print("Pre-job started with no output redirection.")
