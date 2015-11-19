@@ -95,9 +95,9 @@ class _Curl:
             com += ' --key %s' % self.sslKey
         # add rucio account info
         if rucioAccount:
-            if os.environ.has_key('RUCIO_ACCOUNT'):
+            if 'RUCIO_ACCOUNT' in os.environ:
                 data['account'] = os.environ['RUCIO_ACCOUNT']
-            if os.environ.has_key('RUCIO_APPID'):
+            if 'RUCIO_APPID' in os.environ:
                 data['appid'] = os.environ['RUCIO_APPID']
         # data
         strData = ''
@@ -148,9 +148,9 @@ class _Curl:
             #com += ' --key %s' % '/tmp/mycredentialtest'
         # add rucio account info
         if rucioAccount:
-            if os.environ.has_key('RUCIO_ACCOUNT'):
+            if 'RUCIO_ACCOUNT' in os.environ:
                 data['account'] = os.environ['RUCIO_ACCOUNT']
-            if os.environ.has_key('RUCIO_APPID'):
+            if 'RUCIO_APPID' in os.environ:
                 data['appid'] = os.environ['RUCIO_APPID']
         # data
         strData = ''
@@ -395,7 +395,7 @@ def runBrokerage(baseURLSSL, sites, proxy,
             outputPK = pickle.loads(output)
             # add directIO info
             if nonDirectSites != []:
-                if not outputPK.has_key('logInfo'):
+                if 'logInfo' not in outputPK:
                     outputPK['logInfo'] = []
                 for tmpSite in nonDirectSites:
                     msgBody = 'action=skip site=%s reason=nondirect - not directIO site' % tmpSite

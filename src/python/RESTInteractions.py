@@ -148,7 +148,7 @@ class HTTPRequests(dict):
             If a CA certificate path cannot be found throws a EnvironmentException exception
         """
         caDefault = '/etc/grid-security/certificates/'
-        if os.environ.has_key("X509_CERT_DIR"):
+        if "X509_CERT_DIR" in os.environ:
             return os.environ["X509_CERT_DIR"]
         elif os.path.isdir(caDefault):
             return caDefault

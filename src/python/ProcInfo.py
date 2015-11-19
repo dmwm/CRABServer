@@ -83,7 +83,7 @@ class ProcInfo:
 	
 	# Call this to stop monitoring a PID
 	def removeJobToMonitor (this, pid):
-		if this.JOBS.has_key(pid):
+		if pid in this.JOBS:
 			del this.JOBS[pid];
 
 	# Return a filtered hash containting the system-related parameters and values
@@ -92,7 +92,7 @@ class ProcInfo:
 	
 	# Return a filtered hash containing the job-related parameters and values
 	def getJobData (this, pid, params):
-		if not this.JOBS.has_key(pid):
+		if pid not in this.JOBS:
 			return [];
 		return this.getFilteredData(this.JOBS[pid]['DATA'], params);
 
@@ -144,13 +144,13 @@ class ProcInfo:
 					this.DATA['total_swap'] = float(elem[1]) / 1024.0;
 				line = FMEM.readline();
 			FMEM.close();
-			if this.DATA.has_key('total_mem') and this.DATA.has_key('mem_free'):
+			if 'total_mem' in this.DATA and 'mem_free' in this.DATA:
 				this.DATA['mem_used'] = this.DATA['total_mem'] - this.DATA['mem_free'];
-			if this.DATA.has_key('total_swap') and this.DATA.has_key('swap_free'):
+			if 'total_swap' in this.DATA and 'swap_free' in this.DATA:
 				this.DATA['swap_used'] = this.DATA['total_swap'] - this.DATA['swap_free'];
-			if this.DATA.has_key('mem_used') and this.DATA.has_key('total_mem') and this.DATA['total_mem'] > 0:
+			if 'mem_used' in this.DATA and 'total_mem' in this.DATA and this.DATA['total_mem'] > 0:
 				this.DATA['mem_usage'] = 100.0 * this.DATA['mem_used'] / this.DATA['total_mem'];
-			if this.DATA.has_key('swap_used') and this.DATA.has_key('total_swap') and this.DATA['total_swap'] > 0:
+			if 'swap_used' in this.DATA and 'total_swap' in this.DATA and this.DATA['total_swap'] > 0:
 				this.DATA['swap_usage'] = 100.0 * this.DATA['swap_used'] / this.DATA['total_swap'];
 		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ProcInfo: cannot open /proc/meminfo");
@@ -326,7 +326,7 @@ class ProcInfo:
 			sockets['sockets_tcp'] += 1;
 			state = arg[len(arg)-1];
 			key = 'sockets_tcp_'+state;
-			if tcp_details.has_key(key):
+			if key in tcp_details:
 		    	    tcp_details[key] += 1;
 		    if proto.find('udp') == 0:
                 	sockets['sockets_udp'] += 1;
@@ -366,7 +366,7 @@ class ProcInfo:
 		except IOError as ex:
 			this.logger.log(Logger.ERROR, "ProcInfo: cannot execute ps -A -o \"pid ppid\"");
 
-		if pidmap.has_key(parent):
+		if parent in pidmap:
 			this.logger.log(Logger.INFO, 'ProcInfo: No job with pid='+str(parent));
 			this.removeJobToMonitor(parent);
 			return [];
@@ -402,7 +402,7 @@ class ProcInfo:
 	# read information about this the JOB_PID process
 	# memory sizes are given in KB
 	def readJobInfo (this, pid):
-		if (pid == '') or not this.JOBS.has_key(pid):
+		if (pid == '') or pid not in this.JOBS:
 			return;
 		children = this.getChildren(pid);
 		if(len(children) == 0):
@@ -426,7 +426,7 @@ class ProcInfo:
 					sec = this.parsePSTime(cputime1); # times corespornding to all child processes.
 					cputime += sec;	# total cputime is the sum of cputimes for all processes.
 					pcpu += float(pcpu1); # total %cpu is the sum of all children %cpu.
-					if not mem_cmd_map.has_key(`pmem1`+" "+`rsz1`+" "+`vsz1`+" "+`comm1`):
+					if `pmem1`+" "+`rsz1`+" "+`vsz1`+" "+`comm1` not in mem_cmd_map:
 						# it's the first thread/process with this memory footprint; add it.
 						mem_cmd_map[`pmem1`+" "+`rsz1`+" "+`vsz1`+" "+`comm1`] = 1;
 						pmem += float(pmem1); rsz += int(rsz1); vsz += int(vsz1);
@@ -465,7 +465,7 @@ class ProcInfo:
 	# and the free disk space on the partition to which that directory belongs
 	# sizes are given in MB
 	def readJobDiskUsage (this, pid):
-		if (pid == '') or not this.JOBS.has_key(pid):
+		if (pid == '') or pid not in this.JOBS:
 			return;
 		workDir = this.JOBS[pid]['WORKDIR'];
 		if workDir == '':
@@ -499,7 +499,7 @@ class ProcInfo:
 			return;
 		
 		# cpu -related params
-		if (dataRef.has_key('raw_cpu_usr')) and (prevDataRef.has_key('raw_cpu_usr')):
+		if ('raw_cpu_usr' in dataRef) and ('raw_cpu_usr' in prevDataRef):
 			diff={};
 			cpu_sum = 0;
 			for param in ['cpu_usr', 'cpu_nice', 'cpu_sys', 'cpu_idle']:
@@ -516,7 +516,7 @@ class ProcInfo:
 				del dataRef['cpu_usage'];
 		
 		# swap & pages -related params
-		if (dataRef.has_key('raw_pages_in')) and (prevDataRef.has_key('raw_pages_in')):
+		if ('raw_pages_in' in dataRef) and ('raw_pages_in' in prevDataRef):
 			interval = dataRef['TIME'] - prevDataRef['TIME'];
 			for param in ['pages_in', 'pages_out', 'swap_in', 'swap_out']:
 				diff = this.diffWithOverflowCheck(dataRef['raw_'+param], prevDataRef['raw_'+param]);
@@ -528,7 +528,7 @@ class ProcInfo:
 		# eth - related params
 		interval = dataRef['TIME'] - prevDataRef['TIME'];
 		for rawParam in dataRef.keys():
-			if (rawParam.find('raw_eth') == 0) and prevDataRef.has_key(rawParam):
+			if (rawParam.find('raw_eth') == 0) and rawParam in prevDataRef:
 				param = rawParam.split('raw_')[1];
 				if interval != 0:
 					dataRef[param] = this.diffWithOverflowCheck(dataRef[rawParam], prevDataRef[rawParam]); # absolute difference
@@ -576,7 +576,7 @@ class ProcInfo:
 					for key in dataHash.keys():
 						if key.find('processes') == 0:
 							result[key] = dataHash[key];
-				elif dataHash.has_key(param):
+				elif param in dataHash:
 					result[param] = dataHash[param];
 		sorted_result = [];
 		keys = result.keys();
