@@ -384,22 +384,22 @@ class ApMon:
 		"""
 		Set the destinations of the ApMon instance. It accepts the same parameters as the constructor.
 		"""
-		if type(initValue) == type("string"):
+		if isinstance(initValue, type("string")):
 			self.configAddresses = [initValue]
 			self.configRecheck = True
 			self.configRecheckInterval = 600
 			self.__reloadAddresses()
-		elif type(initValue) == type([]):
+		elif isinstance(initValue, type([])):
 			self.configAddresses = initValue
 			self.configRecheck = True
 			self.configRecheckInterval = 600
 			self.__reloadAddresses()
-		elif type(initValue) == type(()):
+		elif isinstance(initValue, type(())):
 			self.configAddresses = []
 			for dest in initValue:
 				self.__addDestination (dest, self.destinations)
 			self.configRecheck = False
-		elif type(initValue) == type({}):
+		elif isinstance(initValue, type({})):
 			self.configAddresses = []
 			for dest, opts in initValue.items():
 				self.__addDestination (dest, self.destinations, opts)
@@ -719,11 +719,11 @@ class ApMon:
 		sent_params_nr = 0
 		paramsPacker = xdrlib.Packer ()
 		
-		if type(params) == type( {} ):
+		if isinstance(params, type( {} )):
 			for name, value in params.iteritems():
 				if self.__packParameter(paramsPacker, name, value):
 					sent_params_nr += 1
-		elif type(params) == type( [] ):
+		elif isinstance(params, type( [] )):
 			for name, value in params:
 				self.logger.log(Logger.DEBUG, "Adding parameter "+name+" = "+str(value));
 				if self.__packParameter(paramsPacker, name, value):

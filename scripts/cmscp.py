@@ -218,7 +218,7 @@ def get_from_job_report(key, default = None, location = None):
             msg = "WARNING: Job report doesn't contain section %s['%s']." % (subreport_name, loc)
             print msg
             return default
-    if type(subreport) != dict:
+    if not isinstance(subreport, dict):
         if subreport_name:
             msg = "WARNING: Job report section %s is not a dict." % (subreport_name)
         else:
@@ -282,7 +282,7 @@ def add_to_job_report(key_value_pairs, location = None, mode = 'overwrite'):
             msg = "WARNING: Job report doesn't contain section %s['%s']." % (subreport_name, loc)
             print msg
             return False
-    if type(subreport) != dict:
+    if not isinstance(subreport, dict):
         if subreport_name:
             msg = "WARNING: Job report section %s is not a dict." % (subreport_name) 
         else:

@@ -77,7 +77,7 @@ class DataDiscovery(TaskAction):
                         print "got problem: %s" % ex
                         print "got another problem: %s" % ex.__dict__
                 if pnn and pnn in pnn_psn_map:
-                    if type(pnn_psn_map[pnn]) == list:
+                    if isinstance(pnn_psn_map[pnn], list):
                         wmfile['locations'].extend(pnn_psn_map[pnn])
                     else:
                         wmfile['locations'].append(pnn_psn_map[pnn])
