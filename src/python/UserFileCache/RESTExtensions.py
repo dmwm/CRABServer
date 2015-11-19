@@ -50,7 +50,7 @@ def file_size(argfile):
     if isinstance(argfile, file):
         return fstat(argfile.fileno()).st_size, True
     elif isinstance(argfile, cStringIO.OutputType):
-        argfile.seek(0,2)
+        argfile.seek(0, 2)
         filesize = argfile.tell()
         argfile.seek(0)
         return filesize, False

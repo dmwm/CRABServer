@@ -203,9 +203,9 @@ class DagmanResubmitter(TaskAction):
                 msg = "Skipping document %s as it seems to correspond to another task: %s" % (docid, doc['key'][0])
                 self.logger.warning(msg)
                 continue
-            data = {'last_update'       : time.time(),
-                    'retry'             : str(datetime.datetime.now()),
-                    'publication_state' : 'not_published',
+            data = {'last_update': time.time(),
+                    'retry': str(datetime.datetime.now()),
+                    'publication_state': 'not_published',
                    }
             try:
                 database.updateDocument(docid, 'DBSPublisher', 'updateFile', data)

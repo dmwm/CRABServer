@@ -390,7 +390,7 @@ def handleException(exitAcronym, exitCode, exitMsg):
         print "ERROR: Failed to record execution site name in the FJR from the site-local-config.xml"
         print traceback.format_exc()
 
-    with open('jobReport.json','w') as of:
+    with open('jobReport.json', 'w') as of:
         json.dump(report, of)
     if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         stopDashboardMonitoring(ad)
@@ -544,8 +544,8 @@ def prepSandbox(opts):
         shutil.rmtree(destDir)
     os.makedirs(destDir)
     os.rename('PSet.py', destDir + '/PSet.py')
-    open('WMTaskSpace/__init__.py','w').close()
-    open(destDir + '/__init__.py','w').close()
+    open('WMTaskSpace/__init__.py', 'w').close()
+    open(destDir + '/__init__.py', 'w').close()
     #move the additional user files in the right place
     if opts.userFiles:
         for myfile in opts.userFiles.split(','):
@@ -915,7 +915,7 @@ if __name__ == "__main__":
                 report = report.__to_json__(None)
                 StripReport(report)
                 report['jobExitCode'] = jobExitCode
-                with open('jobReport.json','w') as of:
+                with open('jobReport.json', 'w') as of:
                     json.dump(report, of)
             except:
                 print "WARNING: Failure when trying to parse FJR XML after job failure.  Traceback follows."
@@ -967,9 +967,9 @@ if __name__ == "__main__":
         if 'phedex-node' in slc.localStageOut:
             report['phedex_node'] = slc.localStageOut['phedex-node']
         print "== Execution site from site-local-config.xml: %s" % slc.siteName
-        with open('jobReport.json','w') as of:
+        with open('jobReport.json', 'w') as of:
             json.dump(report, of)
-        with open('jobReportExtract.pickle','w') as of:
+        with open('jobReportExtract.pickle', 'w') as of:
             pickle.dump(report, of)
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             stopDashboardMonitoring(ad)

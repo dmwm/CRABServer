@@ -46,7 +46,7 @@ class StepConfiguration(Configuration):
         for out in outputMods:
             setattr(self, out, ConfigSection("output"))
             getattr(self, out)._internal_name = "output"
-            getattr(self,out).lfnBase = lfnBase #'/store/temp/user/mmascher/RelValProdTTbar/mc/v6'
+            getattr(self, out).lfnBase = lfnBase #'/store/temp/user/mmascher/RelValProdTTbar/mc/v6'
         StepConfiguration.outputMods = outputMods
 
     def getTypeHelper(self):

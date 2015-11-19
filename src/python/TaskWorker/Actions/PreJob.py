@@ -134,9 +134,9 @@ class PreJob:
         if not self.task_ad:
             return
         params = {'tool': 'crab3',
-                  'SubmissionType':'crab3',
+                  'SubmissionType': 'crab3',
                   'JSToolVersion': '3.3.0',
-                  'tool_ui': os.environ.get('HOSTNAME',''),
+                  'tool_ui': os.environ.get('HOSTNAME', ''),
                   'scheduler': 'GLIDEIN',
                   'GridName': self.task_ad['CRAB_UserDN'],
                   'ApplicationVersion': self.task_ad['CRAB_JobSW'],
@@ -150,7 +150,7 @@ class PreJob:
                   'exe': 'cmsRun',
                   'broker': self.backend,
                   'bossId': str(self.job_id),
-                  'localId' : '',
+                  'localId': '',
                   'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (self.job_id, self.task_ad['CRAB_ReqName'].replace("_", ":")),
                  }
 

@@ -62,7 +62,7 @@ class CRAB3CreateXML(object):
         child_timestamp = SubElement(root, "timestamp")
         child_timestamp.text = str(now_utc)
 
-        child_status = SubElement(root,"status")
+        child_status = SubElement(root, "status")
 
         if subprocesses_config == proccess_count:
             # This means that everything is fine

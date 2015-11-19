@@ -580,20 +580,20 @@ def inject_to_aso(file_transfer_info):
     ## hash here as it includes /store/temp/user/foo.$HASH. We should normalize
     ## based on the final LFN (/store/user/foo/).
     doc_id = hashlib.sha224(file_transfer_info['source']['lfn']).hexdigest()
-    doc_new_info = {'state'           : 'new',
-                    'source'          : source_site,
-                    'destination'     : G_JOB_AD['CRAB_AsyncDest'],
-                    'lfn'             : file_transfer_info['source']['lfn'],
-                    'checksums'       : checksums,
-                    'size'            : size,
+    doc_new_info = {'state': 'new',
+                    'source': source_site,
+                    'destination': G_JOB_AD['CRAB_AsyncDest'],
+                    'lfn': file_transfer_info['source']['lfn'],
+                    'checksums': checksums,
+                    'size': size,
                     # The following four times - and how they're calculated - makes no sense to me. BB
-                    'last_update'     : last_update,
-                    'start_time'      : G_NOW,
-                    'end_time'        : '',
-                    'job_end_time'    : time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
-                    'retry_count'     : [],
-                    'failure_reason'  : [],
-                    'job_retry_count' : G_JOB_AD.get('CRAB_Retry', -1),
+                    'last_update': last_update,
+                    'start_time': G_NOW,
+                    'end_time': '',
+                    'job_end_time': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
+                    'retry_count': [],
+                    'failure_reason': [],
+                    'job_retry_count': G_JOB_AD.get('CRAB_Retry', -1),
                    }
     msg = "Stageout request document so far:\n%s" % (pprint.pformat(doc_new_info))
     print msg
@@ -636,23 +636,23 @@ def inject_to_aso(file_transfer_info):
             input_dataset_or_primary_dataset = '/'+primary_dataset # Adding the '/' until we fix ASO
         else:
             input_dataset_or_primary_dataset = '/'+'NotDefined' # Adding the '/' until we fix ASO
-        doc = {'_id'                     : doc_id,
-               'workflow'                : G_JOB_AD['CRAB_ReqName'],
-               'jobid'                   : G_JOB_AD['CRAB_Id'],
-               'rest_host'               : G_JOB_AD['CRAB_RestHost'],
-               'rest_uri'                : G_JOB_AD['CRAB_RestURInoAPI'],
-               'inputdataset'            : input_dataset_or_primary_dataset,
-               'dbs_url'                 : str(G_JOB_AD['CRAB_DBSURL']),
-               'lfn'                     : file_transfer_info['source']['lfn'],
-               'source_lfn'              : file_transfer_info['source']['lfn'],
-               'destination_lfn'         : file_transfer_info['destination']['lfn'],
-               'type'                    : file_type,
-               'publish'                 : publish,
-               'publication_state'       : 'not_published',
-               'publication_retry_count' : [],
-               'user'                    : G_JOB_AD['CRAB_UserHN'],
-               'role'                    : role,
-               'group'                   : group,
+        doc = {'_id': doc_id,
+               'workflow': G_JOB_AD['CRAB_ReqName'],
+               'jobid': G_JOB_AD['CRAB_Id'],
+               'rest_host': G_JOB_AD['CRAB_RestHost'],
+               'rest_uri': G_JOB_AD['CRAB_RestURInoAPI'],
+               'inputdataset': input_dataset_or_primary_dataset,
+               'dbs_url': str(G_JOB_AD['CRAB_DBSURL']),
+               'lfn': file_transfer_info['source']['lfn'],
+               'source_lfn': file_transfer_info['source']['lfn'],
+               'destination_lfn': file_transfer_info['destination']['lfn'],
+               'type': file_type,
+               'publish': publish,
+               'publication_state': 'not_published',
+               'publication_retry_count': [],
+               'user': G_JOB_AD['CRAB_UserHN'],
+               'role': role,
+               'group': group,
               }
     except Exception:
         msg  = "Error loading document from ASO database."
@@ -966,9 +966,9 @@ def main():
     """
     ## Initialize the cmscp exit status. This is what will be written into the
     ## report.
-    exit_info = {'exit_code'    : 0,
-                 'exit_acronym' : 'OK',
-                 'exit_msg'     : 'OK',
+    exit_info = {'exit_code': 0,
+                 'exit_acronym': 'OK',
+                 'exit_msg': 'OK',
                 }
     def update_exit_info(exit_info, exit_code, exit_msg = None, force = False):
         """
@@ -1098,8 +1098,8 @@ def main():
     split_re = re.compile(",\s*")
     ## Get the list of output files produced by the job.
     output_files = []
-    if G_JOB_AD['CRAB_localOutputFiles'].replace(' ',''):
-        output_files = split_re.split(G_JOB_AD['CRAB_localOutputFiles'].replace(' ',''))
+    if G_JOB_AD['CRAB_localOutputFiles'].replace(' ', ''):
+        output_files = split_re.split(G_JOB_AD['CRAB_localOutputFiles'].replace(' ', ''))
     ## If there is no list of output files, turn off their transfer.
     if len(output_files) == 0:
         if not transfer_outputs:

@@ -231,7 +231,7 @@ class MasterWorker(object):
                 if int(hte.headers.get('X-Error-Http', '0')) == 503:
                     #503 - Database/Service unavailable. Maybe Intervention of CMSWEB ongoing?
                     retry = True
-                    time_sleep = 30 + random.randint(10,30)
+                    time_sleep = 30 + random.randint(10, 30)
                     self.logger.info("Sleeping %s seconds and will try to update again." % str(time_sleep))
                     time.sleep(time_sleep)
             except Exception as exc:

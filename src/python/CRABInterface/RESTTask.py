@@ -1,7 +1,7 @@
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
-from WMCore.REST.Error import InvalidParameter,ExecutionError
+from WMCore.REST.Error import InvalidParameter, ExecutionError
 
 from CRABInterface.Utils import conn_handler
 from CRABInterface.Utils import getDBinstance

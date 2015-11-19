@@ -7,7 +7,7 @@ from WMCore.REST.Error import ExecutionError
 
 # CRABServer dependecies here
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_SUBRES_SI , RX_TASKNAME
+from CRABInterface.Regexps import RX_SUBRES_SI, RX_TASKNAME
 from CRABInterface.Utils import conn_handler
 from CRABInterface.__init__ import __version__
 

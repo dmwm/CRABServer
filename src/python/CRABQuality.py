@@ -33,7 +33,7 @@ def runTests(mode='default',integrationHost=None):
     elif mode == 'integration':
         extraArgs = ['-a', 'integration,!broken']
 
-    args = [__file__,'--with-xunit', '-v', '-s',
+    args = [__file__, '--with-xunit', '-v', '-s',
                 '-m', '(_t.py$)|(_t$)|(^test)',
                 testBaseDir,
                 __file__]
@@ -84,14 +84,14 @@ def sendTestJobsToAllSites():
         # crab -submit it and wait two hours
         state = { 'desc' : 'Test job to %s' % site,
                   'timeout' : time.time() + 60 * 120,
-                  'path' : '%s/crab_%s' % (integrationTempDir,configOpts['requestName'])}
+                  'path' : '%s/crab_%s' % (integrationTempDir, configOpts['requestName'])}
         integrationStatus[site] = state
         cmdLine = "unset LD_LIBRARY_PATH ; %s ; crab -d %s submit -c %s" % \
                                     (cmsswEnv, skipProxy, configPath)
         stdout, returncode = runCommand(cmdLine, integrationTempDir)
         if not os.path.exists(state['path']):
             state['error'] = "Couldn't submit CRAB task:%s\n%s" %\
-                                       (state['path'],stdout)
+                                       (state['path'], stdout)
         integrationStatus[site] = state
         skipProxy = "-p"
 
@@ -181,7 +181,7 @@ def testImport_t():
                 continue
             moduleName = filename.replace('.py', '')
             if baseModule != '.':
-                toImport = "%s.%s" % (baseModule,moduleName)
+                toImport = "%s.%s" % (baseModule, moduleName)
             else:
                 toImport = moduleName
             importOne.name = "Import.%s" % toImport
@@ -299,7 +299,7 @@ T3_US_UCR
 T3_US_UMD
 T3_US_UMiss
 T3_US_UVA"""
-allSites = list(set([x.replace('_Buffer','').replace('_Disk','').replace('_MSS','')
+allSites = list(set([x.replace('_Buffer', '').replace('_Disk', '').replace('_MSS', '')
                      for x in allSitesRaw.split('\n')]))
 
 configSnippet = """from WMCore.Configuration import Configuration

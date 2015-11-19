@@ -79,7 +79,7 @@ class HTCondorLocator(object):
             schedd = htcondor.Schedd(self.scheddAd)
         return schedd, address
 
-    def getScheddObjNew(self,schedd):
+    def getScheddObjNew(self, schedd):
         """
         Return a tuple (schedd, address) containing an object representing the
         remote schedd and its corresponding address.

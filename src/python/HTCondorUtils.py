@@ -54,7 +54,7 @@ class AuthenticatedSubprocess(object):
                 exceptionString = str(traceback.format_exc(c))
                 # Uh, I forgot what traceback function does this without the join 
                 msg = "Trapped exception in Dagman.Fork: %s %s %s \n%s" % \
-                                (a,b,c,str('\n'.join(traceback.format_tb(c))))
+                                (a, b, c, str('\n'.join(traceback.format_tb(c))))
                 self.wpipe.write(msg)
                 self.wpipe.close()
                 os._exit(1)

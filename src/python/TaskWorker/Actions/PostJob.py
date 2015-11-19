@@ -511,20 +511,20 @@ class ASOServerJob(object):
                 needs_transfer = self.log_needs_transfer
             self.logger.info("Working on file %s" % (filename))
             doc_id = hashlib.sha224(source_lfn).hexdigest()
-            doc_new_info = {'state'           : 'new',
-                            'source'          : source_site,
-                            'destination'     : self.dest_site,
-                            'checksums'       : checksums,
-                            'size'            : size,
-                            'last_update'     : last_update,
-                            'start_time'      : now,
-                            'end_time'        : '',
-                            'job_end_time'    : time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
-                            'retry_count'     : [],
-                            'failure_reason'  : [],
+            doc_new_info = {'state': 'new',
+                            'source': source_site,
+                            'destination': self.dest_site,
+                            'checksums': checksums,
+                            'size': size,
+                            'last_update': last_update,
+                            'start_time': now,
+                            'end_time': '',
+                            'job_end_time': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
+                            'retry_count': [],
+                            'failure_reason': [],
                             ## The 'job_retry_count' is used by ASO when reporting to dashboard,
                             ## so it is OK to set it equal to the crab (post-job) retry count.
-                            'job_retry_count' : self.crab_retry,
+                            'job_retry_count': self.crab_retry,
                            }
             if not needs_transfer:
                 msg  = "File %s is marked as having been directly staged out"
@@ -628,24 +628,24 @@ class ASOServerJob(object):
                         input_dataset_or_primary_dataset = '/'+primary_dataset # Adding the '/' until we fix ASO
                     else:
                         input_dataset_or_primary_dataset = '/'+'NotDefined' # Adding the '/' until we fix ASO
-                    doc = {'_id'                     : doc_id,
-                           'inputdataset'            : input_dataset_or_primary_dataset,
-                           'rest_host'               : str(self.job_ad['CRAB_RestHost']),
-                           'rest_uri'                : str(self.job_ad['CRAB_RestURInoAPI']),
-                           'lfn'                     : source_lfn,
-                           'source_lfn'              : source_lfn,
-                           'destination_lfn'         : dest_lfn,
-                           'checksums'               : checksums,
-                           'user'                    : str(self.job_ad['CRAB_UserHN']),
-                           'group'                   : group,
-                           'role'                    : role,
-                           'dbs_url'                 : str(self.job_ad['CRAB_DBSURL']),
-                           'workflow'                : self.reqname,
-                           'jobid'                   : self.job_id,
-                           'publication_state'       : 'not_published',
-                           'publication_retry_count' : [],
-                           'type'                    : file_type,
-                           'publish'                 : publish,
+                    doc = {'_id': doc_id,
+                           'inputdataset': input_dataset_or_primary_dataset,
+                           'rest_host': str(self.job_ad['CRAB_RestHost']),
+                           'rest_uri': str(self.job_ad['CRAB_RestURInoAPI']),
+                           'lfn': source_lfn,
+                           'source_lfn': source_lfn,
+                           'destination_lfn': dest_lfn,
+                           'checksums': checksums,
+                           'user': str(self.job_ad['CRAB_UserHN']),
+                           'group': group,
+                           'role': role,
+                           'dbs_url': str(self.job_ad['CRAB_DBSURL']),
+                           'workflow': self.reqname,
+                           'jobid': self.job_id,
+                           'publication_state': 'not_published',
+                           'publication_retry_count': [],
+                           'type': file_type,
+                           'publish': publish,
                           }
                     ## TODO: We do the following, only because that's what ASO does when a file has
                     ## been successfully transferred. But this modified LFN makes no sence when it
@@ -1581,7 +1581,7 @@ class PostJob():
                 with open(env_file, "w") as fd:
                     fd.write("------ Environment variables:\n")
                     for key in sorted(os.environ.keys()):
-                        fd.write("%30s    %s\n" % (key,os.environ[key]))
+                        fd.write("%30s    %s\n" % (key, os.environ[key]))
             except:
                 self.logger.info("Not able to write ENV variables to a file. Continuing")
                 pass
@@ -1592,7 +1592,7 @@ class PostJob():
             self.logger.debug("------ Job classad values for debug purposes:")
             msg = "-"*100
             for key in sorted(self.job_ad.keys(), key=lambda v: (v.upper(), v[0].islower())):
-                msg += "\n%35s    %s" % (key,self.job_ad[key])
+                msg += "\n%35s    %s" % (key, self.job_ad[key])
             self.logger.debug(msg)
             self.logger.debug("-"*100)
         else:
@@ -1996,22 +1996,22 @@ class PostJob():
         """
         Check if all the required attributes from the job ad are there.
         """
-        required_job_ad_attrs = {'CRAB_UserRole'           : {'allowUndefined': True },
-                                 'CRAB_UserGroup'          : {'allowUndefined': True },
-                                 'CRAB_ASOURL'             : {'allowUndefined': False},
-                                 'CRAB_AsyncDest'          : {'allowUndefined': False},
-                                 'CRAB_DBSURL'             : {'allowUndefined': False},
-                                 'DESIRED_CMSDataset'      : {'allowUndefined': True },
-                                 'CRAB_JobSW'              : {'allowUndefined': False},
-                                 'CRAB_Publish'            : {'allowUndefined': False},
-                                 'CRAB_PublishName'        : {'allowUndefined': False},
-                                 'CRAB_PrimaryDataset'     : {'allowUndefined': False},
-                                 'CRAB_RestHost'           : {'allowUndefined': False},
-                                 'CRAB_RestURInoAPI'       : {'allowUndefined': False},
-                                 'CRAB_RetryOnASOFailures' : {'allowUndefined': False},
-                                 'CRAB_SaveLogsFlag'       : {'allowUndefined': False},
-                                 'CRAB_TransferOutputs'    : {'allowUndefined': False},
-                                 'CRAB_UserHN'             : {'allowUndefined': False},
+        required_job_ad_attrs = {'CRAB_UserRole': {'allowUndefined': True },
+                                 'CRAB_UserGroup': {'allowUndefined': True },
+                                 'CRAB_ASOURL': {'allowUndefined': False},
+                                 'CRAB_AsyncDest': {'allowUndefined': False},
+                                 'CRAB_DBSURL': {'allowUndefined': False},
+                                 'DESIRED_CMSDataset': {'allowUndefined': True },
+                                 'CRAB_JobSW': {'allowUndefined': False},
+                                 'CRAB_Publish': {'allowUndefined': False},
+                                 'CRAB_PublishName': {'allowUndefined': False},
+                                 'CRAB_PrimaryDataset': {'allowUndefined': False},
+                                 'CRAB_RestHost': {'allowUndefined': False},
+                                 'CRAB_RestURInoAPI': {'allowUndefined': False},
+                                 'CRAB_RetryOnASOFailures': {'allowUndefined': False},
+                                 'CRAB_SaveLogsFlag': {'allowUndefined': False},
+                                 'CRAB_TransferOutputs': {'allowUndefined': False},
+                                 'CRAB_UserHN': {'allowUndefined': False},
                                 }
         missing_attrs = []
         for attr in required_job_ad_attrs:
@@ -2167,12 +2167,12 @@ class PostJob():
                       }
         state = states_dict.get(state, state)
         msg = "Setting Dashboard state to %s." % (state)
-        params = {'MonitorID'    : self.reqname,
-                  'MonitorJobID' : "%d_https://glidein.cern.ch/%d/%s_%d" \
+        params = {'MonitorID': self.reqname,
+                  'MonitorJobID': "%d_https://glidein.cern.ch/%d/%s_%d" \
                                    % (self.job_id, self.job_id, \
                                       self.reqname.replace("_", ":"), \
                                       self.crab_retry),
-                  'StatusValue'  : state,
+                  'StatusValue': state,
                  }
         if reason:
             params['StatusValueReason'] = reason
@@ -2363,15 +2363,15 @@ class testServer(unittest.TestCase):
             "cmsRun" : { "input" : {},
               "output":
                 {"outmod1" :
-                    [ { "output_module_class" : "PoolOutputModule",
-                        "input" : ["/test/input2",
+                    [ { "output_module_class": "PoolOutputModule",
+                        "input": ["/test/input2",
                                    "/test/input2"
                                   ],
-                        "events" : 200,
-                        "size" : 100,
-                        "SEName" : sourceSite,
-                        "runs" : { 1: [1,2,3],
-                                   2: [2,3,4]},
+                        "events": 200,
+                        "size": 100,
+                        "SEName": sourceSite,
+                        "runs": { 1: [1, 2, 3],
+                                   2: [2, 3, 4]},
                       }]}}}}
 
 

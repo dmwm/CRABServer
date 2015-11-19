@@ -170,7 +170,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             return lumilist
 
         res = {}
-        self.logger.info("About to compute report of workflow: %s with usedbs=%s. Getting status first." % (workflow,usedbs))
+        self.logger.info("About to compute report of workflow: %s with usedbs=%s. Getting status first." % (workflow, usedbs))
         statusRes = self.status(workflow, userdn)[0]
 
         #get the information we need from the taskdb/initilize variables
@@ -194,11 +194,11 @@ class HTCondorDataWorkflow(DataWorkflow):
             if row[GetFromTaskAndType.PANDAID] in jobids:
                 if str(row[GetFromTaskAndType.PANDAID]) not in res['runsAndLumis']:
                     res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])] = []
-                res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])].append( { 'parents' : row[GetFromTaskAndType.PARENTS].read(),
-                        'runlumi' : row[GetFromTaskAndType.RUNLUMI].read(),
-                        'events'  : row[GetFromTaskAndType.INEVENTS],
-                        'type'    : row[GetFromTaskAndType.TYPE],
-                        'lfn'     : row[GetFromTaskAndType.LFN],
+                res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])].append( { 'parents': row[GetFromTaskAndType.PARENTS].read(),
+                        'runlumi': row[GetFromTaskAndType.RUNLUMI].read(),
+                        'events': row[GetFromTaskAndType.INEVENTS],
+                        'type': row[GetFromTaskAndType.TYPE],
+                        'lfn': row[GetFromTaskAndType.LFN],
                 })
         self.logger.info("Got %s edm files for workflow %s" % (len(res['runsAndLumis']), workflow))
 
@@ -224,8 +224,8 @@ class HTCondorDataWorkflow(DataWorkflow):
                     res['dbsNumFiles'] += sum(len(x['Parents']) for x in outputDetails.values())
 
                 outLumis = LumiList(runsAndLumis = outLumis).compactList
-                for run,lumis in outLumis.iteritems():
-                    res['dbsOutLumilist'][run] = reduce(lambda x1,x2: x1+x2, map(lambda x: range(x[0], x[1]+1), lumis))
+                for run, lumis in outLumis.iteritems():
+                    res['dbsOutLumilist'][run] = reduce(lambda x1, x2: x1+x2, map(lambda x: range(x[0], x[1]+1), lumis))
                 self.logger.info("Aggregated output lumilist: %s" % res['dbsOutLumilist'])
             except Exception as ex:
                 msg = "Failed to contact DBS: %s" % str(ex)

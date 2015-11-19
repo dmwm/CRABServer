@@ -90,7 +90,7 @@ class RESTFile(RESTEntity):
 
             if not os.path.isdir(outfilepath):
                 os.makedirs(outfilepath)
-            handlefile = open(outfilename,'wb')
+            handlefile = open(outfilename, 'wb')
             inputfile.file.seek(0)
             shutil.copyfileobj(inputfile.file, handlefile)
             handlefile.close()
@@ -242,7 +242,7 @@ class RESTInfo(RESTEntity):
         if kwargs['verbose']:
             files_dict = {}
             for file_ in files:
-                files_dict[file_] = self.fileinfo(hashkey=file_,username=username)
+                files_dict[file_] = self.fileinfo(hashkey=file_, username=username)
 
         res["file_list"] = files_dict if kwargs['verbose'] else list(files)
         res["used_space"] = [get_size(userpath)]

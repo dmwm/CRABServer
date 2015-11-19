@@ -18,7 +18,7 @@ class RenewRemoteProxies(BaseRecurringAction):
     pollingTime = 360 #minutes
 
     def _execute(self, resthost, resturi, config, task):
-        renewer = CRAB3ProxyRenewer(config, resthost, resturi.replace("workflowdb","info"), self.logger)
+        renewer = CRAB3ProxyRenewer(config, resthost, resturi.replace("workflowdb", "info"), self.logger)
         renewer.execute()
 
 MINPROXYLENGTH = 60 * 60 * 24

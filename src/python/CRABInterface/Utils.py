@@ -39,7 +39,7 @@ def getDBinstance(config, namespace, name):
         backend = 'Oracle'
 
     #factory = WMFactory(name = 'TaskQuery', namespace = 'Databases.TaskDB.%s.Task' % backend)
-    factory = WMFactory(name = name, namespace = 'Databases.%s.%s.%s' % (namespace,backend,name))
+    factory = WMFactory(name = name, namespace = 'Databases.%s.%s.%s' % (namespace, backend, name))
 
     return factory.loadObject( name )
 
@@ -215,8 +215,8 @@ def retrieveUserCert(func):
         myproxyserver = "myproxy.cern.ch"
         userdn = kwargs['userdn']
         defaultDelegation = {'logger': logger,
-                             'proxyValidity' : '192:00',
-                             'min_time_left' : 36000,
+                             'proxyValidity': '192:00',
+                             'min_time_left': 36000,
                              'server_key': serverKey,
                              'server_cert': serverCert,}
         timeleftthreshold = 60 * 60 * 24

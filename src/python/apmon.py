@@ -178,7 +178,7 @@ class ApMon:
 		self.performBgMonitoring = True     # by default, perform background monitoring
 		self.monitoredJobs = {}	            # Monitored jobs; key = pid; value = hash with
 		self.maxMsgRate = 100		    # Maximum number of messages allowed to be sent per second
-		self.__defaultSenderRef = {'INSTANCE_ID': random.randint(0,0x7FFFFFFE), 'SEQ_NR': 0};
+		self.__defaultSenderRef = {'INSTANCE_ID': random.randint(0, 0x7FFFFFFE), 'SEQ_NR': 0};
 		self.__defaultUserCluster = "ApMon_UserSend";
 		self.__defaultUserNode = socket.getfqdn();
 		self.__defaultSysMonCluster = "ApMon_SysMon";
@@ -794,7 +794,7 @@ class ApMon:
 		level = self.maxMsgRate - self.maxMsgRate / 10; 
 	
 		if valSent > (self.maxMsgRate - level) :
-			if random.randint(0,self.maxMsgRate / 10) >= (self.maxMsgRate - valSent):
+			if random.randint(0, self.maxMsgRate / 10) >= (self.maxMsgRate - valSent):
 				doSend = False;
 	
 		# counting sent and dropped messages

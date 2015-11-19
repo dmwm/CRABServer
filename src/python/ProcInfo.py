@@ -50,7 +50,7 @@ class ProcInfo:
 		this.LAST_UPDATE_TIME = 0;  # when the last measurement was done
 		this.JOBS = {};             # jobs that will be monitored
 		this.logger = logger	    # use the given logger
-		this.OS_TYPE = os.popen('uname -s').readline().replace('\n','');
+		this.OS_TYPE = os.popen('uname -s').readline().replace('\n', '');
 	
 	# This should be called from time to time to update the monitored data,
 	# but not more often than once a second because of the resolution of time()
@@ -582,6 +582,6 @@ class ProcInfo:
 		keys = result.keys();
 		keys.sort();
 		for key in keys:
-			sorted_result.append((key,result[key]));
+			sorted_result.append((key, result[key]));
 		return sorted_result;
 

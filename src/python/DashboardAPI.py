@@ -103,7 +103,7 @@ def logger(msg) :
     if not msg.endswith('\n') :
         msg += '\n'
     try :
-        fh = open('report.log','a')
+        fh = open('report.log', 'a')
         fh.write(msg)
         fh.close
     except Exception as e :
