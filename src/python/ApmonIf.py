@@ -1,5 +1,6 @@
+from __future__ import absolute_import
 
-from DashboardAPI import apmonSend, apmonFree
+from .DashboardAPI import apmonSend, apmonFree
     
 class ApmonIf:
     """

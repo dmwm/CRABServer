@@ -30,6 +30,7 @@
  * OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
  * MODIFICATIONS.
 """
+from __future__ import absolute_import
 
 
 import os
@@ -37,7 +38,7 @@ import re
 import time
 import string
 import socket
-import Logger
+from . import Logger
 
 """
 Class ProcInfo

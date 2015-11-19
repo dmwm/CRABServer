@@ -3,8 +3,9 @@
 """
 This is the Dashboard API Module for the Worker Node
 """
+from __future__ import absolute_import
 
-import apmon
+from . import apmon
 import time, sys, os
 import traceback
 from types import DictType, StringType, ListType

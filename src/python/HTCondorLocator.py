@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import types
 import bisect
 import random
@@ -5,7 +6,7 @@ import time
 import classad
 import htcondor
 
-import HTCondorUtils
+from . import HTCondorUtils
 
 CollectorCache = {}
 # From http://stackoverflow.com/questions/3679694/a-weighted-version-of-random-choice
