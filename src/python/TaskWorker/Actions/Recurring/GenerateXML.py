@@ -43,6 +43,7 @@ class CRAB3CreateXML(object):
             self.logger.error("Not generating xml because no XML_Report_ID exists in TaskWorker configuration")
             return
         root = Element('serviceupdate')
+        root.set( "xmlns",  "http://sls.cern.ch/SLS/XML/update")
         child = SubElement(root, "id")
         child.text = self.config.TaskWorker.XML_Report_ID
         # data = SubElement(root, "data")
@@ -60,12 +61,14 @@ class CRAB3CreateXML(object):
         now_utc = datetime.now().strftime(fmt)
         child_timestamp = SubElement(root, "timestamp")
         child_timestamp.text = str(now_utc)
-        child_availability = SubElement(root, "availability")
+
+        child_status = SubElement(root,"status")
+
         if subprocesses_config == proccess_count:
             # This means that everything is fine
-            child_availability.text = "100"
+            child_status.text = "available"
         else:
-            child_availability.text = str((100/subprocesses_config)*proccess_count)
+            child_status.text = "degraded"
 
         # Write all this information to a temp file and move to correct location
         temp_xmllocation = self.xmllocation + ".temp"
