@@ -292,6 +292,11 @@ def stopDashboardMonitoring(myad):
 
 
 def logCMSSW():
+    """ First it checks if cmsRun-stdout.log is available and if it
+    is available, it will check if file is not too big and also will
+    limit each line to maxLineLen. These logs will be returned back to
+    schedd and we don`t want to take a lot of space on it. Full log files
+    will be returned back to user SE, if he set saveLogs flag in crab config."""
     global logCMSSWSaved
     if logCMSSWSaved:
         return
@@ -308,6 +313,8 @@ def logCMSSW():
     # check size of outfile
     keepAtStart = 1000
     keepAtEnd   = 3000
+    maxLineLen = 3000
+    lineLenExceeded = False
     maxLines    = keepAtStart + keepAtEnd
     numLines = sum(1 for line in open(outfile))
     tooBig = numLines > maxLines
@@ -318,21 +325,39 @@ def logCMSSW():
         with open(outfile) as fp:
             for nl, line in enumerate(fp):
                 if nl < keepAtStart:
-                    print "== CMSSW: ", line,
+                    lineLenExceeded = printCMSSWLine("== CMSSW: %s " % line, maxLineLen, lineLenExceeded)
                 if nl == keepAtStart+1:
                     print "== CMSSW: "
                     print "== CMSSW: [...BIG SNIP...]"
                     print "== CMSSW: "
                 if numLines-nl <= keepAtEnd:
-                    print "== CMSSW: ", line,
+                    lineLenExceeded = printCMSSWLine("== CMSSW: %s " % line, maxLineLen, lineLenExceeded)
     else:
         for line in open(outfile):
-            print "== CMSSW: ", line,
+            lineLenExceeded = printCMSSWLine("== CMSSW: %s " % line, maxLineLen, lineLenExceeded)
 
     print "======== CMSSW OUTPUT FINSHING ========"
+    if lineLenExceeded:
+        print 'NOTICE: Some lines have been truncated, because it was bigger than %s characters.' % maxLineLen
     logCMSSWSaved = True
     open('logCMSSWSaved.txt', 'a').close()
     os.utime('logCMSSWSaved.txt', None)
+
+def printCMSSWLine(line, lineLenLimit, lineLenExceeded):
+    """ Checks if line is not exceeding lineLimit and prints it.
+        If exceeds, line is limited. Returns true if line was truncated.
+        False - not truncated. If minimum 1 line will exceed the limit,
+        return will always be true"""
+        exceeded = False
+        if len(line) > lineLenLimit:
+            print line[:lineLenLimit]
+            exceeded = True
+        else:
+            print line
+            exceeded = False
+        if lineLenExceeded or exceeded:
+            return True
+        return False
 
 
 def handleException(exitAcronym, exitCode, exitMsg):
