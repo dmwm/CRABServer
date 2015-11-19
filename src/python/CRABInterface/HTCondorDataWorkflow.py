@@ -22,6 +22,7 @@ from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTas
 
 import HTCondorUtils
 import HTCondorLocator
+from functools import reduce
 
 
 JOB_KILLED_HOLD_REASON = "Python-initiated action."
