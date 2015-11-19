@@ -53,7 +53,7 @@ class DataFileMetadata(object):
         binds = {}
         for name in bindnames:
             binds[name] = [str(kwargs[name])]
-        binds['runlumi'] = [str(dict(zip(map(str, kwargs['outfileruns']), [map(str, lumilist.split(',')) for lumilist in kwargs['outfilelumis']])))]
+        binds['runlumi'] = [str(dict(list(zip(map(str, kwargs['outfileruns']), [map(str, lumilist.split(',')) for lumilist in kwargs['outfilelumis']]))))]
 
         #Changed to Select if exist, update, else insert
         binds['outtmplfn'] = binds['outlfn']

@@ -10,7 +10,7 @@ import HTCondorUtils
 CollectorCache = {}
 # From http://stackoverflow.com/questions/3679694/a-weighted-version-of-random-choice
 def weighted_choice(choices):
-    values, weights = zip(*choices)
+    values, weights = list(zip(*choices))
     total = 0
     cum_weights = []
     for w in weights:

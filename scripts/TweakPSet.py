@@ -54,7 +54,7 @@ class StepConfiguration(Configuration):
     def listOutputModules(self):
         om = StepConfiguration.outputMods
         #like return {"output1" : self.output1, "output2" : self.output2 ...} for each output1, output2 ... in self.outputMods
-        return dict(zip(om, map( lambda out: getattr(self, out), om)))
+        return dict(list(zip(om, map( lambda out: getattr(self, out), om))))
     def getOutputModule(self, name):
         return getattr(self, name)
 
