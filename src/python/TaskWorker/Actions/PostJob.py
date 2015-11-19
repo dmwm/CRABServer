@@ -282,7 +282,7 @@ class ASOServerJob(object):
         except Exception as ex:
             msg = "Failed to connect to ASO database: %s" % (str(ex))
             self.logger.exception(msg)
-            raise RuntimeError, msg
+            raise RuntimeError(msg)
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -373,7 +373,7 @@ class ASOServerJob(object):
                     self.failures[doc_id] = {'reasons': reasons, 'app': app, 'severity': severity}
             else:
                 exmsg = "Got an unknown transfer status: %s" % (transfer_status)
-                raise RuntimeError, exmsg
+                raise RuntimeError(exmsg)
         if all_transfers_finished:
             msg = "All transfers finished."
             self.logger.info(msg)
@@ -425,7 +425,7 @@ class ASOServerJob(object):
         self.docs_in_transfer = self.inject_to_aso()
         if self.docs_in_transfer == False:
             exmsg = "Couldn't upload document to ASO database"
-            raise RuntimeError, exmsg
+            raise RuntimeError(exmsg)
         if not self.docs_in_transfer:
             self.logger.info("No files to transfer via ASO. Done!")
             return 0
@@ -2398,7 +2398,7 @@ class testServer(unittest.TestCase):
             status, res = commands.getstatusoutput(cmd)
             if status:
                 exmsg = "Couldn't make file: %s" % (res)
-                raise RuntimeError, exmsg
+                raise RuntimeError(exmsg)
         finally:
             if os.path.exists(path):
                 os.unlink(path)

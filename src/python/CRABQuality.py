@@ -22,11 +22,11 @@ def runTests(mode='default',integrationHost=None):
     Top-level function
     """
     if mode not in ['default', 'integration']:
-        raise ArgumentError, "Invalid mode selected"
+        raise ArgumentError("Invalid mode selected")
 
     testBaseDir = getTestRoot()
     if not os.path.exists(testBaseDir):
-        raise RuntimeError, "Test tree not found"
+        raise RuntimeError("Test tree not found")
 
     extraArgs = []
     if mode == 'default':
@@ -66,7 +66,7 @@ def sendTestJobsToAllSites():
     stdout, returncode = runCommand(command, integrationTempDir)
     if returncode != 0 or not os.path.exists("%s/%s" %
                                     (integrationTempDir, integrationCMSSWVer)):
-        raise RuntimeError, "Couldn't get CMSSW install: \n%s" % stdout
+        raise RuntimeError("Couldn't get CMSSW install: \n%s" % stdout)
     cmsswEnv = getCMSSWEnvironment % {'cmsswVersion':integrationCMSSWVer}
 
     # Write cmsRun configuration
@@ -137,7 +137,7 @@ def testJobsToAllSites():
 def getJobStatus(taskDir, timeout, isError):
     global integrationCMSSWVer, integrationTempDir
     if isError:
-        raise RuntimeError, isError
+        raise RuntimeError(isError)
     stdout = "Status not checked yet"
     triesRemaining = 5
     # If a previous status check takes too long, it can cause
@@ -165,7 +165,7 @@ def getJobStatus(taskDir, timeout, isError):
         if not hasStatus:
             triesRemaining -= 1
             if triesRemaining <= 0:
-                raise RuntimeError, "Status call didn't return a status"
+                raise RuntimeError("Status call didn't return a status")
         time.sleep(5)
     # timeout
     assert time.time() < timeout, "Job timed out. Last status: %s" % stdout

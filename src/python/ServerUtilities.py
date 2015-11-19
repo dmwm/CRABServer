@@ -180,7 +180,7 @@ def getPFN(proxy, lfnsaddprefix, filename, sitename, logger):
     except HTTPException as errormsg:
         logger.info('Error: Failed to contact PhEDEx or wrong PhEDEx node name is used')
         logger.info('Result: %s\nStatus :%s\nURL :%s' % (errormsg.result, errormsg.status, errormsg.url))
-        raise HTTPException, errormsg
+        raise HTTPException(errormsg)
     return pfn
 
 
