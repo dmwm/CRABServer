@@ -81,7 +81,7 @@ class RESTTask(RESTEntity):
             raise InvalidParameter("Task name not found in the input parameters")
 
         try:
-            row = self.api.query(None, None, self.Task.QuickSearch_sql, taskname=kwargs["workflow"]).next()
+            row = next(self.api.query(None, None, self.Task.QuickSearch_sql, taskname=kwargs["workflow"]))
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"])
 
@@ -109,7 +109,7 @@ class RESTTask(RESTEntity):
             raise InvalidParameter("Task name not found in the input parameters")
         workflow = kwargs['workflow']
         try:
-            row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
+            row = self.Task.ID_tuple(*next(self.api.query(None, None, self.Task.ID_sql, taskname=workflow)))
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"])
         yield row.user_webdir
@@ -128,7 +128,7 @@ class RESTTask(RESTEntity):
         self.logger.info("Getting proxied url for %s" % workflow)
 
         try:
-            row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
+            row = self.Task.ID_tuple(*next(self.api.query(None, None, self.Task.ID_sql, taskname=workflow)))
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"])
 
@@ -276,7 +276,7 @@ class RESTTask(RESTEntity):
         workflow = kwargs['workflow']
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
 
-        row = self.Task.ID_tuple(*self.api.query(None, None, self.Task.ID_sql, taskname=workflow).next())
+        row = self.Task.ID_tuple(*next(self.api.query(None, None, self.Task.ID_sql, taskname=workflow)))
         outputdatasets = literal_eval(row.output_dataset.read() if row.output_dataset else '[]')
         outputdatasets = str(list(set(outputdatasets + kwargs['outputdatasets'])))
 

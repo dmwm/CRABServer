@@ -40,7 +40,7 @@ class RESTServerInfo(RESTEntity):
         if subresource:
             return getattr(RESTServerInfo, subresource)(self, **kwargs)
         else:
-            self.api.query(None, None, "select NULL from DUAL").next() #Checking database connection
+            next(self.api.query(None, None, "select NULL from DUAL")) #Checking database connection
             return [{"crabserver":"Welcome","version":__version__}]
 
     @conn_handler(services=['centralconfig'])
