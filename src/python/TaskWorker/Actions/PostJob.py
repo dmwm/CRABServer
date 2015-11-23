@@ -1140,7 +1140,7 @@ class PostJob():
         DEFER_NUM = self.get_defer_num()
 
         if first_pj_execution():
-            self.logger.info("======== Starting post-job execution. Version %s" % __version__)
+            self.logger.info("======== Starting execution. Task Worker Version %s" % __version__)
 
         ## Create the task web directory in the schedd. Ignore if it exists already.
         self.create_taskwebdir()
