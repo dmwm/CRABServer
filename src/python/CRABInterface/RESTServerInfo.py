@@ -7,7 +7,7 @@ from WMCore.REST.Error import ExecutionError
 
 # CRABServer dependecies here
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_SUBRES_SI , RX_TASKNAME
+from CRABInterface.Regexps import RX_SUBRES_SI, RX_TASKNAME
 from CRABInterface.Utils import conn_handler
 from CRABInterface.__init__ import __version__
 
@@ -40,7 +40,7 @@ class RESTServerInfo(RESTEntity):
         if subresource:
             return getattr(RESTServerInfo, subresource)(self, **kwargs)
         else:
-            self.api.query(None, None, "select NULL from DUAL").next() #Checking database connection
+            next(self.api.query(None, None, "select NULL from DUAL")) #Checking database connection
             return [{"crabserver":"Welcome","version":__version__}]
 
     @conn_handler(services=['centralconfig'])
@@ -64,7 +64,7 @@ class RESTServerInfo(RESTEntity):
             schedd, address = loc.getScheddObj(workflow) 
         except Exception as ex:
             self.logger.exception(ex)
-            raise ExecutionError("Unable to get schedd address for task %s" % (workflow)), ex
+            raise ExecutionError("Unable to get schedd address for task %s" % (workflow))(ex)
         yield loc.scheddAd['Machine']
 
     @conn_handler(services=['centralconfig'])

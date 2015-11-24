@@ -1,6 +1,7 @@
 """
     CRABQuality - Entry module for CRAB testing functionality
 """
+from __future__ import print_function
 import nose
 from nose.tools import with_setup
 import os
@@ -21,11 +22,11 @@ def runTests(mode='default',integrationHost=None):
     Top-level function
     """
     if mode not in ['default', 'integration']:
-        raise ArgumentError, "Invalid mode selected"
+        raise ArgumentError("Invalid mode selected")
 
     testBaseDir = getTestRoot()
     if not os.path.exists(testBaseDir):
-        raise RuntimeError, "Test tree not found"
+        raise RuntimeError("Test tree not found")
 
     extraArgs = []
     if mode == 'default':
@@ -33,7 +34,7 @@ def runTests(mode='default',integrationHost=None):
     elif mode == 'integration':
         extraArgs = ['-a', 'integration,!broken']
 
-    args = [__file__,'--with-xunit', '-v', '-s',
+    args = [__file__, '--with-xunit', '-v', '-s',
                 '-m', '(_t.py$)|(_t$)|(^test)',
                 testBaseDir,
                 __file__]
@@ -60,19 +61,19 @@ def sendTestJobsToAllSites():
     global integrationTempDir
     integrationTempDir = tempfile.mkdtemp(prefix='crab3-int')
     # make CMSSW checkout
-    print "Making CMSSW release area"
+    print("Making CMSSW release area")
     command = makeCMSSWSnippet % {'cmsswVersion' : integrationCMSSWVer}
     stdout, returncode = runCommand(command, integrationTempDir)
     if returncode != 0 or not os.path.exists("%s/%s" %
                                     (integrationTempDir, integrationCMSSWVer)):
-        raise RuntimeError, "Couldn't get CMSSW install: \n%s" % stdout
+        raise RuntimeError("Couldn't get CMSSW install: \n%s" % stdout)
     cmsswEnv = getCMSSWEnvironment % {'cmsswVersion':integrationCMSSWVer}
 
     # Write cmsRun configuration
     open('%s/pset.py' % integrationTempDir, 'w').write(psetSnippet)
     skipProxy = ""
     for site in sorted(allSites):
-        print "Submitting to %s" % site
+        print("Submitting to %s" % site)
         # make configuration
         configOpts = { 'requestName' : '%s_%s' % (taskNamePrefix, site),
                        'serverUrl' : 'crab3-gwms-1.cern.ch',
@@ -84,14 +85,14 @@ def sendTestJobsToAllSites():
         # crab -submit it and wait two hours
         state = { 'desc' : 'Test job to %s' % site,
                   'timeout' : time.time() + 60 * 120,
-                  'path' : '%s/crab_%s' % (integrationTempDir,configOpts['requestName'])}
+                  'path' : '%s/crab_%s' % (integrationTempDir, configOpts['requestName'])}
         integrationStatus[site] = state
         cmdLine = "unset LD_LIBRARY_PATH ; %s ; crab -d %s submit -c %s" % \
                                     (cmsswEnv, skipProxy, configPath)
         stdout, returncode = runCommand(cmdLine, integrationTempDir)
         if not os.path.exists(state['path']):
             state['error'] = "Couldn't submit CRAB task:%s\n%s" %\
-                                       (state['path'],stdout)
+                                       (state['path'], stdout)
         integrationStatus[site] = state
         skipProxy = "-p"
 
@@ -103,7 +104,7 @@ def cleanupTestJobs():
         if 'path' not in integrationStatus[site]:
             continue
         taskPath = integrationStatus[site]['path']
-        print "Killing task of %s" % taskPath
+        print("Killing task of %s" % taskPath)
         cmdLine = "unset LD_LIBRARY_PATH ; %s ; crab -d -p kill -t %s" % (cmsswEnv, taskPath)
         #stdout, returncode = runCommand(cmdLine, integrationTempDir)
         #if not returncode:
@@ -136,7 +137,7 @@ def testJobsToAllSites():
 def getJobStatus(taskDir, timeout, isError):
     global integrationCMSSWVer, integrationTempDir
     if isError:
-        raise RuntimeError, isError
+        raise RuntimeError(isError)
     stdout = "Status not checked yet"
     triesRemaining = 5
     # If a previous status check takes too long, it can cause
@@ -145,7 +146,7 @@ def getJobStatus(taskDir, timeout, isError):
     while firstLoop or time.time() < timeout:
         firstLoop = False
         cmsswEnv = getCMSSWEnvironment % {'cmsswVersion':integrationCMSSWVer}
-        print "Getting status of %s" % taskDir
+        print("Getting status of %s" % taskDir)
         cmdLine = "unset LD_LIBRARY_PATH ; %s ; crab -d -p status -t %s" % (cmsswEnv, taskDir)
         stdout, exitCode = runCommand(cmdLine, integrationTempDir)
         hasStatus = False
@@ -164,7 +165,7 @@ def getJobStatus(taskDir, timeout, isError):
         if not hasStatus:
             triesRemaining -= 1
             if triesRemaining <= 0:
-                raise RuntimeError, "Status call didn't return a status"
+                raise RuntimeError("Status call didn't return a status")
         time.sleep(5)
     # timeout
     assert time.time() < timeout, "Job timed out. Last status: %s" % stdout
@@ -181,7 +182,7 @@ def testImport_t():
                 continue
             moduleName = filename.replace('.py', '')
             if baseModule != '.':
-                toImport = "%s.%s" % (baseModule,moduleName)
+                toImport = "%s.%s" % (baseModule, moduleName)
             else:
                 toImport = moduleName
             importOne.name = "Import.%s" % toImport
@@ -299,7 +300,7 @@ T3_US_UCR
 T3_US_UMD
 T3_US_UMiss
 T3_US_UVA"""
-allSites = list(set([x.replace('_Buffer','').replace('_Disk','').replace('_MSS','')
+allSites = list(set([x.replace('_Buffer', '').replace('_Disk', '').replace('_MSS', '')
                      for x in allSitesRaw.split('\n')]))
 
 configSnippet = """from WMCore.Configuration import Configuration

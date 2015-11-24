@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import re
 import sys
@@ -20,7 +21,7 @@ if '_CONDOR_JOB_AD' not in os.environ or not os.path.exists(os.environ["_CONDOR_
 
 
 newstdout = "adjust_out.txt"
-logfd = os.open(newstdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
+logfd = os.open(newstdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
 if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
     os.dup2(logfd, 1)
     os.dup2(logfd, 2)

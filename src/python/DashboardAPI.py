@@ -3,8 +3,10 @@
 """
 This is the Dashboard API Module for the Worker Node
 """
+from __future__ import absolute_import
+from __future__ import print_function
 
-import apmon
+from . import apmon
 import time, sys, os
 import traceback
 from types import DictType, StringType, ListType
@@ -103,7 +105,7 @@ def logger(msg) :
     if not msg.endswith('\n') :
         msg += '\n'
     try :
-        fh = open('report.log','a')
+        fh = open('report.log', 'a')
         fh.write(msg)
         fh.close
     except Exception as e :
@@ -126,7 +128,7 @@ def getContext(overload={}) :
     context = {}
     for paramName in contextConf.keys() :
         paramValue = None
-        if overload.has_key(paramName) :
+        if paramName in overload :
             paramValue = overload[paramName]
         if paramValue is None :    
             envVar = contextConf[paramName][0] 
@@ -184,10 +186,10 @@ def report(args) :
     taskId = context['MonitorID']
     jobId = context['MonitorJobID']
     logger('SENDING with Task:%s Job:%s' % (taskId, jobId))
-    logger('params : ' + `paramArgs`)
+    logger('params : ' + repr(paramArgs))
     apmonSend(taskId, jobId, paramArgs)
     apmonFree()
-    print "Parameters sent to Dashboard."
+    print("Parameters sent to Dashboard.")
 
 #
 # PYTHON BASED JOB WRAPPER
@@ -211,7 +213,7 @@ class DashboardAPI :
         if jobId is not None :
             contextArgs['MonitorJobID'] = jobId
         for key in contextConf.keys() :
-            if not contextArgs.has_key(key) and self.defaultContext[key] is not None :
+            if key not in contextArgs and self.defaultContext[key] is not None :
                 contextArgs[key] = self.defaultContext[key]
         context = getContext(contextArgs)
         taskId = context['MonitorID']
@@ -250,20 +252,20 @@ def reportFailureToDashboard(exitCode, ad = None):
         try:
             ad = parseAd()
         except:
-            print "==== ERROR: Unable to parse job's HTCondor ClassAd ===="
-            print "Will not report failure to Dashboard"
-            print traceback.format_exc()
+            print("==== ERROR: Unable to parse job's HTCondor ClassAd ====")
+            print("Will not report failure to Dashboard")
+            print(traceback.format_exc())
             return
     for attr in ['CRAB_ReqName', 'CRAB_Id', 'CRAB_Retry']:
         if attr not in ad:
-            print "==== ERROR: HTCondor ClassAd is missing attribute %s. ====" % attr
-            print "Will not report failure to Dashboard"
+            print("==== ERROR: HTCondor ClassAd is missing attribute %s. ====" % attr)
+            print("Will not report failure to Dashboard")
     params = {
         'MonitorID': ad['CRAB_ReqName'],
         'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%d' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":"), ad['CRAB_Retry']),
         'JobExitCode': exitCode
     }
-    print "Dashboard stageout failure parameters: %s" % str(params)
+    print("Dashboard stageout failure parameters: %s" % str(params))
     apmonSend(params['MonitorID'], params['MonitorJobID'], params)
     apmonFree()
     return exitCode

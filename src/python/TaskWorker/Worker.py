@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import time
 import signal
@@ -257,6 +258,6 @@ if __name__ == '__main__':
         out = a.checkFinished()
         time.sleep(1)
         if ok is not None:
-            print out
+            print(out)
             break
     a.end()

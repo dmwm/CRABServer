@@ -87,7 +87,7 @@ class DagmanKiller(TaskAction):
                 jobretry = str(ad.eval('CRAB_Retry'))
                 jinfo = {'broker': hostname,
                          'bossId': jobid,
-                         'StatusValue' : 'killed',
+                         'StatusValue': 'killed',
                         }
                 insertJobIdSid(jinfo, jobid, self.workflow, jobretry)
                 self.logger.info("Sending kill info to Dashboard: %s" % str(jinfo))
@@ -153,7 +153,7 @@ class DagmanKiller(TaskAction):
             if jobid and jobretry != None:
                 jinfo = {'broker': hostname,
                          'bossId': jobid,
-                         'StatusValue' : 'killed',
+                         'StatusValue': 'killed',
                         }
                 insertJobIdSid(jinfo, jobid, self.workflow, jobretry)
                 self.logger.info("Sending kill info to Dashboard: %s" % str(jinfo))

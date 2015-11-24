@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import types
 import bisect
 import random
@@ -5,12 +6,12 @@ import time
 import classad
 import htcondor
 
-import HTCondorUtils
+from . import HTCondorUtils
 
 CollectorCache = {}
 # From http://stackoverflow.com/questions/3679694/a-weighted-version-of-random-choice
 def weighted_choice(choices):
-    values, weights = zip(*choices)
+    values, weights = list(zip(*choices))
     total = 0
     cum_weights = []
     for w in weights:
@@ -79,7 +80,7 @@ class HTCondorLocator(object):
             schedd = htcondor.Schedd(self.scheddAd)
         return schedd, address
 
-    def getScheddObjNew(self,schedd):
+    def getScheddObjNew(self, schedd):
         """
         Return a tuple (schedd, address) containing an object representing the
         remote schedd and its corresponding address.

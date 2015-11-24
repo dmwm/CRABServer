@@ -40,7 +40,7 @@ class RESTUserWorkflow(RESTEntity):
         res = set()
         for site in sites:
             if '*' in site:
-                sitere = re.compile(site.replace('*','.*'))
+                sitere = re.compile(site.replace('*', '.*'))
                 expanded = map(str, filter(sitere.match,
                     self.allPNNNames.sites if pnn else self.allCMSNames.sites))
                 self.logger.debug("Site %s expanded to %s during validate" % (site, expanded))
@@ -93,7 +93,7 @@ class RESTUserWorkflow(RESTEntity):
         ## (The PostJob replaces then the isbchecksum by the psethash.)
         ## Here we add the requestname if the user did not specify the publishname
         if kwargs['publishname'].find('-') == -1:
-            outputDatasetTagToCheck = "%s-%s" % (requestname.replace(':','_'), kwargs['publishname'])
+            outputDatasetTagToCheck = "%s-%s" % (requestname.replace(':', '_'), kwargs['publishname'])
         else:
             outputDatasetTagToCheck = "%s" % (kwargs['publishname'])
         kwargs['publishname'] = outputDatasetTagToCheck #that's what the version earlier than 1509 were putting in the DB
@@ -134,7 +134,7 @@ class RESTUserWorkflow(RESTEntity):
 
         if 'publishname2' not in kwargs or not kwargs['publishname2']:
             ## provide the default publication name if it was not specified in the client
-            outputDatasetTagToCheck = requestname.replace(':','_')
+            outputDatasetTagToCheck = requestname.replace(':', '_')
         else:
             outputDatasetTagToCheck = kwargs['publishname2']
 

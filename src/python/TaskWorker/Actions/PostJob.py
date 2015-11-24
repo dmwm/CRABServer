@@ -53,6 +53,7 @@ about the file to the FJR. The information is:
 
 The PostJob and cmscp are the only places in CRAB3 where we should use camel_case instead of snakeCase.
 """
+from __future__ import print_function
 
 import os
 import sys
@@ -281,7 +282,7 @@ class ASOServerJob(object):
         except Exception as ex:
             msg = "Failed to connect to ASO database: %s" % (str(ex))
             self.logger.exception(msg)
-            raise RuntimeError, msg
+            raise RuntimeError(msg)
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -372,7 +373,7 @@ class ASOServerJob(object):
                     self.failures[doc_id] = {'reasons': reasons, 'app': app, 'severity': severity}
             else:
                 exmsg = "Got an unknown transfer status: %s" % (transfer_status)
-                raise RuntimeError, exmsg
+                raise RuntimeError(exmsg)
         if all_transfers_finished:
             msg = "All transfers finished."
             self.logger.info(msg)
@@ -424,7 +425,7 @@ class ASOServerJob(object):
         self.docs_in_transfer = self.inject_to_aso()
         if self.docs_in_transfer == False:
             exmsg = "Couldn't upload document to ASO database"
-            raise RuntimeError, exmsg
+            raise RuntimeError(exmsg)
         if not self.docs_in_transfer:
             self.logger.info("No files to transfer via ASO. Done!")
             return 0
@@ -511,20 +512,20 @@ class ASOServerJob(object):
                 needs_transfer = self.log_needs_transfer
             self.logger.info("Working on file %s" % (filename))
             doc_id = hashlib.sha224(source_lfn).hexdigest()
-            doc_new_info = {'state'           : 'new',
-                            'source'          : source_site,
-                            'destination'     : self.dest_site,
-                            'checksums'       : checksums,
-                            'size'            : size,
-                            'last_update'     : last_update,
-                            'start_time'      : now,
-                            'end_time'        : '',
-                            'job_end_time'    : time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
-                            'retry_count'     : [],
-                            'failure_reason'  : [],
+            doc_new_info = {'state': 'new',
+                            'source': source_site,
+                            'destination': self.dest_site,
+                            'checksums': checksums,
+                            'size': size,
+                            'last_update': last_update,
+                            'start_time': now,
+                            'end_time': '',
+                            'job_end_time': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
+                            'retry_count': [],
+                            'failure_reason': [],
                             ## The 'job_retry_count' is used by ASO when reporting to dashboard,
                             ## so it is OK to set it equal to the crab (post-job) retry count.
-                            'job_retry_count' : self.crab_retry,
+                            'job_retry_count': self.crab_retry,
                            }
             if not needs_transfer:
                 msg  = "File %s is marked as having been directly staged out"
@@ -628,24 +629,24 @@ class ASOServerJob(object):
                         input_dataset_or_primary_dataset = '/'+primary_dataset # Adding the '/' until we fix ASO
                     else:
                         input_dataset_or_primary_dataset = '/'+'NotDefined' # Adding the '/' until we fix ASO
-                    doc = {'_id'                     : doc_id,
-                           'inputdataset'            : input_dataset_or_primary_dataset,
-                           'rest_host'               : str(self.job_ad['CRAB_RestHost']),
-                           'rest_uri'                : str(self.job_ad['CRAB_RestURInoAPI']),
-                           'lfn'                     : source_lfn,
-                           'source_lfn'              : source_lfn,
-                           'destination_lfn'         : dest_lfn,
-                           'checksums'               : checksums,
-                           'user'                    : str(self.job_ad['CRAB_UserHN']),
-                           'group'                   : group,
-                           'role'                    : role,
-                           'dbs_url'                 : str(self.job_ad['CRAB_DBSURL']),
-                           'workflow'                : self.reqname,
-                           'jobid'                   : self.job_id,
-                           'publication_state'       : 'not_published',
-                           'publication_retry_count' : [],
-                           'type'                    : file_type,
-                           'publish'                 : publish,
+                    doc = {'_id': doc_id,
+                           'inputdataset': input_dataset_or_primary_dataset,
+                           'rest_host': str(self.job_ad['CRAB_RestHost']),
+                           'rest_uri': str(self.job_ad['CRAB_RestURInoAPI']),
+                           'lfn': source_lfn,
+                           'source_lfn': source_lfn,
+                           'destination_lfn': dest_lfn,
+                           'checksums': checksums,
+                           'user': str(self.job_ad['CRAB_UserHN']),
+                           'group': group,
+                           'role': role,
+                           'dbs_url': str(self.job_ad['CRAB_DBSURL']),
+                           'workflow': self.reqname,
+                           'jobid': self.job_id,
+                           'publication_state': 'not_published',
+                           'publication_retry_count': [],
+                           'type': file_type,
+                           'publish': publish,
                           }
                     ## TODO: We do the following, only because that's what ASO does when a file has
                     ## been successfully transferred. But this modified LFN makes no sence when it
@@ -1018,7 +1019,7 @@ class PostJob():
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             handler = logging.StreamHandler(sys.stdout)    
         else:
-            print "Wrinting post-job output to %s." % (self.postjob_log_file_name)
+            print("Wrinting post-job output to %s." % (self.postjob_log_file_name))
             mode = 'w' if first_pj_execution() else 'a'
             handler = logging.FileHandler(filename=self.postjob_log_file_name, mode=mode)
         handler.setFormatter(self.logging_formatter)
@@ -1031,8 +1032,8 @@ class PostJob():
         ## need to redirect stdout/err to the post-job log file if we want to see the
         ## unhandled exceptions.
         if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
-            fd_postjob_log = os.open(self.postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0644)
-            os.chmod(self.postjob_log_file_name, 0644)
+            fd_postjob_log = os.open(self.postjob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o644)
+            os.chmod(self.postjob_log_file_name, 0o644)
             os.dup2(fd_postjob_log, 1)
             os.dup2(fd_postjob_log, 2)
 
@@ -1079,7 +1080,7 @@ class PostJob():
             fd_stdout = open(stdout_tmp, 'w')
             fd_stdout.truncate(0)
             fd_stdout.close()
-            os.chmod(fname, 0644)
+            os.chmod(fname, 0o644)
         ## Copy the json job report file jobReport.json.<job_id> to
         ## job_fjr.<job_id>.<crab_retry>.json and create a symbolic link in the task web
         ## directory to the new job report file.
@@ -1087,7 +1088,7 @@ class PostJob():
             msg = "Copying job report from %s to %s." % (G_JOB_REPORT_NAME, G_JOB_REPORT_NAME_NEW)
             self.logger.debug(msg)
             shutil.copy(G_JOB_REPORT_NAME, G_JOB_REPORT_NAME_NEW)
-            os.chmod(G_JOB_REPORT_NAME_NEW, 0644)
+            os.chmod(G_JOB_REPORT_NAME_NEW, 0o644)
             msg = "Creating symbolic link in task web directory to job report file: %s -> %s" % (os.path.join(self.logpath, G_JOB_REPORT_NAME_NEW), G_JOB_REPORT_NAME_NEW)
             self.logger.debug(msg)
             try:
@@ -1581,7 +1582,7 @@ class PostJob():
                 with open(env_file, "w") as fd:
                     fd.write("------ Environment variables:\n")
                     for key in sorted(os.environ.keys()):
-                        fd.write("%30s    %s\n" % (key,os.environ[key]))
+                        fd.write("%30s    %s\n" % (key, os.environ[key]))
             except:
                 self.logger.info("Not able to write ENV variables to a file. Continuing")
                 pass
@@ -1592,7 +1593,7 @@ class PostJob():
             self.logger.debug("------ Job classad values for debug purposes:")
             msg = "-"*100
             for key in sorted(self.job_ad.keys(), key=lambda v: (v.upper(), v[0].islower())):
-                msg += "\n%35s    %s" % (key,self.job_ad[key])
+                msg += "\n%35s    %s" % (key, self.job_ad[key])
             self.logger.debug(msg)
             self.logger.debug("-"*100)
         else:
@@ -1996,22 +1997,22 @@ class PostJob():
         """
         Check if all the required attributes from the job ad are there.
         """
-        required_job_ad_attrs = {'CRAB_UserRole'           : {'allowUndefined': True },
-                                 'CRAB_UserGroup'          : {'allowUndefined': True },
-                                 'CRAB_ASOURL'             : {'allowUndefined': False},
-                                 'CRAB_AsyncDest'          : {'allowUndefined': False},
-                                 'CRAB_DBSURL'             : {'allowUndefined': False},
-                                 'DESIRED_CMSDataset'      : {'allowUndefined': True },
-                                 'CRAB_JobSW'              : {'allowUndefined': False},
-                                 'CRAB_Publish'            : {'allowUndefined': False},
-                                 'CRAB_PublishName'        : {'allowUndefined': False},
-                                 'CRAB_PrimaryDataset'     : {'allowUndefined': False},
-                                 'CRAB_RestHost'           : {'allowUndefined': False},
-                                 'CRAB_RestURInoAPI'       : {'allowUndefined': False},
-                                 'CRAB_RetryOnASOFailures' : {'allowUndefined': False},
-                                 'CRAB_SaveLogsFlag'       : {'allowUndefined': False},
-                                 'CRAB_TransferOutputs'    : {'allowUndefined': False},
-                                 'CRAB_UserHN'             : {'allowUndefined': False},
+        required_job_ad_attrs = {'CRAB_UserRole': {'allowUndefined': True },
+                                 'CRAB_UserGroup': {'allowUndefined': True },
+                                 'CRAB_ASOURL': {'allowUndefined': False},
+                                 'CRAB_AsyncDest': {'allowUndefined': False},
+                                 'CRAB_DBSURL': {'allowUndefined': False},
+                                 'DESIRED_CMSDataset': {'allowUndefined': True },
+                                 'CRAB_JobSW': {'allowUndefined': False},
+                                 'CRAB_Publish': {'allowUndefined': False},
+                                 'CRAB_PublishName': {'allowUndefined': False},
+                                 'CRAB_PrimaryDataset': {'allowUndefined': False},
+                                 'CRAB_RestHost': {'allowUndefined': False},
+                                 'CRAB_RestURInoAPI': {'allowUndefined': False},
+                                 'CRAB_RetryOnASOFailures': {'allowUndefined': False},
+                                 'CRAB_SaveLogsFlag': {'allowUndefined': False},
+                                 'CRAB_TransferOutputs': {'allowUndefined': False},
+                                 'CRAB_UserHN': {'allowUndefined': False},
                                 }
         missing_attrs = []
         for attr in required_job_ad_attrs:
@@ -2167,12 +2168,12 @@ class PostJob():
                       }
         state = states_dict.get(state, state)
         msg = "Setting Dashboard state to %s." % (state)
-        params = {'MonitorID'    : self.reqname,
-                  'MonitorJobID' : "%d_https://glidein.cern.ch/%d/%s_%d" \
+        params = {'MonitorID': self.reqname,
+                  'MonitorJobID': "%d_https://glidein.cern.ch/%d/%s_%d" \
                                    % (self.job_id, self.job_id, \
                                       self.reqname.replace("_", ":"), \
                                       self.crab_retry),
-                  'StatusValue'  : state,
+                  'StatusValue': state,
                  }
         if reason:
             params['StatusValueReason'] = reason
@@ -2363,15 +2364,15 @@ class testServer(unittest.TestCase):
             "cmsRun" : { "input" : {},
               "output":
                 {"outmod1" :
-                    [ { "output_module_class" : "PoolOutputModule",
-                        "input" : ["/test/input2",
+                    [ { "output_module_class": "PoolOutputModule",
+                        "input": ["/test/input2",
                                    "/test/input2"
                                   ],
-                        "events" : 200,
-                        "size" : 100,
-                        "SEName" : sourceSite,
-                        "runs" : { 1: [1,2,3],
-                                   2: [2,3,4]},
+                        "events": 200,
+                        "size": 100,
+                        "SEName": sourceSite,
+                        "runs": { 1: [1, 2, 3],
+                                   2: [2, 3, 4]},
                       }]}}}}
 
 
@@ -2393,11 +2394,11 @@ class testServer(unittest.TestCase):
             os.write(fh, (inputString * ((size/len(inputString))+1))[:size])
             os.close(fh)
             cmd = "env -u LD_LIBRAY_PATH lcg-cp -b -D srmv2 -v file://%s %s" % (path, pfn)
-            print cmd
+            print(cmd)
             status, res = commands.getstatusoutput(cmd)
             if status:
                 exmsg = "Couldn't make file: %s" % (res)
-                raise RuntimeError, exmsg
+                raise RuntimeError(exmsg)
         finally:
             if os.path.exists(path):
                 os.unlink(path)
@@ -2438,9 +2439,9 @@ class testServer(unittest.TestCase):
 if __name__ == '__main__':
     if len(sys.argv) >= 2 and sys.argv[1] == 'UNIT_TEST':
         sys.argv = [sys.argv[0]]
-        print "Beginning testing"
+        print("Beginning testing")
         unittest.main()
-        print "Testing over"
+        print("Testing over")
         sys.exit()
     POSTJOB = PostJob()
     sys.exit(POSTJOB.execute(*sys.argv[2:]))

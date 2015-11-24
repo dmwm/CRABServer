@@ -23,6 +23,7 @@ job_input_file_list_1.json content:
 ["1.root"]
 On Worker nodes it has a tarball with all files. but for debugging purpose it is also available to read directly from file
 """
+from __future__ import print_function
 
 from optparse import OptionParser
 from WMCore.Configuration import Configuration, ConfigSection
@@ -46,7 +47,7 @@ class StepConfiguration(Configuration):
         for out in outputMods:
             setattr(self, out, ConfigSection("output"))
             getattr(self, out)._internal_name = "output"
-            getattr(self,out).lfnBase = lfnBase #'/store/temp/user/mmascher/RelValProdTTbar/mc/v6'
+            getattr(self, out).lfnBase = lfnBase #'/store/temp/user/mmascher/RelValProdTTbar/mc/v6'
         StepConfiguration.outputMods = outputMods
 
     def getTypeHelper(self):
@@ -54,7 +55,7 @@ class StepConfiguration(Configuration):
     def listOutputModules(self):
         om = StepConfiguration.outputMods
         #like return {"output1" : self.output1, "output2" : self.output2 ...} for each output1, output2 ... in self.outputMods
-        return dict(zip(om, map( lambda out: getattr(self, out), om)))
+        return dict(list(zip(om, map( lambda out: getattr(self, out), om))))
     def getOutputModule(self, name):
         return getattr(self, name)
 
@@ -138,7 +139,7 @@ def readFileFromTarball(file, tarball):
     content = '{}'
     if os.path.isfile(file):
         #This is only for Debugging
-        print 'DEBUGGING MODE!'
+        print('DEBUGGING MODE!')
         with open(file, 'r') as f:
             content = f.read()
         return literal_eval(content)
@@ -152,13 +153,13 @@ def readFileFromTarball(file, tarball):
             break
         except KeyError as er:
             #Don`t exit due to KeyError, print error. EventBased and FileBased does not have run and lumis
-            print 'Failed to get information from tarball %s and file %s. Error : %s' %(tarball, file, er)
+            print('Failed to get information from tarball %s and file %s. Error : %s' %(tarball, file, er))
             break
     tar_file.close()
     return literal_eval(content)
 
-print "Beginning TweakPSet"
-print " arguments: %s" % sys.argv
+print("Beginning TweakPSet")
+print(" arguments: %s" % sys.argv)
 agentNumber = 0
 #lfnBase = '/store/temp/user/mmascher/RelValProdTTbar/mc/v6' #TODO how is this built?
 lfnBase = None
@@ -180,8 +181,8 @@ parser.add_option('--eventsPerLumi', dest='eventsPerLumi', default=None)
 opts, args = parser.parse_args()
 
 if opts.oneEventMode:
-    print "One event mode disabled until we can put together a decent version of WMCore."
-    print "TweakPSet.py is going to force one event mode"
+    print("One event mode disabled until we can put together a decent version of WMCore.")
+    print("TweakPSet.py is going to force one event mode")
 
 runAndLumis = {}
 if opts.runAndLumis:

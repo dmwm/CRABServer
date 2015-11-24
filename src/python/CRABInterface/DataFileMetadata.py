@@ -17,7 +17,7 @@ class DataFileMetadata(object):
 
     def __init__(self, config):
         self.logger = logging.getLogger("CRABLogger.DataFileMetadata")
-        self.FileMetaData = getDBinstance(config,'FileMetaDataDB','FileMetaData')
+        self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
 
     def getFiles(self, taskname, filetype):
         self.logger.debug("Calling jobmetadata for task %s and filetype %s" % (taskname, filetype))
@@ -53,7 +53,7 @@ class DataFileMetadata(object):
         binds = {}
         for name in bindnames:
             binds[name] = [str(kwargs[name])]
-        binds['runlumi'] = [str(dict(zip(map(str, kwargs['outfileruns']), [map(str, lumilist.split(',')) for lumilist in kwargs['outfilelumis']])))]
+        binds['runlumi'] = [str(dict(list(zip(map(str, kwargs['outfileruns']), [map(str, lumilist.split(',')) for lumilist in kwargs['outfilelumis']]))))]
 
         #Changed to Select if exist, update, else insert
         binds['outtmplfn'] = binds['outlfn']
@@ -61,7 +61,7 @@ class DataFileMetadata(object):
                               outlfn=binds['outlfn'][0], taskname=binds['taskname'][0])
         try:
             #just one row is picked up by the previous query
-            row = row.next()
+            row = next(row)
         except StopIteration:
             #StipIteration will be raised if no rows was found
             self.logger.debug('No rows selected. Inserting new row into filemetadata')
@@ -80,7 +80,7 @@ class DataFileMetadata(object):
     def changeState(self, *args, **kwargs):#kwargs are (taskname, outlfn, filestate)
         self.logger.debug("Changing state of file %(outlfn)s in task %(taskname)s to %(filestate)s" % kwargs)
 
-        self.api.modify(self.FileMetaData.ChangeFileState_sql, **dict((k, [v]) for k,v in kwargs.iteritems()))
+        self.api.modify(self.FileMetaData.ChangeFileState_sql, **dict((k, [v]) for k, v in kwargs.iteritems()))
 
     def delete(self, taskname, hours):
         if taskname:

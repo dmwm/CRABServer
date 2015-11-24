@@ -157,10 +157,10 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
 queue
 """
 
-SPLIT_ARG_MAP = { "LumiBased" : "lumis_per_job",
-                  "EventBased" : "events_per_job",
-                  "FileBased" : "files_per_job",
-                  "EventAwareLumiBased" : "events_per_job",}
+SPLIT_ARG_MAP = { "LumiBased": "lumis_per_job",
+                  "EventBased": "events_per_job",
+                  "FileBased": "files_per_job",
+                  "EventAwareLumiBased": "events_per_job",}
 
 
 def getCreateTimestamp(taskname):
@@ -262,7 +262,7 @@ def getLocation(default_name, checkout_location):
     loc = default_name
     if not os.path.exists(loc):
         if 'CRABTASKWORKER_ROOT' in os.environ:
-            for path in ['xdata','data']:
+            for path in ['xdata', 'data']:
                 fname = os.path.join(os.environ['CRABTASKWORKER_ROOT'], path, loc)
                 if os.path.exists(fname):
                     return fname
@@ -291,7 +291,7 @@ class DagmanCreator(TaskAction.TaskAction):
         params = {'tool': 'crab3',
                   'SubmissionType':'crab3',
                   'JSToolVersion': '3.3.0',
-                  'tool_ui': os.environ.get('HOSTNAME',''),
+                  'tool_ui': os.environ.get('HOSTNAME', ''),
                   'scheduler': 'GLIDEIN',
                   'GridName': self.task['tm_user_dn'],
                   'ApplicationVersion': self.task['tm_job_sw'],
@@ -505,29 +505,29 @@ class DagmanCreator(TaskAction.TaskAction):
                 lastDirectDest = directDest
             pfns = ["log/cmsRun_%d.log.tar.gz" % i] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
-            nodeSpec = {'count'             : i,
-                        'maxretries'        : task['numautomjobretries'],
-                        'taskname'          : task['tm_taskname'],
-                        'backend'           : os.environ.get('HOSTNAME',''),
-                        'tempDest'          : tempDest,
-                        'outputDest'        : os.path.join(dest, counter),
-                        'remoteOutputFiles' : remoteOutputFilesStr,
-                        'runAndLumiMask'    : runAndLumiMask,
-                        'inputFiles'        : inputFiles,
-                        'localOutputFiles'  : localOutputFiles,
-                        'asyncDest'         : task['tm_asyncdest'],
-                        'firstEvent'        : firstEvent,
-                        'lastEvent'         : lastEvent,
-                        'firstLumi'         : firstLumi,
-                        'firstRun'          : firstRun,
-                        'seeding'           : 'AutomaticSeeding',
-                        'lheInputFiles'     : 'tm_generator' in task and task['tm_generator'] == 'lhe',
-                        'eventsPerLumi'     : task['tm_events_per_lumi'],
-                        'sw'                : task['tm_job_sw'],
-                        'block'             : block,
-                        'destination'       : pfns,
-                        'scriptExe'         : task['tm_scriptexe'],
-                        'scriptArgs'        : json.dumps(task['tm_scriptargs']).replace('"', r'\"\"'),
+            nodeSpec = {'count': i,
+                        'maxretries': task['numautomjobretries'],
+                        'taskname': task['tm_taskname'],
+                        'backend': os.environ.get('HOSTNAME', ''),
+                        'tempDest': tempDest,
+                        'outputDest': os.path.join(dest, counter),
+                        'remoteOutputFiles': remoteOutputFilesStr,
+                        'runAndLumiMask': runAndLumiMask,
+                        'inputFiles': inputFiles,
+                        'localOutputFiles': localOutputFiles,
+                        'asyncDest': task['tm_asyncdest'],
+                        'firstEvent': firstEvent,
+                        'lastEvent': lastEvent,
+                        'firstLumi': firstLumi,
+                        'firstRun': firstRun,
+                        'seeding': 'AutomaticSeeding',
+                        'lheInputFiles': 'tm_generator' in task and task['tm_generator'] == 'lhe',
+                        'eventsPerLumi': task['tm_events_per_lumi'],
+                        'sw': task['tm_job_sw'],
+                        'block': block,
+                        'destination': pfns,
+                        'scriptExe': task['tm_scriptexe'],
+                        'scriptArgs': json.dumps(task['tm_scriptargs']).replace('"', r'\"\"'),
                        }
             dagSpecs.append(nodeSpec)
             self.logger.debug(dagSpecs[-1])
@@ -552,7 +552,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
 
-        os.chmod("CMSRunAnalysis.sh", 0755)
+        os.chmod("CMSRunAnalysis.sh", 0o755)
 
         # This config setting acts as a global black list
         global_blacklist = set(self.getBlacklistedSites())
@@ -776,11 +776,11 @@ class DagmanCreator(TaskAction.TaskAction):
         ml_info = info.setdefault('apmon', [])
         for idx in range(1, info['jobcount']+1):
             taskid = kwargs['task']['tm_taskname']
-            jinfo = {'broker': os.environ.get('HOSTNAME',''),
+            jinfo = {'broker': os.environ.get('HOSTNAME', ''),
                      'bossId': str(idx),
                      'TargetSE': target_se,
-                     'localId' : '',
-                     'StatusValue' : 'pending',
+                     'localId': '',
+                     'StatusValue': 'pending',
                     }
             insertJobIdSid(jinfo, idx, taskid, 0)
             ml_info.append(jinfo)

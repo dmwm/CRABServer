@@ -30,7 +30,7 @@ class Final:
         failed_count = int(args[1])
         restinstance = args[2]
         resturl = args[3]
-        if dag_status in [1,2,3]:
+        if dag_status in [1, 2, 3]:
             if dag_status == 3:
                 msg = "Task aborted because the maximum number of failures was hit; %d total failed jobs." % failed_count
             else:

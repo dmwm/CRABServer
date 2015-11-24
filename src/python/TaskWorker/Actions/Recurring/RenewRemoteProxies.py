@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import sys
 import time
@@ -18,7 +19,7 @@ class RenewRemoteProxies(BaseRecurringAction):
     pollingTime = 360 #minutes
 
     def _execute(self, resthost, resturi, config, task):
-        renewer = CRAB3ProxyRenewer(config, resthost, resturi.replace("workflowdb","info"), self.logger)
+        renewer = CRAB3ProxyRenewer(config, resthost, resturi.replace("workflowdb", "info"), self.logger)
         renewer.execute()
 
 MINPROXYLENGTH = 60 * 60 * 24
@@ -66,7 +67,7 @@ class CRAB3ProxyRenewer(object):
             group = ad['CRAB_UserGroup']
         if 'CRAB_UserRole' in ad and ad['CRAB_UserRole'] and ad['CRAB_UserRole'] != classad.Value.Undefined:
             role = ad['CRAB_UserRole']
-        print vo, group, role
+        print(vo, group, role)
         proxycfg = {'vo': vo,
                     'logger': self.logger,
                     'myProxySvr': self.config.Services.MyProxy,

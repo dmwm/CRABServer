@@ -2,6 +2,7 @@
 """
 CMSRunAnalysis.py - the runtime python portions to launch a CRAB3 / cmsRun job.
 """
+from __future__ import print_function
 
 import os
 import re
@@ -28,7 +29,7 @@ import WMCore.Storage.SiteLocalConfig as SiteLocalConfig
 logCMSSWSaved = False
 
 def sighandler(signum, stack):
-    print 'Job was killed with signal: %s' % signum
+    print('Job was killed with signal: %s' % signum)
     if not logCMSSWSaved:
         logCMSSW()
     sys.exit(50669)
@@ -48,12 +49,12 @@ def mintime():
     tottime = time.time()-starttime
     remaining = mymin - tottime
     if remaining > 0 and not "CRAB3_RUNTIME_DEBUG" in os.environ:
-        print "==== Failure sleep STARTING at %s ====" % time.asctime(time.gmtime())
-        print "Sleeping for %d seconds due to failure." % remaining
+        print("==== Failure sleep STARTING at %s ====" % time.asctime(time.gmtime()))
+        print("Sleeping for %d seconds due to failure." % remaining)
         sys.stdout.flush()
         sys.stderr.flush()
         time.sleep(remaining)
-        print "==== Failure sleep FINISHING at %s ====" % time.asctime(time.gmtime())
+        print("==== Failure sleep FINISHING at %s ====" % time.asctime(time.gmtime()))
 
 
 class PassThroughOptionParser(OptionParser):
@@ -117,7 +118,7 @@ def earlyDashboardMonitoring(myad):
         'OverflowFlag': calcOverflowFlag(myad),
     }
     populateDashboardMonitorInfo(myad, params)
-    print "Dashboard early startup params: %s" % str(params)
+    print("Dashboard early startup params: %s" % str(params))
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
     return params['MonitorJobID']
 
@@ -127,7 +128,7 @@ def earlyDashboardFailure(myad):
         'JobExitCode': 10043,
     }
     populateDashboardMonitorInfo(myad, params)
-    print "Dashboard early startup params: %s" % str(params)
+    print("Dashboard early startup params: %s" % str(params))
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
 
 
@@ -137,7 +138,7 @@ def startDashboardMonitoring(myad):
         'ExeStart': 'cmsRun',
     }
     populateDashboardMonitorInfo(myad, params)
-    print "Dashboard startup parameters: %s" % str(params)
+    print("Dashboard startup parameters: %s" % str(params))
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
 
 
@@ -186,12 +187,12 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
     """
 
     if 'CRAB_DataBlock' not in myad:
-        print "Not sending data to popularity service because 'CRAB_DataBlock' is not in job ad."
+        print("Not sending data to popularity service because 'CRAB_DataBlock' is not in job ad.")
     sources = fjr.get('steps', {}).get('cmsRun', {}).get('input', {}).get('source', [])
     skippedFiles = fjr.get('skippedFiles', [])
     fallbackFiles = fjr.get('fallbackFiles', [])
     if not sources:
-        print "Not sending data to popularity service because no input sources found."
+        print("Not sending data to popularity service because no input sources found.")
 
     # Now, compute the strings about the input files.  Each input file has the following format in the report:
     #
@@ -211,7 +212,7 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
     parentCtr = 0
     for source in sources:
         if 'lfn' not in source:
-            print "Excluding source data from popularity report because no LFN is present. %s" % str(source)
+            print("Excluding source data from popularity report because no LFN is present. %s" % str(source))
         if source.get('input_source_class') == 'PoolSource':
             file_type = 'EDM'
         else:
@@ -258,7 +259,7 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
         'inputFiles': str(inputString),
         'parentFiles': str(parentInputString),
     }
-    print "Dashboard popularity report: %s" % str(report)
+    print("Dashboard popularity report: %s" % str(report))
     DashboardAPI.apmonSend(monitorId, monitorJobId, report)
 
 
@@ -273,7 +274,7 @@ def stopDashboardMonitoring(myad):
     try:
         fjr = json.load(open("jobReport.json"))
     except:
-        print "WARNING: Unable to parse jobReport.json; Dashboard reporting will not be useful.\n", traceback.format_exc()
+        print("WARNING: Unable to parse jobReport.json; Dashboard reporting will not be useful.\n", traceback.format_exc())
     try:
         addReportInfo(params, fjr)
     except:
@@ -281,12 +282,12 @@ def stopDashboardMonitoring(myad):
             params['ExeExitCode'] = 50115
         if 'JobExitCode' not in params:
             params['JobExitCode'] = params['ExeExitCode']
-        print "ERROR: Unable to parse job info from FJR.\n", traceback.format_exc()
-    print "Dashboard end parameters: %s" % str(params)
+        print("ERROR: Unable to parse job info from FJR.\n", traceback.format_exc())
+    print("Dashboard end parameters: %s" % str(params))
     try:
         reportPopularity(params['MonitorID'], params['MonitorJobID'], myad, fjr)
     except:
-        print "ERROR: Failed to report popularity information to Dashboard.\n", traceback.format_exc()
+        print("ERROR: Failed to report popularity information to Dashboard.\n", traceback.format_exc())
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
     DashboardAPI.apmonFree()
 
@@ -301,7 +302,7 @@ def logCMSSW():
     if logCMSSWSaved:
         return
     if not os.path.exists("cmsRun-stdout.log"):
-        print "ERROR: Cannot dump CMSSW stdout; perhaps CMSSW never executed (e.g.: scriptExe was set)?"
+        print("ERROR: Cannot dump CMSSW stdout; perhaps CMSSW never executed (e.g.: scriptExe was set)?")
         logCMSSWSaved = True
         open('logCMSSWSaved.txt', 'a').close()
         os.utime('logCMSSWSaved.txt', None)
@@ -316,36 +317,36 @@ def logCMSSW():
     maxLines    = keepAtStart + keepAtEnd
     numLines = sum(1 for line in open(outfile))
 
-    print "======== CMSSW OUTPUT STARTING ========"
-    print "NOTICE: lines longer than %s characters will be truncated" % maxLineLen
+    print("======== CMSSW OUTPUT STARTING ========")
+    print("NOTICE: lines longer than %s characters will be truncated" % maxLineLen)
 
     tooBig = numLines > maxLines
     if tooBig :
-        print "WARNING: CMSSW output more then %d lines; truncating to first %d and last %d" % (maxLines, keepAtStart, keepAtEnd)
-        print "Use 'crab getlog' to retrieve full output of this job from storage."
-        print "======================================="
+        print("WARNING: CMSSW output more then %d lines; truncating to first %d and last %d" % (maxLines, keepAtStart, keepAtEnd))
+        print("Use 'crab getlog' to retrieve full output of this job from storage.")
+        print("=======================================")
         with open(outfile) as fp:
             for nl, line in enumerate(fp):
                 if nl < keepAtStart:
                     printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
                 if nl == keepAtStart+1:
-                    print "== CMSSW: "
-                    print "== CMSSW: [...BIG SNIP...]"
-                    print "== CMSSW: "
+                    print("== CMSSW: ")
+                    print("== CMSSW: [...BIG SNIP...]")
+                    print("== CMSSW: ")
                 if numLines-nl <= keepAtEnd:
                     printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
     else:
         for line in open(outfile):
             printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
 
-    print "======== CMSSW OUTPUT FINSHING ========"
+    print("======== CMSSW OUTPUT FINSHING ========")
     logCMSSWSaved = True
     open('logCMSSWSaved.txt', 'a').close()
     os.utime('logCMSSWSaved.txt', None)
 
 def printCMSSWLine(line, lineLenLimit):
     """ Simple print auxiliary function that truncates lines"""
-    print line[:lineLenLimit]
+    print(line[:lineLenLimit])
 
 def handleException(exitAcronym, exitCode, exitMsg):
     #first save the traceback before it gets overwritten by other tracebacks (e.g.: wrong jobReport)
@@ -356,9 +357,9 @@ def handleException(exitAcronym, exitCode, exitMsg):
         if os.path.exists("jobReport.json"):
             report = json.load(open("jobReport.json"))
         else:
-            print "WARNING: WMCore did not produce a jobReport.json; FJR will not be useful."
+            print("WARNING: WMCore did not produce a jobReport.json; FJR will not be useful.")
     except:
-        print "WARNING: Unable to parse WMCore's jobReport.json; FJR will not be useful.\n", traceback.format_exc()
+        print("WARNING: Unable to parse WMCore's jobReport.json; FJR will not be useful.\n", traceback.format_exc())
 
     if report.get('steps', {}).get('cmsRun', {}).get('errors'):
         exitMsg += '\nCMSSW error message follows.\n'
@@ -368,7 +369,7 @@ def handleException(exitAcronym, exitCode, exitMsg):
                     exitCode = int(exitCode)
                     fjrExitCode = int(error['exitCode'])
                     if (fjrExitCode % 256 == exitCode) and (fjrExitCode != exitCode):
-                        print "NOTE: FJR has exit code %d and WMCore reports %d; preferring the FJR one." % (fjrExitCode, exitCode)
+                        print("NOTE: FJR has exit code %d and WMCore reports %d; preferring the FJR one." % (fjrExitCode, exitCode))
                         exitCode = fjrExitCode
                 except ValueError:
                     pass
@@ -378,19 +379,19 @@ def handleException(exitAcronym, exitCode, exitMsg):
     report['exitAcronym'] = exitAcronym
     report['exitCode'] = exitCode
     report['exitMsg'] = exitMsg
-    print "ERROR: Exceptional exit at %s (%s): %s" % (time.asctime(time.gmtime()), str(exitCode), str(exitMsg))
+    print("ERROR: Exceptional exit at %s (%s): %s" % (time.asctime(time.gmtime()), str(exitCode), str(exitMsg)))
     if not formatted_tb.startswith("None"):
-        print "ERROR: Traceback follows:\n", formatted_tb
+        print("ERROR: Traceback follows:\n", formatted_tb)
 
     try:
         slc = SiteLocalConfig.loadSiteLocalConfig()
         report['executed_site'] = slc.siteName
-        print "== Execution site for failed job from site-local-config.xml: %s" % slc.siteName
+        print("== Execution site for failed job from site-local-config.xml: %s" % slc.siteName)
     except:
-        print "ERROR: Failed to record execution site name in the FJR from the site-local-config.xml"
-        print traceback.format_exc()
+        print("ERROR: Failed to record execution site name in the FJR from the site-local-config.xml")
+        print(traceback.format_exc())
 
-    with open('jobReport.json','w') as of:
+    with open('jobReport.json', 'w') as of:
         json.dump(report, of)
     if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         stopDashboardMonitoring(ad)
@@ -470,31 +471,31 @@ def parseArgs():
     (opts, args) = parser.parse_args(sys.argv[1:])
 
     try:
-        print "==== Parameters Dump at %s ===" % time.asctime(time.gmtime())
-        print "archiveJob:    ", opts.archiveJob
-        print "runDir:        ", opts.runDir
-        print "sourceURL:     ", opts.sourceURL
-        print "jobNumber:     ", opts.jobNumber
-        print "cmsswVersion:  ", opts.cmsswVersion
-        print "scramArch:     ", opts.scramArch
-        print "inputFile      ", opts.inputFile
-        print "outFiles:      ", opts.outFiles
-        print "runAndLumis:   ", opts.runAndLumis
-        print "lheInputFiles: ", opts.lheInputFiles
-        print "firstEvent:    ", opts.firstEvent
-        print "firstLumi:     ", opts.firstLumi
-        print "eventsPerLumi: ", opts.eventsPerLumi
-        print "lastEvent:     ", opts.lastEvent
-        print "firstRun:      ", opts.firstRun
-        print "seeding:       ", opts.seeding
-        print "userFiles:     ", opts.userFiles
-        print "oneEventMode:  ", opts.oneEventMode
-        print "scriptExe:     ", opts.scriptExe
-        print "scriptArgs:    ", opts.scriptArgs
-        print "==================="
+        print("==== Parameters Dump at %s ===" % time.asctime(time.gmtime()))
+        print("archiveJob:    ", opts.archiveJob)
+        print("runDir:        ", opts.runDir)
+        print("sourceURL:     ", opts.sourceURL)
+        print("jobNumber:     ", opts.jobNumber)
+        print("cmsswVersion:  ", opts.cmsswVersion)
+        print("scramArch:     ", opts.scramArch)
+        print("inputFile      ", opts.inputFile)
+        print("outFiles:      ", opts.outFiles)
+        print("runAndLumis:   ", opts.runAndLumis)
+        print("lheInputFiles: ", opts.lheInputFiles)
+        print("firstEvent:    ", opts.firstEvent)
+        print("firstLumi:     ", opts.firstLumi)
+        print("eventsPerLumi: ", opts.eventsPerLumi)
+        print("lastEvent:     ", opts.lastEvent)
+        print("firstRun:      ", opts.firstRun)
+        print("seeding:       ", opts.seeding)
+        print("userFiles:     ", opts.userFiles)
+        print("oneEventMode:  ", opts.oneEventMode)
+        print("scriptExe:     ", opts.scriptExe)
+        print("scriptArgs:    ", opts.scriptArgs)
+        print("===================")
     except:
         type, value, traceBack = sys.exc_info()
-        print 'ERROR: missing parameters : %s - %s' % (type, value)
+        print('ERROR: missing parameters : %s - %s' % (type, value))
         handleException("FAILED", EC_MissingArg, 'CMSRunAnalysisERROR: missing parameters : %s - %s' % (type, value))
         mintime()
         sys.exit(EC_MissingArg)
@@ -504,17 +505,17 @@ def parseArgs():
 
 #TODO: MM I do not believe this is necessary at all
 def prepSandbox(opts):
-    print "==== Sandbox preparation STARTING at %s ====" % time.asctime(time.gmtime())
+    print("==== Sandbox preparation STARTING at %s ====" % time.asctime(time.gmtime()))
     os.environ['WMAGENTJOBDIR'] = os.getcwd()
     if opts.archiveJob and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         if os.path.exists(opts.archiveJob):
-            print "Sandbox %s already exists, skipping" % opts.archiveJob
+            print("Sandbox %s already exists, skipping" % opts.archiveJob)
         elif opts.sourceURL == 'LOCAL' and not os.path.exists(opts.archiveJob):
-            print "ERROR: Requested for condor to transfer the tarball, but it didn't show up"
+            print("ERROR: Requested for condor to transfer the tarball, but it didn't show up")
             handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: could not get jobO files from panda server')
             sys.exit(EC_WGET)
         else:
-            print "--- wget for jobO ---"
+            print("--- wget for jobO ---")
             output = commands.getoutput('wget -h')
             wgetCommand = 'wget'
             for line in output.split('\n'):
@@ -524,38 +525,38 @@ def prepSandbox(opts):
             com = '%s %s/cache/%s' % (wgetCommand, opts.sourceURL, opts.archiveJob)
             nTry = 3
             for iTry in range(nTry):
-                print 'Try : %s' % iTry
+                print('Try : %s' % iTry)
                 status, output = commands.getstatusoutput(com)
-                print output
+                print(output)
                 if status == 0:
                     break
                 if iTry+1 == nTry:
-                    print "ERROR : cound not get jobO files from panda server"
+                    print("ERROR : cound not get jobO files from panda server")
                     handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: could not get jobO files from panda server')
                     sys.exit(EC_WGET)
                 time.sleep(30)
-        print commands.getoutput('tar xvfzm %s' % opts.archiveJob)
-    print "==== Sandbox preparation FINISHING at %s ====" % time.asctime(time.gmtime())
+        print(commands.getoutput('tar xvfzm %s' % opts.archiveJob))
+    print("==== Sandbox preparation FINISHING at %s ====" % time.asctime(time.gmtime()))
 
     #move the pset in the right place
-    print "==== WMCore filesystem preparation STARTING at %s ====" % time.asctime(time.gmtime())
+    print("==== WMCore filesystem preparation STARTING at %s ====" % time.asctime(time.gmtime()))
     destDir = 'WMTaskSpace/cmsRun'
     if os.path.isdir(destDir):
         shutil.rmtree(destDir)
     os.makedirs(destDir)
     os.rename('PSet.py', destDir + '/PSet.py')
-    open('WMTaskSpace/__init__.py','w').close()
-    open(destDir + '/__init__.py','w').close()
+    open('WMTaskSpace/__init__.py', 'w').close()
+    open(destDir + '/__init__.py', 'w').close()
     #move the additional user files in the right place
     if opts.userFiles:
         for myfile in opts.userFiles.split(','):
             os.rename(myfile, destDir + '/' + myfile)
-    print "==== WMCore filesystem preparation FINISHING at %s ====" % time.asctime(time.gmtime())
+    print("==== WMCore filesystem preparation FINISHING at %s ====" % time.asctime(time.gmtime()))
 
 
 def extractUserSandbox(archiveJob, cmsswVersion):
     os.chdir(cmsswVersion)
-    print commands.getoutput('tar xvfzm %s ' % os.path.join('..', archiveJob))
+    print(commands.getoutput('tar xvfzm %s ' % os.path.join('..', archiveJob)))
     os.chdir('..')
 
 def getProv(filename, scram):
@@ -706,10 +707,10 @@ def AddChecksums(report):
                     fileInfo['pfn'] = fileInfo['fileName']
                 else:
                     continue
-            print "==== Checksum STARTING at %s ====" % time.asctime(time.gmtime())
-            print "== Filename: %s" % fileInfo['pfn']
+            print("==== Checksum STARTING at %s ====" % time.asctime(time.gmtime()))
+            print("== Filename: %s" % fileInfo['pfn'])
             (adler32, cksum) = calculateChecksums(fileInfo['pfn'])
-            print "==== Checksum FINISHING at %s ====" % time.asctime(time.gmtime())
+            print("==== Checksum FINISHING at %s ====" % time.asctime(time.gmtime()))
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
@@ -748,15 +749,15 @@ def AddPsetHash(report, scram):
                 continue
             if 'pfn' not in fileInfo:
                 continue
-            print "== Filename: %s" % fileInfo['pfn']
+            print("== Filename: %s" % fileInfo['pfn'])
             if not os.path.exists(fileInfo['pfn']):
-                print "== Output file missing!"
+                print("== Output file missing!")
                 continue
             m = re.match(r"^[A-Za-z0-9\-._]+$", fileInfo['pfn'])
             if not m:
-                print "== EDM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % fileInfo['pfn']
+                print("== EDM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % fileInfo['pfn'])
                 continue
-            print "==== PSet Hash lookup STARTING at %s ====" % time.asctime(time.gmtime())
+            print("==== PSet Hash lookup STARTING at %s ====" % time.asctime(time.gmtime()))
             lines = getProv(fileInfo['pfn'], scram)
             found_history = False
             matches = {}
@@ -773,15 +774,15 @@ def AddPsetHash(report, scram):
                      matches[depth] = pset_hash
                  else:
                      break
-            print "==== PSet Hash lookup FINISHED at %s ====" % time.asctime(time.gmtime())
+            print("==== PSet Hash lookup FINISHED at %s ====" % time.asctime(time.gmtime()))
             if matches:
                 max_depth = max(matches.keys())
                 pset_hash = matches[max_depth]
-                print "== edmProvDump pset hash %s" % pset_hash
+                print("== edmProvDump pset hash %s" % pset_hash)
                 fileInfo['pset_hash'] = pset_hash
             else:
-                print "ERROR: PSet Hash missing from edmProvDump output.  Full dump below."
-                print lines
+                print("ERROR: PSet Hash missing from edmProvDump output.  Full dump below.")
+                print(lines)
                 raise Exception("PSet hash missing from edmProvDump output.")
 
 
@@ -805,16 +806,16 @@ def StripReport(report):
 
 
 if __name__ == "__main__":
-    print "==== CMSRunAnalysis.py STARTING at %s ====" % time.asctime(time.gmtime())
-    print "Local time : %s" % time.ctime()
+    print("==== CMSRunAnalysis.py STARTING at %s ====" % time.asctime(time.gmtime()))
+    print("Local time : %s" % time.ctime())
     starttime = time.time()
 
     ad = {}
     try:
         ad = parseAd()
     except:
-        print "==== FAILURE WHEN PARSING HTCONDOR CLASSAD AT %s ====" % time.asctime(time.gmtime())
-        print traceback.format_exc()
+        print("==== FAILURE WHEN PARSING HTCONDOR CLASSAD AT %s ====" % time.asctime(time.gmtime()))
+        print(traceback.format_exc())
         ad = {}
     if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         dashboardId = earlyDashboardMonitoring(ad)
@@ -843,8 +844,8 @@ if __name__ == "__main__":
         # error and exit.
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             earlyDashboardFailure(ad)
-        print "==== FAILURE WHEN LOADING WMCORE AT %s ====" % time.asctime(time.gmtime())
-        print traceback.format_exc()
+        print("==== FAILURE WHEN LOADING WMCORE AT %s ====" % time.asctime(time.gmtime()))
+        print(traceback.format_exc())
         mintime()
         sys.exit(10043)
 
@@ -867,14 +868,14 @@ if __name__ == "__main__":
 
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             startDashboardMonitoring(ad)
-        print "==== CMSSW Stack Execution STARTING at %s ====" % time.asctime(time.gmtime())
+        print("==== CMSSW Stack Execution STARTING at %s ====" % time.asctime(time.gmtime()))
         scram = Scram(
             version = opts.cmsswVersion,
             directory = os.getcwd(),
             architecture = opts.scramArch,
             )
 
-        print "==== SCRAM Obj CREATED at %s ====" % time.asctime(time.gmtime())
+        print("==== SCRAM Obj CREATED at %s ====" % time.asctime(time.gmtime()))
         if scram.project() or scram.runtime(): #if any of the two commands fail...
             msg = scram.diagnostic()
             handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
@@ -886,21 +887,21 @@ if __name__ == "__main__":
         try:
             jobExitCode = None
             if opts.scriptExe=='None':
-                print "==== CMSSW JOB Execution started at %s ====" % time.asctime(time.gmtime())
+                print("==== CMSSW JOB Execution started at %s ====" % time.asctime(time.gmtime()))
                 cmssw = executeCMSSWStack(opts, scram)
                 jobExitCode = cmssw.step.execution.exitStatus
             else:
-                print "==== ScriptEXE Execution started at %s ====" % time.asctime(time.gmtime())
+                print("==== ScriptEXE Execution started at %s ====" % time.asctime(time.gmtime()))
                 jobExitCode = executeScriptExe(opts, scram)
         except:
-            print "==== CMSSW Stack Execution FAILED at %s ====" % time.asctime(time.gmtime())
+            print("==== CMSSW Stack Execution FAILED at %s ====" % time.asctime(time.gmtime()))
             logCMSSW()
             raise
-        print "Job exit code: %s" % str(jobExitCode)
-        print "==== CMSSW Stack Execution FINISHING at %s ====" % time.asctime(time.gmtime())
+        print("Job exit code: %s" % str(jobExitCode))
+        print("==== CMSSW Stack Execution FINISHING at %s ====" % time.asctime(time.gmtime()))
         logCMSSW()
     except WMExecutionFailure as WMex:
-        print "ERROR: Caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail)
+        print("ERROR: Caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail))
         exmsg = WMex.name
 
         # Try to recover what we can from the FJR.  handleException will use this if possible.
@@ -915,11 +916,11 @@ if __name__ == "__main__":
                 report = report.__to_json__(None)
                 StripReport(report)
                 report['jobExitCode'] = jobExitCode
-                with open('jobReport.json','w') as of:
+                with open('jobReport.json', 'w') as of:
                     json.dump(report, of)
             except:
-                print "WARNING: Failure when trying to parse FJR XML after job failure.  Traceback follows."
-                print traceback.format_exc()
+                print("WARNING: Failure when trying to parse FJR XML after job failure.  Traceback follows.")
+                print(traceback.format_exc())
 
         handleException("FAILED", WMex.code, exmsg)
         mintime()
@@ -932,7 +933,7 @@ if __name__ == "__main__":
 
     #Create the report file
     try:
-        print "==== Report file creation STARTING at %s ====" % time.asctime(time.gmtime())
+        print("==== Report file creation STARTING at %s ====" % time.asctime(time.gmtime()))
         report = Report("cmsRun")
         report.parse('FrameworkJobReport.xml', "cmsRun")
         jobExitCode = report.getExitCode()
@@ -966,14 +967,14 @@ if __name__ == "__main__":
         report['executed_site'] = slc.siteName
         if 'phedex-node' in slc.localStageOut:
             report['phedex_node'] = slc.localStageOut['phedex-node']
-        print "== Execution site from site-local-config.xml: %s" % slc.siteName
-        with open('jobReport.json','w') as of:
+        print("== Execution site from site-local-config.xml: %s" % slc.siteName)
+        with open('jobReport.json', 'w') as of:
             json.dump(report, of)
-        with open('jobReportExtract.pickle','w') as of:
+        with open('jobReportExtract.pickle', 'w') as of:
             pickle.dump(report, of)
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             stopDashboardMonitoring(ad)
-        print "==== Report file creation FINISHING at %s ====" % time.asctime(time.gmtime())
+        print("==== Report file creation FINISHING at %s ====" % time.asctime(time.gmtime()))
     except FwkJobReportException as FJRex:
         msg = "BadFWJRXML"
         handleException("FAILED", EC_ReportHandlingErr, msg)
@@ -999,6 +1000,6 @@ if __name__ == "__main__":
     else:
         mintime()
 
-    print "==== CMSRunAnalysis.py FINISHING at %s ====" % time.asctime(time.gmtime())
-    print "Local time : %s" % time.ctime()
+    print("==== CMSRunAnalysis.py FINISHING at %s ====" % time.asctime(time.gmtime()))
+    print("Local time : %s" % time.ctime())
     sys.exit(jobExitCode)

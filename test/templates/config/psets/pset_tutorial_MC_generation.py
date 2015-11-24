@@ -127,4 +127,4 @@ process.schedule = cms.Schedule(
 
 # Filter all path with the production filter sequence
 for path in process.paths:
-    getattr(process,path)._seq = process.generator * getattr(process,path)._seq
+    getattr(process, path)._seq = process.generator * getattr(process, path)._seq

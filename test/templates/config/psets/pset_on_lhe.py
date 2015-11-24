@@ -1,7 +1,7 @@
 # Auto generated configuration file
-# using: 
-# Revision: 1.381.2.28 
-# Source: /local/reps/CMSSW/CMSSW/Configuration/PyReleaseValidation/python/ConfigBuilder.py,v 
+# using:
+# Revision: 1.381.2.28
+# Source: /local/reps/CMSSW/CMSSW/Configuration/PyReleaseValidation/python/ConfigBuilder.py,v
 # with command line options: Configuration/Generator/python/testfxfx.py -s GEN --eventcontent=AODSIM --conditions auto:mc --no_exec -n -1 --filein=file:../dynlo.lhe
 import FWCore.ParameterSet.Config as cms
 
@@ -70,45 +70,45 @@ process.generator = cms.EDFilter("Pythia8HadronizerFilter",
     comEnergy = cms.double(13000.0),
     maxEventsToPrint = cms.untracked.int32(1),
     PythiaParameters = cms.PSet(
-        pythia8CommonSettings = cms.vstring('Main:timesAllowErrors = 10000', 
-            'Check:epTolErr = 0.01', 
-            'SLHA:keepSM = on', 
-            'SLHA:minMassSM = 1000.', 
-            'ParticleDecays:limitTau0 = on', 
-            'ParticleDecays:tau0Max = 10', 
+        pythia8CommonSettings = cms.vstring('Main:timesAllowErrors = 10000',
+            'Check:epTolErr = 0.01',
+            'SLHA:keepSM = on',
+            'SLHA:minMassSM = 1000.',
+            'ParticleDecays:limitTau0 = on',
+            'ParticleDecays:tau0Max = 10',
             'ParticleDecays:allowPhotonRadiation = on'),
-        pythia8CUEP8M1Settings = cms.vstring('Tune:pp 14', 
-            'Tune:ee 7', 
-            'MultipartonInteractions:pT0Ref=2.4024', 
-            'MultipartonInteractions:ecmPow=2.5208', 
+        pythia8CUEP8M1Settings = cms.vstring('Tune:pp 14',
+            'Tune:ee 7',
+            'MultipartonInteractions:pT0Ref=2.4024',
+            'MultipartonInteractions:ecmPow=2.5208',
             'MultipartonInteractions:expPow=1.6'),
-        pythia8aMCatNLOSettings = cms.vstring('SpaceShower:pTmaxMatch = 1', 
-            'SpaceShower:pTmaxFudge = 1', 
-            'SpaceShower:MEcorrections = off', 
-            'TimeShower:pTmaxMatch = 1', 
-            'TimeShower:pTmaxFudge = 1', 
-            'TimeShower:MEcorrections = off', 
-            'TimeShower:globalRecoil = on', 
-            'TimeShower:limitPTmaxGlobal = on', 
-            'TimeShower:nMaxGlobalRecoil = 1', 
-            'TimeShower:globalRecoilMode = 2', 
+        pythia8aMCatNLOSettings = cms.vstring('SpaceShower:pTmaxMatch = 1',
+            'SpaceShower:pTmaxFudge = 1',
+            'SpaceShower:MEcorrections = off',
+            'TimeShower:pTmaxMatch = 1',
+            'TimeShower:pTmaxFudge = 1',
+            'TimeShower:MEcorrections = off',
+            'TimeShower:globalRecoil = on',
+            'TimeShower:limitPTmaxGlobal = on',
+            'TimeShower:nMaxGlobalRecoil = 1',
+            'TimeShower:globalRecoilMode = 2',
             'TimeShower:nMaxGlobalBranch = 1'),
-        processParameters = cms.vstring('JetMatching:setMad = off', 
-            'JetMatching:scheme = 1', 
-            'JetMatching:merge = on', 
-            'JetMatching:jetAlgorithm = 2', 
-            'JetMatching:etaJetMax = 999.', 
-            'JetMatching:coneRadius = 1.', 
-            'JetMatching:slowJetPower = 1', 
-            'JetMatching:qCut = 30.', 
-            'JetMatching:doFxFx = on', 
-            'JetMatching:qCutME = 10.', 
-            'JetMatching:nQmatch = 5', 
-            'TimeShower:nPartonsInBorn = 2', 
+        processParameters = cms.vstring('JetMatching:setMad = off',
+            'JetMatching:scheme = 1',
+            'JetMatching:merge = on',
+            'JetMatching:jetAlgorithm = 2',
+            'JetMatching:etaJetMax = 999.',
+            'JetMatching:coneRadius = 1.',
+            'JetMatching:slowJetPower = 1',
+            'JetMatching:qCut = 30.',
+            'JetMatching:doFxFx = on',
+            'JetMatching:qCutME = 10.',
+            'JetMatching:nQmatch = 5',
+            'TimeShower:nPartonsInBorn = 2',
             'JetMatching:nJetMax = 2'),
-        parameterSets = cms.vstring('pythia8CommonSettings', 
-            'pythia8CUEP8M1Settings', 
-            'pythia8aMCatNLOSettings', 
+        parameterSets = cms.vstring('pythia8CommonSettings',
+            'pythia8CUEP8M1Settings',
+            'pythia8aMCatNLOSettings',
             'processParameters')
     )
 )
@@ -121,8 +121,8 @@ process.endjob_step = cms.EndPath(process.endOfProcess)
 process.AODSIMoutput_step = cms.EndPath(process.AODSIMoutput)
 
 # Schedule definition
-process.schedule = cms.Schedule(process.generation_step,process.genfiltersummary_step,process.endjob_step,process.AODSIMoutput_step)
+process.schedule = cms.Schedule(process.generation_step, process.genfiltersummary_step, process.endjob_step, process.AODSIMoutput_step)
 # filter all path with the production filter sequence
 for path in process.paths:
-	getattr(process,path)._seq = process.generator * getattr(process,path)._seq 
+	getattr(process, path)._seq = process.generator * getattr(process, path)._seq
 

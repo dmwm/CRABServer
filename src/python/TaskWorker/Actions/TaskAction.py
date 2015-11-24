@@ -13,9 +13,9 @@ class TaskAction(object):
     def __init__(self, config, server = '', resturi = '', procnum = -1):
         self.logger = logging.getLogger(str(procnum))
         self.config = config
-        self.jobtypeMapper = {'Analysis'  : 'Processing',
-                              'PrivateMC' : 'Production',
-                              'Generic'   : 'Generic',
+        self.jobtypeMapper = {'Analysis': 'Processing',
+                              'PrivateMC': 'Production',
+                              'Generic': 'Generic',
                              }
         self.server = server
 #        self.resturl = resturi #backward compatibility
@@ -28,7 +28,7 @@ class TaskAction(object):
         self.resturi = resturi # everything new should use self.resturi and not self.resturl.
         ## Since 90% of the calls are toward workflowdb the URI default to that REST api
         ## However we are saving the base uri in case the API is different
-        self.restURInoAPI = resturi.rsplit('/',1)[0] ## That's like '/crabserver/prod'
+        self.restURInoAPI = resturi.rsplit('/', 1)[0] ## That's like '/crabserver/prod'
         if server: ## When testing, the server can be None.
             self.backendurls = self.server.get(self.restURInoAPI + '/info', data = {'subresource': 'backendurls'})[0]['result'][0]
 

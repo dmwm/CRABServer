@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import logging
 import cherrypy
 from commands import getstatusoutput
@@ -9,7 +10,7 @@ from WMCore.REST.Format import JSONFormat
 from WMCore.REST.Error import ExecutionError
 
 # CRABServer dependecies here
-import Utils
+from . import Utils
 from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTTask import RESTTask
 from CRABInterface.RESTCampaign import RESTCampaign

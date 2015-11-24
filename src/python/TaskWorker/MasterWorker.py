@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #external dependencies
+from __future__ import print_function
 import os
 import time
 import urllib
@@ -75,8 +76,8 @@ class MasterWorker(object):
                 os.mkdir(dirname)
             except OSError as ose:
                 if ose.errno != 17: #ignore the "Directory already exists error"
-                    print str(ose)
-                    print "The task worker need to access the '%s' directory" % dirname
+                    print(str(ose))
+                    print("The task worker need to access the '%s' directory" % dirname)
                     sys.exit(1)
 
 
@@ -231,7 +232,7 @@ class MasterWorker(object):
                 if int(hte.headers.get('X-Error-Http', '0')) == 503:
                     #503 - Database/Service unavailable. Maybe Intervention of CMSWEB ongoing?
                     retry = True
-                    time_sleep = 30 + random.randint(10,30)
+                    time_sleep = 30 + random.randint(10, 30)
                     self.logger.info("Sleeping %s seconds and will try to update again." % str(time_sleep))
                     time.sleep(time_sleep)
             except Exception as exc:

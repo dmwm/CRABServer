@@ -44,6 +44,7 @@ Note that the parameters must be either integers(32 bits) or doubles(64 bits).
 Sending strings is supported, but they will not be stored in the
 farm's store nor shown in the farm's window in the MonALISA client.
 """
+from __future__ import absolute_import
 
 import re
 import xdrlib
@@ -52,8 +53,8 @@ import struct
 import StringIO
 import threading
 import time
-import Logger
-import ProcInfo
+from . import Logger
+from . import ProcInfo
 import random
 import copy
 
@@ -178,7 +179,7 @@ class ApMon:
 		self.performBgMonitoring = True     # by default, perform background monitoring
 		self.monitoredJobs = {}	            # Monitored jobs; key = pid; value = hash with
 		self.maxMsgRate = 100		    # Maximum number of messages allowed to be sent per second
-		self.__defaultSenderRef = {'INSTANCE_ID': random.randint(0,0x7FFFFFFE), 'SEQ_NR': 0};
+		self.__defaultSenderRef = {'INSTANCE_ID': random.randint(0, 0x7FFFFFFE), 'SEQ_NR': 0};
 		self.__defaultUserCluster = "ApMon_UserSend";
 		self.__defaultUserNode = socket.getfqdn();
 		self.__defaultSysMonCluster = "ApMon_SysMon";
@@ -384,22 +385,22 @@ class ApMon:
 		"""
 		Set the destinations of the ApMon instance. It accepts the same parameters as the constructor.
 		"""
-		if type(initValue) == type("string"):
+		if isinstance(initValue, type("string")):
 			self.configAddresses = [initValue]
 			self.configRecheck = True
 			self.configRecheckInterval = 600
 			self.__reloadAddresses()
-		elif type(initValue) == type([]):
+		elif isinstance(initValue, type([])):
 			self.configAddresses = initValue
 			self.configRecheck = True
 			self.configRecheckInterval = 600
 			self.__reloadAddresses()
-		elif type(initValue) == type(()):
+		elif isinstance(initValue, type(())):
 			self.configAddresses = []
 			for dest in initValue:
 				self.__addDestination (dest, self.destinations)
 			self.configRecheck = False
-		elif type(initValue) == type({}):
+		elif isinstance(initValue, type({})):
 			self.configAddresses = []
 			for dest, opts in initValue.items():
 				self.__addDestination (dest, self.destinations, opts)
@@ -457,7 +458,7 @@ class ApMon:
 				break
 			if self.configRecheck:
 				self.__reloadAddresses()
-				self.logger.log(Logger.DEBUG, "Config reloaded. Seleeping for "+`self.configRecheckInterval`+" sec.");
+				self.logger.log(Logger.DEBUG, "Config reloaded. Seleeping for "+repr(self.configRecheckInterval)+" sec.");
 		self.__configUpdateFinished.set();
 
 	def __reloadAddresses(self):
@@ -505,7 +506,7 @@ class ApMon:
 				host = aDestination.strip()
 				passwd = ""
 		if (not port.isdigit()):
-			self.logger.log(Logger.WARNING, "Bad value for port number "+`port`+" in "+aDestination+" destination");
+			self.logger.log(Logger.WARNING, "Bad value for port number "+repr(port)+" in "+aDestination+" destination");
 			return
 		alreadyAdded = False
 		port = int(port)
@@ -520,19 +521,19 @@ class ApMon:
 				break
 		destination = (host, port, passwd)
 		if not alreadyAdded:
-			self.logger.log(Logger.INFO, "Adding destination "+host+':'+`port`+' '+passwd)
-			if(self.destinations.has_key(destination)):
+			self.logger.log(Logger.INFO, "Adding destination "+host+':'+repr(port)+' '+passwd)
+			if(destination in self.destinations):
 				tempDestinations[destination] = self.destinations[destination]  # reuse previous options
 			else:
 				tempDestinations[destination] = copy.deepcopy(self.__defaultOptions)  # have a different set of options for each dest
-			if not self.destPrevData.has_key(destination):
+			if destination not in self.destPrevData:
 				self.destPrevData[destination] = {}	# set it empty only if it's really new
-			if not self.senderRef.has_key(destination):
+			if destination not in self.senderRef:
 				self.senderRef[destination] = copy.deepcopy(self.__defaultSenderRef) # otherwise, don't reset this nr.
 			if options != self.__defaultOptions:
 				# we have to overwrite defaults with given options
 				for key, value in options.items():
-					self.logger.log(Logger.NOTICE, "Overwritting option: "+key+" = "+`value`)
+					self.logger.log(Logger.NOTICE, "Overwritting option: "+key+" = "+repr(value))
 					tempDestinations[destination][key] = value
 		else:
 			self.logger.log(Logger.NOTICE, "Destination "+host+":"+str(port)+" "+passwd+" already added. Skipping it");
@@ -719,11 +720,11 @@ class ApMon:
 		sent_params_nr = 0
 		paramsPacker = xdrlib.Packer ()
 		
-		if type(params) == type( {} ):
+		if isinstance(params, type( {} )):
 			for name, value in params.iteritems():
 				if self.__packParameter(paramsPacker, name, value):
 					sent_params_nr += 1
-		elif type(params) == type( [] ):
+		elif isinstance(params, type( [] )):
 			for name, value in params:
 				self.logger.log(Logger.DEBUG, "Adding parameter "+name+" = "+str(value));
 				if self.__packParameter(paramsPacker, name, value):
@@ -794,7 +795,7 @@ class ApMon:
 		level = self.maxMsgRate - self.maxMsgRate / 10; 
 	
 		if valSent > (self.maxMsgRate - level) :
-			if random.randint(0,self.maxMsgRate / 10) >= (self.maxMsgRate - valSent):
+			if random.randint(0, self.maxMsgRate / 10) >= (self.maxMsgRate - valSent):
 				doSend = False;
 	
 		# counting sent and dropped messages

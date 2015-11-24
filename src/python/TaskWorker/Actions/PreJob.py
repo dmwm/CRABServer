@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import sys
 import time
@@ -134,9 +135,9 @@ class PreJob:
         if not self.task_ad:
             return
         params = {'tool': 'crab3',
-                  'SubmissionType':'crab3',
+                  'SubmissionType': 'crab3',
                   'JSToolVersion': '3.3.0',
-                  'tool_ui': os.environ.get('HOSTNAME',''),
+                  'tool_ui': os.environ.get('HOSTNAME', ''),
                   'scheduler': 'GLIDEIN',
                   'GridName': self.task_ad['CRAB_UserDN'],
                   'ApplicationVersion': self.task_ad['CRAB_JobSW'],
@@ -150,7 +151,7 @@ class PreJob:
                   'exe': 'cmsRun',
                   'broker': self.backend,
                   'bossId': str(self.job_id),
-                  'localId' : '',
+                  'localId': '',
                   'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (self.job_id, self.task_ad['CRAB_ReqName'].replace("_", ":")),
                  }
 
@@ -174,7 +175,7 @@ class PreJob:
         elif userWebDir:
             setDashboardLogs(params, userWebDir, self.job_id, crab_retry)
         else:
-            print "Not setting dashboard logfiles as I cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx."
+            print("Not setting dashboard logfiles as I cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx.")
 
         insertJobIdSid(params, self.job_id, self.task_ad['CRAB_ReqName'], crab_retry)
         apmon = ApmonIf()
@@ -496,11 +497,11 @@ class PreJob:
                 logpath = os.getcwd()
         ## Create (open) the pre-job log file prejob.<job_id>.<crab_retry>.txt.
         prejob_log_file_name = os.path.join(logpath, "prejob.%d.%d.txt" % (self.job_id, crab_retry))
-        fd_prejob_log = os.open(prejob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0644)
-        os.chmod(prejob_log_file_name, 0644)
+        fd_prejob_log = os.open(prejob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
+        os.chmod(prejob_log_file_name, 0o644)
         ## Redirect stdout and stderr to the pre-job log file.
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
-            print "Pre-job started with no output redirection."
+            print("Pre-job started with no output redirection.")
         else:
             os.dup2(fd_prejob_log, 1)
             os.dup2(fd_prejob_log, 2)

@@ -82,8 +82,8 @@ if helper:
             h = fake_authz_headers(RT.test_authz_key.data) + [("Accept", fmt)]
             self.getPage(page + '?workflow', headers=h, method="GET", body=inbody)
             self.assertStatus("400 Bad Request")
-            self.assertHeader("X-Error-Http","400")
-            self.assertHeader("X-Error-Detail","Invalid input parameter")
+            self.assertHeader("X-Error-Http", "400")
+            self.assertHeader("X-Error-Detail", "Invalid input parameter")
 
         def test_worklow_invalid_param(self, fmt = 'application/json', page = "/test/workflow", inbody=None):
             """Try getting workflow with some extra invalid parameter provided"""
@@ -108,7 +108,7 @@ if helper:
             """Try submitting job with invalid parameter ONLY """
 
             h = fake_authz_headers(RT.test_authz_key.data) + [("Accept", fmt)]
-            self.getPage(page + '?invalid=x',headers=h, method="GET", body=inbody)
+            self.getPage(page + '?invalid=x', headers=h, method="GET", body=inbody)
             self.assertStatus("400 Bad Request")
             self.assertHeader("X-Error-Http", "400")
             self.assertHeader("X-Error-Detail", "Invalid input parameter")
