@@ -8,9 +8,11 @@ from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.WorkQueue.WorkQueueUtils import get_dbs
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
-from TaskWorker.WorkerExceptions import TaskWorkerException
 
+from ServerUtilities import FEEDBACKMAIL
+from TaskWorker.WorkerExceptions import TaskWorkerException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
+
 
 class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service.
@@ -84,18 +86,24 @@ class DBSDataDiscovery(DataDiscovery):
             os.environ['X509_USER_KEY'] = old_key_val
         else:
             del os.environ['X509_USER_KEY']
+
         self.logger.debug("Data discovery through %s for %s" %(self.dbs, kwargs['task']['tm_taskname']))
-        self.checkDatasetStatus(kwargs['task']['tm_input_dataset'], kwargs)
+
+        inputDataset = kwargs['task']['tm_input_dataset']
+
+        self.checkDatasetStatus(inputDataset, kwargs)
+
         try:
             # Get the list of blocks for the locations and then call dls.
             # The WMCore DBS3 implementation makes one call to dls for each block
             # with locations = True so we are using locations=False and looking up location later
-            blocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(kwargs['task']['tm_input_dataset'], locations=False)]
+            blocks = [x['Name'] for x in self.dbs.getFileBlocksInfo(inputDataset, locations=False)]
         except DBSReaderError as dbsexc:
             #dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
-                raise TaskWorkerException("The CRAB3 server backend could not find dataset %s in this DBS instance: %s" % (kwargs['task']['tm_input_dataset'], dbsurl))
+                raise TaskWorkerException("The CRAB3 server backend could not find dataset %s in this DBS instance: %s" % (inputDataset, dbsurl))
             raise
+
         ## Create a map for block's locations: for each block get the list of locations.
         ## Note: listFileBlockLocation() gets first the locations from PhEDEx, and if no
         ## locations are found it gets the original locations from DBS. So it should
@@ -104,58 +112,132 @@ class DBSDataDiscovery(DataDiscovery):
             locationsMap = self.dbs.listFileBlockLocation(list(blocks), phedexNodes=True)
         except Exception as ex: #TODO should we catch HttpException instead?
             self.logger.exception(ex)
-            raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
-                                "This is could be a temporary phedex/dbs glitch, please try to submit a new task (resubmit will not work)"+\
-                                " and contact the experts if the error persists.\nError reason: %s" % str(ex))
+            msg  = "The CRAB3 server backend could not contact DBS/PhEDEx to get the locations of the files in the input dataset."
+            msg += " This could be a temporary DBS/PhEDEx glitch."
+            msg += " Please wait a minute and try to resubmit the task."
+            msg += " If the error persists, report the issue at %s." % (FEEDBACKMAIL)
+            msg += "\nError reason: %s" % (str(ex))
+            raise TaskWorkerException(msg)
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
-            msg = "Task could not be submitted because there is no DISK replica for dataset %s ." % (kwargs['task']['tm_input_dataset'])
-            msg += " Please, check DAS, https://cmsweb.cern.ch/das, and make sure the dataset is accessible on DISK"
+            msg = "Task could not be submitted, because there is no DISK replica for dataset %s ." % (inputDataset)
+            msg += " Please, check DAS, https://cmsweb.cern.ch/das, and make sure the dataset is accessible on DISK."
             msg += " You might want to contact your physics group if you need a disk replica."
             if self.otherLocations:
                 msg += "\nN.B.: your dataset is stored at %s, but those are TAPE locations." % ','.join(sorted(self.otherLocations))
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
+
+        ## Get detailed information about the files in the input dataset.
         try:
-            filedetails = self.dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], getParents=True, validFileOnly=0)
-
-            secondary = kwargs['task'].get('tm_secondary_input_dataset', None)
-            if secondary:
-                moredetails = self.dbs.listDatasetFileDetails(secondary, getParents=False, validFileOnly=0)
-
-                for secfilename, secinfos in moredetails.items():
-                    secinfos['lumiobj'] = LumiList(runsAndLumis=secinfos['Lumis'])
-
-                self.logger.info("Beginning to match files from secondary dataset")
-                for filename, infos in filedetails.items():
-                    infos['Parents'] = []
-                    lumis = LumiList(runsAndLumis=infos['Lumis'])
-                    for secfilename, secinfos in moredetails.items():
-                        if (lumis & secinfos['lumiobj']):
-                            infos['Parents'].append(secfilename)
-                self.logger.info("Done matching files from secondary dataset")
-                kwargs['task']['tm_use_parent'] = 1
+            inputFilesDetails = self.dbs.listDatasetFileDetails(inputDataset, getParents=True, validFileOnly=0)
         except Exception as ex: #TODO should we catch HttpException instead?
             self.logger.exception(ex)
-            raise TaskWorkerException("The CRAB3 server backend could not contact DBS to get the files details (Lumis, events, etc).\n"+\
-                                "This is could be a temporary DBS glitch. Please try to submit a new task (resubmit will not work)"+\
-                                " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
-        if not filedetails:
-            raise TaskWorkerException(("Cannot find any file inside the dataset. Please, check your dataset in DAS, %s.\n"
-                                      "Aborting submission. Resubmitting your task will not help.") %
-                                      ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
-                                      (self.dbsInstance, kwargs['task']['tm_input_dataset']))
+            msg  = "The CRAB3 server backend could not contact DBS to get detailed information of files in the input dataset."
+            msg += " This could be a temporary DBS glitch."
+            msg += " Please wait a minute and try to resubmit the task."
+            msg += " If the error persists, report the issue at %s." % (FEEDBACKMAIL)
+            msg += "\nError reason: %s" % (str(ex))
+            raise TaskWorkerException(msg) #TODO addo the nodes phedex so the user can check themselves
+        if not inputFilesDetails:
+            msg  = "Cannot find any file inside the input dataset."
+            msg += " Please check the dataset in DAS: %s." \
+                 % (("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") % (self.dbsInstance, inputDataset))
+            msg += "\nAborting submission. Resubmission will not help."
+            raise TaskWorkerException(msg)
+
+        ## If the task needs the parent files of the input files, get here the lumis of
+        ## the parent files so that after job splitting we can filter out parent files
+        ## that have no lumis in common with the input files.
+        if kwargs['task']['tm_use_parent'] == 1:
+            validInputFilesLFNs = [lfn for lfn in inputFilesDetails if inputFilesDetails[lfn].get('ValidFile', True)]
+            ## Get the details of the parent files of valid input files.
+            parentFilesDetails = {}
+            for blockName in blocks:
+                try:
+                    inputFilesInBlockInfo = self.dbs.listFilesInBlockWithParents(blockName, lumis=True, validFileOnly=0)
+                except Exception as ex: #TODO should we catch HttpException instead?
+                    self.logger.exception(ex)
+                    msg  = "The CRAB3 server backend could not contact DBS to get detailed information about the parents of files in block %s of the input dataset." % (blockName)
+                    msg += " This could be a temporary DBS glitch."
+                    msg += " Please wait a minute and try to resubmit the task."
+                    msg += " If the error persists, report the issue at %s." % (FEEDBACKMAIL)
+                    msg += "\nError reason: %s" % (str(ex))
+                    raise TaskWorkerException(msg)
+                for inputFileInfo in inputFilesInBlockInfo:
+                    if inputFileInfo['logical_file_name'] not in validInputFilesLFNs:
+                        continue
+                    parentFilesDetails[inputFileInfo['logical_file_name']] = inputFileInfo['ParentList']
+            ## Check that we got parent files details for all the valid input files in the
+            ## the reference list 'validInputFilesLFNs' (derived from 'inputFilesDetails').
+            missing = list(set(validInputFilesLFNs) - set(parentFilesDetails))
+            if missing:
+                msg = "Could not get detailed information for the parents of the following input files: %s" % (missing)
+                raise TaskWorkerException(msg)
+            ## For each (valid) input file:
+            for inputFileLFN, parentFilesInfo in parentFilesDetails.iteritems():
+                ## Check that we got the details of all its parent files.
+                missing = list(set(inputFilesDetails[inputFileLFN]['Parents']) - set(map(lambda x: x['logical_file_name'], parentFilesInfo)))
+                if missing:
+                    msg = "Could not get detailed information for the following parents files of input file %s: %s" % (inputFileLFN, missing)
+                    raise TaskWorkerException(msg)
+                ## Get and save the lumis of each parent file.
+                inputFilesDetails[inputFileLFN]['ParentsLumis'] = {}
+                for parentInfo in parentFilesInfo:
+                    if parentInfo['logical_file_name'] not in inputFilesDetails[inputFileLFN]['Parents']:
+                        continue
+                    parentLumis = {}
+                    for run, lumis in map(lambda x: (x['RunNumber'], x['LumiSectionNumber']), parentInfo['LumiList']):
+                        parentLumis.setdefault(run, []).extend(lumis)
+                    parentLumis = LumiList(runsAndLumis=parentLumis)
+                    inputFilesDetails[inputFileLFN]['ParentsLumis'][parentInfo['logical_file_name']] = parentLumis.getCompactList()
+
+        secondaryInputDataset = kwargs['task']['tm_secondary_input_dataset']
+        if secondaryInputDataset:
+            ## Get detailed information about the files in the secondary input dataset.
+            try:
+                secondaryInputFilesDetails = self.dbs.listDatasetFileDetails(secondaryInputDataset, getParents=False, validFileOnly=0)
+            except Exception as ex: #TODO should we catch HttpException instead?
+                self.logger.exception(ex)
+                msg  = "The CRAB3 server backend could not contact DBS to get detailed information of files in the secondary input dataset."
+                msg += " This could be a temporary DBS glitch."
+                msg += " Please wait a minute and try to resubmit the task."
+                msg += " If the error persists, report the issue at %s." % (FEEDBACKMAIL)
+                msg += "\nError reason: %s" % (str(ex))
+                raise TaskWorkerException(msg) #TODO addo the nodes phedex so the user can check themselves
+            if not secondaryInputFilesDetails:
+                msg  = "Cannot find any file inside the secondary input dataset."
+                msg += " Please check the dataset in DAS: %s." \
+                     % (("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") % (self.dbsInstance, secondaryInputDataset))
+                msg += "\nAborting submission. Resubmission will not help."
+                raise TaskWorkerException(msg)
+
+            for secfilename, secinfos in secondaryInputFilesDetails.items():
+                secinfos['lumiobj'] = LumiList(runsAndLumis=secinfos['Lumis'])
+
+            self.logger.info("Beginning to match files from secondary dataset")
+            for filename, infos in inputFilesDetails.items():
+                infos['Parents'] = []
+                infos['ParentsLumis'] = {}
+                lumis = LumiList(runsAndLumis=infos['Lumis'])
+                for secfilename, secinfos in secondaryInputFilesDetails.items():
+                    if (lumis & secinfos['lumiobj']):
+                        infos['Parents'].append(secfilename)
+                        infos['ParentsLumis'][secfilename] = secinfos['lumiobj'].getCompactList()
+            self.logger.info("Done matching files from secondary dataset")
+            kwargs['task']['tm_use_parent'] = 1
 
         ## Format the output creating the data structures required by wmcore. Filters out invalid files,
         ## files whose block has no location, and figures out the PSN
-        result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'], datasetfiles = filedetails, locations = locationsMap)
+        result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'], datasetfiles = inputFilesDetails, locations = locationsMap)
 
         if not result.result:
-            raise TaskWorkerException(("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, %s.\n"
-                                      "Aborting submission. Resubmitting your task will not help.") %
-                                      ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
-                                      (self.dbsInstance, kwargs['task']['tm_input_dataset']))
+            msg  = "Cannot find any valid file inside the input dataset."
+            msg += " Please check the dataset in DAS: %s." \
+                 % (("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") % (self.dbsInstance, inputDataset))
+            msg += "\nAborting submission. Resubmission will not help."
+            raise TaskWorkerException(msg)
 
         self.logger.debug("Got %s files" % len(result.result.getFiles()))
         return result

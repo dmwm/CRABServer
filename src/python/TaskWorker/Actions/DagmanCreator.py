@@ -25,6 +25,7 @@ from ServerUtilities import insertJobIdSid
 import WMCore.WMSpec.WMTask
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 import WMCore.Services.SiteDB.SiteDB as SiteDB
+from WMCore.DataStructs.LumiList import LumiList
 
 import classad
 
@@ -468,16 +469,19 @@ class DagmanCreator(TaskAction.TaskAction):
         lastDirectDest = None
         lastDirectPfn = None
         for job in jobgroup.getJobs():
-            if task['tm_use_parent'] == 1:
-                inputFiles = json.dumps([
-                    {
-                        'lfn': inputfile['lfn'],
-                        'parents': [{'lfn': parentfile} for parentfile in inputfile['parents']]
-                    }
-                    for inputfile in job['input_files']
-                ])
-            else:
-                inputFiles = json.dumps([inputfile['lfn'] for inputfile in job['input_files']])
+            jobRunsLumis = LumiList(compactList=job['mask']['runAndLumis'])
+            inputFiles = []
+            for inputfile in job['input_files']:
+                if task['tm_use_parent'] == 1:
+                    parents = []
+                    for parentfile in inputfile['parents']:
+                        parentRunsLumis = LumiList(compactList=inputfile.get('parentslumis', {}).get(parentfile, {}))
+                        if not jobRunsLumis or not parentRunsLumis or (jobRunsLumis & parentRunsLumis):
+                            parents.append({'lfn': parentfile})
+                    inputFiles.append({'lfn': inputfile['lfn'], 'parents': parents})
+                else:
+                    inputFiles.append(inputfile['lfn'])
+            inputFiles = json.dumps(inputFiles)
             runAndLumiMask = json.dumps(job['mask']['runAndLumis'])
             firstEvent = str(job['mask']['FirstEvent'])
             lastEvent = str(job['mask']['LastEvent'])

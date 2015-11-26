@@ -89,6 +89,7 @@ class DataDiscovery(TaskAction):
                 for lumi in lumis:
                     uniquelumis.add((run, lumi))
                 lumi_counter += len(lumis)
+            wmfile['parentslumis'] = infos.get('ParentsLumis', {})
             wmfiles.append(wmfile)
             file_counter += 1
 
