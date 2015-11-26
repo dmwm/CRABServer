@@ -95,6 +95,7 @@ CRAB_Archive = %(cachefilename_flatten)s
 CRAB_Id = $(count)
 +CRAB_Id = $(count)
 +CRAB_Dest = "%(temp_dest)s"
++CRAB_Final_Dest = "%(output_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
 +CRAB_ASOURL = %(tm_asourl)s
 +CRAB_PrimaryDataset = %(primarydataset)s

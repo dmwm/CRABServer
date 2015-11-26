@@ -1000,6 +1000,7 @@ def main():
     output_files     = None
     stageout_policy  = None
     dest_temp_dir    = None
+    dest_final_dir   = None
     dest_site        = None
     dest_files       = None
 
@@ -1133,6 +1134,7 @@ def main():
                              'CRAB_StageoutPolicy', \
                              'CRAB_Destination', \
                              'CRAB_Dest', \
+                             'CRAB_Final_Dest', \
                              'CRAB_AsyncDest']
     ## Check that the above attributes are defined in the job ad.
     for attr in job_ad_required_attrs:
@@ -1146,6 +1148,7 @@ def main():
     stageout_policy = split_re.split(G_JOB_AD['CRAB_StageoutPolicy'])
     print "Stageout policy: %s" % (", ".join(stageout_policy))
     dest_temp_dir = G_JOB_AD['CRAB_Dest']
+    dest_final_dir = G_JOB_AD['CRAB_Final_Dest']
     dest_files = split_re.split(G_JOB_AD['CRAB_Destination'])
     dest_site = G_JOB_AD['CRAB_AsyncDest']
     ##--------------------------------------------------------------------------
@@ -1253,7 +1256,7 @@ def main():
     ## b) adding a 'failed' subdirectory in case cmsRun failed.
     if G_JOB_WRAPPER_EXIT_CODE != 0:
         dest_temp_dir = os.path.join(dest_temp_dir, 'failed')
-
+    dest_final_dir = os.path.join(dest_final_dir, counter)
     ## Definitions needed for the logs archive creation, stageout and metadata
     ## upload.
     logs_arch_file_name = 'cmsRun.log.tar.gz'
@@ -1266,12 +1269,7 @@ def main():
         logs_arch_dest_pfn_path = os.path.join(logs_arch_dest_pfn_path, 'failed', 'log')
         logs_arch_dest_pfn = os.path.join(logs_arch_dest_pfn_path, logs_arch_dest_file_name)
     logs_arch_dest_temp_lfn = os.path.join(dest_temp_dir, 'log', logs_arch_dest_file_name)
-    logs_arch_dest_lfn = None
-    ## TODO: This is a hack; the logs destination LFN should be in the job ad.
-    if len(logs_arch_dest_pfn_path.split('/store/')) == 2:
-        logs_arch_dest_lfn = os.path.join('/store', \
-                                          logs_arch_dest_pfn_path.split('/store/')[1], \
-                                          logs_arch_dest_file_name)
+    logs_arch_dest_lfn = os.path.join(dest_final_dir, 'log', logs_arch_dest_file_name)
 
     ##--------------------------------------------------------------------------
     ## Start CHECK OUTPUT FILES EXIST
@@ -1634,11 +1632,7 @@ def main():
                     if G_JOB_WRAPPER_EXIT_CODE != 0:
                         output_dest_pfn_path = os.path.join(output_dest_pfn_path, 'failed')
                     output_dest_pfn = os.path.join(output_dest_pfn_path, output_dest_file_name)
-                    output_dest_lfn = None
-                    ## TODO: This is a hack; the output destination LFN should
-                    ## be in the job ad.
-                    if len(output_dest_pfn_path.split('/store/')) == 2:
-                        output_dest_lfn = os.path.join('/store', output_dest_pfn_path.split('/store/')[1], output_dest_file_name)
+                    output_dest_lfn = os.path.join(dest_final_dir, output_dest_file_name)
                     try:
                         cur_retval, \
                         cur_retmsg = perform_stageout(local_stageout_mgr, \
