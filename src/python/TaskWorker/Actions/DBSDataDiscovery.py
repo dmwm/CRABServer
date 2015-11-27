@@ -132,7 +132,7 @@ class DBSDataDiscovery(DataDiscovery):
                     infos['Parents'] = []
                     lumis = LumiList(runsAndLumis=infos['Lumis'])
                     for secfilename, secinfos in moredetails.items():
-                        if len(lumis and secinfos['lumiobj']) > 0:
+                        if (lumis & secinfos['lumiobj']):
                             infos['Parents'].append(secfilename)
                 self.logger.info("Done matching files from secondary dataset")
                 kwargs['task']['tm_use_parent'] = 1
