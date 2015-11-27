@@ -44,7 +44,6 @@ Note that the parameters must be either integers(32 bits) or doubles(64 bits).
 Sending strings is supported, but they will not be stored in the
 farm's store nor shown in the farm's window in the MonALISA client.
 """
-from __future__ import absolute_import
 
 import re
 import xdrlib
@@ -53,8 +52,8 @@ import struct
 import StringIO
 import threading
 import time
-from . import Logger
-from . import ProcInfo
+import Logger
+import ProcInfo
 import random
 import copy
 

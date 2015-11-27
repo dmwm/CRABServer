@@ -6,7 +6,7 @@ This is the Dashboard API Module for the Worker Node
 from __future__ import absolute_import
 from __future__ import print_function
 
-from . import apmon
+import apmon
 import time, sys, os
 import traceback
 from types import DictType, StringType, ListType

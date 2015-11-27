@@ -6,7 +6,7 @@ import time
 import classad
 import htcondor
 
-from . import HTCondorUtils
+import HTCondorUtils
 
 CollectorCache = {}
 # From http://stackoverflow.com/questions/3679694/a-weighted-version-of-random-choice
