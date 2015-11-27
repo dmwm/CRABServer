@@ -1130,11 +1130,17 @@ def main():
     ## At this point we are sure that one of the transfer flags (transfer_logs
     ## or transfer_outputs) is True.
     ## List of attributes that the code must be able to get from the job ad.
+    ## CRAB_Id: job number in the task,
+    ## CRAB_StageoutPolicy: local or remote stage-out,
+    ## CRAB_Destination: PFNs of user's files in the home SE,
+    ## CRAB_OutTempLFNDir: LFN dir. of the outputs in the close SE,
+    ## CRAB_OutLFNDir: LFN dir. of the outputs in the user's home SE,
+    ## CRAB_AsyncDest: user's home site.
     job_ad_required_attrs = ['CRAB_Id', \
                              'CRAB_StageoutPolicy', \
                              'CRAB_Destination', \
-                             'CRAB_Dest', \
-                             'CRAB_Final_Dest', \
+                             'CRAB_OutTempLFNDir', \
+                             'CRAB_OutLFNDir', \
                              'CRAB_AsyncDest']
     ## Check that the above attributes are defined in the job ad.
     for attr in job_ad_required_attrs:
@@ -1146,9 +1152,9 @@ def main():
             return exit_info
     ## Retrieve the above attributes from the job ad.
     stageout_policy = split_re.split(G_JOB_AD['CRAB_StageoutPolicy'])
-    print "Stageout policy: %s" % (", ".join(stageout_policy))
-    dest_temp_dir = G_JOB_AD['CRAB_Dest']
-    dest_final_dir = G_JOB_AD['CRAB_Final_Dest']
+    print("Stageout policy: %s" % (", ".join(stageout_policy)))
+    dest_temp_dir = G_JOB_AD['CRAB_OutTempLFNDir']
+    dest_final_dir = G_JOB_AD['CRAB_OutLFNDir']
     dest_files = split_re.split(G_JOB_AD['CRAB_Destination'])
     dest_site = G_JOB_AD['CRAB_AsyncDest']
     ##--------------------------------------------------------------------------
@@ -1249,14 +1255,15 @@ def main():
             print 'Not rewriting stageout policy. Continue with %s stageout policy.' % (", ".join(stageout_policy))
 
 
-    ## Modify the stageout temporary directory by:
+    ## Modify the stageout temporary and final directory by:
     ## a) adding a four-digit counter;
     counter = "%04d" % (G_JOB_AD['CRAB_Id'] / 1000)
     dest_temp_dir = os.path.join(dest_temp_dir, counter)
+    dest_final_dir = os.path.join(dest_final_dir, counter)
     ## b) adding a 'failed' subdirectory in case cmsRun failed.
     if G_JOB_WRAPPER_EXIT_CODE != 0:
         dest_temp_dir = os.path.join(dest_temp_dir, 'failed')
-    dest_final_dir = os.path.join(dest_final_dir, counter)
+        dest_final_dir = os.path.join(dest_final_dir, 'failed')
     ## Definitions needed for the logs archive creation, stageout and metadata
     ## upload.
     logs_arch_file_name = 'cmsRun.log.tar.gz'
