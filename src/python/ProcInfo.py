@@ -38,7 +38,7 @@ import re
 import time
 import string
 import socket
-from . import Logger
+import Logger
 
 """
 Class ProcInfo
