@@ -39,12 +39,6 @@ CRAB_oneEventMode=0
 if [ "X$_CONDOR_JOB_AD" != "X" ];
 then
     echo "======== HTCONDOR JOB SUMMARY at $(TZ=GMT date) START ========"
-    CRAB_Dest=`grep '^CRAB_Dest =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
-    if [ "X$CRAB_Dest" = "X" ];
-    then
-        print "Unable to determine CRAB output destination directory"
-        exit 2
-    fi
     ONE_EVENT_TEST=$(grep '^CRAB_oneEventMode =' $_CONDOR_JOB_AD | awk '{print $NF;}')
     if [[ $ONE_EVENT_TEST -eq 1 ]]; then
         CRAB_oneEventMode=1
@@ -62,7 +56,6 @@ then
    echo "CRAB ID: $CRAB_Id"
    echo "Execution site: $JOB_CMSSite"
    echo "Current hostname: $(hostname)"
-   echo "Destination temp dir: $CRAB_Dest"
    echo "Output files: $CRAB_localOutputFiles"
    echo "==== HTCONDOR JOB AD CONTENTS START ===="
    while read i; do
