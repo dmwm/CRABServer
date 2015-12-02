@@ -346,7 +346,7 @@ def logCMSSW():
 
 def printCMSSWLine(line, lineLenLimit):
     """ Simple print auxiliary function that truncates lines"""
-    print(line[:lineLenLimit])
+    print(line[:lineLenLimit].rstrip())
 
 def handleException(exitAcronym, exitCode, exitMsg):
     #first save the traceback before it gets overwritten by other tracebacks (e.g.: wrong jobReport)
