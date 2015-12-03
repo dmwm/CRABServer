@@ -1776,7 +1776,7 @@ class PostJob():
 
     def upload_input_files_metadata(self):
         """
-        Upload the output files metadata. We care about the number of events
+        Upload the (primary) input files metadata. We care about the number of events
         and about the lumis for the report.
         """
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
@@ -1789,10 +1789,7 @@ class PostJob():
             return
         direct_stageout = int(self.job_report.get(u'direct_stageout', 0))
         for ifile in self.job_report['steps']['cmsRun']['input']['source']:
-            if ifile['input_source_class'] != 'PoolSource' or not ifile['lfn']:
-                #TODO: should we also check that "input_type" = "primaryFiles"?
-                #The problematic 'input_type' = 'mixingFiles' is catched now because it does not have an lfn.
-                #See https://cms-logbook.cern.ch/elog/Analysis+Operations/488
+            if ifile['input_source_class'] != 'PoolSource' or ifile.get('input_type', '') != "primaryFiles":
                 continue
             ## Many of these parameters are not needed and are using fake/defined values
             lfn = ifile['lfn'] + "_" + str(self.job_id) ## jobs can analyze the same input
