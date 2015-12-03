@@ -1,6 +1,14 @@
 #!/bin/bash
 exec 2>&1
 
+function DashboardFailure {
+    if [ -f ./DashboardFailure.sh ]; then
+        exec sh ./DashboardFailure.sh $1
+    else
+        exit $1
+    fi
+}
+
 sigterm() {
   echo "ERROR: Job was killed. Logging ulimits:"
   ulimit -a
@@ -10,7 +18,7 @@ sigterm() {
   df -h
   echo "Logging disk usage in directory:"
   du -h
-  exec sh ./DashboardFailure.sh 50669
+  DashboardFailure 50669
   if [ ! -e logCMSSWSaved.txt ];
   then
     python -c "import CMSRunAnalysis; logCMSSW()"
@@ -48,7 +56,7 @@ then
     then
         echo "==== Sourcing cmsset_default.sh failed at $(TZ=GMT date). ===="
         tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
-        exec sh ./DashboardFailure.sh 10032
+        DashboardFailure 10032
     fi
     set -x
     declare -a VERSIONS
@@ -68,17 +76,17 @@ then
     PY_PATH=/cvmfs/cms.cern.ch/$SCRAM_ARCH/external/python
     echo 'python version: ' $VERSIONS
 else
-	echo "Error: neither OSG_APP, CVMFS, nor VO_CMS_SW_DIR environment variables were set" >&2
-	echo "Error: Because of this, we can't load CMSSW. Not good." >&2
-        tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
-	exec sh ./DashboardFailure.sh 10031
+    echo "Error: neither OSG_APP, CVMFS, nor VO_CMS_SW_DIR environment variables were set" >&2
+    echo "Error: Because of this, we can't load CMSSW. Not good." >&2
+    tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
+    DashboardFailure 10031
 fi
 set +x
 if [[ $rc != 0 ]]
 then
     echo "==== Sourcing cmsset_default.sh failed at $(TZ=GMT date). ===="
     tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
-    exec sh ./DashboardFailure.sh 10032
+    DashboardFailure 10032
 else
     echo "==== CMSSW pre-execution environment bootstrap FINISHING at $(TZ=GMT date) ===="
 fi
@@ -89,7 +97,7 @@ N_PYTHON26=${#VERSIONS[*]}
 if [ $N_PYTHON26 -lt 1 ]; then
     echo "Error: Unable to find a CMS version of python."
     echo "CRAB3 requires the CMS version of python to function."
-    exec sh ./DashboardFailure.sh 10043
+    DashboardFailure 10043
 else
     VERSION=${VERSIONS[0]}
     echo "Python found in $PY_PATH/$VERSION";
@@ -100,7 +108,7 @@ else
     if [[ $? != 0 ]]
     then
         echo "Error: Unable to source python environment setup."
-        exec sh ./DashboardFailure.sh 10043
+        DashboardFailure 10043
     fi
 fi
 
@@ -108,19 +116,19 @@ command -v python > /dev/null
 rc=$?
 if [[ $rc != 0 ]]
 then
-	echo "Error: Python wasn't found on this worker node after source CMS version." >&2
-	echo "Error: job execution REQUIRES a working python" >&2
-	exec sh ./DashboardFailure.sh 10043
+    echo "Error: Python wasn't found on this worker node after source CMS version." >&2
+    echo "Error: job execution REQUIRES a working python" >&2
+    DashboardFailure 10043
 else
-	echo "I found python at.."
-	echo `which python`
+    echo "I found python at.."
+    echo `which python`
 fi
 python -c ''
 rc=$?
 if [[ $rc != 0 ]]
 then
-	echo "Error: python is not functional."
-	exec sh ./DashboardFailure.sh 10043
+    echo "Error: python is not functional."
+    DashboardFailure 10043
 fi
 
 echo "==== Python discovery FINISHING at $(TZ=GMT date) ===="
@@ -185,9 +193,8 @@ fi
 if [ ! -e wmcore_initialized ];
 then
     echo "======== ERROR: Unable to initialize WMCore at $(TZ=GMT date) ========"
-    exec sh ./DashboardFailure.sh 10043
+    DashboardFailure 10043
 fi
 
 exit $jobrc
 
-_

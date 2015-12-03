@@ -26,6 +26,14 @@ function finish {
 # Trap all exits and execute finish function
 trap finish EXIT
 
+function DashboardFailure {
+    if [ -f ./DashboardFailure.sh ]; then
+        exec sh ./DashboardFailure.sh $1
+    else
+        exit $1
+    fi
+}
+
 echo "======== gWMS-CMSRunAnalysis.sh STARTING at $(TZ=GMT date) on $(hostname) ========"
 echo "Local time : $(date)"
 echo "Current system : $(uname -a)"
@@ -143,12 +151,12 @@ rc=$?
 set +x
 if [[ $rc != 0 ]]
 then
-	echo "Error: Python2.6 isn't available on this worker node." >&2
-	echo "Error: execution of job stageout wrapper REQUIRES python2.6" >&2
-        exec sh ./DashboardFailure.sh 10043
+    echo "Error: Python2.6 isn't available on this worker node." >&2
+    echo "Error: execution of job stageout wrapper REQUIRES python2.6" >&2
+    DashboardFailure 10043
 else
-	echo "Found python2.6 at:"
-	echo `which python2.6`
+    echo "Found python2.6 at:"
+    echo `which python2.6`
 fi
 echo "======== python2.6 bootstrap for stageout at $(TZ=GMT date) FINISHING ========"
 
@@ -164,7 +172,7 @@ STAGEOUT_EXIT_STATUS=$?
 if [ ! -e wmcore_initialized ];
 then
     echo "======== ERROR: Unable to initialize WMCore at $(TZ=GMT date) ========"
-    exec sh ./DashboardFailure.sh 10043
+    DashboardFailure 10043
 fi
 
 if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
