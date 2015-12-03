@@ -285,12 +285,15 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 raise TaskWorkerException(msg)
 
             try:
-                _address = loc.scheddAd['Machine']
+                dummyAddress = loc.scheddAd['Machine']
             except:
                 raise TaskWorkerException("Unable to get schedd address for task %s" % (task['tm_taskname']))
 
             # Get location of schedd-specific environment script from schedd ad.
             info['remote_condor_setup'] = loc.scheddAd.get("RemoteCondorSetup", "")
+
+            info["CMSGroups"] = set.union(CMSGroupMapper.map_user_to_groups(kwargs['task']['tm_username']), kwargs['task']['user_groups'])
+            self.logger.info("User %s mapped to local groups %s." % (kwargs['task']['tm_username'], info["CMSGroups"]))
 
             self.logger.debug("Finally submitting to the schedd")
             if address:
@@ -321,9 +324,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd = classad.ClassAd()
         addCRABInfoToClassAd(dagAd, info)
 
-        groups = CMSGroupMapper.map_user_to_groups(dagAd["CRAB_UserHN"])
-        if groups:
-            dagAd["CMSGroups"] = groups
+        if info["CMSGroups"]:
+            dagAd["CMSGroups"] = ','.join(info["CMSGroups"])
+        else:
+            dagAd["CMSGroups"] = classad.Value.Undefined
 
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
