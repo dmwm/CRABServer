@@ -221,6 +221,9 @@ class RESTTask(RESTEntity):
 
         row = self.Task.ID_tuple(*rows[0])
         warnings = literal_eval(row.task_warnings.read() if row.task_warnings else '[]')
+        if warning in warnings:
+            self.logger.info("Warning message already present in the task database. Will not add it again.") 
+            return []
         if len(warnings)>10:
             raise ExecutionError("You cannot add more than 10 warnings to a task")
         warnings.append(warning)
