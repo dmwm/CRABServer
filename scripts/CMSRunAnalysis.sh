@@ -97,7 +97,7 @@ N_PYTHON26=${#VERSIONS[*]}
 if [ $N_PYTHON26 -lt 1 ]; then
     echo "Error: Unable to find a CMS version of python."
     echo "CRAB3 requires the CMS version of python to function."
-    DashboardFailure 10043
+    DashboardFailure 10034
 else
     VERSION=${VERSIONS[0]}
     echo "Python found in $PY_PATH/$VERSION";
