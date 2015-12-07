@@ -18,7 +18,7 @@ config.JobType.disableAutomaticOutputCollection = False
 
 #Data Section
 config.section_("Data")
-config.Data.inputDataset = '/MinimumBias/Run2012C-24Aug2012-v1/RECO'
+config.Data.inputDataset = '/SingleMu/Run2012B-13Jul2012-v1/AOD'
 config.Data.inputDBS = 'global'
 config.Data.useParent = True
 config.Data.splitting = 'LumiBased'
