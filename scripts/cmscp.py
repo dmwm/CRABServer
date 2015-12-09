@@ -484,6 +484,13 @@ def perform_local_stageout(local_stageout_mgr, \
         ## Fallback to previous behaviour where phedex is queried for location
         if source_site == 'unknown':
             source_site = G_NODE_MAP.get(dest_temp_se, 'unknown')
+        
+        # If fallback stageout happens, PNN can be different as source
+        if 'PNN' in stageout_info:
+            print("INFO: PNN is defined in site-local-config. %s changed to %s" % (source_site, stageout_info['PNN']))
+            source_site = stageout_info['PNN']
+        else:
+            print("WARNING: PNN is not defined in site-local-config.")
 
         sites_added_ok = add_sites_to_job_report(dest_temp_file_name, \
                                                  is_log, source_site, \
