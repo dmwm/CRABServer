@@ -255,11 +255,15 @@ def reportFailureToDashboard(exitCode, ad = None):
             print("==== ERROR: Unable to parse job's HTCondor ClassAd ====")
             print("Will not report failure to Dashboard")
             print(traceback.format_exc())
-            return
+            return exitCode
+    missattrs = []
     for attr in ['CRAB_ReqName', 'CRAB_Id', 'CRAB_Retry']:
         if attr not in ad:
-            print("==== ERROR: HTCondor ClassAd is missing attribute %s. ====" % attr)
-            print("Will not report failure to Dashboard")
+            missattrs.append(attr)
+    if missattrs:
+        print("==== ERROR: HTCondor ClassAd is missing the following attributes: %s ====" % missattrs)
+        print("Will not report failure to Dashboard")
+        return exitCode
     params = {
         'MonitorID': ad['CRAB_ReqName'],
         'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%d' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":"), ad['CRAB_Retry']),
