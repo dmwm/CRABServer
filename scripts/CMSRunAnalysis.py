@@ -23,7 +23,6 @@ from ast import literal_eval
 from optparse import OptionParser, BadOptionError, AmbiguousOptionError
 
 import DashboardAPI
-from ServerUtilities import setDashboardLogs
 import WMCore.Storage.SiteLocalConfig as SiteLocalConfig
 
 logCMSSWSaved = False
