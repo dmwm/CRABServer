@@ -33,7 +33,7 @@ class Task(object):
     CountLastTasksByStatus = "SELECT tm_task_status, count(*) FROM tasks WHERE tm_start_time > SYS_EXTRACT_UTC(SYSTIMESTAMP) - (:minutes/1440)  GROUP BY tm_task_status"
     #get all the task failures sorted by username in the last :minutes minutes
     LastFailures = "SELECT tm_username, tm_taskname, tm_task_failure from tasks WHERE tm_start_time > SYS_EXTRACT_UTC(SYSTIMESTAMP) - (:minutes/1440) and (tm_task_status='FAILED' \
-                    OR tm_task_status='SUBMITFAILED' OR tm_task_status='KILLFAILED' OR tm_task_status='RESUBMITFAILED)' \
+                    OR tm_task_status='SUBMITFAILED' OR tm_task_status='KILLFAILED' OR tm_task_status='RESUBMITFAILED') \
                     AND tm_task_failure IS NOT NULL ORDER BY tm_username"
 
     #New
