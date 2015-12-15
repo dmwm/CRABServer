@@ -39,10 +39,12 @@ class MyProxyLogon(TaskAction):
         userproxy = proxy.getProxyFilename(serverRenewer=True)
         proxy.logonRenewMyProxy()
         timeleft = proxy.getTimeLeft(userproxy)
+        usergroups = set(proxy.getAllUserGroups(userproxy))
         if timeleft is None or timeleft <= 0:
             msg = "Impossible to retrieve proxy from %s for %s." % (proxycfg['myProxySvr'], proxycfg['userDN'])
             raise TaskWorkerException(msg)
         else:
             kwargs['task']['user_proxy'] = userproxy
+            kwargs['task']['user_groups'] = usergroups
             result = Result(task=kwargs['task'], result='OK')
         return result
