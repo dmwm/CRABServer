@@ -45,7 +45,7 @@ class DryRunUploader(TaskAction):
             self.packSandbox(inputFiles)
 
             self.logger.info('Uploading dry run tarball to the user file cache')
-            ufc = UserFileCache(dict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint': kw['task']['tm_cache_url']})
+            ufc = UserFileCache(mydict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint': kw['task']['tm_cache_url']})
             result = ufc.uploadLog('dry-run-sandbox.tar.gz')
             os.remove('dry-run-sandbox.tar.gz')
             if 'hashkey' not in result:
