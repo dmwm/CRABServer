@@ -101,7 +101,8 @@ class DBSDataDiscovery(DataDiscovery):
         ## locations are found it gets the original locations from DBS. So it should
         ## never be the case at this point that some blocks have no locations.
         try:
-            locationsMap = self.dbs.listFileBlockLocation(list(blocks), phedexNodes=True)
+            dbsOnly = self.dbsInstance.split('/')[1] != 'global'
+            locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly)
         except Exception as ex: #TODO should we catch HttpException instead?
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
@@ -164,7 +165,7 @@ if __name__ == '__main__':
     """ Usage: python DBSDataDiscovery.py dbs_instance dataset
         where dbs_instance should be either prod or phys03
 
-        Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py phys03 /MinBias/jmsilva-crab_scale_70633-3d12352c28d6995a3700097dc8082c04/USER
+        Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/phys03 /MinBias/jmsilva-crab_scale_70633-3d12352c28d6995a3700097dc8082c04/USER
 
         Note: self.uploadWarning is failing, I usually comment it when I run this script standalone
     """
