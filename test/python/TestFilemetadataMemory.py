@@ -24,6 +24,8 @@
     You can see that if dicts are not converted to strings the allocated memory at the end of the process is 300 Mb.
     This was tested with python 2.6.6 (but I observed the same on python 2.7.5).
 """
+from __future__ import division
+from __future__ import print_function
 
 
 import gc
@@ -64,7 +66,7 @@ def bigdict(size):
     res = {}
     runnum = str(random.randint(50000, 150000))
     res[runnum] = []
-    for i in xrange(1, size):
+    for _ in xrange(1, size):
         res[runnum].append(str(random.randint(50000, 150000)))
 
     return res
@@ -73,7 +75,7 @@ def bigdict(size):
 def filemetadataDict(nfiles, lumisPerFile):
     """ Return some data as similar as possible to the filemetadata
     """
-    for i in xrange(nfiles):
+    for _ in xrange(nfiles):
         yield g_conversion({
             "cksum": 0,
             "publishname": randstr(random.randint(40,60)), #"TopTree_ZJets_25ns-00000000000000000000000000000000"
@@ -103,16 +105,16 @@ def printInfo(nfiles, lumisPerFile):
     """ Print the information after creating a dict of nfiles files each
         containing lumisPerFile lumis. Print the memory info after garbage collecting the object
     """
-    print "Task with %s files and %s lumis" % (nfiles, lumisPerFile)
+    print("Task with %s files and %s lumis" % (nfiles, lumisPerFile))
     d = list(filemetadataDict(nfiles, lumisPerFile))
     s = str(d)
-    print "Dictionary generated and converted to string. String len is %s. Memory usage" % (len(s)/1024)
-    print process.get_memory_info()[0]/1024
+    print("Dictionary generated and converted to string. String len is %s. Memory usage" % (len(s)/1024))
+    print(process.get_memory_info()[0]/1024)
     d = None
     s = None
     gc.collect()
-    print "Memory usage after running the garbage collector"
-    print process.get_memory_info()[0]/1024
+    print("Memory usage after running the garbage collector")
+    print(process.get_memory_info()[0]/1024)
 
 
 if __name__ == "__main__":
@@ -124,14 +126,14 @@ if __name__ == "__main__":
 
     dataType = sys.argv[1]
     if dataType not in convFunctions:
-        print("Argument of the script is the type of conversion of the bigdict" % dataTypes)
+        print("Argument of the script is the type of conversion of the bigdict" % convFunctions.keys())
 
     g_conversion = convFunctions[dataType]
 
     process = psutil.Process(os.getpid())
 
-    print "Memory starting the program"
-    print process.get_memory_info()[0]/1024
+    print("Memory starting the program")
+    print(process.get_memory_info()[0]/1024)
 
     printInfo(100, 30) #small task
     printInfo(1000, 100) #Average case (1k jobs, 300 lumis per job) ?
