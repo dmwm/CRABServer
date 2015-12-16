@@ -1,11 +1,6 @@
-import logging
-import time
-import commands
 import json
+import logging
 from ast import literal_eval
-
-# WMCore dependecies here
-from WMCore.REST.Error import InvalidParameter, ExecutionError, MissingObject
 
 from CRABInterface.Utils import getDBinstance
 
@@ -24,7 +19,7 @@ class DataFileMetadata(object):
         binds = {'taskname': taskname, 'filetype': filetype}
         rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, **binds)
         for row in rows:
-            yield {'taskname': taskname,
+            yield json.dumps({'taskname': taskname,
                    'filetype': filetype,
                    'pandajobid': row[0],
                    'outdataset': row[1],
@@ -44,7 +39,7 @@ class DataFileMetadata(object):
                    'parents': literal_eval(row[15].read()),
                    'state': row[16],
                    'created': str(row[17]),
-                   'tmplfn': row[18]}
+                   'tmplfn': row[18]})
 
     def inject(self, *args, **kwargs):
         self.logger.debug("Calling jobmetadata inject with parameters %s" % kwargs)
