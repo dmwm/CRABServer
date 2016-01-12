@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.6
+#!/usr/bin/env python2.7
 """
     NOTE: This is intended to run automagically. Keep the deps minimal
 """
