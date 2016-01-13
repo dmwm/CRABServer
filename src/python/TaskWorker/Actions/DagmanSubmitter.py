@@ -95,11 +95,37 @@ def addCRABInfoToClassAd(ad, info):
             ad[adName] = adVal
 
 
+class ScheddStats(dict):
+    def __init__(self, procnum):
+        self.procnum = procnum
+        self.pid = os.getpid()
+        dict.__init__(self)
+
+    def success(self, schedd):
+        self[schedd]["successes"] = self.setdefault(schedd, {}).get("successes", 0) + 1
+
+    def failure(self, schedd):
+        self[schedd]["failures"] = self.setdefault(schedd, {}).get("failures", 0) + 1
+
+    def __str__(self):
+        res = "Summary of schedd failures/successes for slave process %s (PID %s):\n" % (self.procnum, self.pid)
+        for schedd in self:
+            res += "\t" + schedd + ":\n"
+            res += "\t\t%s %s\n" % ("Number of failures: ", self[schedd].get("successes", 0))
+            res += "\t\t%s %s\n" % ("Number of successes: ", self[schedd].get("failures", 0))
+
+        return res
+
+
 class DagmanSubmitter(TaskAction.TaskAction):
 
     """
     Submit a DAG to a HTCondor schedd
     """
+
+    def __init__(self, *args, **kwargs):
+        TaskAction.TaskAction.__init__(self, *args, **kwargs)
+        self.scheddStats = ScheddStats(kwargs['procnum'])
 
     def execute(self, *args, **kwargs):
         userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry=2, logger=self.logger)
@@ -162,14 +188,18 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 self.logger.debug("Trying to submit task %s %s time.", kwargs['task']['tm_taskname'], str(retry))
                 try:
                     execInt = self.executeInternal(*args, **kwargs)
+                    self.scheddStats.success(schedd)
                     return execInt
                 except Exception as ex:
+                    self.scheddStats.failure(schedd)
                     msg = "Failed to submit task %s; '%s'"% (kwargs['task']['tm_taskname'], str(ex))
                     self.logger.exception(msg)
                     retryIssues.append(msg)
                     if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
                         self.logger.error("Will retry in %s seconds.", self.config.TaskWorker.retry_interval[retry])
                         time.sleep(self.config.TaskWorker.retry_interval[retry])
+                finally:
+                    self.logger.info(self.scheddStats)
             ## All the submission retries to the current schedd have failed. Record the
             ## failures.
             retryIssuesBySchedd[schedd] = retryIssues

@@ -18,6 +18,7 @@ class TaskAction(object):
                               'Generic': 'Generic',
                              }
         self.server = server
+        self.procnum = procnum
 #        self.resturl = resturi #backward compatibility
         ## Trying to give the right naming to the variables.
         ## In the resturl arg we have the REST URI (e.g. '/crabserver/prod/workflowdb').
