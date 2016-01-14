@@ -5,6 +5,7 @@ Submit a DAG directory created by the DagmanCreator component.
 
 import os
 import time
+import pickle
 import urllib
 
 import HTCondorUtils
@@ -111,8 +112,8 @@ class ScheddStats(dict):
         res = "Summary of schedd failures/successes for slave process %s (PID %s):\n" % (self.procnum, self.pid)
         for schedd in self:
             res += "\t" + schedd + ":\n"
-            res += "\t\t%s %s\n" % ("Number of failures: ", self[schedd].get("successes", 0))
-            res += "\t\t%s %s\n" % ("Number of successes: ", self[schedd].get("failures", 0))
+            res += "\t\t%s %s\n" % ("Number of successes: ", self[schedd].get("successes", 0))
+            res += "\t\t%s %s\n" % ("Number of failures: ", self[schedd].get("failures", 0))
 
         return res
 
@@ -385,7 +386,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["TaskType"] = "ROOT"
         dagAd["X509UserProxy"] = info['user_proxy']
 
-        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy']) as (parent, rpipe):
+        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True) as (parent, rpipe):
             if not parent:
                 resultAds = []
                 schedd.submit(dagAd, 1, True, resultAds)
@@ -395,7 +396,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     schedd.edit([id], "LeaveJobInQueue", classad.ExprTree("(JobStatus == 4) && (time()-EnteredCurrentStatus < 30*86400)"))
         results = rpipe.read()
         if results != "OK":
-            raise TaskWorkerException("Failure when submitting task to scheduler. Error reason: '%s'" % results)
+            results = pickle.loads(results)
+            self.logger.debug("Now printing the environment used for submission:\n" + "-"*70 + "\n" + results.environmentStr + "-"*70)
+            raise TaskWorkerException("Failure when submitting task to scheduler. Error reason: '%s'" % results.outputMessage)
 
 
     def sendDashboardJobs(self, params, info):
