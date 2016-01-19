@@ -1,4 +1,3 @@
-#!/usr/bin/env python2.6
 from __future__ import print_function
 import warnings
 
@@ -1046,6 +1045,17 @@ def main():
                     'aso_injection'             : {'return_code': None, 'return_msg': None},
                     'logs_metadata_upload'      : {'return_code': None, 'return_msg': None}
                    }
+
+    ##--------------------------------------------------------------------------
+    ## Check python version
+    ##--------------------------------------------------------------------------
+    if not sys.version_info >= (2,6):
+        msg = "cmscp is exiting because it cannot find a proper python version"
+        print(msg)
+        #TODO: 10043 is "Unable to bootstrap WMCore libraries", maybe we want a better error
+        #(let's wait that errors are in WMCore)
+        update_exit_info(exit_info, 10043, msg, True)
+        return exit_info
 
     ##--------------------------------------------------------------------------
     ## Start PARSE JOB AD
