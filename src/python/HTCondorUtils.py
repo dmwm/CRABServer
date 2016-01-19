@@ -1,5 +1,5 @@
-
 import os
+import pickle
 import traceback
 
 import classad
@@ -23,10 +23,22 @@ except:
 
 readEvents = getattr(htcondor, 'readEvents', htcondor.read_events)
 
+class OutputObj:
+    """ Class used when AuthenticatedSubprocess is created with pickleOut
+        Contains additional information to be used for debug purposes, like environment
+    """
+    def __init__(self, outputMessage):
+        self.outputMessage = outputMessage
+        self.environmentStr = ""
+        for key, val in os.environ.iteritems():
+            self.environmentStr += "%s=%s\n" % (key, val)
+
+
 class AuthenticatedSubprocess(object):
 
-    def __init__(self, proxy):
+    def __init__(self, proxy, pickleOut=False):
         self.proxy = proxy
+        self.pickleOut = pickleOut
 
     def __enter__(self):
         self.r, self.w = os.pipe()
@@ -51,11 +63,14 @@ class AuthenticatedSubprocess(object):
                 self.wpipe.close()
                 os._exit(0)
             else:
-                exceptionString = str(traceback.format_exc(c))
-                # Uh, I forgot what traceback function does this without the join 
+                tracebackString = str('\n'.join(traceback.format_tb(c)))
                 msg = "Trapped exception in Dagman.Fork: %s %s %s \n%s" % \
-                                (a, b, c, str('\n'.join(traceback.format_tb(c))))
-                self.wpipe.write(msg)
+                                (a, b, c, tracebackString)
+                if self.pickleOut:
+                    oo = OutputObj(msg)
+                    self.wpipe.write(pickle.dumps(oo))
+                else:
+                    self.wpipe.write(msg)
                 self.wpipe.close()
                 os._exit(1)
         else:

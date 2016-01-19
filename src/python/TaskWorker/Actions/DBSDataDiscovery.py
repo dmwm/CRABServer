@@ -67,23 +67,24 @@ class DBSDataDiscovery(DataDiscovery):
         self.logger.info("Data discovery with DBS") ## to be changed into debug
         old_cert_val = os.getenv("X509_USER_CERT")
         old_key_val = os.getenv("X509_USER_KEY")
-        os.environ['X509_USER_CERT'] = self.config.TaskWorker.cmscert
-        os.environ['X509_USER_KEY'] = self.config.TaskWorker.cmskey
-        # DBS3 requires X509_USER_CERT to be set - but we don't want to leak that to other modules
-        dbsurl = self.config.Services.DBSUrl
-        if kwargs['task']['tm_dbs_url']:
-            dbsurl = kwargs['task']['tm_dbs_url']
-        self.dbs = get_dbs(dbsurl)
-        self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
-        #
-        if old_cert_val != None:
-            os.environ['X509_USER_CERT'] = old_cert_val
-        else:
-            del os.environ['X509_USER_CERT']
-        if old_key_val != None:
-            os.environ['X509_USER_KEY'] = old_key_val
-        else:
-            del os.environ['X509_USER_KEY']
+        try:
+            os.environ['X509_USER_CERT'] = self.config.TaskWorker.cmscert
+            os.environ['X509_USER_KEY'] = self.config.TaskWorker.cmskey
+            # DBS3 requires X509_USER_CERT to be set - but we don't want to leak that to other modules
+            dbsurl = self.config.Services.DBSUrl
+            if kwargs['task']['tm_dbs_url']:
+                dbsurl = kwargs['task']['tm_dbs_url']
+            self.dbs = get_dbs(dbsurl)
+            self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
+        finally:
+            if old_cert_val != None:
+                os.environ['X509_USER_CERT'] = old_cert_val
+            else:
+                del os.environ['X509_USER_CERT']
+            if old_key_val != None:
+                os.environ['X509_USER_KEY'] = old_key_val
+            else:
+                del os.environ['X509_USER_KEY']
         self.logger.debug("Data discovery through %s for %s" %(self.dbs, kwargs['task']['tm_taskname']))
         self.checkDatasetStatus(kwargs['task']['tm_input_dataset'], kwargs)
         try:
