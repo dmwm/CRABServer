@@ -84,7 +84,7 @@ from TaskWorker import __version__
 from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
-from ServerUtilities import isFailurePermanent, parseJobAd
+from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon
 
 ASO_JOB = None
 config = None
@@ -942,6 +942,8 @@ class PostJob():
         self.aso_start_timestamp = None
         ## The return value of the retry-job.
         self.retryjob_retval     = None
+        ## Stageout exit codes for ASO transfers
+        self.stageout_exit_codes = []
         ## The DAG cluster ID of the job to which this post-job is associated. If the
         ## job hasn't run (because the pre-job return value was != 0), the DAG cluster
         ## ID is -1 (and the $RETURN argument macro is -1004). This is just the first
@@ -1400,7 +1402,7 @@ class PostJob():
             job_ad_file_name = os.environ.get("_CONDOR_JOB_AD", ".job.ad")
             self.logger.info("====== Starting to parse ROOT job ad file %s." % (job_ad_file_name))
             if self.parse_job_ad(job_ad_file_name):
-                self.set_dashboard_state('FAILED')
+                self.set_dashboard_state('FAILED', exitCode=89999)
                 self.logger.info("====== Finished to parse ROOT job ad.")
                 retmsg = "Failure parsing the ROOT job ad."
                 return JOB_RETURN_CODES.FATAL_ERROR, retmsg
@@ -1425,7 +1427,7 @@ class PostJob():
         ## Parse the job report.
         self.logger.info("====== Starting to parse job report file %s." % (G_JOB_REPORT_NAME))
         if self.parse_job_report():
-            self.set_dashboard_state('FAILED')
+            self.set_dashboard_state('FAILED', exitCode=89999)
             self.logger.info("====== Finished to parse job report.")
             retmsg = "Failure parsing the job report."
             return JOB_RETURN_CODES.FATAL_ERROR, retmsg
@@ -1488,7 +1490,7 @@ class PostJob():
                     retmsg = "Fatal error uploading logs archive file metadata: %s" % (str(ex))
                     self.logger.error(retmsg)
                     self.logger.info("====== Finished upload of logs archive file metadata.")
-                    return self.check_retry_count(), retmsg
+                    return self.check_retry_count(80001), retmsg
                 self.logger.info("====== Finished upload of logs archive file metadata.")
             else:
                 msg  = "Skipping logs archive file metadata upload, because it is marked as"
@@ -1522,7 +1524,7 @@ class PostJob():
                 self.logger.error(retmsg)
                 msg = "There was at least one permanent stageout error; user will need to resubmit."
                 self.logger.error(msg)
-                self.set_dashboard_state('FAILED')
+                self.set_dashboard_state('FAILED', exitCode=mostCommon(self.stageout_exit_codes, 60324))
                 self.logger.info("====== Finished to check for ASO transfers.")
                 return JOB_RETURN_CODES.FATAL_ERROR, retmsg
             except RecoverableStageoutError as rse:
@@ -1531,12 +1533,12 @@ class PostJob():
                 msg = "These are all recoverable stageout errors; automatic resubmit is possible."
                 self.logger.error(msg)
                 self.logger.info("====== Finished to check for ASO transfers.")
-                return self.check_retry_count(), retmsg
+                return self.check_retry_count(mostCommon(self.stageout_exit_codes, 60324)), retmsg
             except Exception as ex:
                 retmsg = "Stageout failure: %s" % (str(ex))
                 self.logger.exception(retmsg)
                 self.logger.info("====== Finished to check for ASO transfers.")
-                return self.check_retry_count(), retmsg
+                return self.check_retry_count(mostCommon(self.stageout_exit_codes, 60324)), retmsg
             self.logger.info("====== Finished to check for ASO transfers.")
 
         ## Upload the output files metadata.
@@ -1548,7 +1550,7 @@ class PostJob():
                 retmsg = "Fatal error uploading output files metadata: %s" % (str(ex))
                 self.logger.exception(retmsg)
                 self.logger.info("====== Finished upload of output files metadata.")
-                return self.check_retry_count(), retmsg
+                return self.check_retry_count(80001), retmsg
             self.logger.info("====== Finished upload of output files metadata.")
 
         ## Upload the input files metadata.
@@ -1559,7 +1561,7 @@ class PostJob():
             retmsg = "Fatal error uploading input files metadata: %s" % (str(ex))
             self.logger.exception(retmsg)
             self.logger.info("====== Finished upload of input files metadata.")
-            return self.check_retry_count(), retmsg
+            return self.check_retry_count(80001), retmsg
         self.logger.info("====== Finished upload of input files metadata.")
 
         self.set_dashboard_state('FINISHED')
@@ -1655,6 +1657,7 @@ class PostJob():
             msg += "\nAttempts were made to cancel the ongoing transfers,"
             msg += " but cancellation failed for some transfers."
             msg += "\nConsidering cancellation failures as a permament stageout error."
+            self.stageout_exit_codes.append(60321)
             raise PermanentStageoutError(msg)
 
         ## Retrieve the stageout failures (a dictionary where the keys are the IDs of
@@ -1670,12 +1673,14 @@ class PostJob():
                 failures[doc_id]['reasons'] = [failures[doc_id]['reasons']]
             if isinstance(failures[doc_id]['reasons'], list):
                 last_failure_reason = failures[doc_id]['reasons'][-1]
-                permanent, _ = isFailurePermanent(last_failure_reason)
+                permanent, _, stageout_exit_code = isFailurePermanent(last_failure_reason, True)
                 if permanent:
                     num_permanent_failures += 1
                     failures[doc_id]['severity'] = 'permanent'
                 else:
                     failures[doc_id]['severity'] = 'recoverable'
+                if stageout_exit_code:
+                    self.stageout_exit_codes.append(stageout_exit_code)
         ## Message for stageout error exception.
         msg  = "Stageout failed with code %d." % (aso_job_retval)
         msg += "\nThere were %d failed/killed stageout jobs." % (num_failures)
@@ -2151,7 +2156,7 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def set_dashboard_state(self, state, reason = None):
+    def set_dashboard_state(self, state, reason = None, exitCode = None):
         """
         Set the state of the job in Dashboard.
         """
@@ -2176,7 +2181,7 @@ class PostJob():
             params['StatusValueReason'] = reason
         ## Take exit code from job_fjr.<job_id>.<retry_id>.json and report final exit code to Dashboard.
         ## Only taken if RetryJob think it is FATAL_ERROR.
-        if self.retryjob_retval and self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:
+        if self.retryjob_retval and self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR and not exitCode:
             try:
                 with open(G_JOB_REPORT_NAME_NEW, 'r') as fd:
                     try:
@@ -2196,6 +2201,10 @@ class PostJob():
                 self.logger.debug("Not able to load the fwjr because of a IOError %s. \
                                    Not setting exitcode for dashboard. Continuing normally." % (e))
                 pass
+        ## If Exit Code is defined we report only it. It is the final exit Code of the job
+        elif exitCode:
+            self.logger.debug("Dashboard exit code is defined by Postjob execution.")
+            params['JobExitCode'] = exitCode
         else:
             self.logger.debug("Dashboard exit code already set on the worker node. Continuing normally.")
         ## Unfortunately, Dashboard only has 1-second resolution; we must separate all
@@ -2262,7 +2271,7 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def check_retry_count(self):
+    def check_retry_count(self, exitCode=None):
         """
         When a recoverable error happens, we still have to check if the maximum allowed
         number of job retries was hit. If it was, the post-job should return with the
@@ -2272,12 +2281,12 @@ class PostJob():
             msg  = "Job could be retried, but the maximum allowed number of retries was hit."
             msg += " Setting this node (job) to permanent failure. DAGMan will NOT retry."
             self.logger.info(msg)
-            self.set_dashboard_state('FAILED')
+            self.set_dashboard_state('FAILED', exitCode=exitCode)
             return JOB_RETURN_CODES.FATAL_ERROR
         else:
             msg = "Job will be retried by DAGMan."
             self.logger.info(msg)
-            self.set_dashboard_state('COOLOFF')
+            self.set_dashboard_state('COOLOFF', exitCode=exitCode)
             return JOB_RETURN_CODES.RECOVERABLE_ERROR
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

@@ -11,6 +11,7 @@ import datetime
 import traceback
 import subprocess
 from httplib import HTTPException
+from WMCore.WMExceptions import STAGEOUT_ERRORS
 
 BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
@@ -59,7 +60,7 @@ def getProxiedWebDir(task, host, uri, cert, logFunction = print):
     #This import is here because SeverUtilities is also used on the worker nodes,
     #and I want to avoid the dependency to pycurl right now. We should actually add it one day
     #so that other code in cmscp that uses Requests.py from WMCore can be migrated to RESTInteractions
-    from .RESTInteractions import HTTPRequests
+    from RESTInteractions import HTTPRequests
     data = {'subresource': 'webdirprx',
             'workflow': task,
            }
@@ -199,32 +200,17 @@ def isFailurePermanent(reason, gridJob=False):
     """
     Method that decides whether a failure reason should be considered as a
     permanent failure and submit task or not.
-    # TODO reuse it in PostJob
     """
     checkQuota = " Please check if you have access to write to destination site and your quota does not exceeded."
     refuseToSubmit = " CRAB3 refuses to send jobs to scheduler because of failure to transfer files to destination site."
     if gridJob:
         refuseToSubmit = ""
-    permanentFailureReasons = {
-                               ".*cancelled aso transfer after timeout.*" : "Transfer canceled due to timeout.",
-                               ".*permission denied.*" : "Permission denied.",
-                               ".*disk quota exceeded.*" : "Disk quota exceeded.",
-                               ".*operation not permitted*" : "Operation not allowed.",
-                               ".*mkdir\(\) fail.*" : "Can`t create directory.",
-                               ".*open/create error.*" : "Can`t create directory/file on destination site.",
-                               ".*mkdir\: cannot create directory.*" : "Can`t create directory.",
-                               ".*does not have enough space.*" : "User quota exceeded.",
-                               ".*reports could not open connection to.*" : "Storage element is not accessible.",
-                               ".*530-login incorrect.*" : "Permission denied to write to destination site.",
-                               ".*451 operation failed\: all pools are full.*": "Destination site does not have enough space on their storage.",
-                               ".*system error in connect\: connection refused.*": "Destination site storage refused connection."
-                              }
-    reason = str(reason).lower()
-    for failureReason in permanentFailureReasons:
-        if re.match(failureReason, reason):
-            reason = permanentFailureReasons[failureReason] + checkQuota + refuseToSubmit
-            return True, reason
-    return False, ""
+    for exitCode in STAGEOUT_ERRORS:
+        for error in STAGEOUT_ERRORS[exitCode]:
+            if re.match(error['regex'], reason.lower()):
+                reason = error['error-msg'] + checkQuota + refuseToSubmit
+                return error['isPermanent'], reason, exitCode
+    return False, "", None
 
 
 def parseJobAd(filename):
@@ -246,3 +232,11 @@ def parseJobAd(filename):
                     continue
             jobAd[info[0]] = val
     return jobAd
+
+
+def mostCommon(lst, default=0):
+    try:
+        return max(set(lst), key=lst.count)
+    except ValueError:
+        return default
+
