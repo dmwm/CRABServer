@@ -177,20 +177,22 @@ class Task(dict):
            It depends on the order of elements, as they are returned from the DB.
 
            :arg list object task: the list of task attributes retrieved from the db."""
+
+        #TODO Find a better way to do that, e.g., a way that do not force you to change numbers every time you add something
         self['tm_taskname'] = task[0]
         self['panda_jobset_id'] = task[1]
         self['tm_task_status'] = task[2]
         self['tm_start_time'] = str(task[3])
         self['tm_start_injection'] = str(task[4])
         self['tm_end_injection'] = str(task[5])
-        self['tm_task_failure'] = task[6] if (task[6] is None or isinstance(task[6], str)) else task[6].read() 
+        self['tm_task_failure'] = task[6] if (task[6] is None or isinstance(task[6], str)) else task[6].read()
         self['tm_job_sw'] = task[7]
         self['tm_job_arch'] = task[8]
         self['tm_input_dataset'] = task[9]
         self['tm_site_whitelist'] = literal_eval(task[10])
         self['tm_site_blacklist'] = literal_eval(task[11])
         self['tm_split_algo'] = task[12]
-        self['tm_split_args'] = literal_eval(task[13] if (task[13] is None or isinstance(task[13], str)) else task[13].read()) 
+        self['tm_split_args'] = literal_eval(task[13] if (task[13] is None or isinstance(task[13], str)) else task[13].read())
         self['tm_totalunits'] = task[14]
         self['tm_user_sandbox'] = task[15]
         self['tm_cache_url'] = task[16]
@@ -240,18 +242,19 @@ class Task(dict):
         self['tm_extrajdl'] = task[43]
         self['tm_generator'] = task[44]
         self['tm_asourl'] = task[45]
-        self['tm_events_per_lumi'] = task[46]
-        self['tm_use_parent'] = task[47]
-        self['tm_collector'] = task[48]
-        self['tm_schedd'] = task[49]
-        self['tm_dry_run'] = task[50]
-        self['tm_user_files'] = literal_eval(task[51] if (task[51] is None or isinstance(task[51], str)) else task[51].read())
-        self['tm_transfer_outputs'] = task[52]
-        self['tm_output_lfn'] = task[53]
-        self['tm_ignore_locality'] = task[54]
-        self['tm_fail_limit'] = task[55]
-        self['tm_one_event_mode'] = task[56]
-        self['tm_publish_groupname'] = task[57]
-        self['tm_nonvalid_input_dataset'] = task[58]
-        self['tm_secondary_input_dataset'] = task[59]
-        self['tm_primary_dataset'] = task[60]
+        self['tm_asodb'] = task[46]
+        self['tm_events_per_lumi'] = task[47]
+        self['tm_use_parent'] = task[48]
+        self['tm_collector'] = task[49]
+        self['tm_schedd'] = task[50]
+        self['tm_dry_run'] = task[51]
+        self['tm_user_files'] = literal_eval(task[52] if (task[52] is None or isinstance(task[52], str)) else task[52].read())
+        self['tm_transfer_outputs'] = task[53]
+        self['tm_output_lfn'] = task[54]
+        self['tm_ignore_locality'] = task[55]
+        self['tm_fail_limit'] = task[56]
+        self['tm_one_event_mode'] = task[57]
+        self['tm_publish_groupname'] = task[58]
+        self['tm_nonvalid_input_dataset'] = task[59]
+        self['tm_secondary_input_dataset'] = task[60]
+        self['tm_primary_dataset'] = task[61]
