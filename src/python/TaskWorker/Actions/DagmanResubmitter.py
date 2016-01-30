@@ -46,11 +46,15 @@ class DagmanResubmitter(TaskAction):
 
         if task.get('resubmit_publication', False):
             asourl = task.get('tm_asourl', None)
+            #Let's not assume the db has been updated (mostly for devs), let's default asodb to asynctransfer!
+            #Also the "or" takes care of the case were the new code is executed on old task
+            #i.e.: tm_asodb is there but empty.
+            asodb = task.get('tm_asodb', 'asynctransfer') or 'asynctransfer'
             if not asourl:
                 msg = "ASO URL not set. Can not resubmit publication."
                 raise TaskWorkerException(msg)
             self.logger.info("Will resubmit failed publications")
-            self.resubmitPublication(asourl, proxy, workflow)
+            self.resubmitPublication(asourl, asodb, proxy, workflow)
             return
 
         if task['tm_collector']:
@@ -179,14 +183,14 @@ class DagmanResubmitter(TaskAction):
             raise TaskWorkerException(msg)
 
 
-    def resubmitPublication(self, asourl, proxy, taskname):
+    def resubmitPublication(self, asourl, asodb, proxy, taskname):
         """
         Resubmit failed publications by resetting the publication
         status in the CouchDB documents.
         """
         server = CouchServer(dburl=asourl, ckey=proxy, cert=proxy)
         try:
-            database = server.connectDatabase('asynctransfer')
+            database = server.connectDatabase(asodb)
         except Exception as ex:
             msg = "Error while trying to connect to CouchDB: %s" % (str(ex))
             raise TaskWorkerException(msg)

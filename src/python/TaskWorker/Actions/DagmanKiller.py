@@ -106,8 +106,12 @@ class DagmanKiller(TaskAction):
 
     def killTransfers(self, apmon):
         self.logger.info("About to kill transfers from workflow %s." % self.workflow)
-        ASOURL = self.task.get('tm_asourl', None)
-        if not ASOURL:
+        asourl = self.task.get('tm_asourl', None)
+        #let's default asodb to asynctransfer, for old task this is empty!
+        #Probably tm_asodb is always there and the get is not necessary, but let's not assume this
+        asodb = self.task.get('tm_asodb', 'asynctransfer') or 'asynctransfer'
+
+        if not asourl:
             self.logger.info("ASO URL not set; will not kill transfers")
             return False
 
@@ -116,9 +120,9 @@ class DagmanKiller(TaskAction):
         except:
             hostname = ''
 
-        server = CMSCouch.CouchServer(dburl=ASOURL, ckey=self.proxy, cert=self.proxy)
+        server = CMSCouch.CouchServer(dburl=asourl, ckey=self.proxy, cert=self.proxy)
         try:
-            db = server.connectDatabase('asynctransfer')
+            db = server.connectDatabase(asodb)
         except Exception as ex:
             msg =  "Error while connecting to asynctransfer CouchDB"
             self.logger.exception(msg)

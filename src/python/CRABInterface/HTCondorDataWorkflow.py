@@ -465,7 +465,9 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## Retrieve publication information.
         publicationInfo = {}
         if (row.publication == 'T' and 'finished' in result['jobsPerStatus']):
-            publicationInfo = self.publicationStatus(workflow, row.asourl, row.asodb)
+            #let's default asodb to asynctransfer, for old task this is empty!
+            asodb = row.asodb or 'asynctransfer'
+            publicationInfo = self.publicationStatus(workflow, row.asourl, asodb)
             self.logger.info("Publication status for workflow %s done" % workflow)
         elif (row.publication == 'F'):
             publicationInfo['status'] = {'disabled': []}
@@ -631,6 +633,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             db = server.connectDatabase(asodb)
         except Exception:
             msg = "Error while connecting to asynctransfer CouchDB for workflow %s " % (workflow)
+            msg += "\n asourl=%s asodb=%s" % (asourl, asodb)
             self.logger.exception(msg)
             publicationInfo['status'] = {'error': msg}
             return publicationInfo

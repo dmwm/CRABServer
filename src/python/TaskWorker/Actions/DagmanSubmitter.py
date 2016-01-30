@@ -77,6 +77,7 @@ SUBMIT_INFO = [ \
     ('MaxWallTimeMins', 'tm_maxjobruntime'),
     ('JobPrio', 'tm_priority'),
     ('CRAB_ASOURL', 'tm_asourl'),
+    ('CRAB_ASODB', 'tm_asodb'),
     ('CRAB_FailedNodeLimit', 'faillimit'),
     ('CRAB_DashboardTaskType', 'taskType'),
     ('CRAB_MaxPost', 'maxpost')]

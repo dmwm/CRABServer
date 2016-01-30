@@ -515,7 +515,7 @@ def inject_to_aso(file_transfer_info):
     """
     Inject a document to the ASO database.
     """
-    for attr in ['CRAB_ASOURL', 'CRAB_AsyncDest', 'DESIRED_CMSDataset', \
+    for attr in ['CRAB_ASOURL', 'CRAB_ASODB', 'CRAB_AsyncDest', 'DESIRED_CMSDataset', \
                  'CRAB_UserGroup', 'CRAB_UserRole', 'CRAB_DBSURL', \
                  'CRAB_ReqName', 'CRAB_UserHN', 'CRAB_Publish', \
                  'CRAB_RestHost', 'CRAB_RestURInoAPI', 'CRAB_PrimaryDataset']:
@@ -608,7 +608,7 @@ def inject_to_aso(file_transfer_info):
     couch_server = CMSCouch.CouchServer(dburl = G_JOB_AD['CRAB_ASOURL'], \
                                         ckey = os.environ['X509_USER_PROXY'], \
                                         cert = os.environ['X509_USER_PROXY'])
-    couch_database = couch_server.connectDatabase("asynctransfer", create = False)
+    couch_database = couch_server.connectDatabase(G_JOB_AD['CRAB_ASODB'], create = False)
 
     needs_commit = True
     try:
@@ -1807,6 +1807,7 @@ def main():
             print(msg)
             if 'CRAB_ASOURL' in G_JOB_AD and G_JOB_AD['CRAB_ASOURL']:
                 msg = "Will use ASO server at %s." % (G_JOB_AD['CRAB_ASOURL'])
+                msg += "ASO db name is %s." % G_JOB_AD['CRAB_ASODB']
                 print(msg)
             for file_transfer_info in G_ASO_TRANSFER_REQUESTS:
                 if not file_transfer_info['inject']:
