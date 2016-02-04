@@ -98,6 +98,7 @@ CRAB_Id = $(count)
 +CRAB_OutLFNDir = "%(output_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
 +CRAB_ASOURL = %(tm_asourl)s
++CRAB_ASODB = %(tm_asodb)s
 +CRAB_PrimaryDataset = %(primarydataset)s
 +TaskType = "Job"
 +AccountingGroup = %(accounting_group)s
@@ -209,7 +210,7 @@ def transform_strings(input):
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'primarydataset', 'splitalgo', 'algoargs', \
                'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-               'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', \
+               'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
                'stageoutpolicy', 'taskType', 'worker_name', 'desired_opsys', 'desired_opsysvers', \
                'desired_arch', 'accounting_group', 'resthost', 'resturinoapi':
         val = input.get(var, None)
@@ -416,6 +417,8 @@ class DagmanCreator(TaskAction.TaskAction):
         info['edmoutfiles'] = task['tm_edm_outfiles']
         info['oneEventMode'] = 1 if info['tm_one_event_mode'] == 'T' else 0
         info['ASOURL'] = task['tm_asourl']
+        asodb = task.get('tm_asodb', 'asynctransfer') or 'asynctransfer'
+        info['ASODB'] = asodb
         info['taskType'] = self.getDashboardTaskType()
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0

@@ -58,7 +58,6 @@ RX_CHECKSUM  = re.compile(r'^[A-Za-z0-9\-]+$')
 RX_FILESTATE  = re.compile(r'^TRANSFERRING|FINISHED|FAILED|COOLOFF$')
 RX_LFNPATH   = re.compile(r"^(?=.{0,500}$)%(subdir)s(/%(subdir)s)*/?$" % lfnParts)
 RX_HOURS   = re.compile(r"^\d{0,6}$") #should be able to erase the last 100 years with 6 digits
-RX_ASOURL = RX_DBSURL
 RX_URL = re.compile(r"^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w :\.-])*$")
 RX_SCRIPTARGS = re.compile(r'^[+a-zA-Z0-9\-.,_:?/"]+=[a-zA-Z0-9\-.,_:?/"()]+$')
 RX_SCHEDD_NAME = re.compile(r"^[A-Za-z0-9._-]+[@.][A-Za-z0-9._-]+\.[A-Za-z]{2,6}$")
@@ -81,9 +80,11 @@ RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._]{1,100}$")
 ## this can be improved by putting a dependency on CAFUtilities task state machine
 RX_STATUS = re.compile(r"^[A-Za-z_]{1,20}$")
 
-##inserted by eric obeng summer student for username validation
-RX_USERNAME = re.compile(r"^[A-Za-z_]{1,20}$")
+RX_USERNAME = re.compile(r"^[A-Za-z_0-9]{1,20}$")
 RX_DATE = re.compile(r"^(19|20)\d\d[- /.](0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|3[01])$")
+
+RX_ASOURL = RX_DBSURL
+RX_ASODB = RX_USERNAME
 
 ## need to be careful with this
 RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s\=\+/]{0,10000}$")

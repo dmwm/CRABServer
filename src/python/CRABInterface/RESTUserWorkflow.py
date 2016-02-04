@@ -1,6 +1,7 @@
 # external dependecies here
 import re
 import time
+import random
 import logging
 import cherrypy
 
@@ -18,6 +19,7 @@ from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
 from CRABInterface.Regexps import *
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
 from ServerUtilities import checkOutLFN
+
 
 
 class RESTUserWorkflow(RESTEntity):
@@ -210,6 +212,67 @@ class RESTUserWorkflow(RESTEntity):
             setattr(invalidp, 'trace', '')
             raise invalidp
 
+    def _getAsoConfig(self, asourl, asodb):
+        """ Figures out which asourl and asodb to use. Here some rules:
+            1) If ASOURL is set up in the client then use it. If ASODB is None then default to 'asynctransfer' (for old clients).
+               If ASODB is defined but ASOURL is not, then give an error (somebody is doing it wrong!).
+            2) If ASOURL is not defined in the client then look at the external configuration of the server which looks like:
+                ...
+                "ASOURL" : "https://cmsweb.cern.ch/couchdb",
+                "asoConfig" : [
+                    {"couchURL" : "https://cmsweb.cern.ch/couchdb", "couchDBName" : "asynctransfer"},
+                    {"couchURL" : "https://cmsweb-testbed.cern.ch/couchdb2", "couchDBName" : "asynctransfer1"}
+                ]
+                ...
+
+                2.1) The external configuration contains asoConfig (the new and default thing now):
+                     Pick up a random element from the list and figures out the asourl and asodb.
+                     No validation of the configuration is done,
+                     we assume asocConfig is a list that contains dicts (at least one),
+                     and each dict has both couchURL and couchDBName.
+                     Documentation about the external conf is here:
+                         https://twiki.cern.ch/twiki/bin/view/CMSPublic/CMSCrabRESTInterface#External_dynamic_configuration
+                2.2) Else if the external configuration contains the old key ASOURL:
+                     ASOURL could either be a string (the value for asourl that we need to use) or a list (in which case
+                     we will use a random element)
+            3) If asourl is not defined in the client nor in the external config give an error.
+        """
+
+        ASYNC_DEFAULT_DB = 'asynctransfer'
+
+        #1) The user is trying to pass something to us
+        if asourl:
+            self.logger.info("ASO url and database defined in the client configuration")
+            if not asodb:
+                asodb = ASYNC_DEFAULT_DB
+        if asodb and not asourl:
+            raise ExecutionError("You set up Debug.ASODB but you did not set up Debug.ASOURL. Please specify ASOURL as well or remove ASODB.")
+
+        #2) We need to figure out the values ourselves
+        if not asourl: #just checking asourl here because either both asourl and asodb are set, or neither are
+            extconf = self.centralcfg.centralconfig.get("backend-urls", {})
+            #2.1) Get asourl and asodb from the new extrnal configuration (that's what we usually do for most of the users)
+            if 'asoConfig' in extconf:
+                asoconf = random.choice(extconf['asoConfig'])
+                asourl = asoconf['couchURL']
+                asodb = asoconf['couchDBName']
+            #2.2) No asoConfig defined, let's look for the old ASOURL.
+            elif 'ASOURL' in extconf:
+                msg = "You are using the old ASOURL parameter in your external configuration, please use asoConfig instead."
+                msg += "\nSee https://twiki.cern.ch/twiki/bin/view/CMSPublic/CMSCrabRESTInterface#External_dynamic_configuration"
+                self.logger.warning(msg)
+                if isinstance(extconf['ASOURL'], list):
+                    asourl = random.choice(asourl)
+                else:
+                    asourl = extconf['ASOURL']
+                asodb = ASYNC_DEFAULT_DB
+
+        #3) Give an error if we cannot figure out aso configuration
+        if not (asourl and asodb):
+            raise ExecutionError("The server configuration is wrong (asoConfig missing): cannot figure out ASO urls.")
+
+        return asourl, asodb
+
     def _checkSite(self, site, pnn = False):
         sites = self.allPNNNames.sites if pnn else self.allCMSNames.sites
         if site not in sites:
@@ -350,7 +413,7 @@ class RESTUserWorkflow(RESTEntity):
             ## The client is not forced to define the primary dataset. So make sure to have
             ## defaults or take it from the input dataset. The primary dataset is needed for
             ## the LFN of the output/log files and for publication. We want to have it well
-            ## defined even if publication and/or transfer to storage are off. 
+            ## defined even if publication and/or transfer to storage are off.
             if safe.kwargs['inputdata']:
                 param.kwargs['primarydataset'] = safe.kwargs['inputdata'].split('/')[1]
             if not param.kwargs.get('primarydataset', None):
@@ -387,6 +450,8 @@ class RESTUserWorkflow(RESTEntity):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
             validate_strlist("adduserfiles", param, safe, RX_ADDFILE)
             validate_str("asourl", param, safe, RX_ASOURL, optional=True)
+            validate_str("asodb", param, safe, RX_ASODB, optional=True)
+            safe.kwargs["asourl"], safe.kwargs["asodb"] = self._getAsoConfig(safe.kwargs["asourl"], safe.kwargs["asodb"])
             validate_str("scriptexe", param, safe, RX_ADDFILE, optional=True)
             validate_strlist("scriptargs", param, safe, RX_SCRIPTARGS)
             validate_str("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
@@ -464,7 +529,7 @@ class RESTUserWorkflow(RESTEntity):
                 savelogsflag, publication, publishname, publishname2, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
                 tfileoutfiles, edmoutfiles, runs, lumis,
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
-                faillimit, ignorelocality, userfiles, asourl, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun):
+                faillimit, ignorelocality, userfiles, asourl, asodb, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun):
         """Perform the workflow injection
 
            :arg str workflow: request name defined by the user;
@@ -513,6 +578,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg int ignorelocality: whether to ignore file locality in favor of the whitelist.
            :arg str userfiles: The files to process instead of a DBS-based dataset.
            :arg str asourl: ASO url to be used in place of the one in the ext configuration.
+           :arg str asodb: ASO db to be used in place of the one in the ext configuration. Default to asynctransfer.
            :arg str scriptexe: script to execute in place of cmsrun.
            :arg str scriptargs: arguments to be passed to the scriptexe script.
            :arg str scheddname: Schedd Name used for debugging.
@@ -533,7 +599,7 @@ class RESTUserWorkflow(RESTEntity):
                                        dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfn=lfn,
-                                       ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, asourl=asourl,
+                                       ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, asourl=asourl, asodb=asodb,
                                        scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun)
 
     @restcall

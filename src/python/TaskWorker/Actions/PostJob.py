@@ -274,11 +274,15 @@ class ASOServerJob(object):
         self.aso_start_timestamp = aso_start_timestamp
         proxy = os.environ.get('X509_USER_PROXY', None)
         self.aso_db_url = self.job_ad['CRAB_ASOURL']
+        #I don't think it is necessary to default to asynctransfer here, we are taking care of it
+        #in dagman creator and if CRAB_ASODB is not there it means it's old task executing old code
+        #But just to make sure...
+        self.aso_db_name = self.job_ad.get('CRAB_ASODB', 'asynctransfer') or 'asynctransfer'
         try:
             if first_pj_execution():
                 self.logger.info("Will use ASO server at %s." % (self.aso_db_url))
             self.couch_server = CMSCouch.CouchServer(dburl = self.aso_db_url, ckey = proxy, cert = proxy)
-            self.couch_database = self.couch_server.connectDatabase("asynctransfer", create = False)
+            self.couch_database = self.couch_server.connectDatabase(self.aso_db_name, create = False)
         except Exception as ex:
             msg = "Failed to connect to ASO database: %s" % (str(ex))
             self.logger.exception(msg)
@@ -1997,6 +2001,7 @@ class PostJob():
         required_job_ad_attrs = {'CRAB_UserRole': {'allowUndefined': True },
                                  'CRAB_UserGroup': {'allowUndefined': True },
                                  'CRAB_ASOURL': {'allowUndefined': False},
+                                 'CRAB_ASODB': {'allowUndefined': True},
                                  'CRAB_AsyncDest': {'allowUndefined': False},
                                  'CRAB_DBSURL': {'allowUndefined': False},
                                  'DESIRED_CMSDataset': {'allowUndefined': True },

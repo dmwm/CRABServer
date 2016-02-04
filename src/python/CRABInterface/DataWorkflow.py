@@ -1,5 +1,4 @@
 import copy
-import random
 import logging
 import cherrypy
 from ast import literal_eval
@@ -105,8 +104,8 @@ class DataWorkflow(object):
                sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                username, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
-               ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, scriptexe=None, scriptargs=None, scheddname=None,
-               extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None):
+               ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, asodb=None, scriptexe=None, scriptargs=None,
+               scheddname=None, extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -154,6 +153,7 @@ class DataWorkflow(object):
            :arg str lfn: lfn used to store output files.
            :arg str userfiles: The files to process instead of a DBS-based dataset.
            :arg str asourl: Specify which ASO to use for transfers and publishing.
+           :arg str asodb: ASO db to be used in place of the one in the ext configuration. Default to asynctransfer.
            :arg str scheddname: Schedd Name used for debugging.
            :arg str collector: Collector Name used for debugging.
            :arg int dryrun: enable dry run mode (initialize but do not submit task).
@@ -185,11 +185,6 @@ class DataWorkflow(object):
             numcores = 1
         if priority is None:
             priority = 10
-
-        if not asourl:
-            asourl = self.centralcfg.centralconfig.get("backend-urls", {}).get("ASOURL", "")
-            if isinstance(asourl, list):
-                asourl = random.choice(asourl)
 
         arguments = {}
 
@@ -244,6 +239,7 @@ class DataWorkflow(object):
                             scriptargs      = [dbSerializer(scriptargs)],
                             extrajdl        = [dbSerializer(extrajdl)],
                             asourl          = [asourl],
+                            asodb           = [asodb],
                             collector       = [collector],
                             schedd_name     = [schedd_name],
                             dry_run         = ['T' if dryrun else 'F'],

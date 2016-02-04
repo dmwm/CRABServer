@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-import logging
-
 class Task(object):
     """
     """
@@ -14,7 +12,7 @@ class Task(object):
                        tm_publish_dbs_url, tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
                        tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, \
                        tm_user_infiles, tw_name, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority, tm_activity, \
-                       tm_scriptexe, tm_scriptargs, tm_extrajdl, tm_generator, tm_asourl, tm_events_per_lumi, \
+                       tm_scriptexe, tm_scriptargs, tm_extrajdl, tm_generator, tm_asourl, tm_asodb, tm_events_per_lumi, \
                        tm_use_parent, tm_collector, tm_schedd, tm_dry_run, \
                        tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode, \
                        tm_publish_groupname, tm_nonvalid_input_dataset, tm_secondary_input_dataset, tm_primary_dataset \
@@ -36,7 +34,7 @@ class Task(object):
               tm_user_vo, tm_user_role, tm_user_group, tm_publish_name, tm_publish_groupname, tm_asyncdest, tm_dbs_url, tm_publish_dbs_url, \
               tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, tm_job_type, tm_generator, tm_arguments, \
               panda_resubmitted_jobs, tm_save_logs, tm_user_infiles, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority, \
-              tm_scriptexe, tm_scriptargs, tm_extrajdl, tm_asourl, tm_events_per_lumi, tm_collector, tm_schedd, tm_dry_run, \
+              tm_scriptexe, tm_scriptargs, tm_extrajdl, tm_asourl, tm_asodb, tm_events_per_lumi, tm_collector, tm_schedd, tm_dry_run, \
               tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode) \
               VALUES (%(task_name)s, %(task_activity)s, %(jobset_id)s, upper(%(task_status)s), UTC_TIMESTAMP(), %(task_failure)s, %(job_sw)s, \
               %(job_arch)s, %(input_dataset)s, %(primary_dataset)s, %(nonvalid_data)s, %(use_parent)s, %(secondary_dataset)s, %(site_whitelist)s, %(site_blacklist)s, \
@@ -44,7 +42,7 @@ class Task(object):
               %(user_vo)s, %(user_role)s, %(user_group)s, %(publish_name)s, %(publish_groupname)s, %(asyncdest)s, %(dbs_url)s, %(publish_dbs_url)s, \
               %(publication)s, %(outfiles)s, %(tfile_outfiles)s, %(edm_outfiles)s, %(job_type)s, %(generator)s, %(arguments)s, \
               %(resubmitted_jobs)s, %(save_logs)s, %(user_infiles)s, %(maxjobruntime)s, %(numcores)s, %(maxmemory)s, %(priority)s, \
-              %(scriptexe)s, %(scriptargs)s, %(extrajdl)s, %(asourl)s, %(events_per_lumi)s, %(collector)s, %(schedd_name)s, %(dry_run)s, \
+              %(scriptexe)s, %(scriptargs)s, %(extrajdl)s, %(asourl)s, %(asodb)s, %(events_per_lumi)s, %(collector)s, %(schedd_name)s, %(dry_run)s, \
               %(user_files)s, %(transfer_outputs)s, %(output_lfn)s, %(ignore_locality)s, %(fail_limit)s, %(one_event_mode)s)"
 
     GetResubmitParams_sql = "SELECT tm_site_blacklist, tm_site_whitelist, tm_maxjobruntime, tm_maxmemory, tm_numcores, tm_priority \
