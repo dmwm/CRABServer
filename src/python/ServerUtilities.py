@@ -151,7 +151,7 @@ def createDummyFile(filename, logger):
     try:
         with open(abspath, 'w') as fd:
             fd.write('This is a dummy file created by the crab checkwrite command on %s' % str(datetime.datetime.now().strftime('%d/%m/%Y at %H:%M:%S')))
-    except IOError as er:
+    except IOError:
         logger.info('Error: Failed to create file %s localy.' % filename)
         raise
 

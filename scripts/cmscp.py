@@ -17,10 +17,10 @@ import hashlib
 import datetime
 import traceback
 
-from ServerUtilities import cmd_exist, parseJobAd
-
 if os.path.exists("WMCore.zip") and "WMCore.zip" not in sys.path:
     sys.path.append("WMCore.zip")
+
+from ServerUtilities import cmd_exist, parseJobAd
 
 if 'http_proxy' in os.environ and not os.environ['http_proxy'].startswith("http://"):
     os.environ['http_proxy'] = "http://%s" % (os.environ['http_proxy'])

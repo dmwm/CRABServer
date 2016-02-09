@@ -1101,7 +1101,7 @@ class PostJob():
                     msg += "\nDetails follow:"
                     self.logger.exception(msg)
                     self.logger.info("Continuing since this is not a critical error.")
-            except Exception as e:
+            except Exception:
                 msg  = "Cannot create symbolic link to the jobreport json."
                 msg += "\nDetails follow:"
                 self.logger.exception(msg)
@@ -2260,7 +2260,7 @@ class PostJob():
                 with open(fname + '.tmp', 'w') as fd:
                     json.dump(retry_info, fd)
                 os.rename(fname + '.tmp', fname)
-            except Exception as e:
+            except Exception:
                 msg  = "Failed to update file %s with increased post-job count by +1." % (fname)
                 msg += "\nDetails follow:"
                 self.logger.exception(msg)
