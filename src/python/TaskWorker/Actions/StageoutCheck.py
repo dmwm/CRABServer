@@ -1,11 +1,13 @@
 import os
 import re
 from httplib import HTTPException
+
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
-from ServerUtilities import getCheckWriteCommand, createDummyFile 
-from ServerUtilities import removeDummyFile, getPFN, executeCommand
+
 from ServerUtilities import isFailurePermanent
+from ServerUtilities import getCheckWriteCommand, createDummyFile
+from ServerUtilities import removeDummyFile, getPFN, executeCommand
 
 class StageoutCheck(TaskAction):
 
@@ -19,6 +21,7 @@ class StageoutCheck(TaskAction):
         self.task = None
         self.proxy = None
         self.workflow = None
+        TaskAction.__init__(self, *args, **kwargs)
 
     def checkPermissions(self, Cmd):
         """
