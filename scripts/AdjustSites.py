@@ -198,6 +198,7 @@ def makeWebDir(ad):
         sourceLinks = ["debug",
                        "RunJobs.dag", "RunJobs.dag.dagman.out", "RunJobs.dag.nodes.log",
                        "input_files.tar.gz", "run_and_lumis.tar.gz",
+                       "input_dataset_lumis.json", "input_dataset_duplicate_lumis.json",
                        "aso_status.json", "error_summary.json",
                       ]
         for source in sourceLinks:
@@ -210,6 +211,7 @@ def makeWebDir(ad):
         os.symlink(os.path.abspath(os.path.join(".", ".job.ad")), os.path.join(path, "job_ad.txt"))
     except Exception as ex:
         printLog("Failed to copy/symlink files in the user web directory: %s" % str(ex))
+
     try:
         storage_rules = htcondor.param['CRAB_StorageRules']
     except:

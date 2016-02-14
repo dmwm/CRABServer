@@ -2,6 +2,7 @@ from __future__ import print_function
 import os
 import time
 import logging
+import tempfile
 import traceback
 from logging import FileHandler
 from httplib import HTTPException
@@ -31,16 +32,30 @@ class TaskHandler(object):
     """Handling the set of operations to be performed."""
 
 
-    def __init__(self, task, procnum, server, workFunction):
+    def __init__(self, task, procnum, server, config, workFunction, createTempDir=False):
         """Initializer
 
         :arg TaskWorker.DataObjects.Task task: the task to work on."""
         self.logger = logging.getLogger(str(procnum))
         self.procnum = procnum
         self.server = server
+        self.config = config
         self.workFunction = workFunction
         self._work = []
         self._task = task
+        self.tempDir = None
+        if createTempDir:
+            self.tempDir = self.createTempDir()
+            self._task['scratch'] = self.tempDir
+
+
+    def createTempDir(self):
+        if hasattr(self.config, 'TaskWorker') and hasattr(self.config.TaskWorker, 'scratchDir'):
+            tempDir = tempfile.mkdtemp(prefix='_' + self._task['tm_taskname'], dir=self.config.TaskWorker.scratchDir)
+        else:
+            msg = "The 'scratchDir' parameter is not set in the config.TaskWorker section of the CRAB server backend configuration file."
+            raise Exception(msg)
+        return tempDir
 
 
     def addTaskLogHandler(self):
@@ -96,7 +111,7 @@ class TaskHandler(object):
             self.logger.debug("Starting %s on %s" % (str(work), self._task['tm_taskname']))
             t0 = time.time()
             try:
-                output = work.execute(nextinput, task=self._task)
+                output = work.execute(nextinput, task=self._task, tempDir=self.tempDir)
             except StopHandler as sh:
                 msg = "Controlled stop of handler for %s on %s " % (self._task, str(sh))
                 self.logger.error(msg)
@@ -151,7 +166,7 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     :*args and *kwargs: extra parameters currently not defined
     :return: the handler."""
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=2)
-    handler = TaskHandler(task, procnum, server, 'handleNewTask')
+    handler = TaskHandler(task, procnum, server, config, 'handleNewTask', createTempDir=True)
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
     handler.addWork(StageoutCheck(config=config, server=server, resturi=resturi, procnum=procnum))
     if task['tm_job_type'] == 'Analysis':
@@ -185,7 +200,7 @@ def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=2)
-    handler = TaskHandler(task, procnum, server, 'handleResubmit')
+    handler = TaskHandler(task, procnum, server, config, 'handleResubmit')
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
     def glidein(config):
         """Performs the re-injection into Glidein
@@ -207,7 +222,7 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=2)
-    handler = TaskHandler(task, procnum, server, 'handleKill')
+    handler = TaskHandler(task, procnum, server, config, 'handleKill')
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 5))
     def glidein(config):
         """Performs kill of jobs sent through Glidein

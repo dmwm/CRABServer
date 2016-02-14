@@ -2,6 +2,7 @@ import re
 import json
 import time
 import copy
+import tarfile
 import StringIO
 import tempfile
 from ast import literal_eval
@@ -9,7 +10,6 @@ from ast import literal_eval
 import pycurl
 import classad
 
-from ServerUtilities import FEEDBACKMAIL
 import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.WMSpec.WMTask import buildLumiMask
 from WMCore.DataStructs.LumiList import LumiList
@@ -17,6 +17,8 @@ from WMCore.Services.DBS.DBSReader import DBSReader
 from CRABInterface.DataWorkflow import DataWorkflow
 from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Error import ExecutionError, InvalidParameter
+
+from ServerUtilities import FEEDBACKMAIL
 from CRABInterface.Utils import conn_handler, global_user_throttle
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 
@@ -154,67 +156,200 @@ class HTCondorDataWorkflow(DataWorkflow):
                   }
 
 
-    def report(self, workflow, userdn, usedbs):
+    def report(self, workflow, userdn):
         """
-        Computes the report for workflow. If usedbs is used also query DBS and return information about the input and output datasets
+        Computes the report for the workflow.
         """
+
+        ## This is what we want to return to the client:
+        ## 1) The status of each job (useful for the client to return lumi information
+        ##    at a per job status basis).
+        ## 2) The lumis (and the lumis split across files) in the input dataset at data
+        ##    discovery time.
+        ## 3) The lumi-mask (lumi-mask AND run-range).
+        ## 4) The lumis each job was requested to process.
+        ## 5) The lumis each job has processed.
+        ## 6) The lumis in the published output datasets.
 
         def _compactLumis(datasetInfo):
             """ Help function that allow to convert from runLumis divided per file (result of listDatasetFileDetails)
                 to an aggregated result.
             """
             lumilist = {}
-            for dummyfile, info in datasetInfo.iteritems():
+            for dummyFile, info in datasetInfo.iteritems():
                 for run, lumis in info['Lumis'].iteritems():
                     lumilist.setdefault(str(run), []).extend(lumis)
             return lumilist
 
         res = {}
-        self.logger.info("About to compute report of workflow: %s with usedbs=%s. Getting status first." % (workflow, usedbs))
-        statusRes = self.status(workflow, userdn)[0]
 
-        #get the information we need from the taskdb/initilize variables
+        ## Get the jobs status first.
+        self.logger.info("About to compute report of workflow %s. Getting status first." % (workflow))
+        statusRes = self.status(workflow, userdn)[0]
+        statusPerJob = {}
+        for status, jobid in statusRes['jobList']:
+            statusPerJob[str(jobid)] = status
+        res['statusPerJob'] = statusPerJob
+        numJobs = len(statusPerJob)
+
+        ## Get the information we need from the Task DB.
         row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
         row = self.Task.ID_tuple(*row)
+        userWebDirURL = row.user_webdir
+        if not userWebDirURL:
+            self.logger.warning("WebDir URL not defined for task %s" % (workflow))
         inputDataset = row.input_dataset
-        outputDatasets = literal_eval(row.output_dataset.read() if row.output_dataset else 'None')
         dbsUrl = row.dbs_url
-
-        #load the lumimask
+        outputDatasets = literal_eval(row.output_dataset.read() if row.output_dataset else '[]')
+        publication = True if row.publication == 'T' else False
         splitArgs = literal_eval(row.split_args.read())
+        res['publication'] = publication
+
+        ## What the input dataset had in DBS when the task was submitted
+        ## -------------------------------------------------------------
+        ## Get the lumis (and the lumis split across files) in the input dataset. Files
+        ## containing this information were created at data discovery time and then
+        ## copied to the schedd.
+        res['inputDataset'] = {'lumis': {}, 'duplicateLumis': {}}
+        if inputDataset and userWebDirURL:
+            curl = self.prepareCurl()
+            fp = tempfile.TemporaryFile()
+            curl.setopt(pycurl.WRITEFUNCTION, fp.write)
+            hbuf = StringIO.StringIO()
+            curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
+            try:
+                ## Retrieve the lumis in the input dataset.
+                url = userWebDirURL + "/input_dataset_lumis.json"
+                curl.setopt(pycurl.URL, url)
+                self.myPerform(curl, url)
+                header = ResponseHeader(hbuf.getvalue())
+                if header.status == 200:
+                    fp.seek(0)
+                    res['inputDataset']['lumis'] = json.load(fp)
+                else:
+                    self.logger.error("Failed to retrieve input dataset lumis.")
+                ## Clean temp file and buffer.
+                fp.seek(0); fp.truncate(0); hbuf.truncate(0)
+                ## Retrieve the lumis split across files in the input dataset.
+                url = userWebDirURL + "/input_dataset_duplicate_lumis.json"
+                curl.setopt(pycurl.URL, url)
+                self.myPerform(curl, url)
+                header = ResponseHeader(hbuf.getvalue())
+                if header.status == 200:
+                    fp.seek(0)
+                    res['inputDataset']['duplicateLumis'] = json.load(fp)
+                else:
+                    self.logger.error("Failed to retrieve input dataset duplicate lumis.")
+            finally:
+                fp.close()
+                hbuf.close()
+
+        ## The filter of lumi-mask, run-range
+        ## ----------------------------------
+        ## Build a lumi-mask from the splitting arguments in the Task DB. This lumi-mask
+        ## is equal to: user lumi-mask AND user run-range.
         res['lumiMask'] = buildLumiMask(splitArgs['runs'], splitArgs['lumis'])
-        self.logger.info("Lumi mask was: %s" % res['lumiMask'])
 
-        #extract the finished jobs from filemetadata
-        jobids = [x[1] for x in statusRes['jobList'] if x[0] in ['finished']]
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,POOLIN', taskname=workflow)
+        ## What each job was requested to process
+        ## --------------------------------------
+        ## Get the lumis to process by each job in the workflow.
+        res['lumisToProcess'] = {}
+        if userWebDirURL:
+            curl = self.prepareCurl()
+            fp = tempfile.NamedTemporaryFile()
+            curl.setopt(pycurl.WRITEFUNCTION, fp.write)
+            hbuf = StringIO.StringIO()
+            curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
+            try:
+                url = userWebDirURL + "/run_and_lumis.tar.gz"
+                curl.setopt(pycurl.URL, url)
+                self.myPerform(curl, url)
+                header = ResponseHeader(hbuf.getvalue())
+                if header.status == 200:
+                    fp.seek(0)
+                    tarball = tarfile.open(fp.name)
+                    try:
+                        for jobid in xrange(1, numJobs+1):
+                            filename = "job_lumis_%d.json" % (jobid)
+                            try:
+                                member = tarball.getmember(filename)
+                            except KeyError:
+                                self.logger.warning("File %s not found in run_and_lumis.tar.gz for task %s" % (filename, workflow))
+                            else:
+                                fd = tarball.extractfile(member)
+                                try:
+                                    res['lumisToProcess'][str(jobid)] = json.load(fd)
+                                finally:
+                                    fd.close()
+                    finally:
+                        tarball.close()
+            finally:
+                fp.close()
+                hbuf.close()
 
+        ## What each job has processed
+        ## ---------------------------
+        ## Retrieve the filemetadata of output and input files. (The filemetadata are
+        ## uploaded by the post-job after stageout has finished for all output and log
+        ## files in the job.)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow)
+        ## Extract from the filemetadata the necessary information. 
         res['runsAndLumis'] = {}
         for row in rows:
-            if row[GetFromTaskAndType.PANDAID] in jobids:
-                if str(row[GetFromTaskAndType.PANDAID]) not in res['runsAndLumis']:
-                    res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])] = []
-                res['runsAndLumis'][str(row[GetFromTaskAndType.PANDAID])].append( { 'parents': row[GetFromTaskAndType.PARENTS].read(),
-                        'runlumi': row[GetFromTaskAndType.RUNLUMI].read(),
-                        'events': row[GetFromTaskAndType.INEVENTS],
-                        'type': row[GetFromTaskAndType.TYPE],
-                        'lfn': row[GetFromTaskAndType.LFN],
-                })
-        self.logger.info("Got %s edm files for workflow %s" % (len(res['runsAndLumis']), workflow))
+            jobidstr = str(row[GetFromTaskAndType.PANDAID])
+            if statusPerJob.get(jobidstr) in ['finished']:
+                if jobidstr not in res['runsAndLumis']:
+                    res['runsAndLumis'][jobidstr] = []
+                res['runsAndLumis'][jobidstr].append({'parents': row[GetFromTaskAndType.PARENTS].read(),
+                                                      'runlumi': row[GetFromTaskAndType.RUNLUMI].read(),
+                                                      'events': row[GetFromTaskAndType.INEVENTS],
+                                                      'type': row[GetFromTaskAndType.TYPE],
+                                                      'lfn': row[GetFromTaskAndType.LFN],
+                                                     })
+        self.logger.info("Got %s EDM,TFILE,FAKE,POOLIN filemetadata for workflow %s" % (len(res['runsAndLumis']), workflow))
 
-        if usedbs:
-            if not outputDatasets:
-                raise ExecutionError("Cannot find any information about the output datasets names. You can try to execute 'crab report' with --dbs=no")
+        ## What has been published
+        ## -----------------------
+        ## Get the lumis and number of events in the published output datasets.
+        res['outputDatasets'] = {}
+        if publication:
+            for outputDataset in outputDatasets:
+                res['outputDatasets'][outputDataset] = {'lumis': {}, 'numEvents': 0}
+                try:
+                    dbs = DBSReader("https://cmsweb.cern.ch/dbs/prod/phys03/DBSReader") #We can only publish here with DBS3
+                    outputDatasetDetails = dbs.listDatasetFileDetails(outputDataset)
+                except Exception as ex:
+                    msg  = "Failed to retrieve information from DBS for output dataset %s." % (outputDataset)
+                    msg += " Exception while contacting DBS: %s" % (str(ex))
+                    self.logger.exception(msg)
+                else:
+                    outputDatasetLumis = _compactLumis(outputDatasetDetails)
+                    outputDatasetLumis = LumiList(runsAndLumis=outputDatasetLumis).getCompactList()
+                    res['outputDatasets'][outputDataset]['lumis'] = outputDatasetLumis
+                    for outputFileDetails in outputDatasetDetails.values():
+                        res['outputDatasets'][outputDataset]['numEvents'] += outputFileDetails['NumberOfEvents']
+
+        ## Old logic kept here only for backward compatibility. Remove it in March 2016 release.
+        res['dbsInLumilist'] = {}
+        res['dbsInLumilistNewClientOldTask'] = {}
+        res['dbsOutLumilist'] = {}
+        res['dbsNumEvents'] = 0
+        res['dbsNumFiles'] = 0
+        if inputDataset:
             try:
                 #load the input dataset's lumilist
                 dbs = DBSReader(dbsUrl)
                 inputDetails = dbs.listDatasetFileDetails(inputDataset)
                 res['dbsInLumilist'] = _compactLumis(inputDetails)
+                res['dbsInLimilistNewClientOldTask'] = LumiList(runsAndLumis=_compactLumis(inputDetails)).getCompactList()
                 self.logger.info("Aggregated input lumilist: %s" % res['dbsInLumilist'])
+            except Exception as ex:
+                msg = "Failed to contact DBS: %s" % str(ex)
+                self.logger.exception(msg)
+                raise ExecutionError("Exception while contacting DBS. Cannot get the input lumi lists.")
+        if outputDatasets and publication:
+            try:
                 #load the output datasets' lumilist
-                res['dbsNumEvents'] = 0
-                res['dbsNumFiles'] = 0
-                res['dbsOutLumilist'] = {}
                 dbs = DBSReader("https://cmsweb.cern.ch/dbs/prod/phys03/DBSReader") #We can only publish here with DBS3
                 outLumis = []
                 for outputDataset in outputDatasets:
@@ -222,7 +357,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                     outLumis.append(_compactLumis(outputDetails))
                     res['dbsNumEvents'] += sum(x['NumberOfEvents'] for x in outputDetails.values())
                     res['dbsNumFiles'] += sum(len(x['Parents']) for x in outputDetails.values())
-
                 outLumis = LumiList(runsAndLumis = outLumis).compactList
                 for run, lumis in outLumis.iteritems():
                     res['dbsOutLumilist'][run] = reduce(lambda x1, x2: x1+x2, map(lambda x: range(x[0], x[1]+1), lumis))
@@ -230,7 +364,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             except Exception as ex:
                 msg = "Failed to contact DBS: %s" % str(ex)
                 self.logger.exception(msg)
-                raise ExecutionError("Exception while contacting DBS. Cannot get the input/output lumi lists. You can try to execute 'crab report' with --dbs=no")
+                raise ExecutionError("Exception while contacting DBS. Cannot get the output lumi lists.")
 
         yield res
 
@@ -277,7 +411,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         result["taskWarningMsg"] = taskWarnings
 
         ## Helper function to add the task status and the failure message (both as taken
-        ## from the TaskDB) to the result dictionary.
+        ## from the Task DB) to the result dictionary.
         def addStatusAndFailureFromDB(result, row):
             result['status'] = row.task_status
             if row.task_failure is not None:

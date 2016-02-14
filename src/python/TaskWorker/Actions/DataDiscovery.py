@@ -1,7 +1,11 @@
 from __future__ import print_function
+import os
+import json
+
+from WMCore.DataStructs.Run import Run
 from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
-from WMCore.DataStructs.Run import Run
+from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
 
 from TaskWorker.Actions.TaskAction import TaskAction
@@ -20,7 +24,7 @@ class DataDiscovery(TaskAction):
     return a properly formatted output.
     """
 
-    def formatOutput(self, task, requestname, datasetfiles, locations):
+    def formatOutput(self, task, requestname, datasetfiles, locations, tempDir):
         """
         Receives as input the result of the data location
         discovery operations and fill up the WMCore objects.
@@ -33,8 +37,8 @@ class DataDiscovery(TaskAction):
         wmfiles = []
         event_counter = 0
         lumi_counter = 0
-        file_counter = 0
         uniquelumis = set()
+        datasetLumis = {}
         ## Loop over the sorted list of files.
         for lfn, infos in datasetfiles.iteritems():
             ## Skip the file if the block has not been found or has no locations.
@@ -51,7 +55,7 @@ class DataDiscovery(TaskAction):
                         "The CRAB3 server backend refuses to submit jobs to the Grid scheduler\n" +
                         "because you specified useParents=True but some your files have no" +
                         "parents.\nExample: " + lfn)
-            ## Createa a WMCore File object.
+            ## Create a WMCore File object.
             try:
                 size = infos['FileSize']
                 checksums = {'Checksum': infos['Checksum'], 'Adler32': infos['Adler32'], 'Md5': infos['Md5']}
@@ -69,7 +73,7 @@ class DataDiscovery(TaskAction):
                     self.logger.debug("Translating PNN %s" %pnn)
                     try:
                         pnn_psn_map[pnn] = sbj.PNNtoPSN(pnn)
-                    except KeyError as ke:
+                    except KeyError:
                         self.logger.error("Impossible translating %s to a CMS name through SiteDB" %pnn)
                         pnn_psn_map[pnn] = ''
                     except httplib.HTTPException as ex:
@@ -85,17 +89,27 @@ class DataDiscovery(TaskAction):
             wmfile['workflow'] = requestname
             event_counter += infos['NumberOfEvents']
             for run, lumis in infos['Lumis'].iteritems():
+                datasetLumis.setdefault(run, []).extend(lumis)
                 wmfile.addRun(Run(run, *lumis))
                 for lumi in lumis:
                     uniquelumis.add((run, lumi))
                 lumi_counter += len(lumis)
             wmfiles.append(wmfile)
-            file_counter += 1
 
         uniquelumis = len(uniquelumis)
         self.logger.debug('Tot events found: %d' % event_counter)
         self.logger.debug('Tot lumis found: %d' % uniquelumis)
         self.logger.debug('Duplicate lumis found: %d' % (lumi_counter - uniquelumis))
         self.logger.debug('Tot files found: %d' % len(wmfiles))
+
+        self.logger.debug("Starting to create compact lumilists for input dataset")
+        datasetLumiList = LumiList(runsAndLumis=datasetLumis)
+        datasetLumis = datasetLumiList.getCompactList()
+        datasetDuplicateLumis = datasetLumiList.getDuplicates().getCompactList()
+        self.logger.debug("Finished to create compact lumilists for input dataset")
+        with open(os.path.join(tempDir, "input_dataset_lumis.json"), "w") as fd:
+            json.dump(datasetLumis, fd)
+        with open(os.path.join(tempDir, "input_dataset_duplicate_lumis.json"), "w") as fd:
+            json.dump(datasetDuplicateLumis, fd)
 
         return Result(task = task, result = Fileset(name = 'FilesToSplit', files = set(wmfiles)))

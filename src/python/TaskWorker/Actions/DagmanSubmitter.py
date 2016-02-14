@@ -230,7 +230,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         schedd = ""
         try:
             self.logger.debug("Duplicate check is getting the schedd obj. Collector is: %s", task['tm_collector'])
-            schedd, _address = loc.getScheddObjNew(task['tm_schedd'])
+            schedd, dummyAddress = loc.getScheddObjNew(task['tm_schedd'])
             self.logger.debug("Got schedd obj for %s ", task['tm_schedd'])
         except Exception as exp:
             msg = "The CRAB server backend was not able to contact the Grid scheduler."
@@ -274,11 +274,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         task = kwargs['task']
         workflow = task['tm_taskname']
-        tempDir = args[0][0]
-        info = args[0][1]
+        info = args[0][0]
         #self.logger.debug("Task input information: %s" % str(info))
-        dashboardParams = args[0][2]
-        inputFiles = args[0][3]
+        dashboardParams = args[0][1]
+        inputFiles = args[0][2]
 
         self.logger.debug("Starting duplicate check")
         dup = self.duplicateCheck(task)
@@ -287,7 +286,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             return dup
 
         cwd = os.getcwd()
-        os.chdir(tempDir)
+        os.chdir(kwargs['tempDir'])
 
         info['inputFilesString'] = ", ".join(inputFiles)
         outputFiles = ["RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001"]
