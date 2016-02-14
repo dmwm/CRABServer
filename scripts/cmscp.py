@@ -1532,7 +1532,7 @@ def main():
     if cmscp_status['init_local_stageout_mgr']['return_code'] != 0:
         update_exit_info(exit_info, \
                          cmscp_status['init_direct_stageout_impl']['return_code'], \
-                         cmscp_status['init_direct_stageout_impl']['return_msg'])
+                         cmscp_status['init_direct_stageout_impl']['return_msg'], True)
     ##--------------------------------------------------------------------------
     ## Finish DIRECT STAGEOUT IMPLEMENTATION INITIALIZATION
     ##--------------------------------------------------------------------------
