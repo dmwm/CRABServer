@@ -68,3 +68,6 @@ alter table tasks add (tm_primary_dataset VARCHAR(255));
 
 --Changes that will be needed for version 3.3.1602
 alter table tasks add (tm_asodb VARCHAR(20));
+
+--Changes that will be needed for version 3.3.1603
+alter table tasks add (tm_task_command VARCHAR(20));

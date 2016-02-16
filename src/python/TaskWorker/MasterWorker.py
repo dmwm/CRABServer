@@ -2,6 +2,7 @@
 #external dependencies
 from __future__ import print_function
 import os
+import sys
 import time
 import urllib
 import signal
@@ -9,10 +10,9 @@ import random
 import logging
 import traceback
 from httplib import HTTPException
-from logging.handlers import TimedRotatingFileHandler
 
 #WMcore dependencies
-from WMCore.Configuration import loadConfigurationFile, Configuration
+from WMCore.Configuration import loadConfigurationFile
 
 #CAFUtilities dependencies
 from RESTInteractions import HTTPRequests
@@ -21,30 +21,20 @@ from TaskWorker.WorkerExceptions import *
 from TaskWorker.TestWorker import TestWorker
 from MultiProcessingLog import MultiProcessingLog
 from TaskWorker.Worker import Worker, setProcessLogger
-import TaskWorker.Actions.Recurring.BaseRecurringAction
 from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
 from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
 
 ## NOW placing this here, then to be verified if going into Action.Handler, or TSM
 ## The meaning of the elements in the 3-tuples are as follows:
-## 1st) the status of the tasks on which a work should be done;
+## 1st) the command to be executed on the task;
 ## 2nd) the work that should be do;
 ## 3nd) the new status that the task should get in case of failure.
-STATE_ACTIONS_MAP = [('NEW', handleNewTask, 'SUBMITFAILED'), ('KILL', handleKill, 'KILLFAILED'), ('RESUBMIT', handleResubmit, 'RESUBMITFAILED')]
-def states():
-    for st in sorted(STATE_ACTIONS_MAP, key=lambda k: random.random()):
-        yield st
-
-def handler(status):
-    for st in STATE_ACTIONS_MAP:
-        if st[0] == status:
-            return st[1]
+STATE_ACTIONS_MAP = { 'SUBMIT' : (handleNewTask, 'SUBMITFAILED'), 'KILL' : (handleKill, 'KILLFAILED'), 'RESUBMIT' : (handleResubmit, 'RESUBMITFAILED')}
 
 MODEURL = {'cmsweb-dev': {'host': 'cmsweb-dev.cern.ch', 'instance':  'dev'},
            'cmsweb-preprod': {'host': 'cmsweb-testbed.cern.ch', 'instance': 'preprod'},
            'cmsweb-prod': {'host': 'cmsweb.cern.ch', 'instance':  'prod'},
            'private': {'host': None, 'instance':  'dev'},}
-
 
 def validateConfig(config):
     """Verify that the input configuration contains all needed info
@@ -166,6 +156,7 @@ class MasterWorker(object):
             self.server.post(self.restURInoAPI + '/workflowdb', data = urllib.urlencode(configreq))
         except HTTPException as hte:
             #Using a msg variable and only one self.logger.error so that messages do not get shuffled
+            #TODO simplify this
             msg = "Task Worker could not update a task status (HTTPException): %s\nConfiguration parameters=%s\n" % (str(hte), configreq)
             if not hte.headers.get('X-Error-Detail', '') == 'Required object is missing' or \
                not hte.headers.get('X-Error-Http', -1) == '400':
@@ -179,9 +170,11 @@ class MasterWorker(object):
                 msg += "\turl: %s\n" %(getattr(hte, 'url', 'unknown'))
                 msg += "\tresult: %s\n" %(getattr(hte, 'result', 'unknown'))
             self.logger.error(msg)
+            return False
         except Exception as exc:
             msg = "Task Worker could not update a task status: %s\nConfiguration parameters=%s\n" % (str(exc), configreq)
             self.logger.error(msg + traceback.format_exc())
+            return False
 
         return True
 
@@ -212,14 +205,15 @@ class MasterWorker(object):
         self.STOP = True
 
 
-    def updateWork(self, taskname, status):
-        configreq = {'workflow': taskname, 'status': status, 'subresource': 'state'}
+    def updateWork(self, taskname, command, status):
+        configreq = {'workflow': taskname, 'command': command, 'status': status, 'subresource': 'state'}
         retry = True
         while retry:
             try:
                 self.server.post(self.restURInoAPI + '/workflowdb', data = urllib.urlencode(configreq))
                 retry = False
             except HTTPException as hte:
+                #TODO simplify here
                 #Using a msg variable and only one self.logger.error so that messages do not get shuffled
                 msg = "Task Worker could not update a task status (HTTPException): %s\nConfiguration parameters=%s\n" % (str(hte), configreq)
                 msg += "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown'))
@@ -247,19 +241,23 @@ class MasterWorker(object):
 
         self.logger.debug("Starting")
         while(not self.STOP):
-            for status, worktype, failstatus in states():
-                limit = self.slaves.queueableTasks()
-                if not self._lockWork(limit=limit, getstatus=status, setstatus='HOLDING'):
-                    continue
-                ## Warning: If we fail to retrieve tasks on HOLDING (e.g. because cmsweb is down)
-                ## we may end up executing the wrong worktype later on. A solution would be to
-                ## save the previous task state in a new column of the TaskDB.
-                pendingwork = self._getWork(limit=limit, getstatus='HOLDING')
-                self.logger.info("Retrieved a total of %d %s works" %(len(pendingwork), worktype))
-                self.logger.debug("Retrieved the following works: \n%s" %(str(pendingwork)))
-                self.slaves.injectWorks([(worktype, task, failstatus, None) for task in pendingwork])
-                for task in pendingwork:
-                    self.updateWork(task['tm_taskname'], 'QUEUED')
+            limit = self.slaves.queueableTasks()
+            if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
+                continue
+            pendingwork = self._getWork(limit=limit, getstatus='HOLDING')
+
+            if len(pendingwork) > 0:
+                self.logger.info("Retrieved a total of %d works", len(pendingwork))
+                self.logger.debug("Retrieved the following works: \n%s", str(pendingwork))
+
+            toInject = []
+            for task in pendingwork:
+                worktype, failstatus = STATE_ACTIONS_MAP[task['tm_command']]
+                toInject.append((worktype, task, failstatus, None))
+            self.slaves.injectWorks(toInject)
+
+            for task in pendingwork:
+                self.updateWork(task['tm_taskname'], task['tm_command'], 'QUEUED')
 
             for action in self.recurringActions:
                 if action.isTimeToGo():
