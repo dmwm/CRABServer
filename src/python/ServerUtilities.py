@@ -18,7 +18,7 @@ FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
 
 
 ## These are all possible statuses of a task in the TaskDB.
-TASKDBSTATUSES = ['NEW', 'HOLDING', 'QUEUED', 'UPLOADED', 'SUBMITTED', 'SUBMITFAILED', 'KILL', 'KILLED', 'KILLFAILED', 'RESUBMIT', 'RESUBMITFAILED', 'FAILED']
+TASKDBSTATUSES = ['NEW', 'HOLDING', 'QUEUED', 'UPLOADED', 'SUBMITTED', 'SUBMITFAILED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
 
 ## These are all possible statuses of a task as returned by the `status' API.
 TASKSTATUSES = TASKDBSTATUSES + ['COMPLETED', 'UNKNOWN', 'InTransition']

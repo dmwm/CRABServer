@@ -433,7 +433,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         if row.task_status in ['NEW', 'HOLDING', 'UPLOADED', 'SUBMITFAILED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']:
             addStatusAndFailureFromDB(result, row)
-            if row.task_status in ['NEW', 'UPLOADED', 'SUBMITFAILED']:
+            if row.task_status in ['NEW', 'UPLOADED', 'SUBMITFAILED'] and row.task_command not in ['KILL', 'RESUBMIT']:
                 self.logger.debug("Detailed result for workflow %s: %s\n" % (workflow, result))
                 return [result]
 
