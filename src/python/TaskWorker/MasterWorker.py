@@ -244,7 +244,7 @@ class MasterWorker(object):
             limit = self.slaves.queueableTasks()
             if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
                 continue
-            self.logger.debug("Work for taskworker %s locked in the DB (state HOLDING)", self.config.TaskWorker.name)
+
             pendingwork = self._getWork(limit=limit, getstatus='HOLDING')
 
             if len(pendingwork) > 0:
@@ -253,23 +253,23 @@ class MasterWorker(object):
 
             toInject = []
             for task in pendingwork:
-                worktype, failstatus = STATE_ACTIONS_MAP[task['tm_command']]
+                worktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
                 toInject.append((worktype, task, failstatus, None))
             self.slaves.injectWorks(toInject)
 
             for task in pendingwork:
-                self.updateWork(task['tm_taskname'], task['tm_command'], 'QUEUED')
+                self.updateWork(task['tm_taskname'], task['tm_task_command'], 'QUEUED')
 
             for action in self.recurringActions:
                 if action.isTimeToGo():
                     #Maybe we should use new slaves and not reuse the ones used for the tasks
-                    self.logger.debug("Injecting recurring action: \n%s" %(str(action.__module__)))
+                    self.logger.debug("Injecting recurring action: \n%s", (str(action.__module__)))
                     self.slaves.injectWorks([(handleRecurring, {'tm_taskname' : action.__module__}, 'FAILED', action.__module__)])
 
             self.logger.info('Master Worker status:')
-            self.logger.info(' - free slaves: %d' % self.slaves.freeSlaves())
-            self.logger.info(' - acquired tasks: %d' % self.slaves.queuedTasks())
-            self.logger.info(' - tasks pending in queue: %d' % self.slaves.pendingTasks())
+            self.logger.info(' - free slaves: %d', self.slaves.freeSlaves())
+            self.logger.info(' - acquired tasks: %d', self.slaves.queuedTasks())
+            self.logger.info(' - tasks pending in queue: %d', self.slaves.pendingTasks())
 
             time.sleep(self.config.TaskWorker.polling)
 
