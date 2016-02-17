@@ -231,7 +231,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         raise TaskWorkerException(msg)
 
 
-    def duplicateCheck(self, task):
+    def duplicateCheck(self, task, duplicateCheckRetry=False):
         """
         Look to see if the task we are about to submit is already in the schedd.
         If so, assume that this task in TaskWorker was run successfully, but killed
@@ -265,6 +265,33 @@ class DagmanSubmitter(TaskAction.TaskAction):
         if not results:
             # Task not already in schedd
             return None
+
+        # Need to double check if JobStatus is 1(idle) or 2(running).
+        # All other statuses means that task is not submitted or failed to be submitted.
+        # There was issue with spooling files to scheduler and duplicate check found dagman on scheduler
+        # but the filew were not correctly transferred.
+        if results[0]['JobStatus'] not in [1,2] and not duplicateCheckRetry:
+            retriesNum = 5
+            while retriesNum != 0:
+                self.logger.debug("Job status (current value: %s, left retries %s) is not idle or running. Will delay 10s and will check again.", results[0]['JobStatus'], retriesNum)
+                time.sleep(10)
+                dupRetry = self.duplicateCheck(self, task, True)
+                if dupRetry:
+                    retriesNum = 0
+                else:
+                    retriesNum -= 1
+                    if retriesNum == 0:
+                        # After 5 retries it sets task as submitted in CRABServer database. It is first implementation
+                        # and might require modification if after 5 retries TW is still not able to get task status from scheduler,
+                        # but this first has to happen.
+                        self.logger.debug("After 5 retries duplicateCheck was not able to determine if task is idle or running on scheduler. Setting task as submitted.")
+        elif duplicateCheckRetry:
+            if results[0]['JobStatus'] in [1,2]:
+                return True
+            else:
+                return False
+        else:
+            self.logger.debug("Task seems to be submitted correctly. Classads got from scheduler: %s" % results)
 
         configreq = {'workflow': workflow,
                      'status': "SUBMITTED",
