@@ -244,6 +244,7 @@ class MasterWorker(object):
             limit = self.slaves.queueableTasks()
             if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
                 continue
+            self.logger.debug("Work for taskworker %s locked in the DB (state HOLDING)", self.config.TaskWorker.name)
             pendingwork = self._getWork(limit=limit, getstatus='HOLDING')
 
             if len(pendingwork) > 0:

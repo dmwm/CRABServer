@@ -37,6 +37,7 @@ class RESTWorkerWorkflow(RESTEntity):
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
             validate_str("status", param, safe, RX_STATUS, optional=True)
+            validate_str("command", param, safe, RX_STATUS, optional=True)
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
             validate_num("jobset", param, safe, optional=True) #TODO remeove the jobset
             validate_str("failure", param, safe, RX_TEXT_FAIL, optional=True)
@@ -90,7 +91,7 @@ class RESTWorkerWorkflow(RESTEntity):
                 raise InvalidParameter("Failure message is not in the accepted format")
         methodmap = {"state": {"args": (self.Task.SetStatusTask_sql,), "method": self.api.modify, "kwargs": {"status": [status],
                                                                                "command": [command], "taskname": [workflow]}},
-                  #TODO MM - I don“'t see where this start API is used
+                   #TODO MM - I don't see where this start API is used
                   "start": {"args": (self.Task.SetReadyTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
                                                                                        "tm_taskname": [workflow]}},
                   "failure": {"args": (self.Task.SetFailedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
@@ -139,9 +140,8 @@ class RESTWorkerWorkflow(RESTEntity):
             binds = {"limit": limit, "tw_name": workername, "get_status": getstatus}
             rows = self.api.query(None, None, self.Task.GetReadyTasks_sql, **binds)
             for row in rows:
-                newtask = Task()
-                newtask.deserialize(row)
-                yield dict(newtask)
+                newtask = self.Task.GetReadyTasks_tuple(*row)
+                yield fixupTask(newtask)
 
     @restcall
     def delete(self):
@@ -164,104 +164,48 @@ class RESTWorkerWorkflow(RESTEntity):
         self.api.modify(self.Task.SetSplitargsTask_sql, **binds)
 
 
-class Task(dict):
-    """Main object of work. This will be passed from a class to another.
-       This will collect all task parameters contained in the DB, but
-       living only in memory.
+def fixupTask(task):
+    """ Fixup some values obtained by the query. """
 
-       NB: this can be reviewd and expanded in order to implement
-           the needed methods to work with the database."""
+    result = task._asdict()
 
-    def __init__(self, *args, **kwargs):
-        """Initializer of the task object.
+    #fixup values that needs to be strings
+    for field in ['tm_start_time', 'tm_start_injection', 'tm_end_injection']:
+        current = result[field]
+        result[field] = str(current)
 
-           :arg *args/**kwargs: key/value pairs to update the dictionary."""
-        self.update(*args, **kwargs)
+    #fixup CLOBS values by calling read (only for Oracle)
+    for field in ['tm_task_failure', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles', 'tm_edm_outfiles',
+                  'panda_resubmitted_jobs', 'tm_arguments', 'tm_scriptargs', 'tm_user_files', 'tm_arguments']:
+        current = result[field]
+        fixedCurr = current if (current is None or isinstance(current, str)) else current.read()
+        result[field] = fixedCurr
 
-    def deserialize(self, task):
-        """Deserialize a task from a list format to the self Task dictionary.
-           It depends on the order of elements, as they are returned from the DB.
+    #liter_evaluate values
+    for field in ['tm_site_whitelist', 'tm_site_blacklist', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles',
+                  'tm_edm_outfiles', 'panda_resubmitted_jobs', 'tm_user_infiles', 'tm_arguments', 'tm_scriptargs',
+                  'tm_user_files']:
+        current = result[field]
+        print current, field, str(type(current))
+        result[field] = literal_eval(current)
 
-           :arg list object task: the list of task attributes retrieved from the db."""
+    #convert tm_arguments to the desired values
+    extraargs = result['tm_arguments']
+    result['resubmit_publication'] = extraargs['resubmit_publication'] if 'resubmit_publication' in extraargs else None
+    result['resubmit_jobids'] = extraargs['resubmit_jobids'] if 'resubmit_jobids' in extraargs else None
+    if result['resubmit_jobids'] is None and 'resubmitList' in extraargs: ## For backward compatibility only.
+        result['resubmit_jobids'] = extraargs['resubmitList']
+    result['resubmit_site_whitelist'] = extraargs['site_whitelist'] if 'site_whitelist' in extraargs else None
+    if result['resubmit_site_whitelist'] is None and 'siteWhiteList' in extraargs: ## For backward compatibility only.
+        result['resubmit_site_whitelist'] = extraargs['siteWhiteList']
+    result['resubmit_site_blacklist'] = extraargs['site_blacklist'] if 'site_blacklist' in extraargs else None
+    if result['resubmit_site_blacklist'] is None and 'siteBlackList' in extraargs: ## For backward compatibility only.
+        result['resubmit_site_blacklist'] = extraargs['siteBlackList']
+    result['resubmit_maxjobruntime'] = extraargs['maxjobruntime'] if 'maxjobruntime' in extraargs else None
+    result['resubmit_maxmemory'] = extraargs['maxmemory'] if 'maxmemory' in extraargs else None
+    result['resubmit_numcores'] = extraargs['numcores'] if 'numcores' in extraargs else None
+    result['resubmit_priority'] = extraargs['priority'] if 'priority' in extraargs else None
+    result['kill_ids'] = extraargs['killList'] if 'killList' in extraargs else []
+    result['kill_all'] = extraargs['killAll'] if 'killAll' in extraargs else False
 
-        #TODO Find a better way to do that, e.g., a way that do not force you to change numbers every time you add something
-        self['tm_taskname'] = task[0]
-        self['panda_jobset_id'] = task[1]
-        self['tm_task_status'] = task[2]
-        self['tm_task_command'] = task[2] #FIXME id!!!!
-        self['tm_start_time'] = str(task[3])
-        self['tm_start_injection'] = str(task[4])
-        self['tm_end_injection'] = str(task[5])
-        self['tm_task_failure'] = task[6] if (task[6] is None or isinstance(task[6], str)) else task[6].read()
-        self['tm_job_sw'] = task[7]
-        self['tm_job_arch'] = task[8]
-        self['tm_input_dataset'] = task[9]
-        self['tm_site_whitelist'] = literal_eval(task[10])
-        self['tm_site_blacklist'] = literal_eval(task[11])
-        self['tm_split_algo'] = task[12]
-        self['tm_split_args'] = literal_eval(task[13] if (task[13] is None or isinstance(task[13], str)) else task[13].read())
-        self['tm_totalunits'] = task[14]
-        self['tm_user_sandbox'] = task[15]
-        self['tm_cache_url'] = task[16]
-        self['tm_username'] = task[17]
-        self['tm_user_dn'] = task[18]
-        self['tm_user_vo'] = task[19]
-        self['tm_user_role'] = task[20]
-        self['tm_user_group'] = task[21]
-        self['tm_publish_name'] = task[22]
-        self['tm_asyncdest'] = task[23]
-        self['tm_dbs_url'] = task[24]
-        self['tm_publish_dbs_url'] = task[25]
-        self['tm_publication'] = task[26]
-        self['tm_outfiles'] = literal_eval(task[27] if (task[27] is None or isinstance(task[27], str)) else task[27].read())
-        self['tm_tfile_outfiles'] = literal_eval(task[28] if (task[28] is None or isinstance(task[28], str)) else task[28].read())
-        self['tm_edm_outfiles'] = literal_eval(task[29] if (task[29] is None or isinstance(task[29], str)) else task[29].read())
-        self['tm_job_type'] = task[30]
-        extraargs = literal_eval(task[31] if (task[31] is None or isinstance(task[31], str)) else task[31].read())
-        self['resubmit_publication'] = extraargs['resubmit_publication'] if 'resubmit_publication' in extraargs else None
-        self['resubmit_jobids'] = extraargs['resubmit_jobids'] if 'resubmit_jobids' in extraargs else None
-        if self['resubmit_jobids'] is None and 'resubmitList' in extraargs: ## For backward compatibility only.
-            self['resubmit_jobids'] = extraargs['resubmitList']
-        self['resubmit_site_whitelist'] = extraargs['site_whitelist'] if 'site_whitelist' in extraargs else None
-        if self['resubmit_site_whitelist'] is None and 'siteWhiteList' in extraargs: ## For backward compatibility only.
-            self['resubmit_site_whitelist'] = extraargs['siteWhiteList']
-        self['resubmit_site_blacklist'] = extraargs['site_blacklist'] if 'site_blacklist' in extraargs else None
-        if self['resubmit_site_blacklist'] is None and 'siteBlackList' in extraargs: ## For backward compatibility only.
-            self['resubmit_site_blacklist'] = extraargs['siteBlackList']
-        self['resubmit_maxjobruntime'] = extraargs['maxjobruntime'] if 'maxjobruntime' in extraargs else None
-        self['resubmit_maxmemory'] = extraargs['maxmemory'] if 'maxmemory' in extraargs else None
-        self['resubmit_numcores'] = extraargs['numcores'] if 'numcores' in extraargs else None
-        self['resubmit_priority'] = extraargs['priority'] if 'priority' in extraargs else None
-        self['kill_ids'] = extraargs['killList'] if 'killList' in extraargs else []
-        self['kill_all'] = extraargs['killAll'] if 'killAll' in extraargs else False
-        self['panda_resubmitted_jobs'] = literal_eval(task[32] if (task[32] is None or isinstance(task[32], str)) else task[32].read())
-        self['tm_save_logs'] = task[33]
-        self['tm_user_infiles'] = literal_eval(task[34])
-        self['worker_name'] = task[35]
-        self['tm_arguments'] = literal_eval(task[31] if (task[31] is None or isinstance(task[31], str)) else task[31].read())
-        self['tm_maxjobruntime'] = task[36]
-        self['tm_numcores'] = task[37]
-        self['tm_maxmemory'] = task[38]
-        self['tm_priority'] = task[39]
-        self['tm_activity'] = task[40]
-        self['tm_scriptexe'] = task[41]
-        self['tm_scriptargs'] = literal_eval(task[42] if (task[42] is None or isinstance(task[42], str)) else task[42].read())
-        self['tm_extrajdl'] = task[43]
-        self['tm_generator'] = task[44]
-        self['tm_asourl'] = task[45]
-        self['tm_asodb'] = task[46]
-        self['tm_events_per_lumi'] = task[47]
-        self['tm_use_parent'] = task[48]
-        self['tm_collector'] = task[49]
-        self['tm_schedd'] = task[50]
-        self['tm_dry_run'] = task[51]
-        self['tm_user_files'] = literal_eval(task[52] if (task[52] is None or isinstance(task[52], str)) else task[52].read())
-        self['tm_transfer_outputs'] = task[53]
-        self['tm_output_lfn'] = task[54]
-        self['tm_ignore_locality'] = task[55]
-        self['tm_fail_limit'] = task[56]
-        self['tm_one_event_mode'] = task[57]
-        self['tm_publish_groupname'] = task[58]
-        self['tm_nonvalid_input_dataset'] = task[59]
-        self['tm_secondary_input_dataset'] = task[60]
-        self['tm_primary_dataset'] = task[61]
+    return result
