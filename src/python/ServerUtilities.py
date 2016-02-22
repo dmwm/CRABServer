@@ -16,6 +16,12 @@ from WMCore.WMExceptions import STAGEOUT_ERRORS
 BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
 
+# Fatal error limits for job resource usage
+# Defaults are used if unable to load from .job.ad
+# Otherwise it uses these values.
+MAX_WALLTIME = 21*60*60 + 30*60
+MAX_MEMORY = 2*1024
+MAX_DISK_SPACE = 20000000 # Disk usage is not used from .job.ad as CRAB3 is not seeting it. 20GB is max.
 
 ## These are all possible statuses of a task in the TaskDB.
 TASKDBSTATUSES = ['NEW', 'HOLDING', 'QUEUED', 'UPLOADED', 'SUBMITTED', 'SUBMITFAILED', 'KILL', 'KILLED', 'KILLFAILED', 'RESUBMIT', 'RESUBMITFAILED', 'FAILED']
