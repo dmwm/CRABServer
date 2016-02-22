@@ -1800,6 +1800,9 @@ class PostJob():
         for ifile in self.job_report['steps']['cmsRun']['input']['source']:
             if ifile['input_source_class'] != 'PoolSource' or ifile.get('input_type', '') != "primaryFiles":
                 continue
+            if not ifile['lfn']:
+                self.logger.debug("Input file lfn is not present in job report. Will skip upload to filemetadata.")
+                continue
             ## Many of these parameters are not needed and are using fake/defined values
             lfn = ifile['lfn'] + "_" + str(self.job_id) ## jobs can analyze the same input
             configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
