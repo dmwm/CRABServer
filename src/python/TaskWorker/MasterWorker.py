@@ -240,6 +240,18 @@ class MasterWorker(object):
                 self.logger.error(msg + traceback.format_exc())
                 retry = False
 
+    def buildDeveloperTarballs(self):
+        """ Builds the TaskManagerRun.tar.gz and CMSRunAnalysis.tar.gz files in case the CRAB_OVERRIDE_SOURCE
+            env variable is set."""
+
+        if os.environ["CRAB_OVERRIDE_SOURCE"] and os.path.isdir(os.environ["CRAB_OVERRIDE_SOURCE"]):
+            self.logger.debug("Building TaskWorker tarballs because CRAB_OVERRIDE_SOURCE is set")
+            os.system("sh $CRAB_OVERRIDE_SOURCE./CRABServer/bin/htcondor_make_runtime.sh")
+            if (os.path.isfile(os.environ["MYTESTAREA"] + "/CMSRunAnalysis-3.3.0-pre1.tar.gz") 
+                and os.path.isfile(os.environ["MYTESTAREA"] + "/TaskManagerRun-3.3.0-pre1.tar.gz")):
+
+                os.system("mv $MYTESTAREA/CMSRunAnalysis-3.3.0-pre1.tar.gz $MYTESTAREA/CMSRunAnalysis.tar.gz")
+                os.system("mv $MYTESTAREA/TaskManagerRun-3.3.0-pre1.tar.gz $MYTESTAREA/TaskManagerRun.tar.gz")
 
     def algorithm(self):
         """I'm the intelligent guy taking care of getting the work
@@ -318,5 +330,6 @@ if __name__ == '__main__':
     mw = MasterWorker(configuration, quiet=options.quiet, debug=options.debug)
     signal.signal(signal.SIGINT, mw.quit)
     signal.signal(signal.SIGTERM, mw.quit)
+    mw.buildDeveloperTarballs()
     mw.algorithm()
     mw.slaves.end()
