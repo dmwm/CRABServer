@@ -535,6 +535,24 @@ class PreJob:
         sleep_time = int(self.dag_retry)*60
         if old_time:
             sleep_time = int(max(1, sleep_time - old_time))
+        # -------------------------------------------------------------------
+        # Double check if it is HC job as they want to have finer submittion
+        # This part of the code is done for HC and finer submittion to scheduler.
+        # This allows to specify extraJdl CRAB_JOB_RELEASE_TIMEOUT=Xseconds and
+        # Prejob will sleep this timeout from releasing it in the queue.
+        # If this is not set, it will sleep cooloff time described upper.
+        if self.task_ad.get("CRAB_HC", '') and \
+           self.task_ad.get("CRAB_JOB_RELEASE_TIMEOUT", '0') and \
+           self.task_ad.get("QDate", ''):
+            self.logger.info('Release timeout was specified in extraJDL by user: %s seconds' % self.task_ad.get("CRAB_JOB_RELEASE_TIMEOUT", '0'))
+            timeout = self.task_ad.get("CRAB_JOB_RELEASE_TIMEOUT", '0')
+            sleep_time = int(self.job_id * int(timeout))
+            # Also we want to double check with QDate as QDate is when the task
+            # was submitted.
+            diffFromNow = int((int(time.time()) + sleep_time)- int(self.task_ad.get("QDate", 0)))
+            sleep_time = 0 if diffFromNow < 0 else diffFromNow
+            self.logger.info("%s job will sleep %s seconds" % (self.job_id, timeout))
+        # --------------------------------------------------------------------
         self.update_dashboard(crab_retry)
         msg = "Finished pre-job execution. Sleeping %s seconds..." % (sleep_time)
         self.logger.info(msg)
