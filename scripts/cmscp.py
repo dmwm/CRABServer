@@ -7,6 +7,7 @@ with warnings.catch_warnings():
 import os
 import sys
 import re
+import copy
 import json
 import time
 import pprint
@@ -1033,17 +1034,21 @@ def main():
            }
 
     ## A dictionary with a RetTuple for each of the steps coded below.
-    ## Return status code = None means the step was not executed.
+    ## Return status code = None means the step was not executed. The keys
+    ## for logs_stageout and outputs_stageout are filled in later with this
+    ## template
+    cmscp_status_policy_template = {'return_code' : None,
+                                    'return_msg': None,
+                                    'files_temp': False
+                                   }
     cmscp_status = {'job_report_validation'     : {'return_code': None, 'return_msg': None},
                     'outputs_exist'             : {'return_code': None, 'return_msg': None},
                     'outputs_in_job_report'     : {'return_code': None, 'return_msg': None},
                     'logs_archive'              : {'return_code': None, 'return_msg': None},
                     'init_local_stageout_mgr'   : {'return_code': None, 'return_msg': None},
                     'init_direct_stageout_impl' : {'return_code': None, 'return_msg': None},
-                    'logs_stageout'             : {'local'  : {'return_code': None, 'return_msg': None},
-                                                   'remote' : {'return_code': None, 'return_msg': None}},
-                    'outputs_stageout'          : {'local'  : {'return_code': None, 'return_msg': None},
-                                                   'remote' : {'return_code': None, 'return_msg': None}},
+                    'logs_stageout'             : {},
+                    'outputs_stageout'          : {},
                     'aso_injection'             : {'return_code': None, 'return_msg': None},
                     'logs_metadata_upload'      : {'return_code': None, 'return_msg': None}
                    }
@@ -1276,6 +1281,12 @@ def main():
         else:
             print('Not rewriting stageout policy. Continue with %s stageout policy.' % (", ".join(stageout_policy)))
 
+    ## Once we've chosen stageout policies, initialize the status dict
+    for policy in stageout_policy:
+        cmscp_status['logs_stageout'][policy] = \
+                copy.deepcopy(cmscp_status_policy_template)
+        cmscp_status['outputs_stageout'][policy] = \
+                copy.deepcopy(cmscp_status_policy_template)
 
     ## Modify the stageout temporary and final directory by:
     ## a) adding a four-digit counter;
@@ -1638,6 +1649,7 @@ def main():
                 print(msg)
                 cmscp_status['outputs_stageout'][policy]['return_code'] = 60318
                 cmscp_status['outputs_stageout'][policy]['return_msg'] = msg
+                cmscp_status['outputs_stageout'][policy]['files_temp'] = False
                 condition = False
         ## If we have to, stage out the output files.
         if condition:
@@ -1690,6 +1702,7 @@ def main():
                 if cmscp_status['outputs_stageout'][policy]['return_code'] in [None, 0]:
                     cmscp_status['outputs_stageout'][policy]['return_code'] = cur_retval
                     cmscp_status['outputs_stageout'][policy]['return_msg'] = cur_retmsg
+                    cmscp_status['outputs_stageout'][policy]['files_temp'] = cur_files_temp
                 ## If the stageout failed for one of the output files, don't even
                 ## try to stage out the rest of the output files.
                 if cmscp_status['outputs_stageout'][policy]['return_code'] not in [None, 0]:
@@ -1764,13 +1777,19 @@ def main():
     ##--------------------------------------------------------------------------
     ## Do the injection of the transfer request documents to the ASO database
     ## only if all the local or direct stageouts have succeeded.
-    condition_inject_outputs = (cmscp_status['outputs_stageout']['local']['return_code'] == 0 and \
-                                cmscp_status['outputs_stageout']['remote']['return_code'] != 0)
+    condition_inject_outputs = False
+    condition_successful_output = False
+    for policy in cmscp_status['outputs_stageout'].keys():
+        if cmscp_status['outputs_stageout'][policy]['return_code'] == 0:
+            condition_successful_output = True
+            if cmscp_status['outputs_stageout'][policy]['files_temp']:
+                condition_inject_outputs = True
+
     not_inject_msg_outputs = ''
     if transfer_outputs:
         if not condition_inject_outputs:
             not_inject_msg_outputs = "Will not inject transfer requests to ASO for the user output files,"
-            if cmscp_status['outputs_stageout']['remote']['return_code'] == 0:
+            if condition_successful_output:
                 not_inject_msg_outputs += " because they were staged out directly to the permanent storage."
             else:
                 not_inject_msg_outputs += " because their local stageouts were not successful"
@@ -1778,11 +1797,20 @@ def main():
                 not_inject_msg_outputs += " or local stageout was not even performed)."
     condition_inject_logs = (cmscp_status['logs_stageout']['local']['return_code'] == 0 and \
                              cmscp_status['logs_stageout']['remote']['return_code'] != 0)
+
+    condition_inject_logs = False
+    condition_successful_logoutput = False
+    for policy in cmscp_status['logs_stageout'].keys():
+        if cmscp_status['logs_stageout'][policy]['return_code'] == 0:
+            condition_successful_logoutput = True
+            if cmscp_status['logs_stageout'][policy]['files_temp']:
+                condition_inject_logs = True
+
     not_inject_msg_logs = ''
     if transfer_logs:
         if not condition_inject_logs:
             not_inject_msg_logs = "Will not inject transfer request to ASO for the user logs archive file,"
-            if cmscp_status['logs_stageout']['remote']['return_code'] == 0:
+            if condition_successful_logoutput:
                 not_inject_msg_logs += " because it was staged out directly to the permanent storage."
             else:
                 not_inject_msg_logs += " because its local stageout was not successful"
