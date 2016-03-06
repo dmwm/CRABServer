@@ -1562,7 +1562,7 @@ def main():
     ## done successfully.
     first_stageout_failure_code = None
     first_stageout_failure_msg  = None
-    is_log_in_storage = {'local': False, 'remote': False}
+    is_log_in_storage = {'temp': False, 'permanent': False}
     for policy in stageout_policy:
         clean = False
         ##---------------
@@ -1618,7 +1618,11 @@ def main():
             msg += " (status %d)." % (cmscp_status['logs_stageout'][policy]['return_code'])
             print(msg)
             if cmscp_status['logs_stageout'][policy]['return_code'] == 0:
-                is_log_in_storage[policy] = True
+                if cmscp_status['logs_stageout'][policy]['files_temp']:
+                    is_log_in_storage['temp'] = True
+                else:
+                    is_log_in_storage['permanent'] = True
+
             ## If the stageout failed, clean the stageout area. But don't remove
             ## the log from the local stageout area (we want to keep it there in
             ## case the next stageout policy also fails).
@@ -1736,7 +1740,8 @@ def main():
             print(msg)
             clean_log = (policy == 'remote')
             if clean_log:
-                is_log_in_storage[policy] = False
+                for location in "temp", "permanent":
+                    is_log_in_storage[location] = False
             clean_stageout_area(local_stageout_mgr, direct_stageout_impl, \
                                 policy, logs_arch_dest_temp_lfn, \
                                 keep_log = not clean_log)
@@ -1897,7 +1902,7 @@ def main():
     ##--------------------------------------------------------------------------
     ## Upload of the log file metadata to the crab cache. Ignore any failure
     ## since the post-job can always retry the upload.
-    condition = (is_log_in_storage['local'] or is_log_in_storage['remote'])
+    condition = (is_log_in_storage['temp'] or is_log_in_storage['permanent'])
     if skip['logs_metadata_upload']:
         msg  = "WARNING: Internal wrapper flag skip['logs_metadata_upload'] is True."
         msg += " Skipping upload of logs archive file metadata."
