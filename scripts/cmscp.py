@@ -431,7 +431,8 @@ def perform_stageout(local_stageout_mgr, direct_stageout_impl, \
         retval, retmsg, is_file_temp = \
                                     perform_local_stageout(local_stageout_mgr, \
                                                     source_file, dest_temp_lfn, \
-                                                    dest_lfn, dest_site, \
+                                                    dest_lfn, dest_pfn, \
+                                                    dest_site, \
                                                     source_site, is_log, inject)
     elif policy == 'remote':
         ## Can return 60311, 60307 or 60403.
@@ -450,12 +451,18 @@ def perform_stageout(local_stageout_mgr, direct_stageout_impl, \
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 def perform_local_stageout(local_stageout_mgr, \
-                           source_file, dest_temp_lfn, dest_lfn, dest_site, \
-                           source_site, is_log, inject):
+                           source_file, dest_temp_lfn, dest_lfn, dest_pfn, \
+                           dest_site, source_site, is_log, inject):
     """
     Wrapper for local stageouts.
     """
-    file_for_transfer = {'LFN': dest_temp_lfn, 'PFN': source_file}
+    if source_site == dest_site:
+        file_temp = False
+        file_for_transfer = {'LFN': dest_lfn, 'PFN': source_file}
+    else:
+        file_temp = True
+        file_for_transfer = {'LFN': dest_temp_lfn, 'PFN': source_file}
+
     ## Start the clock for timeout counting.
     signal.signal(signal.SIGALRM, alarmHandler)
     signal.alarm(G_TRANSFERS_TIMEOUT)
@@ -481,7 +488,8 @@ def perform_local_stageout(local_stageout_mgr, \
         retval, retmsg = 60307, msg
     finally:
         signal.alarm(0)
-    if retval == 0:
+    if retval == 0 and file_temp:
+        # We moved the file to a temporary LFN and need ASO to move it later
         dest_temp_file_name = os.path.split(dest_temp_lfn)[-1]
         dest_temp_se = stageout_info['SEName']
 
@@ -510,8 +518,29 @@ def perform_local_stageout(local_stageout_mgr, \
                                   'local_stageout_mgr' : local_stageout_mgr,
                                   'inject'             : True
                                  }
+            global G_ASO_TRANSFER_REQUESTS
             G_ASO_TRANSFER_REQUESTS.append(file_transfer_info)
-    return retval, retmsg, True
+    elif not file_temp:
+        # File was moved directly to permanent LFN on the dest_site. We don't
+        # need ASO to move the file for us
+        if retval == 0:
+            dest_file_name = os.path.split(dest_pfn)[-1]
+            sites_added_ok = add_sites_to_job_report(dest_file_name, is_log, \
+                                                    None, dest_site, \
+                                                    None, True)
+            if not sites_added_ok:
+                msg = "WARNING: Ignoring failure in adding the above information to the job report."
+                print(msg)
+        global G_DIRECT_STAGEOUTS
+        direct_stageout_info = {'dest_pfn'  : dest_pfn,
+                                'dest_site' : dest_site,
+                                'is_log'    : is_log,
+                                'removed'   : False
+                            }
+        G_DIRECT_STAGEOUTS.append(direct_stageout_info)
+
+
+    return retval, retmsg, file_temp
 
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
