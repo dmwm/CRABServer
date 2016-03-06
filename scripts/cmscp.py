@@ -1568,15 +1568,17 @@ def main():
         ##---------------
         ## Logs stageout.
         ##---------------
-        condition = condition_logs_stageout
+        condition_logs_xfer_okay = False
+        for test_policy in cmscp_status['logs_stageout']:
+            if test_policy['return_code'] == 0:
+                condition_logs_xfer_okay = True
+        condition = condition_logs_stageout and condition_logs_xfer_okay
         if policy == 'local':
             condition = (condition and \
-                         cmscp_status['init_local_stageout_mgr']['return_code'] == 0 and \
-                         cmscp_status['logs_stageout']['remote']['return_code'] != 0)
+                         cmscp_status['init_local_stageout_mgr']['return_code'] == 0)
         elif policy == 'remote':
             condition = (condition and \
-                         cmscp_status['init_direct_stageout_impl']['return_code'] == 0 and \
-                         cmscp_status['logs_stageout']['local']['return_code'] != 0)
+                         cmscp_status['init_direct_stageout_impl']['return_code'] == 0)
         ## There are some cases where we don't have to stage out the log files.
         if condition:
             if skip['logs_stageout'][policy]:
@@ -1628,15 +1630,18 @@ def main():
         ##------------------
         ## Outputs stageout.
         ##------------------
-        condition = condition_outputs_stageout
+        condition_outputs_xfer_okay = False
+        for test_policy in cmscp_status['outputs_stageout']:
+            if test_policy['return_code'] == 0:
+                condition_outputs_xfer_okay = True
+        condition = condition_logs_stageout and condition_outputs_xfer_okay
         if policy == 'local':
             condition = (condition and \
-                         cmscp_status['init_local_stageout_mgr']['return_code'] == 0 and \
-                         cmscp_status['outputs_stageout']['remote']['return_code'] != 0)
+                         cmscp_status['init_local_stageout_mgr']['return_code'] == 0)
         elif policy == 'remote':
             condition = (condition and \
-                         cmscp_status['init_direct_stageout_impl']['return_code'] == 0 and \
-                         cmscp_status['outputs_stageout']['local']['return_code'] != 0)
+                         cmscp_status['init_direct_stageout_impl']['return_code'] == 0)
+
         ## There are some cases where we don't have to stage out the output files.
         if condition:
             if skip['outputs_stageout'][policy]:
