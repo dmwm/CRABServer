@@ -793,7 +793,7 @@ def perform_direct_stageout(direct_stageout_impl, \
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 def clean_stageout_area(local_stageout_mgr, direct_stageout_impl, policy, \
-                        logs_arch_dest_temp_lfn, keep_log):
+                        logs_arch_dest_lfn, keep_log):
     """
     Wrapper for cleaning the local or remote storage areas.
     """
@@ -807,9 +807,9 @@ def clean_stageout_area(local_stageout_mgr, direct_stageout_impl, policy, \
             ## local_stageout_mgr.cleanSuccessfulStageOuts(), because we want
             ## the user to be able to retrieve the logs archive via
             ## 'crab getlog'.
-            if logs_arch_dest_temp_lfn in local_stageout_mgr.completedFiles:
-                logs_arch_info = local_stageout_mgr.completedFiles[logs_arch_dest_temp_lfn]
-                del local_stageout_mgr.completedFiles[logs_arch_dest_temp_lfn]
+            if logs_arch_dest_lfn in local_stageout_mgr.completedFiles:
+                logs_arch_info = local_stageout_mgr.completedFiles[logs_arch_dest_lfn]
+                del local_stageout_mgr.completedFiles[logs_arch_dest_lfn]
                 add_back_logs_arch = True
                 msg  = "Will not remove logs archive file from local temporary storage"
                 msg += " (but will consider its local stageout as failed for transfer purposes)."
@@ -817,7 +817,7 @@ def clean_stageout_area(local_stageout_mgr, direct_stageout_impl, policy, \
         for dest_temp_lfn in local_stageout_mgr.completedFiles.keys():
             file_name = os.path.basename(dest_temp_lfn)
             orig_file_name, _ = get_job_id(file_name)
-            is_log = (dest_temp_lfn == logs_arch_dest_temp_lfn)
+            is_log = (dest_temp_lfn == logs_arch_dest_lfn)
             msg = "Setting local_stageout = False for file %s in job report." % (orig_file_name)
             print(msg)
             add_to_file_in_job_report(file_name, is_log, \
@@ -845,7 +845,7 @@ def clean_stageout_area(local_stageout_mgr, direct_stageout_impl, policy, \
         if add_back_logs_arch:
             ## Now add back the logs archive file to the list of successfully
             ## completed local stageouts (if corresponds to this manager).
-            local_stageout_mgr.completedFiles[logs_arch_dest_temp_lfn] = logs_arch_info
+            local_stageout_mgr.completedFiles[logs_arch_dest_lfn] = logs_arch_info
         ## Remove these same files from the list of files that need injection to ASO
         ## database. Notice that the logs archive file is removed from the list even
         ## if not removed from the storage.
@@ -1648,8 +1648,10 @@ def main():
             print(msg)
             if cmscp_status['logs_stageout'][policy]['return_code'] == 0:
                 if cmscp_status['logs_stageout'][policy]['files_temp']:
+                    cmscp_status['logs_stageout'][policy]['log_lfn'] = logs_arch_dest_temp_lfn
                     is_log_in_storage['temp'] = True
                 else:
+                    cmscp_status['logs_stageout'][policy]['log_lfn'] = logs_arch_dest_lfn
                     is_log_in_storage['permanent'] = True
 
             ## If the stageout failed, clean the stageout area. But don't remove
@@ -1771,8 +1773,9 @@ def main():
             if clean_log:
                 for location in "temp", "permanent":
                     is_log_in_storage[location] = False
-            clean_stageout_area(local_stageout_mgr, direct_stageout_impl, \
-                                policy, logs_arch_dest_temp_lfn, \
+            clean_stageout_area(local_stageout_mgr, direct_stageout_impl,
+                                policy,
+                                cmscp_status['logs_stageout'][policy]['log_lfn'],
                                 keep_log = not clean_log)
             msg  = "====== %s: " % (time.asctime(time.gmtime()))
             msg += "Finished to clean %s stageout area." % (policy)
