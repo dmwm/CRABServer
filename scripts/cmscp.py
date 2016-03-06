@@ -124,16 +124,17 @@ G_JOB_WRAPPER_EXIT_CODE = None
 ## as one single atomic thing and we only use G_JOB_WRAPPER_EXIT_CODE.
 G_JOB_EXIT_CODE = None
 
-## List to collect the files that have been staged out directly. The list is
-## filed by the perform_direct_stageout() function. For each file, append a
-## dictionary with relevant information used then in the clean_stageout_area()
-## function. If a file is removed from the remote storage, we still keep the
-## file in this list, but set the 'removed' flag to True.
+## List to collect the files that have been staged out directly the permenant
+## storage location. The list is filed by the perform_<policy>_stageout()
+## functions. For each file, append a dictionary with relevant information used
+## then in the clean_stageout_area() function. If a file is removed from the
+## remote storage, we still keep the file in this list, but set the 'removed'
+## flag to True.
 G_DIRECT_STAGEOUTS = []
 
-## List to collect the transfer requests to ASO for files that were
-## successfully transferred to the local storage. This list is filled in by the
-## perform_local_stageout() function. For each file, append a dictionary with
+## List to collect the transfer requests to ASO for files that were successfully
+## transferred to the local storage. This list is filled in by the
+## perform_<policy>_stageout() functions. For each file, append a dictionary with
 ## the information needed by the inject_to_aso() function.
 G_ASO_TRANSFER_REQUESTS = []
 
