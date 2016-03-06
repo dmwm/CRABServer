@@ -426,13 +426,15 @@ def perform_stageout(local_stageout_mgr, direct_stageout_impl, \
     Wrapper for local and direct stageouts.
     """
     if policy == 'local':
-        retval, retmsg = perform_local_stageout(local_stageout_mgr, \
-                                                source_file, dest_temp_lfn, \
-                                                dest_lfn, dest_site, \
-                                                source_site, is_log, inject)
+        retval, retmsg, is_file_temp = \
+                                    perform_local_stageout(local_stageout_mgr, \
+                                                    source_file, dest_temp_lfn, \
+                                                    dest_lfn, dest_site, \
+                                                    source_site, is_log, inject)
     elif policy == 'remote':
         ## Can return 60311, 60307 or 60403.
-        retval, retmsg = perform_direct_stageout(direct_stageout_impl, \
+        retval, retmsg, is_file_temp = \
+                                    perform_direct_stageout(direct_stageout_impl, \
                                                  direct_stageout_command, \
                                                  direct_stageout_protocol, \
                                                  source_file, dest_pfn, dest_site, \
@@ -440,8 +442,8 @@ def perform_stageout(local_stageout_mgr, direct_stageout_impl, \
     else:
         msg = "ERROR: Skipping unknown stageout policy named '%s'." % (policy)
         print(msg)
-        retval, retmsg = 80000, msg
-    return retval, retmsg
+        retval, retmsg, is_file_temp = 80000, msg, False
+    return retval, retmsg, is_file_temp
 
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -507,7 +509,7 @@ def perform_local_stageout(local_stageout_mgr, \
                                   'inject'             : True
                                  }
             G_ASO_TRANSFER_REQUESTS.append(file_transfer_info)
-    return retval, retmsg
+    return retval, retmsg, True
 
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -755,7 +757,7 @@ def perform_direct_stageout(direct_stageout_impl, \
             msg = "WARNING: Ignoring failure in adding the above information to the job report."
             print(msg)
 
-    return retval, retmsg
+    return retval, retmsg, False
 
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1577,7 +1579,8 @@ def main():
             print(msg)
             try:
                 cmscp_status['logs_stageout'][policy]['return_code'], \
-                cmscp_status['logs_stageout'][policy]['return_msg'] = \
+                cmscp_status['logs_stageout'][policy]['return_msg'], \
+                cmscp_status['logs_stageout'][policy]['files_temp'], = \
                                                      perform_stageout(local_stageout_mgr, \
                                                                       direct_stageout_impl, \
                                                                       direct_stageout_command, \
@@ -1662,7 +1665,8 @@ def main():
                     output_dest_lfn = os.path.join(dest_final_dir, output_dest_file_name)
                     try:
                         cur_retval, \
-                        cur_retmsg = perform_stageout(local_stageout_mgr, \
+                        cur_retmsg, \
+                        cur_files_temp = perform_stageout(local_stageout_mgr, \
                                                       direct_stageout_impl, \
                                                       direct_stageout_command, \
                                                       direct_stageout_protocol, \
