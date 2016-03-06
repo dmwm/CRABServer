@@ -1265,9 +1265,11 @@ def main():
     if source_site == dest_site:
         # Make sure two policies are used (local, remote) and we can change it
         # It can be that only one policy is specified. See TW configuration file.
-        if stageout_policy == ["local", "remote"]:
+        if stageout_policy[0] != "local" and "local" in stageout_policy:
             print('Job execution site is the same as destination site. Changing stageout policy.')
-            stageout_policy = ["remote", "local"]
+            while "local" in stageout_policy:
+                stageout_policy.remove("local")
+            stageout_policy.insert(0, "local")
             print('New stageout policy: %s' % (", ".join(stageout_policy)))
         else:
             print('Not rewriting stageout policy. Continue with %s stageout policy.' % (", ".join(stageout_policy)))
