@@ -616,7 +616,7 @@ class DagmanCreator(TaskAction.TaskAction):
         ignoreLocality = kwargs['task']['tm_ignore_locality'] == 'T'
         self.logger.debug("Ignore locality: %s" % (ignoreLocality))
 
-        for jobgroup in splitterResult:
+        for jobgroup in splitterResult[0]:
             jobs = jobgroup.getJobs()
 
             blocks = set()
@@ -742,7 +742,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 dag += SUBDAG_FRAGMENT.format(**dagSpec)
 
         ## Create a tarball with all the job lumi files.
-        with getLockedFile('run_and_lumis.tar.gz', 'a') as fd and getLockedFile('inputfiles.tar.gz', 'a') as fd2:
+        with getLockedFile('run_and_lumis.tar.gz', 'a') as fd, getLockedFile('inputfiles.tar.gz', 'a') as fd2:
             self.logger.debug("Acquired lock on run and lumi tarball")
 
             try:
