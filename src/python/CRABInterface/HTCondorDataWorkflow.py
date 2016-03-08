@@ -293,7 +293,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## uploaded by the post-job after stageout has finished for all output and log
         ## files in the job.)
         rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow)
-        ## Extract from the filemetadata the necessary information. 
+        ## Extract from the filemetadata the necessary information.
         res['runsAndLumis'] = {}
         for row in rows:
             jobidstr = str(row[GetFromTaskAndType.PANDAID])
@@ -1049,6 +1049,13 @@ class HTCondorDataWorkflow(DataWorkflow):
             status = ad.get('NodeStatus', -1)
             retry = ad.get('RetryCount', -1)
             msg = ad.get("StatusDetails", "")
+
+            # Each job has a subdag for recovery that we need to skip in case its status is 0 STATUS_NOT_READY
+            # Also, we decrease NodesTotal since it does not have to be counted
+            if node.endswith("SubJobs") and status <= 0:
+                taskStatus['NodesTotal'] -= 1
+                continue
+
             if status == 1: # STATUS_READY
                 info = nodes.setdefault(nodeid, {})
                 if info.get("State") == "transferring":
