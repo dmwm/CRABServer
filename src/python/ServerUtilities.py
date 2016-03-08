@@ -89,7 +89,7 @@ def setDashboardLogs(params, webdir, jobid, retry):
     log_files = [("job_out", "txt"), ("postjob", "txt")]
     for i, log_file in enumerate(log_files):
         log_file_basename, log_file_extension = log_file
-        log_file_name = "%s/%s.%d.%d.%s" % (webdir, \
+        log_file_name = "%s/%s.%s.%d.%s" % (webdir, \
                                             log_file_basename, jobid, \
                                             retry, \
                                             log_file_extension)

@@ -152,7 +152,7 @@ class PreJob:
                   'broker': self.backend,
                   'bossId': str(self.job_id),
                   'localId': '',
-                  'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (self.job_id, self.task_ad['CRAB_ReqName'].replace("_", ":")),
+                  'SyncGridJobId': 'https://glidein.cern.ch/%s/%s' % (self.job_id, self.task_ad['CRAB_ReqName'].replace("_", ":")),
                  }
 
         storage_rules = htcondor.param['CRAB_StorageRules']
