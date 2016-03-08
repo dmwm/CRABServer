@@ -744,7 +744,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 dag += SUBDAG_FRAGMENT.format(**dagSpec)
 
         ## Create a tarball with all the job lumi files.
-        with getLockedFile('run_and_lumis.tar.gz', 'a') as fd, getLockedFile('inputfiles.tar.gz', 'a') as fd2:
+        with getLockedFile('run_and_lumis.tar.gz', 'a') as fd, getLockedFile('input_files.tar.gz', 'a') as fd2:
             self.logger.debug("Acquired lock on run and lumi tarball")
 
             try:
@@ -758,12 +758,12 @@ class DagmanCreator(TaskAction.TaskAction):
                 tfd = tarfile.open('run_and_lumis.tar.gz', 'w:gz')
                 tempDir2 = tempfile.mkdtemp()
                 try:
-                    tfd2 = tarfile.open('inputfiles.tar.gz', 'r:gz')
+                    tfd2 = tarfile.open('input_files.tar.gz', 'r:gz')
                     tfd2.extractall(tempDir2)
                     tfd2.close()
                 except tarfile.ReadError:
                     self.logger.debug("First iteration: creating inputfiles from scratch")
-                tfd2 = tarfile.open('inputfiles.tar.gz', 'w:gz')
+                tfd2 = tarfile.open('input_files.tar.gz', 'w:gz')
                 for dagSpec in dagSpecs:
                     job_lumis_file = os.path.join(tempDir, 'job_lumis_'+ str(dagSpec['count']) +'.json')
                     with open(job_lumis_file, "w") as fd:
