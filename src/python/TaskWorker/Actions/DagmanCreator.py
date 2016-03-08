@@ -9,12 +9,15 @@ import re
 import json
 import shutil
 import string
+import pickle
 import tarfile
 import hashlib
+import tempfile
 import commands
 from ast import literal_eval
 from httplib import HTTPException
 
+from ServerUtilities import getLockedFile
 import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
 import TaskWorker.Actions.TaskAction as TaskAction
@@ -40,19 +43,23 @@ NODE_STATUS_FILE node_state 30 ALWAYS-UPDATE
 
 # NOTE: a file must be present, but 'noop' makes it not be read.
 #FINAL FinalCleanup Job.1.submit NOOP
-#SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT %(resthost)s %(resturiwfdb)s
+#SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT {resthost} {resturiwfdb}
 
 """
 
 DAG_FRAGMENT = """
-JOB Job%(count)d Job.%(count)d.submit
-SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %(backend)s
-SCRIPT DEFER 4 1800 POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(taskname)s %(count)d %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
-#PRE_SKIP Job%(count)d 3
-RETRY Job%(count)d %(maxretries)d UNLESS-EXIT 2
-VARS Job%(count)d count="%(count)d" runAndLumiMask="job_lumis_%(count)d.json" lheInputFiles="%(lheInputFiles)s" firstEvent="%(firstEvent)s" firstLumi="%(firstLumi)s" lastEvent="%(lastEvent)s" firstRun="%(firstRun)s" eventsPerLumi="%(eventsPerLumi)s" seeding="%(seeding)s" inputFiles="job_input_file_list_%(count)d.txt" scriptExe="%(scriptExe)s" scriptArgs="%(scriptArgs)s" +CRAB_localOutputFiles="\\"%(localOutputFiles)s\\"" +CRAB_DataBlock="\\"%(block)s\\"" +CRAB_Destination="\\"%(destination)s\\""
-ABORT-DAG-ON Job%(count)d 3
+JOB Job{count} Job.{count}.submit
+SCRIPT PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {taskname} {backend}
+SCRIPT DEFER 4 1800 POST Job{count} dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES {taskname} {count} {tempDest} {outputDest} cmsRun_{count}.log.tar.gz {remoteOutputFiles}
+#PRE_SKIP Job{count} 3
+RETRY Job{count} {maxretries} UNLESS-EXIT 2
+VARS Job{count} count="{count}" runAndLumiMask="job_lumis_{count}.json" lheInputFiles="{lheInputFiles}" firstEvent="{firstEvent}" firstLumi="{firstLumi}" lastEvent="{lastEvent}" firstRun="{firstRun}" maxRuntime="{maxRuntime}" eventsPerLumi="{eventsPerLumi}" seeding="{seeding}" inputFiles="job_input_file_list_{count}.txt" scriptExe="{scriptExe}" scriptArgs="{scriptArgs}" +CRAB_localOutputFiles="\\"{localOutputFiles}\\"" +CRAB_DataBlock="\\"{block}\\"" +CRAB_Destination="\\"{destination}\\""
+ABORT-DAG-ON Job{count} 3
+"""
 
+SUBDAG_FRAGMENT = """
+SUBDAG EXTERNAL Job{parent}SubJobs RunJobs{parent}.subdag
+PARENT Job{count} CHILD Job{parent}SubJobs
 """
 
 JOB_SUBMIT = \
@@ -124,7 +131,7 @@ Error = job_err.$(CRAB_Id)
 Log = job_log
 # args changed...
 
-Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) '--inputFile=$(inputFiles)' '--runAndLumis=$(runAndLumiMask)' --lheInputFiles=$(lheInputFiles) --firstEvent=$(firstEvent) --firstLumi=$(firstLumi) --lastEvent=$(lastEvent) --firstRun=$(firstRun) --seeding=$(seeding) --scriptExe=$(scriptExe) --eventsPerLumi=$(eventsPerLumi) '--scriptArgs=$(scriptArgs)' -o $(CRAB_AdditionalOutputFiles)"
+Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) '--inputFile=$(inputFiles)' '--runAndLumis=$(runAndLumiMask)' --lheInputFiles=$(lheInputFiles) --firstEvent=$(firstEvent) --firstLumi=$(firstLumi) --lastEvent=$(lastEvent) --firstRun=$(firstRun) --seeding=$(seeding) --scriptExe=$(scriptExe) --eventsPerLumi=$(eventsPerLumi) --maxRuntime=$(maxRuntime) '--scriptArgs=$(scriptArgs)' -o $(CRAB_AdditionalOutputFiles)"
 
 transfer_input_files = CMSRunAnalysis.sh, cmscp.py%(additional_input_file)s
 transfer_output_files = jobReport.json.$(count)
@@ -381,7 +388,8 @@ class DagmanCreator(TaskAction.TaskAction):
         """
 
         if os.path.exists("Job.submit"):
-            return
+            return {}
+
         # From here on out, we convert from tm_* names to the DataWorkflow names
         info = dict(task)
         info['workflow'] = task['tm_taskname']
@@ -462,7 +470,7 @@ class DagmanCreator(TaskAction.TaskAction):
         return info
 
 
-    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid):
+    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, subjob=None):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
@@ -487,17 +495,22 @@ class DagmanCreator(TaskAction.TaskAction):
             lastEvent = str(job['mask']['LastEvent'])
             firstLumi = str(job['mask']['FirstLumi'])
             firstRun = str(job['mask']['FirstRun'])
-            i += 1
-            sitead['Job%d' % i] = list(availablesites)
+            if subjob is None:
+                i += 1
+                count = str(i)
+            else:
+                subjob += 1
+                count = '{parent}-{subjob}'.format(parent=i, subjob=subjob)
+            sitead['Job{0}'.format(count)] = list(availablesites)
             siteinfo[i] = groupid
             remoteOutputFiles = []
             localOutputFiles = []
             for origFile in outfiles:
                 info = origFile.rsplit(".", 1)
                 if len(info) == 2:
-                    fileName = "%s_%d.%s" % (info[0], i, info[1])
+                    fileName = "%s_%s.%s" % (info[0], count, info[1])
                 else:
-                    fileName = "%s_%d" % (origFile, i)
+                    fileName = "%s_%s" % (origFile, count)
                 remoteOutputFiles.append("%s" % fileName)
                 localOutputFiles.append("%s=%s" % (origFile, fileName))
             remoteOutputFilesStr = " ".join(remoteOutputFiles)
@@ -511,6 +524,7 @@ class DagmanCreator(TaskAction.TaskAction):
             pfns = ["log/cmsRun_%d.log.tar.gz" % i] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
             nodeSpec = {'count': i,
+                        'parent': str(i),
                         'maxretries': task['numautomjobretries'],
                         'taskname': task['tm_taskname'],
                         'backend': os.environ.get('HOSTNAME', ''),
@@ -528,6 +542,7 @@ class DagmanCreator(TaskAction.TaskAction):
                         'seeding': 'AutomaticSeeding',
                         'lheInputFiles': 'tm_generator' in task and task['tm_generator'] == 'lhe',
                         'eventsPerLumi': task['tm_events_per_lumi'],
+                        'maxRuntime' : task['max_runtime'],
                         'sw': task['tm_job_sw'],
                         'block': block,
                         'destination': pfns,
@@ -542,7 +557,10 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def createSubdag(self, splitterResult, **kwargs):
 
-        startjobid = 0
+        startjobid = kwargs.get('startjobid', 0)
+        subjob = kwargs.get('subjob', None)
+        self.logger.debug('starting createSubdag, kwargs are:')
+        self.logger.debug(str(kwargs))
         dagSpecs = []
 
         if hasattr(self.config.TaskWorker, 'stageoutPolicy'):
@@ -553,6 +571,7 @@ class DagmanCreator(TaskAction.TaskAction):
         ## In the future this parameter may be set by the user in the CRAB configuration
         ## file and we would take it from the Task DB.
         kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
+        kwargs['task']['max_runtime'] = getattr(self.config.TaskWorker, 'maxRuntime', -1)
 
         info = self.makeJobSubmit(kwargs['task'])
 
@@ -716,31 +735,58 @@ class DagmanCreator(TaskAction.TaskAction):
             self.logger.warning(msg)
 
         ## Write down the DAG as needed by DAGMan.
-        dag = DAG_HEADER % {'resthost': kwargs['task']['resthost'], 'resturiwfdb': kwargs['task']['resturinoapi'] + '/workflowdb'}
+        dag = DAG_HEADER.format(resthost=kwargs['task']['resthost'], resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
         for dagSpec in dagSpecs:
-            dag += DAG_FRAGMENT % dagSpec
+            dag += DAG_FRAGMENT.format(**dagSpec)
+            if subjob is None:
+                dag += SUBDAG_FRAGMENT.format(**dagSpec)
 
         ## Create a tarball with all the job lumi files.
-        run_and_lumis_tar = tarfile.open("run_and_lumis.tar.gz", "w:gz")
-        ## Also creating a tarball with the dataset input files.
-        ## Each .txt file in the tarball contains a list of dataset files to be used for the job.
-        input_files_tar = tarfile.open("input_files.tar.gz", "w:gz")
-        for dagSpec in dagSpecs:
-            job_lumis_file = 'job_lumis_'+ str(dagSpec['count']) +'.json'
-            job_input_file_list = 'job_input_file_list_' + str(dagSpec['count']) + '.txt'
-            with open(job_lumis_file, "w") as fd:
-                fd.write(str(dagSpec['runAndLumiMask']))
-            with open(job_input_file_list, "w") as fd:
-                fd.write(str(dagSpec['inputFiles']))
-            run_and_lumis_tar.add(job_lumis_file)
-            input_files_tar.add(job_input_file_list)
-            os.remove(job_lumis_file)
-            os.remove(job_input_file_list)
-        run_and_lumis_tar.close()
-        input_files_tar.close()
+        with getLockedFile('run_and_lumis.tar.gz', 'a') as fd and getLockedFile('inputfiles.tar.gz', 'a') as fd2:
+            self.logger.debug("Acquired lock on run and lumi tarball")
+
+            try:
+                tempDir = tempfile.mkdtemp()
+                tfd = tarfile.open('run_and_lumis.tar.gz', 'r:gz')
+                tfd.extractall(tempDir)
+                tfd.close()
+                tfd = tarfile.open('run_and_lumis.tar.gz', 'w:gz')
+                tempDir2 = tempfile.mkdtemp()
+                tfd2 = tarfile.open('inputfiles.tar.gz', 'r:gz')
+                tfd2.extractall(tempDir2)
+                tfd2.close()
+                tfd2 = tarfile.open('inputfiles.tar.gz', 'w:gz')
+                for dagSpec in dagSpecs:
+                    job_lumis_file = os.path.join(tempDir, 'job_lumis_'+ str(dagSpec['count']) +'.json')
+                    with open(job_lumis_file, "w") as fd:
+                        fd.write(str(dagSpec['runAndLumiMask']))
+                    ## Also creating a tarball with the dataset input files.
+                    ## Each .txt file in the tarball contains a list of dataset files to be used for the job.
+                    job_input_file_list = os.path.join(tempDir2, 'job_input_file_list_'+ str(dagSpec['count']) +'.txt')
+                    with open(job_input_file_list, "w") as fd2:
+                        fd2.write(str(dagSpec['inputFiles']))
+            finally:
+                tfd.add(tempDir, arcname='')
+                tfd.close()
+                shutil.rmtree(tempDir)
+                tfd2.add(tempDir2, arcname='')
+                tfd2.close()
+                shutil.rmtree(tempDir2)
+
+        if subjob is None:
+            name = "RunJobs.dag"
+            ## Cache data discovery
+            with open("datadiscovery.pkl", "wb") as fd:
+                pickle.dump(splitterResult[1], fd)
+
+            ## Cache task information
+            with open("taskinformation.json", "w") as fd:
+                json.dump(kwargs['task'], fd)
+        else:
+            name = "RunJobs{0}.subdag".format(dagSpec['parent'])
 
         ## Save the DAG into a file.
-        with open("RunJobs.dag", "w") as fd:
+        with open(name, "w") as fd:
             fd.write(dag)
 
         with open("site.ad", "w") as fd:
@@ -882,7 +928,7 @@ class DagmanCreator(TaskAction.TaskAction):
             params = self.sendDashboardTask()
 
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
-                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'run_and_lumis.tar.gz', 'input_files.tar.gz']
+                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.json', 'run_and_lumis.tar.gz', 'input_files.tar.gz']
 
         self.extractMonitorFiles(inputFiles, **kw)
 

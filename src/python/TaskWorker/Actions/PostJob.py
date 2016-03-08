@@ -63,10 +63,12 @@ import uuid
 import glob
 import fcntl
 import errno
+import pickle
 import pprint
 import shutil
 import signal
 import urllib
+import tarfile
 import hashlib
 import logging
 import commands
@@ -79,12 +81,21 @@ from httplib import HTTPException
 
 import DashboardAPI
 import WMCore.Database.CMSCouch as CMSCouch
+from WMCore.DataStructs.LumiList import LumiList
 
 from TaskWorker import __version__
 from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
+from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
+from TaskWorker.Actions.DagmanCreator import DagmanCreator
+from TaskWorker.Actions.DagmanCreator import SPLIT_ARG_MAP
+from TaskWorker.WorkerExceptions import TaskWorkerException
+
 from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon
+
+from WMCore.Configuration import Configuration, ConfigSection
+
 
 ASO_JOB = None
 config = None
@@ -1439,6 +1450,74 @@ class PostJob():
         ## If this is a deferred post-job execution, put back the log level to DEBUG.
         if not first_pj_execution():
             self.logger.setLevel(logging.DEBUG)
+
+        ## Parse the lumis send to process
+        self.logger.info("====== Starting to parse the lumi file")
+        try:
+            tmpdir = tempfile.mkdtemp()
+            f = tarfile.open("run_and_lumis.tar.gz")
+            fn = "job_lumis_{0}.json".format(self.job_id)
+            f.extract(fn, path=tmpdir)
+            with open(os.path.join(tmpdir, fn)) as fd:
+                injson = json.load(fd)
+                inlumis = LumiList(compactList=injson)
+        finally:
+            f.close()
+            shutil.rmtree(tmpdir)
+
+        outlumis = LumiList()
+        for input in self.job_report['steps']['cmsRun']['input']['source']:
+            outlumis += LumiList(runsAndLumis=input['runs'])
+
+        self.logger.info("Lumis expected to be processed: {0}".format(len(inlumis.getLumis())))
+        self.logger.info("Lumis actually processed:       {0}".format(len(outlumis.getLumis())))
+        self.logger.info("Difference in lumis:            {0}".format(len((inlumis - outlumis).getLumis())))
+
+        missing = inlumis - outlumis
+        missing_compact = missing.getCompactList()
+
+        runs = missing.getRuns()
+        lumis = [",".join(map(str, reduce(lambda x, y: x + y, missing_compact[run]))) for run in runs]
+
+        with open('datadiscovery.pkl', 'rb') as fd:
+            dataset = pickle.load(fd)
+
+        with open('taskinformation.json') as fd:
+            task = json.load(fd)
+
+        task['tm_split_args']['runs'] = runs
+        task['tm_split_args']['lumis'] = lumis
+        for algorithm, units in SPLIT_ARG_MAP.items():
+            if task['tm_split_algo'] == algorithm:
+                task['tm_split_args'][units] /= 4
+        self.logger.info("dataset: %s" % str(dataset))
+        self.logger.info("task: %s" % str(task))
+
+        try:
+            config = Configuration()
+            config.TaskWorker = ConfigSection(name="TaskWorker")
+
+            splitter = Splitter(config, server=None, resturi='')
+            split_result = splitter.execute(dataset, task=task)
+
+            self.logger.info("Splitting results:")
+            for g in split_result.result[0]:
+                self.logger.error("Created jobgroup with length {0}".format(len(g.getJobs())))
+        except TaskWorkerException as e:
+            self.logger.error("Error during splitting")
+
+        try:
+            creator = DagmanCreator(config, server=None, resturi='')
+            with open('site.ad') as fd:
+                sitead = classad.parse(fd)
+            availablesites = sitead['Job%d' % self.job_id]
+            self.logger.error('found available sites: %s' % str(availablesites))
+            self.logger.error(str(type(availablesites)))
+            with open('site.ad.json') as fd:
+                siteinfo = json.load(fd)
+            creator.createSubdag(split_result.result, task=task, sitead=sitead, availablesites=availablesites, siteinfo=siteinfo, startjobid=self.job_id, subjob=0)
+        except TaskWorkerException as e:
+            self.logger.error('Error during subdag creation')
 
         ## If the flag CRAB_NoWNStageout is set, we finish the post-job here.
         ## (I didn't remove this yet, because even if the transfer of the logs and

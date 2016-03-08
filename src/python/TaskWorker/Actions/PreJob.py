@@ -55,7 +55,7 @@ class PreJob:
         """
         retmsg = ""
         ## Load the retry_info.
-        retry_info_file_name = "retry_info/job.%d.txt" % (self.job_id)
+        retry_info_file_name = "retry_info/job.%s.txt" % (self.job_id)
         if os.path.exists(retry_info_file_name):
             try:
                 with open(retry_info_file_name, 'r') as fd:
@@ -94,7 +94,7 @@ class PreJob:
 
         ## The next (first) if statement is trying to catch the case in which the job or
         ## the pre-job was re-started before the post-job started to run ...
-        job_out_file_name = "job_out.%d" % (self.job_id)
+        job_out_file_name = "job_out.%s" % (self.job_id)
         if retry_info['pre'] > retry_info['post']:
             ## If job_out exists, then the job was likely submitted and we should run the
             ## post-job.
@@ -192,6 +192,8 @@ class PreJob:
         try:
             self.logger.info("Loading classads from: %s" % os.environ['_CONDOR_JOB_AD'])
             self.task_ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
+            self.logger.info(os.listdir('.'))
+            self.logger.info(str(self.task_ad))
         except:
             msg = "Got exception while trying to parse the job ad."
             self.logger.exception(msg)
@@ -201,7 +203,7 @@ class PreJob:
         """
         Need a doc string here.
         """
-        file_name = "resubmit_info/job.%d.txt" % (self.job_id)
+        file_name = "resubmit_info/job.%s.txt" % (self.job_id)
         if os.path.exists(file_name):
             with open(file_name, 'r') as fd:
                 self.resubmit_info = literal_eval(fd.read())
@@ -211,7 +213,7 @@ class PreJob:
         """
         Need a doc string here.
         """
-        file_name = "resubmit_info/job.%d.txt" % (self.job_id)
+        file_name = "resubmit_info/job.%s.txt" % (self.job_id)
         with open(file_name + ".tmp", 'w') as fd:
             fd.write(str(self.resubmit_info))
         os.rename(file_name + ".tmp", file_name)
@@ -339,7 +341,7 @@ class PreJob:
 
         ## Within the schedd, order the first few jobs in the task before all other tasks of the same priority.
         pre_job_prio = 1
-        if self.job_id <= 5:
+        if int(self.job_id.split('-')[0]) <= 5:
             pre_job_prio = 0
         new_submit_text += '+PreJobPrio1 = %d\n' % pre_job_prio
 
@@ -368,7 +370,7 @@ class PreJob:
         with open("Job.submit", 'r') as fd:
             new_submit_text += fd.read()
         ## Write the Job.<job_id>.submit file.
-        with open("Job.%d.submit" % (self.job_id), 'w') as fd:
+        with open("Job.%s.submit" % (self.job_id), 'w') as fd:
             fd.write(new_submit_text)
 
 
@@ -425,7 +427,7 @@ class PreJob:
         else:
             with open("site.ad") as fd:
                 site_ad = classad.parse(fd)
-            available = set(site_ad['Job%d' % (self.job_id)])
+            available = set(site_ad['Job%s' % (self.job_id)])
         ## Take the intersection between the available sites and the site whitelist.
         ## This is the new set of available sites.
         if sitewhitelist:
@@ -481,7 +483,7 @@ class PreJob:
         Need a doc string here.
         """
         self.dag_retry = int(args[0])
-        self.job_id    = int(args[1])
+        self.job_id    = str(args[1])
         self.taskname  = args[2] # this is not used
         self.backend   = args[3]
 
@@ -496,9 +498,10 @@ class PreJob:
             if ose.errno != errno.EEXIST:
                 logpath = os.getcwd()
         ## Create (open) the pre-job log file prejob.<job_id>.<crab_retry>.txt.
-        prejob_log_file_name = os.path.join(logpath, "prejob.%d.%d.txt" % (self.job_id, crab_retry))
+        prejob_log_file_name = os.path.join(logpath, "prejob.%s.%s.txt" % (self.job_id, crab_retry))
         fd_prejob_log = os.open(prejob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
         os.chmod(prejob_log_file_name, 0o644)
+
         ## Redirect stdout and stderr to the pre-job log file.
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             print("Pre-job started with no output redirection.")

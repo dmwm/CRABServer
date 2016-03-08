@@ -91,7 +91,7 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
     eventsPerLumi:  start a new lumi section after the specified amount of events.  None disables this.
     """
     def __init__(self, location, inputFiles, runAndLumis, agentNumber, lfnBase, outputMods, firstEvent=0, lastEvent=-1, firstLumi=None,\
-                    firstRun=None, seeding=None, lheInputFiles=False, oneEventMode=False, eventsPerLumi=None):
+                    firstRun=None, seeding=None, lheInputFiles=False, oneEventMode=False, eventsPerLumi=None, maxRuntime=None):
         ScriptInterface.__init__(self)
         self.stepSpace = ConfigSection()
         self.stepSpace.location = location
@@ -109,6 +109,8 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
 #        self.step.data.application.configuration.pickledarguments.globalTag/globalTagTransaction
         if eventsPerLumi:
             self.step.data.application.configuration.eventsPerLumi = eventsPerLumi
+        if maxRuntime:
+            self.step.data.application.configuration.maxSecondsUntilRampdown = maxRuntime
         self.step.data.application.multicore.enabled = False
         self.step.data.section_("input")
         self.job = jobDict(lheInputFiles, seeding)
@@ -178,6 +180,7 @@ parser.add_option('--seeding', dest='seeding')
 parser.add_option('--lheInputFiles', dest='lheInputFiles')
 parser.add_option('--oneEventMode', dest='oneEventMode', default=False)
 parser.add_option('--eventsPerLumi', dest='eventsPerLumi', default=None)
+parser.add_option('--maxRuntime', dest='maxRuntime', default=None)
 opts, args = parser.parse_args()
 
 if opts.oneEventMode:
@@ -192,6 +195,7 @@ if opts.inputFile:
     inputFile = readFileFromTarball(opts.inputFile, 'input_files.tar.gz')
 pset = SetupCMSSWPsetCore( opts.location, inputFile, runAndLumis, agentNumber, lfnBase, outputMods,\
                            literal_eval(opts.firstEvent), literal_eval(opts.lastEvent), literal_eval(opts.firstLumi),\
-                           literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode, literal_eval(opts.eventsPerLumi))
+                           literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode, \
+                           literal_eval(opts.eventsPerLumi), literal_eval(opts.maxRuntime))
 
 pset()
