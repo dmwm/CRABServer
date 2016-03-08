@@ -617,6 +617,8 @@ class DagmanCreator(TaskAction.TaskAction):
         self.logger.debug("Ignore locality: %s" % (ignoreLocality))
 
         for jobgroup in splitterResult[0]:
+            self.logger.error(dir(jobgroup))
+            self.logger.error(type(jobgroup))
             jobs = jobgroup.getJobs()
 
             blocks = set()
@@ -747,14 +749,20 @@ class DagmanCreator(TaskAction.TaskAction):
 
             try:
                 tempDir = tempfile.mkdtemp()
-                tfd = tarfile.open('run_and_lumis.tar.gz', 'r:gz')
-                tfd.extractall(tempDir)
-                tfd.close()
+                try:
+                    tfd = tarfile.open('run_and_lumis.tar.gz', 'r:gz')
+                    tfd.extractall(tempDir)
+                    tfd.close()
+                except tarfile.ReadError:
+                    self.logger.debug("First iteration: creating run and lumi from scratch")
                 tfd = tarfile.open('run_and_lumis.tar.gz', 'w:gz')
                 tempDir2 = tempfile.mkdtemp()
-                tfd2 = tarfile.open('inputfiles.tar.gz', 'r:gz')
-                tfd2.extractall(tempDir2)
-                tfd2.close()
+                try:
+                    tfd2 = tarfile.open('inputfiles.tar.gz', 'r:gz')
+                    tfd2.extractall(tempDir2)
+                    tfd2.close()
+                except tarfile.ReadError:
+                    self.logger.debug("First iteration: creating inputfiles from scratch")
                 tfd2 = tarfile.open('inputfiles.tar.gz', 'w:gz')
                 for dagSpec in dagSpecs:
                     job_lumis_file = os.path.join(tempDir, 'job_lumis_'+ str(dagSpec['count']) +'.json')
@@ -780,8 +788,8 @@ class DagmanCreator(TaskAction.TaskAction):
                 pickle.dump(splitterResult[1], fd)
 
             ## Cache task information
-            with open("taskinformation.json", "w") as fd:
-                json.dump(kwargs['task'], fd)
+            with open("taskinformation.pkl", "wb") as fd:
+                pickle.dump(kwargs['task'], fd)
         else:
             name = "RunJobs{0}.subdag".format(dagSpec['parent'])
 
@@ -928,7 +936,7 @@ class DagmanCreator(TaskAction.TaskAction):
             params = self.sendDashboardTask()
 
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
-                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.json', 'run_and_lumis.tar.gz', 'input_files.tar.gz']
+                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'run_and_lumis.tar.gz', 'input_files.tar.gz']
 
         self.extractMonitorFiles(inputFiles, **kw)
 

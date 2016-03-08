@@ -1482,8 +1482,8 @@ class PostJob():
         with open('datadiscovery.pkl', 'rb') as fd:
             dataset = pickle.load(fd)
 
-        with open('taskinformation.json') as fd:
-            task = json.load(fd)
+        with open('taskinformation.pkl', 'rb') as fd:
+            task = pickle.load(fd)
 
         task['tm_split_args']['runs'] = runs
         task['tm_split_args']['lumis'] = lumis
