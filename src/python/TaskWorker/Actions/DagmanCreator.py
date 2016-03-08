@@ -562,6 +562,7 @@ class DagmanCreator(TaskAction.TaskAction):
         self.logger.debug('starting createSubdag, kwargs are:')
         self.logger.debug(str(kwargs))
         dagSpecs = []
+        subdags = []
 
         if hasattr(self.config.TaskWorker, 'stageoutPolicy'):
             kwargs['task']['stageoutpolicy'] = ",".join(self.config.TaskWorker.stageoutPolicy)
@@ -742,44 +743,49 @@ class DagmanCreator(TaskAction.TaskAction):
             dag += DAG_FRAGMENT.format(**dagSpec)
             if subjob is None:
                 dag += SUBDAG_FRAGMENT.format(**dagSpec)
+                subdag = "RunJobs{0}.subdag".format(dagSpec['count'])
+                with open(subdag, "w") as fd:
+                    fd.write("")
+                subdags.append(subdag)
 
         ## Create a tarball with all the job lumi files.
-        with getLockedFile('run_and_lumis.tar.gz', 'a') as fd, getLockedFile('input_files.tar.gz', 'a') as fd2:
-            self.logger.debug("Acquired lock on run and lumi tarball")
+        with getLockedFile('run_and_lumis.tar.gz', 'a') as fd:
+            with getLockedFile('input_files.tar.gz', 'a') as fd2:
+                self.logger.debug("Acquired lock on run and lumi tarball")
 
-            try:
-                tempDir = tempfile.mkdtemp()
                 try:
-                    tfd = tarfile.open('run_and_lumis.tar.gz', 'r:gz')
-                    tfd.extractall(tempDir)
+                    tempDir = tempfile.mkdtemp()
+                    try:
+                        tfd = tarfile.open('run_and_lumis.tar.gz', 'r:gz')
+                        tfd.extractall(tempDir)
+                        tfd.close()
+                    except tarfile.ReadError:
+                        self.logger.debug("First iteration: creating run and lumi from scratch")
+                    tfd = tarfile.open('run_and_lumis.tar.gz', 'w:gz')
+                    tempDir2 = tempfile.mkdtemp()
+                    try:
+                        tfd2 = tarfile.open('input_files.tar.gz', 'r:gz')
+                        tfd2.extractall(tempDir2)
+                        tfd2.close()
+                    except tarfile.ReadError:
+                        self.logger.debug("First iteration: creating inputfiles from scratch")
+                    tfd2 = tarfile.open('input_files.tar.gz', 'w:gz')
+                    for dagSpec in dagSpecs:
+                        job_lumis_file = os.path.join(tempDir, 'job_lumis_'+ str(dagSpec['count']) +'.json')
+                        with open(job_lumis_file, "w") as fd:
+                            fd.write(str(dagSpec['runAndLumiMask']))
+                        ## Also creating a tarball with the dataset input files.
+                        ## Each .txt file in the tarball contains a list of dataset files to be used for the job.
+                        job_input_file_list = os.path.join(tempDir2, 'job_input_file_list_'+ str(dagSpec['count']) +'.txt')
+                        with open(job_input_file_list, "w") as fd2:
+                            fd2.write(str(dagSpec['inputFiles']))
+                finally:
+                    tfd.add(tempDir, arcname='')
                     tfd.close()
-                except tarfile.ReadError:
-                    self.logger.debug("First iteration: creating run and lumi from scratch")
-                tfd = tarfile.open('run_and_lumis.tar.gz', 'w:gz')
-                tempDir2 = tempfile.mkdtemp()
-                try:
-                    tfd2 = tarfile.open('input_files.tar.gz', 'r:gz')
-                    tfd2.extractall(tempDir2)
+                    shutil.rmtree(tempDir)
+                    tfd2.add(tempDir2, arcname='')
                     tfd2.close()
-                except tarfile.ReadError:
-                    self.logger.debug("First iteration: creating inputfiles from scratch")
-                tfd2 = tarfile.open('input_files.tar.gz', 'w:gz')
-                for dagSpec in dagSpecs:
-                    job_lumis_file = os.path.join(tempDir, 'job_lumis_'+ str(dagSpec['count']) +'.json')
-                    with open(job_lumis_file, "w") as fd:
-                        fd.write(str(dagSpec['runAndLumiMask']))
-                    ## Also creating a tarball with the dataset input files.
-                    ## Each .txt file in the tarball contains a list of dataset files to be used for the job.
-                    job_input_file_list = os.path.join(tempDir2, 'job_input_file_list_'+ str(dagSpec['count']) +'.txt')
-                    with open(job_input_file_list, "w") as fd2:
-                        fd2.write(str(dagSpec['inputFiles']))
-            finally:
-                tfd.add(tempDir, arcname='')
-                tfd.close()
-                shutil.rmtree(tempDir)
-                tfd2.add(tempDir2, arcname='')
-                tfd2.close()
-                shutil.rmtree(tempDir2)
+                    shutil.rmtree(tempDir2)
 
         if subjob is None:
             name = "RunJobs.dag"
@@ -856,7 +862,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 self.logger.error("Failed to record the number of jobs.")
                 return 1
 
-        return info, splitterResult
+        return info, splitterResult, subdags
 
 
     def extractMonitorFiles(self, inputFiles, **kw):
@@ -950,9 +956,9 @@ class DagmanCreator(TaskAction.TaskAction):
             inputFiles.append("input_dataset_lumis.json")
             inputFiles.append("input_dataset_duplicate_lumis.json")
 
-        info, splitterResult = self.createSubdag(*args, **kw)
+        info, splitterResult, subdags = self.createSubdag(*args, **kw)
 
-        return info, params, inputFiles, splitterResult
+        return info, params, inputFiles + subdags, splitterResult
 
 
     def execute(self, *args, **kw):
