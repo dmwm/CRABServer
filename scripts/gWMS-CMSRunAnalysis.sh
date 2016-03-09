@@ -58,7 +58,7 @@ then
     JOB_CMSSite=`grep '^JOB_CMSSite =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
     if [ "X$CRAB_Id" = "X" ];
     then
-        print "Unable to determine CRAB Id."
+        echo "Unable to determine CRAB Id."
         exit 2
     fi
    echo "CRAB ID: $CRAB_Id"
