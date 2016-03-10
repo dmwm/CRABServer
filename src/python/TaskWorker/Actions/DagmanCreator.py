@@ -521,9 +521,9 @@ class DagmanCreator(TaskAction.TaskAction):
             if lastDirectDest != directDest:
                 lastDirectPfn = self.resolvePFNs(task['tm_asyncdest'], directDest)
                 lastDirectDest = directDest
-            pfns = ["log/cmsRun_%d.log.tar.gz" % i] + remoteOutputFiles
+            pfns = ["log/cmsRun_{0}.log.tar.gz".format(count)] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
-            nodeSpec = {'count': i,
+            nodeSpec = {'count': count,
                         'parent': str(i),
                         'maxretries': task['numautomjobretries'],
                         'taskname': task['tm_taskname'],
@@ -592,8 +592,8 @@ class DagmanCreator(TaskAction.TaskAction):
             global_blacklist = set()
             self.logger.debug("Ignoring the CRAB site blacklist.")
 
-        sitead = classad.ClassAd()
-        siteinfo = {'group_sites': {}, 'group_datasites': {}}
+        sitead = kwargs.get('sitead', classad.ClassAd())
+        siteinfo = kwargs.get('siteinfo', {'group_sites': {}, 'group_datasites': {}})
 
         blocksWithNoLocations = set()
 
@@ -721,7 +721,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 msg += " This is expected to result in DESIRED_SITES = %s" % (list(available))
                 self.logger.debug(msg)
 
-            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, list(blocks)[0], availablesites, datasites, outfiles, startjobid)
+            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, list(blocks)[0], availablesites, datasites, outfiles, startjobid, subjob=subjob)
             dagSpecs += jobgroupDagSpecs
 
         if not dagSpecs:
