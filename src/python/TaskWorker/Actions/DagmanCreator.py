@@ -17,7 +17,7 @@ import commands
 from ast import literal_eval
 from httplib import HTTPException
 
-from ServerUtilities import getLockedFile
+from ServerUtilities import getLock
 import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
 import TaskWorker.Actions.TaskAction as TaskAction
@@ -49,7 +49,7 @@ NODE_STATUS_FILE node_state 30 ALWAYS-UPDATE
 
 DAG_FRAGMENT = """
 JOB Job{count} Job.{count}.submit
-SCRIPT PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {taskname} {backend}
+SCRIPT PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {parent {taskname} {backend}}
 SCRIPT DEFER 4 1800 POST Job{count} dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES {taskname} {count} {tempDest} {outputDest} cmsRun_{count}.log.tar.gz {remoteOutputFiles}
 #PRE_SKIP Job{count} 3
 RETRY Job{count} {maxretries} UNLESS-EXIT 2
@@ -592,8 +592,8 @@ class DagmanCreator(TaskAction.TaskAction):
             global_blacklist = set()
             self.logger.debug("Ignoring the CRAB site blacklist.")
 
-        sitead = kwargs.get('sitead', classad.ClassAd())
-        siteinfo = kwargs.get('siteinfo', {'group_sites': {}, 'group_datasites': {}})
+        sitead = classad.ClassAd()
+        siteinfo = {'group_sites': {}, 'group_datasites': {}}
 
         blocksWithNoLocations = set()
 
@@ -749,43 +749,43 @@ class DagmanCreator(TaskAction.TaskAction):
                 subdags.append(subdag)
 
         ## Create a tarball with all the job lumi files.
-        with getLockedFile('run_and_lumis.tar.gz', 'a') as fd:
-            with getLockedFile('input_files.tar.gz', 'a') as fd2:
-                self.logger.debug("Acquired lock on run and lumi tarball")
+        with getLock('splitting_data'):
+            self.logger.debug("Acquired lock on run and lumi tarball")
+
+            try:
+                tempDir = tempfile.mkdtemp()
+                tempDir2 = tempfile.mkdtemp()
 
                 try:
-                    tempDir = tempfile.mkdtemp()
-                    try:
-                        tfd = tarfile.open('run_and_lumis.tar.gz', 'r:gz')
-                        tfd.extractall(tempDir)
-                        tfd.close()
-                    except tarfile.ReadError:
-                        self.logger.debug("First iteration: creating run and lumi from scratch")
-                    tfd = tarfile.open('run_and_lumis.tar.gz', 'w:gz')
-                    tempDir2 = tempfile.mkdtemp()
-                    try:
-                        tfd2 = tarfile.open('input_files.tar.gz', 'r:gz')
-                        tfd2.extractall(tempDir2)
-                        tfd2.close()
-                    except tarfile.ReadError:
-                        self.logger.debug("First iteration: creating inputfiles from scratch")
-                    tfd2 = tarfile.open('input_files.tar.gz', 'w:gz')
-                    for dagSpec in dagSpecs:
-                        job_lumis_file = os.path.join(tempDir, 'job_lumis_'+ str(dagSpec['count']) +'.json')
-                        with open(job_lumis_file, "w") as fd:
-                            fd.write(str(dagSpec['runAndLumiMask']))
-                        ## Also creating a tarball with the dataset input files.
-                        ## Each .txt file in the tarball contains a list of dataset files to be used for the job.
-                        job_input_file_list = os.path.join(tempDir2, 'job_input_file_list_'+ str(dagSpec['count']) +'.txt')
-                        with open(job_input_file_list, "w") as fd2:
-                            fd2.write(str(dagSpec['inputFiles']))
-                finally:
-                    tfd.add(tempDir, arcname='')
+                    tfd = tarfile.open('run_and_lumis.tar.gz', 'r:gz')
+                    tfd.extractall(tempDir)
                     tfd.close()
-                    shutil.rmtree(tempDir)
-                    tfd2.add(tempDir2, arcname='')
+                except (tarfile.ReadError, IOError):
+                    self.logger.debug("First iteration: creating run and lumi from scratch")
+                try:
+                    tfd2 = tarfile.open('input_files.tar.gz', 'r:gz')
+                    tfd2.extractall(tempDir2)
                     tfd2.close()
-                    shutil.rmtree(tempDir2)
+                except (tarfile.ReadError, IOError):
+                    self.logger.debug("First iteration: creating inputfiles from scratch")
+                tfd = tarfile.open('run_and_lumis.tar.gz', 'w:gz')
+                tfd2 = tarfile.open('input_files.tar.gz', 'w:gz')
+                for dagSpec in dagSpecs:
+                    job_lumis_file = os.path.join(tempDir, 'job_lumis_'+ str(dagSpec['count']) +'.json')
+                    with open(job_lumis_file, "w") as fd:
+                        fd.write(str(dagSpec['runAndLumiMask']))
+                    ## Also creating a tarball with the dataset input files.
+                    ## Each .txt file in the tarball contains a list of dataset files to be used for the job.
+                    job_input_file_list = os.path.join(tempDir2, 'job_input_file_list_'+ str(dagSpec['count']) +'.txt')
+                    with open(job_input_file_list, "w") as fd2:
+                        fd2.write(str(dagSpec['inputFiles']))
+            finally:
+                tfd.add(tempDir, arcname='')
+                tfd.close()
+                shutil.rmtree(tempDir)
+                tfd2.add(tempDir2, arcname='')
+                tfd2.close()
+                shutil.rmtree(tempDir2)
 
         if subjob is None:
             name = "RunJobs.dag"
@@ -796,18 +796,19 @@ class DagmanCreator(TaskAction.TaskAction):
             ## Cache task information
             with open("taskinformation.pkl", "wb") as fd:
                 pickle.dump(kwargs['task'], fd)
+
+            ## Cache site information
+            with open("site.ad", "w") as fd:
+                fd.write(str(sitead))
+
+            with open("site.ad.json", "w") as fd:
+                json.dump(siteinfo, fd)
         else:
             name = "RunJobs{0}.subdag".format(dagSpec['parent'])
 
         ## Save the DAG into a file.
         with open(name, "w") as fd:
             fd.write(dag)
-
-        with open("site.ad", "w") as fd:
-            fd.write(str(sitead))
-
-        with open("site.ad.json", "w") as fd:
-            json.dump(siteinfo, fd)
 
         task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
         userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))

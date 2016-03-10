@@ -421,13 +421,13 @@ class PreJob:
         if os.path.exists("site.ad.json"):
             with open("site.ad.json") as fd:
                 site_info = json.load(fd)
-            group = site_info[str(self.job_id)]
+            group = site_info[str(self.parent)]
             available = set(site_info['group_sites'][str(group)])
             datasites = set(site_info['group_datasites'][str(group)])
         else:
             with open("site.ad") as fd:
                 site_ad = classad.parse(fd)
-            available = set(site_ad['Job%s' % (self.job_id)])
+            available = set(site_ad['Job%s' % (self.parent)])
         ## Take the intersection between the available sites and the site whitelist.
         ## This is the new set of available sites.
         if sitewhitelist:
@@ -483,9 +483,10 @@ class PreJob:
         Need a doc string here.
         """
         self.dag_retry = int(args[0])
-        self.job_id    = str(args[1])
-        self.taskname  = args[2] # this is not used
-        self.backend   = args[3]
+        self.job_id = str(args[1])
+        self.parent = args[2]
+        self.taskname = args[3] # this is not used
+        self.backend = args[4]
 
         ## Calculate the CRAB retry count.
         crab_retry, calculate_crab_retry_msg = self.calculate_crab_retry()

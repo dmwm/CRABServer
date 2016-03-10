@@ -1510,14 +1510,7 @@ class PostJob():
 
         try:
             creator = DagmanCreator(config, server=None, resturi='')
-            with open('site.ad') as fd:
-                sitead = classad.parse(fd)
-            availablesites = sitead['Job%d' % self.job_id]
-            self.logger.error('found available sites: %s' % str(availablesites))
-            self.logger.error(str(type(availablesites)))
-            with open('site.ad.json') as fd:
-                siteinfo = json.load(fd)
-            creator.createSubdag(split_result.result, task=task, sitead=sitead, availablesites=availablesites, siteinfo=siteinfo, startjobid=self.job_id, subjob=0)
+            creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0)
         except TaskWorkerException as e:
             self.logger.error('Error during subdag creation')
 
