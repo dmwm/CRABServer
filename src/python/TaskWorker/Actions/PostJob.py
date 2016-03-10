@@ -318,7 +318,7 @@ class ASOServerJob(object):
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def load_docs_in_transfer(self):
-        """ Function that loads the object saved as a json by save_docs_in_transfer 
+        """ Function that loads the object saved as a json by save_docs_in_transfer
         """
         try:
             filename = 'transfer_info/docs_in_transfer.%d.%d.json' % (self.job_id, self.crab_retry)
@@ -328,7 +328,7 @@ class ASOServerJob(object):
             #Only printing a generic message, the full stacktrace is printed in execute()
             self.logger.error("Failed to load the docs in transfer. Aborting the postjob")
             raise
-        
+
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_transfers(self):
@@ -982,7 +982,7 @@ class PostJob():
         self.postjob_log_file_name = None
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-        
+
     def get_defer_num(self):
 
         DEFER_INFO_FILE = 'defer_info/defer_num.%d.%d.txt' % (self.job_id, self.dag_retry)
@@ -1035,7 +1035,7 @@ class PostJob():
         ## Create a file handler (or a stream handler to stdout), flush the memory
         ## handler content to the file (or stdout) and remove the memory handler.
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
-            handler = logging.StreamHandler(sys.stdout)    
+            handler = logging.StreamHandler(sys.stdout)
         else:
             print("Wrinting post-job output to %s." % (self.postjob_log_file_name))
             mode = 'w' if first_pj_execution() else 'a'
@@ -1124,7 +1124,7 @@ class PostJob():
                 self.logger.info("Continuing since this is not a critical error.")
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-    
+
     def execute(self, *args, **kw):
         """
         The execute method of PostJob.
@@ -1185,7 +1185,7 @@ class PostJob():
             self.logger.error(msg)
             if self.crab_retry is not None:
                 self.set_dashboard_state('FAILED')
-            retval = JOB_RETURN_CODES.FATAL_ERROR 
+            retval = JOB_RETURN_CODES.FATAL_ERROR
             self.log_finish_msg(retval)
             return retval
 
@@ -1300,9 +1300,9 @@ class PostJob():
             If the retry-job returns non 0 (meaning there was an error), report the state
             to dashboard and exit the post-job.
         """
-        
+
         res = 0, ""
-        
+
         self.logger.info("====== Starting to analyze job exit status.")
         retry = RetryJob()
         if not os.environ.get('TEST_POSTJOB_DISABLE_RETRIES', False):
@@ -1357,6 +1357,64 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    def createSubjobs(self):
+        ## Parse the lumis send to process
+        self.logger.info("====== Starting to parse the lumi file")
+        try:
+            tmpdir = tempfile.mkdtemp()
+            f = tarfile.open("run_and_lumis.tar.gz")
+            fn = "job_lumis_{0}.json".format(self.job_id)
+            f.extract(fn, path=tmpdir)
+            with open(os.path.join(tmpdir, fn)) as fd:
+                injson = json.load(fd)
+                inlumis = LumiList(compactList=injson)
+        finally:
+            f.close()
+            shutil.rmtree(tmpdir)
+
+        outlumis = LumiList()
+        for input in self.job_report['steps']['cmsRun']['input']['source']:
+            outlumis += LumiList(runsAndLumis=input['runs'])
+
+        self.logger.info("Lumis expected to be processed: {0}".format(len(inlumis.getLumis())))
+        self.logger.info("Lumis actually processed:       {0}".format(len(outlumis.getLumis())))
+        self.logger.info("Difference in lumis:            {0}".format(len((inlumis - outlumis).getLumis())))
+        missing = inlumis - outlumis
+        missing_compact = missing.getCompactList()
+        runs = missing.getRuns()
+        lumis = [",".join(map(str, reduce(lambda x, y:x + y, missing_compact[run]))) for run in runs]
+        with open('datadiscovery.pkl', 'rb') as fd:
+            dataset = pickle.load(fd)
+        with open('taskinformation.pkl', 'rb') as fd:
+            task = pickle.load(fd)
+        task['tm_split_args']['runs'] = runs
+        task['tm_split_args']['lumis'] = lumis
+        for algorithm, units in SPLIT_ARG_MAP.items():
+            if task['tm_split_algo'] == algorithm:
+                task['tm_split_args'][units] /= 4
+
+        self.logger.info("dataset: %s" % str(dataset))
+        self.logger.info("task: %s" % str(task))
+        try:
+            config = Configuration()
+            config.TaskWorker = ConfigSection(name="TaskWorker")
+            config.TaskWorker.scratchDir = '.' # XXX
+            splitter = Splitter(config, server=None, resturi='')
+            split_result = splitter.execute(dataset, task=task)
+            self.logger.info("Splitting results:")
+            for g in split_result.result[0]:
+                self.logger.error("Created jobgroup with length {0}".format(len(g.getJobs())))
+
+        except TaskWorkerException as e:
+            self.logger.error("Error during splitting")
+        try:
+            creator = DagmanCreator(config, server=None, resturi='')
+            creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0)
+        except TaskWorkerException as e:
+            self.logger.error('Error during subdag creation')
+
+    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
     def execute_internal(self):
         """
         The execute method calls this execute_internal method. All post-job actions
@@ -1370,7 +1428,7 @@ class PostJob():
             self.logger.error(retmsg)
             return 10, retmsg
 
-        ## If this is a deferred post-job execution, reduce the log level to WARNING. 
+        ## If this is a deferred post-job execution, reduce the log level to WARNING.
         if not first_pj_execution():
             self.logger.setLevel(logging.WARNING)
         ## Parse the job ad and use it if possible.
@@ -1452,67 +1510,7 @@ class PostJob():
         if not first_pj_execution():
             self.logger.setLevel(logging.DEBUG)
 
-        ## Parse the lumis send to process
-        self.logger.info("====== Starting to parse the lumi file")
-        try:
-            tmpdir = tempfile.mkdtemp()
-            f = tarfile.open("run_and_lumis.tar.gz")
-            fn = "job_lumis_{0}.json".format(self.job_id)
-            f.extract(fn, path=tmpdir)
-            with open(os.path.join(tmpdir, fn)) as fd:
-                injson = json.load(fd)
-                inlumis = LumiList(compactList=injson)
-        finally:
-            f.close()
-            shutil.rmtree(tmpdir)
-
-        outlumis = LumiList()
-        for input in self.job_report['steps']['cmsRun']['input']['source']:
-            outlumis += LumiList(runsAndLumis=input['runs'])
-
-        self.logger.info("Lumis expected to be processed: {0}".format(len(inlumis.getLumis())))
-        self.logger.info("Lumis actually processed:       {0}".format(len(outlumis.getLumis())))
-        self.logger.info("Difference in lumis:            {0}".format(len((inlumis - outlumis).getLumis())))
-
-        missing = inlumis - outlumis
-        missing_compact = missing.getCompactList()
-
-        runs = missing.getRuns()
-        lumis = [",".join(map(str, reduce(lambda x, y: x + y, missing_compact[run]))) for run in runs]
-
-        with open('datadiscovery.pkl', 'rb') as fd:
-            dataset = pickle.load(fd)
-
-        with open('taskinformation.pkl', 'rb') as fd:
-            task = pickle.load(fd)
-
-        task['tm_split_args']['runs'] = runs
-        task['tm_split_args']['lumis'] = lumis
-        for algorithm, units in SPLIT_ARG_MAP.items():
-            if task['tm_split_algo'] == algorithm:
-                task['tm_split_args'][units] /= 4
-        self.logger.info("dataset: %s" % str(dataset))
-        self.logger.info("task: %s" % str(task))
-
-        try:
-            config = Configuration()
-            config.TaskWorker = ConfigSection(name="TaskWorker")
-            config.TaskWorker.scratchDir = '.' # XXX
-
-            splitter = Splitter(config, server=None, resturi='')
-            split_result = splitter.execute(dataset, task=task)
-
-            self.logger.info("Splitting results:")
-            for g in split_result.result[0]:
-                self.logger.error("Created jobgroup with length {0}".format(len(g.getJobs())))
-        except TaskWorkerException as e:
-            self.logger.error("Error during splitting")
-
-        try:
-            creator = DagmanCreator(config, server=None, resturi='')
-            creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0)
-        except TaskWorkerException as e:
-            self.logger.error('Error during subdag creation')
+        self.createSubjobs()
 
         ## If the flag CRAB_NoWNStageout is set, we finish the post-job here.
         ## (I didn't remove this yet, because even if the transfer of the logs and
