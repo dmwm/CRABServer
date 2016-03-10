@@ -1275,6 +1275,8 @@ class PostJob():
         if retval != JOB_RETURN_CODES.OK:
             #Print system environment and job classads
             self.print_env_and_ads()
+        else:
+            self.createSubjobs()
 
         self.log_finish_msg(retval)
 
@@ -1508,8 +1510,6 @@ class PostJob():
         ## If this is a deferred post-job execution, put back the log level to DEBUG.
         if not first_pj_execution():
             self.logger.setLevel(logging.DEBUG)
-
-        self.createSubjobs()
 
         ## If the flag CRAB_NoWNStageout is set, we finish the post-job here.
         ## (I didn't remove this yet, because even if the transfer of the logs and
