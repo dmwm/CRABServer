@@ -49,7 +49,7 @@ NODE_STATUS_FILE node_state 30 ALWAYS-UPDATE
 
 DAG_FRAGMENT = """
 JOB Job{count} Job.{count}.submit
-SCRIPT PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {parent {taskname} {backend}}
+SCRIPT PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {parent} {taskname} {backend}
 SCRIPT DEFER 4 1800 POST Job{count} dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES {taskname} {count} {tempDest} {outputDest} cmsRun_{count}.log.tar.gz {remoteOutputFiles}
 #PRE_SKIP Job{count} 3
 RETRY Job{count} {maxretries} UNLESS-EXIT 2
