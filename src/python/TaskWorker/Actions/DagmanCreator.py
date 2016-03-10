@@ -502,7 +502,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 subjob += 1
                 count = '{parent}-{subjob}'.format(parent=i, subjob=subjob)
             sitead['Job{0}'.format(count)] = list(availablesites)
-            siteinfo[i] = groupid
+            siteinfo[count] = groupid
             remoteOutputFiles = []
             localOutputFiles = []
             for origFile in outfiles:
