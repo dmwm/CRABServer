@@ -68,7 +68,6 @@ import pprint
 import shutil
 import signal
 import urllib
-import classad
 import tarfile
 import hashlib
 import logging
@@ -99,7 +98,6 @@ from WMCore.Configuration import Configuration, ConfigSection
 
 
 ASO_JOB = None
-config = None
 G_JOB_REPORT_NAME = None
 G_JOB_REPORT_NAME_NEW = None
 G_ERROR_SUMMARY_FILE_NAME = "error_summary.json"
@@ -1373,8 +1371,8 @@ class PostJob():
             shutil.rmtree(tmpdir)
 
         outlumis = LumiList()
-        for input in self.job_report['steps']['cmsRun']['input']['source']:
-            outlumis += LumiList(runsAndLumis=input['runs'])
+        for input_ in self.job_report['steps']['cmsRun']['input']['source']:
+            outlumis += LumiList(runsAndLumis=input_['runs'])
 
         self.logger.info("Lumis expected to be processed: {0}".format(len(inlumis.getLumis())))
         self.logger.info("Lumis actually processed:       {0}".format(len(outlumis.getLumis())))
@@ -1403,14 +1401,15 @@ class PostJob():
             split_result = splitter.execute(dataset, task=task)
             self.logger.info("Splitting results:")
             for g in split_result.result[0]:
-                self.logger.error("Created jobgroup with length {0}".format(len(g.getJobs())))
+                msg = "Created jobgroup with length {0}".format(len(g.getJobs()))
+                self.logger.error(msg)
 
-        except TaskWorkerException as e:
+        except TaskWorkerException:
             self.logger.error("Error during splitting")
         try:
             creator = DagmanCreator(config, server=None, resturi='')
             creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0)
-        except TaskWorkerException as e:
+        except TaskWorkerException:
             self.logger.error('Error during subdag creation')
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
