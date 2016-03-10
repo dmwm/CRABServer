@@ -68,6 +68,7 @@ import pprint
 import shutil
 import signal
 import urllib
+import classad
 import tarfile
 import hashlib
 import logging
@@ -1496,6 +1497,7 @@ class PostJob():
         try:
             config = Configuration()
             config.TaskWorker = ConfigSection(name="TaskWorker")
+            config.TaskWorker.scratchDir = '.' # XXX
 
             splitter = Splitter(config, server=None, resturi='')
             split_result = splitter.execute(dataset, task=task)
