@@ -10,6 +10,7 @@
 # If it is lower, sleep the difference. Will not sleep if CRAB3_RUNTIME_DEBUG is set.
 START_TIME=$(date +%s)
 function finish {
+  chirp_exit_code
   END_TIME=$(date +%s)
   DIFF_TIME=$((END_TIME-START_TIME))
   echo "Job Running time in seconds: " $DIFF_TIME
@@ -22,7 +23,6 @@ function finish {
       sleep $SLEEP_TIME
     fi
   fi
-  chirp_exit_code
 }
 # Trap all exits and execute finish function
 trap finish EXIT
@@ -66,8 +66,9 @@ END
         echo "==== Failed to load the long exit code from jobReport.json.$CRAB_Id. Falling back to short exit code ===="
         #otherwise checjk if EXIT_STATUS is set and report it
         if [ -z "$EXIT_STATUS" ]; then
-            echo "======== Short exit code also missing. Skipping condor_chirp (NB it's only for monitoring purposes) ========"
-            return
+            echo "======== Short exit code also missing. Settint exit code to 80001 ========"
+            condor_chirp set_job_attr_delayed Chirp_CRAB3_Job_ExitCode 80001
+            CHIRP_EC=$?
         else
             echo "==== Short exit code of the job is $EXIT_STATUS ===="
             condor_chirp set_job_attr_delayed Chirp_CRAB3_Job_ExitCode $EXIT_STATUS
