@@ -121,8 +121,10 @@ class MasterWorker(object):
             self.restURInoAPI = '/crabserver/' + MODEURL[self.config.TaskWorker.mode]['instance']
         if resthost is None:
             raise ConfigException("No correct mode provided: need to specify config.TaskWorker.mode in the configuration")
-        self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry = 2)
-        self.logger.debug("Hostcert: %s, hostkey: %s" %(str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey)))
+        #Let's increase the server's retries for recoverable errors in the MasterWorker
+        #60 means we'll keep retrying for 1 hour basically (we retry at 20*NUMRETRY seconds, so at: 20s, 60s, 120s, 200s, 300s ...)
+        self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry = 20)
+        self.logger.debug("Hostcert: %s, hostkey: %s", str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey))
         # Retries for any failures
         if not hasattr(self.config.TaskWorker, 'max_retry'):
             self.config.TaskWorker.max_retry = 0
