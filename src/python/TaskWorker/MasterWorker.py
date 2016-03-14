@@ -185,61 +185,53 @@ class MasterWorker(object):
         try:
             pendingwork = self.server.get(self.restURInoAPI + '/workflowdb', data = configreq)[0]['result']
         except HTTPException as hte:
-            self.logger.error("HTTP Error during _getWork: %s" % str(hte))
-            self.logger.error("Could not get any work from the server: \n" +
-                              "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown')) +
-                              "\treason: %s" %(hte.headers.get('X-Error-Detail', 'unknown')))
-            if hte.headers.get('X-Error-Http', 'unknown') in ['unknown']:
-                self.logger.error("Server could not acquire any work from the server:")
-                self.logger.error("%s " %(str(traceback.format_exc())))
-                self.logger.error("\turl: %s\n" %(getattr(hte, 'url', 'unknown')))
-                self.logger.error("\tresult: %s\n" %(getattr(hte, 'result', 'unknown')))
-        except Exception as exc:
-            self.logger.error("Server could not process the request: %s" %(str(exc)))
-            self.logger.error(traceback.format_exc())
+            msg = "HTTP Error during _getWork: %s\n" % str(hte)
+            msg += "HTTP Headers are %s: " % hte.headers
+            self.logger.error(msg)
+        except Exception: #pylint: disable=broad-except
+            self.logger.exception("Server could not process the _getWork request (prameters are %s)", configreq)
         return pendingwork
 
 
-    def quit(self, code, traceback_):
+    def quit_(self, dummyCode, dummyTraceback):
         self.logger.info("Received kill request. Waiting for the workers...")
         self.STOP = True
 
 
     def updateWork(self, taskname, command, status):
         configreq = {'workflow': taskname, 'command': command, 'status': status, 'subresource': 'state'}
-        retry = True
-        while retry:
-            try:
-                self.server.post(self.restURInoAPI + '/workflowdb', data = urllib.urlencode(configreq))
-                retry = False
-            except HTTPException as hte:
-                #TODO simplify here
-                #Using a msg variable and only one self.logger.error so that messages do not get shuffled
-                msg = "Task Worker could not update a task status (HTTPException): %s\nConfiguration parameters=%s\n" % (str(hte), configreq)
-                msg += "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown'))
-                msg += "\treason: %s\n" %(hte.headers.get('X-Error-Detail', 'unknown'))
-                msg += "\turl: %s\n" %(getattr(hte, 'url', 'unknown'))
-                msg += "\tresult: %s\n" %(getattr(hte, 'result', 'unknown'))
-                msg += "%s \n" %(str(traceback.format_exc()))
-                self.logger.error(msg)
-                retry = False
-                if int(hte.headers.get('X-Error-Http', '0')) == 503:
-                    #503 - Database/Service unavailable. Maybe Intervention of CMSWEB ongoing?
-                    retry = True
-                    time_sleep = 30 + random.randint(10, 30)
-                    self.logger.info("Sleeping %s seconds and will try to update again." % str(time_sleep))
-                    time.sleep(time_sleep)
-            except Exception as exc:
-                msg = "Task Worker could not update a task status: %s\nConfiguration parameters=%s\n" % (str(exc), configreq)
-                self.logger.error(msg + traceback.format_exc())
-                retry = False
+        try:
+            self.server.post(self.restURInoAPI + '/workflowdb', data = urllib.urlencode(configreq))
+        except HTTPException as hte:
+            msg = "HTTP Error during updateWork: %s\n" % str(hte)
+            msg += "HTTP Headers are %s: " % hte.headers
+            self.logger.error(msg)
+        except Exception: #pylint: disable=broad-except
+            self.logger.exception("Server could not process the updateWork request (prameters are %s)", configreq)
+
+
+    def failQueuedTasks(self):
+        limit = self.slaves.nworkers * 2
+        total = 0
+        while True:
+            pendingwork = self._getWork(limit=limit, getstatus='QUEUED')
+            for task in pendingwork:
+                self.updateWork(task['tm_taskname'], task['tm_task_command'], 'FAILED')
+            if not len(pendingwork):
+                self.info.debug("Finished failing QUEUED tasks (total %s)", total)
+                break #too bad "do..while" does not exist in python...
+            else:
+                total += len(pendingwork)
+                self.info.debug("Failed %s tasks (limit %s), getting next chunk of tasks", len(pendingwork), limit)
 
 
     def algorithm(self):
         """I'm the intelligent guy taking care of getting the work
-           and distribuiting it to the slave processes."""
+           and distributing it to the slave processes."""
 
-        self.logger.debug("Starting")
+        self.logger.debug("Failing QUEUED tasks before startup.")
+        self.failQueuedTasks()
+        self.logger.debug("Starting main loop.")
         while(not self.STOP):
             limit = self.slaves.queueableTasks()
             if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
