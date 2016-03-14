@@ -98,8 +98,8 @@ def addCRABInfoToClassAd(ad, info):
 
 
 class ScheddStats(dict):
-    def __init__(self, procnum):
-        self.procnum = procnum
+    def __init__(self):
+        self.procnum = None
         self.pid = os.getpid()
         dict.__init__(self)
 
@@ -117,6 +117,7 @@ class ScheddStats(dict):
             res += "\t\t%s %s\n" % ("Number of failures: ", self[schedd].get("failures", 0))
 
         return res
+scheddStats = ScheddStats()
 
 
 class DagmanSubmitter(TaskAction.TaskAction):
@@ -127,7 +128,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
     def __init__(self, *args, **kwargs):
         TaskAction.TaskAction.__init__(self, *args, **kwargs)
-        self.scheddStats = ScheddStats(kwargs['procnum'])
+        scheddStats.procnum = kwargs['procnum']
 
     def execute(self, *args, **kwargs):
         userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry=2, logger=self.logger)
@@ -190,10 +191,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 self.logger.debug("Trying to submit task %s %s time.", kwargs['task']['tm_taskname'], str(retry))
                 try:
                     execInt = self.executeInternal(*args, **kwargs)
-                    self.scheddStats.success(schedd)
+                    scheddStats.success(schedd)
                     return execInt
                 except Exception as ex:
-                    self.scheddStats.failure(schedd)
+                    scheddStats.failure(schedd)
                     msg = "Failed to submit task %s; '%s'"% (kwargs['task']['tm_taskname'], str(ex))
                     self.logger.exception(msg)
                     retryIssues.append(msg)
@@ -201,7 +202,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                         self.logger.error("Will retry in %s seconds.", self.config.TaskWorker.retry_interval[retry])
                         time.sleep(self.config.TaskWorker.retry_interval[retry])
                 finally:
-                    self.logger.info(self.scheddStats)
+                    self.logger.info(scheddStats)
             ## All the submission retries to the current schedd have failed. Record the
             ## failures.
             retryIssuesBySchedd[schedd] = retryIssues
