@@ -153,29 +153,17 @@ class MasterWorker(object):
             * the server call succeeded or
             * the server could not find anything to update or
             * the server has an internal error"""
+
         configreq = {'subresource': 'process', 'workername': self.config.TaskWorker.name, 'getstatus': getstatus, 'limit': limit, 'status': setstatus}
         try:
             self.server.post(self.restURInoAPI + '/workflowdb', data = urllib.urlencode(configreq))
         except HTTPException as hte:
-            #Using a msg variable and only one self.logger.error so that messages do not get shuffled
-            #TODO simplify this
-            msg = "Task Worker could not update a task status (HTTPException): %s\nConfiguration parameters=%s\n" % (str(hte), configreq)
-            if not hte.headers.get('X-Error-Detail', '') == 'Required object is missing' or \
-               not hte.headers.get('X-Error-Http', -1) == '400':
-                msg += "Task Worker could not update work to the server: \n" +\
-                                  "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown')) +\
-                                  "\treason: %s\n" %(hte.headers.get('X-Error-Detail', 'unknown'))
-                msg += "Probably no task to be updated\n"
-            if hte.headers.get('X-Error-Http', 'unknown') in ['unknown']:
-                msg += "TW could not update work to the server:\n"
-                msg += "%s \n" %(str(traceback.format_exc()))
-                msg += "\turl: %s\n" %(getattr(hte, 'url', 'unknown'))
-                msg += "\tresult: %s\n" %(getattr(hte, 'result', 'unknown'))
+            msg = "HTTP Error during _lockWork: %s\n" % str(hte)
+            msg += "HTTP Headers are %s: " % hte.headers
             self.logger.error(msg)
             return False
-        except Exception as exc:
-            msg = "Task Worker could not update a task status: %s\nConfiguration parameters=%s\n" % (str(exc), configreq)
-            self.logger.error(msg + traceback.format_exc())
+        except Exception: #pylint: disable=broad-except
+            self.logger.exception("Server could not process the _lockWork request (prameters are %s)", configreq)
             return False
 
         return True
