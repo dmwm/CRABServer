@@ -22,6 +22,7 @@ function finish {
       sleep $SLEEP_TIME
     fi
   fi
+  chirp_exit_code
 }
 # Trap all exits and execute finish function
 trap finish EXIT
@@ -32,6 +33,48 @@ function DashboardFailure {
     else
         exit $1
     fi
+}
+
+function chirp_exit_code {
+    #Get the long exit code and set a classad using condor_chirp
+    #The long exit code is taken from jobReport.json file if it exist
+    #and is successfully loaded. It is taken from the EXIT_STATUS variable
+    #instead (which contains the short exit coce)
+
+    #check if the command condor_chirp exists
+    command -v condor_chirp > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        echo "Cannot find condor_chirp to set up the job exit code (ignoring, that's for monitoring purposes)"
+        return
+    fi
+    #check if exitCode is in there and report it
+    echo "======== Figuring out long exit code of the job for condor_chirp ========"
+    #any error or exception will be printed to stderr and cause $? <> 0
+    LONG_EXIT_CODE=$(python << END
+from __future__ import print_function
+import json
+with open("jobReport.json.$CRAB_Id") as fd:
+    data = json.load(fd)
+print(data['exitCode'])
+END
+)
+    if [ $? -eq 0 ]; then
+        echo "==== Long exit code of the job is $LONG_EXIT_CODE ===="
+        condor_chirp set_job_attr_delayed Chirp_CRAB3_Job_ExitCode $LONG_EXIT_CODE
+        CHIRP_EC=$?
+    else
+        echo "==== Failed to load the long exit code from jobReport.json.$CRAB_Id. Falling back to short exit code ===="
+        #otherwise checjk if EXIT_STATUS is set and report it
+        if [ -z "$EXIT_STATUS" ]; then
+            echo "======== Short exit code also missing. Skipping condor_chirp (NB it's only for monitoring purposes) ========"
+            return
+        else
+            echo "==== Short exit code of the job is $EXIT_STATUS ===="
+            condor_chirp set_job_attr_delayed Chirp_CRAB3_Job_ExitCode $EXIT_STATUS
+            CHIRP_EC=$?
+        fi
+    fi
+    echo "======== Finished condor_chirp -ing the exit code of the job. Exit code of condor_chirp: $CHIRP_EC ========"
 }
 
 echo "======== gWMS-CMSRunAnalysis.sh STARTING at $(TZ=GMT date) on $(hostname) ========"
@@ -146,7 +189,8 @@ if [[ $rc != 0 ]]
 then
     echo "Error: Python2.6 isn't available on this worker node." >&2
     echo "Error: execution of job stageout wrapper REQUIRES python2.6" >&2
-    DashboardFailure 10043
+    EXIT_STATUS=10043
+    DashboardFailure $EXIT_STATUS
 else
     echo "Found python2.6 at:"
     echo `which python2.6`
@@ -165,7 +209,8 @@ STAGEOUT_EXIT_STATUS=$?
 if [ ! -e wmcore_initialized ];
 then
     echo "======== ERROR: Unable to initialize WMCore at $(TZ=GMT date) ========"
-    DashboardFailure 10043
+    EXIT_STATUS=10043
+    DashboardFailure $EXIT_STATUS
 fi
 
 if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
