@@ -6,9 +6,7 @@ import sys
 import time
 import urllib
 import signal
-import random
 import logging
-import traceback
 from httplib import HTTPException
 
 #WMcore dependencies
@@ -17,7 +15,7 @@ from WMCore.Configuration import loadConfigurationFile
 #CAFUtilities dependencies
 from RESTInteractions import HTTPRequests
 
-from TaskWorker.WorkerExceptions import *
+from TaskWorker.WorkerExceptions import ConfigException
 from TaskWorker.TestWorker import TestWorker
 from MultiProcessingLog import MultiProcessingLog
 from TaskWorker.Worker import Worker, setProcessLogger
@@ -101,8 +99,8 @@ class MasterWorker(object):
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
             logger = setProcessLogger("master")
-            logger.debug("PID %s." % os.getpid())
-            logger.debug("Logging level initialized to %s." % loglevel)
+            logger.debug("PID %s.", os.getpid())
+            logger.debug("Logging level initialized to %s.", loglevel)
             return logger
 
         self.STOP = False
@@ -255,13 +253,10 @@ class MasterWorker(object):
 
             time.sleep(self.config.TaskWorker.polling)
 
-            finished = self.slaves.checkFinished()
+            dummyFinished = self.slaves.checkFinished()
 
         self.logger.debug("Master Worker Exiting Main Cycle")
 
-#    def __del__(self):
-#        """Shutting down all the slaves"""
-#        self.slaves.end()
 
 if __name__ == '__main__':
     from optparse import OptionParser
@@ -292,12 +287,12 @@ if __name__ == '__main__':
         raise ConfigException("Configuration not found")
 
     configuration = loadConfigurationFile( os.path.abspath(options.config) )
-    status, msg = validateConfig(configuration)
-    if not status:
-        raise ConfigException(msg)
+    status_, msg_ = validateConfig(configuration)
+    if not status_:
+        raise ConfigException(msg_)
 
     mw = MasterWorker(configuration, quiet=options.quiet, debug=options.debug)
-    signal.signal(signal.SIGINT, mw.quit)
-    signal.signal(signal.SIGTERM, mw.quit)
+    signal.signal(signal.SIGINT, mw.quit_)
+    signal.signal(signal.SIGTERM, mw.quit_)
     mw.algorithm()
     mw.slaves.end()

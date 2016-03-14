@@ -56,14 +56,14 @@ def processWorker(inputs, results, resthost, resturi, procnum):
 
         outputs = None
         t0 = time.time()
-        logger.debug("%s: Starting %s on %s" %(procName, str(work), task['tm_taskname']))
+        logger.debug("%s: Starting %s on %s", procName, str(work), task['tm_taskname'])
         try:
             msg = None
             outputs = work(resthost, resturi, WORKER_CONFIG, task, procnum, inputargs)
         except WorkerHandlerException as we:
             outputs = Result(task=task, err=str(we))
             msg = str(we)
-        except Exception as exc:
+        except Exception as exc: #pylint: disable=broad-except
             outputs = Result(task=task, err=str(exc))
             msg = "%s: I just had a failure for %s" % (procName, str(exc))
             msg += "\n\tworkid=" + str(workid)
@@ -83,19 +83,19 @@ def processWorker(inputs, results, resthost, resturi, procnum):
                     server.post(resturi, data = urllib.urlencode(configreq))
                     logger.info("Error message successfully uploaded to the REST")
                 except HTTPException as hte:
-                    logger.warning("Cannot upload failure message to the REST for workflow %s. HTTP headers follows:" % task['tm_taskname'])
+                    logger.warning("Cannot upload failure message to the REST for workflow %s. HTTP headers follows:", task['tm_taskname'])
                     logger.error(hte.headers)
-                except Exception as exc:
-                    logger.warning("Cannot upload failure message to the REST for workflow %s.\nReason: %s" % (task['tm_taskname'], exc))
+                except Exception as exc: #pylint: disable=broad-except
+                    logger.warning("Cannot upload failure message to the REST for workflow %s.\nReason: %s", task['tm_taskname'], exc)
                     logger.exception('Traceback follows:')
         t1 = time.time()
-        logger.debug("%s: ...work on %s completed in %d seconds: %s" % (procName, task['tm_taskname'], t1-t0, outputs))
+        logger.debug("%s: ...work on %s completed in %d seconds: %s", procName, task['tm_taskname'], t1-t0, outputs)
 
         results.put({
                      'workid': workid,
                      'out' : outputs
                     })
-    logger.debug("Slave %s exiting." % procnum)
+    logger.debug("Slave %s exiting.", procnum)
     return 0
 
 
@@ -162,7 +162,7 @@ class Worker(object):
             try:
                 self.logger.debug("Putting stop message in the queue for %s " % str(x)) # AndresT: How can we be sure the stop message is for process x?
                 self.inputs.put(('-1', 'STOP', 'control', []))
-            except Exception as ex:
+            except Exception as ex: #pylint: disable=broad-except
                 msg =  "Hit some exception in deletion\n"
                 msg += str(ex)
                 self.logger.error(msg)
@@ -178,7 +178,7 @@ class Worker(object):
            :arg list of tuple items: list of tuple, where each element
                                      contains the type of work to be
                                      done, the task object and the args."""
-        self.logger.debug("Ready to inject %d items"%len(items))
+        self.logger.debug("Ready to inject %d items" % len(items))
         workid = 0 if len(self.working.keys()) == 0 else max(self.working.keys()) + 1
         for work in items:
             worktype, task, failstatus, arguments = work
@@ -203,7 +203,7 @@ class Worker(object):
             except Empty:
                 pass
             if out is not None:
-                self.logger.debug('Retrieved work %s'% str(out))
+                self.logger.debug('Retrieved work %s' % str(out))
                 if isinstance(out['out'], list):
                     allout.extend(out['out'])
                 else:
@@ -245,19 +245,3 @@ class Worker(object):
         if self.queuedTasks() <= len(self.pool):
             return 0
         return self.queuedTasks() - len(self.pool)
-
-
-if __name__ == '__main__':
-
-    from TaskWorker.Actions.Handler import handleNewTask
-
-    a = Worker()
-    a.begin()
-    a.injectWorks([(handleNewTask, Task(), 'SUBMITFAILED', 'pippo'), (handleNewTask, {'tm_taskname': 'pippo'}, 'SUBMITFAILED', 'pippo')])
-    while(True):
-        out = a.checkFinished()
-        time.sleep(1)
-        if ok is not None:
-            print(out)
-            break
-    a.end()
