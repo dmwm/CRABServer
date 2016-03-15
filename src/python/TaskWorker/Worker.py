@@ -1,7 +1,6 @@
 from __future__ import print_function
 import os
 import time
-import signal
 import urllib
 import logging
 import traceback
@@ -123,10 +122,6 @@ class Worker(object):
         :arg WMCore.Configuration config: input TaskWorker configuration
         :arg str instance: the hostname where the rest interface is running
         :arg str resturi: the rest base url to contact."""
-        #Adding signal handlers that do not do anything. Soft kill is handled by the master worker
-        #We just need to prevent "accidental" kill of the worker processes by things like pkill -f TaskWorker
-        signal.signal(signal.SIGINT, lambda code, tb: None)
-        signal.signal(signal.SIGTERM, lambda code, tb: None)
         self.logger = logging.getLogger("master")
         global WORKER_CONFIG
         WORKER_CONFIG = config
@@ -140,10 +135,6 @@ class Worker(object):
         self.working = {}
         self.resthost = resthost
         self.resturi = resturi
-
-    def __del__(self):
-        """When deleted shutting down all slaves"""
-        self.end()
 
     def begin(self):
         """Starting up all the slaves"""
@@ -159,17 +150,27 @@ class Worker(object):
     def end(self):
         """Stopping all the slaves"""
         self.logger.debug("Ready to close all %i started processes " % len(self.pool))
-        for x in self.pool:
+        for p in self.pool:
             try:
-                self.logger.debug("Putting stop message in the queue for %s " % str(x)) # AndresT: How can we be sure the stop message is for process x?
-                self.inputs.put(('-1', 'STOP', 'control', []))
+                ## Put len(self.pool) messages in the subprocesses queue.
+                ## Each subprocess will work on one stop message and exit
+                self.logger.debug("Putting stop message in the queue for %s " % str(p))
+                self.inputs.put(('-1', 'STOP', 'control', 'STOPFAILED', []))
             except Exception as ex: #pylint: disable=broad-except
                 msg =  "Hit some exception in deletion\n"
                 msg += str(ex)
                 self.logger.error(msg)
+        self.logger.info('Slaves stop messages sent. Waiting for subprocesses.')
+        for p in self.pool:
+            try:
+                p.join()
+            except Exception as ex: #pylint: disable=broad-except
+                msg =  "Hit some exception in join\n"
+                msg += str(ex)
+                self.logger.error(msg)
+        self.logger.info('Subprocesses ended!')
 
         self.pool = []
-        self.logger.info('Slaves stop messages sent!')
         return
 
     def injectWorks(self, items):
