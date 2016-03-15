@@ -200,18 +200,25 @@ class MasterWorker(object):
 
 
     def failQueuedTasks(self):
+        """ This method is used at the TW startup and it fails QUEUED tasks that supposedly
+            could not communicate with the REST and update their status. The method put those
+            task to SUBMITFAILED, KILLFAILED, RESUBMITFAILED depending on the value of
+            the command field.
+        """
         limit = self.slaves.nworkers * 2
         total = 0
         while True:
             pendingwork = self._getWork(limit=limit, getstatus='QUEUED')
             for task in pendingwork:
-                self.updateWork(task['tm_taskname'], task['tm_task_command'], 'FAILED')
+                self.logger.debug("Failing QUEUED task %s", task['tm_task_name'])
+                dummyWorktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
+                self.updateWork(task['tm_taskname'], task['tm_task_command'], failstatus)
             if not len(pendingwork):
-                self.info.debug("Finished failing QUEUED tasks (total %s)", total)
+                self.logger.info("Finished failing QUEUED tasks (total %s)", total)
                 break #too bad "do..while" does not exist in python...
             else:
                 total += len(pendingwork)
-                self.info.debug("Failed %s tasks (limit %s), getting next chunk of tasks", len(pendingwork), limit)
+                self.logger.info("Failed %s tasks (limit %s), getting next chunk of tasks", len(pendingwork), limit)
 
 
     def algorithm(self):
