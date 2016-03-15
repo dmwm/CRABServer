@@ -379,6 +379,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         #Empty results
         result = {"status"           : '',
+                  "command"           : '',
                   "taskFailureMsg"   : '',
                   "taskWarningMsg"   : [],
                   "statusFailureMsg" : '',
@@ -399,6 +400,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % workflow)
 
+        if row.task_command:
+            result['command'] = row.task_command
         # 0 - simple crab status
         # 1 - crab status -long
         # 2 - crab status -idle
