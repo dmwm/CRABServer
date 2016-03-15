@@ -8,6 +8,7 @@ class TestWorker(object):
         self.config = config
         self.resthost = resthost
         self.resturi = resturi
+        self.nworkers = 3
 
     def pendingTasks(self):
         return 0

@@ -183,7 +183,7 @@ class MasterWorker(object):
 
 
     def quit_(self, dummyCode, dummyTraceback):
-        self.logger.info("Received kill request. Waiting for the workers...")
+        self.logger.info("Received kill request. Setting STOP flag in the master process...")
         self.STOP = True
 
 

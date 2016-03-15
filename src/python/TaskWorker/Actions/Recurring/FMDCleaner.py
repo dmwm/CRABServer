@@ -13,7 +13,7 @@ class FMDCleaner(BaseRecurringAction):
 
     def _execute(self, resthost, resturi, config, task):
         self.logger.info('Cleaning filemetadata older than 30 days..')
-        server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry = 2
+        server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry = 2,
                               logger = self.logger)
         ONE_MONTH = 24 * 30
         try:
