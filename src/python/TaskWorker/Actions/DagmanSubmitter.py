@@ -252,7 +252,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         configreq = {'workflow': workflow,
                      'status': "SUBMITTED",
-                     'jobset': "-1",
                      'subresource': 'success',
                     }
         self.logger.warning("Task %s already submitted to HTCondor; pushing information centrally: %s", workflow, str(configreq))
@@ -337,7 +336,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         configreq = {'workflow': kwargs['task']['tm_taskname'],
                      'status': "SUBMITTED",
-                     'jobset': "-1",
                      'subresource': 'success',}
         self.logger.debug("Pushing information centrally %s", configreq)
         data = urllib.urlencode(configreq)

@@ -27,26 +27,16 @@ class RESTWorkerWorkflow(RESTEntity):
         authz_login_valid() #TODO: should we also call authz_operator here ? Otherwise anybody can get tasks from here.
                             #      Actually, maybe something even more strict is necessary (only the prod TW machine can access this resource)
 
-        if method in ['PUT']: #TODO remove the PUT
-            validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
-            validate_num("subjobdef", param, safe, optional=True)
-            validate_str("substatus", param, safe, RX_STATUS, optional=False)
-            validate_strlist("subblocks", param, safe, RX_BLOCK)
-            validate_str("subfailure", param, safe, RX_TEXT_FAIL, optional=True)
-            validate_str("subuser", param, safe, RX_DN, optional=False)
-        elif method in ['POST']:
+        if method in ['POST']:
             validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
             validate_str("status", param, safe, RX_STATUS, optional=True)
             validate_str("command", param, safe, RX_STATUS, optional=True)
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
-            validate_num("jobset", param, safe, optional=True) #TODO remeove the jobset
             validate_str("failure", param, safe, RX_TEXT_FAIL, optional=True)
             validate_numlist("resubmittedjobs", param, safe)
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("subresource", param, safe, RX_SUBPOSTWORKER, optional=True)
             validate_num("limit", param, safe, optional=True)
-            validate_strlist("runs", param, safe, RX_RUNS) #TODO runs and lumis can be removed
-            validate_strlist("lumis", param, safe, RX_LUMIRANGE)
             # possible combinations to check
             # 1) taskname + status
             # 2) taskname + status + failure
@@ -59,30 +49,13 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
             validate_num("limit", param, safe, optional=True)
             validate_str("subresource", param, safe, RX_SUBGETWORKER, optional=True)
-            validate_num("subjobdef", param, safe, optional=True) #TODO remove
-            validate_str("subuser", param, safe, RX_DN, optional=True) #TODO remve
             # possible combinations to check
             # 1) workername + getstatus + limit
             # 2) subresource + subjobdef + subuser
-        elif method in ['DELETE']:
-            pass
+
 
     @restcall
-    def put(self, workflow, subjobdef, substatus, subblocks, subfailure, subuser):
-        """ Insert a new jobgroup in the task"""
-        #TODO this is unused AFAIK. The whole put (and the wuery in Task.py) can be removed.
-        if subfailure is not None:
-            try:
-                subfailure = b64decode(subfailure)
-            except TypeError:
-                raise InvalidParameter("Failure message is not in the accepted format")
-        binds = {"task_name": [workflow], "jobdef_id": [subjobdef if subjobdef >= 0 else None], "jobgroup_status": [substatus], "blocks": [str(subblocks)],
-                 "jobgroup_failure": [subfailure], "tm_user_dn": [subuser]}
-        self.api.modify(self.JobGroup.AddJobGroup_sql, **binds)
-        return []
-
-    @restcall
-    def post(self, workflow, status, command, subresource, jobset, failure, resubmittedjobs, getstatus, workername, limit, runs, lumis):
+    def post(self, workflow, status, command, subresource, failure, resubmittedjobs, getstatus, workername, limit):
         """ Updates task information """
         if failure is not None:
             try:
@@ -97,18 +70,14 @@ class RESTWorkerWorkflow(RESTEntity):
                   "failure": {"args": (self.Task.SetFailedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
                                                                                 "failure": [failure],
                                                                                "tm_taskname": [workflow]}},
-                  #TODO MM - not used?
+                  #Used in DagmanSubmitter?
                   "success": {"args": (self.Task.SetInjectedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
-                                                                                            "panda_jobset_id": [jobset],
                                                                                             "tm_taskname": [workflow],
                                                                                             "resubmitted_jobs": [str(resubmittedjobs)]}},
                   "process": {"args": (self.Task.UpdateWorker_sql,), "method": self.api.modifynocheck, "kwargs": {"tw_name": [workername],
                                                                                                    "get_status": [getstatus],
                                                                                                    "limit": [limit],
                                                                                                    "set_status": [status]}},
-                  #TODO not used for sure
-                  "lumimask": {"args": (runs, lumis,), "method": self.setLumiMask, "kwargs": {"taskname": [workflow]}}
-
         }
 
         if subresource is None:
@@ -119,49 +88,22 @@ class RESTWorkerWorkflow(RESTEntity):
         return []
 
     @restcall
-    def get(self, workername, getstatus, limit, subresource, subjobdef, subuser):
+    def get(self, workername, getstatus, limit, subresource):
         """ Retrieve all columns for a specified task or
             tasks which are in a particular status with
             particular conditions """
 
-        #TODO subresource jobgroup is not used
-        if subresource is not None and subresource == 'jobgroup':
-            binds = {'jobdef_id': subjobdef, 'user_dn': subuser}
-            rows = self.api.query(None, None, self.JobGroup.GetJobGroupFromJobDef_sql, **binds)
-            for row in rows:
-                # taskname, jobdefid, status, blocks, failures, dn
-                yield {'tm_taskname': row[0],
-                       'panda_jobdef_id': row[1],
-                       'panda_jobdef_status': row[2],
-                       'tm_data_blocks': literal_eval(row[3] if row[3] is None else row[3].read()),
-                       'panda_jobgroup_failure': row[4] if row[4] is None else row[4].read(),
-                       'tm_user_dn': row[5]}
-        else:
-            binds = {"limit": limit, "tw_name": workername, "get_status": getstatus}
-            rows = self.api.query(None, None, self.Task.GetReadyTasks_sql, **binds)
-            for row in rows:
-                newtask = self.Task.GetReadyTasks_tuple(*row)
-                yield fixupTask(newtask)
+        binds = {"limit": limit, "tw_name": workername, "get_status": getstatus}
+        rows = self.api.query(None, None, self.Task.GetReadyTasks_sql, **binds)
+        for row in rows:
+            newtask = self.Task.GetReadyTasks_tuple(*row)
+            yield fixupTask(newtask)
+
 
     @restcall
     def delete(self):
         """ Delete a task from the DB """
         raise NotImplementedError
-
-    #TODO this is not needed anymore
-    def setLumiMask(self, runs, lumis, **binds):
-        """ Load the old splitargs, convert it into the corresponding dict, and change runs and lumis
-            accordingly to what the TaskWorker provided
-        """
-        #load the task
-        task = next(self.api.query(None, None, self.Task.ID_sql, taskname=binds['taskname'][0]))
-        task = self.Task.ID_tuple(*task)
-        splitargs = literal_eval(task.split_args.read())
-        #update the tm_splitargs
-        splitargs['runs'] = runs
-        splitargs['lumis'] = lumis
-        binds['splitargs'] = [str(splitargs)]
-        self.api.modify(self.Task.SetSplitargsTask_sql, **binds)
 
 
 def fixupTask(task):
