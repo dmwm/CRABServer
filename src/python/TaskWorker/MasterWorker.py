@@ -243,10 +243,11 @@ class MasterWorker(object):
             for task in pendingwork:
                 worktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
                 toInject.append((worktype, task, failstatus, None))
-            self.slaves.injectWorks(toInject)
 
             for task in pendingwork:
                 self.updateWork(task['tm_taskname'], task['tm_task_command'], 'QUEUED')
+
+            self.slaves.injectWorks(toInject)
 
             for action in self.recurringActions:
                 if action.isTimeToGo():
