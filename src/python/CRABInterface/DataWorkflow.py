@@ -421,7 +421,7 @@ class DataWorkflow(object):
         # Hm...
         dbSerializer = str
 
-        if statusRes['status'] in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']:
+        if statusRes['status'] in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'KILLED']:
             killList = [jobid for jobstatus, jobid in statusRes['jobList'] if jobstatus not in self.successList]
             if jobids:
                 #if the user wants to kill specific jobids make the intersection
