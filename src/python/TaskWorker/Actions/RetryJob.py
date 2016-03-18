@@ -6,13 +6,9 @@ import shutil
 import subprocess
 import classad
 from collections import namedtuple
-
+from ServerUtilities import MAX_DISK_SPACE, MAX_WALLTIME, MAX_MEMORY
 
 JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERROR')(0, 1, 2)
-
-# Fatal error limits for job resource usage
-MAX_WALLTIME = 21*60*60 + 30*60
-MAX_MEMORY = 2*1024
 
 # Without this environment variable set, HTCondor takes a write lock per logfile entry
 os.environ['_condor_ENABLE_USERLOG_LOCKING'] = 'false'
@@ -239,12 +235,29 @@ class RetryJob(object):
 
     def check_disk_report(self):
         """
-        Need a doc string here.
+        This function checks 2 things:
+            a) If remove reason is 'Removed due to disk usage' which is set in PeriodicRemove
+                  expression. PeriodicRemove & PeriodicRemoveReason is set in DagmanCreator.py
+                  before task submittion to scheduler.
+            b) If disk usage is >= of Maximum allowed disk usage.
+        If one or other evaluates to true, it will create fake_fjr and job will not be retried.
         """
         # If job was killed on the WN, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to disk usage"):
             exitMsg = "Not retrying job due to excessive disk usage (job automatically killed on the worker node)"
             self.create_fake_fjr(exitMsg, 50662, 50662)
+        if 'DiskUsage' in self.ad:
+            try:
+                diskUsage = int(self.ad['DiskUsage'])
+                if diskUsage >= MAX_DISK_SPACE:
+                    self.logger.debug("Disk Usage: %s, Maximum allowed disk usage: %s", diskUsage, MAX_DISK_SPACE)
+                    exitMsg = "Not retrying job due to excessive disk usage (job automatically killed on the worker node)"
+                    self.create_fake_fjr(exitMsg, 50662, 50662)
+            except:
+                msg = "Unable to get DiskUsage from job classads. Will not perform Disk Usage check."
+                self.logger.debug(msg)
+
+
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -385,8 +398,6 @@ class RetryJob(object):
 
         if used_job_ad:
             #We can determine walltime and max memory from job ad.
-            global MAX_WALLTIME
-            global MAX_MEMORY
             self.ad = job_ad
             if 'MaxWallTimeMins' in self.ad:
                 try:

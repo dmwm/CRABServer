@@ -19,7 +19,7 @@ import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
 import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
-from ServerUtilities import insertJobIdSid
+from ServerUtilities import insertJobIdSid, MAX_DISK_USAGE
 
 import WMCore.WMSpec.WMTask
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
@@ -136,23 +136,27 @@ use_x509userproxy = true
 # TODO: Uncomment this when we get out of testing mode
 Requirements = ((target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)) %(opsys_req)s
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
-# Remove if we've been in the 'held' status for more than 7 minutes, OR
-# if job is idle more than 7 days, OR
-# We are running AND
-#  Over memory use OR
-#  Over wall clock limit
+# Remove if
+# a) job is in the 'held' status for more than 7 minutes
+# b) job is idle more than 7 days
+# c) job is running and one of:
+#    1) Over memory use
+#    2) Over wall clock limit
+#    3) Over disk usage of N GB, which is set in ServerUtilities
+# d) job is idle and users proxy expired 1 day ago. (P.S. why 1 day ago? because there is recurring action which is updating user proxy and lifetime.)
+# == If New periodic remove expression is added, also it should have Periodic Remove Reason. Otherwise message will not be clear and it is hard to debug
 periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) || \
                   ((JobStatus =?= 1) && (time() - EnteredCurrentStatus > 7*24*60*60)) || \
                   ((JobStatus =?= 2) && ( \
                      (MemoryUsage > RequestMemory) || \
                      (MaxWallTimeMins*60 < time() - EnteredCurrentStatus) || \
-                     (DiskUsage > 100000000))) || \
+                     (DiskUsage > %(max_disk_usage)s))) || \
                   ((JobStatus =?= 1) && (time() > (x509UserProxyExpiration + 86400)))
 +PeriodicRemoveReason = ifThenElse(time() - EnteredCurrentStatus > 7*24*60*60 && isUndefined(MemoryUsage), "Removed due to idle time limit", \
                           ifThenElse(time() > x509UserProxyExpiration, "Removed job due to proxy expiration", \
                             ifThenElse(MemoryUsage > RequestMemory, "Removed due to memory use", \
                               ifThenElse(MaxWallTimeMins*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
-                                ifThenElse(DiskUsage > 100000000, "Removed due to disk usage", \
+                                ifThenElse(DiskUsage >  %(max_disk_usage)s, "Removed due to disk usage", \
                                   "Removed due to job being held")))))
 %(extra_jdl)s
 queue
@@ -455,6 +459,8 @@ class DagmanCreator(TaskAction.TaskAction):
             info['additional_input_file'] += ", sandbox.tar.gz"
         info['additional_input_file'] += ", run_and_lumis.tar.gz"
         info['additional_input_file'] += ", input_files.tar.gz"
+
+        info['max_disk_usage'] = MAX_DISK_USAGE
 
         with open("Job.submit", "w") as fd:
             fd.write(JOB_SUBMIT % info)
