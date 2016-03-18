@@ -16,22 +16,24 @@ $(document).ready(function() {
         username = "",
         userWebDir = "",
         scriptExe = "",
-        inputDataset = "";
-        proxiedWebDirUrl = "";
+        inputDataset = "",
+        proxiedWebDirUrl = "",
+        dbsInstance = "";
 
     // If a parameter "task" exists, tries to load task info the same way a form submit loads it.
     processPageUrl();
-
-    // Prevent all future ajax calls from being cached
 
     /**
      * Task search form listener - the starting point of control flow.
      */
     $("#task-search-form").submit(function(e) {
         e.preventDefault();
-        inputTaskName = $("#task-search-form-input").val();
-        dbVersion = $("#db-selector-box").val();
 
+        //Trimming whitespaces from the search field
+        inputTaskName = $("#task-search-form-input").val().trim();
+        $("#task-search-form-input").val(inputTaskName);
+
+        dbVersion = $("#db-selector-box").val();
         setUrls(dbVersion);
 
         taskInfo = "";
@@ -51,6 +53,14 @@ $(document).ready(function() {
     });
 
     /**
+     * Task search form clear button listener - clears the field when the button 
+     * is pressed.
+     */
+    $("#clear-button").click(function() {
+        $("#task-search-form-input").val("");
+    })
+
+    /**
      * Saves necessary information from task info into global variables
      * Has to be run after displayTaskInfo
      */
@@ -59,6 +69,7 @@ $(document).ready(function() {
 
         if (taskInfo != undefined && taskInfo != "") {
             for (var i = 0; i < taskInfo.desc.columns.length; i++) {
+
                 switch (taskInfo.desc.columns[i]) {
                     case "tm_user_webdir":
                         userWebDir = taskInfo.result[i];
@@ -74,6 +85,11 @@ $(document).ready(function() {
                         break;
                     case "tm_input_dataset":
                         inputDataset = taskInfo.result[i];
+                        break;
+                    case "tm_dbs_url":
+                        // RegExp to extract the DBS instance 
+                        re = /(\/cmsweb.cern.ch\/dbs\/)(.+)(\/DBSReader)/;
+                        dbsInstance = taskInfo.result[i].match(re)[2];
                     default:
                         break;
                 }
@@ -115,7 +131,7 @@ $(document).ready(function() {
 
     /**
      * Fetches and displays the config/ PSet files for given task.
-     * It first querys an api which either returns a proxied url (which is needed to get around firewalls)
+     * It first queries an api which either returns a proxied url (which is needed to get around firewalls)
      * or returns nothing, in which case the files cannot be retrieved.
      *
      */
@@ -145,6 +161,8 @@ $(document).ready(function() {
             .done(function(data) {
                 $("#task-pset-paragraph").text(data);
             });
+
+        var urlEnd = "/sandbox.tar.gz";
 
         $("#task-config-link").attr("href", userWebDir + "/debug/crabConfig.py");
         $("#task-pset-link").attr("href", userWebDir + "/debug/originalPSet.py");
@@ -263,10 +281,9 @@ $(document).ready(function() {
 
             var dashboardUrl = "http://dashb-cms-job.cern.ch/dashboard/templates/" + "task-analysis/#user=default&refresh=0&table=Jobs&p=1&records=25" + "&activemenu=2&status=&site=&tid=" + inputTaskName;
 
-            var dasUrl = "https://cmsweb.cern.ch/das/request?view=list&limit=50" + "&instance=prod%2Fglobal&input=" + inputDataset;
+            var dasUrl = "https://cmsweb.cern.ch/das/request?view=list&limit=50" + "&instance=" + dbsInstance + "&input=" + inputDataset;
 
             $("#main-dashboard-link").attr("href", dashboardUrl);
-
             $("#main-webdir-link").attr("href", userWebDir);
             $("#main-das-link").attr("href", dasUrl);
 

@@ -43,10 +43,19 @@ body {
 }
 
 /* for preventing a double border between form input and selector */
-#task-search-form-input {
+/*#task-search-form-input {
 	width: 101%;
-}
-#db-selector{
+}*/
+
+#db-selector {
 	width: 8%;
-	/*margin-left: -1px;*/
+}
+#db-selector-box {
+	border-left: none;
+}
+
+#clear-button {
+	border-left: none;
+	border-radius: 0;
+	width: 3em;
 }
