@@ -19,7 +19,7 @@ import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
 import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
-from ServerUtilities import insertJobIdSid, MAX_DISK_USAGE
+from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE
 
 import WMCore.WMSpec.WMTask
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
@@ -150,13 +150,13 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
                   ((JobStatus =?= 2) && ( \
                      (MemoryUsage > RequestMemory) || \
                      (MaxWallTimeMins*60 < time() - EnteredCurrentStatus) || \
-                     (DiskUsage > %(max_disk_usage)s))) || \
+                     (DiskUsage > %(max_disk_space)s))) || \
                   ((JobStatus =?= 1) && (time() > (x509UserProxyExpiration + 86400)))
 +PeriodicRemoveReason = ifThenElse(time() - EnteredCurrentStatus > 7*24*60*60 && isUndefined(MemoryUsage), "Removed due to idle time limit", \
                           ifThenElse(time() > x509UserProxyExpiration, "Removed job due to proxy expiration", \
                             ifThenElse(MemoryUsage > RequestMemory, "Removed due to memory use", \
                               ifThenElse(MaxWallTimeMins*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
-                                ifThenElse(DiskUsage >  %(max_disk_usage)s, "Removed due to disk usage", \
+                                ifThenElse(DiskUsage >  %(max_disk_space)s, "Removed due to disk usage", \
                                   "Removed due to job being held")))))
 %(extra_jdl)s
 queue
@@ -460,7 +460,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['additional_input_file'] += ", run_and_lumis.tar.gz"
         info['additional_input_file'] += ", input_files.tar.gz"
 
-        info['max_disk_usage'] = MAX_DISK_USAGE
+        info['max_disk_space'] = MAX_DISK_SPACE
 
         with open("Job.submit", "w") as fd:
             fd.write(JOB_SUBMIT % info)
