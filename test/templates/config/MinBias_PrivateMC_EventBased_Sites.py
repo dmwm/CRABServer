@@ -20,7 +20,7 @@ config.section_("Data")
 config.Data.outputPrimaryDataset = 'MinBias'
 config.Data.splitting = 'EventBased'
 config.Data.unitsPerJob = 100 
-config.Data.totalUnits = 1000
+config.Data.totalUnits = 10000
 config.Data.ignoreLocality = False
 config.Data.publication = True
 config.Data.publishDBS = 'phys03'
