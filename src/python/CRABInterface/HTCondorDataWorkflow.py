@@ -341,7 +341,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 dbs = DBSReader(dbsUrl)
                 inputDetails = dbs.listDatasetFileDetails(inputDataset)
                 res['dbsInLumilist'] = _compactLumis(inputDetails)
-                res['dbsInLimilistNewClientOldTask'] = LumiList(runsAndLumis=_compactLumis(inputDetails)).getCompactList()
+                res['dbsInLumilistNewClientOldTask'] = LumiList(runsAndLumis=_compactLumis(inputDetails)).getCompactList()
                 self.logger.info("Aggregated input lumilist: %s" % res['dbsInLumilist'])
             except Exception as ex:
                 msg = "Failed to contact DBS: %s" % str(ex)
