@@ -131,7 +131,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         scheddStats.procnum = kwargs['procnum']
 
     def execute(self, *args, **kwargs):
-        userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry=2, logger=self.logger)
+        userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry=20, logger=self.logger)
         retryIssuesBySchedd = {}
         goodSchedulers = []
         try:
@@ -253,7 +253,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         configreq = {'workflow': workflow,
                      'status': "SUBMITTED",
-                     'jobset': "-1",
                      'subresource': 'success',
                     }
         self.logger.warning("Task %s already submitted to HTCondor; pushing information centrally: %s", workflow, str(configreq))
@@ -338,7 +337,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         configreq = {'workflow': kwargs['task']['tm_taskname'],
                      'status': "SUBMITTED",
-                     'jobset': "-1",
                      'subresource': 'success',}
         self.logger.debug("Pushing information centrally %s", configreq)
         data = urllib.urlencode(configreq)

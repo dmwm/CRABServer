@@ -379,6 +379,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         #Empty results
         result = {"status"           : '',
+                  "command"           : '',
                   "taskFailureMsg"   : '',
                   "taskWarningMsg"   : [],
                   "statusFailureMsg" : '',
@@ -399,6 +400,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % workflow)
 
+        if row.task_command:
+            result['command'] = row.task_command
         # 0 - simple crab status
         # 1 - crab status -long
         # 2 - crab status -idle
@@ -433,7 +436,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         if row.task_status in ['NEW', 'HOLDING', 'UPLOADED', 'SUBMITFAILED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']:
             addStatusAndFailureFromDB(result, row)
-            if row.task_status in ['NEW', 'UPLOADED', 'SUBMITFAILED']:
+            if row.task_status in ['NEW', 'UPLOADED', 'SUBMITFAILED'] and row.task_command not in ['KILL', 'RESUBMIT']:
                 self.logger.debug("Detailed result for workflow %s: %s\n" % (workflow, result))
                 return [result]
 

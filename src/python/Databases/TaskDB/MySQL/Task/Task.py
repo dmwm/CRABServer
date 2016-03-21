@@ -59,7 +59,7 @@ class Task(object):
                           WHERE tm_taskname = %(tm_taskname)s"
 
     SetInjectedTasks_sql = """UPDATE tasks SET tm_end_injection = UTC_TIMESTAMP(), \
-                         tm_task_status = upper(%(tm_task_status)s), panda_jobset_id = %(panda_jobset_id)s, \
+                         tm_task_status = upper(%(tm_task_status)s), \
 			 panda_resubmitted_jobs = %(resubmitted_jobs)s WHERE tm_taskname = %(tm_taskname)s"""
 
     SetJobSetId_sql = "UPDATE tasks SET panda_jobset_id = %(jobsetid)s WHERE tm_taskname = %(taskname)s"

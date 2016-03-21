@@ -117,6 +117,8 @@ class CRAB3ProxyRenewer(object):
         ads = {}
         now = time.time()
         for ad in task_ads:
+            ## TODO we should detect the TW is shutting down and exit this loop
+            ## in such a case
             if 'x509userproxyexpiration' in ad:
                 lifetime = ad['x509userproxyexpiration'] - now
                 if lifetime > MINPROXYLENGTH:

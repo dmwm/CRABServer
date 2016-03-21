@@ -60,7 +60,8 @@ class Splitter(TaskAction):
             self.logger.warning("The input dataset contains the following duplicated lumis %s" % lumiChecker.splitLumiFiles.keys())
             #TODO use self.uploadWarning
             try:
-                userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'])
+                userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry = 2,
+                                          logger = self.logger)
                 configreq = {'subresource': 'addwarning',
                              'workflow': kwargs['task']['tm_taskname'],
                              'warning': b64encode('The CRAB3 server backend detected lumis split across files in the input dataset.'

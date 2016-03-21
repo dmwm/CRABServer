@@ -194,6 +194,7 @@ class DataWorkflow(object):
                             task_activity   = [activity],
                             jobset_id       = [None],
                             task_status     = ['NEW'],
+                            task_command    = ['SUBMIT'],
                             task_failure    = [''],
                             job_sw          = [jobsw],
                             job_arch        = [jobarch],
@@ -386,12 +387,15 @@ class DataWorkflow(object):
             ## above parameters.
             self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow], arguments = [str(arguments)])
 
+        #TODO states are changed
         ## Change the status of the task in the Tasks DB to RESUBMIT (or NEW).
         if statusRes['status'] == 'SUBMITFAILED':
             newstate = ["NEW"]
+            newcommand = ["SUBMIT"]
         else:
-            newstate = ["RESUBMIT"]
-        self.api.modify(self.Task.SetStatusTask_sql, status = newstate, taskname = [workflow])
+            newstate = ["NEW"]
+            newcommand = ["RESUBMIT"]
+        self.api.modify(self.Task.SetStatusTask_sql, status = newstate, command = newcommand, taskname = [workflow])
         return [{'result': retmsg}]
 
 
@@ -417,7 +421,7 @@ class DataWorkflow(object):
         # Hm...
         dbSerializer = str
 
-        if statusRes['status'] in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']:
+        if statusRes['status'] in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'KILLED']:
             killList = [jobid for jobstatus, jobid in statusRes['jobList'] if jobstatus not in self.successList]
             if jobids:
                 #if the user wants to kill specific jobids make the intersection
@@ -430,10 +434,11 @@ class DataWorkflow(object):
             self.logger.info("Jobs to kill: %s" % killList)
 
             args.update({"killList": killList, "killAll": jobids==[]})
-            self.api.modify(self.Task.SetStatusTask_sql, status = ["KILL"], taskname = [workflow])
+            #Set arguments first so in case of failure we don't do any "damage"
             self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow], arguments = [dbSerializer(args)])
+            self.api.modify(self.Task.SetStatusTask_sql, status = ["NEW"], command = ["KILL"], taskname = [workflow])
         elif statusRes['status'] == 'NEW':
-            self.api.modify(self.Task.SetStatusTask_sql, status = ["KILLED"], taskname = [workflow])
+            self.api.modify(self.Task.SetStatusTask_sql, status = ["KILLED"], command = ["KILL"], taskname = [workflow])
         else:
             raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
 
@@ -451,6 +456,6 @@ class DataWorkflow(object):
             raise ExecutionError(msg)
         else:
             self.api.modify(self.Task.SetDryRun_sql, taskname=[workflow], dry_run=['F'])
-            self.api.modify(self.Task.SetStatusTask_sql, taskname=[workflow], status=['NEW'])
+            self.api.modify(self.Task.SetStatusTask_sql, taskname=[workflow], status=['NEW'], command=['SUBMIT'])
 
         return [{'result': 'ok'}]
