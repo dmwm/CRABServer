@@ -4,7 +4,6 @@ import time
 import logging
 import tempfile
 import traceback
-from logging import FileHandler
 from httplib import HTTPException
 
 from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
@@ -58,27 +57,6 @@ class TaskHandler(object):
         return tempDir
 
 
-    def addTaskLogHandler(self):
-        #set the logger to save the tasklog
-        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
-        taskdirname = "logs/tasks/%s/" % self._task['tm_username']
-        if not os.path.isdir(taskdirname):
-            os.mkdir(taskdirname)
-        taskhandler = FileHandler(taskdirname + self._task['tm_taskname'] + '.log')
-        taskhandler.setFormatter(formatter)
-        taskhandler.setLevel(logging.DEBUG)
-        self.logger.addHandler(taskhandler)
-        self.server.logger = self.logger
-
-        return taskhandler
-
-
-    def removeTaskLogHandler(self, taskhandler):
-        taskhandler.flush()
-        taskhandler.close()
-        self.logger.removeHandler(taskhandler)
-
-
     def addWork(self, work):
         """Appending a new action to be performed on the task
 
@@ -99,13 +77,6 @@ class TaskHandler(object):
         """Performing the set of actions"""
         nextinput = args
 
-        taskhandler = self.addTaskLogHandler()
-
-        # I know it looks like a duplicated printout from the process logs (proc.N.log) perspective.
-        # Infact we have a smilar printout in the processWorker function of the Worker module, but
-        # it does not go to the task logfile and it is useful imho.
-        self.logger.debug("Process %s is starting %s on task %s" % (self.procnum, self.workFunction, self._task['tm_taskname']))
-
         for work in self.getWorks():
             #Loop that iterates over the actions to be performed
             self.logger.debug("Starting %s on %s" % (str(work), self._task['tm_taskname']))
@@ -119,13 +90,11 @@ class TaskHandler(object):
                 break #exit normally. Worker will not notice there was an error
             except TaskWorkerException as twe:
                 self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
-                self.removeTaskLogHandler(taskhandler)
                 raise WorkerHandlerException(str(twe)) #TaskWorker error, do not add traceback to the error propagated to the REST
             except Exception as exc:
                 msg = "Problem handling %s because of %s failure, traceback follows\n" % (self._task['tm_taskname'], str(exc))
                 msg += str(traceback.format_exc())
                 self.logger.error(msg)
-                self.removeTaskLogHandler(taskhandler)
                 raise WorkerHandlerException(msg) #Errors not foreseen. Print everything!
             finally:
                 #upload logfile of the task to the crabcache
@@ -145,12 +114,13 @@ class TaskHandler(object):
                         self.logger.exception(msg)
             t1 = time.time()
             self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1 - t0))
+
+            #XXX MM - Not ereally sure what this is and why it's here..
             try:
                 nextinput = output.result
             except AttributeError:
                 nextinput = output
 
-        self.removeTaskLogHandler(taskhandler)
 
         return nextinput
 
@@ -230,12 +200,3 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
         handler.addWork(DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum))
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)
-
-
-if __name__ == '__main__':
-    print("New task")
-    handleNewTask(None, None, None, task, 0)
-    print("\nResubmit task")
-    handleResubmit(None, None, None, task, 0)
-    print("\nKill task")
-    handleKill(None, None, None, task, 0)
