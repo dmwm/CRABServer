@@ -131,9 +131,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
         scheddStats.procnum = kwargs['procnum']
 
     def execute(self, *args, **kwargs):
+        task =  kwargs['task']
 
-
-        userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry=20, logger=self.logger)
+        userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
         goodSchedulers = []
         try:
             goodSchedulers = self.server.get(self.restURInoAPI + '/info', data={'subresource': 'backendurls'})[0]['result'][0]['htcondorSchedds']
@@ -142,14 +142,14 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.logger.error(hte.headers)
             self.logger.warning("Unable to contact cmsweb. Will use only on schedulers which was chosen by CRAB3 frontend.")
         self.logger.info("Good schedulers list got from crabserver: %s ", goodSchedulers)
-        if kwargs['task']['tm_schedd'] not in goodSchedulers:
+        if task['tm_schedd'] not in goodSchedulers:
             self.logger.info("Scheduler which is chosen is not in crabserver output %s.", goodSchedulers)
-            self.logger.info("No late binding of schedd. Will use %s for submission.", kwargs['task']['tm_schedd'])
-            goodSchedulers = [kwargs['task']['tm_schedd']]
+            self.logger.info("No late binding of schedd. Will use %s for submission.", task['tm_schedd'])
+            goodSchedulers = [task['tm_schedd']]
         else:
             #Make sure that first scheduler is used which is chosen by HTCondorLocator
-            goodSchedulers.remove(kwargs['task']['tm_schedd'])
-            goodSchedulers.insert(0, kwargs['task']['tm_schedd'])
+            goodSchedulers.remove(task['tm_schedd'])
+            goodSchedulers.insert(0, task['tm_schedd'])
         self.logger.info("Final good schedulers list after shuffle: %s ", goodSchedulers)
 
         retryIssuesBySchedd = {}
@@ -158,27 +158,27 @@ class DagmanSubmitter(TaskAction.TaskAction):
         # change walltime to max 47h Issue: #4742
         stdmaxjobruntime = 2750
         stdmaxmemory = 2500
-        if kwargs['task']['tm_maxjobruntime'] > stdmaxjobruntime:
-            msg = "Task requests %s minutes of runtime, but only %s minutes are guaranteed to be available." % (kwargs['task']['tm_maxjobruntime'], stdmaxjobruntime)
+        if task['tm_maxjobruntime'] > stdmaxjobruntime:
+            msg = "Task requests %s minutes of runtime, but only %s minutes are guaranteed to be available." % (task['tm_maxjobruntime'], stdmaxjobruntime)
             msg += " Jobs may not find a site where to run."
             msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
             self.logger.warning(msg)
             args[0][1]['tm_maxjobruntime'] = str(stdmaxjobruntime)
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
-        if kwargs['task']['tm_maxmemory'] > stdmaxmemory:
-            msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (kwargs['task']['tm_maxmemory'], stdmaxmemory)
+            self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
+        if task['tm_maxmemory'] > stdmaxmemory:
+            msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (task['tm_maxmemory'], stdmaxmemory)
             msg += " Jobs may not find a site where to run and stay idle forever."
             self.logger.warning(msg)
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+            self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
 
         for schedd in goodSchedulers:
             #If submission failure is true, trying to change a scheduler
-            configreq = {'workflow': kwargs['task']['tm_taskname'],
+            configreq = {'workflow': task['tm_taskname'],
                          'subresource': 'updateschedd',
                          'scheddname': schedd}
             try:
                 userServer.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
-                kwargs['task']['tm_schedd'] = schedd
+                task['tm_schedd'] = schedd
             except HTTPException as hte:
                 msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
                 self.logger.warning(msg)
@@ -187,14 +187,14 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 continue
             retryIssues = []
             for retry in range(self.config.TaskWorker.max_retry + 1): #max_retry can be 0
-                self.logger.debug("Trying to submit task %s %s time.", kwargs['task']['tm_taskname'], str(retry))
+                self.logger.debug("Trying to submit task %s %s time.", task['tm_taskname'], str(retry))
                 try:
                     execInt = self.executeInternal(*args, **kwargs)
                     scheddStats.success(schedd)
                     return execInt
                 except Exception as ex:
                     scheddStats.failure(schedd)
-                    msg = "Failed to submit task %s; '%s'"% (kwargs['task']['tm_taskname'], str(ex))
+                    msg = "Failed to submit task %s; '%s'"% (task['tm_taskname'], str(ex))
                     self.logger.exception(msg)
                     retryIssues.append(msg)
                     if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
