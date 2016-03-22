@@ -131,8 +131,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
         scheddStats.procnum = kwargs['procnum']
 
     def execute(self, *args, **kwargs):
+
+
         userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry=20, logger=self.logger)
-        retryIssuesBySchedd = {}
         goodSchedulers = []
         try:
             goodSchedulers = self.server.get(self.restURInoAPI + '/info', data={'subresource': 'backendurls'})[0]['result'][0]['htcondorSchedds']
@@ -147,13 +148,11 @@ class DagmanSubmitter(TaskAction.TaskAction):
             goodSchedulers = [kwargs['task']['tm_schedd']]
         else:
             #Make sure that first scheduler is used which is chosen by HTCondorLocator
-            try:
-                goodSchedulers.remove(kwargs['task']['tm_schedd'])
-            except ValueError:
-                pass
+            goodSchedulers.remove(kwargs['task']['tm_schedd'])
             goodSchedulers.insert(0, kwargs['task']['tm_schedd'])
         self.logger.info("Final good schedulers list after shuffle: %s ", goodSchedulers)
 
+        retryIssuesBySchedd = {}
         #Check memory and walltime and if user requires too much:
         # upload warning back to crabserver
         # change walltime to max 47h Issue: #4742
