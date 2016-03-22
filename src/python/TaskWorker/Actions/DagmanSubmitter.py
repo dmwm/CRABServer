@@ -130,10 +130,12 @@ class DagmanSubmitter(TaskAction.TaskAction):
         TaskAction.TaskAction.__init__(self, *args, **kwargs)
         scheddStats.procnum = kwargs['procnum']
 
-    def execute(self, *args, **kwargs):
-        task =  kwargs['task']
 
-        userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
+    def getScheddList(self, task):
+        """ Get the list of good schedulers from the REST interface (backend urls)
+            Might return an empty list if not able to contact the REST
+            In any case the schedd choosen by the user in the crabconfig is put in the first place
+        """
         goodSchedulers = []
         try:
             goodSchedulers = self.server.get(self.restURInoAPI + '/info', data={'subresource': 'backendurls'})[0]['result'][0]['htcondorSchedds']
@@ -147,10 +149,17 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.logger.info("No late binding of schedd. Will use %s for submission.", task['tm_schedd'])
             goodSchedulers = [task['tm_schedd']]
         else:
-            #Make sure that first scheduler is used which is chosen by HTCondorLocator
             goodSchedulers.remove(task['tm_schedd'])
-            goodSchedulers.insert(0, task['tm_schedd'])
+            goodSchedulers.insert(0, task['tm_schedd']) #Make sure that first scheduler is used which is chosen by HTCondorLocator
         self.logger.info("Final good schedulers list after shuffle: %s ", goodSchedulers)
+
+        return goodSchedulers
+
+
+    def execute(self, *args, **kwargs):
+        task =  kwargs['task']
+
+        goodSchedulers = self.getScheddList(task)
 
         retryIssuesBySchedd = {}
         #Check memory and walltime and if user requires too much:
@@ -176,6 +185,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             configreq = {'workflow': task['tm_taskname'],
                          'subresource': 'updateschedd',
                          'scheddname': schedd}
+            userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
             try:
                 userServer.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
                 task['tm_schedd'] = schedd
