@@ -11,7 +11,6 @@ from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 from RESTInteractions import HTTPRequests
 
 from TaskWorker.Actions.Splitter import Splitter
-from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.DagmanKiller import DagmanKiller
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
@@ -22,7 +21,7 @@ from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
 from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
-from TaskWorker.WorkerExceptions import WorkerHandlerException, StopHandler, TaskWorkerException
+from TaskWorker.WorkerExceptions import WorkerHandlerException, TaskWorkerException
 
 DEFAULT_BACKEND = 'glidein'
 
@@ -77,17 +76,12 @@ class TaskHandler(object):
         """Performing the set of actions"""
         nextinput = args
 
+        #Loop that iterates over the actions to be performed
         for work in self.getWorks():
-            #Loop that iterates over the actions to be performed
             self.logger.debug("Starting %s on %s" % (str(work), self._task['tm_taskname']))
             t0 = time.time()
             try:
                 output = work.execute(nextinput, task=self._task, tempDir=self.tempDir)
-            except StopHandler as sh:
-                msg = "Controlled stop of handler for %s on %s " % (self._task, str(sh))
-                self.logger.error(msg)
-                nextinput = Result(task=self._task, result='StopHandler exception received, controlled stop')
-                break #exit normally. Worker will not notice there was an error
             except TaskWorkerException as twe:
                 self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
                 raise WorkerHandlerException(str(twe)) #TaskWorker error, do not add traceback to the error propagated to the REST
@@ -115,7 +109,7 @@ class TaskHandler(object):
             t1 = time.time()
             self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1 - t0))
 
-            #XXX MM - Not ereally sure what this is and why it's here..
+            #XXX MM - Not really sure what this is and why it's here..
             try:
                 nextinput = output.result
             except AttributeError:
