@@ -171,15 +171,12 @@ class DagmanSubmitter(TaskAction.TaskAction):
         return goodSchedulers
 
 
-    def execute(self, *args, **kwargs):
-        task =  kwargs['task']
+    def checkMemoryWalltime(self, args, task):
+        """ Check memory and walltime and if user requires too much:
+            - upload warning back to crabserver
+            - change walltime to max 47h Issue: #4742
+        """
 
-        goodSchedulers = self.getScheddList(task)
-
-        retryIssuesBySchedd = {}
-        #Check memory and walltime and if user requires too much:
-        # upload warning back to crabserver
-        # change walltime to max 47h Issue: #4742
         stdmaxjobruntime = 2750
         stdmaxmemory = 2500
         if task['tm_maxjobruntime'] > stdmaxjobruntime:
@@ -194,6 +191,15 @@ class DagmanSubmitter(TaskAction.TaskAction):
             msg += " Jobs may not find a site where to run and stay idle forever."
             self.logger.warning(msg)
             self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
+
+
+    def execute(self, *args, **kwargs):
+        task =  kwargs['task']
+
+        goodSchedulers = self.getScheddList(task)
+        self.checkMemoryWalltime(args, task)
+
+        retryIssuesBySchedd = {}
 
         for schedd in goodSchedulers:
             #If submission failure is true, trying to change a scheduler
