@@ -289,7 +289,12 @@ class DagmanSubmitter(TaskAction.TaskAction):
             # if the state of the dag is not idle or running then we raise exception and let
             # the dagman submitter retry later. hopefully after seven minutes the dag gets removed
             # from the schedd and the submission succeds
+            retry = results[0]['JobStatus'] == 5 #5==Held
             msg = "Task %s already found on schedd %s " % (workflow, task['tm_schedd'])
+            if retry:
+                msg += "Going to retry submission later since the dag status is Held and the task should be removed on the schedd"
+            else:
+                msg += "Aborting submission since the task is in state %s" % results[0]['JobStatus']
             raise TaskWorkerException(msg)
         else:
             self.logger.debug("Task seems to be submitted correctly. Classads got from scheduler: %s", results)
