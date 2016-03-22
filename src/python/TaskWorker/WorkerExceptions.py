@@ -14,7 +14,9 @@ Important exceptions:
 class TaskWorkerException(Exception):
     """General exception to be returned in case of failures
        by the TaskWorker objects"""
-    pass
+    def __init__(self, message, retry = False):
+        Exception.__init__(self, message)
+        self.retry = retry
 
 class ConfigException(TaskWorkerException):
     """Returned in case there are issues with the input
