@@ -72,13 +72,13 @@ class TaskHandler(object):
             yield w
 
 
-    def actionWork(self, *args, **kwargs):
+    def actionWork(self, *args, **kwargs): #pylint: disable=unused-argument
         """Performing the set of actions"""
         nextinput = args
 
         #Loop that iterates over the actions to be performed
         for work in self.getWorks():
-            self.logger.debug("Starting %s on %s" % (str(work), self._task['tm_taskname']))
+            self.logger.debug("Starting %s on %s", str(work), self._task['tm_taskname'])
             t0 = time.time()
             try:
                 output = work.execute(nextinput, task=self._task, tempDir=self.tempDir)
@@ -103,11 +103,11 @@ class TaskHandler(object):
                         msg = ("Failed to upload the logfile to %s for task %s. More details in the http headers and body:\n%s\n%s" %
                                (self._task['tm_cache_url'], self._task['tm_taskname'], hte.headers, hte.result))
                         self.logger.error(msg)
-                    except Exception:
+                    except Exception: #pylint: disable=broad-except
                         msg = "Unknown error while uploading the logfile for task %s" % self._task['tm_taskname']
                         self.logger.exception(msg)
             t1 = time.time()
-            self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1 - t0))
+            self.logger.info("Finished %s on %s in %d seconds", str(work), self._task['tm_taskname'], t1 - t0)
 
             #XXX MM - Not really sure what this is and why it's here..
             try:
