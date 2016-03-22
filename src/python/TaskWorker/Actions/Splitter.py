@@ -9,7 +9,6 @@ from WMCore.JobSplitting.SplitterFactory import SplitterFactory
 from RESTInteractions import HTTPRequests
 
 from TaskWorker.DataObjects.Result import Result
-from TaskWorker.WorkerExceptions import StopHandler
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
