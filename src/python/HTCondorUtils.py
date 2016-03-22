@@ -27,8 +27,9 @@ class OutputObj:
     """ Class used when AuthenticatedSubprocess is created with pickleOut
         Contains additional information to be used for debug purposes, like environment
     """
-    def __init__(self, outputMessage):
+    def __init__(self, outputMessage, outputObj):
         self.outputMessage = outputMessage
+        self.outputObj = outputObj
         self.environmentStr = ""
         for key, val in os.environ.iteritems():
             self.environmentStr += "%s=%s\n" % (key, val)
@@ -36,9 +37,10 @@ class OutputObj:
 
 class AuthenticatedSubprocess(object):
 
-    def __init__(self, proxy, pickleOut=False):
+    def __init__(self, proxy, pickleOut=False, outputObj = None):
         self.proxy = proxy
         self.pickleOut = pickleOut
+        self.outputObj = outputObj
 
     def __enter__(self):
         self.r, self.w = os.pipe()
@@ -59,7 +61,11 @@ class AuthenticatedSubprocess(object):
     def __exit__(self, a, b, c):
         if self.pid == 0:
             if (a == None and b == None and c == None):
-                self.wpipe.write("OK")
+                if self.pickleOut:
+                    oo = OutputObj("OK", self.outputObj)
+                    self.wpipe.write(pickle.dumps(oo))
+                else:
+                    self.wpipe.write("OK")
                 self.wpipe.close()
                 os._exit(0)
             else:
@@ -67,7 +73,7 @@ class AuthenticatedSubprocess(object):
                 msg = "Trapped exception in Dagman.Fork: %s %s %s \n%s" % \
                                 (a, b, c, tracebackString)
                 if self.pickleOut:
-                    oo = OutputObj(msg)
+                    oo = OutputObj(msg, self.outputObj)
                     self.wpipe.write(pickle.dumps(oo))
                 else:
                     self.wpipe.write(msg)

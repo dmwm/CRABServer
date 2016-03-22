@@ -385,19 +385,22 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["TaskType"] = "ROOT"
         dagAd["X509UserProxy"] = info['user_proxy']
 
-        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True) as (parent, rpipe):
+        condorIdDict = {}
+        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True, outputObj=condorIdDict) as (parent, rpipe):
             if not parent:
                 resultAds = []
-                schedd.submit(dagAd, 1, True, resultAds)
+                condorIdDict['ClusterId'] = schedd.submit(dagAd, 1, True, resultAds)
                 schedd.spool(resultAds)
                 if resultAds:
-                    id = "%s.%s" % (resultAds[0]['ClusterId'], resultAds[0]['ProcId'])
-                    schedd.edit([id], "LeaveJobInQueue", classad.ExprTree("(JobStatus == 4) && (time()-EnteredCurrentStatus < 30*86400)"))
-        results = rpipe.read()
-        if results != "OK":
-            results = pickle.loads(results)
+                    id_ = "%s.%s" % (resultAds[0]['ClusterId'], resultAds[0]['ProcId'])
+                    schedd.edit([id_], "LeaveJobInQueue", classad.ExprTree("(JobStatus == 4) && (time()-EnteredCurrentStatus < 30*86400)"))
+
+        results = pickle.load(rpipe)
+        if results.outputMessage != "OK":
             self.logger.debug("Now printing the environment used for submission:\n" + "-"*70 + "\n" + results.environmentStr + "-"*70)
             raise TaskWorkerException("Failure when submitting task to scheduler. Error reason: '%s'" % results.outputMessage)
+        else:
+            self.logger.debug("Condor cluster ID: %s", results.outputObj['ClusterId'])
 
 
     def sendDashboardJobs(self, params, info):
