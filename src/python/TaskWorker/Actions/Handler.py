@@ -72,44 +72,62 @@ class TaskHandler(object):
             yield w
 
 
+    def executeAction(self, nextinput, work):
+        """ Execute an action and deal with the error handling and upload of the tasklogfile to the crabcache
+        """
+        try:
+            output = work.execute(nextinput, task=self._task, tempDir=self.tempDir)
+        except TaskWorkerException as twe:
+            self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
+            raise WorkerHandlerException(str(twe), retry = twe.retry) #TaskWorker error, do not add traceback to the error propagated to the REST
+        except Exception as exc:
+            msg = "Problem handling %s because of %s failure, traceback follows\n" % (self._task['tm_taskname'], str(exc))
+            msg += str(traceback.format_exc())
+            self.logger.error(msg)
+            raise WorkerHandlerException(msg) #Errors not foreseen. Print everything!
+        finally:
+            #TODO: we need to do that also in Worker.py otherwise some messages might only be in the TW file but not in the crabcache.
+            logpath = 'logs/tasks/%s/%s.log' % (self._task['tm_username'], self._task['tm_taskname'])
+            if os.path.isfile(logpath) and 'user_proxy' in self._task: #the user proxy might not be there if myproxy retrieval failed
+                cacheurldict = {'endpoint':self._task['tm_cache_url'], 'cert':self._task['user_proxy'], 'key':self._task['user_proxy']}
+                try:
+                    ufc = UserFileCache(cacheurldict)
+                    logfilename = self._task['tm_taskname'] + '_TaskWorker.log'
+                    ufc.uploadLog(logpath, logfilename)
+                except HTTPException as hte:
+                    msg = "Failed to upload the logfile to %s for task %s. More details in the http headers and body:\n%s\n%s" % (self._task['tm_cache_url'], self._task['tm_taskname'], hte.headers, hte.result)
+                    self.logger.error(msg)
+                except Exception: #pylint: disable=broad-except
+                    msg = "Unknown error while uploading the logfile for task %s" % self._task['tm_taskname']
+                    self.logger.exception(msg) #upload logfile of the task to the crabcache
+
+        return output
+
+
     def actionWork(self, *args, **kwargs): #pylint: disable=unused-argument
         """Performing the set of actions"""
         nextinput = args
 
         #Loop that iterates over the actions to be performed
-        for work in self.getWorks():
-            self.logger.debug("Starting %s on %s", str(work), self._task['tm_taskname'])
+        for action in self.getWorks():
+            self.logger.debug("Starting %s on %s", str(action), self._task['tm_taskname'])
             t0 = time.time()
-            try:
-                output = work.execute(nextinput, task=self._task, tempDir=self.tempDir)
-            except TaskWorkerException as twe:
-                self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
-                raise WorkerHandlerException(str(twe)) #TaskWorker error, do not add traceback to the error propagated to the REST
-            except Exception as exc:
-                msg = "Problem handling %s because of %s failure, traceback follows\n" % (self._task['tm_taskname'], str(exc))
-                msg += str(traceback.format_exc())
-                self.logger.error(msg)
-                raise WorkerHandlerException(msg) #Errors not foreseen. Print everything!
-            finally:
-                #upload logfile of the task to the crabcache
-                logpath = 'logs/tasks/%s/%s.log' % (self._task['tm_username'], self._task['tm_taskname'])
-                if os.path.isfile(logpath) and 'user_proxy' in self._task: #the user proxy might not be there if myproxy retrieval failed
-                    cacheurldict = {'endpoint': self._task['tm_cache_url'], 'cert' : self._task['user_proxy'], 'key' : self._task['user_proxy']}
-                    try:
-                        ufc = UserFileCache(cacheurldict)
-                        logfilename = self._task['tm_taskname'] + '_TaskWorker.log'
-                        ufc.uploadLog(logpath, logfilename)
-                    except HTTPException as hte:
-                        msg = ("Failed to upload the logfile to %s for task %s. More details in the http headers and body:\n%s\n%s" %
-                               (self._task['tm_cache_url'], self._task['tm_taskname'], hte.headers, hte.result))
-                        self.logger.error(msg)
-                    except Exception: #pylint: disable=broad-except
-                        msg = "Unknown error while uploading the logfile for task %s" % self._task['tm_taskname']
-                        self.logger.exception(msg)
+            retryCount = 0
+            #execute the current action dealing with retriesz
+            while retryCount < 5:
+                try:
+                    output = self.executeAction(nextinput, action)
+                except WorkerHandlerException as whe:
+                    if whe.retry == False:
+                        raise
+                    retryCount += 1
+                    time.sleep(60 * retryCount)
+                else:
+                    break
             t1 = time.time()
-            self.logger.info("Finished %s on %s in %d seconds", str(work), self._task['tm_taskname'], t1 - t0)
+            self.logger.info("Finished %s on %s in %d seconds", str(action), self._task['tm_taskname'], t1 - t0)
 
-            #XXX MM - Not really sure what this is and why it's here..
+            #XXX MM - Not really sure what this is and why it's here, but I hate this..
             try:
                 nextinput = output.result
             except AttributeError:
@@ -165,7 +183,6 @@ def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
     handler.addWork(DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
 
-    locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)
 
 
