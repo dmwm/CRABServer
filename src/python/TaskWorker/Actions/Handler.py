@@ -141,15 +141,12 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     elif task['tm_job_type'] == 'PrivateMC':
         handler.addWork(MakeFakeFileSet(config=config, server=server, resturi=resturi, procnum=procnum))
     handler.addWork(Splitter(config=config, server=server, resturi=resturi, procnum=procnum))
-    def glidein(config):
-        """Performs the injection of a new task into Glidein
-        :arg WMCore.Configuration config: input configuration"""
-        handler.addWork(DagmanCreator(config=config, server=server, resturi=resturi, procnum=procnum))
-        if task['tm_dry_run'] == 'T':
-            handler.addWork(DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum))
-        else:
-            handler.addWork(DagmanSubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
-    locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
+    handler.addWork(DagmanCreator(config=config, server=server, resturi=resturi, procnum=procnum))
+    if task['tm_dry_run'] == 'T':
+        handler.addWork(DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum))
+    else:
+        handler.addWork(DagmanSubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
+
     return handler.actionWork(args, kwargs)
 
 
@@ -166,10 +163,7 @@ def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=logging.getLogger(str(procnum)))
     handler = TaskHandler(task, procnum, server, config, 'handleResubmit')
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
-    def glidein(config):
-        """Performs the re-injection into Glidein
-        :arg WMCore.Configuration config: input configuration"""
-        handler.addWork(DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
+    handler.addWork(DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
 
     locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)
@@ -188,9 +182,6 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=logging.getLogger(str(procnum)))
     handler = TaskHandler(task, procnum, server, config, 'handleKill')
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 5))
-    def glidein(config):
-        """Performs kill of jobs sent through Glidein
-        :arg WMCore.Configuration config: input configuration"""
-        handler.addWork(DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum))
-    locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
+    handler.addWork(DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum))
+
     return handler.actionWork(args, kwargs)
