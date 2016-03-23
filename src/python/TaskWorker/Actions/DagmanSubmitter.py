@@ -100,14 +100,22 @@ def addCRABInfoToClassAd(ad, info):
 class ScheddStats(dict):
     def __init__(self):
         self.procnum = None
+        self.schedd = None
+        self.clusterId = None
         self.pid = os.getpid()
         dict.__init__(self)
 
-    def success(self, schedd):
+    def success(self, schedd, clusterId):
         self[schedd]["successes"] = self.setdefault(schedd, {}).get("successes", 0) + 1
+        #in case of success store schedd and clusterid so they can be printed
+        self.schedd = schedd
+        self.clusterId = clusterId
 
     def failure(self, schedd):
         self[schedd]["failures"] = self.setdefault(schedd, {}).get("failures", 0) + 1
+        #in case of failure clear schedd and clusterId
+        self.schedd = None
+        self.clusterId = None
 
     def __str__(self):
         res = "Summary of schedd failures/successes for slave process %s (PID %s):\n" % (self.procnum, self.pid)
@@ -115,6 +123,9 @@ class ScheddStats(dict):
             res += "\t" + schedd + ":\n"
             res += "\t\t%s %s\n" % ("Number of successes: ", self[schedd].get("successes", 0))
             res += "\t\t%s %s\n" % ("Number of failures: ", self[schedd].get("failures", 0))
+
+        if self.schedd and self.clusterId:
+            res += "Last successful submission: ClusterId %s submitted to schedd %s\n" % (self.clusterId, self.schedd)
 
         return res
 scheddStats = ScheddStats()
@@ -129,6 +140,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
     def __init__(self, *args, **kwargs):
         TaskAction.TaskAction.__init__(self, *args, **kwargs)
         scheddStats.procnum = kwargs['procnum']
+        self.clusterId = None
 
     def execute(self, *args, **kwargs):
         userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry=20, logger=self.logger)
@@ -191,7 +203,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 self.logger.debug("Trying to submit task %s %s time.", kwargs['task']['tm_taskname'], str(retry))
                 try:
                     execInt = self.executeInternal(*args, **kwargs)
-                    scheddStats.success(schedd)
+                    scheddStats.success(schedd, self.clusterId)
                     return execInt
                 except Exception as ex:
                     scheddStats.failure(schedd)
@@ -328,7 +340,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
             self.logger.debug("Finally submitting to the schedd")
             if address:
-                self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
+                self.clusterId = self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
             else:
                 raise TaskWorkerException("Not able to get schedd address.")
             self.logger.debug("Submission finished")
@@ -396,11 +408,16 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     schedd.edit([id_], "LeaveJobInQueue", classad.ExprTree("(JobStatus == 4) && (time()-EnteredCurrentStatus < 30*86400)"))
 
         results = pickle.load(rpipe)
+
+        #notice that the clusterId might be set even if there was a failure. This is if the schedd.submit succeded, but the spool  call failed
+        if 'ClusterId' in results.outputObj:
+            self.logger.debug("Condor cluster ID just submitted is: %s", results.outputObj['ClusterId'])
         if results.outputMessage != "OK":
             self.logger.debug("Now printing the environment used for submission:\n" + "-"*70 + "\n" + results.environmentStr + "-"*70)
             raise TaskWorkerException("Failure when submitting task to scheduler. Error reason: '%s'" % results.outputMessage)
-        else:
-            self.logger.debug("Condor cluster ID: %s", results.outputObj['ClusterId'])
+
+        #if we don't raise exception above the id is here
+        return results.outputObj['ClusterId']
 
 
     def sendDashboardJobs(self, params, info):
