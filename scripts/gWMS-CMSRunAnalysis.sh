@@ -18,6 +18,7 @@ function finish {
     if [ $DIFF_TIME -lt 1200 ];
     then
       SLEEP_TIME=$((1200 - DIFF_TIME))
+      SLEEP_TIME=1
       echo "Job runtime is less than 20minutes. Sleeping " $SLEEP_TIME
       sleep $SLEEP_TIME
     fi

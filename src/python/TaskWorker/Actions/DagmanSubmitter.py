@@ -288,7 +288,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         cwd = os.getcwd()
         os.chdir(kwargs['tempDir'])
 
-        info['inputFilesString'] = ", ".join(inputFiles)
+        info['inputFilesString'] = ", ".join(inputFiles + ['subdag.ad'])
         outputFiles = ["RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001"]
         info['outputFilesString'] = ", ".join(outputFiles)
         arg = "RunJobs.dag"
@@ -361,8 +361,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
             dagAd["CMSGroups"] = classad.Value.Undefined
 
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
-        dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
-        dagAd["Err"] = str(os.path.join(info['scratch'], "request.err"))
         dagAd["CRAB_Attempt"] = 0
         # We switched from local to scheduler universe.  Why?  It seems there's no way in the
         # local universe to change the hold signal at runtime.  That's fairly important for our
@@ -370,6 +368,25 @@ class DagmanSubmitter(TaskAction.TaskAction):
         #dagAd["JobUniverse"] = 12
         dagAd["JobUniverse"] = 7
         dagAd["HoldKillSig"] = "SIGUSR1"
+        dagAd["X509UserProxy"] = info['user_proxy']
+        dagAd["Requirements"] = classad.ExprTree('true || false')
+        dagAd["TaskType"] = "ROOT"
+        dagAd["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1 CONDOR_ID=", ClusterId, ".", ProcId," %s")' % " ".join(info['additional_environment_options'].split(";")))
+
+        with open('subdag.ad' ,'w') as fd:
+            for k, v in dagAd.items():
+                if k == 'X509UserProxy':
+                    v = os.path.basename(v)
+                if isinstance(v, basestring):
+                    value = classad.quote(v)
+                elif isinstance(v, classad.ExprTree):
+                    value = repr(v)
+                else:
+                    value = v
+                fd.write('+{0} = {1}\n'.format(k, value))
+
+        dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
+        dagAd["Err"] = str(os.path.join(info['scratch'], "request.err"))
         dagAd["Cmd"] = cmd
         dagAd['Args'] = arg
         dagAd["TransferInput"] = str(info['inputFilesString'])
@@ -380,11 +397,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
         dagAd["RemoveKillSig"] = "SIGUSR1"
         dagAd["OnExitHold"] = classad.ExprTree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
-        dagAd["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1 CONDOR_ID=", ClusterId, ".", ProcId," %s")' % " ".join(info['additional_environment_options'].split(";")))
         dagAd["RemoteCondorSetup"] = info['remote_condor_setup']
-        dagAd["Requirements"] = classad.ExprTree('true || false')
-        dagAd["TaskType"] = "ROOT"
-        dagAd["X509UserProxy"] = info['user_proxy']
 
         with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True) as (parent, rpipe):
             if not parent:

@@ -47,6 +47,7 @@ def mintime():
     mymin = 20*60
     tottime = time.time()-starttime
     remaining = mymin - tottime
+    remaining = 1
     if remaining > 0 and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         print("==== Failure sleep STARTING at %s ====" % time.asctime(time.gmtime()))
         print("Sleeping for %d seconds due to failure." % remaining)
@@ -94,7 +95,7 @@ def parseAd():
 
 def populateDashboardMonitorInfo(myad, params):
     params['MonitorID'] = myad['CRAB_ReqName']
-    params['MonitorJobID'] = '%d_https://glidein.cern.ch/%d/%s_%d' % (myad['CRAB_Id'], myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":"), myad['CRAB_Retry'])
+    params['MonitorJobID'] = '{0}_https://glidein.cern.ch/{0}/{1}_{2}'.format(myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":"), myad['CRAB_Retry'])
 
 
 def calcOverflowFlag(myad):
@@ -111,7 +112,7 @@ def calcOverflowFlag(myad):
 def earlyDashboardMonitoring(myad):
     params = {
         'WNHostName': socket.getfqdn(),
-        'SyncGridJobId': 'https://glidein.cern.ch/%d/%s' % (myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":")),
+        'SyncGridJobId': 'https://glidein.cern.ch/{0}/{1}'.format(myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":")),
         'SyncSite': myad['JOB_CMSSite'],
         'SyncCE': myad['Used_Gatekeeper'].split(":")[0].split(" ")[0],
         'OverflowFlag': calcOverflowFlag(myad),

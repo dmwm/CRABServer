@@ -118,6 +118,7 @@ else
 fi
 
 export _CONDOR_DAGMAN_LOG=$PWD/$1.dagman.out
+export _CONDOR_DAGMAN_GENERATE_SUBDAG_SUBMITS=False
 export _CONDOR_MAX_DAGMAN_LOG=0
 
 # Export path where final job is written. This requires enable the PER_JOB_HISTORY_DIR
@@ -144,6 +145,10 @@ elif [ ! -r $X509_USER_PROXY ]; then
     condor_qedit $CONDOR_ID DagmanHoldReason "'The proxy is unreadable for some reason'"
     EXIT_STATUS=6
 else
+    for f in *.subdag; do
+        condor_submit_dag -no_submit -insert_sub_file subdag.ad $f
+    done
+
     # Documentation about condor_dagman: http://research.cs.wisc.edu/htcondor/manual/v8.3/condor_dagman.html
     # In particular:
     # -autorescue 0|1
