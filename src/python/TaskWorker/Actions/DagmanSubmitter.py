@@ -425,8 +425,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         apmon = ApmonIf()
         for job in info:
             job.update(params)
-            self.logger.debug("Dashboard job info: %s", job)
             apmon.sendToML(job)
+        self.logger.debug("Dashboard job info submitted. Last job for example is: %s", job)
         apmon.free()
 
 
