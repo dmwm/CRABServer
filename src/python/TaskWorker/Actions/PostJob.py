@@ -1376,10 +1376,12 @@ class PostJob():
         for input_ in self.job_report['steps']['cmsRun']['input']['source']:
             outlumis += LumiList(runsAndLumis=input_['runs'])
 
+        missing = inlumis - outlumis
         self.logger.info("Lumis expected to be processed: {0}".format(len(inlumis.getLumis())))
         self.logger.info("Lumis actually processed:       {0}".format(len(outlumis.getLumis())))
-        self.logger.info("Difference in lumis:            {0}".format(len((inlumis - outlumis).getLumis())))
-        missing = inlumis - outlumis
+        self.logger.info("Difference in lumis:            {0}".format(len(missing.getLumis())))
+        if len(missing.getLumis()) == 0: #we don't want to create the subjobs if the job processed everything
+            return
         missing_compact = missing.getCompactList()
         runs = missing.getRuns()
         lumis = [",".join(map(str, reduce(lambda x, y:x + y, missing_compact[run]))) for run in runs]
