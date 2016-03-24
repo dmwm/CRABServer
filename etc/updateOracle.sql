@@ -68,3 +68,7 @@ alter table tasks add (tm_primary_dataset VARCHAR(255));
 
 --Changes that will be needed for version 3.3.1602
 alter table tasks add (tm_asodb VARCHAR(20));
+
+--Changes needed for the Autmatic Splitting (or resplitting)
+alter table filemetadata add (job_id VARCHAR(20));
+alter table filemetadata modify (panda_job_id null);
