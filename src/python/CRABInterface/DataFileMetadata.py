@@ -19,27 +19,29 @@ class DataFileMetadata(object):
         binds = {'taskname': taskname, 'filetype': filetype}
         rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, **binds)
         for row in rows:
+            row = self.FileMetaData.GetFromTaskAndType_sql(*row)
             yield json.dumps({'taskname': taskname,
                    'filetype': filetype,
-                   'pandajobid': row[0],
-                   'outdataset': row[1],
-                   'acquisitionera': row[2],
-                   'swversion': row[3],
-                   'inevents': row[4],
-                   'globaltag': row[5],
-                   'publishname': row[6],
-                   'location': row[7],
-                   'tmplocation': row[8],
-                   'runlumi': literal_eval(row[9].read()),
-                   'adler32': row[10],
-                   'cksum': row[11],
-                   'md5': row[12],
-                   'lfn': row[13],
-                   'filesize': row[14],
-                   'parents': literal_eval(row[15].read()),
-                   'state': row[16],
-                   'created': str(row[17]),
-                   'tmplfn': row[18]})
+                   'pandajobid': row.pandajobid,
+                   'jobid': row.jobid,
+                   'outdataset': row.outdataset,
+                   'acquisitionera': row.acquisitionera,
+                   'swversion': row.swversion,
+                   'inevents': row.inevents,
+                   'globaltag': row.globaltag,
+                   'publishname': row.publishname,
+                   'location': row.location,
+                   'tmplocation': row.tmplocation,
+                   'runlumi': literal_eval(row.runlumi.read()),
+                   'adler32': row.adler32,
+                   'cksum': row.cksum,
+                   'md5': row.md5,
+                   'lfn': row.lfn,
+                   'filesize': row.filesize,
+                   'parents': literal_eval(row.parents.read()),
+                   'state': row.state,
+                   'created': str(row.parents),
+                   'tmplfn': row.tmplfn})
 
     def inject(self, *args, **kwargs):
         self.logger.debug("Calling jobmetadata inject with parameters %s" % kwargs)

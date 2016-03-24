@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import logging
+from collections import namedtuple
 
 class GetFromTaskAndType():
     """ Used for indexing columns retrieved by the GetFromTaskAndType_sql query
@@ -16,7 +17,30 @@ class FileMetaData(object):
     ChangeFileState_sql = """UPDATE filemetadata SET fmd_filestate=:filestate \
                              WHERE fmd_lfn=:outlfn and tm_taskname=:taskname """
 
+    GetFromTaskAndType_tuple = namedtuple("GetFromTaskAndType", ["panda_job_id",
+                           "jobid",
+                           "outdataset",
+                           "acqera",
+                           "swver",
+                           "inevents",
+                           "globaltag",
+                           "publishname",
+                           "location",
+                           "tmplocation",
+                           "runlumi",
+                           "adler32",
+                           "cksum",
+                           "md5",
+                           "lfn",
+                           "size",
+                           "parent",
+                           "filestate",
+                           "creationtime",
+                           "tmplfn",
+                           "type",
+                           "directstageoutt"])
     GetFromTaskAndType_sql = """SELECT panda_job_id AS pandajobid, \
+                           job_id AS jobid, \
                            fmd_outdataset AS outdataset, \
                            fmd_acq_era AS acquisitionera, \
                            fmd_sw_ver AS swversion, \
@@ -44,17 +68,18 @@ class FileMetaData(object):
              """
 
     New_sql = "INSERT INTO filemetadata ( \
-               tm_taskname, panda_job_id, fmd_outdataset, fmd_acq_era, fmd_sw_ver, fmd_in_events, fmd_global_tag,\
+               tm_taskname, panda_job_id, job_id, fmd_outdataset, fmd_acq_era, fmd_sw_ver, fmd_in_events, fmd_global_tag,\
                fmd_publish_name, fmd_location, fmd_tmp_location, fmd_runlumi, fmd_adler32, fmd_cksum, fmd_md5, fmd_lfn, fmd_size,\
                fmd_type, fmd_parent, fmd_creation_time, fmd_filestate, fmd_direct_stageout, fmd_tmplfn) \
-               VALUES (:taskname, :pandajobid, :outdatasetname, :acquisitionera, :appver, :events, :globalTag,\
+               VALUES (:taskname, :pandajobid, :jobid, :outdatasetname, :acquisitionera, :appver, :events, :globalTag,\
                        :publishdataname, :outlocation, :outtmplocation, :runlumi, :checksumadler32, :checksumcksum, :checksummd5, :outlfn, :outsize,\
                        :outtype, :inparentlfns, SYS_EXTRACT_UTC(SYSTIMESTAMP), :filestate, :directstageout, :outtmplfn)"
 
     Update_sql = """UPDATE filemetadata SET fmd_tmp_location = :outtmplocation, fmd_size = :outsize, fmd_creation_time = SYS_EXTRACT_UTC(SYSTIMESTAMP), fmd_tmplfn = :outtmplfn \
                     WHERE tm_taskname = :taskname AND fmd_lfn = :outlfn"""
 
-    GetCurrent_sql = "SELECT panda_job_id from filemetadata WHERE tm_taskname = :taskname AND fmd_lfn = :outlfn"
+    #the field selected here is not used, the query is only executed to check if a filemetadata for the file was already uploaded or not
+    GetCurrent_sql = "SELECT fmd_lfn from filemetadata WHERE tm_taskname = :taskname AND fmd_lfn = :outlfn"
 
     DeleteTaskFiles_sql = "DELETE FROM filemetadata WHERE tm_taskname = :taskname"
     DeleteFilesByTime_sql = "DELETE FROM filemetadata WHERE fmd_creation_time < sysdate - (:hours/24)"
