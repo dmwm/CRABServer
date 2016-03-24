@@ -129,7 +129,7 @@ class HTTPRequests(dict):
 
         decode the response result reveiced from the server
         """
-        encoder = JSONRequests()
+        encoder = JSONRequests(idict={"pycurl" : True})
         return encoder.decode(result)
 
 
