@@ -33,7 +33,15 @@ class RESTFileMetadata(RESTEntity):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
             validate_strlist("inparentlfns", param, safe, RX_PARENTLFN)
             validate_str("globalTag", param, safe, RX_GLOBALTAG, optional=True)
-            validate_num("pandajobid", param, safe, optional=False)
+            validate_str("jobid", param, safe, RX_RUNS, optional=True)
+            #TODO: for backward compatibility. Get rid of the pandajobid once all jobs using it are done (one month after this gets released)
+            #(The following five lines can be deleted)
+            validate_num("pandajobid", param, safe, optional=True)
+            if bool(safe.kwargs["jobid"]) == bool(safe.kwargs["pandajobid"]):
+                raise InvalidParameter("Only one among jobid and pandajobid should be set")
+            #Oracle/cx_oracle/python stack does not like None for numbers, even if they are nullable
+            if safe.kwargs["pandajobid"] == None:
+                safe.kwargs["pandajobid"] =  0
             validate_num("outsize", param, safe, optional=False)
             validate_str("publishdataname", param, safe, RX_PUBLISH, optional=False)
             validate_str("appver", param, safe, RX_CMSSW, optional=False)
@@ -76,11 +84,11 @@ class RESTFileMetadata(RESTEntity):
     ## * The name of the arguments has to be the same as used in the http request, and the same as used in validate().
 
     @restcall
-    def put(self, taskname, outfilelumis, inparentlfns, globalTag, outfileruns, pandajobid, outsize, publishdataname, appver, outtype, checksummd5,\
+    def put(self, taskname, outfilelumis, inparentlfns, globalTag, outfileruns, jobid, pandajobid, outsize, publishdataname, appver, outtype, checksummd5,\
             checksumcksum, checksumadler32, outlocation, outtmplocation, outdatasetname, acquisitionera, outlfn, events, filestate, directstageout, outtmplfn):
         """Insert a new job metadata information"""
         return self.jobmetadata.inject(taskname=taskname, outfilelumis=outfilelumis, inparentlfns=inparentlfns, globalTag=globalTag, outfileruns=outfileruns,\
-                           pandajobid=pandajobid, outsize=outsize, publishdataname=publishdataname, appver=appver, outtype=outtype, checksummd5=checksummd5,\
+                           jobid=jobid, pandajobid=pandajobid, outsize=outsize, publishdataname=publishdataname, appver=appver, outtype=outtype, checksummd5=checksummd5,\
                            checksumcksum=checksumcksum, checksumadler32=checksumadler32, outlocation=outlocation, outtmplocation=outtmplocation,\
                            outdatasetname=outdatasetname, acquisitionera=acquisitionera, outlfn=outlfn, outtmplfn=outtmplfn, events=events, filestate=filestate, \
                            directstageout=directstageout)

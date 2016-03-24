@@ -10,6 +10,7 @@ class FileMetaData(object):
                              WHERE fmd_lfn=%(outlfn)s and tm_taskname=%(taskname)s """
 
     GetFromTaskAndType_sql = """SELECT panda_job_id AS pandajobid,
+                           job_id AS jobid,
                            fmd_outdataset AS outdataset,
                            fmd_acq_era AS acquisitionera,
                            fmd_sw_ver AS swversion,
