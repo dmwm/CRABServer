@@ -1904,10 +1904,14 @@ class PostJob():
                 configreq.append(("outfileruns", run))
             for lumis in outfilelumis:
                 configreq.append(("outfilelumis", lumis))
-            msg = "Uploading file metadata for input file %s" % ifile['lfn']
+
+            rest_api = 'filemetadata'
+            rest_uri = self.rest_uri_no_api + '/' + rest_api
+            rest_url = self.rest_host + rest_uri
+            msg = "Uploading output metadata for %s to https://%s: %s" % (lfn, rest_url, configreq)
             self.logger.debug(msg)
             try:
-                self.server.put(self.rest_uri_no_api + '/filemetadata', data = urllib.urlencode(configreq))
+                self.server.put(rest_uri, data = urllib.urlencode(configreq))
             except HTTPException as hte:
                 msg = "Error uploading input file metadata: %s" % (str(hte.headers))
                 self.logger.error(msg)
@@ -1987,7 +1991,7 @@ class PostJob():
             rest_api = 'filemetadata'
             rest_uri = self.rest_uri_no_api + '/' + rest_api
             rest_url = self.rest_host + rest_uri
-            msg = "Uploading file metadata for %s to https://%s: %s" % (filename, rest_url, configreq)
+            msg = "Uploading output metadata for %s to https://%s: %s" % (filename, rest_url, configreq)
             self.logger.debug(msg)
             try:
                 self.server.put(rest_uri, data = urllib.urlencode(configreq))
