@@ -1877,7 +1877,7 @@ class PostJob():
             lfn = ifile['lfn'] + "_" + self.job_id ## jobs can analyze the same input
             configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
                          "globalTag"       : "None",
-                         "pandajobid"      : self.job_id,
+                         "jobid"           : self.job_id,
                          "outsize"         : "0",
                          "publishdataname" : self.publish_name,
                          "appver"          : self.job_ad['CRAB_JobSW'],
