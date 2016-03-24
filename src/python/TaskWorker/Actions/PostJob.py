@@ -1802,7 +1802,7 @@ class PostJob():
             self.logger.warning(msg)
             temp_storage_site = self.executed_site
         configreq = {'taskname'        : self.reqname,
-                     'pandajobid'      : self.job_id,
+                     'obid'      : self.job_id,
                      'outsize'         : self.job_report.get(u'log_size', 0),
                      'publishdataname' : self.publish_name,
                      'appver'          : self.job_sw,
@@ -1956,7 +1956,7 @@ class PostJob():
             else:
                 outdataset = '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER'
             configreq = {'taskname'        : self.reqname,
-                         'pandajobid'      : self.job_id,
+                         'jobid'      : self.job_id,
                          'outsize'         : file_info['outsize'],
                          'publishdataname' : publishname,
                          'appver'          : self.job_sw,
