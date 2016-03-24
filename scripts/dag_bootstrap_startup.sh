@@ -102,7 +102,7 @@ if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]; then
         condor_qedit $CONDOR_ID DagmanHoldReason "'Unable to unpack the task manager runtime environment.'"
         exit 1
     fi
-    unzip CRAB3.zip
+    unzip -o CRAB3.zip
     ls -lah
 
     export TASKWORKER_ENV="1"
