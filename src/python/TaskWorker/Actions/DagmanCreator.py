@@ -496,9 +496,11 @@ class DagmanCreator(TaskAction.TaskAction):
             firstLumi = str(job['mask']['FirstLumi'])
             firstRun = str(job['mask']['FirstRun'])
             if subjob is None:
-                i += 1
+                i = int(i) + 1
                 count = str(i)
             else:
+                if isinstance(i, basestring):
+                    i = int(i.split('-', 1)[0])
                 subjob += 1
                 count = '{parent}-{subjob}'.format(parent=i, subjob=subjob)
             sitead['Job{0}'.format(count)] = list(availablesites)

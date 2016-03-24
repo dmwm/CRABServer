@@ -94,7 +94,7 @@ class RetryJob(object):
             self.logger.info(msg)
             return
         for dag_retry in range(self.dag_retry):
-            job_ad_file = os.path.join(".", "finished_jobs", "job.%d.%d" % (self.job_id, dag_retry))
+            job_ad_file = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, dag_retry))
             if os.path.isfile(job_ad_file):
                 try:
                     with open(job_ad_file) as fd:
@@ -116,7 +116,7 @@ class RetryJob(object):
         Need a doc string here.
         """
         try:
-            with open("jobReport.json.%d" % (self.job_id), 'r') as fd:
+            with open("jobReport.json.%s" % (self.job_id), 'r') as fd:
                 try:
                     self.report = json.load(fd)
                 except ValueError:
@@ -139,13 +139,13 @@ class RetryJob(object):
                 job_status_name = name
         try:
             with os.fdopen(os.open("task_statistics.%s.%s" % (self.site, job_status_name), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0o644), 'a') as fd:
-                fd.write("%d\n" % (self.job_id))
+                fd.write("%s\n" % (self.job_id))
         except Exception as ex:
             self.logger.error(str(ex))
             # Swallow the exception - record_site is advisory only
         try:
             with os.fdopen(os.open("task_statistics.%s" % (job_status_name), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0o644), 'a') as fd:
-                fd.write("%d\n" % (self.job_id))
+                fd.write("%s\n" % (self.job_id))
         except Exception as ex:
             self.logger.error(str(ex))
             # Swallow the exception - record_site is advisory only
@@ -162,7 +162,7 @@ class RetryJob(object):
             fake_fjr['exitCode'] = jobExitCode
         else:
             fake_fjr['exitCode'] = exitCode
-        jobReport = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry)
+        jobReport = "job_fjr.%s.%d.json" % (self.job_id, self.crab_retry)
         if os.path.isfile(jobReport) and os.path.getsize(jobReport) > 0:
             #File exists and it is not empty
             msg  = "%s file exists and it is not empty!" % (jobReport)
@@ -302,7 +302,7 @@ class RetryJob(object):
         if exitCode == 134:
             recoverable_signal = False
             try:
-                fname = os.path.expanduser("~/%s/job_out.%d.%d.txt" % (self.reqname, self.job_id, self.crab_retry))
+                fname = os.path.expanduser("~/%s/job_out.%s.%d.txt" % (self.reqname, self.job_id, self.crab_retry))
                 with open(fname) as fd:
                     for line in fd:
                         if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
@@ -318,7 +318,7 @@ class RetryJob(object):
         if exitCode == 8001 or exitCode == 65:
             cvmfs_issue = False
             try:
-                fname = os.path.expanduser("~/%s/job_out.%d.%d.txt" % (self.reqname, self.job_id, self.crab_retry))
+                fname = os.path.expanduser("~/%s/job_out.%s.%d.txt" % (self.reqname, self.job_id, self.crab_retry))
                 cvmfs_issue_re = re.compile("== CMSSW:  unable to load /cvmfs/.*file too short")
                 with open(fname) as fd:
                     for line in fd: 

@@ -147,6 +147,7 @@ elif [ ! -r $X509_USER_PROXY ]; then
 else
     for f in *.subdag; do
         condor_submit_dag -no_submit -insert_sub_file subdag.ad $f
+        touch $f.dagman.out
     done
 
     # Documentation about condor_dagman: http://research.cs.wisc.edu/htcondor/manual/v8.3/condor_dagman.html

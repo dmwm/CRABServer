@@ -372,6 +372,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["Requirements"] = classad.ExprTree('true || false')
         dagAd["TaskType"] = "ROOT"
         dagAd["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1 CONDOR_ID=", ClusterId, ".", ProcId," %s")' % " ".join(info['additional_environment_options'].split(";")))
+        dagAd["RemoteCondorSetup"] = info['remote_condor_setup']
 
         with open('subdag.ad' ,'w') as fd:
             for k, v in dagAd.items():
@@ -397,7 +398,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
         dagAd["RemoveKillSig"] = "SIGUSR1"
         dagAd["OnExitHold"] = classad.ExprTree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
-        dagAd["RemoteCondorSetup"] = info['remote_condor_setup']
 
         with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True) as (parent, rpipe):
             if not parent:

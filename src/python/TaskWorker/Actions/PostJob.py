@@ -124,9 +124,6 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
         Then, add the error reason of the job that are not in errorReport.json
     """
 
-    ## The job_id and crab_retry variables in PostJob are integers, while here we
-    ## mostly use them as strings.
-    job_id = str(job_id)
     crab_retry = str(crab_retry)
 
     error_summary = {}
@@ -305,7 +302,7 @@ class ASOServerJob(object):
             we do not have to query couch to get this list every time the postjob is restarted.
         """
         try:
-            filename = 'transfer_info/docs_in_transfer.%d.%d.json' % (self.job_id, self.crab_retry)
+            filename = 'transfer_info/docs_in_transfer.%s.%d.json' % (self.job_id, self.crab_retry)
             with open(filename, 'w') as fd:
                 json.dump(self.docs_in_transfer, fd)
         except:
@@ -319,7 +316,7 @@ class ASOServerJob(object):
         """ Function that loads the object saved as a json by save_docs_in_transfer
         """
         try:
-            filename = 'transfer_info/docs_in_transfer.%d.%d.json' % (self.job_id, self.crab_retry)
+            filename = 'transfer_info/docs_in_transfer.%s.%d.json' % (self.job_id, self.crab_retry)
             with open(filename) as fd:
                 self.docs_in_transfer = json.load(fd)
         except:
@@ -983,7 +980,7 @@ class PostJob():
 
     def get_defer_num(self):
 
-        DEFER_INFO_FILE = 'defer_info/defer_num.%d.%d.txt' % (self.job_id, self.dag_retry)
+        DEFER_INFO_FILE = 'defer_info/defer_num.%s.%d.txt' % (self.job_id, self.dag_retry)
         defer_num = 0
 
         #read retry number
@@ -1084,11 +1081,11 @@ class PostJob():
         ## naming it job_out.<job_id>.<crab_retry>.txt.
         ## NOTE: We now redirect stdout -> stderr; hence, we don't keep stderr in the
         ## webdir.
-        stdout = "job_out.%d" % (self.job_id)
-        stdout_tmp = "job_out.tmp.%d" % (self.job_id)
+        stdout = "job_out.%s" % (self.job_id)
+        stdout_tmp = "job_out.tmp.%s" % (self.job_id)
         if os.path.exists(stdout):
             os.rename(stdout, stdout_tmp)
-            fname = "job_out.%d.%d.txt" % (self.job_id, self.crab_retry)
+            fname = "job_out.%s.%d.txt" % (self.job_id, self.crab_retry)
             fname = os.path.join(self.logpath, fname)
             msg = "Copying job stdout from %s to %s." % (stdout, fname)
             self.logger.debug(msg)
@@ -1135,7 +1132,7 @@ class PostJob():
         ## TODO: Why not get the request name from the job ad?
         ## We will need to parse the job ad earlier, that's all.
         self.reqname             = args[4]
-        self.job_id              = int(args[5])
+        self.job_id              = args[5]
         self.source_dir          = args[6]
         self.dest_dir            = args[7]
         self.logs_arch_file_name = args[8]
@@ -1167,9 +1164,9 @@ class PostJob():
 
         ## Define the name of the post-job log file.
         if self.crab_retry is None:
-            self.postjob_log_file_name = "postjob.%d.error.txt" % (self.job_id)
+            self.postjob_log_file_name = "postjob.%s.error.txt" % (self.job_id)
         else:
-            self.postjob_log_file_name = "postjob.%d.%d.txt" % (self.job_id, self.crab_retry)
+            self.postjob_log_file_name = "postjob.%s.%d.txt" % (self.job_id, self.crab_retry)
 
         #it needs an existing webdir and the postjob_log_file_name
         self.handle_logfile()
@@ -1190,9 +1187,9 @@ class PostJob():
         ## Now that we have the job id and retry, we can set the job report file
         ## names.
         global G_JOB_REPORT_NAME
-        G_JOB_REPORT_NAME = "jobReport.json.%d" % (self.job_id)
+        G_JOB_REPORT_NAME = "jobReport.json.%s" % (self.job_id)
         global G_JOB_REPORT_NAME_NEW
-        G_JOB_REPORT_NAME_NEW = "job_fjr.%d.%d.json" % (self.job_id, self.crab_retry)
+        G_JOB_REPORT_NAME_NEW = "job_fjr.%s.%d.json" % (self.job_id, self.crab_retry)
 
         if first_pj_execution():
             self.handle_webdir()
@@ -1358,6 +1355,9 @@ class PostJob():
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def createSubjobs(self):
+        if '-' in self.job_id:
+            return
+
         ## Parse the lumis send to process
         self.logger.info("====== Starting to parse the lumi file")
         try:
@@ -1439,7 +1439,7 @@ class PostJob():
         ## Please see: https://github.com/dmwm/CRABServer/issues/4618
         used_job_ad = False
         if self.dag_clusterid == -1:
-            job_ad_file_name = os.path.join(".", "finished_jobs", "job.%d.%d" % (self.job_id, self.dag_retry))
+            job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.dag_retry))
         else:
             condor_history_dir = os.environ.get("_CONDOR_PER_JOB_HISTORY_DIR", "")
             job_ad_file_name = os.path.join(condor_history_dir, str("history." + str(self.dag_jobid)))
@@ -1455,7 +1455,7 @@ class PostJob():
                     try:
                         shutil.copy2(job_ad_file_name, './finished_jobs/')
                         job_ad_source = "history.%s" % (self.dag_jobid)
-                        job_ad_symlink = os.path.join(".", "finished_jobs", "job.%d.%d" % (self.job_id, self.dag_retry))
+                        job_ad_symlink = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.dag_retry))
                         os.symlink(job_ad_source, job_ad_symlink)
                         self.logger.info("       -----> Succeeded to copy job ad file.")
                     except:
@@ -1874,7 +1874,7 @@ class PostJob():
             if ifile['input_source_class'] != 'PoolSource' or ifile.get('input_type', '') != "primaryFiles":
                 continue
             ## Many of these parameters are not needed and are using fake/defined values
-            lfn = ifile['lfn'] + "_" + str(self.job_id) ## jobs can analyze the same input
+            lfn = ifile['lfn'] + "_" + self.job_id ## jobs can analyze the same input
             configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
                          "globalTag"       : "None",
                          "pandajobid"      : self.job_id,
@@ -2249,7 +2249,7 @@ class PostJob():
         state = states_dict.get(state, state)
         msg = "Setting Dashboard state to %s." % (state)
         params = {'MonitorID': self.reqname,
-                  'MonitorJobID': "%d_https://glidein.cern.ch/%d/%s_%d" \
+                  'MonitorJobID': "%s_https://glidein.cern.ch/%s/%s_%d" \
                                    % (self.job_id, self.job_id, \
                                       self.reqname.replace("_", ":"), \
                                       self.crab_retry),
@@ -2313,7 +2313,7 @@ class PostJob():
         """
         Calculate the retry number we're on. See the notes in PreJob.
         """
-        fname = "retry_info/job.%d.txt" % (self.job_id)
+        fname = "retry_info/job.%s.txt" % (self.job_id)
         if os.path.exists(fname):
             try:
                 with open(fname, 'r') as fd:
