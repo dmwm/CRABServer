@@ -31,9 +31,11 @@ class DataWorkflow(object):
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
 
-        self.splitArgMap = { "LumiBased" : "lumis_per_job",
-                        "FileBased" : "files_per_job",
-                        "EventBased" : "events_per_job",
+        self.splitArgMap = {
+                        "Automatic": "seconds_per_job",
+                        "LumiBased": "lumis_per_job",
+                        "FileBased": "files_per_job",
+                        "EventBased": "events_per_job",
                         "EventAwareLumiBased": "events_per_job"}
 
         self.Task = getDBinstance(config, 'TaskDB', 'Task')

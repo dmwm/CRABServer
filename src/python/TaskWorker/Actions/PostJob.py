@@ -1136,11 +1136,12 @@ class PostJob():
         self.source_dir          = args[6]
         self.dest_dir            = args[7]
         self.logs_arch_file_name = args[8]
+        self.stage = args[9]
         ## TODO: We can get the output files from the job ad where we have
         ## CRAB_EDMOutputFiles, CRAB_TFileOutputFiles and CRAB_AdditionalOutputFiles.
         ## (We only need to add the job_id in the file names).
         self.output_files_names  = []
-        for i in xrange(9, len(args)):
+        for i in xrange(10, len(args)):
             self.output_files_names.append(args[i])
 
         ## Get the DAG cluster ID. Needed to know whether the job has run or not.
@@ -1273,7 +1274,10 @@ class PostJob():
             #Print system environment and job classads
             self.print_env_and_ads()
         else:
-            self.createSubjobs()
+            if self.stage == 'probe':
+                self.createJobs()
+            elif self.stage == 'process':
+                self.createSubjobs()
 
         self.log_finish_msg(retval)
 
@@ -1354,11 +1358,50 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def createSubjobs(self):
-        if '-' in self.job_id:
-            return
+    def createJobs(self):
+        self.logger.info("====== Creating jobs")
+        with open('datadiscovery.pkl', 'rb') as fd:
+            dataset = pickle.load(fd)
+        with open('taskinformation.pkl', 'rb') as fd:
+            task = pickle.load(fd)
 
+        self.logger.error(task['tm_split_args'])
+        target = int(task['tm_split_args']['seconds_per_job'])
+        report = self.job_report['steps']['cmsRun']['performance']
+        events = int(target / float(report['cpu']['AvgEventTime']))
+        totalJobSeconds = float(report['cpu']['TotalJobTime'])
+
+        self.logger.info("Target runtime: {0}".format(target))
+        self.logger.info("CPU time per event: {0}".format(report['cpu']['AvgEventTime']))
+        self.logger.info("Resplitting with ~{0} events per job".format(events))
+
+        task['tm_split_algo'] = 'EventAwareLumiBased'
+        task['tm_split_args']['events_per_job'] = events
+
+        self.logger.info("dataset: %s" % str(dataset))
+        self.logger.info("task: %s" % str(task))
+        try:
+            config = Configuration()
+            config.TaskWorker = ConfigSection(name="TaskWorker")
+            config.TaskWorker.scratchDir = '.' # XXX
+            splitter = Splitter(config, server=None, resturi='')
+            split_result = splitter.execute(dataset, task=task)
+            self.logger.info("Splitting results:")
+            for g in split_result.result[0]:
+                msg = "Created jobgroup with length {0}".format(len(g.getJobs()))
+                self.logger.error(msg)
+
+        except TaskWorkerException:
+            self.logger.error("Error during splitting")
+        try:
+            creator = DagmanCreator(config, server=None, resturi='')
+            creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0, stage='process')
+        except TaskWorkerException:
+            self.logger.error('Error during subdag creation')
+
+    def createSubjobs(self):
         ## Parse the lumis send to process
+        self.logger.info("====== Creating subjobs")
         self.logger.info("====== Starting to parse the lumi file")
         try:
             tmpdir = tempfile.mkdtemp()
@@ -1412,7 +1455,7 @@ class PostJob():
             self.logger.error("Error during splitting")
         try:
             creator = DagmanCreator(config, server=None, resturi='')
-            creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0)
+            creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0, stage='tail')
         except TaskWorkerException:
             self.logger.error('Error during subdag creation')
 

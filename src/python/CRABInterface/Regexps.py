@@ -38,7 +38,7 @@ RX_ARCH      = re.compile(r"^(?=.{0,255}$)slc[0-9]{1}_[a-z0-9]+_gcc[a-z0-9]+(_[a
 RX_DATASET   = re.compile(DATASET_RE) #See https://github.com/dmwm/WMCore/issues/6054#issuecomment-135475550
 RX_LFNPRIMDS = re.compile(r"^%(primDS)s$" % lfnParts)
 RX_BLOCK     = re.compile(r"^(/[a-zA-Z0-9\.\-_]{1,100}){3}#[a-zA-Z0-9\.\-_]{1,100}$")
-RX_SPLIT     = re.compile(r"^FileBased|EventBased|LumiBased|EventAwareLumiBased$")
+RX_SPLIT     = re.compile(r"^Automatic|FileBased|EventBased|LumiBased|EventAwareLumiBased$")
 RX_CACHEURL  = re.compile(r"^https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
 RX_ADDFILE   = re.compile(r"^(?=.{0,255}$)([a-zA-Z0-9\-\._]+)$")
 # Can be a LFN or PFN (anything CMSSW accepts is fine here)
@@ -49,6 +49,7 @@ RX_DBSURL    = re.compile(r"^(?=.{0,255}$)https?://([-\w\.]*)\.cern\.ch+(:\d+)?(
 RX_PUBLICATION = re.compile(r"^[TF]")
 RX_VOPARAMS  = re.compile(r"^(?=.{0,255}$)[A-Za-z0-9]*$")
 RX_OUTFILES  = re.compile(r"^(?=.{0,255}$)%s$"%lfnParts['root'])
+RX_JOBID     = re.compile(r"^\d+(-\d+){0,2}$")
 RX_RUNS      = re.compile(r"^\d+$")
 RX_LUMIRANGE = re.compile(r"^\d+,\d+(,\d+,\d+)*$")
 RX_LUMILIST  = re.compile(r"^\d+(,\d+)*$")

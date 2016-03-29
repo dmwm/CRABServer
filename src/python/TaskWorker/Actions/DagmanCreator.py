@@ -50,7 +50,7 @@ NODE_STATUS_FILE node_state 30 ALWAYS-UPDATE
 DAG_FRAGMENT = """
 JOB Job{count} Job.{count}.submit
 SCRIPT PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {parent} {taskname} {backend}
-SCRIPT DEFER 4 1800 POST Job{count} dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES {taskname} {count} {tempDest} {outputDest} cmsRun_{count}.log.tar.gz {remoteOutputFiles}
+SCRIPT DEFER 4 1800 POST Job{count} dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES {taskname} {count} {tempDest} {outputDest} cmsRun_{count}.log.tar.gz {stage} {remoteOutputFiles}
 #PRE_SKIP Job{count} 3
 RETRY Job{count} {maxretries} UNLESS-EXIT 2
 VARS Job{count} count="{count}" runAndLumiMask="job_lumis_{count}.json" lheInputFiles="{lheInputFiles}" firstEvent="{firstEvent}" firstLumi="{firstLumi}" lastEvent="{lastEvent}" firstRun="{firstRun}" maxRuntime="{maxRuntime}" eventsPerLumi="{eventsPerLumi}" seeding="{seeding}" inputFiles="job_input_file_list_{count}.txt" scriptExe="{scriptExe}" scriptArgs="{scriptArgs}" +CRAB_localOutputFiles="\\"{localOutputFiles}\\"" +CRAB_DataBlock="\\"{block}\\"" +CRAB_Destination="\\"{destination}\\""
@@ -165,7 +165,8 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
 queue
 """
 
-SPLIT_ARG_MAP = { "LumiBased": "lumis_per_job",
+SPLIT_ARG_MAP = { "Automatic": "seconds_per_job",
+                  "LumiBased": "lumis_per_job",
                   "EventBased": "events_per_job",
                   "FileBased": "files_per_job",
                   "EventAwareLumiBased": "events_per_job",}
@@ -470,7 +471,7 @@ class DagmanCreator(TaskAction.TaskAction):
         return info
 
 
-    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, subjob=None):
+    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, subjob=None, stage='process'):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
@@ -550,6 +551,7 @@ class DagmanCreator(TaskAction.TaskAction):
                         'destination': pfns,
                         'scriptExe': task['tm_scriptexe'],
                         'scriptArgs': json.dumps(task['tm_scriptargs']).replace('"', r'\"\"'),
+                        'stage': stage,
                        }
             dagSpecs.append(nodeSpec)
             self.logger.debug(dagSpecs[-1])
@@ -561,6 +563,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         startjobid = kwargs.get('startjobid', 0)
         subjob = kwargs.get('subjob', None)
+        stage = kwargs.get('stage', 'process')
         self.logger.debug('starting createSubdag, kwargs are:')
         self.logger.debug(str(kwargs))
         dagSpecs = []
@@ -574,13 +577,19 @@ class DagmanCreator(TaskAction.TaskAction):
         ## In the future this parameter may be set by the user in the CRAB configuration
         ## file and we would take it from the Task DB.
         kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
-        kwargs['task']['max_runtime'] = getattr(self.config.TaskWorker, 'maxRuntime', -1)
 
         info = self.makeJobSubmit(kwargs['task'])
 
         outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
 
         os.chmod("CMSRunAnalysis.sh", 0o755)
+
+        kwargs['task']['max_runtime'] = -1
+
+        if kwargs['task']['tm_split_algo'] == 'Automatic':
+            kwargs['task']['max_runtime'] = 5 * 60
+            outfiles = []
+            stage = 'probe'
 
         # This config setting acts as a global black list
         global_blacklist = set(self.getBlacklistedSites())
@@ -723,7 +732,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 msg += " This is expected to result in DESIRED_SITES = %s" % (list(available))
                 self.logger.debug(msg)
 
-            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, list(blocks)[0], availablesites, datasites, outfiles, startjobid, subjob=subjob)
+            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, list(blocks)[0], availablesites, datasites, outfiles, startjobid, subjob=subjob, stage=stage)
             dagSpecs += jobgroupDagSpecs
 
         if not dagSpecs:

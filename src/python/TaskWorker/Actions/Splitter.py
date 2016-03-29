@@ -21,11 +21,6 @@ class Splitter(TaskAction):
     def execute(self, *args, **kwargs):
         wmwork = Workflow(name=kwargs['task']['tm_taskname'])
 
-        wmsubs = Subscription(fileset=args[0], workflow=wmwork,
-                               split_algo=kwargs['task']['tm_split_algo'],
-                               type=self.jobtypeMapper[kwargs['task']['tm_job_type']])
-        splitter = SplitterFactory()
-        jobfactory = splitter(subscription=wmsubs)
         splitparam = kwargs['task']['tm_split_args']
         splitparam['algorithm'] = kwargs['task']['tm_split_algo']
         if kwargs['task']['tm_job_type'] == 'Analysis':
@@ -35,12 +30,22 @@ class Splitter(TaskAction):
                 splitparam['total_lumis'] = kwargs['task']['tm_totalunits']
             elif kwargs['task']['tm_split_algo'] == 'EventAwareLumiBased':
                 splitparam['total_events'] = kwargs['task']['tm_totalunits']
+            elif kwargs['task']['tm_split_algo'] == 'Automatic':
+                splitparam['algorithm'] = 'FileBased'
+                splitparam['total_files'] = len(args[0].getFiles())
+                splitparam['files_per_job'] = len(args[0].getFiles())
         elif kwargs['task']['tm_job_type'] == 'PrivateMC':
             if 'tm_events_per_lumi' in kwargs['task'] and kwargs['task']['tm_events_per_lumi']:
                 splitparam['events_per_lumi'] = kwargs['task']['tm_events_per_lumi']
             if 'tm_generator' in kwargs['task'] and kwargs['task']['tm_generator'] == 'lhe':
                 splitparam['lheInputFiles'] = True
         splitparam['applyLumiCorrection'] = True
+
+        wmsubs = Subscription(fileset=args[0], workflow=wmwork,
+                               split_algo=splitparam['algorithm'],
+                               type=self.jobtypeMapper[kwargs['task']['tm_job_type']])
+        splitter = SplitterFactory()
+        jobfactory = splitter(subscription=wmsubs)
         factory = jobfactory(**splitparam)
         numJobs = sum([len(jobgroup.getJobs()) for jobgroup in factory])
         maxJobs = getattr(self.config.TaskWorker, 'maxJobsPerTask', 10000)

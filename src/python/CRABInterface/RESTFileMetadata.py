@@ -33,7 +33,7 @@ class RESTFileMetadata(RESTEntity):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
             validate_strlist("inparentlfns", param, safe, RX_PARENTLFN)
             validate_str("globalTag", param, safe, RX_GLOBALTAG, optional=True)
-            validate_str("jobid", param, safe, RX_RUNS, optional=True)
+            validate_str("jobid", param, safe, RX_JOBID, optional=True)
             #TODO: for backward compatibility. Get rid of the pandajobid once all jobs using it are done (one month after this gets released)
             #(The following five lines can be deleted)
             validate_num("pandajobid", param, safe, optional=True)
