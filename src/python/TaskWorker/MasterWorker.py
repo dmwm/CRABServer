@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/tenv python
 #external dependencies
 from __future__ import print_function
 import os
@@ -210,7 +210,7 @@ class MasterWorker(object):
         while True:
             pendingwork = self._getWork(limit=limit, getstatus='QUEUED')
             for task in pendingwork:
-                self.logger.debug("Failing QUEUED task %s", task['tm_task_name'])
+                self.logger.debug("Failing QUEUED task %s", task['tm_taskname'])
                 dummyWorktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
                 self.updateWork(task['tm_taskname'], task['tm_task_command'], failstatus)
             if not len(pendingwork):
