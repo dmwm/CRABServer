@@ -349,7 +349,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         configreq = {'workflow': kwargs['task']['tm_taskname'],
                      'status': "SUBMITTED",
-                     'subresource': 'success',}
+                     'subresource': 'success',
+                     'clusterid' : self.clusterId } #that's the condor cluster id of the dag (actually dag_bootstrap.sh that becomes that dag if everything goes well)
         self.logger.debug("Pushing information centrally %s", configreq)
         data = urllib.urlencode(configreq)
         self.server.post(self.resturi, data=data)

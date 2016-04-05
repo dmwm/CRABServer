@@ -37,6 +37,7 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("subresource", param, safe, RX_SUBPOSTWORKER, optional=True)
             validate_num("limit", param, safe, optional=True)
+            validate_num("clusterid", param, safe, optional=True) #clusterid of the dag
             # possible combinations to check
             # 1) taskname + status
             # 2) taskname + status + failure
@@ -55,7 +56,7 @@ class RESTWorkerWorkflow(RESTEntity):
 
 
     @restcall
-    def post(self, workflow, status, command, subresource, failure, resubmittedjobs, getstatus, workername, limit):
+    def post(self, workflow, status, command, subresource, failure, resubmittedjobs, getstatus, workername, limit, clusterid):
         """ Updates task information """
         if failure is not None:
             try:
@@ -70,9 +71,9 @@ class RESTWorkerWorkflow(RESTEntity):
                   "failure": {"args": (self.Task.SetFailedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
                                                                                 "failure": [failure],
                                                                                "tm_taskname": [workflow]}},
-                  #Used in DagmanSubmitter?
                   "success": {"args": (self.Task.SetInjectedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
                                                                                             "tm_taskname": [workflow],
+                                                                                            "clusterid": [clusterid],
                                                                                             "resubmitted_jobs": [str(resubmittedjobs)]}},
                   "process": {"args": (self.Task.UpdateWorker_sql,), "method": self.api.modifynocheck, "kwargs": {"tw_name": [workername],
                                                                                                    "get_status": [getstatus],
