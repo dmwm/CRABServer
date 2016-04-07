@@ -49,7 +49,7 @@ RX_DBSURL    = re.compile(r"^(?=.{0,255}$)https?://([-\w\.]*)\.cern\.ch+(:\d+)?(
 RX_PUBLICATION = re.compile(r"^[TF]")
 RX_VOPARAMS  = re.compile(r"^(?=.{0,255}$)[A-Za-z0-9]*$")
 RX_OUTFILES  = re.compile(r"^(?=.{0,255}$)%s$"%lfnParts['root'])
-RX_JOBID     = re.compile(r"^\d+(-\d+){0,2}$")
+RX_JOBID     = re.compile(r"^\d+(-\d+){0,1}$")
 RX_RUNS      = re.compile(r"^\d+$")
 RX_LUMIRANGE = re.compile(r"^\d+,\d+(,\d+,\d+)*$")
 RX_LUMILIST  = re.compile(r"^\d+(,\d+)*$")

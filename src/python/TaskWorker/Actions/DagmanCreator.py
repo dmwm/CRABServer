@@ -58,8 +58,8 @@ ABORT-DAG-ON Job{count} 3
 """
 
 SUBDAG_FRAGMENT = """
-SUBDAG EXTERNAL Job{parent}SubJobs RunJobs{parent}.subdag
-PARENT Job{count} CHILD Job{parent}SubJobs
+SUBDAG EXTERNAL Job{count}SubJobs RunJobs{count}.subdag
+PARENT Job{count} CHILD Job{count}SubJobs
 """
 
 JOB_SUBMIT = \
@@ -527,7 +527,7 @@ class DagmanCreator(TaskAction.TaskAction):
             pfns = ["log/cmsRun_{0}.log.tar.gz".format(count)] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
             nodeSpec = {'count': count,
-                        'parent': str(i),
+                        'parent': '0' if stage == 'process' else str(i),
                         'maxretries': task['numautomjobretries'],
                         'taskname': task['tm_taskname'],
                         'backend': os.environ.get('HOSTNAME', ''),
@@ -578,19 +578,25 @@ class DagmanCreator(TaskAction.TaskAction):
         ## file and we would take it from the Task DB.
         kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
 
-        realjob = stage is not 'probe'
+        kwargs['task']['max_runtime'] = -1
+        if kwargs['task']['tm_split_algo'] == 'Automatic':
+            kwargs['task']['max_runtime'] = 5 * 60
+            outfiles = []
+            stage = 'probe'
+
+        if stage == 'probe':
+            parent = None
+            realjob = False
+            startjobid = -1
+        else:
+            parent = startjobid
+            realjob = True
+
         info = self.makeJobSubmit(kwargs['task'], realjob)
 
         outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
 
         os.chmod("CMSRunAnalysis.sh", 0o755)
-
-        kwargs['task']['max_runtime'] = -1
-
-        if kwargs['task']['tm_split_algo'] == 'Automatic':
-            kwargs['task']['max_runtime'] = 5 * 60
-            outfiles = []
-            stage = 'probe'
 
         # This config setting acts as a global black list
         global_blacklist = set(self.getBlacklistedSites())
@@ -751,12 +757,12 @@ class DagmanCreator(TaskAction.TaskAction):
 
         ## Write down the DAG as needed by DAGMan.
         dag = DAG_HEADER.format(
-                nodestate='' if subjob is None else '.{0}'.format(startjobid),
+                nodestate='' if not parent else '.{0}'.format(parent),
                 resthost=kwargs['task']['resthost'],
                 resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
         for dagSpec in dagSpecs:
             dag += DAG_FRAGMENT.format(**dagSpec)
-            if subjob is None:
+            if stage in ('probe', 'process'):
                 dag += SUBDAG_FRAGMENT.format(**dagSpec)
                 subdag = "RunJobs{0}.subdag".format(dagSpec['count'])
                 with open(subdag, "w") as fd:
@@ -802,7 +808,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 tfd2.close()
                 shutil.rmtree(tempDir2)
 
-        if subjob is None:
+        if stage in ('probe', 'conventional'):
             name = "RunJobs.dag"
             ## Cache data discovery
             with open("datadiscovery.pkl", "wb") as fd:
@@ -819,7 +825,7 @@ class DagmanCreator(TaskAction.TaskAction):
             with open("site.ad.json", "w") as fd:
                 json.dump(siteinfo, fd)
         else:
-            name = "RunJobs{0}.subdag".format(dagSpec['parent'])
+            name = "RunJobs{0}.subdag".format(parent)
 
         ## Save the DAG into a file.
         with open(name, "w") as fd:

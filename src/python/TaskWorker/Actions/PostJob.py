@@ -1396,7 +1396,7 @@ class PostJob():
             self.logger.error("Error during splitting")
         try:
             creator = DagmanCreator(config, server=None, resturi='')
-            creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0, stage='process')
+            creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, stage='process')
         except TaskWorkerException:
             self.logger.error('Error during subdag creation')
 
