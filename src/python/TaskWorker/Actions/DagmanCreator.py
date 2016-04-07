@@ -39,7 +39,7 @@ from ApmonIf import ApmonIf
 
 DAG_HEADER = """
 
-NODE_STATUS_FILE node_state 30 ALWAYS-UPDATE
+NODE_STATUS_FILE node_state{nodestate} 30 ALWAYS-UPDATE
 
 # NOTE: a file must be present, but 'noop' makes it not be read.
 #FINAL FinalCleanup Job.1.submit NOOP
@@ -749,7 +749,10 @@ class DagmanCreator(TaskAction.TaskAction):
             self.logger.warning(msg)
 
         ## Write down the DAG as needed by DAGMan.
-        dag = DAG_HEADER.format(resthost=kwargs['task']['resthost'], resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
+        dag = DAG_HEADER.format(
+                nodestate='' if subjob is None else '.{0}'.format(startjobid),
+                resthost=kwargs['task']['resthost'],
+                resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
         for dagSpec in dagSpecs:
             dag += DAG_FRAGMENT.format(**dagSpec)
             if subjob is None:
