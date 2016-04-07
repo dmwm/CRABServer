@@ -146,7 +146,7 @@ elif [ ! -r $X509_USER_PROXY ]; then
     EXIT_STATUS=6
 else
     for f in *.subdag; do
-        condor_submit_dag -no_submit -insert_sub_file subdag.ad $f
+        condor_submit_dag -AutoRescue 0 -MaxPre 20 -MaxIdle 1000 -MaxPost $MAX_POST -no_submit -insert_sub_file subdag.ad -append '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG=$PWD/$f.dagman.out")' $f
         touch $f.dagman.out
     done
 
