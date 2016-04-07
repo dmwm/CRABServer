@@ -471,7 +471,7 @@ class DagmanCreator(TaskAction.TaskAction):
         return info
 
 
-    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, subjob=None, stage='process'):
+    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, subjob=None, stage='conventional'):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
@@ -563,7 +563,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         startjobid = kwargs.get('startjobid', 0)
         subjob = kwargs.get('subjob', None)
-        stage = kwargs.get('stage', 'process')
+        stage = kwargs.get('stage', 'conventional')
         self.logger.debug('starting createSubdag, kwargs are:')
         self.logger.debug(str(kwargs))
         dagSpecs = []
