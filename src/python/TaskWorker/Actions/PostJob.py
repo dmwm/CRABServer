@@ -1274,6 +1274,9 @@ class PostJob():
             #Print system environment and job classads
             self.print_env_and_ads()
         else:
+            ## Possible stages: probe, process, tail for automatic
+            ## splitting.  All other splitting modes have a stage called
+            ## conventional.
             if self.stage == 'probe':
                 self.createJobs()
             elif self.stage == 'process':
@@ -1378,8 +1381,6 @@ class PostJob():
         task['tm_split_algo'] = 'EventAwareLumiBased'
         task['tm_split_args']['events_per_job'] = events
 
-        self.logger.info("dataset: %s" % str(dataset))
-        self.logger.info("task: %s" % str(task))
         try:
             config = Configuration()
             config.TaskWorker = ConfigSection(name="TaskWorker")
