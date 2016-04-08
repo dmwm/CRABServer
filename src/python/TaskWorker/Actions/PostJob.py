@@ -1372,7 +1372,8 @@ class PostJob():
         self.logger.error(task['tm_split_args'])
         target = int(task['tm_split_args']['seconds_per_job'])
         report = self.job_report['steps']['cmsRun']['performance']
-        events = int(target / float(report['cpu']['AvgEventTime']))
+        # Build in a 50% error margin in the runtime to not create too many tails
+        events = int(0.66 * target / float(report['cpu']['AvgEventTime']))
         totalJobSeconds = float(report['cpu']['TotalJobTime'])
 
         self.logger.info("Target runtime: {0}".format(target))
