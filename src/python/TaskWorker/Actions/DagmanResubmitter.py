@@ -92,7 +92,7 @@ class DagmanResubmitter(TaskAction):
         # Release the DAG
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(workflow)
 
-        ## Calculate new parameters for resubmited jobs. These parameters will
+        ## Calculate new parameters for resubmitted jobs. These parameters will
         ## be (re)written in the _CONDOR_JOB_AD when we do schedd.edit() below.
         ad = classad.ClassAd()
         params = {'CRAB_ResubmitList'  : 'jobids',
@@ -128,9 +128,9 @@ class DagmanResubmitter(TaskAction):
                     schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
                     schedd.act(htcondor.JobAction.Release, rootConst)
         elif overwrite:
+            self.logger.debug("Resubmitting under condition overwrite = True")
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
                 if not parent:
-                    self.logger.debug("Resubmitting under condition overwrite = True")
                     for adparam, taskparam in params.iteritems():
                         if taskparam in ad:
                             if taskparam == 'jobids' and len(list(ad[taskparam])) == 0:
@@ -145,9 +145,9 @@ class DagmanResubmitter(TaskAction):
             ## This should actually not occur anymore in CRAB 3.3.16 or above, because
             ## starting from CRAB 3.3.16 the resubmission parameters are written to the
             ## Task DB with value != None, so the overwrite variable should never be False.
+            self.logger.debug("Resubmitting under condition overwrite = False")
             with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
                 if not parent:
-                    self.logger.debug("Resubmitting under condition overwrite = False")
                     schedd.edit(rootConst, "HoldKillSig", 'SIGKILL')
                     schedd.edit(rootConst, "CRAB_ResubmitList", classad.ExprTree("true"))
                     schedd.act(htcondor.JobAction.Hold, rootConst)
