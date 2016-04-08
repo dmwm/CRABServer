@@ -760,6 +760,9 @@ class DagmanCreator(TaskAction.TaskAction):
                 nodestate='' if not parent else '.{0}'.format(parent),
                 resthost=kwargs['task']['resthost'],
                 resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
+        if stage == 'probe':
+            # We want only one probe job
+            dagSpecs = dagSpecs[:1]
         for dagSpec in dagSpecs:
             dag += DAG_FRAGMENT.format(**dagSpec)
             if stage in ('probe', 'process'):
