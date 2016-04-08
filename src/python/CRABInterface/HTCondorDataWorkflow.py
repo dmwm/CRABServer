@@ -377,15 +377,16 @@ class HTCondorDataWorkflow(DataWorkflow):
            :return: a workflow status summary document"""
 
         #Empty results
-        result = {"status"           : '',
-                  "taskFailureMsg"   : '',
-                  "taskWarningMsg"   : [],
+        result = {"status" : '',
+                  "taskFailureMsg" : '',
+                  "taskWarningMsg" : [],
                   "statusFailureMsg" : '',
-                  "jobsPerStatus"    : {},
-                  "totalJobdefs"     : 0,
-                  "jobList"          : [],
-                  "schedd"           : '',
-                  "collector"        : '' }
+                  "jobs" : [],
+                  "schedd" : '',
+                  "collector" : '',
+                  'outdatasets' : [],
+                  'publication' : None,
+                  'publicationFailures' : None}
 
         # First, verify the task has been submitted by the backend.
         self.logger.info("Got status request for workflow %s" % workflow)
@@ -456,7 +457,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## Here we start to retrieve the jobs statuses.
         jobsPerStatus = {}
         taskJobCount = 0
-        taskStatus = {}
+        joblist = {}
         jobList = []
         results = []
         # task_codes are used if condor_q command is done to retrieve task status
@@ -475,50 +476,48 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         self.logger.info("Getting status for workflow %s using node state file." % workflow)
         try:
-            taskStatus = self.taskWebStatus(row.user_webdir, verbose, result)
+            joblist = self.taskWebStatus(row.user_webdir, verbose, result)
         except ExecutionError as ee:
             ## The old logic will call again taskWebStatus, probably failing for the same
             ## reason. So no need to try the old logic; we can already return.
             addStatusAndFailure(result, status = 'UNKNOWN', failure = ee.info)
             return [result]
 
-        if 'DagStatus' in taskStatus:
-            del taskStatus['DagStatus']
+        if 'DagStatus' in joblist:
+            del joblist['DagStatus']
 
         for i in range(1, taskJobCount+1):
             i = str(i)
-            if i not in taskStatus:
+            if i not in joblist:
 #                if taskStatusCode == 5:
-                taskStatus[i] = {'State': 'unsubmitted'}
-#                    taskStatus[i] = {'State': 'killed'}
+                joblist[i] = {'State': 'unsubmitted'}
+#                    joblist[i] = {'State': 'killed'}
 #                else:
-#                    taskStatus[i] = {'State': 'unsubmitted'}
+#                    joblist[i] = {'State': 'unsubmitted'}
 
-        for job, info in taskStatus.items():
-#            job = int(job)
-            status = info['State']
-            jobsPerStatus.setdefault(status, 0)
-            jobsPerStatus[status] += 1
-            jobList.append((status, job))
-        result['jobsPerStatus'] = jobsPerStatus
-        result['jobList'] = jobList
-        result['jobs'] = taskStatus
+        result['jobs'] = joblist
 
         #Always returning ASOURL also, it is required for kill, resubmit
-        self.logger.info("ASO: %s" % row.asourl)
+        self.logger.info("ASO: %s", row.asourl)
         result['ASOURL'] = row.asourl
 
+        def hasFinishedJobs(joblist):
+            """ Return True if at leas a job finished """
+            for jobid, statusDict in joblist.iteritems():
+                if jobid == '0':
+                    continue
+                if statusDict['State'] == 'finished':
+                    return True
+            return False
         ## Retrieve publication information.
         publicationInfo = {}
-        if (row.publication == 'T' and 'finished' in result['jobsPerStatus']):
+        if (row.publication == 'T' and hasFinishedJobs(joblist)):
             #let's default asodb to asynctransfer, for old task this is empty!
             asodb = row.asodb or 'asynctransfer'
-            publicationInfo = self.publicationStatus(workflow, row.asourl, asodb)
             self.logger.info("Publication status for workflow %s done" % workflow)
         elif (row.publication == 'F'):
             publicationInfo['status'] = {'disabled': []}
-        else:
-            self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.publication, result['jobsPerStatus'].get('finished', 0)))
+
         result['publication'] = publicationInfo.get('status', {})
         result['publicationFailures'] = publicationInfo.get('failure_reasons', {})
 
@@ -745,12 +744,9 @@ class HTCondorDataWorkflow(DataWorkflow):
                     if event['ReturnValue'] == 0:
                         nodes[node]['State'] = 'finished'
                     else:
-                        #Hardcoding the #retries to 2 until we move the max retries from TW config to REST db
-                        #Also, this might not be the way we want to do, it feels like it is error prone
-                        nodes[node]['State'] = 'cooloff' if nodes[node]['Retries'] < 2 else 'failed'
+                        nodes[node]['State'] = 'cooloff'
                 else:
-                    #See comment above
-                    nodes[node]['State'] = 'cooloff' if nodes[node]['Retries'] < 2 else 'failed'
+                    nodes[node]['State'] = 'cooloff'
             elif event['MyType'] == 'PostScriptTerminatedEvent':
                 m = self.node_name2_re.match(event['DAGNodeName'])
                 if m:
