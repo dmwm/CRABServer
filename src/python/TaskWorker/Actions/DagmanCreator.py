@@ -579,8 +579,8 @@ class DagmanCreator(TaskAction.TaskAction):
         ## file and we would take it from the Task DB.
         kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
 
-        kwargs['task']['max_runtime'] = -1
-        if kwargs['task']['tm_split_algo'] == 'Automatic':
+        kwargs['task']['max_runtime'] = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
+        if kwargs['task']['tm_split_algo'] == 'Automatic' and stage == 'conventional':
             kwargs['task']['max_runtime'] = 5 * 60
             outfiles = []
             stage = 'probe'
