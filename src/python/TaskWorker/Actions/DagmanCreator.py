@@ -39,7 +39,7 @@ from ApmonIf import ApmonIf
 
 DAG_HEADER = """
 
-NODE_STATUS_FILE node_state 30 ALWAYS-UPDATE
+NODE_STATUS_FILE node_state{nodestate} 30 ALWAYS-UPDATE
 
 # NOTE: a file must be present, but 'noop' makes it not be read.
 #FINAL FinalCleanup Job.1.submit NOOP
@@ -58,8 +58,8 @@ ABORT-DAG-ON Job{count} 3
 """
 
 SUBDAG_FRAGMENT = """
-SUBDAG EXTERNAL Job{parent}SubJobs RunJobs{parent}.subdag
-PARENT Job{count} CHILD Job{parent}SubJobs
+SUBDAG EXTERNAL Job{count}SubJobs RunJobs{count}.subdag
+PARENT Job{count} CHILD Job{count}SubJobs
 """
 
 JOB_SUBMIT = \
@@ -382,7 +382,7 @@ class DagmanCreator(TaskAction.TaskAction):
         return self.task['tm_activity']
 
 
-    def makeJobSubmit(self, task):
+    def makeJobSubmit(self, task, realjob):
         """
         Create the submit file.  This is reused by all jobs in the task; differences
         between the jobs are taken care of in the makeDagSpecs.
@@ -415,7 +415,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['asyncdest'] = info['tm_asyncdest']
         info['dbsurl'] = info['tm_dbs_url']
         info['publishdbsurl'] = info['tm_publish_dbs_url']
-        info['publication'] = 1 if info['tm_publication'] == 'T' else 0
+        info['publication'] = 1 if realjob and info['tm_publication'] == 'T' else 0
         info['userdn'] = info['tm_user_dn']
         info['requestname'] = string.replace(task['tm_taskname'], '"', '')
         info['savelogsflag'] = 1 if info['tm_save_logs'] == 'T' else 0
@@ -439,7 +439,7 @@ class DagmanCreator(TaskAction.TaskAction):
         # TODO: pass through these correctly.
         info['runs'] = []
         info['lumis'] = []
-        info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
+        info['saveoutput'] = 1 if realjob and info['tm_transfer_outputs'] == 'T' else 0
         info['accounting_group'] = 'analysis.%s' % info['userhn']
         info = transform_strings(info)
         info['faillimit'] = task['tm_fail_limit']
@@ -471,7 +471,7 @@ class DagmanCreator(TaskAction.TaskAction):
         return info
 
 
-    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, subjob=None, stage='process'):
+    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, subjob=None, stage='conventional'):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
@@ -527,7 +527,7 @@ class DagmanCreator(TaskAction.TaskAction):
             pfns = ["log/cmsRun_{0}.log.tar.gz".format(count)] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
             nodeSpec = {'count': count,
-                        'parent': str(i),
+                        'parent': '0' if stage == 'process' else str(i),
                         'maxretries': task['numautomjobretries'],
                         'taskname': task['tm_taskname'],
                         'backend': os.environ.get('HOSTNAME', ''),
@@ -563,7 +563,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         startjobid = kwargs.get('startjobid', 0)
         subjob = kwargs.get('subjob', None)
-        stage = kwargs.get('stage', 'process')
+        stage = kwargs.get('stage', 'conventional')
         self.logger.debug('starting createSubdag, kwargs are:')
         self.logger.debug(str(kwargs))
         dagSpecs = []
@@ -578,18 +578,25 @@ class DagmanCreator(TaskAction.TaskAction):
         ## file and we would take it from the Task DB.
         kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
 
-        info = self.makeJobSubmit(kwargs['task'])
-
-        outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
-
-        os.chmod("CMSRunAnalysis.sh", 0o755)
-
         kwargs['task']['max_runtime'] = -1
-
         if kwargs['task']['tm_split_algo'] == 'Automatic':
             kwargs['task']['max_runtime'] = 5 * 60
             outfiles = []
             stage = 'probe'
+
+        if stage == 'probe':
+            parent = None
+            realjob = False
+            startjobid = -1
+        else:
+            parent = startjobid
+            realjob = True
+
+        info = self.makeJobSubmit(kwargs['task'], realjob)
+
+        outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
+
+        os.chmod("CMSRunAnalysis.sh", 0o755)
 
         # This config setting acts as a global black list
         global_blacklist = set(self.getBlacklistedSites())
@@ -749,10 +756,13 @@ class DagmanCreator(TaskAction.TaskAction):
             self.logger.warning(msg)
 
         ## Write down the DAG as needed by DAGMan.
-        dag = DAG_HEADER.format(resthost=kwargs['task']['resthost'], resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
+        dag = DAG_HEADER.format(
+                nodestate='' if not parent else '.{0}'.format(parent),
+                resthost=kwargs['task']['resthost'],
+                resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
         for dagSpec in dagSpecs:
             dag += DAG_FRAGMENT.format(**dagSpec)
-            if subjob is None:
+            if stage in ('probe', 'process'):
                 dag += SUBDAG_FRAGMENT.format(**dagSpec)
                 subdag = "RunJobs{0}.subdag".format(dagSpec['count'])
                 with open(subdag, "w") as fd:
@@ -798,7 +808,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 tfd2.close()
                 shutil.rmtree(tempDir2)
 
-        if subjob is None:
+        if stage in ('probe', 'conventional'):
             name = "RunJobs.dag"
             ## Cache data discovery
             with open("datadiscovery.pkl", "wb") as fd:
@@ -815,7 +825,7 @@ class DagmanCreator(TaskAction.TaskAction):
             with open("site.ad.json", "w") as fd:
                 json.dump(siteinfo, fd)
         else:
-            name = "RunJobs{0}.subdag".format(dagSpec['parent'])
+            name = "RunJobs{0}.subdag".format(parent)
 
         ## Save the DAG into a file.
         with open(name, "w") as fd:

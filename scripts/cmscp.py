@@ -919,7 +919,7 @@ def upload_log_file_metadata(dest_temp_lfn, dest_lfn):
             print(msg)
             return 80000, msg
     configreq = {'taskname'        : G_JOB_AD['CRAB_ReqName'],
-                 'pandajobid'      : G_JOB_AD['CRAB_Id'],
+                 'jobid'           : G_JOB_AD['CRAB_Id'],
                  'outsize'         : int(get_from_job_report('log_size', 0)),
                  'publishdataname' : G_JOB_AD['CRAB_PublishName'],
                  'appver'          : G_JOB_AD['CRAB_JobSW'],
@@ -1184,7 +1184,7 @@ def main():
     ##--------------------------------------------------------------------------
     ## Set the json job report name.
     global G_JOB_REPORT_NAME
-    G_JOB_REPORT_NAME = 'jobReport.json.%d' % G_JOB_AD['CRAB_Id']
+    G_JOB_REPORT_NAME = 'jobReport.json.%s' % G_JOB_AD['CRAB_Id']
     ## Load the json job report and make sure it has the expected structure.
     condition = no_condition
     if skip['job_report_validation']:
@@ -1275,7 +1275,10 @@ def main():
 
     ## Modify the stageout temporary and final directory by:
     ## a) adding a four-digit counter;
-    counter = "%04d" % (G_JOB_AD['CRAB_Id'] / 1000)
+    jid = G_JOB_AD['CRAB_Id']
+    if isinstance(jid, basestring):
+        jid = int(jid.split('-')[1])
+    counter = "%04d" % (jid / 1000)
     dest_temp_dir = os.path.join(dest_temp_dir, counter)
     dest_final_dir = os.path.join(dest_final_dir, counter)
     ## b) adding a 'failed' subdirectory in case cmsRun failed.
