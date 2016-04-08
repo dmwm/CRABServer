@@ -145,11 +145,6 @@ elif [ ! -r $X509_USER_PROXY ]; then
     condor_qedit $CONDOR_ID DagmanHoldReason "'The proxy is unreadable for some reason'"
     EXIT_STATUS=6
 else
-    for f in *.subdag; do
-        condor_submit_dag -AutoRescue 0 -MaxPre 20 -MaxIdle 1000 -MaxPost $MAX_POST -no_submit -insert_sub_file subdag.ad -append '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG=$PWD/$f.dagman.out")' $f
-        touch $f.dagman.out
-    done
-
     # Documentation about condor_dagman: http://research.cs.wisc.edu/htcondor/manual/v8.3/condor_dagman.html
     # In particular:
     # -autorescue 0|1
@@ -162,6 +157,11 @@ else
     # see subsections 2.10.9 "The Rescue DAG" and 2.10.10 "DAG Recovery".
     #
     # Re-nice the process so, even when we churn through lots of processes, we never starve the schedd or shadows for cycles.
+    #
+    # **Warning**
+    # This is also done in the PostJob to submit subdags for tail-catching
+    # and automated splitting.  Values below will also have to be changed
+    # there in (createSubdagSubmission)!
     exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -DoRecov -AutoRescue 0 -MaxPre 20 -MaxIdle 1000 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
     EXIT_STATUS=$?
 fi

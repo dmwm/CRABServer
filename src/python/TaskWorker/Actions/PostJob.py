@@ -76,6 +76,7 @@ import unittest
 import datetime
 import tempfile
 import traceback
+import subprocess
 import logging.handlers
 from httplib import HTTPException
 
@@ -1396,7 +1397,8 @@ class PostJob():
             self.logger.error("Error during splitting")
         try:
             creator = DagmanCreator(config, server=None, resturi='')
-            creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, stage='process')
+            _, _, subdags = creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, stage='process')
+            self.createSubdagSubmission(subdags)
         except TaskWorkerException:
             self.logger.error('Error during subdag creation')
 
@@ -1456,9 +1458,17 @@ class PostJob():
             self.logger.error("Error during splitting")
         try:
             creator = DagmanCreator(config, server=None, resturi='')
-            creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0, stage='tail')
+            _, _, subdags = creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0, stage='tail')
+            self.createSubdagSubmission(subdags)
         except TaskWorkerException:
             self.logger.error('Error during subdag creation')
+
+    def createSubdagSubmission(self, subdags):
+        for dag in subdags:
+            subprocess.check_call(['condor_submit_dag', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', '1000',
+                '-MaxPost', str(self.job_ad.get('CRAB_MaxPost', 20)), '-no_submit', '-insert_sub_file', 'subdag.ad',
+                '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), dag), dag])
+
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
