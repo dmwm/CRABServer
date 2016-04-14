@@ -1277,7 +1277,7 @@ def main():
     ## a) adding a four-digit counter;
     jid = G_JOB_AD['CRAB_Id']
     if isinstance(jid, basestring):
-        jid = int(jid.split('-')[1])
+        jid = int(jid.split('-')[0])
     counter = "%04d" % (jid / 1000)
     dest_temp_dir = os.path.join(dest_temp_dir, counter)
     dest_final_dir = os.path.join(dest_final_dir, counter)

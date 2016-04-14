@@ -382,7 +382,7 @@ class DagmanCreator(TaskAction.TaskAction):
         return self.task['tm_activity']
 
 
-    def makeJobSubmit(self, task, realjob):
+    def makeJobSubmit(self, task):
         """
         Create the submit file.  This is reused by all jobs in the task; differences
         between the jobs are taken care of in the makeDagSpecs.
@@ -415,7 +415,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['asyncdest'] = info['tm_asyncdest']
         info['dbsurl'] = info['tm_dbs_url']
         info['publishdbsurl'] = info['tm_publish_dbs_url']
-        info['publication'] = 1 if realjob and info['tm_publication'] == 'T' else 0
+        info['publication'] = 1 if info['tm_publication'] == 'T' else 0
         info['userdn'] = info['tm_user_dn']
         info['requestname'] = string.replace(task['tm_taskname'], '"', '')
         info['savelogsflag'] = 1 if info['tm_save_logs'] == 'T' else 0
@@ -439,7 +439,7 @@ class DagmanCreator(TaskAction.TaskAction):
         # TODO: pass through these correctly.
         info['runs'] = []
         info['lumis'] = []
-        info['saveoutput'] = 1 if realjob and info['tm_transfer_outputs'] == 'T' else 0
+        info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
         info['accounting_group'] = 'analysis.%s' % info['userhn']
         info = transform_strings(info)
         info['faillimit'] = task['tm_fail_limit']
@@ -508,14 +508,15 @@ class DagmanCreator(TaskAction.TaskAction):
             siteinfo[count] = groupid
             remoteOutputFiles = []
             localOutputFiles = []
-            for origFile in outfiles:
-                info = origFile.rsplit(".", 1)
-                if len(info) == 2:
-                    fileName = "%s_%s.%s" % (info[0], count, info[1])
-                else:
-                    fileName = "%s_%s" % (origFile, count)
-                remoteOutputFiles.append("%s" % fileName)
-                localOutputFiles.append("%s=%s" % (origFile, fileName))
+            if stage != 'probe':
+                for origFile in outfiles:
+                    info = origFile.rsplit(".", 1)
+                    if len(info) == 2:
+                        fileName = "%s_%s.%s" % (info[0], count, info[1])
+                    else:
+                        fileName = "%s_%s" % (origFile, count)
+                    remoteOutputFiles.append("%s" % fileName)
+                    localOutputFiles.append("%s=%s" % (origFile, fileName))
             remoteOutputFilesStr = " ".join(remoteOutputFiles)
             localOutputFiles = ", ".join(localOutputFiles)
             counter = "%04d" % (i / 1000)
@@ -578,21 +579,19 @@ class DagmanCreator(TaskAction.TaskAction):
         ## file and we would take it from the Task DB.
         kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
 
-        kwargs['task']['max_runtime'] = -1
-        if kwargs['task']['tm_split_algo'] == 'Automatic':
+        kwargs['task']['max_runtime'] = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
+        if kwargs['task']['tm_split_algo'] == 'Automatic' and stage == 'conventional':
             kwargs['task']['max_runtime'] = 5 * 60
             outfiles = []
             stage = 'probe'
 
         if stage == 'probe':
             parent = None
-            realjob = False
             startjobid = -1
         else:
             parent = startjobid
-            realjob = True
 
-        info = self.makeJobSubmit(kwargs['task'], realjob)
+        info = self.makeJobSubmit(kwargs['task'])
 
         outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
 
@@ -760,6 +759,9 @@ class DagmanCreator(TaskAction.TaskAction):
                 nodestate='' if not parent else '.{0}'.format(parent),
                 resthost=kwargs['task']['resthost'],
                 resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
+        if stage == 'probe':
+            # We want only one probe job
+            dagSpecs = dagSpecs[:1]
         for dagSpec in dagSpecs:
             dag += DAG_FRAGMENT.format(**dagSpec)
             if stage in ('probe', 'process'):

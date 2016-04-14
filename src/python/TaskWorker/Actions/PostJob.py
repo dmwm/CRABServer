@@ -76,6 +76,7 @@ import unittest
 import datetime
 import tempfile
 import traceback
+import subprocess
 import logging.handlers
 from httplib import HTTPException
 
@@ -1371,7 +1372,8 @@ class PostJob():
         self.logger.error(task['tm_split_args'])
         target = int(task['tm_split_args']['seconds_per_job'])
         report = self.job_report['steps']['cmsRun']['performance']
-        events = int(target / float(report['cpu']['AvgEventTime']))
+        # Build in a 50% error margin in the runtime to not create too many tails
+        events = int(0.66 * target / float(report['cpu']['AvgEventTime']))
         totalJobSeconds = float(report['cpu']['TotalJobTime'])
 
         self.logger.info("Target runtime: {0}".format(target))
@@ -1396,7 +1398,9 @@ class PostJob():
             self.logger.error("Error during splitting")
         try:
             creator = DagmanCreator(config, server=None, resturi='')
-            creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, stage='process')
+            _, _, subdags = creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, stage='process')
+            subdags.append('RunJobs0.subdag')
+            self.createSubdagSubmission(subdags)
         except TaskWorkerException:
             self.logger.error('Error during subdag creation')
 
@@ -1459,6 +1463,13 @@ class PostJob():
             creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0, stage='tail')
         except TaskWorkerException:
             self.logger.error('Error during subdag creation')
+
+    def createSubdagSubmission(self, subdags):
+        for dag in subdags:
+            subprocess.check_call(['condor_submit_dag', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', '1000',
+                '-MaxPost', str(self.job_ad.get('CRAB_MaxPost', 20)), '-no_submit', '-insert_sub_file', 'subdag.ad',
+                '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), dag), dag])
+
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
