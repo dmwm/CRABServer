@@ -345,8 +345,9 @@ class RetryJob(object):
             if cvmfs_issue:
                 raise RecoverableError("CVMFS issue detected.")
 
-        # Another difficult case -- so far, SIGKILL has only been observed at T2_CH_CERN, and it has nothing to do
-        # with an issue of the job itself.
+        # Another difficult case -- so far, SIGKILL has mostly been observed at T2_CH_CERN, and it has nothing to do
+        # with an issue of the job itself. Typically, this isn't the user code's fault
+        # it was often a site or pilot misconfiguration that led to the pilot exhausting its allocated runtime.
         # We should revisit this issue if we see SIGKILL happening for other cases that are the users' fault.
         if exitCode == 137:
             raise RecoverableError("SIGKILL; likely an unrelated batch system kill.")
