@@ -246,8 +246,8 @@ def parseAd():
         jobad[info[0]] = val
     return jobad
 
-
-def reportFailureToDashboard(exitCode, ad = None):
+# Changes need to be propagated also in WMCore whenever #6420 is merged
+def reportFailureToDashboard(exitCode, ad = None, stageOutReport = None):
     if ad is None:
         try:
             ad = parseAd()
@@ -267,9 +267,12 @@ def reportFailureToDashboard(exitCode, ad = None):
     params = {
         'MonitorID': ad['CRAB_ReqName'],
         'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%d' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":"), ad['CRAB_Retry']),
-        'JobExitCode': exitCode
     }
-    print("Dashboard stageout failure parameters: %s" % str(params))
+    if exitCode:
+        params['JobExitCode'] = exitCode
+    if stageOutReport:
+        params['DashboardReport'] = stageOutReport
+    print("Dashboard stageout report parameters: %s" % str(params))
     apmonSend(params['MonitorID'], params['MonitorJobID'], params)
     apmonFree()
     return exitCode
