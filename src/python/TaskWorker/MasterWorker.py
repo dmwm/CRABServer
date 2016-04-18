@@ -188,6 +188,10 @@ class MasterWorker(object):
 
 
     def updateWork(self, taskname, command, status):
+        """ Update taskname setting the status and the command for it
+            Return True if the change succeded, False otherwise
+        """
+
         configreq = {'workflow': taskname, 'command': command, 'status': status, 'subresource': 'state'}
         try:
             self.server.post(self.restURInoAPI + '/workflowdb', data = urllib.urlencode(configreq))
@@ -197,6 +201,9 @@ class MasterWorker(object):
             self.logger.error(msg)
         except Exception: #pylint: disable=broad-except
             self.logger.exception("Server could not process the updateWork request (prameters are %s)", configreq)
+        else:
+            return True #success
+        return False #failure
 
 
     def failQueuedTasks(self):
@@ -241,11 +248,13 @@ class MasterWorker(object):
 
             toInject = []
             for task in pendingwork:
-                worktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
-                toInject.append((worktype, task, failstatus, None))
+                if self.updateWork(task['tm_taskname'], task['tm_task_command'], 'QUEUED'):
+                    worktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
+                    toInject.append((worktype, task, failstatus, None))
+                else:
+                    #The task stays in HOLDING and will be acquired again later
+                    self.logger.info("Skipping %s since it could not be updated to QUEUED. Will be retried in the next iteration", task['tm_taskname'])
 
-            for task in pendingwork:
-                self.updateWork(task['tm_taskname'], task['tm_task_command'], 'QUEUED')
 
             self.slaves.injectWorks(toInject)
 
