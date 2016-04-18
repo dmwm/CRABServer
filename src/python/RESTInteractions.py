@@ -27,7 +27,8 @@ def retriableError(ex):
         return ex.status in [500, 502, 503]
     elif isinstance(ex, pycurl.error):
         #28 is 'Operation timed out...'
-        return ex[0] in [28]
+        #35,is 'Unknown SSL protocol error', see https://github.com/dmwm/CRABServer/issues/5102
+        return ex[0] in [28, 35]
     return False
 
 
