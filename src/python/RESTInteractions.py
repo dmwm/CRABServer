@@ -5,6 +5,7 @@ Handles client interactions with remote REST interface
 import os
 import time
 import urllib
+import pycurl
 import logging
 from urlparse import urlunparse
 from httplib import HTTPException
@@ -14,6 +15,20 @@ from WMCore.Services.pycurl_manager import RequestHandler
 
 __version__= '0.0.0'
 EnvironmentException = Exception
+
+
+def retriableError(ex):
+    """ Return True if the error can be retried
+    """
+    if isinstance(ex, HTTPException):
+        #500 Internal sever error. For some errors retries it helps
+        #502 CMSWEB frontend answers with this when the CMSWEB backends are overloaded
+        #503 Usually that's the DatabaseUnavailable error
+        return ex.status in [500, 502, 503]
+    elif isinstance(ex, pycurl.error):
+        #28 is 'Operation timed out...'
+        return ex[0] in [28]
+    return False
 
 
 class HTTPRequests(dict):
@@ -106,14 +121,14 @@ class HTTPRequests(dict):
         caCertPath = self.getCACertPath()
         url = 'https://' + self['host'] + uri
 
-        #retries this up to self['retry'] times if the exit code is 503 (the only code at the moemnt)
+        #retries this up to self['retry'] times a range of exit codes
         for i in xrange(self['retry'] + 1):
             try:
                 response, datares = self['conn'].request(url, data, headers, verb=verb, doseq = True, ckey=self['key'], cert=self['cert'], \
                                 capath=caCertPath)#, verbose=True)# for debug
-            except HTTPException as ex:
+            except Exception as ex:
                 #add here other temporary errors we need to retry
-                if ex.status not in [500, 502, 503] or i == self['retry']:
+                if (not retriableError(ex)) or (i == self['retry']):
                     raise #really exit and raise exception if this was the last retry or the exit code is not among the list of the one we retry
                 sleeptime = 20 * (i + 1)
                 self.logger.debug("Sleeping %s seconds after HTTP error. Error details %s:", sleeptime, ex.headers)
