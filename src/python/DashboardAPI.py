@@ -247,7 +247,7 @@ def parseAd():
     return jobad
 
 
-def reportFailureToDashboard(exitCode, ad = None):
+def reportFailureToDashboard(exitCode, ad = None, stageOutReport=None):
     if ad is None:
         try:
             ad = parseAd()
@@ -269,6 +269,8 @@ def reportFailureToDashboard(exitCode, ad = None):
         'MonitorJobID': '%d_https://glidein.cern.ch/%d/%s_%d' % (ad['CRAB_Id'], ad['CRAB_Id'], ad['CRAB_ReqName'].replace("_", ":"), ad['CRAB_Retry']),
         'JobExitCode': exitCode
     }
+    if stageOutReport:
+        params['StageOutReport'] = stageOutReport
     print("Dashboard stageout failure parameters: %s" % str(params))
     apmonSend(params['MonitorID'], params['MonitorJobID'], params)
     apmonFree()
