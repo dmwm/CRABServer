@@ -129,7 +129,7 @@ Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) -
 transfer_input_files = CMSRunAnalysis.sh, cmscp.py%(additional_input_file)s
 transfer_output_files = jobReport.json.$(count)
 # TODO: fold this into the config file instead of hardcoding things.
-Environment = SCRAM_ARCH=$(CRAB_JobArch);%(additional_environment_options)s
+Environment = "SCRAM_ARCH=$(CRAB_JobArch) %(additional_environment_options)s"
 should_transfer_files = YES
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
@@ -450,11 +450,11 @@ class DagmanCreator(TaskAction.TaskAction):
             info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=local'
             info['additional_input_file'] += ", CMSRunAnalysis.tar.gz"
         else:
-            info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=http://hcc-briantest.unl.edu/CMSRunAnalysis-3.3.0-pre1.tar.gz'
+            raise TaskWorkerException("Cannot find CMSRunAnalysis.tar.gz inside the cwd: %s" % os.getcwd())
         if os.path.exists("TaskManagerRun.tar.gz"):
-            info['additional_environment_options'] += ';CRAB_TASKMANAGER_TARBALL=local'
+            info['additional_environment_options'] += ' CRAB_TASKMANAGER_TARBALL=local'
         else:
-            info['additional_environment_options'] += ';CRAB_TASKMANAGER_TARBALL=http://hcc-briantest.unl.edu/TaskManagerRun-3.3.0-pre1.tar.gz'
+            raise TaskWorkerException("Cannot find CMSRunAnalysis.tar.gz inside the cwd: %s" % os.getcwd())
         if os.path.exists("sandbox.tar.gz"):
             info['additional_input_file'] += ", sandbox.tar.gz"
         info['additional_input_file'] += ", run_and_lumis.tar.gz"
