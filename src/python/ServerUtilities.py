@@ -209,14 +209,14 @@ def isFailurePermanent(reason, gridJob=False):
     Method that decides whether a failure reason should be considered as a
     permanent failure and submit task or not.
     """
-    checkQuota = " Please check if you have access to write to destination site and your quota does not exceeded."
-    refuseToSubmit = " CRAB3 refuses to send jobs to scheduler because of failure to transfer files to destination site."
+    checkQuota = " Please check that you have write access to destination site and that your quota is not exceeded, use crab checkwrite for more informations."
+    refuseToSubmit = " Can't submit task because write check at destination site fails."
     if gridJob:
         refuseToSubmit = ""
     for exitCode in STAGEOUT_ERRORS:
         for error in STAGEOUT_ERRORS[exitCode]:
             if re.match(error['regex'], reason.lower()):
-                reason = error['error-msg'] + checkQuota + refuseToSubmit
+                reason = error['error-msg'] + refuseToSumit + checkQuota
                 return error['isPermanent'], reason, exitCode
     return False, "", None
 
