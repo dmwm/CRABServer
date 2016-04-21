@@ -23,17 +23,20 @@ def authz_operator(username = None):
 
 
 def authz_owner_match(dbapi, workflows, Task):
-    """Match user against authorisation requirements to modify an existing resource.
-       Allows to cache couchdb fetched documents if the caller needs them.
+    """ Match user against authorization requirements to modify an existing (list of) workflows.
+        Either the user is the one who submitted the workflow, or it is an operator.
 
-       :arg WMCore.CMSCouch.Database database: database connection to retrieve the docs
-       :arg str list workflows: a list of workflows unique name as positive check
-       :return: in case retrieve_docs is not false the list of couchdb documents."""
+        :arg str list workflows: a list of workflows unique name as positive check
+    """
     user = cherrypy.request.user
     log = cherrypy.log
 
-    alldocs = []
+    #if the user trying to access the resource is an operator just exit to allow access
+    if 'crab3' in cherrypy.request.user.get('roles', {}).get('operator', {}).get('group', set()):
+        log("DEBUG: authz operator %s to access resources %s" % (user, workflows))
+        return
 
+    alldocs = []
     for wf in workflows:
         wfrow = None
         try:
