@@ -528,7 +528,7 @@ class DagmanCreator(TaskAction.TaskAction):
             pfns = ["log/cmsRun_{0}.log.tar.gz".format(count)] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
             nodeSpec = {'count': count,
-                        'parent': '0' if stage == 'process' else str(i),
+                        'parent': str(i),
                         'maxretries': task['numautomjobretries'],
                         'taskname': task['tm_taskname'],
                         'backend': os.environ.get('HOSTNAME', ''),
@@ -819,15 +819,16 @@ class DagmanCreator(TaskAction.TaskAction):
             ## Cache task information
             with open("taskinformation.pkl", "wb") as fd:
                 pickle.dump(kwargs['task'], fd)
+        else:
+            name = "RunJobs{0}.subdag".format(parent)
 
+        if stage != 'tail':
             ## Cache site information
             with open("site.ad", "w") as fd:
                 fd.write(str(sitead))
 
             with open("site.ad.json", "w") as fd:
                 json.dump(siteinfo, fd)
-        else:
-            name = "RunJobs{0}.subdag".format(parent)
 
         ## Save the DAG into a file.
         with open(name, "w") as fd:
