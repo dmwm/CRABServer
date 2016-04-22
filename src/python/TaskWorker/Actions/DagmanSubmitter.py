@@ -201,12 +201,12 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         retryIssuesBySchedd = {}
 
+        userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
         for schedd in goodSchedulers:
             #If submission failure is true, trying to change a scheduler
             configreq = {'workflow': task['tm_taskname'],
                          'subresource': 'updateschedd',
                          'scheddname': schedd}
-            userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
             try:
                 userServer.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
                 task['tm_schedd'] = schedd
@@ -295,7 +295,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 msg += "Going to retry submission later since the dag status is Held and the task should be removed on the schedd"
             else:
                 msg += "Aborting submission since the task is in state %s" % results[0]['JobStatus']
-            raise TaskWorkerException(msg)
+            raise TaskWorkerException(msg, retry)
         else:
             self.logger.debug("Task seems to be submitted correctly. Classads got from scheduler: %s", results)
 
@@ -362,24 +362,24 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 msg += " Please try again later."
                 msg += " Message from the scheduler: %s" % (str(exp))
                 self.logger.exception("%s: %s", workflow, msg)
-                raise TaskWorkerException(msg)
+                raise TaskWorkerException(msg, retry=True)
 
             try:
                 dummyAddress = loc.scheddAd['Machine']
             except:
-                raise TaskWorkerException("Unable to get schedd address for task %s" % (task['tm_taskname']))
+                raise TaskWorkerException("Unable to get schedd address for task %s" % (task['tm_taskname']), retry=True)
 
             # Get location of schedd-specific environment script from schedd ad.
             info['remote_condor_setup'] = loc.scheddAd.get("RemoteCondorSetup", "")
 
             info["CMSGroups"] = set.union(CMSGroupMapper.map_user_to_groups(kwargs['task']['tm_username']), kwargs['task']['user_groups'])
-            self.logger.info("User %s mapped to local groups %s." % (kwargs['task']['tm_username'], info["CMSGroups"]))
+            self.logger.info("User %s mapped to local groups %s.", (kwargs['task']['tm_username'], info["CMSGroups"]))
 
             self.logger.debug("Finally submitting to the schedd")
             if address:
                 self.clusterId = self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
             else:
-                raise TaskWorkerException("Not able to get schedd address.")
+                raise TaskWorkerException("Not able to get schedd address.", retry=True)
             self.logger.debug("Submission finished")
         finally:
             os.chdir(cwd)
@@ -458,7 +458,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.logger.debug("Condor cluster ID just submitted is: %s", results.outputObj['ClusterId'])
         if results.outputMessage != "OK":
             self.logger.debug("Now printing the environment used for submission:\n" + "-"*70 + "\n" + results.environmentStr + "-"*70)
-            raise TaskWorkerException("Failure when submitting task to scheduler. Error reason: '%s'" % results.outputMessage)
+            raise TaskWorkerException("Failure when submitting task to scheduler. Error reason: '%s'" % results.outputMessage, retry=True)
 
         #if we don't raise exception above the id is here
         return results.outputObj['ClusterId']
