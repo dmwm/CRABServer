@@ -408,7 +408,7 @@ class DataWorkflow(object):
 
 
     @conn_handler(services=['centralconfig'])
-    def kill(self, workflow, force, jobids, userdn, userproxy=None):
+    def kill(self, workflow, force, jobids, killwarning, userdn, userproxy=None):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name"""
@@ -416,6 +416,10 @@ class DataWorkflow(object):
         retmsg = "ok"
         self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
         statusRes = self.status(workflow, userdn, userproxy)[0]
+        warnings = statusRes['taskWarningMsg']
+        if killwarning:
+            warnings += [killwarning]
+        warnings = str(warnings)
 
         args = {'ASOURL' : statusRes.get("ASOURL", "")}
         # Hm...
@@ -436,9 +440,9 @@ class DataWorkflow(object):
             args.update({"killList": killList, "killAll": jobids==[]})
             #Set arguments first so in case of failure we don't do any "damage"
             self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow], arguments = [dbSerializer(args)])
-            self.api.modify(self.Task.SetStatusTask_sql, status = ["NEW"], command = ["KILL"], taskname = [workflow])
+            self.api.modify(self.Task.SetStatusWarningTask_sql, status = ["NEW"], command = ["KILL"], taskname = [workflow], warnings = [str(warnings)])
         elif statusRes['status'] == 'NEW':
-            self.api.modify(self.Task.SetStatusTask_sql, status = ["KILLED"], command = ["KILL"], taskname = [workflow])
+            self.api.modify(self.Task.SetStatusWarningTask_sql, status = ["KILLED"], command = ["KILL"], taskname = [workflow], warnings = [str(warnings)])
         else:
             raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
 

@@ -132,9 +132,11 @@ class Task(object):
     SetStartInjection_sql = "UPDATE tasks SET tm_start_injection = SYS_EXTRACT_UTC(SYSTIMESTAMP) \
                             WHERE tm_taskname = :tm_taskname"
    
-    #SetStatusTask -- Used by DataWorkflow.resubmit (crab resubmit), DataWorkflow.kill (crab kill), and DataWorkflow.proceed (crab proceed)
+    #SetStatusTask -- Used by DataWorkflow.resubmit (crab resubmit), and DataWorkflow.proceed (crab proceed)
     #              -- Also used by RESTWorkerWorkflow
     SetStatusTask_sql = "UPDATE tasks SET tm_task_status = upper(:status), tm_task_command = upper(:command) WHERE tm_taskname = :taskname"
+    #SetStatusTask -- Used by DataWorkflow.kill (crab kill). Really similar to SetStatusTask_sql but also set a warning.
+    SetStatusWarningTask_sql = "UPDATE tasks SET tm_task_status = upper(:status), tm_task_command = upper(:command), tm_task_warnings = :warnings WHERE tm_taskname = :taskname"
    
     #UpdateWorker
     UpdateWorker_sql = """UPDATE tasks SET tw_name = :tw_name, tm_task_status = :set_status \

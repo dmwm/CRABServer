@@ -4,6 +4,7 @@ import time
 import random
 import logging
 import cherrypy
+from base64 import b64decode
 
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
@@ -520,6 +521,13 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_num("force", param, safe, optional=True)
             validate_numlist('jobids', param, safe)
+            validate_str("killwarning", param, safe,  RX_TEXT_FAIL, optional=True)
+            #decode killwarning message if present
+            if safe.kwargs['killwarning']:
+                try:
+                    safe.kwargs['killwarning'] = b64decode(safe.kwargs['killwarning'])
+                except TypeError:
+                    raise InvalidParameter("Failure message is not in the accepted format")
 
 
     @restcall
@@ -666,7 +674,7 @@ class RESTUserWorkflow(RESTEntity):
         return result
 
     @restcall
-    def delete(self, workflow, force, jobids):
+    def delete(self, workflow, force, jobids, killwarning):
         """Aborts a workflow. The user needs to be a CMS owner of the workflow.
 
            :arg str list workflow: list of unique name identifiers of workflows;
@@ -675,4 +683,4 @@ class RESTUserWorkflow(RESTEntity):
 
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.api, [workflow], self.Task)
-        return self.userworkflowmgr.kill(workflow, force, jobids, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+        return self.userworkflowmgr.kill(workflow, force, jobids, killwarning, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
