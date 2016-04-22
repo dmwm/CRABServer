@@ -57,7 +57,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         if not results:
             self.logger.info("An invalid workflow name was requested: %s" % workflow)
             raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
-        return results
+        return results[-1]
 
 
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
@@ -293,7 +293,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## uploaded by the post-job after stageout has finished for all output and log
         ## files in the job.)
         rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow)
-        ## Extract from the filemetadata the necessary information. 
+        ## Extract from the filemetadata the necessary information.
         res['runsAndLumis'] = {}
         for row in rows:
             jobidstr = str(row[GetFromTaskAndType.PANDAID])
@@ -378,18 +378,18 @@ class HTCondorDataWorkflow(DataWorkflow):
            :return: a workflow status summary document"""
 
         #Empty results
-        result = {"status"           : '',
-                  "command"           : '',
-                  "taskFailureMsg"   : '',
-                  "taskWarningMsg"   : [],
-                  "statusFailureMsg" : '',
+        result = {"status"           : '', #from the db
+                  "command"           : '', #from the db
+                  "taskFailureMsg"   : '', #from the db
+                  "taskWarningMsg"   : [], #from the db
+                  "statusFailureMsg" : '', #errors of the status itself
                   "jobsPerStatus"    : {},
                   "failedJobdefs"    : 0,
                   "totalJobdefs"     : 0,
                   "jobdefErrors"     : [],
                   "jobList"          : [],
-                  "schedd"           : '',
-                  "collector"        : '' }
+                  "schedd"           : '', #from the db
+                  "collector"        : '' } #from the db
 
         # First, verify the task has been submitted by the backend.
         self.logger.info("Got status request for workflow %s" % workflow)
@@ -402,6 +402,13 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         if row.task_command:
             result['command'] = row.task_command
+
+        ## Add scheduler and collector to the result dictionary.
+        if row.schedd:
+            result['schedd'] = row.schedd
+        if row.collector:
+            result['collector'] = row.collector
+
         # 0 - simple crab status
         # 1 - crab status -long
         # 2 - crab status -idle
@@ -434,17 +441,23 @@ class HTCondorDataWorkflow(DataWorkflow):
                 #else:
                 #    result['statusFailureMsg'] += "\n%s" % (failure)
 
+        #get rid of this? If there is a clusterid we go ahead and get jobs info, otherwise we return result
+        self.logger.debug("Cluster id: %s" % row.clusterid)
         if row.task_status in ['NEW', 'HOLDING', 'UPLOADED', 'SUBMITFAILED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']:
             addStatusAndFailureFromDB(result, row)
             if row.task_status in ['NEW', 'UPLOADED', 'SUBMITFAILED'] and row.task_command not in ['KILL', 'RESUBMIT']:
                 self.logger.debug("Detailed result for workflow %s: %s\n" % (workflow, result))
                 return [result]
+        #even if we get rid these two should be filled
+#                  "taskFailureMsg"   : '', #from the db
+#                  "taskWarningMsg"   : [], #from the db
 
-        ## Add scheduler and collector to the result dictionary.
-        if row.schedd:
-            result['schedd'] = row.schedd
-        if row.collector:
-            result['collector'] = row.collector
+        #here we know we have a clusterid. But what if webdir is not there? return setting a proper statusFailureMsg
+        #Now what to do
+        #    get node_state/job_log from the schedd. Needs Justas patch (is it ok?)
+        #    get error_report
+        #    get aso_status (it is going to change once we are done whith the oracle implementation)
+        #    combine everything
 
         ## Here we start to retrieve the jobs statuses.
         jobsPerStatus = {}
@@ -467,11 +480,9 @@ class HTCondorDataWorkflow(DataWorkflow):
         # User web directory is needed for getting files from scheduler.
         useOldLogic = True
         if row.user_webdir and verbose != 2:
-            self.logger.info("Getting status for workflow %s using node state file." % workflow)
+            self.logger.info("Getting status for workflow %s using node state file.", workflow)
             try:
-                DBResults = {}
-                DBResults['CRAB_UserWebDir'] = row.user_webdir
-                taskStatus = self.taskWebStatus(DBResults, verbose, result)
+                taskStatus = self.taskWebStatus({'CRAB_UserWebDir' : row.user_webdir}, verbose, result)
                 #Check timestamp, if older then 2 minutes, use old logic
                 nodeStateUpd = int(taskStatus.get('DagStatus', {}).get("Timestamp", 0))
                 DAGStatus = int(taskStatus.get('DagStatus', {}).get('DagStatus', -1))
@@ -532,10 +543,10 @@ class HTCondorDataWorkflow(DataWorkflow):
                     addStatusAndFailure(result, status = 'UNKNOWN', failure = msg)
                 return [result]
 
-            taskStatusCode = int(results[-1]['JobStatus'])
-            if 'CRAB_UserWebDir' not in results[-1]:
+            taskStatusCode = int(results['JobStatus'])
+            if 'CRAB_UserWebDir' not in results:
                 if taskStatusCode != 1 and taskStatusCode != 2:
-                    DagmanHoldReason = results[-1]['DagmanHoldReason'] if 'DagmanHoldReason' in results[-1] else None
+                    DagmanHoldReason = results['DagmanHoldReason'] if 'DagmanHoldReason' in results else None
                     msg  = "The task failed to bootstrap on the Grid scheduler %s." % (address)
                     msg += " Please send an e-mail to %s." % (FEEDBACKMAIL)
                     msg += " Hold reason: %s" % (DagmanHoldReason)
@@ -546,7 +557,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 return [result]
 
             try:
-                taskStatus = self.taskWebStatus(results[-1], verbose, result)
+                taskStatus = self.taskWebStatus(results, verbose, result)
             except MissingNodeStatus:
                 msg = "Node status file not currently available. Retry in a minute if you just submitted the task."
                 addStatusAndFailure(result, status = 'UNKNOWN', failure = msg)
@@ -561,15 +572,15 @@ class HTCondorDataWorkflow(DataWorkflow):
                 result['status'] = task_codes.get(taskStatusCode, 'UNKNOWN')
             # HoldReasonCode == 1 indicates that the TW killed the task; perhaps the DB was not properly updated afterward?
             if taskStatusCode == 5:
-                if results[-1]['HoldReasonCode'] == 16:
+                if results['HoldReasonCode'] == 16:
                     result['status'] = 'InTransition'
                 elif row.task_status != 'KILLED':
-                    if results[-1]['HoldReasonCode'] == 1:
+                    if results['HoldReasonCode'] == 1:
                         result['status'] = 'KILLED'
                     elif not result['status']:
                         result['status'] = 'FAILED'
 
-            taskJobCount = int(results[-1].get('CRAB_JobCount', 0))
+            taskJobCount = int(results.get('CRAB_JobCount', 0))
 
         if 'DagStatus' in taskStatus:
             del taskStatus['DagStatus']
@@ -592,7 +603,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         result['jobList'] = jobList
         result['jobs'] = taskStatus
 
-        if len(taskStatus) == 0 and results and results[-1]['JobStatus'] == 2:
+        if len(taskStatus) == 0 and results and results['JobStatus'] == 2:
             result['status'] = 'Running (jobs not submitted)'
 
         #Always returning ASOURL also, it is required for kill, resubmit

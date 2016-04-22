@@ -9,11 +9,11 @@ class Task(object):
     ID_tuple = namedtuple("ID", ["taskname", "panda_jobset_id", "task_status", "task_command", "user_role", "user_group", \
              "task_failure", "split_args", "panda_resubmitted_jobs", "save_logs", "username", \
              "user_dn", "arguments", "input_dataset", "dbs_url", "task_warnings", "publication", "user_webdir", \
-             "asourl", "asodb", "output_dataset", "collector", "schedd", "dry_run"])
+             "asourl", "asodb", "output_dataset", "collector", "schedd", "dry_run", "clusterid"])
     ID_sql = "SELECT tm_taskname, panda_jobset_id, tm_task_status, tm_task_command, tm_user_role, tm_user_group, \
              tm_task_failure, tm_split_args, panda_resubmitted_jobs, tm_save_logs, tm_username, \
              tm_user_dn, tm_arguments, tm_input_dataset, tm_dbs_url, tm_task_warnings, tm_publication, tm_user_webdir, tm_asourl, \
-             tm_asodb, tm_output_dataset, tm_collector, tm_schedd, tm_dry_run \
+             tm_asodb, tm_output_dataset, tm_collector, tm_schedd, tm_dry_run, clusterid \
              FROM tasks WHERE tm_taskname=:taskname"
 
     IDAll_sql = "SELECT tm_taskname, tm_task_status, tm_task_command, tm_user_role, tm_user_group, \
@@ -112,10 +112,11 @@ class Task(object):
                          WHERE tm_taskname = :tm_taskname"
    
     #SetInjectedTasks
-    SetInjectedTasks_sql = """UPDATE tasks SET tm_end_injection = SYS_EXTRACT_UTC(SYSTIMESTAMP), \
+    SetInjectedTasks_sql = "UPDATE tasks SET tm_end_injection = SYS_EXTRACT_UTC(SYSTIMESTAMP), \
                              tm_task_status = upper(:tm_task_status), \
-                             panda_resubmitted_jobs = :resubmitted_jobs \
-                             WHERE tm_taskname = :tm_taskname""" 
+                             panda_resubmitted_jobs = :resubmitted_jobs, \
+                             clusterid = :clusterid \
+                             WHERE tm_taskname = :tm_taskname" 
    
     #SetJobSetId
     SetJobSetId_sql = "UPDATE tasks SET panda_jobset_id = :jobsetid WHERE tm_taskname = :taskname"

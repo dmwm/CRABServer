@@ -78,3 +78,6 @@ UPDATE tasks SET tm_task_status='FAILED' where tm_task_status='HOLDING'; --in ad
 UPDATE tasks SET tm_task_status='NEW',tm_task_command='KILL' WHERE tm_task_status='KILL';
 UPDATE tasks SET tm_task_status='NEW',tm_task_command='RESUBMIT' WHERE tm_task_status='RESUBMIT';
 UPDATE tasks SET tm_task_status='NEW',tm_task_command='SUBMIT' WHERE tm_task_status='NEW';
+
+--Changes that will be needed for version 3.3.1605
+alter table tasks add (clusterid NUMBER(10))
