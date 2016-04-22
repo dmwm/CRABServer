@@ -5,8 +5,7 @@ $(document).ready(function() {
 
     var DB_VERSIONS = ["prod", "preprod", "dev"];   
 
-    // Task info is stored upon displaying it. Required for the tm_user_webdir value, which is needed
-    // for loading the config and pset files.
+    // Task info is stored upon displaying it. Required for loading related information about a task.
     var taskInfo = "",
         dbVersion = "",
         taskInfoUrl = "",
@@ -20,7 +19,7 @@ $(document).ready(function() {
         proxiedWebDirUrl = "",
         dbsInstance = "";
 
-    // If a parameter "task" exists, tries to load task info the same way a form submit loads it.
+    // If a parameter "task" exists in the URL, tries to load task info the same way a form submit loads it.
     processPageUrl();
 
     /**
@@ -132,8 +131,9 @@ $(document).ready(function() {
     /**
      * Fetches and displays the config/ PSet files for given task.
      * It first queries an api which either returns a proxied url (which is needed to get around firewalls)
-     * or returns nothing, in which case the files cannot be retrieved.
+     * or returns nothing, in which case the files cannot be retrieved. In that case the links are pointed to the sandbox, because it is possible that the task was not submitted to the schedd and the debug directory doesn't exist.
      *
+     * If the proxy is found, displays the file content and sets direct links to the files.
      */
     function displayConfigAndPSet(errHandler) {
         if (userWebDir === "") {
@@ -146,8 +146,8 @@ $(document).ready(function() {
         } else if (proxiedWebDirUrl === "") {
             // In case proxy api returned empty or failed
             // Set links, show error and don't load anything else.
-            $("#task-config-link").attr("href", userWebDir + urlEnd);
-            $("#task-pset-link").attr("href", userWebDir + urlEnd);
+            $("#task-config-link").attr("href", userWebDir + "/sandbox.tar.gz");
+            $("#task-pset-link").attr("href", userWebDir + "/sandbox.tar.gz");
             errHandler(new ProxyNotFoundErrorError);
             return;
         }
@@ -161,8 +161,6 @@ $(document).ready(function() {
             .done(function(data) {
                 $("#task-pset-paragraph").text(data);
             });
-
-        var urlEnd = "/sandbox.tar.gz";
 
         $("#task-config-link").attr("href", userWebDir + "/debug/crabConfig.py");
         $("#task-pset-link").attr("href", userWebDir + "/debug/originalPSet.py");
@@ -259,7 +257,7 @@ $(document).ready(function() {
         } else if (proxiedWebDirUrl === "") {
             // In case proxy api returned empty or failed
             // Set links, show error and don't load anything else.
-            $("#script-exe-link").attr("href", userWebDir + urlEnd);
+            $("#script-exe-link").attr("href", userWebDir + "/sandbox.tar.gz");
             errHandler(new ProxyNotFoundErrorError);
             return;
         }
