@@ -36,7 +36,7 @@ class Create(DBCreator):
         tm_activity VARCHAR(255),
         panda_jobset_id NUMBER(11),
         tm_task_status VARCHAR(255) NOT NULL,
-        tm_task_command VARCHAR(20) NOT NULL,
+        tm_task_command VARCHAR(20),
         tm_start_time TIMESTAMP,
         tm_start_injection TIMESTAMP,
         tm_end_injection TIMESTAMP,
