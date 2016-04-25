@@ -80,4 +80,4 @@ UPDATE tasks SET tm_task_status='NEW',tm_task_command='RESUBMIT' WHERE tm_task_s
 UPDATE tasks SET tm_task_status='NEW',tm_task_command='SUBMIT' WHERE tm_task_status='NEW';
 
 --Changes that will be needed for version 3.3.1605
-alter table tasks add (clusterid NUMBER(10))
+alter table tasks add (clusterid NUMBER(10));
