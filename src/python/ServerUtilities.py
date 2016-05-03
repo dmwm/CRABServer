@@ -7,6 +7,8 @@ from __future__ import absolute_import
 
 import os
 import re
+import time
+import calendar
 import datetime
 import traceback
 import subprocess
@@ -22,6 +24,12 @@ FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
 MAX_WALLTIME = 21*60*60 + 30*60
 MAX_MEMORY = 2*1024
 MAX_DISK_SPACE = 20000000 # Disk usage is not used from .job.ad as CRAB3 is not seeting it. 20GB is max.
+
+## Parameter used to set the LeaveJobInQueue and the PeriodicRemoveclassads.
+## It's also used during resubmissions since we don't allow a resubmission during the last week
+## Before changing this value keep in mind that old running DAGs have the old value in the classad expression
+## but DagmanResubmitter uses this value to calculate if a resubmission is possible
+TASKLIFETIME = 30*24*60*60
 
 ## These are all possible statuses of a task in the TaskDB.
 TASKDBSTATUSES_TMP = ['NEW', 'HOLDING', 'QUEUED']
@@ -248,3 +256,19 @@ def mostCommon(lst, default=0):
     except ValueError:
         return default
 
+
+def getTimeFromTaskname(taskname):
+    """ Get the submission time from the taskname and return the seconds since epoch
+        corresponding to it
+    """
+
+    #validate taskname. In principle not necessary, but..
+    if not isinstance(taskname, str):
+        raise TypeError('In ServerUtilities.getTimeFromTaskname: "taskname" parameter must be a string')
+    stime = taskname.split(':')[0] #s stands for string
+    stimePattern = '^\d{6}_\d{6}$'
+    if not re.match(stimePattern, stime):
+        raise ValueError('In ServerUtilities.getTimeFromTaskname: "taskname" parameter must match %s' % stimePattern)
+    #convert the time
+    dtime = time.strptime(stime, '%y%m%d_%H%M%S') #d stands for data structured
+    return calendar.timegm(dtime)
