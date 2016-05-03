@@ -132,7 +132,12 @@ class HTTPRequests(dict):
                 if (not retriableError(ex)) or (i == self['retry']):
                     raise #really exit and raise exception if this was the last retry or the exit code is not among the list of the one we retry
                 sleeptime = 20 * (i + 1)
-                self.logger.debug("Sleeping %s seconds after HTTP error. Error details %s:", sleeptime, ex.headers)
+                msg = "Sleeping %s seconds after HTTP error. " % sleeptime
+                if hasattr(ex, headers):
+                    msg += str(ex.headers)
+                else:
+                    msg += str(ex)
+                self.logger.debug(msg)
                 time.sleep(sleeptime) #sleeps 20s the first time, 40s the second time and so on
             else:
                 break
