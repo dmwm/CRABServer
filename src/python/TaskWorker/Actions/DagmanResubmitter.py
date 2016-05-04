@@ -10,7 +10,10 @@ import HTCondorUtils
 
 from WMCore.Database.CMSCouch import CouchServer
 
+from ServerUtilities import TASKLIFETIME
 from ServerUtilities import FEEDBACKMAIL
+from ServerUtilities import NUM_DAYS_FOR_DRAIN
+from ServerUtilities import getTimeFromTaskname
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
@@ -23,6 +26,23 @@ class DagmanResubmitter(TaskAction):
 
     Internally, we simply release the failed DAG.
     """
+
+
+    def checkTaskLifetime(self, workflow):
+        """ Verify that at least 7 days are left before the task periodic remove expression
+            evaluates to true. This is to let job finish and possibly not remove a task with
+            running jobs
+        """
+
+        resubmitLifeTime = TASKLIFETIME - NUM_DAYS_FOR_DRAIN * 24 * 60 * 60
+        self.logger.info("Checking if resubmission is possible: we don't allow resubmission %s days before task expiration date", NUM_DAYS_FOR_DRAIN)
+        if time.time() > getTimeFromTaskname(workflow) + resubmitLifeTime:
+            msg = "Resubmission of task %s is not possble since less than %s days are left before the task is removed from the schedulers.\n" % (workflow, NUM_DAYS_FOR_DRAIN)
+            msg += "Infact a task expires %s days after its submission\n" % (TASKLIFETIME / (24 * 60 * 60))
+            msg += "You can submit a 'recovery task' if you need to execute again the failed jobs\n"
+            msg +=  "See https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ for more information about recovery tasks\n"
+            raise TaskWorkerException(msg)
+
 
     def executeInternal(self, *args, **kwargs): #pylint: disable=unused-argument
         #Marco: I guess these value errors only happens for development instances
@@ -42,7 +62,9 @@ class DagmanResubmitter(TaskAction):
             resubmitWhat = "jobs"
 
         self.logger.info("About to resubmit %s for workflow: %s." % (resubmitWhat, workflow))
-        self.logger.info("Task info: %s" % str(task))
+        self.logger.debug("Task info: %s" % str(task))
+
+        self.checkTaskLifetime(workflow)
 
         if task.get('resubmit_publication', False):
             asourl = task.get('tm_asourl', None)
