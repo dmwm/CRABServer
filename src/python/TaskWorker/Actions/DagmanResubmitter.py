@@ -12,6 +12,7 @@ from WMCore.Database.CMSCouch import CouchServer
 
 from ServerUtilities import TASKLIFETIME
 from ServerUtilities import FEEDBACKMAIL
+from ServerUtilities import NUM_DAYS_FOR_DRAIN
 from ServerUtilities import getTimeFromTaskname
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
@@ -33,10 +34,9 @@ class DagmanResubmitter(TaskAction):
             running jobs
         """
 
-        NUM_DAYS_FOR_DRAIN = 7
-        SUBMITLIFETIME = TASKLIFETIME - NUM_DAYS_FOR_DRAIN * 24 * 60 * 60
+        resubmitLifeTime = TASKLIFETIME - NUM_DAYS_FOR_DRAIN * 24 * 60 * 60
         self.logger.info("Checking if resubmission is possible: we don't allow resubmission %s days before task expiration date", NUM_DAYS_FOR_DRAIN)
-        if time.time() > getTimeFromTaskname(workflow) + SUBMITLIFETIME:
+        if time.time() > getTimeFromTaskname(workflow) + resubmitLifeTime:
             msg = "Resubmission of task %s is not possble since less than %s days are left before the task is removed from the schedulers.\n" % (workflow, NUM_DAYS_FOR_DRAIN)
             msg += "Infact a task expires %s days after its submission\n" % (TASKLIFETIME / (24 * 60 * 60))
             msg += "You can submit a 'recovery task' if you need to execute again the failed jobs\n"

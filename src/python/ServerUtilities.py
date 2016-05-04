@@ -30,6 +30,8 @@ MAX_DISK_SPACE = 20000000 # Disk usage is not used from .job.ad as CRAB3 is not 
 ## Before changing this value keep in mind that old running DAGs have the old value in the classad expression
 ## but DagmanResubmitter uses this value to calculate if a resubmission is possible
 TASKLIFETIME = 30*24*60*60
+## Number of days where the resubmission is not possible if the task is expiring
+NUM_DAYS_FOR_DRAIN = 7
 
 ## These are all possible statuses of a task in the TaskDB.
 TASKDBSTATUSES_TMP = ['NEW', 'HOLDING', 'QUEUED']
