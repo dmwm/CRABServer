@@ -133,7 +133,7 @@ class HTTPRequests(dict):
                     raise #really exit and raise exception if this was the last retry or the exit code is not among the list of the one we retry
                 sleeptime = 20 * (i + 1)
                 msg = "Sleeping %s seconds after HTTP error. " % sleeptime
-                if hasattr(ex, headers):
+                if hasattr(ex, 'headers'):
                     msg += str(ex.headers)
                 else:
                     msg += str(ex)
