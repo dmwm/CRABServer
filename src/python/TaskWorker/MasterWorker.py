@@ -89,7 +89,7 @@ class MasterWorker(object):
             else:
                 logHandler = MultiProcessingLog('logs/twlog.txt', when='midnight')
                 logFormatter = \
-                    logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
+                    logging.Formatter("%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
                 logHandler.setFormatter(logFormatter)
                 logging.getLogger().addHandler(logHandler)
             loglevel = logging.INFO
