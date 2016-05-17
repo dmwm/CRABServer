@@ -144,6 +144,28 @@ elif [ ! -r $X509_USER_PROXY ]; then
     condor_qedit $CONDOR_ID DagmanHoldReason "'The proxy is unreadable for some reason'"
     EXIT_STATUS=6
 else
+    # --- New status prototype ---
+    # This jdl is created here because we need to identify the task on which the daemon will run,
+    # which is done by passing the cluster_id of the dagman to the daemon process via the jdl. With this, we are 
+    # able to use condor_q in the daemon to check if the task/job status will no longed be updated 
+    # and if the daemon needs to exit.
+    echo "creating and executing task process daemon jdl"
+cat > daemon.jdl << EOF
+Universe   = local
+Executable = task_proc_wrapper.sh
+Arguments  = $CLUSTER_ID
+Log        = daemon.PC.log
+Output     = daemon.out.\$(Cluster).\$(Process)
+Error      = daemon.err.\$(Cluster).\$(Process)
+Queue 1
+EOF
+    # TODO - remove chmod
+    chmod 777 task_proc_wrapper.sh
+    condor_submit daemon.jdl
+    # --- End new status prototype ---
+
+    echo "executing condor_dagman"
+
     # Documentation about condor_dagman: http://research.cs.wisc.edu/htcondor/manual/v8.3/condor_dagman.html
     # In particular:
     # -autorescue 0|1

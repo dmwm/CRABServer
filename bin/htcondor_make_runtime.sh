@@ -74,7 +74,7 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
     popd
 
     mkdir -p bin
-    cp $ORIGDIR/scripts/{TweakPSet.py,CMSRunAnalysis.py,DashboardFailure.sh} .
+    cp $ORIGDIR/scripts/{TweakPSet.py,CMSRunAnalysis.py,DashboardFailure.sh,task_proc_wrapper.sh,cache_status.py} .
     cp $ORIGDIR/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py,ServerUtilities.py,CMSGroupMapper.py,RESTInteractions.py} .
 
 else
@@ -143,14 +143,14 @@ else
     popd
 
     mkdir -p bin
-    cp $CRABSERVER_PATH/scripts/{TweakPSet.py,CMSRunAnalysis.py,DashboardFailure.sh} .
+    cp $CRABSERVER_PATH/scripts/{TweakPSet.py,CMSRunAnalysis.py,DashboardFailure.sh,task_proc_wrapper.sh,cache_status.py} .
     cp $CRABSERVER_PATH/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py,ServerUtilities.py,CMSGroupMapper.py,RESTInteractions.py} .
 fi
 
 pwd
 echo "Making TaskManagerRun tarball"
-tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py libcurl.so.4 || exit 4
+tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py task_proc_wrapper.sh cache_status.py DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py libcurl.so.4 || exit 4
 echo "Making CMSRunAnalysis tarball"
-tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py DashboardFailure.sh || exit 4
+tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py task_proc_wrapper.sh cache_status.py DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py DashboardFailure.sh || exit 4
 popd
 
