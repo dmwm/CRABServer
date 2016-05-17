@@ -1,4 +1,4 @@
-#!/usr/bin/tenv python
+#!/usr/bin/env python
 #external dependencies
 from __future__ import print_function
 import os

@@ -109,7 +109,6 @@ class HTTPRequests(dict):
         You can override the method to encode/decode your data by passing in an
         encoding/decoding function to this method. Your encoded data must end up
         as a string.
-
         """
         data = data or {}
         headers = {

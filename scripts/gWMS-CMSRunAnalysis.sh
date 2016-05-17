@@ -14,6 +14,7 @@
 set > startup_environment.sh
 sed -e 's/^/export /' startup_environment.sh > tmp_env.sh
 mv tmp_env.sh startup_environment.sh
+export JOBSTARTDIR=$PWD
 
 # Saving START_TIME and when job finishes, check if runtime is not lower than 20m
 # If it is lower, sleep the difference. Will not sleep if CRAB3_RUNTIME_DEBUG is set.
