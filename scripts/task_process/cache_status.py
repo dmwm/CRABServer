@@ -3,16 +3,12 @@ import re
 import time
 import logging
 import HTCondorUtils
-import mmap
 import os
 import ast
 import json
-import classad
-import time
-import sys
-logging.basicConfig(filename = 'cache.log', level = logging.DEBUG)
-    
-# 
+logging.basicConfig(filename='task_process/cache.log', level=logging.DEBUG)
+
+#
 # insertCpu,
 # parseJobLog and
 # parseErrorReport code copied from the backend HTCondorDataWorkflow.py
@@ -34,7 +30,7 @@ def insertCpu(event, info):
         if 'RemoteUserCpu' in event:
             info['TotalUserCpuTimeHistory'][-1] = float(event['RemoteUserCpu'])
 
-node_name_re = re.compile("DAG Node: Job(\d+)")    
+node_name_re = re.compile("DAG Node: Job(\d+)")
 node_name2_re = re.compile("Job(\d+)")
 
 def parseJobLog(fp, nodes, node_map):
@@ -48,7 +44,7 @@ def parseJobLog(fp, nodes, node_map):
                 node = m.groups()[0]
                 proc = event['Cluster'], event['Proc']
                 info = nodes.setdefault(node, {'Retries': 0, 'Restarts': 0, 'SiteHistory': [], 'ResidentSetSize': [], 'SubmitTimes': [], 'StartTimes': [],
-                                            'EndTimes': [], 'TotalUserCpuTimeHistory': [], 'TotalSysCpuTimeHistory': [], 'WallDurations': [], 'JobIds': []})
+                                               'EndTimes': [], 'TotalUserCpuTimeHistory': [], 'TotalSysCpuTimeHistory': [], 'WallDurations': [], 'JobIds': []})
                 info['State'] = 'idle'
                 info['JobIds'].append("%d.%d" % proc)
                 info['RecordedSite'] = False
@@ -60,8 +56,6 @@ def parseJobLog(fp, nodes, node_map):
                 info['Retries'] = len(info['SubmitTimes'])-1
                 node_map[proc] = node
         elif event['MyType'] == 'ExecuteEvent':
-        
-            #import pdb; pdb.set_trace()
             node = node_map[event['Cluster'], event['Proc']]
             nodes[node]['StartTimes'].append(eventtime)
             nodes[node]['State'] = 'running'
@@ -77,7 +71,7 @@ def parseJobLog(fp, nodes, node_map):
                 else:
                     nodes[node]['State'] = 'cooloff'
             else:
-                nodes[node]['State']  = 'cooloff'
+                nodes[node]['State'] = 'cooloff'
         elif event['MyType'] == 'PostScriptTerminatedEvent':
             m = node_name2_re.match(event['DAGNodeName'])
             if m:
@@ -90,7 +84,7 @@ def parseJobLog(fp, nodes, node_map):
                     else:
                         nodes[node]['State'] = 'cooloff'
                 else:
-                    nodes[node]['State']  = 'cooloff'
+                    nodes[node]['State'] = 'cooloff'
         elif event['MyType'] == 'ShadowExceptionEvent' or event["MyType"] == "JobReconnectFailedEvent" or event['MyType'] == 'JobEvictedEvent':
             node = node_map[event['Cluster'], event['Proc']]
             if nodes[node]['State'] != 'idle':
@@ -168,18 +162,18 @@ def parseErrorReport(fp, nodes):
     #iterate over the jobs and set the error dict for those which are failed
     for jobid, statedict in nodes.iteritems():
         if 'State' in statedict and statedict['State'] == 'failed' and jobid in data:
-            statedict['Error'] = last(data[jobid]) #data[jobid] contains all retries. take the last one 
+            statedict['Error'] = last(data[jobid]) #data[jobid] contains all retries. take the last one
 
 # --- New code ----
 
 def storeNodesInfoInFile():
-    filename = "status_cache.txt"
+    filename = "task_process/status_cache.txt"
     # Open cache file and get the location until which the jobs_log was parsed last time
     try:
         if os.path.exists(filename) and os.stat(filename).st_size > 0:
             logging.debug("cache file found, opening and reading")
             nodes_storage = open(filename, "r")
-          
+
             last_read_until = int(nodes_storage.readline())
             nodes = ast.literal_eval(nodes_storage.readline())
             node_map = ast.literal_eval(nodes_storage.readline())
@@ -189,8 +183,8 @@ def storeNodesInfoInFile():
             last_read_until = 0
             nodes = {}
             node_map = {}
-    except Exception as e:
-        logging.exception("error during status_cache handling")        
+    except Exception:
+        logging.exception("error during status_cache handling")
     jobsLog = open("job_log", "r")
 
     try:
@@ -198,7 +192,7 @@ def storeNodesInfoInFile():
         errorSummary.seek(0)
         parseErrorReport(errorSummary, nodes)
         errorSummary.close()
-    except IOError as e:
+    except IOError:
         logging.exception("error during error_summary file handling")
 
     jobsLog.seek(last_read_until)
@@ -219,8 +213,8 @@ def storeNodesInfoInFile():
 def main():
     try:
         storeNodesInfoInFile()
-    except Exception as e:
-        logging.exception()
+    except Exception:
+        logging.exception("error during main loop")
 
 main()
 

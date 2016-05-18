@@ -150,18 +150,18 @@ else
     # able to use condor_q in the daemon to check if the task/job status will no longed be updated 
     # and if the daemon needs to exit.
     echo "creating and executing task process daemon jdl"
-cat > daemon.jdl << EOF
+cat > task_process/daemon.jdl << EOF
 Universe   = local
-Executable = task_proc_wrapper.sh
+Executable = task_process/task_proc_wrapper.sh
 Arguments  = $CLUSTER_ID
-Log        = daemon.PC.log
-Output     = daemon.out.\$(Cluster).\$(Process)
-Error      = daemon.err.\$(Cluster).\$(Process)
+Log        = task_process/daemon.PC.log
+Output     = task_process/daemon.out.\$(Cluster).\$(Process)
+Error      = task_process/daemon.err.\$(Cluster).\$(Process)
 Queue 1
 EOF
     # TODO - remove chmod
-    chmod 777 task_proc_wrapper.sh
-    condor_submit daemon.jdl
+    chmod 777 task_process/task_proc_wrapper.sh
+    condor_submit task_process/daemon.jdl
     # --- End new status prototype ---
 
     echo "executing condor_dagman"

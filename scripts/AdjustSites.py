@@ -209,7 +209,7 @@ def makeWebDir(ad):
         os.symlink(os.path.abspath(os.path.join(".", "node_state")), os.path.join(path, "node_state.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "site.ad")), os.path.join(path, "site_ad.txt"))
         os.symlink(os.path.abspath(os.path.join(".", ".job.ad")), os.path.join(path, "job_ad.txt"))
-        os.symlink(os.path.abspath(os.path.join(".", "status_cache.txt")), os.path.join(path, "status_cache"))
+        os.symlink(os.path.abspath(os.path.join(".", "task_process/status_cache.txt")), os.path.join(path, "status_cache"))
     except Exception as ex:
         printLog("Failed to copy/symlink files in the user web directory: %s" % str(ex))
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 if [ ! -f /etc/enable_status_daemon ]; then
-    echo "enable_status_daemon file not found, not starting the status daemon and exiting"
+    echo "/etc/enable_status_daemon file not found, not starting the status daemon and exiting"
     exit 1
 fi
 
@@ -34,6 +34,6 @@ do
         echo "dag status code empty. status daemon exiting"
         exit 0
     fi
-    python cache_status.py
+    python task_process/cache_status.py
     sleep 300s
 done
