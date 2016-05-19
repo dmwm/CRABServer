@@ -529,6 +529,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 self.logger.info("Web status for workflow %s done " % workflow)
             except Exception as exp: # Empty results is catched here, because getRootTasks raises InvalidParameter exception.
                 #when the task is submitted for the first time
+                self.logger.exception("Exception while querying schedd")
                 if row.task_status in ['QUEUED']:
                     result['status'] = row.task_status
                 else:

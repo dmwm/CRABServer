@@ -441,7 +441,8 @@ class DataWorkflow(object):
             #Set arguments first so in case of failure we don't do any "damage"
             self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow], arguments = [dbSerializer(args)])
             self.api.modify(self.Task.SetStatusWarningTask_sql, status = ["NEW"], command = ["KILL"], taskname = [workflow], warnings = [str(warnings)])
-        elif statusRes['status'] == 'NEW':
+        elif statusRes['status'] == 'NEW' and statusRes['command'] == 'SUBMIT':
+            #if the task has just been submitted and not acquired by the TW
             self.api.modify(self.Task.SetStatusWarningTask_sql, status = ["KILLED"], command = ["KILL"], taskname = [workflow], warnings = [str(warnings)])
         else:
             raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
