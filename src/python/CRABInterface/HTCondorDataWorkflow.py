@@ -5,6 +5,7 @@ import copy
 import tarfile
 import StringIO
 import tempfile
+import calendar
 from ast import literal_eval
 
 import pycurl
@@ -382,6 +383,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                   "command"           : '', #from the db
                   "taskFailureMsg"   : '', #from the db
                   "taskWarningMsg"   : [], #from the db
+                  "submissionTime"   : 0, #from the db
                   "statusFailureMsg" : '', #errors of the status itself
                   "jobsPerStatus"    : {},
                   "failedJobdefs"    : 0,
@@ -400,6 +402,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % workflow)
 
+        result['submissionTime'] = calendar.timegm(row.start_time.utctimetuple())
         if row.task_command:
             result['command'] = row.task_command
 

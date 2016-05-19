@@ -27,11 +27,11 @@ MAX_DISK_SPACE = 20000000 # Disk usage is not used from .job.ad as CRAB3 is not 
 
 ## Parameter used to set the LeaveJobInQueue and the PeriodicRemoveclassads.
 ## It's also used during resubmissions since we don't allow a resubmission during the last week
-## Before changing this value keep in mind that old running DAGs have the old value in the classad expression
-## but DagmanResubmitter uses this value to calculate if a resubmission is possible
+## Before changing this value keep in mind that old running DAGs have the old value in the CRAB_TaskSubmitTime
+## classad expression but DagmanResubmitter uses this value to calculate if a resubmission is possible
 TASKLIFETIME = 30*24*60*60
 ## Number of days where the resubmission is not possible if the task is expiring
-NUM_DAYS_FOR_DRAIN = 7
+NUM_DAYS_FOR_RESUBMITDRAIN = 7
 
 ## These are all possible statuses of a task in the TaskDB.
 TASKDBSTATUSES_TMP = ['NEW', 'HOLDING', 'QUEUED']
@@ -261,7 +261,7 @@ def mostCommon(lst, default=0):
 
 def getTimeFromTaskname(taskname):
     """ Get the submission time from the taskname and return the seconds since epoch
-        corresponding to it
+        corresponding to it. The function is not currently used.
     """
 
     #validate taskname. In principle not necessary, but..

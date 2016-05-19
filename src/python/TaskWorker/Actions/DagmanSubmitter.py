@@ -16,7 +16,6 @@ import HTCondorLocator
 
 from ServerUtilities import FEEDBACKMAIL
 from ServerUtilities import TASKLIFETIME
-from ServerUtilities import getTimeFromTaskname
 
 import TaskWorker.DataObjects.Result as Result
 import TaskWorker.Actions.TaskAction as TaskAction
@@ -304,7 +303,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         cwd = os.getcwd()
         os.chdir(kwargs['tempDir'])
 
-        info['taskname'] = workflow
+        info['start_time'] = task['tm_start_time']
         info['inputFilesString'] = ", ".join(inputFiles)
         outputFiles = ["RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001"]
         info['outputFilesString'] = ", ".join(outputFiles)
@@ -390,7 +389,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["Cmd"] = cmd
         dagAd['Args'] = arg
         dagAd["TransferInput"] = str(info['inputFilesString'])
-        dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % getTimeFromTaskname(info["taskname"]))
+        dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"])
         # Putting JobStatus == 4 since LeaveJobInQueue is for completed jobs (probably redundant)
         LEAVE_JOB_IN_QUEUE_EXPR = "(JobStatus == 4) && ((time()-CRAB_TaskSubmitTime) < %s)" % TASKLIFETIME
         dagAd["LeaveJobInQueue"] = classad.ExprTree(LEAVE_JOB_IN_QUEUE_EXPR)
