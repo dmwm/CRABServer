@@ -2,11 +2,18 @@
 import re
 import time
 import logging
-import HTCondorUtils
 import os
 import ast
 import json
-logging.basicConfig(filename='task_process/cache.log', level=logging.DEBUG)
+import sys
+from shutil import move
+# Need to import HTCondorUtils from a parent directory, not easy when the files are not in python packages.
+# Solution by ajay, SO: http://stackoverflow.com/questions/11536764
+# /attempted-relative-import-in-non-package-even-with-init-py/27876800#comment28841658_19190695
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import HTCondorUtils
+
+logging.basicConfig(filename='task_process/cache_status.log', level=logging.DEBUG)
 
 #
 # insertCpu,
@@ -201,14 +208,19 @@ def storeNodesInfoInFile():
 
     read_until = jobsLog.tell()
     jobsLog.close()
-    nodes_storage = open(filename, "w")
-    nodes_storage.seek(0)
 
+    # First write the new cache file under a temporary name, so that other processes
+    # don't get an incomplete result. Then replace the old one with the new one.
+    temp_filename = (filename + ".%s") % os.getpid()
+
+    nodes_storage = open(temp_filename, "w")
+    nodes_storage.seek(0)
     nodes_storage.write(str(read_until) + "\n")
     nodes_storage.write(str(nodes) + "\n")
     nodes_storage.write(str(node_map) + "\n")
-
     nodes_storage.close()
+
+    move(temp_filename, filename)
 
 def main():
     try:
