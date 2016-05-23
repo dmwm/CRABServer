@@ -109,7 +109,6 @@ class HTTPRequests(dict):
         You can override the method to encode/decode your data by passing in an
         encoding/decoding function to this method. Your encoded data must end up
         as a string.
-
         """
         data = data or {}
         headers = {
@@ -132,7 +131,7 @@ class HTTPRequests(dict):
                 if (not retriableError(ex)) or (i == self['retry']):
                     raise #really exit and raise exception if this was the last retry or the exit code is not among the list of the one we retry
                 sleeptime = 20 * (i + 1)
-                msg = "Sleeping %s seconds after HTTP error. " % sleeptime
+                msg = "Sleeping %s seconds after HTTP error. Error details: " % sleeptime
                 if hasattr(ex, 'headers'):
                     msg += str(ex.headers)
                 else:

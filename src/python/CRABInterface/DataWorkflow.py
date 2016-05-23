@@ -1,4 +1,5 @@
 import copy
+import time
 import logging
 import cherrypy
 from ast import literal_eval
@@ -7,6 +8,8 @@ from ast import literal_eval
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 
 ## CRAB dependencies
+from ServerUtilities import TASKLIFETIME
+from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
 
 
@@ -255,6 +258,25 @@ class DataWorkflow(object):
         return [{'RequestName': workflow}]
 
 
+    def checkTaskLifetime(self, submissionTime):
+        """ Verify that at least 7 days are left before the task periodic remove expression
+            evaluates to true. This is to let job finish and possibly not remove a task with
+            running jobs.
+
+            submissionTime are the seconds since epoch of the task submission time in the DB
+        """
+
+        msg = None
+        ## resubmitLifeTime is 23 days expressed in seconds
+        resubmitLifeTime = TASKLIFETIME - NUM_DAYS_FOR_RESUBMITDRAIN * 24 * 60 * 60
+        if time.time() > (submissionTime + resubmitLifeTime):
+            msg = "Resubmission of the task is not possble since less than %s days are left before the task is removed from the schedulers.\n" % NUM_DAYS_FOR_RESUBMITDRAIN
+            msg += "A task expires %s days after its submission\n" % (TASKLIFETIME / (24 * 60 * 60))
+            msg += "You can submit a 'recovery task' if you need to execute again the failed jobs\n"
+            msg += "See https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ for more information about recovery tasks"
+        return msg
+
+
     def resubmit(self, workflow, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority, userdn, userproxy):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
@@ -271,12 +293,18 @@ class DataWorkflow(object):
         ## Get the status of the task/jobs.
         statusRes = self.status(workflow, userdn, userproxy)[0]
 
+        ## Check lifetime of the task and raise ExecutionError if appropriate
+        self.logger.info("Checking if resubmission is possible: we don't allow resubmission %s days before task expiration date", NUM_DAYS_FOR_RESUBMITDRAIN)
+        retmsg = self.checkTaskLifetime(statusRes['submissionTime'])
+        if retmsg:
+            return [{'result': retmsg}]
+
         ## Ignore the following options if this is a publication resubmission or if the
         ## task was never submitted.
         if publication or statusRes['status'] == 'SUBMITFAILED':
             jobids, force = None, False
             siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority = None, None, None, None, None, None
-            
+
         ## We allow resubmission only if the task status is one of these:
         allowedTaskStates = ['SUBMITTED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
         ## We allow resubmission of successfully finished jobs if the user explicitly

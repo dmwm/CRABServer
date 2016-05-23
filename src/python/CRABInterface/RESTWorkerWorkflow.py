@@ -10,6 +10,7 @@ from CRABInterface.Regexps import RX_TASKNAME, RX_BLOCK, RX_WORKER_NAME, RX_STAT
 
 # external dependecies here
 import cherrypy
+import calendar
 from ast import literal_eval
 from base64 import b64decode
 
@@ -112,10 +113,10 @@ def fixupTask(task):
 
     result = task._asdict()
 
-    #fixup values that needs to be strings
+    #fixup timestamps
     for field in ['tm_start_time', 'tm_start_injection', 'tm_end_injection']:
         current = result[field]
-        result[field] = str(current)
+        result[field] = str(calendar.timegm(current.utctimetuple())) if current else ''
 
     #fixup CLOBS values by calling read (only for Oracle)
     for field in ['tm_task_failure', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles', 'tm_edm_outfiles',
@@ -129,7 +130,6 @@ def fixupTask(task):
                   'tm_edm_outfiles', 'panda_resubmitted_jobs', 'tm_user_infiles', 'tm_arguments', 'tm_scriptargs',
                   'tm_user_files']:
         current = result[field]
-        print current, field, str(type(current))
         result[field] = literal_eval(current)
 
     #convert tm_arguments to the desired values

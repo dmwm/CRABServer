@@ -42,7 +42,7 @@ class DagmanResubmitter(TaskAction):
             resubmitWhat = "jobs"
 
         self.logger.info("About to resubmit %s for workflow: %s." % (resubmitWhat, workflow))
-        self.logger.info("Task info: %s" % str(task))
+        self.logger.debug("Task info: %s" % str(task))
 
         if task.get('resubmit_publication', False):
             asourl = task.get('tm_asourl', None)

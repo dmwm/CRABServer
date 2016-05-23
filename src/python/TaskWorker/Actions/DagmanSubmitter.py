@@ -8,12 +8,15 @@ import time
 import pickle
 import urllib
 
+from httplib import HTTPException
+
 import HTCondorUtils
 import CMSGroupMapper
 import HTCondorLocator
 
-from httplib import HTTPException
 from ServerUtilities import FEEDBACKMAIL
+from ServerUtilities import TASKLIFETIME
+
 import TaskWorker.DataObjects.Result as Result
 import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
@@ -300,6 +303,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         cwd = os.getcwd()
         os.chdir(kwargs['tempDir'])
 
+        info['start_time'] = task['tm_start_time']
         info['inputFilesString'] = ", ".join(inputFiles)
         outputFiles = ["RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001"]
         info['outputFilesString'] = ", ".join(outputFiles)
@@ -385,8 +389,12 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["Cmd"] = cmd
         dagAd['Args'] = arg
         dagAd["TransferInput"] = str(info['inputFilesString'])
-        dagAd["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
-        dagAd["PeriodicRemove"] = classad.ExprTree("(JobStatus == 5) && (time()-EnteredCurrentStatus > 30*86400)")
+        dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"])
+        # Putting JobStatus == 4 since LeaveJobInQueue is for completed jobs (probably redundant)
+        LEAVE_JOB_IN_QUEUE_EXPR = "(JobStatus == 4) && ((time()-CRAB_TaskSubmitTime) < %s)" % TASKLIFETIME
+        dagAd["LeaveJobInQueue"] = classad.ExprTree(LEAVE_JOB_IN_QUEUE_EXPR)
+        # Removing a task after the expiration date no matter what its status is
+        dagAd["PeriodicRemove"] = classad.ExprTree("((time()-CRAB_TaskSubmitTime) > %s)" % TASKLIFETIME)
         dagAd["TransferOutput"] = info['outputFilesString']
         dagAd["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
         dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
@@ -404,9 +412,11 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 resultAds = []
                 condorIdDict['ClusterId'] = schedd.submit(dagAd, 1, True, resultAds)
                 schedd.spool(resultAds)
+                # editing the LeaveJobInQueue since the remote submit overwrites it
+                # see https://github.com/dmwm/CRABServer/pull/5212#issuecomment-216519749
                 if resultAds:
                     id_ = "%s.%s" % (resultAds[0]['ClusterId'], resultAds[0]['ProcId'])
-                    schedd.edit([id_], "LeaveJobInQueue", classad.ExprTree("(JobStatus == 4) && (time()-EnteredCurrentStatus < 30*86400)"))
+                    schedd.edit([id_], "LeaveJobInQueue", classad.ExprTree(LEAVE_JOB_IN_QUEUE_EXPR))
 
         results = pickle.load(rpipe)
 
