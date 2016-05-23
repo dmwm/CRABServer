@@ -103,6 +103,7 @@ class MasterWorker(object):
             logger.debug("Logging level initialized to %s.", loglevel)
             return logger
 
+
         self.STOP = False
         self.TEST = test
         self.logger = setRootLogger(quiet, debug)
@@ -309,8 +310,18 @@ if __name__ == '__main__':
     if not status_:
         raise ConfigException(msg_)
 
-    mw = MasterWorker(configuration, quiet=options.quiet, debug=options.debug)
-    signal.signal(signal.SIGINT, mw.quit_)
-    signal.signal(signal.SIGTERM, mw.quit_)
-    mw.algorithm()
-    mw.slaves.end()
+    mw = None
+    try:
+        mw = MasterWorker(configuration, quiet=options.quiet, debug=options.debug)
+        signal.signal(signal.SIGINT, mw.quit_)
+        signal.signal(signal.SIGTERM, mw.quit_)
+        mw.algorithm()
+    except:
+        if mw:
+            mw.logger.exception("Unexpected and fatal error. Exiting task worker")
+        #don't really wanna miss this, propagating the exception and exiting really bad
+        raise
+    finally:
+        #there can be an exception before slaves are created, e.g. in the __init__
+        if hasattr(mw, 'slaves'):
+            mw.slaves.end()
