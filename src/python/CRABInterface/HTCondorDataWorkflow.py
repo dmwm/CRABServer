@@ -330,43 +330,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                     for outputFileDetails in outputDatasetDetails.values():
                         res['outputDatasets'][outputDataset]['numEvents'] += outputFileDetails['NumberOfEvents']
 
-        ## Old logic kept here only for backward compatibility. Remove it in March 2016 release.
-        res['dbsInLumilist'] = {}
-        res['dbsInLumilistNewClientOldTask'] = {}
-        res['dbsOutLumilist'] = {}
-        res['dbsNumEvents'] = 0
-        res['dbsNumFiles'] = 0
-        if inputDataset:
-            try:
-                #load the input dataset's lumilist
-                dbs = DBSReader(dbsUrl)
-                inputDetails = dbs.listDatasetFileDetails(inputDataset)
-                res['dbsInLumilist'] = _compactLumis(inputDetails)
-                res['dbsInLumilistNewClientOldTask'] = LumiList(runsAndLumis=_compactLumis(inputDetails)).getCompactList()
-                self.logger.info("Aggregated input lumilist: %s" % res['dbsInLumilist'])
-            except Exception as ex:
-                msg = "Failed to contact DBS: %s" % str(ex)
-                self.logger.exception(msg)
-                raise ExecutionError("Exception while contacting DBS. Cannot get the input lumi lists.")
-        if outputDatasets and publication:
-            try:
-                #load the output datasets' lumilist
-                dbs = DBSReader("https://cmsweb.cern.ch/dbs/prod/phys03/DBSReader") #We can only publish here with DBS3
-                outLumis = []
-                for outputDataset in outputDatasets:
-                    outputDetails = dbs.listDatasetFileDetails(outputDataset)
-                    outLumis.append(_compactLumis(outputDetails))
-                    res['dbsNumEvents'] += sum(x['NumberOfEvents'] for x in outputDetails.values())
-                    res['dbsNumFiles'] += sum(len(x['Parents']) for x in outputDetails.values())
-                outLumis = LumiList(runsAndLumis = outLumis).compactList
-                for run, lumis in outLumis.iteritems():
-                    res['dbsOutLumilist'][run] = reduce(lambda x1, x2: x1+x2, map(lambda x: range(x[0], x[1]+1), lumis))
-                self.logger.info("Aggregated output lumilist: %s" % res['dbsOutLumilist'])
-            except Exception as ex:
-                msg = "Failed to contact DBS: %s" % str(ex)
-                self.logger.exception(msg)
-                raise ExecutionError("Exception while contacting DBS. Cannot get the output lumi lists.")
-
         yield res
 
 
