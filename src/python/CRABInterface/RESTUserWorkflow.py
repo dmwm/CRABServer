@@ -14,9 +14,8 @@ from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import allScramArchsAndVe
 from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
 
 # CRABServer dependecies here
-from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
-from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
+from CRABInterface.RESTExtensions import authz_owner_match
 from CRABInterface.Regexps import *
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
 from ServerUtilities import checkOutLFN
@@ -278,7 +277,7 @@ class RESTUserWorkflow(RESTEntity):
         sites = self.allPNNNames.sites if pnn else self.allCMSNames.sites
         if site not in sites:
             excasync = ValueError("A site name you specified is not valid")
-            invalidp = InvalidParameter("The parameter %s is not in the list of known CMS sites %s" % (site, sites), errobj = excasync)
+            invalidp = InvalidParameter("The parameter %s is not in the list of known CMS PhEDEx nodes." % (site), errobj = excasync)
             setattr(invalidp, 'trace', '')
             raise invalidp
 
@@ -314,7 +313,6 @@ class RESTUserWorkflow(RESTEntity):
     @conn_handler(services=['sitedb', 'centralconfig'])
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
-        #authz_login_valid()
 
         if method in ['PUT']:
             ## Define the taskname and write it in the 'workflow' parameter.
