@@ -61,10 +61,10 @@ class RESTServerInfo(RESTEntity):
         workflow = kwargs['workflow']
         try:
             loc = HTCondorLocator.HTCondorLocator(backendurl)
-            schedd, address = loc.getScheddObj(workflow) 
+            schedd, address = loc.getScheddObjNew(workflow)
         except Exception as ex:
             self.logger.exception(ex)
-            raise ExecutionError("Unable to get schedd address for task %s" % (workflow))(ex)
+            raise ExecutionError("Unable to get schedd address for task %s" % (workflow))
         yield loc.scheddAd['Machine']
 
     @conn_handler(services=['centralconfig'])
