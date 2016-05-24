@@ -41,7 +41,6 @@ def memoryBasedChoices(schedds, restSchedds, logger=None):
     """ Choose the schedd based on the DetectedMemory classad present in the schedds object
         Return a list of scheddobj and the weight to be used in the weighted choice
     """
-    import pdb;pdb.set_trace()
     schedds_dict = {}
     for schedd in schedds:
         if 'DetectedMemory' in schedd and 'Name' in schedd:
