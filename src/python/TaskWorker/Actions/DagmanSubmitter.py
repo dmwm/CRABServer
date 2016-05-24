@@ -105,6 +105,7 @@ class ScheddStats(dict):
         self.procnum = None
         self.schedd = None
         self.clusterId = None
+        self.taskErrors = {}
         self.pid = os.getpid()
         dict.__init__(self)
 
@@ -119,6 +120,12 @@ class ScheddStats(dict):
         #in case of failure clear schedd and clusterId
         self.schedd = None
         self.clusterId = None
+
+    def taskError(self, schedd, msg):
+        self.taskErrors.setdefault(schedd, []).append(msg)
+
+    def resetTaskInfo(self):
+        self.taskErrors = {}
 
     def __str__(self):
         res = "Summary of schedd failures/successes for slave process %s (PID %s):\n" % (self.procnum, self.pid)
@@ -143,10 +150,11 @@ class DagmanSubmitter(TaskAction.TaskAction):
     def __init__(self, *args, **kwargs):
         TaskAction.TaskAction.__init__(self, *args, **kwargs)
         scheddStats.procnum = kwargs['procnum']
+        scheddStats.resetTaskInfo()
         self.clusterId = None
 
 
-    def getScheddList(self, task):
+    def getScheddListFromREST(self, task):
         """ Get the list of good schedulers from the REST interface (backend urls)
             Might return an empty list if not able to contact the REST
             In any case the schedd choosen by the user in the crabconfig is put in the first place
@@ -171,6 +179,23 @@ class DagmanSubmitter(TaskAction.TaskAction):
         return goodSchedulers
 
 
+    def sendScheddToREST(self, task, schedd):
+        """ Try to set the schedd to the oracle database in the REST interface
+            Raises TaskWorkerException in case of failure
+        """
+        task['tm_schedd'] = schedd
+        userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
+        configreq = {'workflow':task['tm_taskname'], 'subresource':'updateschedd',
+            'scheddname':schedd}
+        try:
+            userServer.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
+        except HTTPException as hte:
+            msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
+            self.logger.warning(msg)
+            time.sleep(20)
+            raise TaskWorkerException(msg) #we already tried 20 times, give up
+
+
     def checkMemoryWalltime(self, args, task):
         """ Check memory and walltime and if user requires too much:
             - upload warning back to crabserver
@@ -193,57 +218,74 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
 
 
-    def execute(self, *args, **kwargs):
-        task =  kwargs['task']
 
-        goodSchedulers = self.getScheddList(task)
+    def pickAndSetSchedd(self, task, goodSchedulers):
+        """ Pick up a schedd using the correct formula
+            Send it to the REST
+
+            If we can't send the schedd to the REST this is considered a permanent error
+        """
+        self.logger.debug("Picking up the scheduler")
+        loc = HTCondorLocator.HTCondorLocator(self.backendurls)
+        schedd = loc.getSchedd()
+        self.logger.debug("Finished picking up scheduler. Sending schedd to rest")
+        self.sendScheddToREST(task, schedd)
+        self.logger.debug("Schedd sent to REST.")
+
+        return schedd
+
+
+    def execute(self, *args, **kwargs):
+        """ Execute is the core method that submit the task to the schedd.
+            The schedd can be defined in the tm_schedd task parameter if the user selected a schedd or it is a retry, otherwise it is empty.
+                If it is empty the method will choose one
+                If it contains a schedd it will do the duplicate check and try to submit the task to it
+                In case of multiple failures is will set a new schedd and return back to the asction handler for retries.
+        """
+        task =  kwargs['task']
+        schedd = task['tm_schedd']
+
+        goodSchedulers = self.getScheddListFromREST(task)
         self.checkMemoryWalltime(args, task)
 
-        retryIssuesBySchedd = {}
+        if not schedd:
+            schedd = self.pickAndSetSchedd(task, goodSchedulers)
 
-        userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
-        for schedd in goodSchedulers:
-            #If submission failure is true, trying to change a scheduler
-            configreq = {'workflow': task['tm_taskname'],
-                         'subresource': 'updateschedd',
-                         'scheddname': schedd}
+        self.logger.debug("Starting duplicate check")
+        dupRes = self.duplicateCheck(task)
+        self.logger.debug("Duplicate check finished with result %s", dupRes)
+        if dupRes != None:
+            return dupRes
+
+
+        for retry in range(self.config.TaskWorker.max_retry + 1): #max_retry can be 0
+            self.logger.debug("Trying to submit task %s to schedd %s for the %s time.", task['tm_taskname'], schedd, str(retry))
             try:
-                userServer.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
-                task['tm_schedd'] = schedd
-            except HTTPException as hte:
-                msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
-                self.logger.warning(msg)
-                time.sleep(20)
-                retryIssuesBySchedd[schedd] = [msg]
-                continue
-            retryIssues = []
-            for retry in range(self.config.TaskWorker.max_retry + 1): #max_retry can be 0
-                self.logger.debug("Trying to submit task %s %s time.", task['tm_taskname'], str(retry))
-                try:
-                    execInt = self.executeInternal(*args, **kwargs)
-                    scheddStats.success(schedd, self.clusterId)
-                    return execInt
-                except Exception as ex:
-                    scheddStats.failure(schedd)
-                    msg = "Failed to submit task %s; '%s'"% (task['tm_taskname'], str(ex))
-                    self.logger.exception(msg)
-                    retryIssues.append(msg)
-                    if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
-                        self.logger.error("Will retry in %s seconds.", self.config.TaskWorker.retry_interval[retry])
-                        time.sleep(self.config.TaskWorker.retry_interval[retry])
-                finally:
-                    self.logger.info(scheddStats)
+                execInt = self.executeInternal(*args, **kwargs)
+                scheddStats.success(schedd, self.clusterId)
+                return execInt
+            except Exception as ex: #pylint: disable=broad-except
+                scheddStats.failure(schedd)
+                msg = "Failed to submit task %s; '%s'"% (task['tm_taskname'], str(ex))
+                self.logger.exception(msg)
+                scheddStats.taskError(schedd, msg)
+                if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
+                    self.logger.debug("choosing a new schedd and then retrying")
+                    self.pickAndSetSchedd(task, goodSchedulers)
+                    self.logger.error("Will retry in %s seconds.", self.config.TaskWorker.retry_interval[retry])
+                    time.sleep(self.config.TaskWorker.retry_interval[retry])
+            finally:
+                self.logger.info(scheddStats)
             ## All the submission retries to the current schedd have failed. Record the
             ## failures.
-            retryIssuesBySchedd[schedd] = retryIssues
-        ## All the submission retries to all possible schedds have failed.
+        ## All the submission retries to this schedd have failed.
         msg = "The CRAB server backend was not able to submit the jobs to the Grid schedulers."
         msg += " This could be a temporary glitch. Please try again later."
         msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
-        msg += " The submission was retried %s times on %s schedulers." % (sum(map(len, retryIssuesBySchedd.values())), len(retryIssuesBySchedd))
-        msg += " These are the failures per Grid scheduler: %s" % (str(retryIssuesBySchedd))
+        msg += " The submission was retried %s times on %s schedulers." % (sum([len(x) for x in scheddStats.taskErrors.values()]), len(scheddStats.taskErrors))
+        msg += " These are the failures per Grid scheduler: %s" % (str(scheddStats.taskErrors))
         self.logger.error(msg)
-        raise TaskWorkerException(msg)
+        raise TaskWorkerException(msg, retry=True)
 
 
     def duplicateCheck(self, task):
@@ -327,12 +369,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dashboardParams = args[0][1]
         inputFiles = args[0][2]
 
-        self.logger.debug("Starting duplicate check")
-        dup = self.duplicateCheck(task)
-        self.logger.debug("Duplicate check finished %s", dup)
-        if dup != None:
-            return dup
-
         cwd = os.getcwd()
         os.chdir(kwargs['tempDir'])
 
@@ -373,11 +409,12 @@ class DagmanSubmitter(TaskAction.TaskAction):
             info['remote_condor_setup'] = loc.scheddAd.get("RemoteCondorSetup", "")
 
             info["CMSGroups"] = set.union(CMSGroupMapper.map_user_to_groups(kwargs['task']['tm_username']), kwargs['task']['user_groups'])
-            self.logger.info("User %s mapped to local groups %s.", (kwargs['task']['tm_username'], info["CMSGroups"]))
+            self.logger.info("User %s mapped to local groups %s.", kwargs['task']['tm_username'], info["CMSGroups"])
 
             self.logger.debug("Finally submitting to the schedd")
             if address:
                 self.clusterId = self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
+                raise TaskWorkerException("Not able to get schedd address.", retry=True)
             else:
                 raise TaskWorkerException("Not able to get schedd address.", retry=True)
             self.logger.debug("Submission finished")
