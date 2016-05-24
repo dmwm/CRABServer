@@ -1,3 +1,4 @@
+from __future__ import division
 from __future__ import absolute_import
 import bisect
 import random
@@ -19,31 +20,47 @@ def weighted_choice(choices):
     i = bisect.bisect(cum_weights, x)
     return values[i]
 
-
-def memoryBasedChoices(schedds, htcondorSchedds):
+def capacityMetricsChoices(schedds, restSchedds, logger=None):
     """ Choose the schedd based on the DetectedMemory classad present in the schedds object
         Return a list of scheddobj and the weight to be used in the weighted choice
     """
+    schedds_usage = {}
+    totalMemory = sum([ schedd['DetectedMemory'] for schedd in schedds if 'DetectedMemory' in schedd])
+    totalJobs = sum([ schedd['MaxJobsRunning'] for schedd in schedds if 'MaxJobsRunning' in schedd])
+    totalUploads = sum([ schedd['TransferQueueMaxUploading'] for schedd in schedds if 'TransferQueueMaxUploading' in schedd])
+    for schedd in schedds:
+        logger.debug("%s: Mem %s, Mx %s;  Run %s, Mx %s;  Trf %s, Max %s", schedd['Name'], schedd['DetectedMemory'], totalMemory,
+                     schedd['JobsRunning'], totalJobs, schedd['TransferQueueNumUploading'], totalUploads)
+        schedds_usage[schedd['Name']] = max(schedd['DetectedMemory']/totalMemory,
+                                            schedd['JobsRunning']/totalJobs, schedd['TransferQueueNumUploading']/totalUploads)
+
+    choices = [(schedd, 1/schedds_usage.get(schedd, .5)) for schedd in restSchedds]
+    return choices
+
+def memoryBasedChoices(schedds, restSchedds, logger=None):
+    """ Choose the schedd based on the DetectedMemory classad present in the schedds object
+        Return a list of scheddobj and the weight to be used in the weighted choice
+    """
+    import pdb;pdb.set_trace()
     schedds_dict = {}
     for schedd in schedds:
         if 'DetectedMemory' in schedd and 'Name' in schedd:
             schedds_dict[schedd['Name']] = schedd['DetectedMemory']
-
-    choices = [(i, schedds_dict.get(i, 24 * 1024)) for i in htcondorSchedds]
+    choices = [(i, schedds_dict.get(i, 24 * 1024)) for i in restSchedds]
     return choices
 
 
 class HTCondorLocator(object):
 
-    def __init__(self, config):
+    def __init__(self, config, logger=None):
         self.config = config
+        self.logger = logger
 
     def getSchedd(self, chooserFunction=memoryBasedChoices):
         """
         Determine a schedd to use for this task.
         """
         collector = self.getCollector()
-        schedd = "localhost"
 
         htcondor.param['COLLECTOR_HOST'] = collector
         coll = htcondor.Collector()
@@ -51,7 +68,7 @@ class HTCondorLocator(object):
                             'TransferQueueNumUploading', 'TransferQueueMaxUploading', 'TotalRunningJobs', 'JobsRunning',
                             'MaxJobsRunning', 'IsOK'])
         if self.config and "htcondorSchedds" in self.config:
-            choices = chooserFunction(schedds, self.config['htcondorSchedds'])
+            choices = chooserFunction(schedds, self.config['htcondorSchedds'], self.logger)
         schedd = weighted_choice(choices)
         return schedd
 
