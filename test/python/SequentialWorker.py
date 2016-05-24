@@ -8,7 +8,7 @@
 """
 
 from WMCore.Configuration import Configuration
-from TaskWorker.MasterWorker import MasterWorker
+from TaskWorker.MasterWorker import MasterWorker, validateConfig
 
 import logging
 import sys
@@ -19,5 +19,6 @@ from WMCore.Configuration import loadConfigurationFile, Configuration
 config = loadConfigurationFile( sys.argv[1] )
 config.TaskWorker.nslaves = 1
 
+validateConfig(config)
 mc = MasterWorker(config, False, True, True)
 mc.algorithm()

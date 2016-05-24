@@ -227,7 +227,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
         """
         self.logger.debug("Picking up the scheduler")
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
-        schedd = loc.getSchedd()
+        if hasattr(self.config.TaskWorker, 'scheddPickerFunction'):
+            schedd = loc.getSchedd(chooserFunction=self.config.TaskWorker.scheddPickerFunction)
+        else:
+            schedd = loc.getSchedd() #uses the default memory stuff
         self.logger.debug("Finished picking up scheduler. Sending schedd to rest")
         self.sendScheddToREST(task, schedd)
         self.logger.debug("Schedd sent to REST.")
@@ -414,7 +417,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.logger.debug("Finally submitting to the schedd")
             if address:
                 self.clusterId = self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
-                raise TaskWorkerException("Not able to get schedd address.", retry=True)
             else:
                 raise TaskWorkerException("Not able to get schedd address.", retry=True)
             self.logger.debug("Submission finished")
