@@ -7,6 +7,7 @@ import traceback
 import multiprocessing
 from Queue import Empty
 from base64 import b64encode
+from logging import FileHandler
 from httplib import HTTPException
 from logging.handlers import TimedRotatingFileHandler
 
@@ -30,6 +31,26 @@ def truncateError(msg):
     else:
         return msg
 
+
+def addTaskLogHandler(logger, username, taskname):
+    #set the logger to save the tasklog
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
+    taskdirname = "logs/tasks/%s/" % username
+    if not os.path.isdir(taskdirname):
+        os.mkdir(taskdirname)
+    taskhandler = FileHandler(taskdirname + taskname + '.log')
+    taskhandler.setFormatter(formatter)
+    taskhandler.setLevel(logging.DEBUG)
+    logger.addHandler(taskhandler)
+
+    return taskhandler
+
+
+def removeTaskLogHandler(logger, taskhandler):
+    taskhandler.flush()
+    taskhandler.close()
+    logger.removeHandler(taskhandler)
+
 def processWorker(inputs, results, resthost, resturi, procnum):
     """Wait for an reference to appear in the input queue, call the referenced object
        and write the output in the output queue.
@@ -45,6 +66,7 @@ def processWorker(inputs, results, resthost, resturi, procnum):
             ## Get (and remove) an item from the input queue. If the queue is empty, wait
             ## until an item is available.
             workid, work, task, failstatus, inputargs = inputs.get()
+            taskhandler = addTaskLogHandler(logger, task['tm_username'], task['tm_taskname'])
         except (EOFError, IOError):
             crashMessage = "Hit EOF/IO in getting new work\n"
             crashMessage += "Assuming this is a graceful break attempt.\n"
@@ -90,6 +112,7 @@ def processWorker(inputs, results, resthost, resturi, procnum):
                     logger.exception('Traceback follows:')
         t1 = time.time()
         logger.debug("%s: ...work on %s completed in %d seconds: %s", procName, task['tm_taskname'], t1-t0, outputs)
+        removeTaskLogHandler(logger, taskhandler)
 
         results.put({
                      'workid': workid,
