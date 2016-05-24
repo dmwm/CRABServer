@@ -50,11 +50,6 @@ class DataWorkflow(object):
            """
         return workflow
 
-    @classmethod
-    def chooseScheduler(cls, scheddname=None, backend_urls=None):
-        """ Has to be subclassed """
-        raise NotImplementedError
-
     def getLatests(self, username, timestamp):
         """Retrives the latest workflows for the user
 
@@ -168,13 +163,6 @@ class DataWorkflow(object):
         else:
             collector = backend_urls['htcondorPool']
 
-        schedd_name = ""
-        try:
-            schedd_name = self.chooseScheduler(scheddname, backend_urls).split(":")[0]
-        except IOError as err:
-            self.logger.debug("Failed to communicate with components %s. Request name %s: " % (str(err), str(workflow)))
-            raise ExecutionError("Failed to communicate with crabserver components. If problem persist, please report it.")
-
         splitArgName = self.splitArgMap[splitalgo]
         dbSerializer = str
 
@@ -245,7 +233,7 @@ class DataWorkflow(object):
                             asourl          = [asourl],
                             asodb           = [asodb],
                             collector       = [collector],
-                            schedd_name     = [schedd_name],
+                            schedd_name     = [None],
                             dry_run         = ['T' if dryrun else 'F'],
                             user_files       = [dbSerializer(userfiles)],
                             transfer_outputs = ['T' if saveoutput else 'F'],

@@ -37,15 +37,6 @@ class HTCondorDataWorkflow(DataWorkflow):
     """ HTCondor implementation of the status command.
     """
 
-    @classmethod
-    @conn_handler(services=['centralconfig'])
-    def chooseScheduler(cls, scheddname=None, backend_urls=None):
-        if not scheddname:
-            locator = HTCondorLocator.HTCondorLocator(backend_urls)
-            scheddname = locator.getSchedd()
-        return scheddname
-
-
     def getRootTasks(self, workflow, schedd):
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
         rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType', "HoldReason", "HoldReasonCode", "CRAB_UserWebDir",
