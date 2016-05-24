@@ -1,7 +1,7 @@
 from WMCore.Configuration import Configuration
 config = Configuration()
 
-#General section
+#General Section
 config.section_("General")
 config.General.requestName = 'CHANGE'
 config.General.workArea = 'CHANGE'
@@ -12,23 +12,20 @@ config.General.activity = 'analysistest'
 
 #Job Type Section
 config.section_("JobType")
-config.JobType.pluginName = 'Analysis'
-config.JobType.psetName = 'psets/pset_use_parent.py'
+config.JobType.pluginName = 'PrivateMC'
+config.JobType.psetName = 'psets/pset_tutorial_MC_generation.py'
 config.JobType.disableAutomaticOutputCollection = False
 
 #Data Section
 config.section_("Data")
-config.Data.inputDataset = '/MinimumBias/Run2015B-PromptReco-v1/RECO'
-config.Data.inputDBS = 'global'
-config.Data.useParent = True
-config.Data.splitting = 'LumiBased'
-config.Data.unitsPerJob = 100
-config.Data.totalUnits = 10000
+config.Data.outputPrimaryDataset = 'MinBias'
+config.Data.splitting = 'EventBased'
+config.Data.unitsPerJob = 1 
+config.Data.totalUnits = 5 
 config.Data.ignoreLocality = False
 config.Data.publication = True
 config.Data.publishDBS = 'phys03'
 config.Data.outputDatasetTag = 'CHANGE'
-config.Data.allowNonValidInputDataset =True
 
 #Site Section
 config.section_("Site")

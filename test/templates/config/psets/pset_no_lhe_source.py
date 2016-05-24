@@ -26,7 +26,7 @@ process.maxEvents = cms.untracked.PSet(
 )
 
 # Input source
-process.source = cms.Source("LHESource",
+process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring('file:dynlo.lhe')
 )
 
