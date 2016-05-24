@@ -114,13 +114,14 @@ class TaskHandler(object):
             t0 = time.time()
             retryCount = 0
             #execute the current action dealing with retriesz
-            while retryCount < 5:
+            MAX_RETRIES = 5
+            while retryCount < MAX_RETRIES:
                 try:
                     output = self.executeAction(nextinput, action)
                 except WorkerHandlerException as whe:
-                    if whe.retry == False:
-                        raise
                     retryCount += 1
+                    if whe.retry == False or retryCount >= MAX_RETRIES:
+                        raise
                     time.sleep(60 * retryCount)
                 else:
                     break
