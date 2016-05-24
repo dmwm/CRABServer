@@ -1,11 +1,7 @@
 import FWCore.ParameterSet.Config as cms
 process = cms.Process('UseParent')
 process.source = cms.Source('PoolSource',
-        fileNames = cms.untracked.vstring(
-            # '/store/data/Run2012C/MinimumBias/RAW-RECO/25Feb2013-v1/10000/0274B626-B27F-E211-A7F4-20CF305B04F5.root'
-            '/store/data/Run2012C/SingleMu/RAW/v1/000/198/050/18073F7C-2DC4-E111-BEE0-003048D2BDD8.root'
-            #'/store/data/Run2012A/MinimumBias/AOD/22Jan2013-v1/20000/001D07E3-CF67-E211-B063-002590596468.root'
-        ),
+        fileNames = cms.untracked.vstring('/store/data/Run2015B/MinimumBias/RAW/v1/000/250/974/00000/DA155786-0E24-E511-8FA7-02163E014624.root'),
 )
 
 process.dump = cms.EDAnalyzer(
