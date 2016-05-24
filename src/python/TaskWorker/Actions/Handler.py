@@ -4,7 +4,6 @@ import time
 import logging
 import tempfile
 import traceback
-from logging import FileHandler
 from httplib import HTTPException
 
 from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
@@ -12,7 +11,6 @@ from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 from RESTInteractions import HTTPRequests
 
 from TaskWorker.Actions.Splitter import Splitter
-from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.DagmanKiller import DagmanKiller
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
@@ -23,7 +21,7 @@ from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
 from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
-from TaskWorker.WorkerExceptions import WorkerHandlerException, StopHandler, TaskWorkerException
+from TaskWorker.WorkerExceptions import WorkerHandlerException, TaskWorkerException
 
 DEFAULT_BACKEND = 'glidein'
 
@@ -58,27 +56,6 @@ class TaskHandler(object):
         return tempDir
 
 
-    def addTaskLogHandler(self):
-        #set the logger to save the tasklog
-        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
-        taskdirname = "logs/tasks/%s/" % self._task['tm_username']
-        if not os.path.isdir(taskdirname):
-            os.mkdir(taskdirname)
-        taskhandler = FileHandler(taskdirname + self._task['tm_taskname'] + '.log')
-        taskhandler.setFormatter(formatter)
-        taskhandler.setLevel(logging.DEBUG)
-        self.logger.addHandler(taskhandler)
-        self.server.logger = self.logger
-
-        return taskhandler
-
-
-    def removeTaskLogHandler(self, taskhandler):
-        taskhandler.flush()
-        taskhandler.close()
-        self.logger.removeHandler(taskhandler)
-
-
     def addWork(self, work):
         """Appending a new action to be performed on the task
 
@@ -95,62 +72,67 @@ class TaskHandler(object):
             yield w
 
 
-    def actionWork(self, *args, **kwargs):
+    def executeAction(self, nextinput, work):
+        """ Execute an action and deal with the error handling and upload of the tasklogfile to the crabcache
+        """
+        try:
+            output = work.execute(nextinput, task=self._task, tempDir=self.tempDir)
+        except TaskWorkerException as twe:
+            self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
+            raise WorkerHandlerException(str(twe), retry = twe.retry) #TaskWorker error, do not add traceback to the error propagated to the REST
+        except Exception as exc:
+            msg = "Problem handling %s because of %s failure, traceback follows\n" % (self._task['tm_taskname'], str(exc))
+            msg += str(traceback.format_exc())
+            self.logger.error(msg)
+            raise WorkerHandlerException(msg) #Errors not foreseen. Print everything!
+        finally:
+            #TODO: we need to do that also in Worker.py otherwise some messages might only be in the TW file but not in the crabcache.
+            logpath = 'logs/tasks/%s/%s.log' % (self._task['tm_username'], self._task['tm_taskname'])
+            if os.path.isfile(logpath) and 'user_proxy' in self._task: #the user proxy might not be there if myproxy retrieval failed
+                cacheurldict = {'endpoint':self._task['tm_cache_url'], 'cert':self._task['user_proxy'], 'key':self._task['user_proxy']}
+                try:
+                    ufc = UserFileCache(cacheurldict)
+                    logfilename = self._task['tm_taskname'] + '_TaskWorker.log'
+                    ufc.uploadLog(logpath, logfilename)
+                except HTTPException as hte:
+                    msg = "Failed to upload the logfile to %s for task %s. More details in the http headers and body:\n%s\n%s" % (self._task['tm_cache_url'], self._task['tm_taskname'], hte.headers, hte.result)
+                    self.logger.error(msg)
+                except Exception: #pylint: disable=broad-except
+                    msg = "Unknown error while uploading the logfile for task %s" % self._task['tm_taskname']
+                    self.logger.exception(msg) #upload logfile of the task to the crabcache
+
+        return output
+
+
+    def actionWork(self, *args, **kwargs): #pylint: disable=unused-argument
         """Performing the set of actions"""
         nextinput = args
 
-        taskhandler = self.addTaskLogHandler()
-
-        # I know it looks like a duplicated printout from the process logs (proc.N.log) perspective.
-        # Infact we have a smilar printout in the processWorker function of the Worker module, but
-        # it does not go to the task logfile and it is useful imho.
-        self.logger.debug("Process %s is starting %s on task %s" % (self.procnum, self.workFunction, self._task['tm_taskname']))
-
-        for work in self.getWorks():
-            #Loop that iterates over the actions to be performed
-            self.logger.debug("Starting %s on %s" % (str(work), self._task['tm_taskname']))
+        #Loop that iterates over the actions to be performed
+        for action in self.getWorks():
+            self.logger.debug("Starting %s on %s", str(action), self._task['tm_taskname'])
             t0 = time.time()
-            try:
-                output = work.execute(nextinput, task=self._task, tempDir=self.tempDir)
-            except StopHandler as sh:
-                msg = "Controlled stop of handler for %s on %s " % (self._task, str(sh))
-                self.logger.error(msg)
-                nextinput = Result(task=self._task, result='StopHandler exception received, controlled stop')
-                break #exit normally. Worker will not notice there was an error
-            except TaskWorkerException as twe:
-                self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
-                self.removeTaskLogHandler(taskhandler)
-                raise WorkerHandlerException(str(twe)) #TaskWorker error, do not add traceback to the error propagated to the REST
-            except Exception as exc:
-                msg = "Problem handling %s because of %s failure, traceback follows\n" % (self._task['tm_taskname'], str(exc))
-                msg += str(traceback.format_exc())
-                self.logger.error(msg)
-                self.removeTaskLogHandler(taskhandler)
-                raise WorkerHandlerException(msg) #Errors not foreseen. Print everything!
-            finally:
-                #upload logfile of the task to the crabcache
-                logpath = 'logs/tasks/%s/%s.log' % (self._task['tm_username'], self._task['tm_taskname'])
-                if os.path.isfile(logpath) and 'user_proxy' in self._task: #the user proxy might not be there if myproxy retrieval failed
-                    cacheurldict = {'endpoint': self._task['tm_cache_url'], 'cert' : self._task['user_proxy'], 'key' : self._task['user_proxy']}
-                    try:
-                        ufc = UserFileCache(cacheurldict)
-                        logfilename = self._task['tm_taskname'] + '_TaskWorker.log'
-                        ufc.uploadLog(logpath, logfilename)
-                    except HTTPException as hte:
-                        msg = ("Failed to upload the logfile to %s for task %s. More details in the http headers and body:\n%s\n%s" %
-                               (self._task['tm_cache_url'], self._task['tm_taskname'], hte.headers, hte.result))
-                        self.logger.error(msg)
-                    except Exception:
-                        msg = "Unknown error while uploading the logfile for task %s" % self._task['tm_taskname']
-                        self.logger.exception(msg)
+            retryCount = 0
+            #execute the current action dealing with retriesz
+            while retryCount < 5:
+                try:
+                    output = self.executeAction(nextinput, action)
+                except WorkerHandlerException as whe:
+                    if whe.retry == False:
+                        raise
+                    retryCount += 1
+                    time.sleep(60 * retryCount)
+                else:
+                    break
             t1 = time.time()
-            self.logger.info("Finished %s on %s in %d seconds" % (str(work), self._task['tm_taskname'], t1 - t0))
+            self.logger.info("Finished %s on %s in %d seconds", str(action), self._task['tm_taskname'], t1 - t0)
+
+            #XXX MM - Not really sure what this is and why it's here, but I hate this..
             try:
                 nextinput = output.result
             except AttributeError:
                 nextinput = output
 
-        self.removeTaskLogHandler(taskhandler)
 
         return nextinput
 
@@ -177,15 +159,12 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     elif task['tm_job_type'] == 'PrivateMC':
         handler.addWork(MakeFakeFileSet(config=config, server=server, resturi=resturi, procnum=procnum))
     handler.addWork(Splitter(config=config, server=server, resturi=resturi, procnum=procnum))
-    def glidein(config):
-        """Performs the injection of a new task into Glidein
-        :arg WMCore.Configuration config: input configuration"""
-        handler.addWork(DagmanCreator(config=config, server=server, resturi=resturi, procnum=procnum))
-        if task['tm_dry_run'] == 'T':
-            handler.addWork(DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum))
-        else:
-            handler.addWork(DagmanSubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
-    locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
+    handler.addWork(DagmanCreator(config=config, server=server, resturi=resturi, procnum=procnum))
+    if task['tm_dry_run'] == 'T':
+        handler.addWork(DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum))
+    else:
+        handler.addWork(DagmanSubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
+
     return handler.actionWork(args, kwargs)
 
 
@@ -202,12 +181,8 @@ def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=logging.getLogger(str(procnum)))
     handler = TaskHandler(task, procnum, server, config, 'handleResubmit')
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
-    def glidein(config):
-        """Performs the re-injection into Glidein
-        :arg WMCore.Configuration config: input configuration"""
-        handler.addWork(DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
+    handler.addWork(DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
 
-    locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
     return handler.actionWork(args, kwargs)
 
 
@@ -224,18 +199,6 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=logging.getLogger(str(procnum)))
     handler = TaskHandler(task, procnum, server, config, 'handleKill')
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 5))
-    def glidein(config):
-        """Performs kill of jobs sent through Glidein
-        :arg WMCore.Configuration config: input configuration"""
-        handler.addWork(DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum))
-    locals()[getattr(config.TaskWorker, 'backend', DEFAULT_BACKEND).lower()](config)
+    handler.addWork(DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum))
+
     return handler.actionWork(args, kwargs)
-
-
-if __name__ == '__main__':
-    print("New task")
-    handleNewTask(None, None, None, task, 0)
-    print("\nResubmit task")
-    handleResubmit(None, None, None, task, 0)
-    print("\nKill task")
-    handleKill(None, None, None, task, 0)

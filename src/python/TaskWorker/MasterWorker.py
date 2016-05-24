@@ -15,10 +15,11 @@ from WMCore.Configuration import loadConfigurationFile
 #CAFUtilities dependencies
 from RESTInteractions import HTTPRequests
 
-from TaskWorker.WorkerExceptions import ConfigException
+import HTCondorLocator
 from TaskWorker.TestWorker import TestWorker
 from MultiProcessingLog import MultiProcessingLog
 from TaskWorker.Worker import Worker, setProcessLogger
+from TaskWorker.WorkerExceptions import ConfigException
 from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
 from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
 
@@ -41,6 +42,8 @@ def validateConfig(config):
     :return bool, string: flag for validation result and a message."""
     if getattr(config, 'TaskWorker', None) is None:
         return False, "Configuration problem: Task worker section is missing. "
+    if not hasattr(config.TaskWorker, 'scheddPickerFunction'):
+        config.TaskWorker.scheddPickerFunction = HTCondorLocator.memoryBasedChoices
     return True, 'Ok'
 
 
