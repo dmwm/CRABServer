@@ -20,7 +20,7 @@ def weighted_choice(choices):
     i = bisect.bisect(cum_weights, x)
     return values[i]
 
-def capacityMetricsChoices(schedds, restSchedds, logger=None):
+def capacityMetricsChoices(schedds, goodSchedds, logger=None):
     """ Choose the schedd based on the DetectedMemory classad present in the schedds object
         Return a list of scheddobj and the weight to be used in the weighted choice
     """
@@ -34,10 +34,10 @@ def capacityMetricsChoices(schedds, restSchedds, logger=None):
         schedds_usage[schedd['Name']] = max(schedd['DetectedMemory']/totalMemory,
                                             schedd['JobsRunning']/totalJobs, schedd['TransferQueueNumUploading']/totalUploads)
 
-    choices = [(schedd, 1/schedds_usage.get(schedd, .5)) for schedd in restSchedds]
+    choices = [(schedd, 1/schedds_usage.get(schedd, .5)) for schedd in goodSchedds]
     return choices
 
-def memoryBasedChoices(schedds, restSchedds, logger=None):
+def memoryBasedChoices(schedds, goodSchedds, logger=None):
     """ Choose the schedd based on the DetectedMemory classad present in the schedds object
         Return a list of scheddobj and the weight to be used in the weighted choice
     """
@@ -45,7 +45,7 @@ def memoryBasedChoices(schedds, restSchedds, logger=None):
     for schedd in schedds:
         if 'DetectedMemory' in schedd and 'Name' in schedd:
             schedds_dict[schedd['Name']] = schedd['DetectedMemory']
-    choices = [(i, schedds_dict.get(i, 24 * 1024)) for i in restSchedds]
+    choices = [(i, schedds_dict.get(i, 24 * 1024)) for i in goodSchedds]
     return choices
 
 

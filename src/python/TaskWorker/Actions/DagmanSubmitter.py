@@ -4,6 +4,7 @@ Submit a DAG directory created by the DagmanCreator component.
 """
 
 import os
+import copy
 import time
 import pickle
 import urllib
@@ -154,31 +155,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         self.clusterId = None
 
 
-    def getScheddListFromREST(self, task):
-        """ Get the list of good schedulers from the REST interface (backend urls)
-            Might return an empty list if not able to contact the REST
-            In any case the schedd choosen by the user in the crabconfig is put in the first place
-        """
-        goodSchedulers = []
-        try:
-            goodSchedulers = self.server.get(self.restURInoAPI + '/info', data={'subresource': 'backendurls'})[0]['result'][0]['htcondorSchedds']
-            goodSchedulers = list(set(goodSchedulers)) #we do not care about
-        except HTTPException as hte:
-            self.logger.error(hte.headers)
-            self.logger.warning("Unable to contact cmsweb. Will use only on schedulers which was chosen by CRAB3 frontend.")
-        self.logger.info("Good schedulers list got from crabserver: %s ", goodSchedulers)
-        if task['tm_schedd'] not in goodSchedulers:
-            self.logger.info("Scheduler which is chosen is not in crabserver output %s.", goodSchedulers)
-            self.logger.info("No late binding of schedd. Will use %s for submission.", task['tm_schedd'])
-            goodSchedulers = [task['tm_schedd']]
-        else:
-            goodSchedulers.remove(task['tm_schedd'])
-            goodSchedulers.insert(0, task['tm_schedd']) #Make sure that first scheduler is used which is chosen by HTCondorLocator
-        self.logger.info("Final good schedulers list after shuffle: %s ", goodSchedulers)
-
-        return goodSchedulers
-
-
     def sendScheddToREST(self, task, schedd):
         """ Try to set the schedd to the oracle database in the REST interface
             Raises TaskWorkerException in case of failure
@@ -218,15 +194,20 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
 
 
-
-    def pickAndSetSchedd(self, task, goodSchedulers):
+    def pickAndSetSchedd(self, task):
         """ Pick up a schedd using the correct formula
             Send it to the REST
 
             If we can't send the schedd to the REST this is considered a permanent error
         """
         self.logger.debug("Picking up the scheduler")
-        loc = HTCondorLocator.HTCondorLocator(self.backendurls)
+        #copy the list of schedd from REST external configuration. They are loaded when action is created
+        restSchedulers = self.backendurls['htcondorSchedds']
+        alreadyTriedSchedds = scheddStats.taskErrors.keys() #keys in the taskerrors are schedd
+
+        currentBackendurls = copy.deepcopy(self.backendurls)
+        currentBackendurls['htcondorSchedds'] = dict([(s,restSchedulers[s]) for s in restSchedulers if s not in alreadyTriedSchedds])
+        loc = HTCondorLocator.HTCondorLocator(currentBackendurls)
         if hasattr(self.config.TaskWorker, 'scheddPickerFunction'):
             schedd = loc.getSchedd(chooserFunction=self.config.TaskWorker.scheddPickerFunction)
         else:
@@ -248,11 +229,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
         task =  kwargs['task']
         schedd = task['tm_schedd']
 
-        goodSchedulers = self.getScheddListFromREST(task)
         self.checkMemoryWalltime(args, task)
 
         if not schedd:
-            schedd = self.pickAndSetSchedd(task, goodSchedulers)
+            schedd = self.pickAndSetSchedd(task)
 
         self.logger.debug("Starting duplicate check")
         dupRes = self.duplicateCheck(task)
@@ -274,7 +254,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 scheddStats.taskError(schedd, msg)
                 if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
                     self.logger.debug("choosing a new schedd and then retrying")
-                    self.pickAndSetSchedd(task, goodSchedulers)
+                    self.pickAndSetSchedd(task)
                     self.logger.error("Will retry in %s seconds.", self.config.TaskWorker.retry_interval[retry])
                     time.sleep(self.config.TaskWorker.retry_interval[retry])
             finally:
@@ -314,7 +294,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
             msg += " Message from the scheduler: %s" % (str(exp))
             self.logger.exception("%s: %s", workflow, msg)
-            raise TaskWorkerException(msg)
+            raise TaskWorkerException(msg, retry=True)
 
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
 
