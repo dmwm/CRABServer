@@ -345,7 +345,8 @@ class HTCondorDataWorkflow(DataWorkflow):
                   "jobdefErrors"     : [],
                   "jobList"          : [],
                   "schedd"           : '', #from the db
-                  "collector"        : '' } #from the db
+                  "collector"        : '',  #from the db
+                  "username"         : ''} #from the db
 
         # First, verify the task has been submitted by the backend.
         self.logger.info("Got status request for workflow %s" % workflow)
@@ -361,6 +362,8 @@ class HTCondorDataWorkflow(DataWorkflow):
             result['command'] = row.task_command
 
         ## Add scheduler and collector to the result dictionary.
+        if row.username:
+            result['username'] = row.username
         if row.schedd:
             result['schedd'] = row.schedd
         if row.collector:
