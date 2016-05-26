@@ -24,7 +24,7 @@ class DagmanResubmitter(TaskAction):
     Internally, we simply release the failed DAG.
     """
 
-    def executeInternal(self, *args, **kwargs):
+    def executeInternal(self, *args, **kwargs): #pylint: disable=unused-argument
         #Marco: I guess these value errors only happens for development instances
         if 'task' not in kwargs:
             raise ValueError("No task specified.")
@@ -42,7 +42,7 @@ class DagmanResubmitter(TaskAction):
             resubmitWhat = "jobs"
 
         self.logger.info("About to resubmit %s for workflow: %s." % (resubmitWhat, workflow))
-        self.logger.info("Task info: %s" % str(task))
+        self.logger.debug("Task info: %s" % str(task))
 
         if task.get('resubmit_publication', False):
             asourl = task.get('tm_asourl', None)
@@ -62,9 +62,9 @@ class DagmanResubmitter(TaskAction):
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
 
         schedd = ""
-        address = ""
+        dummyAddress = ""
         try:
-            schedd, address = loc.getScheddObjNew(task['tm_schedd'])
+            schedd, dummyAddress = loc.getScheddObjNew(task['tm_schedd'])
         except Exception as exp:
             msg  = "The CRAB server backend was not able to contact the Grid scheduler."
             msg += " Please try again later."
@@ -233,8 +233,8 @@ if __name__ == "__main__":
     config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
     config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
 
-    server = HTTPRequests('vmatanasi2.cern.ch', config.TaskWorker.cmscert, config.TaskWorker.cmskey)
-    resubmitter = DagmanResubmitter(config, server, '/crabserver/dev/workflowdb')
+    server_ = HTTPRequests('vmatanasi2.cern.ch', config.TaskWorker.cmscert, config.TaskWorker.cmskey)
+    resubmitter = DagmanResubmitter(config, server_, '/crabserver/dev/workflowdb')
     resubmitter.execute(task={'tm_taskname':'141129_110306_crab3test-5:atanasi_crab_test_resubmit', 'user_proxy' : os.environ["X509_USER_PROXY"],
                               'resubmit_site_whitelist' : ['T2_IT_Bari'], 'resubmit_site_blacklist' : ['T2_IT_Legnaro'], 'resubmit_priority' : 2,
                               'resubmit_numcores' : 1, 'resubmit_maxjobruntime' : 1000, 'resubmit_maxmemory' : 1000

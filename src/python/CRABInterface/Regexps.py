@@ -65,7 +65,7 @@ RX_SCHEDD_NAME = re.compile(r"^[A-Za-z0-9._-]+[@.][A-Za-z0-9._-]+\.[A-Za-z]{2,6}
 RX_COLLECTOR = re.compile(r"^(([A-Za-z0-9._-]+\.[A-Za-z]{2,6}),?)+$")
 #TODO!
 RX_OUT_DATASET = re.compile(r"^.*$")
-
+RX_CLUSTERID = re.compile(r"^[0-9.]+$")
 #basic certificate check -- used for proxies retrieved from myproxy
 RX_CERT = re.compile(r'^[-]{5}BEGIN CERTIFICATE[-]{5}[\w\W]+[-]{5}END CERTIFICATE[-]{5}\n$')
 

@@ -29,13 +29,14 @@ class Create(DBCreator):
         #  //
         # // Define create statements for each table
         #//
-        #  //
+        #  //255 chars for tm_task_status is even too much
         self.create['b_tasks'] = """
         CREATE TABLE tasks(
         tm_taskname VARCHAR(255) NOT NULL,
         tm_activity VARCHAR(255),
         panda_jobset_id NUMBER(11),
         tm_task_status VARCHAR(255) NOT NULL,
+        tm_task_command VARCHAR(20),
         tm_start_time TIMESTAMP,
         tm_start_injection TIMESTAMP,
         tm_end_injection TIMESTAMP,

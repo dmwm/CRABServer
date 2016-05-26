@@ -1,15 +1,25 @@
+#!/bin/sh
 #
 # Script will submit all tasks with set parameters#
 #
 
 #Parameters required to change !
 #------------------------------
-TAG='HG1505b'
-VERSION=1
-CMSSW='CMSSW_7_0_6'
-WORK_DIR=/afs/cern.ch/work/j/jbalcas/VALIDATE/$TAG
+TAG='HG1605b'
+VERSION='4'
+CMSSW='CMSSW_7_4_7' # The template for UseSecondary dataset needs this version
+WORK_DIR="/afs/cern.ch/user/j/jmsilva/workspace/crabValidation/$TAG"
 MAIN_DIR=`pwd`
-CLIENT=/cvmfs/cms.cern.ch/crab3/crab_pre.sh
+
+# from HG1605 we start using light client
+export CRAB_SOURCE_SCRIPT='/cvmfs/cms.cern.ch/crab3/crab_pre.sh'
+
+#CLIENT='/cvmfs/cms.cern.ch/crab3/crab_pre.sh'
+
+# we use our own crab client until we had cvmfs one fixed to
+# work with scripts
+CLIENT="$MAIN_DIR/crab_light2.sh"
+
 STORAGE_SITE='T2_CH_CERN'
 INSTANCE='preprod'
 #-----------------------------
@@ -17,6 +27,14 @@ INSTANCE='preprod'
 source /afs/cern.ch/cms/cmsset_default.sh
 #Specify environment variable, change it if it`s required
 export SCRAM_ARCH=slc6_amd64_gcc481
+
+#-----------------------------
+echo ============================
+echo $TAG-$VERSION
+echo $WORK_DIR
+echo $CLIENT
+#echo ${CMSSW_VERSIONS[@]}
+echo ============================
 
 # out_cond - Output conditions, log_cond - Logs condition, pub_cond - Publication cond, ign_cond - IgnoreLocality
 # Number of possible values should be always equal
@@ -68,6 +86,8 @@ cd $WORK_DIR
 if [ ! -d "$CMSSW" ]; then
   cmsrel $CMSSW
 fi
+
+# ~/workspace/crabValidation/
 cd $WORK_DIR/$CMSSW/src/
 
 #Setup CMS environment
@@ -82,6 +102,39 @@ cp -R $MAIN_DIR/config/* .
 #untar skimming and do scram b
 tar -xvf SkimMsecSleep.tar
 scram b
+
+#files_to_exclude="./MinBias_PrivateMC_EventBased_ExtraParams.py ./MinBias_PrivateMC_EventBased.py ./PrivateMC_for_LHE.py ./MinBias_PrivateMC_EventBased_Sites.py"
+files_to_exclude="./MinBias_PrivateMC_EventBased_ExtraParams.py ./MinBias_PrivateMC_EventBased.py ./MinBias_PrivateMC_EventBased_Sites.py ./MinBias_PrivateMC_EventBased_CMSSW_version.py"
+
+if [ "X$1" == "X" ];then
+  echo "running default templates"
+else
+  echo "running only the template $1"
+  file_name=$1
+
+  re=.*${file_name}.*
+  if [[ ${files_to_exclude[*]} =~ $re ]]; then
+    echo "-"
+    echo "-Skipping $file_name because it is already tested or will be after regular templates."
+    echo "-"
+    exit
+  fi
+
+  echo $file_name;
+  file_name_temp=${file_name:0:(${#file_name})-3};
+  #Generate new name
+  new_name=$TAG-$VERSION-$file_name_temp-'L-T_O-T_P-T_IL-F'
+  publish_name=$new_name-`date +%s`
+  echo $new_name
+  sed_new_data $file_name $new_name True True $TAG-$VERSION True $publish_name False False
+  crab submit -c $file_name
+  #Submit same task with disableAutomaticOutputCollection = True
+  new_name=$new_name-'DOC-T'
+  sed_new_data $file_name $new_name True True $TAG-$VERSION True $publish_name False True
+  crab submit -c $file_name
+  exit 0
+fi
+
 
 #No point testing all templates with possible versions of flags
 #Change 2015.01 only for MinBias_PrivateMC
@@ -107,9 +160,19 @@ do
   crab submit -c $file_name
 done
 
+
 #Submit all left templates
 for file_name in `find . -maxdepth 1 -name '*.py'`;
 do
+
+  re=.*${file_name}.*
+  if [[ ${files_to_exclude[*]} =~ $re ]]; then
+    echo "-"
+    echo "-Skipping $file_name because it is already tested or will be after regular templates."
+    echo "-"
+    continue
+  fi
+
   echo $file_name;
   file_name_temp=${file_name:2:(${#file_name})-5};
   #Generate new name
@@ -149,6 +212,7 @@ do
   crab submit -c $file_name
 done
 
+
 #As for LHE it requires older version of CMSSW. Need to ask Anna to review, she might know for newer version of CMSSW
 CMSSW='CMSSW_5_3_22'
 cd $WORK_DIR
@@ -165,9 +229,9 @@ source $CLIENT
 
 cp -R $MAIN_DIR/config/* .
 
+#======================================== PrivateMC_for_LHE
 #Copy LHE file from AFS (Size too big for GIT)
-cp /afs/cern.ch/user/j/jbalcas/public/forLHE/dynlo.lhe input_files/
-
+#cp /afs/cern.ch/user/j/jbalcas/public/forLHE/dynlo.lhe input_files/
 file_name='PrivateMC_for_LHE.py'
 file_name_temp=${file_name:0:(${#file_name})-3};
 #Generate new name
@@ -182,16 +246,4 @@ sed_new_data $file_name $new_name True True $TAG-$VERSION True $publish_name Fal
 crab submit -c $file_name
 
 
-#Use Parent
-file_name='Analysis_Use_Parent.py'
-file_name_temp=${file_name:0:(${#file_name})-3};
-#Generate new name
-new_name=$TAG-$VERSION-$file_name_temp-'L-T_O-T_P-T_IL-F'
 
-sed_new_data $file_name $new_name True True $TAG-$VERSION True $publish_name False False
-crab submit -c $file_name
-
-#Submit same task with disableAutomaticOutputCollection = True
-new_name=$new_name-'DOC-T'
-sed_new_data $file_name $new_name True True $TAG-$VERSION True $publish_name False True
-crab submit -c $file_name

@@ -238,11 +238,13 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
                     error_summary.setdefault(fjr_job_id, {})[fjr_crab_retry] = (exit_code, exit_msg, {})
                     error_summary_changed = True
 
+    logger.debug("Writing error summary file")
     ## If we have updated the error summary, write it to the json file.
     ## Use a temporary file and rename to avoid concurrent writing of the file.
     if error_summary_changed:
         fsummary.truncate(0)
         json.dump(error_summary, fsummary)
+    logger.debug("Writen error summary file")
 
 ##==============================================================================
 
@@ -988,7 +990,13 @@ class PostJob():
         if os.path.exists(DEFER_INFO_FILE):
             try:
                 with open(DEFER_INFO_FILE) as fd:
-                    defer_num = int(fd.readline().strip())
+                    line = fd.readline().strip()
+                    #Protect from empty files, see https://github.com/dmwm/CRABServer/issues/5199
+                    if line:
+                        defer_num = int(line)
+                    else:
+                        #if the line is empty we are sure it's the first try. See comment 10 lines below
+                        defer_num = 0
             except IOError as e:
                 self.logger.error("I/O error({0}): {1}".format(e.errno, e.strerror))
                 raise
@@ -998,11 +1006,19 @@ class PostJob():
             except:
                 self.logger.exception("Unexpected error: %s" % sys.exc_info()[0])
                 raise
+        else:
+            #create the file if it does not exist
+            with open(DEFER_INFO_FILE, 'w') as dummyFD:
+                pass
+
 
         #update retry number
         try:
-            with open(DEFER_INFO_FILE, 'w') as fd:
-                fd.write(str(defer_num + 1))
+            #open in rb+ mode instead of w so if the schedd crashes between the open and the write
+            #we do not end up with an empty (corrupted) file. (Well, this can only happens the first try)
+            with open(DEFER_INFO_FILE, 'rb+') as fd:
+                #put some spaces to overwrite possibly longer numbers (should never happen, but..)
+                fd.write(str(defer_num + 1) + ' '*10)
         except IOError as e:
             self.logger.error("I/O error({0}): {1}".format(e.errno, e.strerror))
             raise

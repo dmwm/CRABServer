@@ -1,9 +1,8 @@
+from __future__ import division
 from __future__ import absolute_import
-import types
 import bisect
 import random
 import time
-import classad
 import htcondor
 
 import HTCondorUtils
@@ -21,64 +20,56 @@ def weighted_choice(choices):
     i = bisect.bisect(cum_weights, x)
     return values[i]
 
+def capacityMetricsChoices(schedds, goodSchedds, logger=None):
+    """ Choose the schedd based on the DetectedMemory classad present in the schedds object
+        Return a list of scheddobj and the weight to be used in the weighted choice
+    """
+    schedds_usage = {}
+    totalMemory = sum([ schedd['DetectedMemory'] for schedd in schedds if 'DetectedMemory' in schedd])
+    totalJobs = sum([ schedd['MaxJobsRunning'] for schedd in schedds if 'MaxJobsRunning' in schedd])
+    totalUploads = sum([ schedd['TransferQueueMaxUploading'] for schedd in schedds if 'TransferQueueMaxUploading' in schedd])
+    for schedd in schedds:
+        logger.debug("%s: Mem %s, Mx %s;  Run %s, Mx %s;  Trf %s, Max %s", schedd['Name'], schedd['DetectedMemory'], totalMemory,
+                     schedd['JobsRunning'], totalJobs, schedd['TransferQueueNumUploading'], totalUploads)
+        schedds_usage[schedd['Name']] = max(schedd['DetectedMemory']/totalMemory,
+                                            schedd['JobsRunning']/totalJobs, schedd['TransferQueueNumUploading']/totalUploads)
+
+    choices = [(schedd, 1/schedds_usage.get(schedd, .5)) for schedd in goodSchedds]
+    return choices
+
+def memoryBasedChoices(schedds, goodSchedds, logger=None):
+    """ Choose the schedd based on the DetectedMemory classad present in the schedds object
+        Return a list of scheddobj and the weight to be used in the weighted choice
+    """
+    schedds_dict = {}
+    for schedd in schedds:
+        if 'DetectedMemory' in schedd and 'Name' in schedd:
+            schedds_dict[schedd['Name']] = schedd['DetectedMemory']
+    choices = [(i, schedds_dict.get(i, 24 * 1024)) for i in goodSchedds]
+    return choices
+
+
 class HTCondorLocator(object):
 
-    def __init__(self, config):
+    def __init__(self, config, logger=None):
         self.config = config
+        self.logger = logger
 
-    def getSchedd(self):
+    def getSchedd(self, chooserFunction=memoryBasedChoices):
         """
         Determine a schedd to use for this task.
         """
         collector = self.getCollector()
-        schedd = "localhost"
 
         htcondor.param['COLLECTOR_HOST'] = collector
         coll = htcondor.Collector()
-        schedds = coll.query(htcondor.AdTypes.Schedd, 'StartSchedulerUniverse =?= true', ['Name', 'DetectedMemory'])
-        schedds_dict = {}
-        for schedd in schedds:
-            if 'DetectedMemory' in schedd and 'Name' in schedd:
-                schedds_dict[schedd['Name']] = schedd['DetectedMemory']
+        schedds = coll.query(htcondor.AdTypes.Schedd, 'StartSchedulerUniverse =?= true', ['Name', 'DetectedMemory',
+                            'TransferQueueNumUploading', 'TransferQueueMaxUploading', 'TotalRunningJobs', 'JobsRunning',
+                            'MaxJobsRunning', 'IsOK'])
         if self.config and "htcondorSchedds" in self.config:
-            choices = [(i, schedds_dict.get(i, 24*1024)) for i in self.config["htcondorSchedds"]]
-            schedd = weighted_choice(choices)
-        if collector:
-            return "%s:%s" % (schedd, collector)
+            choices = chooserFunction(schedds, self.config['htcondorSchedds'], self.logger)
+        schedd = weighted_choice(choices)
         return schedd
-
-    def getScheddObj(self, name):
-        """
-        Return a tuple (schedd, address) containing an object representing the
-        remote schedd and its corresponding address.
-        Still required for OLD tasks. Remove it later TODO
-        """
-        info = name.split("_")
-        if len(info) > 3:
-            name = info[2]
-        else:
-            name = self.getSchedd()
-        if name == "localhost":
-            schedd = htcondor.Schedd()
-            with open(htcondor.param['SCHEDD_ADDRESS_FILE']) as fd:
-                address = fd.read().split("\n")[0]
-        else:
-            info = name.split(":")
-            pool = "localhost"
-            if len(info) == 3:
-                pool = info[1]
-            htcondor.param['COLLECTOR_HOST'] = self.getCollector(pool)
-            coll = htcondor.Collector()
-            schedds = coll.query(htcondor.AdTypes.Schedd, 'regexp(%s, Name)' % HTCondorUtils.quote(info[0]))
-            self.scheddAd = ""
-            if not schedds:
-                self.scheddAd = self.getCachedCollectorOutput(info[0])
-            else:
-                self.cacheCollectorOutput(info[0], schedds[0])
-                self.scheddAd = self.getCachedCollectorOutput(info[0])
-            address = self.scheddAd['MyAddress']
-            schedd = htcondor.Schedd(self.scheddAd)
-        return schedd, address
 
     def getScheddObjNew(self, schedd):
         """

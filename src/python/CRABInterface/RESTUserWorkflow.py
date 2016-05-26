@@ -4,6 +4,7 @@ import time
 import random
 import logging
 import cherrypy
+from base64 import b64decode
 
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
@@ -13,9 +14,8 @@ from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import allScramArchsAndVe
 from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
 
 # CRABServer dependecies here
-from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
-from CRABInterface.RESTExtensions import authz_owner_match, authz_login_valid
+from CRABInterface.RESTExtensions import authz_owner_match
 from CRABInterface.Regexps import *
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
 from ServerUtilities import checkOutLFN
@@ -277,7 +277,7 @@ class RESTUserWorkflow(RESTEntity):
         sites = self.allPNNNames.sites if pnn else self.allCMSNames.sites
         if site not in sites:
             excasync = ValueError("A site name you specified is not valid")
-            invalidp = InvalidParameter("The parameter %s is not in the list of known CMS sites %s" % (site, sites), errobj = excasync)
+            invalidp = InvalidParameter("The parameter %s is not in the list of known CMS PhEDEx nodes." % (site), errobj = excasync)
             setattr(invalidp, 'trace', '')
             raise invalidp
 
@@ -313,7 +313,6 @@ class RESTUserWorkflow(RESTEntity):
     @conn_handler(services=['sitedb', 'centralconfig'])
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
-        #authz_login_valid()
 
         if method in ['PUT']:
             ## Define the taskname and write it in the 'workflow' parameter.
@@ -520,6 +519,13 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_num("force", param, safe, optional=True)
             validate_numlist('jobids', param, safe)
+            validate_str("killwarning", param, safe,  RX_TEXT_FAIL, optional=True)
+            #decode killwarning message if present
+            if safe.kwargs['killwarning']:
+                try:
+                    safe.kwargs['killwarning'] = b64decode(safe.kwargs['killwarning'])
+                except TypeError:
+                    raise InvalidParameter("Failure message is not in the accepted format")
 
 
     @restcall
@@ -666,7 +672,7 @@ class RESTUserWorkflow(RESTEntity):
         return result
 
     @restcall
-    def delete(self, workflow, force, jobids):
+    def delete(self, workflow, force, jobids, killwarning):
         """Aborts a workflow. The user needs to be a CMS owner of the workflow.
 
            :arg str list workflow: list of unique name identifiers of workflows;
@@ -675,4 +681,4 @@ class RESTUserWorkflow(RESTEntity):
 
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.api, [workflow], self.Task)
-        return self.userworkflowmgr.kill(workflow, force, jobids, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+        return self.userworkflowmgr.kill(workflow, force, jobids, killwarning, userdn=cherrypy.request.headers['Cms-Authn-Dn'])

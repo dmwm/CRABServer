@@ -69,6 +69,19 @@ alter table tasks add (tm_primary_dataset VARCHAR(255));
 --Changes that will be needed for version 3.3.1602
 alter table tasks add (tm_asodb VARCHAR(20));
 
+--Changes that will be needed for version 3.3.1604
+alter table tasks add (tm_task_command VARCHAR(20));
+--THE FOLLOWING UPDATES NECESSARILY NEEDS TO TUN ONCE THE UPDATE IS COMPELTE ON CMSWEB AND BEFORE RESTARTING THE TW
+UPDATE tasks SET tm_task_status='FAILED' where tm_task_status='QUEUED'; --that's the usual command to fail locked QUEUED task
+UPDATE tasks SET tm_task_status='FAILED' where tm_task_status='HOLDING'; --in addition we need to do this for holding tasks
+--these are command to take care of tasks submitted to the old server and not processed by the TW
+UPDATE tasks SET tm_task_status='NEW',tm_task_command='KILL' WHERE tm_task_status='KILL';
+UPDATE tasks SET tm_task_status='NEW',tm_task_command='RESUBMIT' WHERE tm_task_status='RESUBMIT';
+UPDATE tasks SET tm_task_status='NEW',tm_task_command='SUBMIT' WHERE tm_task_status='NEW';
+
+--Changes that will be needed for version 3.3.1605
+alter table tasks add (clusterid NUMBER(10));
+
 --Changes needed for the Autmatic Splitting (or resplitting)
 alter table filemetadata add (job_id VARCHAR(20));
 alter table filemetadata modify (panda_job_id null);

@@ -5,6 +5,7 @@ Handles client interactions with remote REST interface
 import os
 import time
 import urllib
+import pycurl
 import logging
 from urlparse import urlunparse
 from httplib import HTTPException
@@ -14,6 +15,21 @@ from WMCore.Services.pycurl_manager import RequestHandler
 
 __version__= '0.0.0'
 EnvironmentException = Exception
+
+
+def retriableError(ex):
+    """ Return True if the error can be retried
+    """
+    if isinstance(ex, HTTPException):
+        #500 Internal sever error. For some errors retries it helps
+        #502 CMSWEB frontend answers with this when the CMSWEB backends are overloaded
+        #503 Usually that's the DatabaseUnavailable error
+        return ex.status in [500, 502, 503]
+    elif isinstance(ex, pycurl.error):
+        #28 is 'Operation timed out...'
+        #35,is 'Unknown SSL protocol error', see https://github.com/dmwm/CRABServer/issues/5102
+        return ex[0] in [28, 35]
+    return False
 
 
 class HTTPRequests(dict):
@@ -33,11 +49,11 @@ class HTTPRequests(dict):
         """
         Initialise an HTTP handler
         """
+        dict.__init__(self)
         #set up defaults
         self.setdefault("accept_type", 'text/html')
         self.setdefault("content_type", 'application/x-www-form-urlencoded')
         self.setdefault("host", url)
-        #self.setdefault("proxyfilename", proxyfilename)
         self.setdefault("cert", localcert)
         self.setdefault("key", localkey)
         # get the URL opener
@@ -56,32 +72,31 @@ class HTTPRequests(dict):
         """
         return RequestHandler(config={'timeout': 300, 'connecttimeout' : 300})
 
-    def get(self, uri = None, data = {}):
+    def get(self, uri = None, data = None):
         """
         GET some data
         """
         return self.makeRequest(uri = uri, data = data, verb = 'GET')
 
-    def post(self, uri = None, data = {}):
+    def post(self, uri = None, data = None):
         """
         POST some data
         """
         return self.makeRequest(uri = uri, data = data, verb = 'POST')
 
-    def put(self, uri = None, data = {}):
+    def put(self, uri = None, data = None):
         """
         PUT some data
         """
         return self.makeRequest(uri = uri, data = data, verb = 'PUT')
 
-    def delete(self, uri = None, data = {}):
+    def delete(self, uri = None, data = None):
         """
         DELETE some data
         """
         return self.makeRequest(uri = uri, data = data, verb = 'DELETE')
 
-    def makeRequest(self, uri = None, data = {}, verb = 'GET',
-                     encoder = True, decoder = True, contentType = None):
+    def makeRequest(self, uri = None, data = None, verb = 'GET'):
         """
         Make a request to the remote database. for a give URI. The type of
         request will determine the action take by the server (be careful with
@@ -94,8 +109,8 @@ class HTTPRequests(dict):
         You can override the method to encode/decode your data by passing in an
         encoding/decoding function to this method. Your encoded data must end up
         as a string.
-
         """
+        data = data or {}
         headers = {
                    "User-agent": "CRABClient/%s" % self['version'],
                    "Accept": "*/*",
@@ -106,17 +121,22 @@ class HTTPRequests(dict):
         caCertPath = self.getCACertPath()
         url = 'https://' + self['host'] + uri
 
-        #retries this up to self['retry'] times if the exit code is 503 (the only code at the moemnt)
+        #retries this up to self['retry'] times a range of exit codes
         for i in xrange(self['retry'] + 1):
             try:
                 response, datares = self['conn'].request(url, data, headers, verb=verb, doseq = True, ckey=self['key'], cert=self['cert'], \
                                 capath=caCertPath)#, verbose=True)# for debug
-            except HTTPException as ex:
+            except Exception as ex:
                 #add here other temporary errors we need to retry
-                if ex.status not in [500, 502, 503] or i == self['retry']:
-                    raise #really exit and raise exception it this was the last retry or the exit code is not among the list of the one we retry
+                if (not retriableError(ex)) or (i == self['retry']):
+                    raise #really exit and raise exception if this was the last retry or the exit code is not among the list of the one we retry
                 sleeptime = 20 * (i + 1)
-                self.logger.debug("Sleeping %s seconds after HTTP error. Error details %s:", sleeptime, ex.headers)
+                msg = "Sleeping %s seconds after HTTP error. Error details:  " % sleeptime
+                if hasattr(ex, 'headers'):
+                    msg += str(ex.headers)
+                else:
+                    msg += str(ex)
+                self.logger.debug(msg)
                 time.sleep(sleeptime) #sleeps 20s the first time, 40s the second time and so on
             else:
                 break
@@ -129,7 +149,7 @@ class HTTPRequests(dict):
 
         decode the response result reveiced from the server
         """
-        encoder = JSONRequests()
+        encoder = JSONRequests(idict={"pycurl" : True})
         return encoder.decode(result)
 
 

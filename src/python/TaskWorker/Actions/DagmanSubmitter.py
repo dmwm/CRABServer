@@ -4,16 +4,20 @@ Submit a DAG directory created by the DagmanCreator component.
 """
 
 import os
+import copy
 import time
 import pickle
 import urllib
+
+from httplib import HTTPException
 
 import HTCondorUtils
 import CMSGroupMapper
 import HTCondorLocator
 
-from httplib import HTTPException
 from ServerUtilities import FEEDBACKMAIL
+from ServerUtilities import TASKLIFETIME
+
 import TaskWorker.DataObjects.Result as Result
 import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
@@ -98,16 +102,31 @@ def addCRABInfoToClassAd(ad, info):
 
 
 class ScheddStats(dict):
-    def __init__(self, procnum):
-        self.procnum = procnum
+    def __init__(self):
+        self.procnum = None
+        self.schedd = None
+        self.clusterId = None
+        self.taskErrors = {}
         self.pid = os.getpid()
         dict.__init__(self)
 
-    def success(self, schedd):
+    def success(self, schedd, clusterId):
         self[schedd]["successes"] = self.setdefault(schedd, {}).get("successes", 0) + 1
+        #in case of success store schedd and clusterid so they can be printed
+        self.schedd = schedd
+        self.clusterId = clusterId
 
     def failure(self, schedd):
         self[schedd]["failures"] = self.setdefault(schedd, {}).get("failures", 0) + 1
+        #in case of failure clear schedd and clusterId
+        self.schedd = None
+        self.clusterId = None
+
+    def taskError(self, schedd, msg):
+        self.taskErrors.setdefault(schedd, []).append(msg)
+
+    def resetTaskInfo(self):
+        self.taskErrors = {}
 
     def __str__(self):
         res = "Summary of schedd failures/successes for slave process %s (PID %s):\n" % (self.procnum, self.pid)
@@ -116,7 +135,11 @@ class ScheddStats(dict):
             res += "\t\t%s %s\n" % ("Number of successes: ", self[schedd].get("successes", 0))
             res += "\t\t%s %s\n" % ("Number of failures: ", self[schedd].get("failures", 0))
 
+        if self.schedd and self.clusterId:
+            res += "Last successful submission: ClusterId %s submitted to schedd %s\n" % (self.clusterId, self.schedd)
+
         return res
+scheddStats = ScheddStats()
 
 
 class DagmanSubmitter(TaskAction.TaskAction):
@@ -127,92 +150,125 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
     def __init__(self, *args, **kwargs):
         TaskAction.TaskAction.__init__(self, *args, **kwargs)
-        self.scheddStats = ScheddStats(kwargs['procnum'])
+        scheddStats.procnum = kwargs['procnum']
+        scheddStats.resetTaskInfo()
+        self.clusterId = None
 
-    def execute(self, *args, **kwargs):
-        userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry=2, logger=self.logger)
-        retryIssuesBySchedd = {}
-        goodSchedulers = []
+
+    def sendScheddToREST(self, task, schedd):
+        """ Try to set the schedd to the oracle database in the REST interface
+            Raises TaskWorkerException in case of failure
+        """
+        task['tm_schedd'] = schedd
+        userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
+        configreq = {'workflow':task['tm_taskname'], 'subresource':'updateschedd',
+            'scheddname':schedd}
         try:
-            goodSchedulers = self.server.get(self.restURInoAPI + '/info', data={'subresource': 'backendurls'})[0]['result'][0]['htcondorSchedds']
-            goodSchedulers = list(set(goodSchedulers)) #we do not care about
+            userServer.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
         except HTTPException as hte:
-            self.logger.error(hte.headers)
-            self.logger.warning("Unable to contact cmsweb. Will use only on schedulers which was chosen by CRAB3 frontend.")
-        self.logger.info("Good schedulers list got from crabserver: %s ", goodSchedulers)
-        if kwargs['task']['tm_schedd'] not in goodSchedulers:
-            self.logger.info("Scheduler which is chosen is not in crabserver output %s.", goodSchedulers)
-            self.logger.info("No late binding of schedd. Will use %s for submission.", kwargs['task']['tm_schedd'])
-            goodSchedulers = [kwargs['task']['tm_schedd']]
-        else:
-            #Make sure that first scheduler is used which is chosen by HTCondorLocator
-            try:
-                goodSchedulers.remove(kwargs['task']['tm_schedd'])
-            except ValueError:
-                pass
-            goodSchedulers.insert(0, kwargs['task']['tm_schedd'])
-        self.logger.info("Final good schedulers list after shuffle: %s ", goodSchedulers)
+            msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
+            self.logger.warning(msg)
+            time.sleep(20)
+            raise TaskWorkerException(msg) #we already tried 20 times, give up
 
-        #Check memory and walltime and if user requires too much:
-        # upload warning back to crabserver
-        # change walltime to max 47h Issue: #4742
+
+    def checkMemoryWalltime(self, args, task):
+        """ Check memory and walltime and if user requires too much:
+            - upload warning back to crabserver
+            - change walltime to max 47h Issue: #4742
+        """
+
         stdmaxjobruntime = 2750
         stdmaxmemory = 2500
-        if kwargs['task']['tm_maxjobruntime'] > stdmaxjobruntime:
-            msg = "Task requests %s minutes of runtime, but only %s minutes are guaranteed to be available." % (kwargs['task']['tm_maxjobruntime'], stdmaxjobruntime)
+        if task['tm_maxjobruntime'] > stdmaxjobruntime:
+            msg = "Task requests %s minutes of runtime, but only %s minutes are guaranteed to be available." % (task['tm_maxjobruntime'], stdmaxjobruntime)
             msg += " Jobs may not find a site where to run."
             msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
             self.logger.warning(msg)
             args[0][1]['tm_maxjobruntime'] = str(stdmaxjobruntime)
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
-        if kwargs['task']['tm_maxmemory'] > stdmaxmemory:
-            msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (kwargs['task']['tm_maxmemory'], stdmaxmemory)
+            self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
+        if task['tm_maxmemory'] > stdmaxmemory:
+            msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (task['tm_maxmemory'], stdmaxmemory)
             msg += " Jobs may not find a site where to run and stay idle forever."
             self.logger.warning(msg)
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+            self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
 
-        for schedd in goodSchedulers:
-            #If submission failure is true, trying to change a scheduler
-            configreq = {'workflow': kwargs['task']['tm_taskname'],
-                         'subresource': 'updateschedd',
-                         'scheddname': schedd}
+
+    def pickAndSetSchedd(self, task):
+        """ Pick up a schedd using the correct formula
+            Send it to the REST
+
+            If we can't send the schedd to the REST this is considered a permanent error
+        """
+        self.logger.debug("Picking up the scheduler")
+        #copy the list of schedd from REST external configuration. They are loaded when action is created
+        restSchedulers = self.backendurls['htcondorSchedds']
+        alreadyTriedSchedds = scheddStats.taskErrors.keys() #keys in the taskerrors are schedd
+
+        currentBackendurls = copy.deepcopy(self.backendurls)
+        currentBackendurls['htcondorSchedds'] = dict([(s,restSchedulers[s]) for s in restSchedulers if s not in alreadyTriedSchedds])
+        loc = HTCondorLocator.HTCondorLocator(currentBackendurls)
+        if hasattr(self.config.TaskWorker, 'scheddPickerFunction'):
+            schedd = loc.getSchedd(chooserFunction=self.config.TaskWorker.scheddPickerFunction)
+        else:
+            schedd = loc.getSchedd() #uses the default memory stuff
+        self.logger.debug("Finished picking up scheduler. Sending schedd to rest")
+        self.sendScheddToREST(task, schedd)
+        self.logger.debug("Schedd sent to REST.")
+
+        return schedd
+
+
+    def execute(self, *args, **kwargs):
+        """ Execute is the core method that submit the task to the schedd.
+            The schedd can be defined in the tm_schedd task parameter if the user selected a schedd or it is a retry, otherwise it is empty.
+                If it is empty the method will choose one
+                If it contains a schedd it will do the duplicate check and try to submit the task to it
+                In case of multiple failures is will set a new schedd and return back to the asction handler for retries.
+        """
+        task =  kwargs['task']
+        schedd = task['tm_schedd']
+
+        self.checkMemoryWalltime(args, task)
+
+        if not schedd:
+            schedd = self.pickAndSetSchedd(task)
+
+        self.logger.debug("Starting duplicate check")
+        dupRes = self.duplicateCheck(task)
+        self.logger.debug("Duplicate check finished with result %s", dupRes)
+        if dupRes != None:
+            return dupRes
+
+
+        for retry in range(self.config.TaskWorker.max_retry + 1): #max_retry can be 0
+            self.logger.debug("Trying to submit task %s to schedd %s for the %s time.", task['tm_taskname'], schedd, str(retry))
             try:
-                userServer.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
-                kwargs['task']['tm_schedd'] = schedd
-            except HTTPException as hte:
-                msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
-                self.logger.warning(msg)
-                time.sleep(20)
-                retryIssuesBySchedd[schedd] = [msg]
-                continue
-            retryIssues = []
-            for retry in range(self.config.TaskWorker.max_retry + 1): #max_retry can be 0
-                self.logger.debug("Trying to submit task %s %s time.", kwargs['task']['tm_taskname'], str(retry))
-                try:
-                    execInt = self.executeInternal(*args, **kwargs)
-                    self.scheddStats.success(schedd)
-                    return execInt
-                except Exception as ex:
-                    self.scheddStats.failure(schedd)
-                    msg = "Failed to submit task %s; '%s'"% (kwargs['task']['tm_taskname'], str(ex))
-                    self.logger.exception(msg)
-                    retryIssues.append(msg)
-                    if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
-                        self.logger.error("Will retry in %s seconds.", self.config.TaskWorker.retry_interval[retry])
-                        time.sleep(self.config.TaskWorker.retry_interval[retry])
-                finally:
-                    self.logger.info(self.scheddStats)
+                execInt = self.executeInternal(*args, **kwargs)
+                scheddStats.success(schedd, self.clusterId)
+                return execInt
+            except Exception as ex: #pylint: disable=broad-except
+                scheddStats.failure(schedd)
+                msg = "Failed to submit task %s; '%s'"% (task['tm_taskname'], str(ex))
+                self.logger.exception(msg)
+                scheddStats.taskError(schedd, msg)
+                if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
+                    self.logger.debug("choosing a new schedd and then retrying")
+                    self.pickAndSetSchedd(task)
+                    self.logger.error("Will retry in %s seconds.", self.config.TaskWorker.retry_interval[retry])
+                    time.sleep(self.config.TaskWorker.retry_interval[retry])
+            finally:
+                self.logger.info(scheddStats)
             ## All the submission retries to the current schedd have failed. Record the
             ## failures.
-            retryIssuesBySchedd[schedd] = retryIssues
-        ## All the submission retries to all possible schedds have failed.
+        ## All the submission retries to this schedd have failed.
         msg = "The CRAB server backend was not able to submit the jobs to the Grid schedulers."
         msg += " This could be a temporary glitch. Please try again later."
         msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
-        msg += " The submission was retried %s times on %s schedulers." % (sum(map(len, retryIssuesBySchedd.values())), len(retryIssuesBySchedd))
-        msg += " These are the failures per Grid scheduler: %s" % (str(retryIssuesBySchedd))
+        msg += " The submission was retried %s times on %s schedulers." % (sum([len(x) for x in scheddStats.taskErrors.values()]), len(scheddStats.taskErrors))
+        msg += " These are the failures per Grid scheduler: %s" % (str(scheddStats.taskErrors))
         self.logger.error(msg)
-        raise TaskWorkerException(msg)
+        raise TaskWorkerException(msg, retry=True)
 
 
     def duplicateCheck(self, task):
@@ -238,7 +294,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
             msg += " Message from the scheduler: %s" % (str(exp))
             self.logger.exception("%s: %s", workflow, msg)
-            raise TaskWorkerException(msg)
+            raise TaskWorkerException(msg, retry=True)
 
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
 
@@ -250,9 +306,26 @@ class DagmanSubmitter(TaskAction.TaskAction):
             # Task not already in schedd
             return None
 
+        # Need to double check if JobStatus is 1(idle) or 2(running).
+        # All other statuses means that task is not submitted or failed to be submitted.
+        # There was issue with spooling files to scheduler and duplicate check found dagman on scheduler
+        # but the filew were not correctly transferred.
+        if results[0]['JobStatus'] not in [1,2]:
+            # if the state of the dag is not idle or running then we raise exception and let
+            # the dagman submitter retry later. hopefully after seven minutes the dag gets removed
+            # from the schedd and the submission succeds
+            retry = results[0]['JobStatus'] == 5 #5==Held
+            msg = "Task %s already found on schedd %s " % (workflow, task['tm_schedd'])
+            if retry:
+                msg += "Going to retry submission later since the dag status is Held and the task should be removed on the schedd"
+            else:
+                msg += "Aborting submission since the task is in state %s" % results[0]['JobStatus']
+            raise TaskWorkerException(msg, retry)
+        else:
+            self.logger.debug("Task seems to be submitted correctly. Classads got from scheduler: %s", results)
+
         configreq = {'workflow': workflow,
                      'status': "SUBMITTED",
-                     'jobset': "-1",
                      'subresource': 'success',
                     }
         self.logger.warning("Task %s already submitted to HTCondor; pushing information centrally: %s", workflow, str(configreq))
@@ -279,15 +352,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dashboardParams = args[0][1]
         inputFiles = args[0][2]
 
-        self.logger.debug("Starting duplicate check")
-        dup = self.duplicateCheck(task)
-        self.logger.debug("Duplicate check finished %s", dup)
-        if dup != None:
-            return dup
-
         cwd = os.getcwd()
         os.chdir(kwargs['tempDir'])
 
+        info['start_time'] = task['tm_start_time']
         info['inputFilesString'] = ", ".join(inputFiles + ['subdag.ad'])
         outputFiles = ["RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001"]
         info['outputFilesString'] = ", ".join(outputFiles)
@@ -313,32 +381,32 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 msg += " Please try again later."
                 msg += " Message from the scheduler: %s" % (str(exp))
                 self.logger.exception("%s: %s", workflow, msg)
-                raise TaskWorkerException(msg)
+                raise TaskWorkerException(msg, retry=True)
 
             try:
                 dummyAddress = loc.scheddAd['Machine']
             except:
-                raise TaskWorkerException("Unable to get schedd address for task %s" % (task['tm_taskname']))
+                raise TaskWorkerException("Unable to get schedd address for task %s" % (task['tm_taskname']), retry=True)
 
             # Get location of schedd-specific environment script from schedd ad.
             info['remote_condor_setup'] = loc.scheddAd.get("RemoteCondorSetup", "")
 
             info["CMSGroups"] = set.union(CMSGroupMapper.map_user_to_groups(kwargs['task']['tm_username']), kwargs['task']['user_groups'])
-            self.logger.info("User %s mapped to local groups %s." % (kwargs['task']['tm_username'], info["CMSGroups"]))
+            self.logger.info("User %s mapped to local groups %s.", kwargs['task']['tm_username'], info["CMSGroups"])
 
             self.logger.debug("Finally submitting to the schedd")
             if address:
-                self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
+                self.clusterId = self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
             else:
-                raise TaskWorkerException("Not able to get schedd address.")
+                raise TaskWorkerException("Not able to get schedd address.", retry=True)
             self.logger.debug("Submission finished")
         finally:
             os.chdir(cwd)
 
         configreq = {'workflow': kwargs['task']['tm_taskname'],
                      'status': "SUBMITTED",
-                     'jobset': "-1",
-                     'subresource': 'success',}
+                     'subresource': 'success',
+                     'clusterid' : self.clusterId } #that's the condor cluster id of the dag (actually dag_bootstrap.sh that becomes that dag if everything goes well)
         self.logger.debug("Pushing information centrally %s", configreq)
         data = urllib.urlencode(configreq)
         self.server.post(self.resturi, data=data)
@@ -391,27 +459,41 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["Cmd"] = cmd
         dagAd['Args'] = arg
         dagAd["TransferInput"] = str(info['inputFilesString'])
-        dagAd["LeaveJobInQueue"] = classad.ExprTree("(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || (StageOutFinish == 0))")
-        dagAd["PeriodicRemove"] = classad.ExprTree("(JobStatus == 5) && (time()-EnteredCurrentStatus > 30*86400)")
+        dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"])
+        # Putting JobStatus == 4 since LeaveJobInQueue is for completed jobs (probably redundant)
+        LEAVE_JOB_IN_QUEUE_EXPR = "(JobStatus == 4) && ((time()-CRAB_TaskSubmitTime) < %s)" % TASKLIFETIME
+        dagAd["LeaveJobInQueue"] = classad.ExprTree(LEAVE_JOB_IN_QUEUE_EXPR)
+        # Removing a task after the expiration date no matter what its status is
+        dagAd["PeriodicRemove"] = classad.ExprTree("((time()-CRAB_TaskSubmitTime) > %s)" % TASKLIFETIME)
         dagAd["TransferOutput"] = info['outputFilesString']
         dagAd["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
         dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
         dagAd["RemoveKillSig"] = "SIGUSR1"
         dagAd["OnExitHold"] = classad.ExprTree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
 
-        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True) as (parent, rpipe):
+        condorIdDict = {}
+        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True, outputObj=condorIdDict) as (parent, rpipe):
             if not parent:
                 resultAds = []
-                schedd.submit(dagAd, 1, True, resultAds)
+                condorIdDict['ClusterId'] = schedd.submit(dagAd, 1, True, resultAds)
                 schedd.spool(resultAds)
+                # editing the LeaveJobInQueue since the remote submit overwrites it
+                # see https://github.com/dmwm/CRABServer/pull/5212#issuecomment-216519749
                 if resultAds:
-                    id = "%s.%s" % (resultAds[0]['ClusterId'], resultAds[0]['ProcId'])
-                    schedd.edit([id], "LeaveJobInQueue", classad.ExprTree("(JobStatus == 4) && (time()-EnteredCurrentStatus < 30*86400)"))
-        results = rpipe.read()
-        if results != "OK":
-            results = pickle.loads(results)
+                    id_ = "%s.%s" % (resultAds[0]['ClusterId'], resultAds[0]['ProcId'])
+                    schedd.edit([id_], "LeaveJobInQueue", classad.ExprTree(LEAVE_JOB_IN_QUEUE_EXPR))
+
+        results = pickle.load(rpipe)
+
+        #notice that the clusterId might be set even if there was a failure. This is if the schedd.submit succeded, but the spool  call failed
+        if 'ClusterId' in results.outputObj:
+            self.logger.debug("Condor cluster ID just submitted is: %s", results.outputObj['ClusterId'])
+        if results.outputMessage != "OK":
             self.logger.debug("Now printing the environment used for submission:\n" + "-"*70 + "\n" + results.environmentStr + "-"*70)
-            raise TaskWorkerException("Failure when submitting task to scheduler. Error reason: '%s'" % results.outputMessage)
+            raise TaskWorkerException("Failure when submitting task to scheduler. Error reason: '%s'" % results.outputMessage, retry=True)
+
+        #if we don't raise exception above the id is here
+        return results.outputObj['ClusterId']
 
 
     def sendDashboardJobs(self, params, info):
@@ -419,8 +501,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         apmon = ApmonIf()
         for job in info:
             job.update(params)
-            self.logger.debug("Dashboard job info: %s", job)
             apmon.sendToML(job)
+        self.logger.debug("Dashboard job info submitted. Last job for example is: %s", job)
         apmon.free()
 
 

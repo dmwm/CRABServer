@@ -12,6 +12,7 @@ import fcntl
 import shutil
 import tarfile
 import tempfile
+import calendar
 import datetime
 import traceback
 import subprocess
@@ -22,9 +23,25 @@ from WMCore.WMExceptions import STAGEOUT_ERRORS
 BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
 
+# Fatal error limits for job resource usage
+# Defaults are used if unable to load from .job.ad
+# Otherwise it uses these values.
+MAX_WALLTIME = 21*60*60 + 30*60
+MAX_MEMORY = 2*1024
+MAX_DISK_SPACE = 20000000 # Disk usage is not used from .job.ad as CRAB3 is not seeting it. 20GB is max.
+
+## Parameter used to set the LeaveJobInQueue and the PeriodicRemoveclassads.
+## It's also used during resubmissions since we don't allow a resubmission during the last week
+## Before changing this value keep in mind that old running DAGs have the old value in the CRAB_TaskSubmitTime
+## classad expression but DagmanResubmitter uses this value to calculate if a resubmission is possible
+TASKLIFETIME = 30*24*60*60
+## Number of days where the resubmission is not possible if the task is expiring
+NUM_DAYS_FOR_RESUBMITDRAIN = 7
 
 ## These are all possible statuses of a task in the TaskDB.
-TASKDBSTATUSES = ['NEW', 'HOLDING', 'QUEUED', 'UPLOADED', 'SUBMITTED', 'SUBMITFAILED', 'KILL', 'KILLED', 'KILLFAILED', 'RESUBMIT', 'RESUBMITFAILED', 'FAILED']
+TASKDBSTATUSES_TMP = ['NEW', 'HOLDING', 'QUEUED']
+TASKDBSTATUSES_FINAL = ['UPLOADED', 'SUBMITTED', 'SUBMITFAILED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
+TASKDBSTATUSES = TASKDBSTATUSES_TMP + TASKDBSTATUSES_FINAL
 
 ## These are all possible statuses of a task as returned by the `status' API.
 TASKSTATUSES = TASKDBSTATUSES + ['COMPLETED', 'UNKNOWN', 'InTransition']
@@ -207,14 +224,14 @@ def isFailurePermanent(reason, gridJob=False):
     Method that decides whether a failure reason should be considered as a
     permanent failure and submit task or not.
     """
-    checkQuota = " Please check if you have access to write to destination site and your quota does not exceeded."
-    refuseToSubmit = " CRAB3 refuses to send jobs to scheduler because of failure to transfer files to destination site."
+    checkQuota = " Please check that you have write access to destination site and that your quota is not exceeded, use crab checkwrite for more informations."
+    refuseToSubmit = " Can't submit task because write check at destination site fails."
     if gridJob:
         refuseToSubmit = ""
     for exitCode in STAGEOUT_ERRORS:
         for error in STAGEOUT_ERRORS[exitCode]:
             if re.match(error['regex'], reason.lower()):
-                reason = error['error-msg'] + checkQuota + refuseToSubmit
+                reason = error['error-msg'] + refuseToSubmit + checkQuota
                 return error['isPermanent'], reason, exitCode
     return False, "", None
 
@@ -252,3 +269,20 @@ def getLock(name):
     with open(name + '.lock', 'a+') as fd:
         fcntl.flock(fd, fcntl.LOCK_EX)
         yield fd
+
+
+def getTimeFromTaskname(taskname):
+    """ Get the submission time from the taskname and return the seconds since epoch
+        corresponding to it. The function is not currently used.
+    """
+
+    #validate taskname. In principle not necessary, but..
+    if not isinstance(taskname, str):
+        raise TypeError('In ServerUtilities.getTimeFromTaskname: "taskname" parameter must be a string')
+    stime = taskname.split(':')[0] #s stands for string
+    stimePattern = '^\d{6}_\d{6}$'
+    if not re.match(stimePattern, stime):
+        raise ValueError('In ServerUtilities.getTimeFromTaskname: "taskname" parameter must match %s' % stimePattern)
+    #convert the time
+    dtime = time.strptime(stime, '%y%m%d_%H%M%S') #d stands for data structured
+    return calendar.timegm(dtime)

@@ -2,49 +2,38 @@
 #external dependencies
 from __future__ import print_function
 import os
+import sys
 import time
 import urllib
 import signal
-import random
 import logging
-import traceback
 from httplib import HTTPException
-from logging.handlers import TimedRotatingFileHandler
 
 #WMcore dependencies
-from WMCore.Configuration import loadConfigurationFile, Configuration
+from WMCore.Configuration import loadConfigurationFile
 
 #CAFUtilities dependencies
 from RESTInteractions import HTTPRequests
 
-from TaskWorker.WorkerExceptions import *
+import HTCondorLocator
 from TaskWorker.TestWorker import TestWorker
 from MultiProcessingLog import MultiProcessingLog
 from TaskWorker.Worker import Worker, setProcessLogger
-import TaskWorker.Actions.Recurring.BaseRecurringAction
+from TaskWorker.WorkerExceptions import ConfigException
 from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
 from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
 
 ## NOW placing this here, then to be verified if going into Action.Handler, or TSM
 ## The meaning of the elements in the 3-tuples are as follows:
-## 1st) the status of the tasks on which a work should be done;
+## 1st) the command to be executed on the task;
 ## 2nd) the work that should be do;
 ## 3nd) the new status that the task should get in case of failure.
-STATE_ACTIONS_MAP = [('NEW', handleNewTask, 'SUBMITFAILED'), ('KILL', handleKill, 'KILLFAILED'), ('RESUBMIT', handleResubmit, 'RESUBMITFAILED')]
-def states():
-    for st in sorted(STATE_ACTIONS_MAP, key=lambda k: random.random()):
-        yield st
-
-def handler(status):
-    for st in STATE_ACTIONS_MAP:
-        if st[0] == status:
-            return st[1]
+STATE_ACTIONS_MAP = { 'SUBMIT' : (handleNewTask, 'SUBMITFAILED'), 'KILL' : (handleKill, 'KILLFAILED'), 'RESUBMIT' : (handleResubmit, 'RESUBMITFAILED')}
 
 MODEURL = {'cmsweb-dev': {'host': 'cmsweb-dev.cern.ch', 'instance':  'dev'},
            'cmsweb-preprod': {'host': 'cmsweb-testbed.cern.ch', 'instance': 'preprod'},
            'cmsweb-prod': {'host': 'cmsweb.cern.ch', 'instance':  'prod'},
            'private': {'host': None, 'instance':  'dev'},}
-
 
 def validateConfig(config):
     """Verify that the input configuration contains all needed info
@@ -53,6 +42,8 @@ def validateConfig(config):
     :return bool, string: flag for validation result and a message."""
     if getattr(config, 'TaskWorker', None) is None:
         return False, "Configuration problem: Task worker section is missing. "
+    if not hasattr(config.TaskWorker, 'scheddPickerFunction'):
+        config.TaskWorker.scheddPickerFunction = HTCondorLocator.memoryBasedChoices
     return True, 'Ok'
 
 
@@ -101,7 +92,7 @@ class MasterWorker(object):
             else:
                 logHandler = MultiProcessingLog('logs/twlog.txt', when='midnight')
                 logFormatter = \
-                    logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
+                    logging.Formatter("%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
                 logHandler.setFormatter(logFormatter)
                 logging.getLogger().addHandler(logHandler)
             loglevel = logging.INFO
@@ -111,9 +102,10 @@ class MasterWorker(object):
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
             logger = setProcessLogger("master")
-            logger.debug("PID %s." % os.getpid())
-            logger.debug("Logging level initialized to %s." % loglevel)
+            logger.debug("PID %s.", os.getpid())
+            logger.debug("Logging level initialized to %s.", loglevel)
             return logger
+
 
         self.STOP = False
         self.TEST = test
@@ -131,8 +123,11 @@ class MasterWorker(object):
             self.restURInoAPI = '/crabserver/' + MODEURL[self.config.TaskWorker.mode]['instance']
         if resthost is None:
             raise ConfigException("No correct mode provided: need to specify config.TaskWorker.mode in the configuration")
-        self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry = 2)
-        self.logger.debug("Hostcert: %s, hostkey: %s" %(str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey)))
+        #Let's increase the server's retries for recoverable errors in the MasterWorker
+        #60 means we'll keep retrying for 1 hour basically (we retry at 20*NUMRETRY seconds, so at: 20s, 60s, 120s, 200s, 300s ...)
+        self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry = 20,
+                                   logger = self.logger)
+        self.logger.debug("Hostcert: %s, hostkey: %s", str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey))
         # Retries for any failures
         if not hasattr(self.config.TaskWorker, 'max_retry'):
             self.config.TaskWorker.max_retry = 0
@@ -161,27 +156,18 @@ class MasterWorker(object):
             * the server call succeeded or
             * the server could not find anything to update or
             * the server has an internal error"""
+
         configreq = {'subresource': 'process', 'workername': self.config.TaskWorker.name, 'getstatus': getstatus, 'limit': limit, 'status': setstatus}
         try:
             self.server.post(self.restURInoAPI + '/workflowdb', data = urllib.urlencode(configreq))
         except HTTPException as hte:
-            #Using a msg variable and only one self.logger.error so that messages do not get shuffled
-            msg = "Task Worker could not update a task status (HTTPException): %s\nConfiguration parameters=%s\n" % (str(hte), configreq)
-            if not hte.headers.get('X-Error-Detail', '') == 'Required object is missing' or \
-               not hte.headers.get('X-Error-Http', -1) == '400':
-                msg += "Task Worker could not update work to the server: \n" +\
-                                  "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown')) +\
-                                  "\treason: %s\n" %(hte.headers.get('X-Error-Detail', 'unknown'))
-                msg += "Probably no task to be updated\n"
-            if hte.headers.get('X-Error-Http', 'unknown') in ['unknown']:
-                msg += "TW could not update work to the server:\n"
-                msg += "%s \n" %(str(traceback.format_exc()))
-                msg += "\turl: %s\n" %(getattr(hte, 'url', 'unknown'))
-                msg += "\tresult: %s\n" %(getattr(hte, 'result', 'unknown'))
+            msg = "HTTP Error during _lockWork: %s\n" % str(hte)
+            msg += "HTTP Headers are %s: " % hte.headers
             self.logger.error(msg)
-        except Exception as exc:
-            msg = "Task Worker could not update a task status: %s\nConfiguration parameters=%s\n" % (str(exc), configreq)
-            self.logger.error(msg + traceback.format_exc())
+            return False
+        except Exception: #pylint: disable=broad-except
+            self.logger.exception("Server could not process the _lockWork request (prameters are %s)", configreq)
+            return False
 
         return True
 
@@ -192,95 +178,107 @@ class MasterWorker(object):
         try:
             pendingwork = self.server.get(self.restURInoAPI + '/workflowdb', data = configreq)[0]['result']
         except HTTPException as hte:
-            self.logger.error("HTTP Error during _getWork: %s" % str(hte))
-            self.logger.error("Could not get any work from the server: \n" +
-                              "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown')) +
-                              "\treason: %s" %(hte.headers.get('X-Error-Detail', 'unknown')))
-            if hte.headers.get('X-Error-Http', 'unknown') in ['unknown']:
-                self.logger.error("Server could not acquire any work from the server:")
-                self.logger.error("%s " %(str(traceback.format_exc())))
-                self.logger.error("\turl: %s\n" %(getattr(hte, 'url', 'unknown')))
-                self.logger.error("\tresult: %s\n" %(getattr(hte, 'result', 'unknown')))
-        except Exception as exc:
-            self.logger.error("Server could not process the request: %s" %(str(exc)))
-            self.logger.error(traceback.format_exc())
+            msg = "HTTP Error during _getWork: %s\n" % str(hte)
+            msg += "HTTP Headers are %s: " % hte.headers
+            self.logger.error(msg)
+        except Exception: #pylint: disable=broad-except
+            self.logger.exception("Server could not process the _getWork request (prameters are %s)", configreq)
         return pendingwork
 
 
-    def quit(self, code, traceback_):
-        self.logger.info("Received kill request. Waiting for the workers...")
+    def quit_(self, dummyCode, dummyTraceback):
+        self.logger.info("Received kill request. Setting STOP flag in the master process...")
         self.STOP = True
 
 
-    def updateWork(self, taskname, status):
-        configreq = {'workflow': taskname, 'status': status, 'subresource': 'state'}
-        retry = True
-        while retry:
-            try:
-                self.server.post(self.restURInoAPI + '/workflowdb', data = urllib.urlencode(configreq))
-                retry = False
-            except HTTPException as hte:
-                #Using a msg variable and only one self.logger.error so that messages do not get shuffled
-                msg = "Task Worker could not update a task status (HTTPException): %s\nConfiguration parameters=%s\n" % (str(hte), configreq)
-                msg += "\tstatus: %s\n" %(hte.headers.get('X-Error-Http', 'unknown'))
-                msg += "\treason: %s\n" %(hte.headers.get('X-Error-Detail', 'unknown'))
-                msg += "\turl: %s\n" %(getattr(hte, 'url', 'unknown'))
-                msg += "\tresult: %s\n" %(getattr(hte, 'result', 'unknown'))
-                msg += "%s \n" %(str(traceback.format_exc()))
-                self.logger.error(msg)
-                retry = False
-                if int(hte.headers.get('X-Error-Http', '0')) == 503:
-                    #503 - Database/Service unavailable. Maybe Intervention of CMSWEB ongoing?
-                    retry = True
-                    time_sleep = 30 + random.randint(10, 30)
-                    self.logger.info("Sleeping %s seconds and will try to update again." % str(time_sleep))
-                    time.sleep(time_sleep)
-            except Exception as exc:
-                msg = "Task Worker could not update a task status: %s\nConfiguration parameters=%s\n" % (str(exc), configreq)
-                self.logger.error(msg + traceback.format_exc())
-                retry = False
+    def updateWork(self, taskname, command, status):
+        """ Update taskname setting the status and the command for it
+            Return True if the change succeded, False otherwise
+        """
+
+        configreq = {'workflow': taskname, 'command': command, 'status': status, 'subresource': 'state'}
+        try:
+            self.server.post(self.restURInoAPI + '/workflowdb', data = urllib.urlencode(configreq))
+        except HTTPException as hte:
+            msg = "HTTP Error during updateWork: %s\n" % str(hte)
+            msg += "HTTP Headers are %s: " % hte.headers
+            self.logger.error(msg)
+        except Exception: #pylint: disable=broad-except
+            self.logger.exception("Server could not process the updateWork request (prameters are %s)", configreq)
+        else:
+            return True #success
+        return False #failure
+
+
+    def failQueuedTasks(self):
+        """ This method is used at the TW startup and it fails QUEUED tasks that supposedly
+            could not communicate with the REST and update their status. The method put those
+            task to SUBMITFAILED, KILLFAILED, RESUBMITFAILED depending on the value of
+            the command field.
+        """
+        limit = self.slaves.nworkers * 2
+        total = 0
+        while True:
+            pendingwork = self._getWork(limit=limit, getstatus='QUEUED')
+            for task in pendingwork:
+                self.logger.debug("Failing QUEUED task %s", task['tm_taskname'])
+                dummyWorktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
+                self.updateWork(task['tm_taskname'], task['tm_task_command'], failstatus)
+            if not len(pendingwork):
+                self.logger.info("Finished failing QUEUED tasks (total %s)", total)
+                break #too bad "do..while" does not exist in python...
+            else:
+                total += len(pendingwork)
+                self.logger.info("Failed %s tasks (limit %s), getting next chunk of tasks", len(pendingwork), limit)
 
 
     def algorithm(self):
         """I'm the intelligent guy taking care of getting the work
-           and distribuiting it to the slave processes."""
+           and distributing it to the slave processes."""
 
-        self.logger.debug("Starting")
+        self.logger.debug("Failing QUEUED tasks before startup.")
+        self.failQueuedTasks()
+        self.logger.debug("Starting main loop.")
         while(not self.STOP):
-            for status, worktype, failstatus in states():
-                limit = self.slaves.queueableTasks()
-                if not self._lockWork(limit=limit, getstatus=status, setstatus='HOLDING'):
-                    continue
-                ## Warning: If we fail to retrieve tasks on HOLDING (e.g. because cmsweb is down)
-                ## we may end up executing the wrong worktype later on. A solution would be to
-                ## save the previous task state in a new column of the TaskDB.
-                pendingwork = self._getWork(limit=limit, getstatus='HOLDING')
-                self.logger.info("Retrieved a total of %d %s works" %(len(pendingwork), worktype))
-                self.logger.debug("Retrieved the following works: \n%s" %(str(pendingwork)))
-                self.slaves.injectWorks([(worktype, task, failstatus, None) for task in pendingwork])
-                for task in pendingwork:
-                    self.updateWork(task['tm_taskname'], 'QUEUED')
+            limit = self.slaves.queueableTasks()
+            if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
+                continue
+
+            pendingwork = self._getWork(limit=limit, getstatus='HOLDING')
+
+            if len(pendingwork) > 0:
+                self.logger.info("Retrieved a total of %d works", len(pendingwork))
+                self.logger.debug("Retrieved the following works: \n%s", str(pendingwork))
+
+            toInject = []
+            for task in pendingwork:
+                if self.updateWork(task['tm_taskname'], task['tm_task_command'], 'QUEUED'):
+                    worktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
+                    toInject.append((worktype, task, failstatus, None))
+                else:
+                    #The task stays in HOLDING and will be acquired again later
+                    self.logger.info("Skipping %s since it could not be updated to QUEUED. Will be retried in the next iteration", task['tm_taskname'])
+
+
+            self.slaves.injectWorks(toInject)
 
             for action in self.recurringActions:
                 if action.isTimeToGo():
                     #Maybe we should use new slaves and not reuse the ones used for the tasks
-                    self.logger.debug("Injecting recurring action: \n%s" %(str(action.__module__)))
+                    self.logger.debug("Injecting recurring action: \n%s", (str(action.__module__)))
                     self.slaves.injectWorks([(handleRecurring, {'tm_taskname' : action.__module__}, 'FAILED', action.__module__)])
 
             self.logger.info('Master Worker status:')
-            self.logger.info(' - free slaves: %d' % self.slaves.freeSlaves())
-            self.logger.info(' - acquired tasks: %d' % self.slaves.queuedTasks())
-            self.logger.info(' - tasks pending in queue: %d' % self.slaves.pendingTasks())
+            self.logger.info(' - free slaves: %d', self.slaves.freeSlaves())
+            self.logger.info(' - acquired tasks: %d', self.slaves.queuedTasks())
+            self.logger.info(' - tasks pending in queue: %d', self.slaves.pendingTasks())
 
             time.sleep(self.config.TaskWorker.polling)
 
-            finished = self.slaves.checkFinished()
+            dummyFinished = self.slaves.checkFinished()
 
         self.logger.debug("Master Worker Exiting Main Cycle")
 
-#    def __del__(self):
-#        """Shutting down all the slaves"""
-#        self.slaves.end()
 
 if __name__ == '__main__':
     from optparse import OptionParser
@@ -311,12 +309,22 @@ if __name__ == '__main__':
         raise ConfigException("Configuration not found")
 
     configuration = loadConfigurationFile( os.path.abspath(options.config) )
-    status, msg = validateConfig(configuration)
-    if not status:
-        raise ConfigException(msg)
+    status_, msg_ = validateConfig(configuration)
+    if not status_:
+        raise ConfigException(msg_)
 
-    mw = MasterWorker(configuration, quiet=options.quiet, debug=options.debug)
-    signal.signal(signal.SIGINT, mw.quit)
-    signal.signal(signal.SIGTERM, mw.quit)
-    mw.algorithm()
-    mw.slaves.end()
+    mw = None
+    try:
+        mw = MasterWorker(configuration, quiet=options.quiet, debug=options.debug)
+        signal.signal(signal.SIGINT, mw.quit_)
+        signal.signal(signal.SIGTERM, mw.quit_)
+        mw.algorithm()
+    except:
+        if mw:
+            mw.logger.exception("Unexpected and fatal error. Exiting task worker")
+        #don't really wanna miss this, propagating the exception and exiting really bad
+        raise
+    finally:
+        #there can be an exception before slaves are created, e.g. in the __init__
+        if hasattr(mw, 'slaves'):
+            mw.slaves.end()

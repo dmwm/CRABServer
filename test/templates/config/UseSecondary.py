@@ -16,14 +16,20 @@ config.JobType.psetName = 'psets/pset_use_parent.py'
 
 #Data Section
 config.section_("Data")
-config.Data.inputDataset = '/SingleMu/Run2015B-17Jul2015-v1/MINIAOD'
+#config.Data.inputDataset = '/SingleMu/Run2015B-17Jul2015-v1/MINIAOD'
+config.Data.inputDataset = '/MinimumBias/Run2015B-PromptReco-v1/RECO'
 config.Data.inputDBS = 'global'
 config.Data.splitting = 'LumiBased'
-config.Data.unitsPerJob = 20 # 200
-config.Data.secondaryInputDataset = '/SingleMu/Run2015B-v1/RAW'
+config.Data.unitsPerJob = 200 # 200
+#config.Data.secondaryInputDataset = '/SingleMu/Run2015B-v1/RAW'
+config.Data.secondaryInputDataset = '/MinimumBias/Run2015B-v1/RAW'
 config.Data.ignoreLocality = False
 
 #Site Section
 config.section_("Site")
 config.Site.storageSite = 'CHANGE'
+
+#Debug Section
+config.section_("Debug")
+config.Debug.extraJDL = ['+CMS_ALLOW_OVERFLOW=False']
 

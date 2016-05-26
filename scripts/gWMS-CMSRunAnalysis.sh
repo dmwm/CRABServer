@@ -6,10 +6,21 @@
 # difficult-to-impossible to run.
 #
 
+# On some sites we know there was some problems with environment cleaning
+# with using 'env -i'. To overcome this issue, whenever we start a job, we have
+# to save full current environment into file, and whenever it is needed we can load
+# it. Be aware, that there are some read-only variables, like: BASHOPTS, BASH_VERSINFO,
+# EUID, PPID, SHELLOPTS, UID, etc.
+set > startup_environment.sh
+sed -e 's/^/export /' startup_environment.sh > tmp_env.sh
+mv tmp_env.sh startup_environment.sh
+export JOBSTARTDIR=$PWD
+
 # Saving START_TIME and when job finishes, check if runtime is not lower than 20m
 # If it is lower, sleep the difference. Will not sleep if CRAB3_RUNTIME_DEBUG is set.
 START_TIME=$(date +%s)
 function finish {
+  chirp_exit_code
   END_TIME=$(date +%s)
   DIFF_TIME=$((END_TIME-START_TIME))
   echo "Job Running time in seconds: " $DIFF_TIME
@@ -23,7 +34,6 @@ function finish {
       sleep $SLEEP_TIME
     fi
   fi
-  chirp_exit_code
 }
 # Trap all exits and execute finish function
 trap finish EXIT
@@ -67,8 +77,9 @@ END
         echo "==== Failed to load the long exit code from jobReport.json.$CRAB_Id. Falling back to short exit code ===="
         #otherwise checjk if EXIT_STATUS is set and report it
         if [ -z "$EXIT_STATUS" ]; then
-            echo "======== Short exit code also missing. Skipping condor_chirp (NB it's only for monitoring purposes) ========"
-            return
+            echo "======== Short exit code also missing. Settint exit code to 80001 ========"
+            condor_chirp set_job_attr_delayed Chirp_CRAB3_Job_ExitCode 80001
+            CHIRP_EC=$?
         else
             echo "==== Short exit code of the job is $EXIT_STATUS ===="
             condor_chirp set_job_attr_delayed Chirp_CRAB3_Job_ExitCode $EXIT_STATUS
@@ -102,7 +113,7 @@ then
     JOB_CMSSite=`grep '^JOB_CMSSite =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
     if [ "X$CRAB_Id" = "X" ];
     then
-        print "Unable to determine CRAB Id."
+        echo "Unable to determine CRAB Id."
         exit 2
     fi
    echo "CRAB ID: $CRAB_Id"

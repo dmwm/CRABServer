@@ -39,7 +39,8 @@ class TaskAction(object):
 
     def uploadWarning(self, warning, userProxy, taskname):
         try:
-            userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2)
+            userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2,
+                                      logger = self.logger)
             configreq = {'subresource': 'addwarning',
                          'workflow': taskname,
                          'warning': b64encode(warning)}

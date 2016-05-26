@@ -1,9 +1,11 @@
 import re
 import json
 import time
+import copy
 import tarfile
 import StringIO
 import tempfile
+import calendar
 from ast import literal_eval
 
 import pycurl
@@ -35,15 +37,6 @@ class HTCondorDataWorkflow(DataWorkflow):
     """ HTCondor implementation of the status command.
     """
 
-    @classmethod
-    @conn_handler(services=['centralconfig'])
-    def chooseScheduler(cls, scheddname=None, backend_urls=None):
-        if not scheddname:
-            locator = HTCondorLocator.HTCondorLocator(backend_urls)
-            scheddname = locator.getSchedd()
-        return scheddname
-
-
     def getRootTasks(self, workflow, schedd):
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
         rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType', "HoldReason", "HoldReasonCode", "CRAB_UserWebDir",
@@ -56,7 +49,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         if not results:
             self.logger.info("An invalid workflow name was requested: %s" % workflow)
             raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
-        return results
+        return results[-1]
 
 
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
@@ -328,43 +321,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                     for outputFileDetails in outputDatasetDetails.values():
                         res['outputDatasets'][outputDataset]['numEvents'] += outputFileDetails['NumberOfEvents']
 
-        ## Old logic kept here only for backward compatibility. Remove it in March 2016 release.
-        res['dbsInLumilist'] = {}
-        res['dbsInLumilistNewClientOldTask'] = {}
-        res['dbsOutLumilist'] = {}
-        res['dbsNumEvents'] = 0
-        res['dbsNumFiles'] = 0
-        if inputDataset:
-            try:
-                #load the input dataset's lumilist
-                dbs = DBSReader(dbsUrl)
-                inputDetails = dbs.listDatasetFileDetails(inputDataset)
-                res['dbsInLumilist'] = _compactLumis(inputDetails)
-                res['dbsInLimilistNewClientOldTask'] = LumiList(runsAndLumis=_compactLumis(inputDetails)).getCompactList()
-                self.logger.info("Aggregated input lumilist: %s" % res['dbsInLumilist'])
-            except Exception as ex:
-                msg = "Failed to contact DBS: %s" % str(ex)
-                self.logger.exception(msg)
-                raise ExecutionError("Exception while contacting DBS. Cannot get the input lumi lists.")
-        if outputDatasets and publication:
-            try:
-                #load the output datasets' lumilist
-                dbs = DBSReader("https://cmsweb.cern.ch/dbs/prod/phys03/DBSReader") #We can only publish here with DBS3
-                outLumis = []
-                for outputDataset in outputDatasets:
-                    outputDetails = dbs.listDatasetFileDetails(outputDataset)
-                    outLumis.append(_compactLumis(outputDetails))
-                    res['dbsNumEvents'] += sum(x['NumberOfEvents'] for x in outputDetails.values())
-                    res['dbsNumFiles'] += sum(len(x['Parents']) for x in outputDetails.values())
-                outLumis = LumiList(runsAndLumis = outLumis).compactList
-                for run, lumis in outLumis.iteritems():
-                    res['dbsOutLumilist'][run] = reduce(lambda x1, x2: x1+x2, map(lambda x: range(x[0], x[1]+1), lumis))
-                self.logger.info("Aggregated output lumilist: %s" % res['dbsOutLumilist'])
-            except Exception as ex:
-                msg = "Failed to contact DBS: %s" % str(ex)
-                self.logger.exception(msg)
-                raise ExecutionError("Exception while contacting DBS. Cannot get the output lumi lists.")
-
         yield res
 
 
@@ -377,16 +333,20 @@ class HTCondorDataWorkflow(DataWorkflow):
            :return: a workflow status summary document"""
 
         #Empty results
-        result = {"status" : '',
-                  "taskFailureMsg" : '',
-                  "taskWarningMsg" : [],
-                  "statusFailureMsg" : '',
-                  "jobs" : [],
-                  "schedd" : '',
-                  "collector" : '',
-                  'outdatasets' : [],
-                  'publication' : None,
-                  'publicationFailures' : None}
+        result = {"status"           : '', #from the db
+                  "command"           : '', #from the db
+                  "taskFailureMsg"   : '', #from the db
+                  "taskWarningMsg"   : [], #from the db
+                  "submissionTime"   : 0, #from the db
+                  "statusFailureMsg" : '', #errors of the status itself
+                  "jobsPerStatus"    : {},
+                  "failedJobdefs"    : 0,
+                  "totalJobdefs"     : 0,
+                  "jobdefErrors"     : [],
+                  "jobList"          : [],
+                  "schedd"           : '', #from the db
+                  "collector"        : '',  #from the db
+                  "username"         : ''} #from the db
 
         # First, verify the task has been submitted by the backend.
         self.logger.info("Got status request for workflow %s" % workflow)
@@ -396,6 +356,18 @@ class HTCondorDataWorkflow(DataWorkflow):
             row = self.Task.ID_tuple(*next(row))
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % workflow)
+
+        result['submissionTime'] = calendar.timegm(row.start_time.utctimetuple())
+        if row.task_command:
+            result['command'] = row.task_command
+
+        ## Add scheduler and collector to the result dictionary.
+        if row.username:
+            result['username'] = row.username
+        if row.schedd:
+            result['schedd'] = row.schedd
+        if row.collector:
+            result['collector'] = row.collector
 
         # 0 - simple crab status
         # 1 - crab status -long
@@ -429,35 +401,28 @@ class HTCondorDataWorkflow(DataWorkflow):
                 #else:
                 #    result['statusFailureMsg'] += "\n%s" % (failure)
 
+        #get rid of this? If there is a clusterid we go ahead and get jobs info, otherwise we return result
+        self.logger.debug("Cluster id: %s" % row.clusterid)
         if row.task_status in ['NEW', 'HOLDING', 'UPLOADED', 'SUBMITFAILED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']:
             addStatusAndFailureFromDB(result, row)
-            if row.task_status in ['NEW', 'UPLOADED', 'SUBMITFAILED']:
+            if row.task_status in ['NEW', 'UPLOADED', 'SUBMITFAILED'] and row.task_command not in ['KILL', 'RESUBMIT']:
                 self.logger.debug("Detailed result for workflow %s: %s\n" % (workflow, result))
                 return [result]
+        #even if we get rid these two should be filled
+#                  "taskFailureMsg"   : '', #from the db
+#                  "taskWarningMsg"   : [], #from the db
 
-        ## Add scheduler and collector to the result dictionary.
-        if row.schedd:
-            result['schedd'] = row.schedd
-        if row.collector:
-            result['collector'] = row.collector
-
-##TO BE DONE IN CASE WE HJAVE A CLUSTERID IN THE DB BUT WE DO NOT HAVE A WEBDIR (YET?)
-#            if 'CRAB_UserWebDir' not in results[-1]:
-#                if taskStatusCode != 1 and taskStatusCode != 2:
-#                    DagmanHoldReason = results[-1]['DagmanHoldReason'] if 'DagmanHoldReason' in results[-1] else None
-#                    msg  = "The task failed to bootstrap on the Grid scheduler %s." % (address)
-#                    msg += " Please send an e-mail to %s." % (FEEDBACKMAIL)
-#                    msg += " Hold reason: %s" % (DagmanHoldReason)
-#                    addStatusAndFailure(result, status = 'UNKNOWN', failure = msg)
-#                else:
-#                    addStatusAndFailure(result, status = 'SUBMITTED')
-#                    result['taskWarningMsg'] = ["Task has not yet bootstrapped. Retry in a minute if you just submitted the task."] + result['taskWarningMsg']
-#                return [result]
+        #here we know we have a clusterid. But what if webdir is not there? return setting a proper statusFailureMsg
+        #Now what to do
+        #    get node_state/job_log from the schedd. Needs Justas patch (is it ok?)
+        #    get error_report
+        #    get aso_status (it is going to change once we are done whith the oracle implementation)
+        #    combine everything
 
         ## Here we start to retrieve the jobs statuses.
         jobsPerStatus = {}
         taskJobCount = 0
-        joblist = {}
+        taskStatus = {}
         jobList = []
         results = []
         # task_codes are used if condor_q command is done to retrieve task status
@@ -473,51 +438,150 @@ class HTCondorDataWorkflow(DataWorkflow):
         # Use new logic to get task status from scheduler.
         # In case it will fail, old logic will be used.
         # User web directory is needed for getting files from scheduler.
+        useOldLogic = True
+        if row.user_webdir and verbose != 2:
+            self.logger.info("Getting status for workflow %s using node state file.", workflow)
+            try:
+                taskStatus = self.taskWebStatus({'CRAB_UserWebDir' : row.user_webdir}, verbose, result)
+                #Check timestamp, if older then 2 minutes, use old logic
+                nodeStateUpd = int(taskStatus.get('DagStatus', {}).get("Timestamp", 0))
+                DAGStatus = int(taskStatus.get('DagStatus', {}).get('DagStatus', -1))
+                epochTime = int(time.time())
+                # If DAGStatus is 5 or 6, it means it is final state and node_state file will not be updated anymore
+                # and there is no need to query schedd to get information about task.
+                # If not, we check when the last time file was updated. It should update every 30s, which is set in
+                # job classad:
+                # https://github.com/dmwm/CRABServer/blob/5caac0d379f5e4522f026eeaf3621f7eb5ced98e/src/python/TaskWorker/Actions/DagmanCreator.py#L39
+                if (nodeStateUpd > 0 and (int(nodeStateUpd - epochTime) > 60)) or DAGStatus in [5, 6]:
+                    self.logger.info("Node state is up to date, using it")
+                    taskJobCount = int(taskStatus.get('DagStatus', {}).get('NodesTotal'))
+                    self.logger.info(taskStatus)
+                    useOldLogic = False
+                    if row.task_status in ['QUEUED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']:
+                        result['status'] = row.task_status
+                    else:
+                        result['status'] = dagman_codes.get(DAGStatus, row.task_status)
+                else:
+                    self.logger.info("Node state file is too old or does not have an update time. Will use condor_q to get the workflow status.")
+                    useOldLogic = True
+            except MissingNodeStatus:
+                # Node_status file is not ready or task is too old
+                # Will use old logic.
+                useOldLogic = True
+            except ExecutionError as ee:
+                ## The old logic will call again taskWebStatus, probably failing for the same
+                ## reason. So no need to try the old logic; we can already return.
+                addStatusAndFailure(result, status = 'UNKNOWN', failure = ee.info)
+                return [result]
 
-        self.logger.info("Getting status for workflow %s using node state file." % workflow)
-        try:
-            joblist = self.taskWebStatus(row.user_webdir, verbose, result)
-        except ExecutionError as ee:
-            ## The old logic will call again taskWebStatus, probably failing for the same
-            ## reason. So no need to try the old logic; we can already return.
-            addStatusAndFailure(result, status = 'UNKNOWN', failure = ee.info)
-            return [result]
+        if useOldLogic:
+            self.logger.info("Will get status using condor_q")
+            backend_urls = copy.deepcopy(self.centralcfg.centralconfig["backend-urls"])
+            if row.collector:
+                backend_urls['htcondorPool'] = row.collector
+            self.logger.info("Getting status for workflow %s, looking for schedd %s" % (workflow, row.schedd))
+            try:
+                locator = HTCondorLocator.HTCondorLocator(backend_urls)
+                self.logger.debug("Will talk to %s." % locator.getCollector())
+                self.logger.debug("Schedd name %s." % row.schedd)
+                schedd, address = locator.getScheddObjNew(row.schedd)
+                results = self.getRootTasks(workflow, schedd)
+                self.logger.info("Web status for workflow %s done " % workflow)
+            except Exception as exp: # Empty results is catched here, because getRootTasks raises InvalidParameter exception.
+                #when the task is submitted for the first time
+                self.logger.exception("Exception while querying schedd")
+                if row.task_status in ['QUEUED']:
+                    result['status'] = row.task_status
+                else:
+                    msg  = "The CRAB server frontend was not able to find the task in the Grid scheduler"
+                    msg += " (remember, tasks older than 30 days are automatically removed)."
+                    msg += " If the task is a recent one, this could mean there is a temporary glitch."
+                    msg += " Please try again later."
+                    msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
+                    if str(exp):
+                        msg += " Message from the scheduler: %s" % (str(exp))
+                    self.logger.exception("%s: %s" % (workflow, msg))
+                    addStatusAndFailure(result, status = 'UNKNOWN', failure = msg)
+                return [result]
 
-        if 'DagStatus' in joblist:
-            del joblist['DagStatus']
+            taskStatusCode = int(results['JobStatus'])
+            if 'CRAB_UserWebDir' not in results:
+                if taskStatusCode != 1 and taskStatusCode != 2:
+                    DagmanHoldReason = results['DagmanHoldReason'] if 'DagmanHoldReason' in results else None
+                    msg  = "The task failed to bootstrap on the Grid scheduler %s." % (address)
+                    msg += " Please send an e-mail to %s." % (FEEDBACKMAIL)
+                    msg += " Hold reason: %s" % (DagmanHoldReason)
+                    addStatusAndFailure(result, status = 'UNKNOWN', failure = msg)
+                else:
+                    addStatusAndFailure(result, status = 'SUBMITTED')
+                    result['taskWarningMsg'] = ["Task has not yet bootstrapped. Retry in a minute if you just submitted the task."] + result['taskWarningMsg']
+                return [result]
+
+            try:
+                taskStatus = self.taskWebStatus(results, verbose, result)
+            except MissingNodeStatus:
+                msg = "Node status file not currently available. Retry in a minute if you just submitted the task."
+                addStatusAndFailure(result, status = 'UNKNOWN', failure = msg)
+                return [result]
+            except ExecutionError as ee:
+                addStatusAndFailure(result, status = 'UNKNOWN', failure = ee.info)
+                return [result]
+
+            if row.task_status in ['QUEUED']:
+                result['status'] = row.task_status
+            elif not result['status']:
+                result['status'] = task_codes.get(taskStatusCode, 'UNKNOWN')
+            # HoldReasonCode == 1 indicates that the TW killed the task; perhaps the DB was not properly updated afterward?
+            if taskStatusCode == 5:
+                if results['HoldReasonCode'] == 16:
+                    result['status'] = 'InTransition'
+                elif row.task_status != 'KILLED':
+                    if results['HoldReasonCode'] == 1:
+                        result['status'] = 'KILLED'
+                    elif not result['status']:
+                        result['status'] = 'FAILED'
+
+            taskJobCount = int(results.get('CRAB_JobCount', 0))
+
+        if 'DagStatus' in taskStatus:
+            del taskStatus['DagStatus']
 
         for i in range(1, taskJobCount+1):
             i = str(i)
-            if i not in joblist:
-#                if taskStatusCode == 5:
-                joblist[i] = {'State': 'unsubmitted'}
-#                    joblist[i] = {'State': 'killed'}
-#                else:
-#                    joblist[i] = {'State': 'unsubmitted'}
+            if i not in taskStatus:
+                if taskStatusCode == 5:
+                    taskStatus[i] = {'State': 'killed'}
+                else:
+                    taskStatus[i] = {'State': 'unsubmitted'}
 
-        result['jobs'] = joblist
+        for job, info in taskStatus.items():
+            job = int(job)
+            status = info['State']
+            jobsPerStatus.setdefault(status, 0)
+            jobsPerStatus[status] += 1
+            jobList.append((status, job))
+        result['jobsPerStatus'] = jobsPerStatus
+        result['jobList'] = jobList
+        result['jobs'] = taskStatus
+
+        if len(taskStatus) == 0 and results and results['JobStatus'] == 2:
+            result['status'] = 'Running (jobs not submitted)'
 
         #Always returning ASOURL also, it is required for kill, resubmit
-        self.logger.info("ASO: %s", row.asourl)
+        self.logger.info("ASO: %s" % row.asourl)
         result['ASOURL'] = row.asourl
 
-        def hasFinishedJobs(joblist):
-            """ Return True if at leas a job finished """
-            for jobid, statusDict in joblist.iteritems():
-                if jobid == '0':
-                    continue
-                if statusDict['State'] == 'finished':
-                    return True
-            return False
         ## Retrieve publication information.
         publicationInfo = {}
-        if (row.publication == 'T' and hasFinishedJobs(joblist)):
+        if (row.publication == 'T' and 'finished' in result['jobsPerStatus']):
             #let's default asodb to asynctransfer, for old task this is empty!
             asodb = row.asodb or 'asynctransfer'
+            publicationInfo = self.publicationStatus(workflow, row.asourl, asodb)
             self.logger.info("Publication status for workflow %s done" % workflow)
         elif (row.publication == 'F'):
             publicationInfo['status'] = {'disabled': []}
-
+        else:
+            self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.publication, result['jobsPerStatus'].get('finished', 0)))
         result['publication'] = publicationInfo.get('status', {})
         result['publicationFailures'] = publicationInfo.get('failure_reasons', {})
 
@@ -577,45 +641,62 @@ class HTCondorDataWorkflow(DataWorkflow):
                                   "contact %s if the error persist. Error from curl: %s"
                                   % (url, FEEDBACKMAIL, str(e))))
 
-    def taskWebStatus(self, webdirURL, verbose, statusResult):
+    def taskWebStatus(self, task_ad, verbose, statusResult):
         nodes = {}
+        url = task_ad['CRAB_UserWebDir']
         curl = self.prepareCurl()
         fp = tempfile.TemporaryFile()
         curl.setopt(pycurl.WRITEFUNCTION, fp.write)
         hbuf = StringIO.StringIO()
         curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
         try:
-            jobs_url = webdirURL + "/jobs_log.txt"
-            curl.setopt(pycurl.URL, jobs_url)
-            self.logger.info("Starting download of job log")
-            self.myPerform(curl, jobs_url)
-            self.logger.info("Finished download of job log")
+            self.logger.debug("Retrieving task status from web with verbosity %d." % verbose)
+            if verbose == 1:
+                jobs_url = url + "/jobs_log.txt"
+                curl.setopt(pycurl.URL, jobs_url)
+                self.logger.info("Starting download of job log")
+                self.myPerform(curl, jobs_url)
+                self.logger.info("Finished download of job log")
+                header = ResponseHeader(hbuf.getvalue())
+                if header.status == 200:
+                    fp.seek(0)
+                    self.logger.debug("Starting parse of job log")
+                    self.parseJobLog(fp, nodes)
+                    self.logger.debug("Finished parse of job log")
+                else:
+                    raise ExecutionError("Cannot get jobs log file. Retry in a minute if you just submitted the task")
+            elif verbose == 2:
+                site_url = url + "/site_ad.txt"
+                curl.setopt(pycurl.URL, site_url)
+                self.logger.debug("Starting download of site ad")
+                self.myPerform(curl, site_url)
+                self.logger.debug("Finished download of site ad")
+                header = ResponseHeader(hbuf.getvalue())
+                if header.status == 200:
+                    fp.seek(0)
+                    self.logger.debug("Starting parse of site ad")
+                    self.parseSiteAd(fp, task_ad, nodes)
+                    self.logger.debug("Finished parse of site ad")
+                else:
+                    raise ExecutionError("Cannot get site ad. Retry in a minute if you just submitted the task")
+
+            nodes_url = url + "/node_state.txt"
+            curl.setopt(pycurl.URL, nodes_url)
+            # Before executing any new curl, truncate and clean temp file
+            fp, hbuf = self.cleanTempFileAndBuff(fp, hbuf)
+            self.logger.debug("Starting download of node state")
+            self.myPerform(curl, nodes_url)
+            self.logger.debug("Finished download of node state")
             header = ResponseHeader(hbuf.getvalue())
             if header.status == 200:
                 fp.seek(0)
-                self.logger.debug("Starting parse of job log")
-                self.parseJobLog(fp, nodes)
-                self.logger.debug("Finished parse of job log")
+                self.logger.debug("Starting parse of node state")
+                self.parseNodeState(fp, nodes)
+                self.logger.debug("Finished parse of node state")
             else:
-                raise ExecutionError("Cannot get jobs log file. Retry in a minute if you just submitted the task")
+                raise MissingNodeStatus("Cannot get node state log. Retry in a minute if you just submitted the task")
 
-#            nodes_url = webdirURL + "/node_state.txt"
-#            curl.setopt(pycurl.URL, nodes_url)
-#            # Before executing any new curl, truncate and clean temp file
-#            fp, hbuf = self.cleanTempFileAndBuff(fp, hbuf)
-#            self.logger.debug("Starting download of node state")
-#            self.myPerform(curl, nodes_url)
-#            self.logger.debug("Finished download of node state")
-#            header = ResponseHeader(hbuf.getvalue())
-#            if header.status == 200:
-#                fp.seek(0)
-#                self.logger.debug("Starting parse of node state")
-#                self.parseNodeState(fp, nodes)
-#                self.logger.debug("Finished parse of node state")
-#            else:
-#                raise MissingNodeStatus("Cannot get node state log. Retry in a minute if you just submitted the task")
-
-            site_url = webdirURL + "/error_summary.json"
+            site_url = url + "/error_summary.json"
             # Before executing any new curl, truncate and clean temp file
             fp, hbuf = self.cleanTempFileAndBuff(fp, hbuf)
             curl.setopt(pycurl.URL, site_url)
@@ -633,7 +714,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
             # Before executing any new curl, truncate and clean temp file
             fp, hbuf = self.cleanTempFileAndBuff(fp, hbuf)
-            aso_url = webdirURL + "/aso_status.json"
+            aso_url = url + "/aso_status.json"
             curl.setopt(pycurl.URL, aso_url)
             self.logger.debug("Starting download of aso state")
             curl.perform()
@@ -705,8 +786,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         return publicationInfo
 
 
-    node_name_re = re.compile("DAG Node: Job(\d+(-\d+){0,2})")
-    node_name2_re = re.compile("Job(\d+(-\d+){0,2})")
+    node_name_re = re.compile("DAG Node: Job(\d+)")
+    node_name2_re = re.compile("Job(\d+)")
     def parseJobLog(self, fp, nodes):
         node_map = {}
         count = 0
@@ -742,11 +823,11 @@ class HTCondorDataWorkflow(DataWorkflow):
                 self.insertCpu(event, nodes[node])
                 if event['TerminatedNormally']:
                     if event['ReturnValue'] == 0:
-                        nodes[node]['State'] = 'finished'
+                        nodes[node]['State'] = 'transferring'
                     else:
                         nodes[node]['State'] = 'cooloff'
                 else:
-                    nodes[node]['State'] = 'cooloff'
+                    nodes[node]['State']  = 'cooloff'
             elif event['MyType'] == 'PostScriptTerminatedEvent':
                 m = self.node_name2_re.match(event['DAGNodeName'])
                 if m:
@@ -943,13 +1024,6 @@ class HTCondorDataWorkflow(DataWorkflow):
             status = ad.get('NodeStatus', -1)
             retry = ad.get('RetryCount', -1)
             msg = ad.get("StatusDetails", "")
-
-            # Each job has a subdag for recovery that we need to skip in case its status is 0 STATUS_NOT_READY
-            # Also, we decrease NodesTotal since it does not have to be counted
-            if node.endswith("SubJobs") and status <= 0:
-                taskStatus['NodesTotal'] -= 1
-                continue
-
             if status == 1: # STATUS_READY
                 info = nodes.setdefault(nodeid, {})
                 if info.get("State") == "transferring":
@@ -983,4 +1057,23 @@ class HTCondorDataWorkflow(DataWorkflow):
                 # be tried again in the near future.  This behavior is no longer
                 # observed; STATUS_ERROR is terminal.
                 info['State'] = 'failed'
+
+
+    job_name_re = re.compile(r"Job(\d+)")
+    def parseSiteAd(self, fp, task_ad, nodes):
+        site_ad = classad.parse(fp)
+        blacklist = set(task_ad['CRAB_SiteBlacklist'])
+        whitelist = set(task_ad['CRAB_SiteWhitelist'])
+        for key, val in site_ad.items():
+            m = self.job_name_re.match(key)
+            if not m:
+                continue
+            nodeid = m.groups()[0]
+            sites = set(val.eval())
+            if whitelist:
+                sites &= whitelist
+            # Never blacklist something on the whitelist
+            sites -= (blacklist-whitelist)
+            info = nodes.setdefault(nodeid, {})
+            info['AvailableSites'] = list([i.eval() for i in sites])
 
