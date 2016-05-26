@@ -1803,7 +1803,11 @@ class PostJob():
             if ifile['input_source_class'] != 'PoolSource' or ifile.get('input_type', '') != "primaryFiles":
                 continue
             ## Many of these parameters are not needed and are using fake/defined values
-            lfn = ifile['lfn'] + "_" + str(self.job_id) ## jobs can analyze the same input
+            if not ifile['lfn'] :  # there are valid use case with no input LFN but we need to count files for crab report
+                lfn = '/store/user/dummy/DummyLFN'
+            else:
+                lfn = ifile['lfn']
+            lfn = lfn + "_" + str(self.job_id) ## jobs can analyze the same input
             configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
                          "globalTag"       : "None",
                          "pandajobid"      : self.job_id,
