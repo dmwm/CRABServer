@@ -266,7 +266,7 @@ class MasterWorker(object):
                 if action.isTimeToGo():
                     #Maybe we should use new slaves and not reuse the ones used for the tasks
                     self.logger.debug("Injecting recurring action: \n%s", (str(action.__module__)))
-                    self.slaves.injectWorks([(handleRecurring, {'tm_taskname' : action.__module__}, 'FAILED', action.__module__)])
+                    self.slaves.injectWorks([(handleRecurring, {'tm_username': 'recurring', 'tm_taskname' : action.__module__}, 'FAILED', action.__module__)])
 
             self.logger.info('Master Worker status:')
             self.logger.info(' - free slaves: %d', self.slaves.freeSlaves())
