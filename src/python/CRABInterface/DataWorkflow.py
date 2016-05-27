@@ -233,7 +233,7 @@ class DataWorkflow(object):
                             asourl          = [asourl],
                             asodb           = [asodb],
                             collector       = [collector],
-                            schedd_name     = [None],
+                            schedd_name     = [scheddname],
                             dry_run         = ['T' if dryrun else 'F'],
                             user_files       = [dbSerializer(userfiles)],
                             transfer_outputs = ['T' if saveoutput else 'F'],
