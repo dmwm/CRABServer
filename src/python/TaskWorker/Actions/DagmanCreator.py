@@ -46,7 +46,7 @@ NODE_STATUS_FILE node_state 30 ALWAYS-UPDATE
 
 DAG_FRAGMENT = """
 JOB Job%(count)d Job.%(count)d.submit
-SCRIPT PRE  Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %(backend)s
+SCRIPT %(prescriptDefer)s PRE Job%(count)d dag_bootstrap.sh PREJOB $RETRY %(count)d %(taskname)s %(backend)s
 SCRIPT DEFER 4 1800 POST Job%(count)d dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES %(taskname)s %(count)d %(tempDest)s %(outputDest)s cmsRun_%(count)d.log.tar.gz %(remoteOutputFiles)s
 #PRE_SKIP Job%(count)d 3
 RETRY Job%(count)d %(maxretries)d UNLESS-EXIT 2
@@ -516,7 +516,19 @@ class DagmanCreator(TaskAction.TaskAction):
                 lastDirectDest = directDest
             pfns = ["log/cmsRun_%d.log.tar.gz" % i] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
+            slowJobRelease = False
+            extrajdls = literal_eval(task['tm_extrajdl'])
+            for ej in extrajdls:
+                if ej.find('CRAB_JobReleaseTimeout') in [0, 1]: #there might be a + before
+                    slowJobRelease = True
+                    releaseTimeout = int(ej.split('=')[1])
+                    break
+            if slowJobRelease:
+                prescriptDeferString = 'DEFER 4 %s' % (i*releaseTimeout)
+            else:
+                prescriptDeferString = ''
             nodeSpec = {'count': i,
+                        'prescriptDefer' : prescriptDeferString,
                         'maxretries': task['numautomjobretries'],
                         'taskname': task['tm_taskname'],
                         'backend': os.environ.get('HOSTNAME', ''),

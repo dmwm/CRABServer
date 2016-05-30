@@ -536,6 +536,17 @@ class PreJob:
         if old_time:
             sleep_time = int(max(1, sleep_time - old_time))
         self.update_dashboard(crab_retry)
+        deferTime = int(self.task_ad.get("CRAB_JobReleaseTimeout", 0))
+        if deferTime:
+            self.logger.info('Release timeout specified in extr1aJDL:')
+            totalDefer = deferTime * int(self.job_id)
+            submitTime = int(self.task_ad.get("CRAB_TaskSubmitTime"))
+            currentTime = time.time()
+            if currentTime < (submitTime + totalDefer):
+                self.logger.info('  Release timeout specified in extr1aJDL: deferring %s seconds' % totalDefer)
+                return 4
+            else:
+                self.logger.info('  Continuing normally since current time is greater than foreseen starttime of the job')
         msg = "Finished pre-job execution. Sleeping %s seconds..." % (sleep_time)
         self.logger.info(msg)
         os.close(fd_prejob_log)
