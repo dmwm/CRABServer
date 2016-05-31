@@ -471,8 +471,8 @@ class DagmanCreator(TaskAction.TaskAction):
     def getPreScriptDefer(self, task, jobid):
         """ Return the string to be used for deferring prejobs
             If the extrajdl CRAB_JobReleaseTimeout is not set in the client it returns
-            an empty string, otherwise it return a string to defer the prejob the right
-            amount of time (jobid * CRAB_JobReleaseTimeout)
+            an empty string, otherwise it return a string to defer the prejob by
+            jobid * CRAB_JobReleaseTimeout seconds
         """
         slowJobRelease = False
         extrajdls = literal_eval(task['tm_extrajdl'])

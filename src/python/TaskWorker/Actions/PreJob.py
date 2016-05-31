@@ -484,15 +484,15 @@ class PreJob:
         """
         deferTime = int(self.task_ad.get("CRAB_JobReleaseTimeout", 0))
         if deferTime:
-            self.logger.info('Release timeout specified in extr1aJDL:')
+            self.logger.info('Release timeout specified in extraJDL:')
             totalDefer = deferTime * int(self.job_id)
             submitTime = int(self.task_ad.get("CRAB_TaskSubmitTime"))
             currentTime = time.time()
             if currentTime < (submitTime + totalDefer):
-                self.logger.info('  Release timeout specified in extr1aJDL: deferring %s seconds' % totalDefer)
+                self.logger.info('  Defer time of this job (%s seconds since initial task submission) not elapsed yet, deferring for %s seconds' % (totalDefer, totalDefer))
                 return True
             else:
-                self.logger.info('  Continuing normally since current time is greater than foreseen starttime of the job')
+                self.logger.info('  Continuing normally since current time is greater than requested starttime of the job')
         return False
 
 
