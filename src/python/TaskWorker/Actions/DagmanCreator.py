@@ -468,6 +468,26 @@ class DagmanCreator(TaskAction.TaskAction):
         return info
 
 
+    def getPreScriptDefer(self, task, jobid):
+        """ Return the string to be used for deferring prejobs
+            If the extrajdl CRAB_JobReleaseTimeout is not set in the client it returns
+            an empty string, otherwise it return a string to defer the prejob the right
+            amount of time (jobid * CRAB_JobReleaseTimeout)
+        """
+        slowJobRelease = False
+        extrajdls = literal_eval(task['tm_extrajdl'])
+        for ej in extrajdls:
+            if ej.find('CRAB_JobReleaseTimeout') in [0, 1]: #there might be a + before
+                slowJobRelease = True
+                releaseTimeout = int(ej.split('=')[1])
+
+        if slowJobRelease:
+            prescriptDeferString = 'DEFER 4 %s' % (jobid * releaseTimeout)
+        else:
+            prescriptDeferString = ''
+        return prescriptDeferString
+
+
     def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid):
         dagSpecs = []
         i = startjobid
@@ -516,17 +536,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 lastDirectDest = directDest
             pfns = ["log/cmsRun_%d.log.tar.gz" % i] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
-            slowJobRelease = False
-            extrajdls = literal_eval(task['tm_extrajdl'])
-            for ej in extrajdls:
-                if ej.find('CRAB_JobReleaseTimeout') in [0, 1]: #there might be a + before
-                    slowJobRelease = True
-                    releaseTimeout = int(ej.split('=')[1])
-                    break
-            if slowJobRelease:
-                prescriptDeferString = 'DEFER 4 %s' % (i*releaseTimeout)
-            else:
-                prescriptDeferString = ''
+            prescriptDeferString = self.getPreScriptDefer(task, i)
             nodeSpec = {'count': i,
                         'prescriptDefer' : prescriptDeferString,
                         'maxretries': task['numautomjobretries'],
