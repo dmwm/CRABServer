@@ -157,7 +157,7 @@ class PreJob:
 
         storage_rules = htcondor.param['CRAB_StorageRules']
         userWebDir = getWebdirForDb(str(self.task_ad.get('CRAB_ReqName')), storage_rules)
-        
+
         userWebDirPrx = ""
         try:
             with open('proxied_webdir') as fd:
@@ -165,7 +165,7 @@ class PreJob:
             userWebDirPrx = proxied_webdir
         except IOError as e:
             self.logger.error(("'I/O error(%s): %s', when looking for the proxied_webdir file. Might be normal"
-                         " if the schedd does not have a proxiedurl in the REST external config." % (e.errno, e.strerror))) 
+                         " if the schedd does not have a proxiedurl in the REST external config." % (e.errno, e.strerror)))
 
         self.logger.info("User web dir proxy: " + userWebDirPrx)
         self.logger.info("web dir: " + userWebDir)
@@ -476,6 +476,26 @@ class PreJob:
             pass
 
 
+    def needsDefer(self):
+        """ Check if the Prejob needs to be deferred, feature useful for some use cases that requires
+            slow release of jobs in a task.
+            The function return True if CRAB_JobReleaseTimeout is defined and not 0, and if the submit
+            time of the task plus the defer time is greater than the current time.
+        """
+        deferTime = int(self.task_ad.get("CRAB_JobReleaseTimeout", 0))
+        if deferTime:
+            self.logger.info('Release timeout specified in extraJDL:')
+            totalDefer = deferTime * int(self.job_id)
+            submitTime = int(self.task_ad.get("CRAB_TaskSubmitTime"))
+            currentTime = time.time()
+            if currentTime < (submitTime + totalDefer):
+                self.logger.info('  Defer time of this job (%s seconds since initial task submission) not elapsed yet, deferring for %s seconds' % (totalDefer, totalDefer))
+                return True
+            else:
+                self.logger.info('  Continuing normally since current time is greater than requested starttime of the job')
+        return False
+
+
     def execute(self, *args):
         """
         Need a doc string here.
@@ -536,6 +556,8 @@ class PreJob:
         if old_time:
             sleep_time = int(max(1, sleep_time - old_time))
         self.update_dashboard(crab_retry)
+        if self.needsDefer():
+            return 4
         msg = "Finished pre-job execution. Sleeping %s seconds..." % (sleep_time)
         self.logger.info(msg)
         os.close(fd_prejob_log)
