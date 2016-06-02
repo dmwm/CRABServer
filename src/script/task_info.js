@@ -146,8 +146,8 @@ $(document).ready(function() {
         } else if (proxiedWebDirUrl === "") {
             // In case proxy api returned empty or failed
             // Set links, show error and don't load anything else.
-            $("#task-config-link").attr("href", userWebDir + "/sandbox.tar.gz");
-            $("#task-pset-link").attr("href", userWebDir + "/sandbox.tar.gz");
+            $("#task-config-link").attr("href", userWebDir + "/debug_files.tar.gz");
+            $("#task-pset-link").attr("href", userWebDir + "/debug_files.tar.gz");
             errHandler(new ProxyNotFoundErrorError);
             return;
         }
