@@ -99,7 +99,7 @@ class DataWorkflow(object):
 
     @conn_handler(services=['centralconfig'])
     def submit(self, workflow, activity, jobtype, jobsw, jobarch, use_parent, secondarydata, generator, events_per_lumi, siteblacklist,
-               sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
+               sitewhitelist, splitalgo, algoargs, cachefilename, debugfilename, cacheurl, addoutputfiles,
                username, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, asodb=None, scriptexe=None, scriptargs=None,
@@ -203,6 +203,7 @@ class DataWorkflow(object):
                                                 splitArgName : algoargs, 'runs': runs, 'lumis': lumis})],
                             total_units     = [totalunits],
                             user_sandbox    = [cachefilename],
+                            debug_files     = [debugfilename],
                             cache_url       = [cacheurl],
                             username        = [username],
                             user_dn         = [userdn],

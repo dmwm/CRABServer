@@ -820,14 +820,14 @@ class DagmanCreator(TaskAction.TaskAction):
         Also modified inputFiles list by appending a debug folder if extraction succeeds.
         """
         try:
-            sandboxTar = tarfile.open('sandbox.tar.gz')
-            sandboxTar.extract('debug/crabConfig.py')
-            sandboxTar.extract('debug/originalPSet.py')
+            debugTar = tarfile.open('debug_files.tar.gz')
+            debugTar.extract('debug/crabConfig.py')
+            debugTar.extract('debug/originalPSet.py')
             scriptExeName = kw['task'].get('tm_scriptexe')
             if scriptExeName != None:
-                sandboxTar.extract(scriptExeName)
+                debugTar.extract(scriptExeName)
                 shutil.copy(scriptExeName, 'debug/' + scriptExeName)
-            sandboxTar.close()
+            debugTar.close()
 
             inputFiles.append('debug')
 
@@ -866,6 +866,7 @@ class DagmanCreator(TaskAction.TaskAction):
             ufc = UserFileCache(mydict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint' : kw['task']['tm_cache_url']})
             try:
                 ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
+                ufc.download(hashkey=kw['task']['tm_debug_files'].split(".")[0], output="debug_files.tar.gz")
             except Exception as ex:
                 self.logger.exception(ex)
                 raise TaskWorkerException("The CRAB3 server backend could not download the input sandbox with your code "+\
@@ -901,6 +902,7 @@ class DagmanCreator(TaskAction.TaskAction):
         if kw['task']['tm_input_dataset']:
             inputFiles.append("input_dataset_lumis.json")
             inputFiles.append("input_dataset_duplicate_lumis.json")
+        inputFiles.append("debug_files.tar.gz")
 
         info, splitterResult = self.createSubdag(*args, **kw)
 

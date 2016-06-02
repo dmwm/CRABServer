@@ -194,6 +194,8 @@ def makeWebDir(ad):
         os.makedirs(path)
         ## Copy the sandbox to the web directory.
         shutil.copy2(os.path.join(".", "sandbox.tar.gz"), os.path.join(path, "sandbox.tar.gz"))
+        shutil.copy2(os.path.join(".", "debug_files.tar.gz"), os.path.join(path, "debug_files.tar.gz"))
+
         ## Make all the necessary symbolic links in the web directory.
         sourceLinks = ["debug",
                        "RunJobs.dag", "RunJobs.dag.dagman.out", "RunJobs.dag.nodes.log",

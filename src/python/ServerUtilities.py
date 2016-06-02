@@ -53,9 +53,9 @@ def USER_SANDBOX_EXCLUSIONS(tarmembers):
     """
     if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers):
         #exclude the pickle pset if the dumpPython PSet is there
-        return ['PSet.py', 'PSet.pkl', 'debug/crabConfig.py', 'debug/originalPSet.py.py']
+        return ['PSet.py', 'PSet.pkl']
     else:
-        return ['debug/crabConfig.py', 'debug/originalPSet.py.py']
+        return []
 
 
 def checkOutLFN(lfn, username):
