@@ -55,15 +55,8 @@ def removeTaskLogHandler(logger, taskhandler):
     taskhandler.close()
     logger.removeHandler(taskhandler)
 
-def processWorker(inputs, results, resthost, resturi, procnum):
-    """Wait for an reference to appear in the input queue, call the referenced object
-       and write the output in the output queue.
 
-       :arg Queue inputs: the queue where the inputs are shared by the master
-       :arg Queue results: the queue where this method writes the output
-       :return: default returning zero, but not really needed."""
-    logger = setProcessLogger(str(procnum))
-    logger.info("Process %s is starting. PID %s", procnum, os.getpid())
+def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger):
     procName = "Process-%s" % procnum
     while True:
         try:
@@ -122,6 +115,22 @@ def processWorker(inputs, results, resthost, resturi, procnum):
                      'workid': workid,
                      'out' : outputs
                     })
+
+
+def processWorker(inputs, results, resthost, resturi, procnum):
+    """Wait for an reference to appear in the input queue, call the referenced object
+       and write the output in the output queue.
+
+       :arg Queue inputs: the queue where the inputs are shared by the master
+       :arg Queue results: the queue where this method writes the output
+       :return: default returning zero, but not really needed."""
+    logger = setProcessLogger(str(procnum))
+    logger.info("Process %s is starting. PID %s", procnum, os.getpid())
+    try:
+        processWorkerLoop(inputs, results, resthost, resturi, procnum, logger)
+    except: #pylint: disable=bare-except
+        #if enything happen put the log inside process logfiles instead of nohup.log
+        logger.exception("Unexpected error in process worker!")
     logger.debug("Slave %s exiting.", procnum)
     return 0
 
