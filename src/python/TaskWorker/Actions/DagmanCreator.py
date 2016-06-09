@@ -563,7 +563,6 @@ class DagmanCreator(TaskAction.TaskAction):
                         'scriptArgs': json.dumps(task['tm_scriptargs']).replace('"', r'\"\"'),
                        }
             dagSpecs.append(nodeSpec)
-            self.logger.debug(dagSpecs[-1])
 
         return dagSpecs, i
 

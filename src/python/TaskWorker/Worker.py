@@ -40,7 +40,7 @@ def addTaskLogHandler(logger, username, taskname):
         os.mkdir(taskdirname)
     except OSError as ose:
         if ose.errno != 17: #ignore the "Directory already exists error" but print other errors traces
-            logger.exception("Cannot set task hanlder logfile for task %s. Ignoring and continuing normally." % taskname)
+            logger.exception("Cannot set task handler logfile for task %s. Ignoring and continuing normally." % taskname)
     taskhandler = FileHandler(taskdirname + taskname + '.log')
     taskhandler.setFormatter(formatter)
     taskhandler.setLevel(logging.DEBUG)

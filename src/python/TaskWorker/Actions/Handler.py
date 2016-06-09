@@ -23,8 +23,6 @@ from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
 from TaskWorker.WorkerExceptions import WorkerHandlerException, TaskWorkerException
 
-DEFAULT_BACKEND = 'glidein'
-
 
 class TaskHandler(object):
     """Handling the set of operations to be performed."""
