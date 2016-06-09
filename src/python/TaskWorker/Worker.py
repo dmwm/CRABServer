@@ -36,12 +36,16 @@ def addTaskLogHandler(logger, username, taskname):
     #set the logger to save the tasklog
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
     taskdirname = "logs/tasks/%s/" % username
-    if not os.path.isdir(taskdirname):
+    try:
         os.mkdir(taskdirname)
+    except OSError as ose:
+        if ose.errno != 17: #ignore the "Directory already exists error" but print other errors traces
+            logger.exception("Cannot set task handler logfile for task %s. Ignoring and continuing normally." % taskname)
     taskhandler = FileHandler(taskdirname + taskname + '.log')
     taskhandler.setFormatter(formatter)
     taskhandler.setLevel(logging.DEBUG)
     logger.addHandler(taskhandler)
+
 
     return taskhandler
 
@@ -51,15 +55,8 @@ def removeTaskLogHandler(logger, taskhandler):
     taskhandler.close()
     logger.removeHandler(taskhandler)
 
-def processWorker(inputs, results, resthost, resturi, procnum):
-    """Wait for an reference to appear in the input queue, call the referenced object
-       and write the output in the output queue.
 
-       :arg Queue inputs: the queue where the inputs are shared by the master
-       :arg Queue results: the queue where this method writes the output
-       :return: default returning zero, but not really needed."""
-    logger = setProcessLogger(str(procnum))
-    logger.info("Process %s is starting. PID %s", procnum, os.getpid())
+def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger):
     procName = "Process-%s" % procnum
     while True:
         try:
@@ -118,6 +115,22 @@ def processWorker(inputs, results, resthost, resturi, procnum):
                      'workid': workid,
                      'out' : outputs
                     })
+
+
+def processWorker(inputs, results, resthost, resturi, procnum):
+    """Wait for an reference to appear in the input queue, call the referenced object
+       and write the output in the output queue.
+
+       :arg Queue inputs: the queue where the inputs are shared by the master
+       :arg Queue results: the queue where this method writes the output
+       :return: default returning zero, but not really needed."""
+    logger = setProcessLogger(str(procnum))
+    logger.info("Process %s is starting. PID %s", procnum, os.getpid())
+    try:
+        processWorkerLoop(inputs, results, resthost, resturi, procnum, logger)
+    except: #pylint: disable=bare-except
+        #if enything happen put the log inside process logfiles instead of nohup.log
+        logger.exception("Unexpected error in process worker!")
     logger.debug("Slave %s exiting.", procnum)
     return 0
 
@@ -127,7 +140,7 @@ def setProcessLogger(name):
         can be retrieved with logging.getLogger(name) in other parts of the code
     """
     logger = logging.getLogger(name)
-    handler = TimedRotatingFileHandler('logs/processes/proc.%s.txt' % name, 'midnight', backupCount=30)
+    handler = TimedRotatingFileHandler('logs/processes/proc.c3id_%s.pid_%s.txt' % (name, os.getpid()), 'midnight', backupCount=30)
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)

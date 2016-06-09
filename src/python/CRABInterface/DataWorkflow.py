@@ -254,7 +254,7 @@ class DataWorkflow(object):
             submissionTime are the seconds since epoch of the task submission time in the DB
         """
 
-        msg = None
+        msg = "ok"
         ## resubmitLifeTime is 23 days expressed in seconds
         resubmitLifeTime = TASKLIFETIME - NUM_DAYS_FOR_RESUBMITDRAIN * 24 * 60 * 60
         if time.time() > (submissionTime + resubmitLifeTime):
@@ -284,7 +284,7 @@ class DataWorkflow(object):
         ## Check lifetime of the task and raise ExecutionError if appropriate
         self.logger.info("Checking if resubmission is possible: we don't allow resubmission %s days before task expiration date", NUM_DAYS_FOR_RESUBMITDRAIN)
         retmsg = self.checkTaskLifetime(statusRes['submissionTime'])
-        if retmsg:
+        if retmsg != "ok":
             return [{'result': retmsg}]
 
         ## Ignore the following options if this is a publication resubmission or if the
