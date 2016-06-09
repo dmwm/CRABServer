@@ -36,12 +36,16 @@ def addTaskLogHandler(logger, username, taskname):
     #set the logger to save the tasklog
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
     taskdirname = "logs/tasks/%s/" % username
-    if not os.path.isdir(taskdirname):
+    try:
         os.mkdir(taskdirname)
+    except OSError as ose:
+        if ose.errno != 17: #ignore the "Directory already exists error" but print other errors traces
+            logger.exception("Cannot set task hanlder logfile for task %s. Ignoring and continuing normally." % taskname)
     taskhandler = FileHandler(taskdirname + taskname + '.log')
     taskhandler.setFormatter(formatter)
     taskhandler.setLevel(logging.DEBUG)
     logger.addHandler(taskhandler)
+
 
     return taskhandler
 
