@@ -4,7 +4,7 @@ These are extensions which are not directly contained in WMCore.REST module.
 Collecting all here since aren't supposed to be many.
 """
 
-from ServerUtilities import USER_SANDBOX_EXCLUSIONS
+from ServerUtilities import USER_SANDBOX_EXCLUSIONS, NEW_USER_SANDBOX_EXCLUSIONS
 
 # WMCore dependecies here
 from WMCore.REST.Validation import _validate_one
@@ -63,7 +63,7 @@ def list_users(cachedir):
                 yield username
 
 def list_files(quotapath):
-    for dirpath, dirnames, filenames in walk(quotapath):
+    for _, _, filenames in walk(quotapath):
         for f in filenames:
             yield f
 
@@ -73,7 +73,7 @@ def get_size(quotapath):
     :arg str quotapath: the directory for which is needed to calculate the quota
     :return: bytes taken by the directory"""
     totalsize = 0
-    for dirpath, dirnames, filenames in walk(quotapath):
+    for dirpath, _, filenames in walk(quotapath):
         for f in filenames:
             fp = path.join(dirpath, f)
             totalsize += path.getsize(fp)
@@ -85,7 +85,7 @@ def quota_user_free(quotadir, infile):
     :arg str quotadir: the user path where the file will be written
     :arg file|cStringIO.StringIO infile: file object handler or cStringIO.StringIO
     :return: Nothing"""
-    filesize, realfile = file_size(infile.file)
+    filesize, _ = file_size(infile.file)
     quota = get_size(quotadir)
     quotaLimit = QUOTA_USER_LIMIT*10 if cherrypy.request.user['login'] in POWER_USERS_LIST else QUOTA_USER_LIMIT
     if filesize + quota > quotaLimit:
@@ -130,9 +130,11 @@ def _check_tarfile(argname, val, hashkey, newchecksum):
 
     digest = None
     try:
-        #This newchecksum param and the "else" branch is there for backward compatibility.
-        #We can remove the whole commit at some point in the future
-        if newchecksum:
+        #This newchecksum param and the if/else branch is there for backward compatibility.
+        #The parameter, older exclusion and checksum functions should be removed in the future.
+        if newchecksum == 2:
+            digest = calculateChecksum(val.file, exclude=NEW_USER_SANDBOX_EXCLUSIONS)
+        elif newchecksum == 1:
             digest = calculateChecksum(val.file, exclude=USER_SANDBOX_EXCLUSIONS)
         else:
             tar = tarfile.open(fileobj=val.file, mode='r')

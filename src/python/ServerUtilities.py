@@ -53,6 +53,18 @@ def USER_SANDBOX_EXCLUSIONS(tarmembers):
     """
     if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers):
         #exclude the pickle pset if the dumpPython PSet is there
+        return ['PSet.py', 'PSet.pkl', 'debug/crabConfig.py', 'debug/originalPSet.py.py']
+    else:
+        return ['debug/crabConfig.py', 'debug/originalPSet.py.py']
+    
+def NEW_USER_SANDBOX_EXCLUSIONS(tarmembers):
+    """ Exclusion function used with the new crabclient (>= 3.3.1607). Since the new client sandbox no longer
+        contains the debug files, it's pointless to exclude them. Also, this function is used when getting
+        the hash of the debug tarball (a new addition in 3.3.1607). If the debug files are excluded, the tarball
+        would always have the same hash and stay the same, serving no purpose.
+    """
+    if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers):
+        #exclude the pickle pset if the dumpPython PSet is there
         return ['PSet.py', 'PSet.pkl']
     else:
         return []

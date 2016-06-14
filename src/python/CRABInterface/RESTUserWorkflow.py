@@ -342,7 +342,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("algoargs", param, safe, optional=False)
             validate_num("totalunits", param, safe, optional=True)
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
-            validate_str("debugfilename", param, safe, RX_CACHENAME, optional=False)
+            validate_str("debugfilename", param, safe, RX_CACHENAME, optional=True)
             validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
             validate_str("lfn", param, safe, RX_LFN, optional=True)
             self._checkOutLFN(safe.kwargs, username)

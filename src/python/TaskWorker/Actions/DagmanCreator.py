@@ -813,14 +813,17 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def extractMonitorFiles(self, inputFiles, **kw):
         """
-        Ops mon needs access to some files from sandbox.tar.gz.
-        It's impractical to extract those files on the user's browser, therefore
-        the files are extracted here to the debug folder to be later sent to the schedd.
+        Ops mon needs access to some files from the debug_files.tar.gz or sandbox.tar.gz.
+        tarball.
+        If an older client is used, the files are in the sandbox, the newer client (3.3.1607) 
+        separates them into a debug_file tarball to allow sandbox recycling and not break the ops mon.
+        The files are extracted here to the debug folder to be later sent to the schedd.
 
-        Also modified inputFiles list by appending a debug folder if extraction succeeds.
+        Modifies inputFiles list by appending the debug folder if the extraction succeeds.
         """
+        tarFileName = 'sandbox.tar.gz' if not os.path.isfile('debug_files.tar.gz') else 'debug_files.tar.gz'
         try:
-            debugTar = tarfile.open('debug_files.tar.gz')
+            debugTar = tarfile.open(tarFileName)
             debugTar.extract('debug/crabConfig.py')
             debugTar.extract('debug/originalPSet.py')
             scriptExeName = kw['task'].get('tm_scriptexe')
@@ -837,7 +840,7 @@ class DagmanCreator(TaskAction.TaskAction):
                     os.chmod('debug/' + f, 0o644)
         except Exception as ex:
             self.logger.exception(ex)
-            self.uploadWarning("Extracting files from sandbox failed, ops monitor will not work.", \
+            self.uploadWarning("Extracting files from %s failed, ops monitor will not work." % tarFileName, \
                     kw['task']['user_proxy'], kw['task']['tm_taskname'])
 
         return
@@ -866,13 +869,19 @@ class DagmanCreator(TaskAction.TaskAction):
             ufc = UserFileCache(mydict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint' : kw['task']['tm_cache_url']})
             try:
                 ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
-                ufc.download(hashkey=kw['task']['tm_debug_files'].split(".")[0], output="debug_files.tar.gz")
             except Exception as ex:
                 self.logger.exception(ex)
                 raise TaskWorkerException("The CRAB3 server backend could not download the input sandbox with your code "+\
                                     "from the frontend (crabcache component).\nThis could be a temporary glitch; please try to submit a new task later "+\
                                     "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO url!?
             kw['task']['tm_user_sandbox'] = 'sandbox.tar.gz'
+
+            # For an older client (<3.3.1607) this field will be empty and the file will not exist.
+            if kw['task']['tm_debug_files']:
+                try:
+                    ufc.download(hashkey=kw['task']['tm_debug_files'].split(".")[0], output="debug_files.tar.gz")
+                except Exception as ex:
+                    self.logger.exception(ex)
 
         # Bootstrap the runtime if it is available.
         job_runtime = getLocation('CMSRunAnalysis.tar.gz', 'CRABServer/')
@@ -902,7 +911,8 @@ class DagmanCreator(TaskAction.TaskAction):
         if kw['task']['tm_input_dataset']:
             inputFiles.append("input_dataset_lumis.json")
             inputFiles.append("input_dataset_duplicate_lumis.json")
-        inputFiles.append("debug_files.tar.gz")
+        if kw['task']['tm_debug_files']:
+            inputFiles.append("debug_files.tar.gz")
 
         info, splitterResult = self.createSubdag(*args, **kw)
 
