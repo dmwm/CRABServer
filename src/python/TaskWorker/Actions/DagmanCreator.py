@@ -834,21 +834,24 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def extractMonitorFiles(self, inputFiles, **kw):
         """
-        Ops mon needs access to some files from sandbox.tar.gz.
-        It's impractical to extract those files on the user's browser, therefore
-        the files are extracted here to the debug folder to be later sent to the schedd.
+        Ops mon needs access to some files from the debug_files.tar.gz or sandbox.tar.gz.
+        tarball.
+        If an older client is used, the files are in the sandbox, the newer client (3.3.1607) 
+        separates them into a debug_file tarball to allow sandbox recycling and not break the ops mon.
+        The files are extracted here to the debug folder to be later sent to the schedd.
 
-        Also modified inputFiles list by appending a debug folder if extraction succeeds.
+        Modifies inputFiles list by appending the debug folder if the extraction succeeds.
         """
+        tarFileName = 'sandbox.tar.gz' if not os.path.isfile('debug_files.tar.gz') else 'debug_files.tar.gz'
         try:
-            sandboxTar = tarfile.open('sandbox.tar.gz')
-            sandboxTar.extract('debug/crabConfig.py')
-            sandboxTar.extract('debug/originalPSet.py')
+            debugTar = tarfile.open(tarFileName)
+            debugTar.extract('debug/crabConfig.py')
+            debugTar.extract('debug/originalPSet.py')
             scriptExeName = kw['task'].get('tm_scriptexe')
             if scriptExeName != None:
-                sandboxTar.extract(scriptExeName)
+                debugTar.extract(scriptExeName)
                 shutil.copy(scriptExeName, 'debug/' + scriptExeName)
-            sandboxTar.close()
+            debugTar.close()
 
             inputFiles.append('debug')
 
@@ -858,7 +861,7 @@ class DagmanCreator(TaskAction.TaskAction):
                     os.chmod('debug/' + f, 0o644)
         except Exception as ex:
             self.logger.exception(ex)
-            self.uploadWarning("Extracting files from sandbox failed, ops monitor will not work.", \
+            self.uploadWarning("Extracting files from %s failed, ops monitor will not work." % tarFileName, \
                     kw['task']['user_proxy'], kw['task']['tm_taskname'])
 
         return
@@ -894,6 +897,13 @@ class DagmanCreator(TaskAction.TaskAction):
                                     "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO url!?
             kw['task']['tm_user_sandbox'] = 'sandbox.tar.gz'
 
+            # For an older client (<3.3.1607) this field will be empty and the file will not exist.
+            if kw['task']['tm_debug_files']:
+                try:
+                    ufc.download(hashkey=kw['task']['tm_debug_files'].split(".")[0], output="debug_files.tar.gz")
+                except Exception as ex:
+                    self.logger.exception(ex)
+
         # Bootstrap the runtime if it is available.
         job_runtime = getLocation('CMSRunAnalysis.tar.gz', 'CRABServer/')
         shutil.copy(job_runtime, '.')
@@ -922,6 +932,8 @@ class DagmanCreator(TaskAction.TaskAction):
         if kw['task']['tm_input_dataset']:
             inputFiles.append("input_dataset_lumis.json")
             inputFiles.append("input_dataset_duplicate_lumis.json")
+        if kw['task']['tm_debug_files']:
+            inputFiles.append("debug_files.tar.gz")
 
         info, splitterResult = self.createSubdag(*args, **kw)
 

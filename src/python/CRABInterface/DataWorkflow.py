@@ -1,11 +1,10 @@
 import copy
 import time
 import logging
-import cherrypy
 from ast import literal_eval
 
 ## WMCore dependecies
-from WMCore.REST.Error import ExecutionError, InvalidParameter
+from WMCore.REST.Error import ExecutionError
 
 ## CRAB dependencies
 from ServerUtilities import TASKLIFETIME
@@ -103,7 +102,8 @@ class DataWorkflow(object):
                username, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, asodb=None, scriptexe=None, scriptargs=None,
-               scheddname=None, extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None):
+               scheddname=None, extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None,
+               debugfilename=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -203,6 +203,7 @@ class DataWorkflow(object):
                                                 splitArgName : algoargs, 'runs': runs, 'lumis': lumis})],
                             total_units     = [totalunits],
                             user_sandbox    = [cachefilename],
+                            debug_files     = [debugfilename],
                             cache_url       = [cacheurl],
                             username        = [username],
                             user_dn         = [userdn],
