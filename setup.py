@@ -201,7 +201,7 @@ class InstallCommand(install):
             sys.exit(1)
 
         # Expand various sources, but don't build anything from c++ now.
-        define_the_build(self, self.distribution, self.system, (self.patch and 'x') or '')
+        define_the_build(self.distribution, self.system, (self.patch and 'x') or '')
 
         # Whack the metadata name.
         self.distribution.metadata.name = self.system
