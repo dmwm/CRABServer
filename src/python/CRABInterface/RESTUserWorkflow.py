@@ -345,7 +345,8 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
             validate_str("lfn", param, safe, RX_LFN, optional=True)
             self._checkOutLFN(safe.kwargs, username)
-            validate_strlist("addoutputfiles", param, safe, RX_ADDFILE)
+            validate_strlist("addoutputfiles", param, safe, RX_ADDFILE, custom_err="Incorrect 'JobType.outputFiles' parameter. " \
+                    "Allowed regexp: '%s'." % RX_ADDFILE.pattern)
             validate_strlist("userfiles", param, safe, RX_USERFILE)
             validate_num("savelogsflag", param, safe, optional=False)
             validate_num("saveoutput", param, safe, optional=True)
@@ -440,8 +441,10 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("numcores", param, safe, optional=True)
             validate_num("maxmemory", param, safe, optional=True)
             validate_str("dbsurl", param, safe, RX_DBSURL, optional=False)
-            validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES)
-            validate_strlist("edmoutfiles", param, safe, RX_OUTFILES)
+            validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES, custom_err="Incorrect tfileoutfiles parameter (TFileService). " \
+                    "Allowed regexp: '%s'." % RX_OUTFILES.pattern)
+            validate_strlist("edmoutfiles", param, safe, RX_OUTFILES, custom_err="Incorrect edmoutfiles parameter (PoolOutputModule). " \
+                    "Allowed regexp: '%s'." % RX_OUTFILES.pattern)
             validate_strlist("runs", param, safe, RX_RUNS)
             validate_strlist("lumis", param, safe, RX_LUMIRANGE)
             #validate_str("scheduler", param, safe, RX_SCHEDULER)
