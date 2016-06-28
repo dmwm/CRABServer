@@ -16,6 +16,8 @@ from CRABInterface.RESTTask import RESTTask
 from CRABInterface.RESTCampaign import RESTCampaign
 from CRABInterface.RESTServerInfo import RESTServerInfo
 from CRABInterface.RESTFileMetadata import RESTFileMetadata
+from CRABInterface.RESTFileTransfers import RESTFileTransfers
+from CRABInterface.RESTFileUserTransfers import RESTFileUserTransfers
 from CRABInterface.RESTWorkerWorkflow import RESTWorkerWorkflow
 from CRABInterface.DataFileMetadata import DataFileMetadata
 from CRABInterface.DataWorkflow import DataWorkflow
@@ -59,7 +61,9 @@ class RESTBaseAPI(DatabaseRESTApi):
                     'filemetadata': RESTFileMetadata(app, self, config, mount),
                     'workflowdb': RESTWorkerWorkflow(app, self, config, mount),
                     'task': RESTTask(app, self, config, mount),
-                   } )
+                    'filetransfers': RESTFileTransfers(app, self, config, mount),
+                    'fileusertransfers': RESTFileUserTransfers(app, self, config, mount),
+                   })
 
         self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None) )
 

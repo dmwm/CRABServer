@@ -19,7 +19,7 @@ from CRABInterface.DataWorkflow import DataWorkflow
 from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 
-from ServerUtilities import FEEDBACKMAIL
+from ServerUtilities import FEEDBACKMAIL, isCouchDBURL
 from CRABInterface.Utils import conn_handler, global_user_throttle
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 
@@ -369,6 +369,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         if row.collector:
             result['collector'] = row.collector
 
+        self.isCouchDBURL = isCouchDBURL(row.asourl)
+
         # 0 - simple crab status
         # 1 - crab status -long
         # 2 - crab status -idle
@@ -576,8 +578,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         if (row.publication == 'T' and 'finished' in result['jobsPerStatus']):
             #let's default asodb to asynctransfer, for old task this is empty!
             asodb = row.asodb or 'asynctransfer'
-            publicationInfo = self.publicationStatus(workflow, row.asourl, asodb)
-            self.logger.info("Publication status for workflow %s done" % workflow)
+            publicationInfo = self.publicationStatus(workflow, row.asourl, asodb, row.username)
+            self.logger.info("Publication status for workflow %s done", workflow)
         elif (row.publication == 'F'):
             publicationInfo['status'] = {'disabled': []}
         else:
@@ -732,8 +734,13 @@ class HTCondorDataWorkflow(DataWorkflow):
             fp.close()
             hbuf.close()
 
+    def publicationStatus(self, workflow, asourl, asodb, user):
+        if self.isCouchDBURL:
+            return self.publicationStatusCouch(workflow, asourl, asodb)
+        else:
+            return self.publicationStatusOracle(workflow, asourl, asodb, user)
 
-    def publicationStatus(self, workflow, asourl, asodb):
+    def publicationStatusCouch(self, workflow, asourl, asodb):
         publicationInfo = {'status': {}, 'failure_reasons': {}}
         if not asourl:
             raise ExecutionError("This CRAB server is not configured to publish; no publication status is available.")
@@ -741,39 +748,39 @@ class HTCondorDataWorkflow(DataWorkflow):
         try:
             db = server.connectDatabase(asodb)
         except Exception:
-            msg = "Error while connecting to asynctransfer CouchDB for workflow %s " % (workflow)
+            msg = "Error while connecting to asynctransfer CouchDB for workflow %s " % workflow
             msg += "\n asourl=%s asodb=%s" % (asourl, asodb)
             self.logger.exception(msg)
             publicationInfo['status'] = {'error': msg}
             return publicationInfo
-        ## Get the publication status for the given workflow. The next query to the
-        ## CouchDB view returns a list of 1 dictionary (row) with:
-        ## 'key'   : workflow,
-        ## 'value' : a dictionary with possible publication statuses as keys and the
-        ##           counts as values.
+        # Get the publication status for the given workflow. The next query to the
+        # CouchDB view returns a list of 1 dictionary (row) with:
+        # 'key'   : workflow,
+        # 'value' : a dictionary with possible publication statuses as keys and the
+        #           counts as values.
         query = {'reduce': True, 'key': workflow, 'stale': 'update_after'}
         try:
             publicationList = db.loadView('AsyncTransfer', 'PublicationStateByWorkflow', query)['rows']
         except Exception:
-            msg = "Error while querying CouchDB for publication status information for workflow %s " % (workflow)
+            msg = "Error while querying CouchDB for publication status information for workflow %s " % workflow
             self.logger.exception(msg)
             publicationInfo['status'] = {'error': msg}
             return publicationInfo
         if publicationList:
             publicationStatusDict = publicationList[0]['value']
             publicationInfo['status'] = publicationStatusDict
-            ## Get the publication failure reasons for the given workflow. The next query to
-            ## the CouchDB view returns a list of N_different_publication_failures
-            ## dictionaries (rows) with:
-            ## 'key'   : [workflow, publication failure],
-            ## 'value' : count.
+            # Get the publication failure reasons for the given workflow. The next query to
+            # the CouchDB view returns a list of N_different_publication_failures
+            # dictionaries (rows) with:
+            # 'key'   : [workflow, publication failure],
+            # 'value' : count.
             numFailedPublications = publicationStatusDict['publication_failed']
             if numFailedPublications:
                 query = {'group': True, 'startkey': [workflow], 'endkey': [workflow, {}], 'stale': 'update_after'}
                 try:
                     publicationFailedList = db.loadView('DBSPublisher', 'PublicationFailedByWorkflow', query)['rows']
                 except Exception:
-                    msg = "Error while querying CouchDB for publication failures information for workflow %s " % (workflow)
+                    msg = "Error while querying CouchDB for publication failures information for workflow %s " % workflow
                     self.logger.exception(msg)
                     publicationInfo['failure_reasons']['error'] = msg
                     return publicationInfo
@@ -782,6 +789,14 @@ class HTCondorDataWorkflow(DataWorkflow):
                     failureReason = publicationFailed['key'][1]
                     numFailedFiles = publicationFailed['value']
                     publicationInfo['failure_reasons']['result'].append((failureReason, numFailedFiles))
+
+        return publicationInfo
+
+    def publicationStatusOracle(self, workflow, asourl, asodb, user):
+        msg = "Publication information for oracle not yet implemented"
+        publicationInfo = {}
+        publicationInfo['status'] = {}
+        publicationInfo['status']['error'] = msg
 
         return publicationInfo
 
@@ -923,15 +938,20 @@ class HTCondorDataWorkflow(DataWorkflow):
         """
         transfers = {}
         data = json.load(fp)
-        for docid, result in data['results'].items():
-            jobid = str(result['value']['jobid'])
-            if not jobid in nodes:
+        for docid, result in data['results'].iteritems():
+            #Oracle has an improved structure in aso_status
+            if self.isCouchDBURL:
+                result = result['value']
+            else:
+                result = result[0]
+            jobid = str(result['jobid'])
+            if jobid not in nodes:
                 msg = ("It seems one or more jobs are missing from the node_state file."
                        " It might be corrupted as a result of a disk failure on the schedd (maybe it is full?)"
                        " This might be interesting for analysis operation (%s) %" + FEEDBACKMAIL)
                 statusResult['taskWarningMsg'] = [msg] + statusResult['taskWarningMsg']
             if jobid in nodes and nodes[jobid]['State'] == 'transferring':
-                transfers.setdefault(jobid, {})[docid] = result['value']['state']
+                transfers.setdefault(jobid, {})[docid] = result['state']
             return
         for jobid in transfers:
             ## The aso_status file is created/updated by the post-jobs when monitoring the

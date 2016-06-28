@@ -11,15 +11,26 @@ from WMCore.REST.Error import MissingObject
 import cherrypy
 import traceback
 
+def authz_user_action(username = None):
+    if username and username == cherrypy.request.user['login']:
+        return
+    raise cherrypy.HTTPError(403, "You are not allowed to access this resource. You can update only your owned documents!")
 
-def authz_operator(username = None):
+def authz_operator(username = None, group='crab3', role='operator'):
     """ Check if the the user who is trying to access this resource (i.e.: cherrypy.request.user['login'], the cert username) is the
         same as username. If not check if the user is a CRAB3 operator. {... 'operator': {'group': set(['crab3']) ... in the cherrypy roles}
         If the username is not passed just check role
     """
     if cherrypy.request.user['login'] != username and\
-       'crab3' not in cherrypy.request.user.get('roles', {}).get('operator', {}).get('group', set()):
+       group not in cherrypy.request.user.get('roles', {}).get(role, {}).get('group', set()):
         raise cherrypy.HTTPError(403, "You are not allowed to access this resource. You need to be a CRAB3 operator in sitedb to perform this action")
+
+def authz_operator_without_raise(group, role):
+    try:
+        authz_operator(None, group, role)
+        return True
+    except cherrypy.HTTPError:
+        return False
 
 
 def authz_owner_match(dbapi, workflows, Task):

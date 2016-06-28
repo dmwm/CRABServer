@@ -180,33 +180,33 @@ else
 	exit 2
 fi
 
-if [ -e $VO_CMS_SW_DIR/COMP/slc6_amd64_gcc481/external/python/2.6.8-comp9/etc/profile.d/init.sh ]
+if [ -e $VO_CMS_SW_DIR/COMP/slc6_amd64_gcc493/external/python/2.7.6/etc/profile.d/init.sh ]
 then
     set +x
-	. $VO_CMS_SW_DIR/COMP/slc6_amd64_gcc481/external/python/2.6.8-comp9/etc/profile.d/init.sh
-	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$VO_CMS_SW_DIR/COMP/slc6_amd64_gcc481/external/openssl/1.0.1p/lib:$VO_CMS_SW_DIR/COMP/slc6_amd64_gcc481/external/bz2lib/1.0.6/lib
+	. $VO_CMS_SW_DIR/COMP/slc6_amd64_gcc493/external/python/2.7.6/etc/profile.d/init.sh
+	#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$VO_CMS_SW_DIR/COMP/slc6_amd64_gcc481/external/openssl/1.0.1p/lib:$VO_CMS_SW_DIR/COMP/slc6_amd64_gcc481/external/bz2lib/1.0.6/lib
     set -x
-elif [ -e $OSG_APP/cmssoft/cms/COMP/slc6_amd64_gcc481/external/python/2.6.8-comp9/etc/profile.d/init.sh ]
+elif [ -e $OSG_APP/cmssoft/cms/COMP/slc6_amd64_gcc493/external/python/2.7.6/etc/profile.d/init.sh ]
 then
     set +x
-	. $OSG_APP/cmssoft/cms/COMP/slc6_amd64_gcc481/external/python/2.6.8-comp9/etc/profile.d/init.sh
-	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$OSG_APP/cmssoft/cms/COMP/slc6_amd64_gcc481/external/openssl/1.0.1p/lib:$OSG_APP/cmssoft/cms/COMP/slc6_amd64_gcc481/external/bz2lib/1.0.6/lib
+	. $OSG_APP/cmssoft/cms/COMP/slc6_amd64_gcc493/external/python/2.7.6/etc/profile.d/init.sh
+    #export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$OSG_APP/cmssoft/cms/COMP/slc6_amd64_gcc481/external/openssl/1.0.1p/lib:$OSG_APP/cmssoft/cms/COMP/slc6_amd64_gcc481/external/bz2lib/1.0.6/lib
     set -x
 fi
-command -v python2.6 > /dev/null
+command -v python2.7 > /dev/null
 rc=$?
 set +x
 if [[ $rc != 0 ]]
 then
-    echo "Error: Python2.6 isn't available on this worker node." >&2
+    echo "Error: Python2.7 isn't available on this worker node." >&2
     echo "Error: execution of job stageout wrapper REQUIRES python2.6" >&2
     EXIT_STATUS=10043
     DashboardFailure $EXIT_STATUS
 else
-    echo "Found python2.6 at:"
-    echo `which python2.6`
+    echo "Found python2.7 at:"
+    echo `which python2.7`
 fi
-echo "======== python2.6 bootstrap for stageout at $(TZ=GMT date) FINISHING ========"
+echo "======== python2.7 bootstrap for stageout at $(TZ=GMT date) FINISHING ========"
 
 echo "======== Attempting to notify HTCondor of file stageout ========"
 condor_chirp phase output
@@ -214,7 +214,7 @@ condor_chirp phase output
 echo "======== Stageout at $(TZ=GMT date) STARTING ========"
 rm -f wmcore_initialized
 # Note we prevent buffering of stdout/err -- this is due to observed issues in mixing of out/err for stageout plugins
-PYTHONUNBUFFERED=1 python2.6 cmscp.py
+PYTHONUNBUFFERED=1 python2.7 cmscp.py
 STAGEOUT_EXIT_STATUS=$?
 
 if [ ! -e wmcore_initialized ];

@@ -9,6 +9,7 @@ import sys
 import re
 import json
 import time
+import urllib
 import pprint
 import signal
 import logging
@@ -20,7 +21,7 @@ import traceback
 if os.path.exists("WMCore.zip") and "WMCore.zip" not in sys.path:
     sys.path.append("WMCore.zip")
 
-from ServerUtilities import cmd_exist, parseJobAd
+from ServerUtilities import cmd_exist, parseJobAd, TRANSFERDB_STATES, isCouchDBURL
 
 if 'http_proxy' in os.environ and not os.environ['http_proxy'].startswith("http://"):
     os.environ['http_proxy'] = "http://%s" % (os.environ['http_proxy'])
@@ -607,6 +608,11 @@ def inject_to_aso(file_transfer_info):
     msg = "Stageout request document so far:\n%s" % (pprint.pformat(doc_new_info))
     print(msg)
 
+    cur_retval, cur_retmsg = upload_to_couch(doc_id, doc_new_info, file_transfer_info, publish, file_type, role, group)
+    return cur_retval, cur_retmsg
+
+
+def upload_to_couch(doc_id, doc_new_info, file_transfer_info, publish, file_type, role, group):
     couch_server = CMSCouch.CouchServer(dburl = G_JOB_AD['CRAB_ASOURL'], \
                                         ckey = os.environ['X509_USER_PROXY'], \
                                         cert = os.environ['X509_USER_PROXY'])
@@ -678,22 +684,28 @@ def inject_to_aso(file_transfer_info):
             return 60320, msg
         msg = "Final stageout job description:\n%s" % (pprint.pformat(doc))
         print(msg)
-        if get_from_job_report('aso_start_time') is None or \
-           get_from_job_report('aso_start_timestamp') is None:
-            msg  = "Setting"
-            msg += " aso_start_time = %s" % (G_NOW)
-            msg += " and"
-            msg += " aso_start_time_stamp = %s" % (G_NOW_EPOCH)
-            msg += " in job report."
-            print(msg)
-            is_ok = add_to_job_report([('aso_start_time', G_NOW), \
-                                       ('aso_start_timestamp', G_NOW_EPOCH)])
-            if not is_ok:
-                msg = "WARNING: Failed to set aso_start_time in job report."
-                print(msg)
+        setASOStartTime()
     return 0, None
 
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+
+def setASOStartTime():
+    if get_from_job_report('aso_start_time') is None or \
+       get_from_job_report('aso_start_timestamp') is None:
+        msg  = "Setting"
+        msg += " aso_start_time = %s" % (G_NOW)
+        msg += " and"
+        msg += " aso_start_time_stamp = %s" % (G_NOW_EPOCH)
+        msg += " in job report."
+        print(msg)
+        is_ok = add_to_job_report([('aso_start_time', G_NOW), \
+                                   ('aso_start_timestamp', G_NOW_EPOCH)])
+        if not is_ok:
+            msg = "WARNING: Failed to set aso_start_time in job report."
+            print(msg)
+
+
 
 def perform_direct_stageout(direct_stageout_impl, \
                             direct_stageout_command, direct_stageout_protocol, \
@@ -1765,10 +1777,11 @@ def main():
     ##--------------------------------------------------------------------------
 
     ##--------------------------------------------------------------------------
-    ## Start INJECTION TO ASO
+    ## Start INJECTION FOR ASO
     ##--------------------------------------------------------------------------
     ## Do the injection of the transfer request documents to the ASO database
     ## only if all the local or direct stageouts have succeeded.
+    ##--------------------------------------------------------------------------
     condition_inject_outputs = (cmscp_status['outputs_stageout']['local']['return_code'] == 0 and \
                                 cmscp_status['outputs_stageout']['remote']['return_code'] != 0)
     not_inject_msg_outputs = ''
@@ -1794,7 +1807,11 @@ def main():
                 not_inject_msg_logs += " (or file was removed from local temporary storage"
                 not_inject_msg_logs += " or local stageout was not even performed)."
     condition = condition_inject_outputs or condition_inject_logs
-    if skip['aso_injection']:
+    if 'CRAB_ASOURL' in G_JOB_AD and G_JOB_AD['CRAB_ASOURL'] and not isCouchDBURL(G_JOB_AD['CRAB_ASOURL']):
+        msg  = "WARNING: url for transfer is not couchdb (likely an Oracle transfer)."
+        msg += " Skipping injection of transfer requests to ASO."
+        print(msg)
+    elif skip['aso_injection']:
         msg  = "WARNING: Internal wrapper flag skip['aso_injection'] is True."
         msg += " Skipping injection of transfer requests to ASO."
         print(msg)

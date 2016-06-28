@@ -18,7 +18,7 @@ from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match
 from CRABInterface.Regexps import *
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
-from ServerUtilities import checkOutLFN
+from ServerUtilities import checkOutLFN, generateTaskName
 
 
 
@@ -315,12 +315,9 @@ class RESTUserWorkflow(RESTEntity):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
 
         if method in ['PUT']:
-            ## Define the taskname and write it in the 'workflow' parameter.
-            timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
             username = cherrypy.request.user['login'] # username registered in SiteDB
             requestname = param.kwargs['workflow']
-            taskname = "%s:%s_%s" % (timestamp, username, requestname)
-            param.kwargs['workflow'] = taskname
+            param.kwargs['workflow'] = generateTaskName(username, requestname)
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_str("activity", param, safe, RX_ACTIVITY, optional=True)
             validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
