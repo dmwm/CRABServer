@@ -72,6 +72,7 @@ class RESTWorkerWorkflow(RESTEntity):
                   "failure": {"args": (self.Task.SetFailedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
                                                                                 "failure": [failure],
                                                                                "tm_taskname": [workflow]}},
+                  #Used in DagmanSubmitter?
                   "success": {"args": (self.Task.SetInjectedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
                                                                                             "tm_taskname": [workflow],
                                                                                             "clusterid": [clusterid],

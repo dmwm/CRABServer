@@ -8,6 +8,8 @@ from __future__ import absolute_import
 import os
 import re
 import time
+import urllib
+import hashlib
 import calendar
 import datetime
 import traceback
@@ -42,6 +44,38 @@ TASKDBSTATUSES = TASKDBSTATUSES_TMP + TASKDBSTATUSES_FINAL
 TASKSTATUSES = TASKDBSTATUSES + ['COMPLETED', 'UNKNOWN', 'InTransition']
 
 
+## These are all allowed transfer and publication status. P.S. See below for allowed statuses for user
+## to put into database. For sure we don`t want to allow or make mistakes and add KILL status for files
+## which were not transferred at all. Just a bit of security
+TRANSFERDB_STATES = {0: "NEW",
+                     1: "ACQUIRED",
+                     2: "FAILED",
+                     3: "DONE",
+                     4: "RETRY",
+                     5: "SUBMITTED",
+                     6: "KILL",
+                     7: "KILLED"}
+TRANSFERDB_STATUSES = dict((v, k) for k, v in TRANSFERDB_STATES.iteritems())
+
+PUBLICATIONDB_STATES = {0: "NEW",
+                        1: "ACQUIRED",
+                        2: "FAILED",
+                        3: "DONE",
+                        4: "RETRY",
+                        5: "NOT_REQUIRED"}
+PUBLICATIONDB_STATUSES = dict((v, k) for k, v in PUBLICATIONDB_STATES.iteritems())
+
+## Whenever user is putting a new Doc, these statuses will be used for double checking
+## and also for adding in database correct value
+USER_ALLOWED_TRANSFERDB_STATES = {0: "NEW",
+                                  3: "DONE"}
+USER_ALLOWED_TRANSFERDB_STATUSES = dict((v, k) for k, v in TRANSFERDB_STATES.iteritems())
+
+USER_ALLOWED_PUBLICATIONDB_STATES = {0: "NEW",
+                                     4: "RETRY",
+                                     5: "NOT_REQUIRED"}
+USER_ALLOWED_PUBLICATIONDB_STATUSES = dict((v, k) for k, v in PUBLICATIONDB_STATES.iteritems())
+
 def USER_SANDBOX_EXCLUSIONS(tarmembers):
     """ The function is used by both the client and the crabcache to get a list of files to exclude during the
         calculation of the checksum of the user input sandbox.
@@ -69,6 +103,9 @@ def NEW_USER_SANDBOX_EXCLUSIONS(tarmembers):
     else:
         return []
 
+
+def isCouchDBURL(url):
+    return 'couchdb' in url
 
 def checkOutLFN(lfn, username):
     if lfn.startswith('/store/user/'):
@@ -269,6 +306,63 @@ def mostCommon(lst, default=0):
         return max(set(lst), key=lst.count)
     except ValueError:
         return default
+
+
+def getHashLfn(lfn):
+    """
+    Provide a hashed lfn from an lfn.
+    """
+    return hashlib.sha224(lfn).hexdigest()
+
+
+def generateTaskName(username, requestname, timestamp=None):
+    """Generate a taskName which is saved in database"""
+    if not timestamp:
+        timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
+    taskname = "%s:%s_%s" % (timestamp, username, requestname)
+    return taskname
+
+
+# TODO: Remove this from CRABClient. This is kind of common for WMCore not only for CRAB. Maybe better place to have this in WMCore?
+def encodeRequest(configreq, listParams=[]):
+    """ Used to encode the request from a dict to a string. Include the code needed for transforming lists in the format required by
+        cmsweb, e.g.:   adduserfiles = ['file1','file2']  ===>  [...]adduserfiles=file1&adduserfiles=file2[...]
+    """
+    encodedLists = ''
+    for lparam in listParams:
+        if lparam in configreq:
+            if len(configreq[lparam]) > 0:
+                encodedLists += ('&%s=' % lparam) + ('&%s=' % lparam).join(map(urllib.quote, configreq[lparam]))
+            del configreq[lparam]
+    encoded = urllib.urlencode(configreq) + encodedLists
+    return str(encoded)
+
+
+def oracleOutputMapping(result, key=None):
+    """If key is defined, it will use id as a key and will return dictionary which contains all items with this specific key
+       Otherwise it will return a list of dictionaries.
+       Up to caller to check for catch KeyError,ValueError and any other related failures.
+       KeyError is raised if wrong key is specified.
+       ValueError is raised if wrong format is provided. So far database provides tuple which has 1 dictionary.
+    """
+    if not(result, tuple):
+        raise ValueError('Provided input is not valid tuple')
+    if not(result[0], dict):
+        raise ValueError('Provided input does not contain dictionary as first element')
+    outputDict = {} if key else []
+    for item in result[0]['result']:
+        docInfo = dict(zip(result[0]['desc']['columns'], item))
+        docOut = {}
+        for dockey in docInfo:
+            # Remove first 3 characters as they are tm_*
+            docOut[dockey[3:]] = docInfo[dockey] # rm tm_ which is specific for database
+        if key:
+            if docOut[key] not in outputDict:
+                outputDict[docOut[key]] = []
+            outputDict[docOut[key]].append(docOut)
+        else:
+            outputDict.append(docOut)
+    return outputDict
 
 
 def getTimeFromTaskname(taskname):
