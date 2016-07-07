@@ -29,7 +29,10 @@ systems = \
                    'Databases/FileMetaDataDB/Oracle/FileMetaData',
                    'Databases/TaskDB', 'Databases/TaskDB/Oracle',
                    'Databases/TaskDB/Oracle/JobGroup',
-                   'Databases/TaskDB/Oracle/Task']
+                   'Databases/TaskDB/Oracle/Task',
+                   'Databases/FileTransfersDB',
+                   'Databases/FileTransfersDB/Oracle/',
+                   'Databases/FileTransfersDB/Oracle/FileTransfers']
     },
     'TaskWorker':
     {
