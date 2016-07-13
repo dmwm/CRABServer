@@ -262,7 +262,7 @@ $(document).ready(function() {
             return;
         }
 
-        $.ajax(proxiedWebDirUrl + "/debug/originalPSet.py")
+        $.ajax(proxiedWebDirUrl + "/debug/" + scriptExe)
             .done(function(data) {
                 $("#script-exe-paragraph").text(data);
             });
