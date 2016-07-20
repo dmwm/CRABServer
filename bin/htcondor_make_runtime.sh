@@ -10,7 +10,7 @@ STARTDIR=$PWD/tmp/runtime
 CRAB3_VERSION=3.3.0-pre1
 
 WMCOREDIR=$STARTDIR/WMCore
-WMCOREVER=0.9.94d
+WMCOREVER=1.0.14_crab_4
 WMCOREREPO=dmwm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
@@ -151,6 +151,6 @@ pwd
 echo "Making TaskManagerRun tarball"
 tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py task_process DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py libcurl.so.4 || exit 4
 echo "Making CMSRunAnalysis tarball"
-tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py DashboardFailure.sh || exit 4
+tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py DashboardFailure.sh libcurl.so.4 || exit 4
 popd
 

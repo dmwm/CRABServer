@@ -1,11 +1,10 @@
 import copy
 import time
 import logging
-import cherrypy
 from ast import literal_eval
 
 ## WMCore dependecies
-from WMCore.REST.Error import ExecutionError, InvalidParameter
+from WMCore.REST.Error import ExecutionError
 
 ## CRAB dependencies
 from ServerUtilities import TASKLIFETIME
@@ -105,7 +104,8 @@ class DataWorkflow(object):
                username, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, asodb=None, scriptexe=None, scriptargs=None,
-               scheddname=None, extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None):
+               scheddname=None, extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None,
+               debugfilename=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -205,6 +205,7 @@ class DataWorkflow(object):
                                                 splitArgName : algoargs, 'runs': runs, 'lumis': lumis})],
                             total_units     = [totalunits],
                             user_sandbox    = [cachefilename],
+                            debug_files     = [debugfilename],
                             cache_url       = [cacheurl],
                             username        = [username],
                             user_dn         = [userdn],
@@ -235,7 +236,7 @@ class DataWorkflow(object):
                             asourl          = [asourl],
                             asodb           = [asodb],
                             collector       = [collector],
-                            schedd_name     = [None],
+                            schedd_name     = [scheddname],
                             dry_run         = ['T' if dryrun else 'F'],
                             user_files       = [dbSerializer(userfiles)],
                             transfer_outputs = ['T' if saveoutput else 'F'],
@@ -256,7 +257,7 @@ class DataWorkflow(object):
             submissionTime are the seconds since epoch of the task submission time in the DB
         """
 
-        msg = None
+        msg = "ok"
         ## resubmitLifeTime is 23 days expressed in seconds
         resubmitLifeTime = TASKLIFETIME - NUM_DAYS_FOR_RESUBMITDRAIN * 24 * 60 * 60
         if time.time() > (submissionTime + resubmitLifeTime):
@@ -286,7 +287,7 @@ class DataWorkflow(object):
         ## Check lifetime of the task and raise ExecutionError if appropriate
         self.logger.info("Checking if resubmission is possible: we don't allow resubmission %s days before task expiration date", NUM_DAYS_FOR_RESUBMITDRAIN)
         retmsg = self.checkTaskLifetime(statusRes['submissionTime'])
-        if retmsg:
+        if retmsg != "ok":
             return [{'result': retmsg}]
 
         ## Ignore the following options if this is a publication resubmission or if the

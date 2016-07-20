@@ -82,6 +82,9 @@ UPDATE tasks SET tm_task_status='NEW',tm_task_command='SUBMIT' WHERE tm_task_sta
 --Changes that will be needed for version 3.3.1605
 alter table tasks add (clusterid NUMBER(10));
 
+--Changes that will be needed for version 3.3.1607
+alter table tasks add (tm_debug_files VARCHAR(255));
+
 --Changes needed for the Autmatic Splitting (or resplitting)
 alter table filemetadata add (job_id VARCHAR(20));
 alter table filemetadata modify (panda_job_id null);

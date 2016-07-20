@@ -1,4 +1,5 @@
 #!/usr/bin/python
+from __future__ import print_function, division
 import re
 import time
 import logging
@@ -6,6 +7,7 @@ import os
 import ast
 import json
 import sys
+import classad
 from shutil import move
 # Need to import HTCondorUtils from a parent directory, not easy when the files are not in python packages.
 # Solution by ajay, SO: http://stackoverflow.com/questions/11536764
@@ -171,6 +173,62 @@ def parseErrorReport(fp, nodes):
         if 'State' in statedict and statedict['State'] == 'failed' and jobid in data:
             statedict['Error'] = last(data[jobid]) #data[jobid] contains all retries. take the last one
 
+def parseNodeStateV2(fp, nodes):
+    """
+    HTCondor 8.1.6 updated the node state file to be classad-based.
+    This is a more flexible format that allows future extensions but, unfortunately,
+    also requires a separate parser.
+    """
+    taskStatus = nodes.setdefault("DagStatus", {})
+    for ad in classad.parseAds(fp):
+        if ad['Type'] == "DagStatus":
+            taskStatus['Timestamp'] = ad.get('Timestamp', -1)
+            taskStatus['NodesTotal'] = ad.get('NodesTotal', -1)
+            taskStatus['DagStatus'] = ad.get('DagStatus', -1)
+            continue
+        if ad['Type'] != "NodeStatus":
+            continue
+        node = ad.get("Node", "")
+        if not node.startswith("Job"):
+            continue
+        nodeid = node[3:]
+        status = ad.get('NodeStatus', -1)
+        retry = ad.get('RetryCount', -1)
+        msg = ad.get("StatusDetails", "")
+        if status == 1: # STATUS_READY
+            info = nodes.setdefault(nodeid, {})
+            if info.get("State") == "transferring":
+                info["State"] = "cooloff"
+            elif info.get('State') != "cooloff":
+                info['State'] = 'unsubmitted'
+        elif status == 2: # STATUS_PRERUN
+            info = nodes.setdefault(nodeid, {})
+            if retry == 0:
+                info['State'] = 'unsubmitted'
+            else:
+                info['State'] = 'cooloff'
+        elif status == 3: # STATUS_SUBMITTED
+            info = nodes.setdefault(nodeid, {})
+            if msg == 'not_idle':
+                info.setdefault('State', 'running')
+            else:
+                info.setdefault('State', 'idle')
+        elif status == 4: # STATUS_POSTRUN
+            info = nodes.setdefault(nodeid, {})
+            if info.get("State") != "cooloff":
+                info['State'] = 'transferring'
+        elif status == 5: # STATUS_DONE
+            info = nodes.setdefault(nodeid, {})
+            info['State'] = 'finished'
+        elif status == 6: # STATUS_ERROR
+            info = nodes.setdefault(nodeid, {})
+            # Older versions of HTCondor would put jobs into STATUS_ERROR
+            # for a short time if the job was to be retried.  Hence, we had
+            # some status parsing logic to try and guess whether the job would
+            # be tried again in the near future.  This behavior is no longer
+            # observed; STATUS_ERROR is terminal.
+            info['State'] = 'failed'
+
 # --- New code ----
 
 def storeNodesInfoInFile():
@@ -205,16 +263,18 @@ def storeNodesInfoInFile():
     jobsLog.seek(last_read_until)
 
     parseJobLog(jobsLog, nodes, node_map)
-
     read_until = jobsLog.tell()
     jobsLog.close()
+
+    node_state = open("node_state", "r")
+    parseNodeStateV2(node_state, nodes)
+    node_state.close()
 
     # First write the new cache file under a temporary name, so that other processes
     # don't get an incomplete result. Then replace the old one with the new one.
     temp_filename = (filename + ".%s") % os.getpid()
 
     nodes_storage = open(temp_filename, "w")
-    nodes_storage.seek(0)
     nodes_storage.write(str(read_until) + "\n")
     nodes_storage.write(str(nodes) + "\n")
     nodes_storage.write(str(node_map) + "\n")

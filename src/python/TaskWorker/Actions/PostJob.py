@@ -1,5 +1,9 @@
 #!/usr/bin/python
-
+# TODO: This is a long term issue and to maintain ~3k lines of code in one file is hard.
+# Would be nice to separate all files and have one for Couch another for RDBMS and maybe
+# in the future someone will want to use Mongo or ES...
+# ANOTHER TODO:
+# In the code it is hard to read: workflow, taskname, reqname. All are the same....
 """
 In the PostJob we read the FrameworkJobReport (FJR) to retrieve information
 about the output files. The FJR contains information for output files produced
@@ -93,7 +97,7 @@ from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.Actions.DagmanCreator import SPLIT_ARG_MAP
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
-from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon
+from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, isCouchDBURL, oracleOutputMapping
 
 from WMCore.Configuration import Configuration, ConfigSection
 
@@ -112,6 +116,12 @@ signal.signal(signal.SIGINT, sighandler)
 signal.signal(signal.SIGTERM, sighandler)
 
 ##==============================================================================
+
+
+class NotFound(Exception):
+    """Not Found is raised only if there is no document found in RDBMS.
+       This makes PostJob to submit new transfer request to database."""
+    pass
 
 DEFER_NUM = -1
 
@@ -255,7 +265,7 @@ class ASOServerJob(object):
     def __init__(self, logger, aso_start_time, aso_start_timestamp, dest_site, source_dir,
                  dest_dir, source_sites, job_id, filenames, reqname, log_size,
                  log_needs_transfer, job_report_output, job_ad, crab_retry, retry_timeout, \
-                 job_failed, transfer_logs, transfer_outputs):
+                 job_failed, transfer_logs, transfer_outputs, rest_host, rest_uri_no_api):
         """
         ASOServerJob constructor.
         """
@@ -284,6 +294,11 @@ class ASOServerJob(object):
         self.aso_start_timestamp = aso_start_timestamp
         proxy = os.environ.get('X509_USER_PROXY', None)
         self.aso_db_url = self.job_ad['CRAB_ASOURL']
+        self.rest_host = rest_host
+        self.rest_uri_no_api = rest_uri_no_api
+        self.rest_uri_file_user_transfers = rest_uri_no_api + "/fileusertransfers"
+        self.rest_uri_file_transfers = rest_uri_no_api + "/filetransfers"
+        self.found_doc_in_db = False
         #I don't think it is necessary to default to asynctransfer here, we are taking care of it
         #in dagman creator and if CRAB_ASODB is not there it means it's old task executing old code
         #But just to make sure...
@@ -291,8 +306,11 @@ class ASOServerJob(object):
         try:
             if first_pj_execution():
                 self.logger.info("Will use ASO server at %s." % (self.aso_db_url))
-            self.couch_server = CMSCouch.CouchServer(dburl = self.aso_db_url, ckey = proxy, cert = proxy)
-            self.couch_database = self.couch_server.connectDatabase(self.aso_db_name, create = False)
+            if isCouchDBURL(self.aso_db_url):
+                self.couch_server = CMSCouch.CouchServer(dburl = self.aso_db_url, ckey = proxy, cert = proxy)
+                self.couch_database = self.couch_server.connectDatabase(self.aso_db_name, create = False)
+            else:
+                self.server = HTTPRequests(self.rest_host, proxy, proxy, retry=2)
         except Exception as ex:
             msg = "Failed to connect to ASO database: %s" % (str(ex))
             self.logger.exception(msg)
@@ -334,7 +352,6 @@ class ASOServerJob(object):
         failed_killed_transfers = []
         done_transfers = []
         starttime = time.time()
-        #TODO assicurarsi che self.aso_Start_time sia settato quando runno la seconda volta
         if self.aso_start_timestamp:
             starttime = self.aso_start_timestamp
         if first_pj_execution():
@@ -348,7 +365,7 @@ class ASOServerJob(object):
         doc_ids = [doc_info['doc_id'] for doc_info in self.docs_in_transfer]
         for transfer_status, doc_id in zip(transfers_statuses, doc_ids):
             ## States to wait on.
-            if transfer_status in ['new', 'acquired', 'retry', 'unknown']:
+            if transfer_status in ['new', 'acquired', 'retry', 'unknown', 'submitted']:
                 all_transfers_finished = False
                 continue
             ## Good states.
@@ -357,11 +374,11 @@ class ASOServerJob(object):
                     done_transfers.append(doc_id)
                 continue
             ## Bad states.
-            elif transfer_status in ['failed', 'killed']:
+            elif transfer_status in ['failed', 'killed', 'kill']:
                 if doc_id not in failed_killed_transfers:
                     failed_killed_transfers.append(doc_id)
                     msg = "Stageout job (internal ID %s) failed with status '%s'." % (doc_id, transfer_status)
-                    doc = self.load_couch_document(doc_id)
+                    doc = self.load_transfer_document(doc_id)
                     if doc and ('failure_reason' in doc) and doc['failure_reason']:
                         ## reasons:  The transfer failure reason(s).
                         ## app:      The application that gave the transfer failure reason(s).
@@ -448,14 +465,29 @@ class ASOServerJob(object):
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    def recordASOStartTime(self):
+        ## Add the post-job exit code and error message to the job report.
+        job_report = {}
+        try:
+            with open(G_JOB_REPORT_NAME_NEW) as fd:
+                job_report = json.load(fd)
+        except (IOError, ValueError):
+            pass
+        job_report['aso_start_time'] = int(time.time())
+        job_report['aso_start_timestamp'] = str(datetime.datetime.now())
+        with open(G_JOB_REPORT_NAME_NEW, 'w') as fd:
+            json.dump(job_report, fd)
+
+    ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
     def inject_to_aso(self):
         """
         Inject documents to ASO database if not done by cmscp from worker node.
         """
+        self.found_doc_in_db = False  # This is only for oracle implementation and we want to check before adding new doc.
         self.logger.info("====== Starting to check uploads to ASO database.")
         docs_in_transfer = []
         output_files = []
-
         now = str(datetime.datetime.now())
         last_update = int(time.time())
 
@@ -586,12 +618,16 @@ class ASOServerJob(object):
                 ## job retry) is not yet in ASO database, we need to do the upload.
                 needs_commit = True
                 try:
-                    doc = self.couch_database.document(doc_id)
+                    doc = self.getDocByID(doc_id)
                     ## The document was already uploaded to ASO database. It could have been
                     ## uploaded from the WN in the current job retry or in a previous job retry,
                     ## or by the postjob in a previous job retry.
                     transfer_status = doc.get('state')
-                    if doc.get('start_time') == self.aso_start_time:
+                    if not transfer_status:
+                        # This means it is RDBMS database as we changed fields to match what they are :)
+                        transfer_status = doc.get('transfer_state')
+                    if doc.get('start_time') == self.aso_start_time or \
+                       doc.get('start_time') == self.aso_start_timestamp:
                         ## The document was uploaded from the WN in the current job retry, so we don't
                         ## upload a new document. (If the transfer is done or ongoing, then of course we
                         ## don't want to re-inject the transfer request. OTOH, if the transfer has
@@ -622,7 +658,7 @@ class ASOServerJob(object):
                             self.logger.info(msg)
                             msg = "Previous document: %s" % (pprint.pformat(doc))
                             self.logger.debug(msg)
-                except CMSCouch.CouchNotFoundError:
+                except (CMSCouch.CouchNotFoundError, NotFound):
                     ## The document was not yet uploaded to ASO database (if this is the first job
                     ## retry, then either the upload from the WN failed, or cmscp did a direct
                     ## stageout and here we need to inject for publication only). In any case we
@@ -684,11 +720,13 @@ class ASOServerJob(object):
                     doc.update(doc_new_info)
                     msg = "ASO job description: %s" % (pprint.pformat(doc))
                     self.logger.info(msg)
-                    commit_result_msg = self.couch_database.commitOne(doc)[0]
+                    commit_result_msg = self.updateOrInsertDoc(doc)
                     if 'error' in commit_result_msg:
                         msg = "Error injecting document to ASO database:\n%s" % (commit_result_msg)
                         self.logger.info(msg)
                         return False
+                    ## If the upload succeds then record the timestamp in the fwjr (if not already present)
+                    self.recordASOStartTime()
                 ## Record all files for which we want the post-job to monitor their transfer.
                 if needs_transfer:
                     doc_info = {'doc_id'     : doc_id,
@@ -702,6 +740,86 @@ class ASOServerJob(object):
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    def getDocByID(self, doc_id):
+        if not isCouchDBURL(self.aso_db_url):
+            docInfo = self.server.get(self.rest_uri_file_user_transfers, data=encodeRequest({'subresource': 'getById', "id": doc_id}))
+            if docInfo and len(docInfo[0]['result']) == 1:
+                # Means that we have already a document in database!
+                docInfo = oracleOutputMapping(docInfo)
+                # Just to be 100% sure not to break after the mapping been added
+                if not docInfo:
+                    self.found_doc_in_db = False
+                    raise NotFound('Document not found in database')
+                # transfer_state and publication_state is a number in database. Lets change
+                # it to lowercase until we will end up support for CouchDB.
+                docInfo[0]['transfer_state'] = TRANSFERDB_STATES[docInfo[0]['transfer_state']].lower()
+                docInfo[0]['publication_state'] = PUBLICATIONDB_STATES[docInfo[0]['publication_state']].lower()
+                # Also change id to doc_id
+                docInfo[0]['job_id'] = docInfo[0]['id']
+                self.found_doc_in_db = True  # This is needed for further if there is a need to update doc info in DB
+                return docInfo[0]
+            else:
+                self.found_doc_in_db = False
+                raise NotFound('Document not found in database!')
+        else:
+            return self.couch_database.document(doc_id)
+
+    def updateOrInsertDoc(self, doc):
+        """"""
+        returnMsg = {}
+        if not isCouchDBURL(self.aso_db_url):
+            if not self.found_doc_in_db:
+                # This means that it was not founded in DB and we will have to insert new doc
+                newDoc = {'id': doc['_id'],
+                          'username': doc['user'],
+                          'taskname': doc['workflow'],
+                          'start_time': self.aso_start_timestamp,
+                          'destination': doc['destination'],
+                          'destination_lfn': doc['destination_lfn'],
+                          'source': doc['source'],
+                          'source_lfn': doc['source_lfn'],
+                          'filesize': doc['size'],
+                          'publish': doc['publish'],
+                          'transfer_state': doc['state'].upper(),
+                          'publication_state': 'NEW' if doc['publish'] else 'NOT_REQUIRED',
+                          'job_id': doc['jobid'],
+                          'job_retry_count': doc['job_retry_count'],
+                          'type': doc['type'],
+                          'rest_host': doc['rest_host'],
+                          'rest_uri': doc['rest_uri']}
+                try:
+                    self.server.put(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc))
+                except HTTPException as hte:
+                    msg  = "Error uploading document to database."
+                    msg += " Transfer submission failed."
+                    msg += "\n%s" % (str(hte.headers))
+                    returnMsg['error'] = msg
+            else:
+                # This means it is in database and we need only update specific fields.
+                newDoc = {'id': doc['id'],
+                          'username': doc['username'],
+                          'taskname': doc['taskname'],
+                          'start_time': self.aso_start_timestamp,
+                          'source': doc['source'],
+                          'source_lfn': doc['source_lfn'],
+                          'filesize': doc['filesize'],
+                          'transfer_state': 'NEW',
+                          'publication_state': 'NEW' if doc['publish'] else 'NOT_REQUIRED',
+                          'job_id': doc['jobid'],
+                          'job_retry_count': doc['job_retry_count'],
+                          'transfer_retry_count': 0,
+                          'subresource': 'updateDoc'}
+                try:
+                    self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc))
+                except HTTPException as hte:
+                    msg  = "Error updating document in database."
+                    msg += " Transfer submission failed."
+                    msg += "\n%s" % (str(hte.headers))
+                    returnMsg['error'] = msg
+        else:
+            returnMsg = self.couch_database.commitOne(doc)[0]
+        return returnMsg
+
     def get_transfers_statuses(self):
         """
         Retrieve the status of all transfers from the cached file 'aso_status.json'
@@ -709,6 +827,7 @@ class ASOServerJob(object):
         or if we injected a document after the file was last updated. Otherwise call
         get_transfers_statuses_fallback().
         """
+        statuses = []
         query_view = False
         if not os.path.exists("aso_status.json"):
             query_view = True
@@ -734,68 +853,105 @@ class ASOServerJob(object):
                 if doc_id not in aso_info.get("results", {}):
                     query_view = True
                     break
-        if query_view:
-            query = {'reduce': False, 'key': self.reqname, 'stale': 'update_after'}
-            self.logger.debug("Querying ASO view.")
-            try:
-                view_results = self.couch_database.loadView('AsyncTransfer', 'JobsIdsStatesByWorkflow', query)['rows']
-                view_results_dict = {}
-                for view_result in view_results:
-                    view_results_dict[view_result['id']] = view_result
-            except Exception:
-                self.logger.exception("Error while querying the asynctransfer CouchDB.")
-                return self.get_transfers_statuses_fallback()
-            aso_info = {"query_timestamp": time.time(), "results": view_results_dict}
-            tmp_fname = "aso_status.%d.json" % (os.getpid())
-            with open(tmp_fname, 'w') as fd:
-                json.dump(aso_info, fd)
-            os.rename(tmp_fname, "aso_status.json")
-        else:
-            self.logger.debug("Using cached ASO results.")
-        if not aso_info:
-            return self.get_transfers_statuses_fallback()
-        statuses = []
-        for doc_info in self.docs_in_transfer:
-            doc_id = doc_info['doc_id']
-            if doc_id not in aso_info.get("results", {}):
-                return self.get_transfers_statuses_fallback()
-            ## Use the start_time parameter to check whether the transfer state in aso_info
-            ## corresponds to the document we have to monitor. The reason why we have to do
-            ## this check is because the information in aso_info might have been obtained by
-            ## querying an ASO CouchDB view, which can return stale results. We don't mind
-            ## having stale results as long as they correspond to the documents we have to
-            ## monitor (the worst that can happen is that we will wait more than necessary
-            ## to see the transfers in a terminal state). But it could be that some results
-            ## returned by the view correspond to documents injected in a previous job retry
-            ## (or restart), and this is not what we want. If the start_time in aso_info is
-            ## not the same as in the document (we saved the start_time from the documents
-            ## in self.docs_in_transfer), then the view result corresponds to a previous job
-            ## retry. In that case, return transfer state = 'unknown'.
-            transfer_status = aso_info['results'][doc_id]['value']['state']
-            if 'start_time' in aso_info['results'][doc_id]['value']:
-                start_time = aso_info['results'][doc_id]['value']['start_time']
-                if start_time == doc_info['start_time']:
-                    statuses.append(transfer_status)
-                else:
-                    msg  = "Got stale transfer state '%s' for document %s" % (transfer_status, doc_id)
-                    msg += " (got start_time = %s, while in the document is start_time = %s)." % (start_time, doc_info['start_time'])
-                    msg += " Transfer state may correspond to a document from a previous job retry."
-                    msg += " Returning transfer state = 'unknown'."
-                    self.logger.info(msg)
-                    statuses.append('unknown')
+        if isCouchDBURL(self.aso_db_url):
+            if query_view:
+                query = {'reduce': False, 'key': self.reqname, 'stale': 'update_after'}
+                self.logger.debug("Querying ASO view.")
+                try:
+                    view_results = self.couch_database.loadView('AsyncTransfer', 'JobsIdsStatesByWorkflow', query)['rows']
+                    view_results_dict = {}
+                    for view_result in view_results:
+                        view_results_dict[view_result['id']] = view_result
+                except:
+                    self.logger.exception("Error while querying the RDBMS database.")
+                    return self.get_transfers_statuses_fallback()
+                aso_info = {"query_timestamp": time.time(), "results": view_results_dict}
+                tmp_fname = "aso_status.%d.json" % (os.getpid())
+                with open(tmp_fname, 'w') as fd:
+                    json.dump(aso_info, fd)
+                os.rename(tmp_fname, "aso_status.json")
             else:
+                self.logger.debug("Using cached ASO results.")
+            if not aso_info:
+                return self.get_transfers_statuses_fallback()
+            for doc_info in self.docs_in_transfer:
+                doc_id = doc_info['doc_id']
+                if doc_id not in aso_info.get("results", {}):
+                    return self.get_transfers_statuses_fallback()
+                ## Use the start_time parameter to check whether the transfer state in aso_info
+                ## corresponds to the document we have to monitor. The reason why we have to do
+                ## this check is because the information in aso_info might have been obtained by
+                ## querying an ASO CouchDB view, which can return stale results. We don't mind
+                ## having stale results as long as they correspond to the documents we have to
+                ## monitor (the worst that can happen is that we will wait more than necessary
+                ## to see the transfers in a terminal state). But it could be that some results
+                ## returned by the view correspond to documents injected in a previous job retry
+                ## (or restart), and this is not what we want. If the start_time in aso_info is
+                ## not the same as in the document (we saved the start_time from the documents
+                ## in self.docs_in_transfer), then the view result corresponds to a previous job
+                ## retry. In that case, return transfer state = 'unknown'.
+                transfer_status = aso_info['results'][doc_id]['value']['state']
+                if 'start_time' in aso_info['results'][doc_id]['value']:
+                    start_time = aso_info['results'][doc_id]['value']['start_time']
+                    if start_time == doc_info['start_time']:
+                        statuses.append(transfer_status)
+                    else:
+                        msg  = "Got stale transfer state '%s' for document %s" % (transfer_status, doc_id)
+                        msg += " (got start_time = %s, while in the document is start_time = %s)." % (start_time, doc_info['start_time'])
+                        msg += " Transfer state may correspond to a document from a previous job retry."
+                        msg += " Returning transfer state = 'unknown'."
+                        self.logger.info(msg)
+                        statuses.append('unknown')
+                else:
+                    statuses.append(transfer_status)
+        elif not isCouchDBURL(self.aso_db_url):
+            if query_view:
+                self.logger.debug("Querying ASO RDBMS database.")
+                try:
+                    view_results = self.server.get(self.rest_uri_file_user_transfers, data=encodeRequest({'subresource': 'getTransferStatus',
+                                                                                                          'username': str(self.job_ad['CRAB_UserHN']),
+                                                                                                          'taskname': self.reqname}))
+                    view_results_dict = oracleOutputMapping(view_results, 'id')
+                    # There is so much noise values in aso_status.json file. So lets provide a new file structure.
+                    # We will not run ever for one task which can use also RDBMS and CouchDB
+                    # New Structure for view_results_dict is
+                    # {"DocumentHASHID": [{"id": "DocumentHASHID", "start_time": timestamp, "transfer_state": NUMBER!, "last_update": timestamp}]}
+                    for document in view_results_dict:
+                        view_results_dict[document][0]['state'] = TRANSFERDB_STATES[view_results_dict[document][0]['transfer_state']].lower()
+                except:
+                    self.logger.exception("Error while querying the RDBMS database.")
+                    return self.get_transfers_statuses_fallback()
+                aso_info = {"query_timestamp": time.time(), "results": view_results_dict}
+                tmp_fname = "aso_status.%d.json" % (os.getpid())
+                with open(tmp_fname, 'w') as fd:
+                    json.dump(aso_info, fd)
+                os.rename(tmp_fname, "aso_status.json")
+            else:
+                self.logger.debug("Using cached ASO results.")
+            if not aso_info:
+                return self.get_transfers_statuses_fallback()
+            for doc_info in self.docs_in_transfer:
+                doc_id = doc_info['doc_id']
+                if doc_id not in aso_info.get("results", {}):
+                    return self.get_transfers_statuses_fallback()
+                ## Not checking timestamps for oracle since we are not injecting from WN
+                ## and it cannot happen that condor restarts screw up things.
+                transfer_status = aso_info['results'][doc_id][0]['state']
                 statuses.append(transfer_status)
         return statuses
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def load_couch_document(self, doc_id):
+    def load_transfer_document(self, doc_id):
         """
-        Wrapper to load a document from CouchDB, catching exceptions.
+        Wrapper to load a document from CouchDB or RDBMS, catching exceptions.
         """
         doc = None
         try:
-            doc = self.couch_database.document(doc_id)
+            if not isCouchDBURL(self.aso_db_url):
+                doc = self.getDocByID(doc_id)
+            else:
+                doc = self.couch_database.document(doc_id)
         except CMSCouch.CouchError as cee:
             msg = "Error retrieving document from ASO database for ID %s: %s" % (doc_id, str(cee))
             self.logger.error(msg)
@@ -805,13 +961,16 @@ class ASOServerJob(object):
         except Exception:
             msg = "Error retrieving document from ASO database for ID %s" % (doc_id)
             self.logger.exception(msg)
+        except NotFound as er:
+            msg = "Document is not found in ASO RDBMS database for ID %s" % (doc_id)
+            self.logger.warning(msg)
         return doc
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def get_transfers_statuses_fallback(self):
         """
-        Retrieve the status of all transfers by loading the correspnding documents
+        Retrieve the status of all transfers by loading the corresponding documents
         from ASO database and checking the 'state' field.
         """
         msg = "Querying transfers statuses using fallback method (i.e. loading each document)."
@@ -819,8 +978,11 @@ class ASOServerJob(object):
         statuses = []
         for doc_info in self.docs_in_transfer:
             doc_id = doc_info['doc_id']
-            doc = self.load_couch_document(doc_id)
-            status = doc['state'] if doc else 'unknown'
+            doc = self.load_transfer_document(doc_id)
+            if isCouchDBURL(self.aso_db_url):
+                status = doc['state'] if doc else 'unknown'
+            else:
+               status = doc['transfer_state'] if doc else 'unknown'
             statuses.append(status)
         return statuses
 
@@ -844,6 +1006,7 @@ class ASOServerJob(object):
         now = str(datetime.datetime.now())
         cancelled, not_cancelled = [], []
         max_retries = max(int(max_retries), 0)
+        transfersToKill = []  # This is for RDBMS implementation only
         if max_retries:
             msg = "In case of cancellation failure, will retry up to %d times." % (max_retries)
             self.logger.info(msg)
@@ -859,7 +1022,7 @@ class ASOServerJob(object):
                 if reason:
                     msg += " with following reason: %s" % (reason)
                 self.logger.info(msg)
-                doc = self.load_couch_document(doc_id)
+                doc = self.load_transfer_document(doc_id)
                 if not doc:
                     msg = "Could not cancel ASO transfer %s; failed to load document." % (doc_id)
                     self.logger.warning(msg)
@@ -868,22 +1031,79 @@ class ASOServerJob(object):
                     continue
                 doc['state'] = 'killed'
                 doc['end_time'] = now
-                if reason:
-                    if doc['failure_reason']:
-                        if isinstance(doc['failure_reason'], list):
-                            doc['failure_reason'].append(reason)
-                        elif isinstance(doc['failure_reason'], str):
-                            doc['failure_reason'] = [doc['failure_reason'], reason]
+                if isCouchDBURL(self.aso_db_url):
+                    # In case it is still CouchDB leave this in this loop and for RDBMS add
+                    # everything to a list and update this with one call for multiple files.
+                    # One bad thing that we are not saving failure reason. It should not be a big deal
+                    # to implement, but I leave it so far to discuss how it is best to do it.
+                    # I think best is to show the last reason and not all.
+                    if reason:
+                        if doc['failure_reason']:
+                            if isinstance(doc['failure_reason'], list):
+                                doc['failure_reason'].append(reason)
+                            elif isinstance(doc['failure_reason'], str):
+                                doc['failure_reason'] = [doc['failure_reason'], reason]
+                        else:
+                            doc['failure_reason'] = reason
+                    res = self.couch_database.commitOne(doc)[0]
+                    if 'error' in res:
+                        msg = "Error cancelling ASO transfer %s: %s" % (doc_id, res)
+                        self.logger.warning(msg)
+                        if retry == max_retries:
+                            not_cancelled.append((doc_id, msg))
                     else:
-                        doc['failure_reason'] = reason
-                res = self.couch_database.commitOne(doc)
-                if 'error' in res:
-                    msg = "Error cancelling ASO transfer %s: %s" % (doc_id, res)
-                    self.logger.warning(msg)
-                    if retry == max_retries:
-                        not_cancelled.append((doc_id, msg))
+                        cancelled.append(doc_id)
                 else:
-                    cancelled.append(doc_id)
+                    transfersToKill.append(doc_id)
+
+        if not isCouchDBURL(self.aso_db_url):
+            # Now this means that we have a list of ids which needs to be killed
+            # First try to kill ALL in one API call
+            newDoc = {'listOfIds': transfersToKill,
+                      'subresource': 'killTransfersById'}
+            try:
+                killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds']))
+                not_cancelled = killedFiles[0]['result'][0]['failedKill']
+                cancelled = killedFiles[0]['result'][0]['killed']
+            except HTTPException as hte:
+                msg  = "Error setting KILL status in database."
+                msg += " Transfer KILL failed."
+                msg += "\n%s" % (str(hte.headers))
+                self.logger.warning(msg)
+                not_cancelled = transfersToKill
+                cancelled = []
+            # Ok Now lets do a double check on doc_ids which failed to update one by one.
+            # It is just to make proof concept to cover KILL to RDBMS
+            self.logger.info("Failed to kill %s and succeeded to kill %s", not_cancelled, cancelled)
+            transfersToKill = list(set(transfersToKill) - set(cancelled))
+            # Now if there are any transfers left which failed to be killed, try to get it's status
+            # and also kill if status is not in KILL or KILLED
+            for docIdKill in transfersToKill:
+                newDoc = {'listOfIds': [docIdKill],
+                          'subresource': 'killTransfersById'}
+                try:
+                    doc_out = self.getDocByID(docIdKill)
+                    if doc_out['transfer_state'] not in ['kill', 'killed']:
+                        killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds']))
+                        failedFiles = killedFiles[0]['result'][0]['failedKill']
+                        notfailedFiles = killedFiles[0]['result'][0]['killed']
+                        if failedFiles:
+                            not_cancelled.append(docIdKill)
+                        elif notFailedFiles:
+                            cancelled.append(docIdKill)
+                    else:
+                        cancelled.append(docIdKill)
+                except HTTPException as hte:
+                    msg  = "Error setting KILL status in database."
+                    msg += " Transfer KILL failed."
+                    msg += "\n%s" % (str(hte.headers))
+                    self.logger.warning(msg)
+                    not_cancelled.append(docIdKill)
+                    cancelled.append(docIdKill)
+                except NotFound as er:
+                    # This is strange that document is not found in database.
+                    # Just add it as canceled and move on.
+                    cancelled.append(docIdKill)
         return cancelled, not_cancelled
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -1774,7 +1994,8 @@ class PostJob():
                                self.log_needs_transfer, self.job_report_output, \
                                self.job_ad, self.crab_retry, \
                                self.retry_timeout, self.job_failed, \
-                               self.transfer_logs, self.transfer_outputs)
+                               self.transfer_logs, self.transfer_outputs,
+                               self.rest_host, self.rest_uri_no_api)
         if first_pj_execution():
             aso_job_retval = ASO_JOB.run()
         else:
@@ -1897,7 +2118,7 @@ class PostJob():
         msg = msg % (self.logs_arch_file_name, rest_url, configreq)
         self.logger.debug(msg)
         try:
-            self.server.put(rest_uri, data = urllib.urlencode(configreq))
+            self.server.put(rest_uri, data = encodeRequest(configreq))
         except HTTPException as hte:
             msg = "Error uploading logs file metadata: %s" % (str(hte.headers))
             self.logger.error(msg)
@@ -1917,7 +2138,7 @@ class PostJob():
             configreq = {"taskname" : self.job_ad['CRAB_ReqName'],
                          "filetype" : type
             }
-            res, _, _ = self.server.get(self.rest_uri_no_api + '/filemetadata', data = configreq)
+            res, _, _ = self.server.get(self.rest_uri_no_api + '/filemetadata', data = encodeRequest(configreq))
             lfns = [x['lfn'] for x in res[u'result']]
         except HTTPException as hte:
             msg = "Error getting list of file metadata: %s" % (str(hte.headers))
@@ -1945,7 +2166,11 @@ class PostJob():
             if ifile['input_source_class'] != 'PoolSource' or ifile.get('input_type', '') != "primaryFiles":
                 continue
             ## Many of these parameters are not needed and are using fake/defined values
-            lfn = ifile['lfn'] + "_" + self.job_id ## jobs can analyze the same input
+            if not ifile['lfn'] :  # there are valid use case with no input LFN but we need to count files for crab report
+                lfn = '/store/user/dummy/DummyLFN'
+            else:
+                lfn = ifile['lfn']
+            lfn = lfn + "_" + str(self.job_id) ## jobs can analyze the same input
             configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
                          "globalTag"       : "None",
                          "jobid"           : self.job_id,
@@ -1982,7 +2207,7 @@ class PostJob():
             msg = "Uploading output metadata for %s to https://%s: %s" % (lfn, rest_url, configreq)
             self.logger.debug(msg)
             try:
-                self.server.put(rest_uri, data = urllib.urlencode(configreq))
+                self.server.put(rest_uri, data = encodeRequest(configreq))
             except HTTPException as hte:
                 msg = "Error uploading input file metadata: %s" % (str(hte.headers))
                 self.logger.error(msg)
@@ -2065,7 +2290,7 @@ class PostJob():
             msg = "Uploading output metadata for %s to https://%s: %s" % (filename, rest_url, configreq)
             self.logger.debug(msg)
             try:
-                self.server.put(rest_uri, data = urllib.urlencode(configreq))
+                self.server.put(rest_uri, data = encodeRequest(configreq))
             except HTTPException as hte:
                 ## BrianB. Suppressing this exception is a tough decision.
                 ## If the file made it back alright, I suppose we can proceed.
@@ -2088,7 +2313,7 @@ class PostJob():
             msg = "Uploading output datasets to https://%s: %s" % (rest_url, configreq)
             self.logger.debug(msg)
             try:
-                self.server.post(rest_uri, data = urllib.urlencode(configreq))
+                self.server.post(rest_uri, data = encodeRequest(configreq))
                 with open('output_datasets', 'w') as f:
                     f.write(' '.join(output_datasets))
             except HTTPException as hte:

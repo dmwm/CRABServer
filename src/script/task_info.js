@@ -146,8 +146,8 @@ $(document).ready(function() {
         } else if (proxiedWebDirUrl === "") {
             // In case proxy api returned empty or failed
             // Set links, show error and don't load anything else.
-            $("#task-config-link").attr("href", userWebDir + "/sandbox.tar.gz");
-            $("#task-pset-link").attr("href", userWebDir + "/sandbox.tar.gz");
+            $("#task-config-link").attr("href", userWebDir + "/debug_files.tar.gz");
+            $("#task-pset-link").attr("href", userWebDir + "/debug_files.tar.gz");
             errHandler(new ProxyNotFoundErrorError);
             return;
         }
@@ -277,7 +277,8 @@ $(document).ready(function() {
     function displayMainPage(errHandler) {
         if (userWebDir !== "" && inputTaskName !== "" && inputTaskName !== undefined) {
 
-            var dashboardUrl = "http://dashb-cms-job.cern.ch/dashboard/templates/" + "task-analysis/#user=default&refresh=0&table=Jobs&p=1&records=25" + "&activemenu=2&status=&site=&tid=" + inputTaskName;
+            var dashboardUrl = "http://dashb-cms-job.cern.ch/dashboard/templates/" +
+                "task-analysis/#user=" + username + "&table=" + inputTaskName + "$table=Mains&pattern=" + inputTaskName;
 
             var dasUrl = "https://cmsweb.cern.ch/das/request?view=list&limit=50" + "&instance=" + dbsInstance + "&input=" + inputDataset;
 
@@ -287,19 +288,46 @@ $(document).ready(function() {
 
             var url = taskStatusUrl + inputTaskName;
 
+            /**
+             * Displays the table for the main task info page.
+             *
+             * @param {Object} obj - Result from the api query to be processed
+             */
+            function printOutput(obj) {
+                for (var key in obj) {
+                    var attrName = key;
+                    var attrValue = obj[key];
+
+                    // Custom formatting for "jobList" information
+                    sumObject = {};
+                    if (attrName === "jobList") {
+                        for (var i = 0; i < obj["jobList"].length; i++) {
+                            // Take the job status
+                            jobStatus = obj["jobList"][i][0];
+                            // and add it to the total status count.
+                            if (jobStatus in sumObject) {
+                                sumObject[jobStatus]++;
+                            } else {
+                                sumObject[jobStatus] = 1;
+                            }
+                        }
+                        attrValue = '<table style="width:10%">'
+                        for (var foundStatus in sumObject) {
+                            attrValue += "<tr><td>" + foundStatus + " </td><td> " + sumObject[foundStatus] + "</td></tr>";
+                        }
+                        attrValue += "<tr><td>TOTAL </td><td> " + obj["jobList"].length + "</td></tr>";
+                        attrValue += "</table>"
+                    }
+                    $("#main-status-info-table tbody.dynamic-content")
+                        .append("<tr><td>" + attrName + "</td><td>" + attrValue + "</td></tr>");
+                }
+            }
+
             function queryApi(url) {
                 $.ajax(url)
                     .done(function(data) {
-                        for (var i = 0; i < data.result.length; i++) {
-                            var obj = data.result[i];
-                            for (var key in obj) {
-                                var attrName = key;
-                                var attrValue = obj[key];
-
-                                $("#main-status-info-table tbody")
-                                    .append("<tr><td>" + attrName + "</td><td>" + attrValue + "<td></tr>");
-                            }
-                        }
+                        var obj = data.result[0];
+                        printOutput(obj);
                     })
             }
             queryApi(url);

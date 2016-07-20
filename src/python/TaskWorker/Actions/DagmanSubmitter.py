@@ -200,7 +200,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
             If we can't send the schedd to the REST this is considered a permanent error
         """
-        self.logger.debug("Picking up the scheduler")
+        self.logger.debug("Picking up the scheduler using %s", self.config.TaskWorker.scheddPickerFunction)
         #copy the list of schedd from REST external configuration. They are loaded when action is created
         restSchedulers = self.backendurls['htcondorSchedds']
         alreadyTriedSchedds = scheddStats.taskErrors.keys() #keys in the taskerrors are schedd
@@ -212,9 +212,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
             schedd = loc.getSchedd(chooserFunction=self.config.TaskWorker.scheddPickerFunction)
         else:
             schedd = loc.getSchedd() #uses the default memory stuff
-        self.logger.debug("Finished picking up scheduler. Sending schedd to rest")
+        self.logger.debug("Finished picking up scheduler. Sending schedd (%s) to rest", schedd)
         self.sendScheddToREST(task, schedd)
-        self.logger.debug("Schedd sent to REST.")
 
         return schedd
 
@@ -253,21 +252,24 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 self.logger.exception(msg)
                 scheddStats.taskError(schedd, msg)
                 if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
-                    self.logger.debug("choosing a new schedd and then retrying")
-                    self.pickAndSetSchedd(task)
-                    self.logger.error("Will retry in %s seconds.", self.config.TaskWorker.retry_interval[retry])
+                    self.logger.error("Will retry in %s seconds on %s.", self.config.TaskWorker.retry_interval[retry], schedd)
                     time.sleep(self.config.TaskWorker.retry_interval[retry])
             finally:
                 self.logger.info(scheddStats)
             ## All the submission retries to the current schedd have failed. Record the
             ## failures.
+
+        ## Returning back to Handler.py for retries, and in case try on a new schedd
+        self.logger.debug("Choosing a new schedd and then retrying")
+        self.pickAndSetSchedd(task)
+
         ## All the submission retries to this schedd have failed.
         msg = "The CRAB server backend was not able to submit the jobs to the Grid schedulers."
         msg += " This could be a temporary glitch. Please try again later."
         msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
         msg += " The submission was retried %s times on %s schedulers." % (sum([len(x) for x in scheddStats.taskErrors.values()]), len(scheddStats.taskErrors))
         msg += " These are the failures per Grid scheduler: %s" % (str(scheddStats.taskErrors))
-        self.logger.error(msg)
+
         raise TaskWorkerException(msg, retry=True)
 
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/tenv python
 #external dependencies
 from __future__ import print_function
 import os
@@ -222,7 +222,10 @@ class MasterWorker(object):
             pendingwork = self._getWork(limit=limit, getstatus='QUEUED')
             for task in pendingwork:
                 self.logger.debug("Failing QUEUED task %s", task['tm_taskname'])
-                dummyWorktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
+                if task['tm_task_command']:
+                    dummyWorktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
+                else:
+                    failstatus = 'FAILED'
                 self.updateWork(task['tm_taskname'], task['tm_task_command'], failstatus)
             if not len(pendingwork):
                 self.logger.info("Finished failing QUEUED tasks (total %s)", total)
@@ -259,14 +262,13 @@ class MasterWorker(object):
                     #The task stays in HOLDING and will be acquired again later
                     self.logger.info("Skipping %s since it could not be updated to QUEUED. Will be retried in the next iteration", task['tm_taskname'])
 
-
             self.slaves.injectWorks(toInject)
 
             for action in self.recurringActions:
                 if action.isTimeToGo():
                     #Maybe we should use new slaves and not reuse the ones used for the tasks
                     self.logger.debug("Injecting recurring action: \n%s", (str(action.__module__)))
-                    self.slaves.injectWorks([(handleRecurring, {'tm_taskname' : action.__module__}, 'FAILED', action.__module__)])
+                    self.slaves.injectWorks([(handleRecurring, {'tm_username': 'recurring', 'tm_taskname' : action.__module__}, 'FAILED', action.__module__)])
 
             self.logger.info('Master Worker status:')
             self.logger.info(' - free slaves: %d', self.slaves.freeSlaves())

@@ -18,7 +18,7 @@ from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match
 from CRABInterface.Regexps import *
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
-from ServerUtilities import checkOutLFN
+from ServerUtilities import checkOutLFN, generateTaskName
 
 
 
@@ -315,12 +315,9 @@ class RESTUserWorkflow(RESTEntity):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
 
         if method in ['PUT']:
-            ## Define the taskname and write it in the 'workflow' parameter.
-            timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
             username = cherrypy.request.user['login'] # username registered in SiteDB
             requestname = param.kwargs['workflow']
-            taskname = "%s:%s_%s" % (timestamp, username, requestname)
-            param.kwargs['workflow'] = taskname
+            param.kwargs['workflow'] = generateTaskName(username, requestname)
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_str("activity", param, safe, RX_ACTIVITY, optional=True)
             validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
@@ -342,10 +339,12 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("algoargs", param, safe, optional=False)
             validate_num("totalunits", param, safe, optional=True)
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
+            validate_str("debugfilename", param, safe, RX_CACHENAME, optional=True)
             validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
             validate_str("lfn", param, safe, RX_LFN, optional=True)
             self._checkOutLFN(safe.kwargs, username)
-            validate_strlist("addoutputfiles", param, safe, RX_ADDFILE)
+            validate_strlist("addoutputfiles", param, safe, RX_ADDFILE, custom_err="Incorrect 'JobType.outputFiles' parameter. " \
+                    "Allowed regexp: '%s'." % RX_ADDFILE.pattern)
             validate_strlist("userfiles", param, safe, RX_USERFILE)
             validate_num("savelogsflag", param, safe, optional=False)
             validate_num("saveoutput", param, safe, optional=True)
@@ -440,8 +439,10 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("numcores", param, safe, optional=True)
             validate_num("maxmemory", param, safe, optional=True)
             validate_str("dbsurl", param, safe, RX_DBSURL, optional=False)
-            validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES)
-            validate_strlist("edmoutfiles", param, safe, RX_OUTFILES)
+            validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES, custom_err="Incorrect tfileoutfiles parameter (TFileService). " \
+                    "Allowed regexp: '%s'." % RX_OUTFILES.pattern)
+            validate_strlist("edmoutfiles", param, safe, RX_OUTFILES, custom_err="Incorrect edmoutfiles parameter (PoolOutputModule). " \
+                    "Allowed regexp: '%s'." % RX_OUTFILES.pattern)
             validate_strlist("runs", param, safe, RX_RUNS)
             validate_strlist("lumis", param, safe, RX_LUMIRANGE)
             #validate_str("scheduler", param, safe, RX_SCHEDULER)
@@ -531,7 +532,7 @@ class RESTUserWorkflow(RESTEntity):
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, primarydataset, nonvaliddata, useparent, secondarydata, generator, eventsperlumi,
-                siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
+                siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, debugfilename, cacheurl, addoutputfiles,
                 savelogsflag, publication, publishname, publishname2, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
                 tfileoutfiles, edmoutfiles, runs, lumis,
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
@@ -555,6 +556,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str splitalgo: algorithm to be used for the workflow splitting;
            :arg str algoargs: argument to be used by the splitting algorithm;
            :arg str cachefilename: name of the file inside the cache
+           :arg str debugfilename: name of the debugFiles tarball inside the cache
            :arg str cacheurl: URL of the cache
            :arg str list addoutputfiles: list of additional output files;
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
@@ -598,7 +600,7 @@ class RESTUserWorkflow(RESTEntity):
                                        inputdata=inputdata, primarydataset=primarydataset, nonvaliddata=nonvaliddata, use_parent=useparent,
                                        secondarydata=secondarydata, generator=generator, events_per_lumi=eventsperlumi,
                                        siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, splitalgo=splitalgo, algoargs=algoargs,
-                                       cachefilename=cachefilename, cacheurl=cacheurl,
+                                       cachefilename=cachefilename, debugfilename=debugfilename, cacheurl=cacheurl,
                                        addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
                                        username=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
                                        publication=publication, publishname=publishname, publishname2=publishname2, publishgroupname=publishgroupname, asyncdest=asyncdest,
