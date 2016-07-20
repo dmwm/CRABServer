@@ -44,11 +44,6 @@ class DagmanKiller(TaskAction):
             raise ValueError("No proxy provided")
         self.proxy = self.task['user_proxy']
 
-        try:
-            self.killTransfers(apmon)
-        except:
-            self.logger.exception("Failed to kill transfers; suppressing error until functionality is confirmed") #TODO send a warning?
-
         self.logger.info("About to kill workflow: %s." % self.workflow)
 
         self.workflow = str(self.workflow)
@@ -71,6 +66,7 @@ class DagmanKiller(TaskAction):
             self.logger.exception("%s: %s" % (self.workflow, msg))
             raise TaskWorkerException(msg)
 
+        killAll = len(self.task['kill_ids']) == 0
         ad = classad.ClassAd()
         ad['foo'] = self.task['kill_ids']
         try:
@@ -78,7 +74,10 @@ class DagmanKiller(TaskAction):
         except:
             hostname = ''
 
-        const = "CRAB_ReqName =?= %s && member(CRAB_Id, %s)" % (HTCondorUtils.quote(self.workflow), ad.lookup("foo").__repr__())
+        if not killAll:
+            const = "CRAB_ReqName =?= %s && member(CRAB_Id, %s) && member(CRAB_ParentId, %s)" % (HTCondorUtils.quote(self.workflow), ad.lookup("foo").__repr__(), ad.lookup("foo").__repr__())
+        else:
+            const = 'CRAB_ReqName =?= %s && TaskType=?="Job"' % HTCondorUtils.quote(self.workflow)
         try:
             for ad in list(self.schedd.xquery(const, ['CRAB_Id', 'CRAB_Retry'])):
                 if ('CRAB_Id' not in ad) or ('CRAB_Retry' not in ad):
@@ -97,84 +96,15 @@ class DagmanKiller(TaskAction):
 
         # Note that we can not send kills for jobs not in queue at this time; we'll need the
         # DAG FINAL node to be fixed and the node status to include retry number.
-        if self.task['kill_all']:
-            return self.killAll()
+        if killAll:
+            return self.killAll(const)
         else:
-            return self.killJobs(self.task['kill_ids'])
+            return self.killJobs(self.task['kill_ids'], const)
 
 
-    def killTransfers(self, apmon):
-        self.logger.info("About to kill transfers from workflow %s." % self.workflow)
-        asourl = self.task.get('tm_asourl', None)
-        #let's default asodb to asynctransfer, for old task this is empty!
-        #Probably tm_asodb is always there and the get is not necessary, but let's not assume this
-        asodb = self.task.get('tm_asodb', 'asynctransfer') or 'asynctransfer'
-
-        if not asourl:
-            self.logger.info("ASO URL not set; will not kill transfers")
-            return False
-
-        try:
-            hostname = socket.getfqdn()
-        except:
-            hostname = ''
-
-        server = CMSCouch.CouchServer(dburl=asourl, ckey=self.proxy, cert=self.proxy)
-        try:
-            db = server.connectDatabase(asodb)
-        except Exception as ex:
-            msg =  "Error while connecting to asynctransfer CouchDB"
-            self.logger.exception(msg)
-            raise TaskWorkerException(msg)
-        self.queryKill = {'reduce':False, 'key':self.workflow, 'include_docs': True}
-        try:
-            filesKill = db.loadView('AsyncTransfer', 'forKill', self.queryKill)['rows']
-        except Exception as ex:
-            msg =  "Error while connecting to asynctransfer CouchDB"
-            self.logger.exception(msg)
-            raise TaskWorkerException(msg)
-        if len(filesKill) == 0:
-            self.logger.warning('No files to kill found')
-        for idt in filesKill:
-            now = str(datetime.datetime.now())
-            id = idt['value']
-            data = {
-                'end_time': now,
-                'state': 'killed',
-                'last_update': time.time(),
-                'retry': now,
-               }
-            updateUri = "/%s/_design/AsyncTransfer/_update/updateJobs/%s?%s" % (db.name, id, urllib.urlencode(data))
-            jobid = idt.get('jobid')
-            jobretry = idt.get('job_retry_count')
-            if not self.task['kill_all']:
-                if idt.get("jobid") not in self.task['kill_ids']:
-                    continue
-            self.logger.info("Killing transfer %s (job ID %s; job retry %s)." % (id, str(jobid), str(jobretry)))
-            jobid = str(jobid)
-            jobretry = str(jobretry)
-            if jobid and jobretry != None:
-                jinfo = {'broker': hostname,
-                         'bossId': jobid,
-                         'StatusValue': 'killed',
-                        }
-                insertJobIdSid(jinfo, jobid, self.workflow, jobretry)
-                self.logger.info("Sending kill info to Dashboard: %s" % str(jinfo))
-                apmon.sendToML(jinfo)
-            try:
-                db.makeRequest(uri = updateUri, type = "PUT", decode = False)
-            except Exception as ex:
-                msg =  "Error updating document in couch"
-                msg += str(ex)
-                msg += str(traceback.format_exc())
-                raise TaskWorkerException(msg)
-        return True
-
-
-    def killJobs(self, ids):
+    def killJobs(self, ids, const):
         ad = classad.ClassAd()
         ad['foo'] = ids
-        const = "CRAB_ReqName =?= %s && member(CRAB_Id, %s)" % (HTCondorUtils.quote(self.workflow), ad.lookup("foo").__repr__())
         with HTCondorUtils.AuthenticatedSubprocess(self.proxy) as (parent, rpipe):
             if not parent:
                 self.schedd.act(htcondor.JobAction.Remove, const)
@@ -188,12 +118,13 @@ class DagmanKiller(TaskAction):
             raise TaskWorkerException(msg)
 
 
-    def killAll(self):
+    def killAll(self, jobConst):
 
         # We need to keep ROOT DAG in hold until periodic remove kicks in.
         # See DagmanSubmitter.py#L390 (dagAd["PeriodicRemove"])
         # This is needed in case user wants to resubmit.
         rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(self.workflow)
+
         # Holding DAG job does not mean that it will remove all jobs
         # and this must be done separately
         # --------------------------------------
@@ -207,11 +138,10 @@ class DagmanKiller(TaskAction):
         # --------------------------------------
         # TODO: Remove jobConst query when htcondor ticket is solved
         # https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=5175
-        jobConst = "TaskType =!= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(self.workflow)
 
         with HTCondorUtils.AuthenticatedSubprocess(self.proxy) as (parent, rpipe):
             if not parent:
-                with self.schedd.transaction() as tsc:
+                with self.schedd.transaction() as dummytsc:
                     self.schedd.act(htcondor.JobAction.Hold, rootConst)
                     self.schedd.act(htcondor.JobAction.Remove, jobConst)
         results = rpipe.read()

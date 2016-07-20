@@ -53,7 +53,7 @@ SCRIPT {prescriptDefer} PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {
 SCRIPT DEFER 4 1800 POST Job{count} dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES {taskname} {count} {tempDest} {outputDest} cmsRun_{count}.log.tar.gz {stage} {remoteOutputFiles}
 #PRE_SKIP Job{count} 3
 RETRY Job{count} {maxretries} UNLESS-EXIT 2
-VARS Job{count} count="{count}" runAndLumiMask="job_lumis_{count}.json" lheInputFiles="{lheInputFiles}" firstEvent="{firstEvent}" firstLumi="{firstLumi}" lastEvent="{lastEvent}" firstRun="{firstRun}" maxRuntime="{maxRuntime}" eventsPerLumi="{eventsPerLumi}" seeding="{seeding}" inputFiles="job_input_file_list_{count}.txt" scriptExe="{scriptExe}" scriptArgs="{scriptArgs}" +CRAB_localOutputFiles="\\"{localOutputFiles}\\"" +CRAB_DataBlock="\\"{block}\\"" +CRAB_Destination="\\"{destination}\\""
+VARS Job{count} count="{count}" parent="{parent}" runAndLumiMask="job_lumis_{count}.json" lheInputFiles="{lheInputFiles}" firstEvent="{firstEvent}" firstLumi="{firstLumi}" lastEvent="{lastEvent}" firstRun="{firstRun}" maxRuntime="{maxRuntime}" eventsPerLumi="{eventsPerLumi}" seeding="{seeding}" inputFiles="job_input_file_list_{count}.txt" scriptExe="{scriptExe}" scriptArgs="{scriptArgs}" +CRAB_localOutputFiles="\\"{localOutputFiles}\\"" +CRAB_DataBlock="\\"{block}\\"" +CRAB_Destination="\\"{destination}\\""
 ABORT-DAG-ON Job{count} 3
 """
 
@@ -100,6 +100,7 @@ CRAB_JobArch = %(jobarch_flatten)s
 CRAB_Archive = %(cachefilename_flatten)s
 CRAB_Id = $(count)
 +CRAB_Id = "$(count)"
++CRAB_ParentId = "$(parent)"
 +CRAB_OutTempLFNDir = "%(temp_dest)s"
 +CRAB_OutLFNDir = "%(output_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s

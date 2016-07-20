@@ -434,37 +434,29 @@ class DataWorkflow(object):
 
         retmsg = "ok"
         self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
-        statusRes = self.status(workflow, userdn, userproxy)[0]
-        warnings = statusRes['taskWarningMsg']
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
+        try:
+            #just one row is picked up by the previous query
+            row = self.Task.ID_tuple(*next(row))
+        except StopIteration:
+            raise ExecutionError("Impossible to find task %s in the database." % workflow)
+        warnings = literal_eval(row.task_warnings.read() if row.task_warnings else '[]') #there should actually is a default, but just in case
         if killwarning:
             warnings += [killwarning]
         warnings = str(warnings)
 
-        args = {'ASOURL' : statusRes.get("ASOURL", "")}
-        # Hm...
-        dbSerializer = str
+        args = {'ASOURL' : getattr(row, 'asourl', '')}
 
-        if statusRes['status'] in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'KILLED']:
-            killList = [jobid for jobstatus, jobid in statusRes['jobList'] if jobstatus not in self.successList]
-            if jobids:
-                #if the user wants to kill specific jobids make the intersection
-                killList = list(set(killList) & set(jobids))
-                #check if all the requested jobids can be resubmitted
-                if len(killList) != len(jobids):
-                    retmsg = "Cannot request kill for %s" % (set(jobids) - set(killList))
-            if not killList:
-                raise ExecutionError("There are no jobs to kill. Only jobs not in %s states can be killed" % self.successList)
-            self.logger.info("Jobs to kill: %s" % killList)
-
-            args.update({"killList": killList, "killAll": jobids==[]})
+        if row.task_status in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'KILLED']:
+            args.update({"killList": jobids})
             #Set arguments first so in case of failure we don't do any "damage"
-            self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow], arguments = [dbSerializer(args)])
+            self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow], arguments = [str(args)])
             self.api.modify(self.Task.SetStatusWarningTask_sql, status = ["NEW"], command = ["KILL"], taskname = [workflow], warnings = [str(warnings)])
-        elif statusRes['status'] == 'NEW' and statusRes['command'] == 'SUBMIT':
+        elif row.task_status == 'NEW' and row.task_command == 'SUBMIT':
             #if the task has just been submitted and not acquired by the TW
             self.api.modify(self.Task.SetStatusWarningTask_sql, status = ["KILLED"], command = ["KILL"], taskname = [workflow], warnings = [str(warnings)])
         else:
-            raise ExecutionError("You cannot kill a task if it is in the %s state" % statusRes['status'])
+            raise ExecutionError("You cannot kill a task if it is in the %s state" % row.task_status)
 
         return [{"result":retmsg}]
 
