@@ -8,6 +8,7 @@ import ast
 import json
 import sys
 import classad
+import glob
 from shutil import move
 # Need to import HTCondorUtils from a parent directory, not easy when the files are not in python packages.
 # Solution by ajay, SO: http://stackoverflow.com/questions/11536764
@@ -260,9 +261,9 @@ def storeNodesInfoInFile():
     read_until = jobsLog.tell()
     jobsLog.close()
 
-    node_state = open("node_state", "r")
-    parseNodeStateV2(node_state, nodes)
-    node_state.close()
+    for fn in glob.glob("node_state*"):
+        with open(fn, 'r') as node_state:
+            parseNodeStateV2(node_state, nodes)
 
     try:
         errorSummary = open("error_summary.json", "r")
