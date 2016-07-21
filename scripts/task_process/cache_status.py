@@ -38,8 +38,8 @@ def insertCpu(event, info):
         if 'RemoteUserCpu' in event:
             info['TotalUserCpuTimeHistory'][-1] = float(event['RemoteUserCpu'])
 
-node_name_re = re.compile("DAG Node: Job(\d+)")
-node_name2_re = re.compile("Job(\d+)")
+node_name_re = re.compile("DAG Node: Job(\d+(?:-\d+)?)")
+node_name2_re = re.compile("Job(\d+(?:-\d+)?)")
 
 def parseJobLog(fp, nodes, node_map):
     count = 0
@@ -191,7 +191,7 @@ def parseNodeStateV2(fp, nodes):
         if ad['Type'] != "NodeStatus":
             continue
         node = ad.get("Node", "")
-        if not node.startswith("Job"):
+        if not node.startswith("Job") or node.endswith("SubJobs"):
             continue
         nodeid = node[3:]
         status = ad.get('NodeStatus', -1)
