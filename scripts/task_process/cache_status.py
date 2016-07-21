@@ -18,9 +18,8 @@ import HTCondorUtils
 logging.basicConfig(filename='task_process/cache_status.log', level=logging.DEBUG)
 
 #
-# insertCpu,
-# parseJobLog and
-# parseErrorReport code copied from the backend HTCondorDataWorkflow.py
+# insertCpu, parseJobLog, parsNodeStateV2 and parseErrorReport
+# code copied from the backend HTCondorDataWorkflow.py with minimal changes.
 #
 
 cpu_re = re.compile(r"Usr \d+ (\d+):(\d+):(\d+), Sys \d+ (\d+):(\d+):(\d+)")
@@ -156,6 +155,9 @@ def parseJobLog(fp, nodes, node_map):
     logging.debug("There were %d events in the job log." % count)
     now = time.time()
     for node, info in nodes.items():
+        if node == 'DagStatus':
+            # StartTimes and WallDurations are not present, though crab status2 uses this record to get the DagStatus.
+            continue
         last_start = now
         if info['StartTimes']:
             last_start = info['StartTimes'][-1]
@@ -252,14 +254,6 @@ def storeNodesInfoInFile():
         logging.exception("error during status_cache handling")
     jobsLog = open("job_log", "r")
 
-    try:
-        errorSummary = open("error_summary.json", "r")
-        errorSummary.seek(0)
-        parseErrorReport(errorSummary, nodes)
-        errorSummary.close()
-    except IOError:
-        logging.exception("error during error_summary file handling")
-
     jobsLog.seek(last_read_until)
 
     parseJobLog(jobsLog, nodes, node_map)
@@ -269,6 +263,14 @@ def storeNodesInfoInFile():
     node_state = open("node_state", "r")
     parseNodeStateV2(node_state, nodes)
     node_state.close()
+
+    try:
+        errorSummary = open("error_summary.json", "r")
+        errorSummary.seek(0)
+        parseErrorReport(errorSummary, nodes)
+        errorSummary.close()
+    except IOError:
+        logging.exception("error during error_summary file handling")
 
     # First write the new cache file under a temporary name, so that other processes
     # don't get an incomplete result. Then replace the old one with the new one.
