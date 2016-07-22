@@ -8,6 +8,7 @@ import ast
 import json
 import sys
 import classad
+import glob
 from shutil import move
 # Need to import HTCondorUtils from a parent directory, not easy when the files are not in python packages.
 # Solution by ajay, SO: http://stackoverflow.com/questions/11536764
@@ -38,8 +39,8 @@ def insertCpu(event, info):
         if 'RemoteUserCpu' in event:
             info['TotalUserCpuTimeHistory'][-1] = float(event['RemoteUserCpu'])
 
-node_name_re = re.compile("DAG Node: Job(\d+)")
-node_name2_re = re.compile("Job(\d+)")
+node_name_re = re.compile("DAG Node: Job(\d+(?:-\d+)?)")
+node_name2_re = re.compile("Job(\d+(?:-\d+)?)")
 
 def parseJobLog(fp, nodes, node_map):
     count = 0
@@ -191,7 +192,7 @@ def parseNodeStateV2(fp, nodes):
         if ad['Type'] != "NodeStatus":
             continue
         node = ad.get("Node", "")
-        if not node.startswith("Job"):
+        if not node.startswith("Job") or node.endswith("SubJobs"):
             continue
         nodeid = node[3:]
         status = ad.get('NodeStatus', -1)
@@ -260,9 +261,9 @@ def storeNodesInfoInFile():
     read_until = jobsLog.tell()
     jobsLog.close()
 
-    node_state = open("node_state", "r")
-    parseNodeStateV2(node_state, nodes)
-    node_state.close()
+    for fn in glob.glob("node_state*"):
+        with open(fn, 'r') as node_state:
+            parseNodeStateV2(node_state, nodes)
 
     try:
         errorSummary = open("error_summary.json", "r")
