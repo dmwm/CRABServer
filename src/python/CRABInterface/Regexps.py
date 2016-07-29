@@ -59,7 +59,7 @@ RX_FILESTATE  = re.compile(r'^TRANSFERRING|FINISHED|FAILED|COOLOFF$')
 RX_LFNPATH   = re.compile(r"^(?=.{0,500}$)%(subdir)s(/%(subdir)s)*/?$" % lfnParts)
 RX_HOURS   = re.compile(r"^\d{0,6}$") #should be able to erase the last 100 years with 6 digits
 RX_URL = re.compile(r"^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w :\.-])*$")
-RX_SCRIPTARGS = re.compile(r'^[+a-zA-Z0-9\-.,_:?/"]+=[a-zA-Z0-9\-.,_:?/"()]+$')
+RX_SCRIPTARGS = re.compile(r'^[+a-zA-Z0-9\-.,_:?/"]+=[a-zA-Z0-9\-=.,_:?/"()]+$')
 RX_SCHEDD_NAME = re.compile(r"^[A-Za-z0-9._-]+[@.][A-Za-z0-9._-]+\.[A-Za-z]{2,6}$")
 RX_COLLECTOR = re.compile(r"^(([A-Za-z0-9._-]+\.[A-Za-z]{2,6}),?)+$")
 #TODO!

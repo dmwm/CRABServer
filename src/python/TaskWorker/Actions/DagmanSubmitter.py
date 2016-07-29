@@ -97,7 +97,7 @@ def addCRABInfoToClassAd(ad, info):
             ad[adName] = classad.ExprTree(str(info[dictName]))
     if 'extra_jdl' in info and info['extra_jdl']:
         for jdl in info['extra_jdl'].split('\n'):
-            adName, adVal = jdl.lstrip('+').split('=')
+            adName, adVal = jdl.lstrip('+').split('=',1)
             ad[adName] = adVal
 
 
