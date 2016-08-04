@@ -56,7 +56,7 @@ class Create(DBCreator):
         tm_rest_uri VARCHAR(255) NOT NULL,
         tm_transfer_state NUMBER(1) NOT NULL,
         tm_publication_state NUMBER(1) NOT NULL,
-        tm_transfer_failure_reason VARCHAR(1000) NOT NULL,
+        tm_transfer_failure_reason VARCHAR(1000),
         tm_publication_failure_reason VARCHAR(1000),
         tm_fts_id VARCHAR(255),
         tm_fts_instance VARCHAR(255),
