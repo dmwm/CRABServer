@@ -37,6 +37,7 @@ class DagmanKiller(TaskAction):
         if 'task' not in kwargs:
             raise ValueError("No task specified.")
         self.task = kwargs['task']
+        self.killAllFlag = len(self.task['kill_ids']) == 0
         if 'tm_taskname' not in self.task:
             raise ValueError("No taskname specified")
         self.workflow = self.task['tm_taskname']
@@ -66,7 +67,6 @@ class DagmanKiller(TaskAction):
             self.logger.exception("%s: %s" % (self.workflow, msg))
             raise TaskWorkerException(msg)
 
-        killAll = len(self.task['kill_ids']) == 0
         ad = classad.ClassAd()
         ad['foo'] = self.task['kill_ids']
         try:
@@ -74,7 +74,7 @@ class DagmanKiller(TaskAction):
         except:
             hostname = ''
 
-        if not killAll:
+        if not self.killAllFlag:
             const = "CRAB_ReqName =?= %s && member(CRAB_Id, %s) && member(CRAB_ParentId, %s)" % (HTCondorUtils.quote(self.workflow), ad.lookup("foo").__repr__(), ad.lookup("foo").__repr__())
         else:
             const = 'CRAB_ReqName =?= %s && TaskType=?="Job"' % HTCondorUtils.quote(self.workflow)
@@ -96,7 +96,7 @@ class DagmanKiller(TaskAction):
 
         # Note that we can not send kills for jobs not in queue at this time; we'll need the
         # DAG FINAL node to be fixed and the node status to include retry number.
-        if killAll:
+        if self.killAllFlag:
             return self.killAll(const)
         else:
             return self.killJobs(self.task['kill_ids'], const)
@@ -174,7 +174,7 @@ class DagmanKiller(TaskAction):
                 ## task for which all jobs have already finished -successfully or not-).
                 configreq = {'subresource': 'state',
                              'workflow': kwargs['task']['tm_taskname'],
-                             'status': 'KILLED' if kwargs['task']['kill_all'] else 'SUBMITTED'}
+                             'status': 'KILLED' if self.killAllFlag else 'SUBMITTED'}
                 self.logger.debug("Setting the task as successfully killed with %s" % (str(configreq)))
                 self.server.post(self.resturi, data = urllib.urlencode(configreq))
             except HTTPException as hte:
