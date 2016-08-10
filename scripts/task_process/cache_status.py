@@ -18,6 +18,20 @@ import HTCondorUtils
 
 logging.basicConfig(filename='task_process/cache_status.log', level=logging.DEBUG)
 
+NODE_DEFAULTS = {
+    'Retries': 0,
+    'Restarts': 0,
+    'SiteHistory': [],
+    'ResidentSetSize': [],
+    'SubmitTimes': [],
+    'StartTimes': [],
+    'EndTimes': [],
+    'TotalUserCpuTimeHistory': [],
+    'TotalSysCpuTimeHistory': [],
+    'WallDurations': [],
+    'JobIds': []
+}
+
 #
 # insertCpu, parseJobLog, parsNodeStateV2 and parseErrorReport
 # code copied from the backend HTCondorDataWorkflow.py with minimal changes.
@@ -52,8 +66,7 @@ def parseJobLog(fp, nodes, node_map):
             if m:
                 node = m.groups()[0]
                 proc = event['Cluster'], event['Proc']
-                info = nodes.setdefault(node, {'Retries': 0, 'Restarts': 0, 'SiteHistory': [], 'ResidentSetSize': [], 'SubmitTimes': [], 'StartTimes': [],
-                                               'EndTimes': [], 'TotalUserCpuTimeHistory': [], 'TotalSysCpuTimeHistory': [], 'WallDurations': [], 'JobIds': []})
+                info = nodes.setdefault(node, NODE_DEFAULTS)
                 info['State'] = 'idle'
                 info['JobIds'].append("%d.%d" % proc)
                 info['RecordedSite'] = False
@@ -198,33 +211,28 @@ def parseNodeStateV2(fp, nodes):
         status = ad.get('NodeStatus', -1)
         retry = ad.get('RetryCount', -1)
         msg = ad.get("StatusDetails", "")
+        info = nodes.setdefault(nodeid, NODE_DEFAULTS)
         if status == 1: # STATUS_READY
-            info = nodes.setdefault(nodeid, {})
             if info.get("State") == "transferring":
                 info["State"] = "cooloff"
             elif info.get('State') != "cooloff":
                 info['State'] = 'unsubmitted'
         elif status == 2: # STATUS_PRERUN
-            info = nodes.setdefault(nodeid, {})
             if retry == 0:
                 info['State'] = 'unsubmitted'
             else:
                 info['State'] = 'cooloff'
         elif status == 3: # STATUS_SUBMITTED
-            info = nodes.setdefault(nodeid, {})
             if msg == 'not_idle':
                 info.setdefault('State', 'running')
             else:
                 info.setdefault('State', 'idle')
         elif status == 4: # STATUS_POSTRUN
-            info = nodes.setdefault(nodeid, {})
             if info.get("State") != "cooloff":
                 info['State'] = 'transferring'
         elif status == 5: # STATUS_DONE
-            info = nodes.setdefault(nodeid, {})
             info['State'] = 'finished'
         elif status == 6: # STATUS_ERROR
-            info = nodes.setdefault(nodeid, {})
             # Older versions of HTCondor would put jobs into STATUS_ERROR
             # for a short time if the job was to be retried.  Hence, we had
             # some status parsing logic to try and guess whether the job would
