@@ -1605,7 +1605,6 @@ class PostJob():
         with open('taskinformation.pkl', 'rb') as fd:
             task = pickle.load(fd)
 
-        self.logger.error(task['tm_split_args'])
         target = int(task['tm_split_args']['seconds_per_job'])
         report = self.job_report['steps']['cmsRun']['performance']
         # Build in a 50% error margin in the runtime to not create too many tails
@@ -1664,7 +1663,8 @@ class PostJob():
         self.logger.info("Lumis expected to be processed: {0}".format(len(inlumis.getLumis())))
         self.logger.info("Lumis actually processed:       {0}".format(len(outlumis.getLumis())))
         self.logger.info("Difference in lumis:            {0}".format(len(missing.getLumis())))
-        if len(missing.getLumis()) == 0: #we don't want to create the subjobs if the job processed everything
+        if len(missing.getLumis()) == 0:
+            # we don't want to create the subjobs if the job processed everything
             return
         missing_compact = missing.getCompactList()
         runs = missing.getRuns()
@@ -1673,14 +1673,25 @@ class PostJob():
             dataset = pickle.load(fd)
         with open('taskinformation.pkl', 'rb') as fd:
             task = pickle.load(fd)
+
+        target = int(task['tm_split_args']['seconds_per_job']) / 4
+        # Target completion jobs to have a 45 minute runtime
+        target = max(target, 45 * 60)
+        report = self.job_report['steps']['cmsRun']['performance']
+
+        # Build in a 50% error margin in the runtime to not create too many tails
+        events = int(target / float(report['cpu']['AvgEventTime']))
+        totalJobSeconds = float(report['cpu']['TotalJobTime'])
+
+        self.logger.info("New target runtime: {0}".format(target))
+        self.logger.info("CPU time per event: {0}".format(report['cpu']['AvgEventTime']))
+        self.logger.info("Resplitting with ~{0} events per job".format(events))
+
+        task['tm_split_algo'] = 'EventAwareLumiBased'
+        task['tm_split_args']['events_per_job'] = events
         task['tm_split_args']['runs'] = runs
         task['tm_split_args']['lumis'] = lumis
-        for algorithm, units in SPLIT_ARG_MAP.items():
-            if task['tm_split_algo'] == algorithm:
-                task['tm_split_args'][units] /= 4
 
-        self.logger.info("dataset: %s" % str(dataset))
-        self.logger.info("task: %s" % str(task))
         try:
             config = Configuration()
             config.TaskWorker = ConfigSection(name="TaskWorker")
