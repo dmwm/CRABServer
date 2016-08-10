@@ -378,6 +378,15 @@ class DagmanCreator(TaskAction.TaskAction):
         return self.task['tm_activity']
 
 
+    def isGlobalBlacklistIgnored(self, kwargs):
+        """ Determine wether the user wants to ignore the globalblacklist
+        """
+        extrajdls = literal_eval(kwargs['task']['tm_extrajdl'])
+        for ej in extrajdls:
+            if ej.find('CRAB_IgnoreGlobalBlacklist') in [0, 1]: #there might be a + before
+                return True
+        return False
+
     def makeJobSubmit(self, task):
         """
         Create the submit file.  This is reused by all jobs in the task; differences
@@ -594,8 +603,9 @@ class DagmanCreator(TaskAction.TaskAction):
         # This is needed for Site Metrics
         # It should not block any site for Site Metrics and if needed for other activities
         # self.config.TaskWorker.ActivitiesToRunEverywhere = ['hctest', 'hcdev']
-        if hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere') and \
-                   kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere:
+        # The other case where the blacklist is ignored is if the user sset this explicitly in his configuration
+        if self.isGlobalBlacklistIgnored(kwargs) or (hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere') and \
+                   kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere):
             global_blacklist = set()
             self.logger.debug("Ignoring the CRAB site blacklist.")
 
