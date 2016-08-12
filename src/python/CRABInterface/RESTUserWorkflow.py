@@ -48,7 +48,7 @@ class RESTUserWorkflow(RESTEntity):
                 self.logger.debug("Site %s expanded to %s during validate" % (site, expanded))
                 if not expanded:
                     excasync = ValueError("Remote output data site not valid")
-                    invalidp = InvalidParameter("Cannot expand site %s to anything" % site, errobj = excasync)
+                    invalidp = InvalidParameter("Cannot expand site %s to anything" % site, errobj=excasync)
                     setattr(invalidp, 'trace', '')
                     raise invalidp
                 res = res.union(expanded)
@@ -67,7 +67,7 @@ class RESTUserWorkflow(RESTEntity):
             kwargs['lfn'] = '/store/user/%s/' % (username)
         else:
             if not checkOutLFN(kwargs['lfn'], username):
-                msg  = "The parameter Data.outLFNDirBase in the CRAB configuration file must start with either"
+                msg = "The parameter Data.outLFNDirBase in the CRAB configuration file must start with either"
                 msg += " '/store/user/<username>/' or '/store/group/<groupname>/'"
                 msg += " (or '/store/local/<something>/' if publication is off),"
                 msg += " where username is your username as registered in SiteDB"
@@ -86,7 +86,7 @@ class RESTUserWorkflow(RESTEntity):
         """
         if 'publishname' not in kwargs:
             ## This now can be undefined since new clients use publishname2
-            msg  = "Server parameter 'publishname' is not defined."
+            msg = "Server parameter 'publishname' is not defined."
             msg += " It is possible that old client is being used."
             self.logger.info(msg)
             return
@@ -101,7 +101,7 @@ class RESTUserWorkflow(RESTEntity):
         kwargs['publishname'] = outputDatasetTagToCheck #that's what the version earlier than 1509 were putting in the DB
         if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
             if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
-                msg  = "Parameter 'publishgroupname' is True,"
+                msg = "Parameter 'publishgroupname' is True,"
                 msg += " but parameter 'lfn' does not start with '/store/group/<groupname>'."
                 raise InvalidParameter(msg)
             group_user_prefix = outlfn.split('/')[3]
@@ -119,7 +119,7 @@ class RESTUserWorkflow(RESTEntity):
             else:
                 param = 'Data.outputDatasetTag'
                 extrastr = ''
-            msg  = "Invalid CRAB configuration parameter %s." % (param)
+            msg = "Invalid CRAB configuration parameter %s." % (param)
             msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (group_user_prefix, extrastr, param)
             msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
             raise InvalidParameter(msg)
@@ -149,7 +149,7 @@ class RESTUserWorkflow(RESTEntity):
         ##Determine if it's a dataset that will go into a group space and therefore the (group)username prefix it will be used
         if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
             if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
-                msg  = "Parameter 'publishgroupname' is True,"
+                msg = "Parameter 'publishgroupname' is True,"
                 msg += " but parameter 'lfn' does not start with '/store/group/<groupname>'."
                 raise InvalidParameter(msg)
             group_user_prefix = outlfn.split('/')[3]
@@ -168,7 +168,7 @@ class RESTUserWorkflow(RESTEntity):
             else:
                 param = 'Data.outputDatasetTag'
                 extrastr = ''
-            msg  = "Invalid CRAB configuration parameter %s." % (param)
+            msg = "Invalid CRAB configuration parameter %s." % (param)
             msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (group_user_prefix, extrastr, param)
             msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
             raise InvalidParameter(msg)
@@ -194,7 +194,7 @@ class RESTUserWorkflow(RESTEntity):
             ## regular expression [a-zA-Z][a-zA-Z0-9\-_]*, which is not nice.
             ## The message from AssertionError exception would be:
             ## "'<kwargs['primarydataset']>' does not match regular expression [a-zA-Z0-9\.\-_]+".
-            msg  = "Invalid 'primarydataset' parameter."
+            msg = "Invalid 'primarydataset' parameter."
             msg += " The parameter should not have more than 99 characters"
             msg += " and should match the regular expression [a-zA-Z][a-zA-Z0-9\-_]*"
             raise InvalidParameter(msg)
@@ -207,8 +207,8 @@ class RESTUserWorkflow(RESTEntity):
             pnn=True)
         if site in bannedDestinations:
             excasync = ValueError("Remote output data site is banned")
-            invalidp = InvalidParameter("The output site you specified in the Site.storageSite parameter (%s) is blacklisted (banned sites: %s)" %\
-                            (site, self.centralcfg.centralconfig['banned-out-destinations']), errobj = excasync)
+            invalidp = InvalidParameter("The output site you specified in the Site.storageSite parameter (%s) is blacklisted (banned sites: %s)" % \
+                            (site, self.centralcfg.centralconfig['banned-out-destinations']), errobj=excasync)
             setattr(invalidp, 'trace', '')
             raise invalidp
 
@@ -273,11 +273,11 @@ class RESTUserWorkflow(RESTEntity):
 
         return asourl, asodb
 
-    def _checkSite(self, site, pnn = False):
+    def _checkSite(self, site, pnn=False):
         sites = self.allPNNNames.sites if pnn else self.allCMSNames.sites
         if site not in sites:
             excasync = ValueError("A site name you specified is not valid")
-            invalidp = InvalidParameter("The parameter %s is not in the list of known CMS PhEDEx nodes." % (site), errobj = excasync)
+            invalidp = InvalidParameter("The parameter %s is not in the list of known CMS PhEDEx nodes." % (site), errobj=excasync)
             setattr(invalidp, 'trace', '')
             raise invalidp
 
@@ -292,17 +292,17 @@ class RESTUserWorkflow(RESTEntity):
         try:
             goodReleases = allScramArchsAndVersions()
         except IOError:
-            msg = "Error connecting to %s and determine the list of available releases. " % TAG_COLLECTOR_URL +\
+            msg = "Error connecting to %s and determine the list of available releases. " % TAG_COLLECTOR_URL + \
                   "Skipping the check of the releases"
         else:
             if goodReleases == {}:
-                msg = "The list of releases at %s is empty. " % TAG_COLLECTOR_URL +\
+                msg = "The list of releases at %s is empty. " % TAG_COLLECTOR_URL + \
                       "Skipping the check of the releases"
             elif jobarch not in goodReleases or jobsw not in goodReleases[jobarch]:
                 msg = "ERROR: %s on %s is not among supported releases" % (jobsw, jobarch)
                 msg += "\nUse config.JobType.allowUndistributedCMSSW = True if you are sure of what you are doing"
                 excasync = "ERROR: %s on %s is not among supported releases or an error occurred" % (jobsw, jobarch)
-                invalidp = InvalidParameter(msg, errobj = excasync)
+                invalidp = InvalidParameter(msg, errobj=excasync)
                 setattr(invalidp, 'trace', '')
                 raise invalidp
 
@@ -385,12 +385,12 @@ class RESTUserWorkflow(RESTEntity):
 
             if safe.kwargs['jobtype'] == 'PrivateMC':
                 if param.kwargs['inputdata']:
-                    msg  = "Invalid 'inputdata' parameter."
+                    msg = "Invalid 'inputdata' parameter."
                     msg += " Job type PrivateMC does not take any input dataset."
                     msg += " If you really intend to run over an input dataset, then you must use job type Analysis."
                     raise InvalidParameter(msg)
                 if safe.kwargs['userfiles']:
-                    msg  = "Invalid 'userfiles' parameter."
+                    msg = "Invalid 'userfiles' parameter."
                     msg += " Job type PrivateMC does not take any input files."
                     msg += " If you really intend to run over input files, then you must use job type Analysis."
                     raise InvalidParameter(msg)
@@ -520,7 +520,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_num("force", param, safe, optional=True)
             validate_numlist('jobids', param, safe)
-            validate_str("killwarning", param, safe,  RX_TEXT_FAIL, optional=True)
+            validate_str("killwarning", param, safe, RX_TEXT_FAIL, optional=True)
             #decode killwarning message if present
             if safe.kwargs['killwarning']:
                 try:

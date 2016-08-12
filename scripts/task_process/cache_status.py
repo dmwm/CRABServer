@@ -238,7 +238,8 @@ def parseNodeStateV2(fp, nodes):
             # some status parsing logic to try and guess whether the job would
             # be tried again in the near future.  This behavior is no longer
             # observed; STATUS_ERROR is terminal.
-            info['State'] = 'failed'
+            if info['State'] != 'killed':
+                info['State'] = 'failed'
 
 # --- New code ----
 
@@ -268,7 +269,6 @@ def storeNodesInfoInFile():
     parseJobLog(jobsLog, nodes, node_map)
     read_until = jobsLog.tell()
     jobsLog.close()
-
     for fn in glob.glob("node_state*"):
         with open(fn, 'r') as node_state:
             parseNodeStateV2(node_state, nodes)
