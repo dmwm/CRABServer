@@ -1674,12 +1674,11 @@ class PostJob():
         with open('taskinformation.pkl', 'rb') as fd:
             task = pickle.load(fd)
 
-        target = int(task['tm_split_args']['seconds_per_job']) / 4
+        target = int(task['tm_split_args']['seconds_per_job']) / 8
         # Target completion jobs to have a 45 minute runtime
         target = max(target, 45 * 60)
         report = self.job_report['steps']['cmsRun']['performance']
 
-        # Build in a 50% error margin in the runtime to not create too many tails
         events = int(target / float(report['cpu']['AvgEventTime']))
         totalJobSeconds = float(report['cpu']['TotalJobTime'])
 
