@@ -16,7 +16,8 @@ TMP_BUFFER=$(mktemp -dt "$0.XXXXXXXXXX")/client_validation.log
 STORAGE_SITE="T2_CH_CERN"
 OLD_CLIENT=/cvmfs/cms.cern.ch/crab3/crab.sh
 NEW_CLIENT=/cvmfs/cms.cern.ch/crab3/crab_pre.sh
-#NEW_CLIENT=/cvmfs/cms.cern.ch/crab3/crab_pre.sh
+#NEW_CLIENT=/cvmfs/cms.cern.ch/crab3/crab_pre_light.sh
+#NEW_CLIENT='./init-light.sh'
 PROXY=`voms-proxy-info -path 2>&1`
 OUTPUTDIR="$PWD/logdir"
 BOLD=$(tput bold 2>/dev/null)
@@ -25,6 +26,18 @@ STOP_IF_FAIL=0
 
 # OCMDS: commands from old client
 # NCMDS: commands from the new client
+
+cd CMSSW_7_4_7
+eval `scramv1 runtime -sh`
+
+# check if the client is up to date
+OV=`source $OLD_CLIENT;crab --version`
+NV=`source $NEW_CLIENT;crab --version`
+
+if [ "$OV" == "$NV" ];then
+  echo "clients are the same, aborting"
+  exit
+fi
 
 OCMDS=(`source $OLD_CLIENT;crab --help | sed -n '/Valid commands are/,/To get single command help run/p' | awk '{print $1}'`) # fetch commands from old client
 NCMDS=(`source $NEW_CLIENT;crab --help | sed -n '/Valid commands are/,/To get single command help run/p' | awk '{print $1}'`) # fetch commands from new client
@@ -240,7 +253,9 @@ done
 # crab task --fromdate=YYYY-MM-DD --days=N --status=STATUS --proxy=PROXY --instance=INSTANCE
 USETHISPARMS=()
 INITPARMS="--days --status --proxy"
-PARAMS=(NEW HOLDING QUEUED UPLOADED SUBMITTED SUBMITFAILED KILL KILLED KILLFAILED RESUBMIT RESUBMITFAILED FAILED)
+PARAMS=(NEW HOLDING QUEUED UPLOADED SUBMITTED SUBMITFAILED KILLED KILLFAILED RESUBMITFAILED FAILED)
+# old task status
+#PARAMS=(NEW HOLDING QUEUED UPLOADED SUBMITTED SUBMITFAILED KILL KILLED KILLFAILED RESUBMIT RESUBMITFAILED FAILED)
 for st in "${PARAMS[@]}";do
   feedParms "1 $st $PROXY"
 done
@@ -321,11 +336,11 @@ done
 
 #report:
 # crab report
-# --outputdir '|--dbs' --proxy --dir
+# --outputdir --proxy --dir
 USETHISPARMS=()
-INITPARMS="--outputdir --dbs --proxy --dir"
-feedParms "$OUTPUTDIR yes $PROXY $PROJDIR"
-feedParms "$OUTPUTDIR no $PROXY $PROJDIR" 
+INITPARMS="--outputdir --proxy --dir"
+feedParms "$OUTPUTDIR $PROXY $PROJDIR"
+feedParms "$OUTPUTDIR $PROXY $PROJDIR" 
 for param in "${USETHISPARMS[@]}";do
   checkThisCommand report "$param"
 done
@@ -353,14 +368,30 @@ done
 # this one needs a taskname to be executed
 # crab remake
 #remake:
-TASKNAME=`crab tasks --days=1 | grep '_crab_'`
+#TASKNAME=`crab tasks --days=1 | grep '_crab_'`
+TASKNAME=(`crab tasks | grep '_crab_'`)
 RMKDIR=`echo $TASKNAME | sed -n 's|.*_\(crab_.*\)|\1|p'`
+RMKDIR=`echo "${TASKNAME[@]}" | xargs -n1 | sed -n 's|.*_\(crab_.*\)|\1|p'`
+RMKDIR=remake
+
 USETHISPARMS=()
 INITPARMS="--task --proxy"
-feedParms $TASKNAME $PROXY
-mkdir remake
+for task in ${TASKNAME[@]};do
+  feedParms "$task $PROXY"
+done
+
+#feedParms "$RMKDIR $PROXY"
+
+if [ ! -d "./remake" ];then
+  mkdir remake
+fi 
+
 cd remake
-checkThisCommand remake ${USETHISPARMS}
+
+for param in "${USETHISPARMS[@]}";do
+  checkThisCommand remake "${param}"
+done
+
 cd ..
 
 # this one needs a taskname which ran into a FAILED status
