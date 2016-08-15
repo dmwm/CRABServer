@@ -41,6 +41,7 @@ class DataWorkflow(object):
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
         self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
         self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
+        self.transferDB = getDBinstance(config, 'FileTransfersDB', 'FileTransfers')
 
     @classmethod
     def updateRequest(cls, workflow):

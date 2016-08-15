@@ -19,8 +19,8 @@ from CRABInterface.DataWorkflow import DataWorkflow
 from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 
-from ServerUtilities import FEEDBACKMAIL, isCouchDBURL
 from CRABInterface.Utils import conn_handler, global_user_throttle
+from ServerUtilities import FEEDBACKMAIL, isCouchDBURL, PUBLICATIONDB_STATES
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 
 import HTCondorUtils
@@ -735,6 +735,13 @@ class HTCondorDataWorkflow(DataWorkflow):
             hbuf.close()
 
     def publicationStatus(self, workflow, asourl, asodb, user):
+        """Here is what basically the function return, a dict called publicationInfo in the subcalls:
+                publicationInfo['status']: something like {'publishing': 0, 'publication_failed': 0, 'not_published': 0, 'published': 5}.
+                                           Later on goes into dictresult['publication'] before being returned to the client
+                publicationInfo['status']['error']: String containing the error message if not able to contact couch or oracle
+                                                    Later on goes into dictresult['publication']['error']
+                publicationInfo['failure_reasons']: errors of single files (not yet implemented for oracle..)
+        """
         if self.isCouchDBURL:
             return self.publicationStatusCouch(workflow, asourl, asodb)
         else:
@@ -793,10 +800,28 @@ class HTCondorDataWorkflow(DataWorkflow):
         return publicationInfo
 
     def publicationStatusOracle(self, workflow, asourl, asodb, user):
-        msg = "Publication information for oracle not yet implemented"
         publicationInfo = {}
-        publicationInfo['status'] = {}
-        publicationInfo['status']['error'] = msg
+
+        #query oracle for the information
+        binds = {}
+        binds['username'] = user
+        binds['taskname'] = workflow
+        res = list(self.api.query(None, None, self.transferDB.GetTaskStatusForPublication_sql, **binds))
+
+        #group results by state
+        statusDict = {}
+        for row in res:
+            status = row[2]
+            statusStr = PUBLICATIONDB_STATES[status].lower()
+            if status != 5:
+                statusDict[statusStr] = statusDict.setdefault(statusStr, 0) + 1
+
+        #format and return
+        publicationInfo['status'] = statusDict
+
+        #Generic errors (like oracle errors) goes here. N.B.: single files errors should not go here
+#        msg = "Publication information for oracle not yet implemented"
+#        publicationInfo['status']['error'] = msg
 
         return publicationInfo
 
