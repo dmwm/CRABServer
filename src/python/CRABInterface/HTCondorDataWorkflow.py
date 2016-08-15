@@ -81,6 +81,52 @@ class HTCondorDataWorkflow(DataWorkflow):
         return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], transferingIds, finishedIds, \
                              row.user_dn, row.username, row.user_role, row.user_group, userproxy)
 
+    def logs2(self, workflow, howmany, jobids, userdn, userproxy=None):
+        self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
+
+        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
+        row = self.Task.ID_tuple(*row)
+
+        return self.getFiles2(workflow, howmany, jobids, ['LOG'], row.user_dn,
+                             row.username, row.user_role, row.user_group, userproxy)
+
+    def output2(self, workflow, howmany, jobids, userdn, userproxy=None):
+        self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
+
+        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
+        row = self.Task.ID_tuple(*row)
+
+        return self.getFiles2(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], row.user_dn,
+                              row.username, row.user_role, row.user_group, userproxy)
+
+    def getFiles2(self, workflow, howmany, jobids, filetype, userdn, username, role, group, userproxy = None):
+        """
+        Retrieves the output PFN aggregating output in final and temporary locations.
+
+        :arg str workflow: the unique workflow name
+        :arg int howmany: the limit on the number of PFN to return
+        :return: a generator of list of outputs"""
+
+        file_type = 'log' if filetype == ['LOG'] else 'output'
+
+        self.logger.debug("Retrieving the %s files of the following jobs: %s" % (file_type, jobids))
+
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow)
+
+        rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
+        if howmany != -1:
+            rows = rows[:howmany]
+
+        for row in rows:
+            yield {'jobid': row[GetFromTaskAndType.PANDAID],
+                   'lfn': row[GetFromTaskAndType.LFN],
+                   'site': row[GetFromTaskAndType.LOCATION],
+                   'tmplfn': row[GetFromTaskAndType.TMPLFN],
+                   'tmpsite': row[GetFromTaskAndType.TMPLOCATION],
+                   'directstageout': row[GetFromTaskAndType.DIRECTSTAGEOUT],
+                   'size': row[GetFromTaskAndType.SIZE],
+                   'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
+                  }
 
     @conn_handler(services=['phedex'])
     def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, username, role, group, userproxy = None):
