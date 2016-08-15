@@ -35,6 +35,8 @@ class StageoutCheck(TaskAction):
             isPermanent, failure, dummyExitCode = isFailurePermanent(err)
             if isPermanent:
                 msg = "CRAB3 refuses to send jobs to grid scheduler for %s. Error message: %s" %(self.task['tm_taskname'], failure)
+                msg += "\n" + out
+                msg += "\n" + err
                 self.logger.warning(msg)
                 raise TaskWorkerException(msg)
             else:
