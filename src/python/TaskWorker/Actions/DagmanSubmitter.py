@@ -199,6 +199,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
             Send it to the REST
 
             If we can't send the schedd to the REST this is considered a permanent error
+
+            Return the name of the schedd selected of None if there are no schedd left
         """
         self.logger.debug("Picking up the scheduler using %s", self.config.TaskWorker.scheddPickerFunction)
         #copy the list of schedd from REST external configuration. They are loaded when action is created
@@ -207,6 +209,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         currentBackendurls = copy.deepcopy(self.backendurls)
         currentBackendurls['htcondorSchedds'] = dict([(s,restSchedulers[s]) for s in restSchedulers if s not in alreadyTriedSchedds])
+        if len(currentBackendurls['htcondorSchedds']) == 0:
+            return None
         loc = HTCondorLocator.HTCondorLocator(currentBackendurls)
         if hasattr(self.config.TaskWorker, 'scheddPickerFunction'):
             schedd = loc.getSchedd(chooserFunction=self.config.TaskWorker.scheddPickerFunction)
@@ -261,7 +265,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         ## Returning back to Handler.py for retries, and in case try on a new schedd
         self.logger.debug("Choosing a new schedd and then retrying")
-        self.pickAndSetSchedd(task)
+        schedd = self.pickAndSetSchedd(task)
 
         ## All the submission retries to this schedd have failed.
         msg = "The CRAB server backend was not able to submit the jobs to the Grid schedulers."
@@ -270,7 +274,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         msg += " The submission was retried %s times on %s schedulers." % (sum([len(x) for x in scheddStats.taskErrors.values()]), len(scheddStats.taskErrors))
         msg += " These are the failures per Grid scheduler: %s" % (str(scheddStats.taskErrors))
 
-        raise TaskWorkerException(msg, retry=True)
+        raise TaskWorkerException(msg, retry=(schedd != None))
 
 
     def duplicateCheck(self, task):
