@@ -1640,6 +1640,13 @@ class PostJob():
             self.logger.error('Error during subdag creation')
 
     def createSubjobs(self):
+        with open('datadiscovery.pkl', 'rb') as fd:
+            dataset = pickle.load(fd)
+        with open('taskinformation.pkl', 'rb') as fd:
+            task = pickle.load(fd)
+        if not task['completion_jobs']:
+            return
+
         ## Parse the lumis send to process
         self.logger.info("====== Creating subjobs")
         self.logger.info("====== Starting to parse the lumi file")
@@ -1669,10 +1676,6 @@ class PostJob():
         missing_compact = missing.getCompactList()
         runs = missing.getRuns()
         lumis = [",".join(map(str, reduce(lambda x, y:x + y, missing_compact[run]))) for run in runs]
-        with open('datadiscovery.pkl', 'rb') as fd:
-            dataset = pickle.load(fd)
-        with open('taskinformation.pkl', 'rb') as fd:
-            task = pickle.load(fd)
 
         target = int(task['tm_split_args']['seconds_per_job']) / 8
         # Target completion jobs to have a 45 minute runtime

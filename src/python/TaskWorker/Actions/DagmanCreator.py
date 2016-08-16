@@ -610,8 +610,11 @@ class DagmanCreator(TaskAction.TaskAction):
         kwargs['task']['max_runtime'] = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
         if kwargs['task']['tm_split_algo'] == 'Automatic' and stage == 'conventional':
             kwargs['task']['max_runtime'] = 5 * 60
+            kwargs['task']['completion_jobs'] = getattr(self.config.TaskWorker, 'completionJobs', False)
             outfiles = []
             stage = 'probe'
+        if stage == 'process' and not kwargs['task']['completion_jobs']:
+            kwargs['task']['max_runtime'] = -1
 
         if stage == 'probe':
             parent = None
@@ -792,7 +795,7 @@ class DagmanCreator(TaskAction.TaskAction):
             dagSpecs = dagSpecs[:1]
         for dagSpec in dagSpecs:
             dag += DAG_FRAGMENT.format(**dagSpec)
-            if stage in ('probe', 'process'):
+            if stage == 'probe' or (stage == 'process' and kwargs['task']['completion_jobs']):
                 dag += SUBDAG_FRAGMENT.format(**dagSpec)
                 subdag = "RunJobs{0}.subdag".format(dagSpec['count'])
                 with open(subdag, "w") as fd:
