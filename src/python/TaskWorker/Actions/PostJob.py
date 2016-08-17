@@ -1504,21 +1504,21 @@ class PostJob():
         ## the jobs has failed).
         retval = self.check_abort_dag(retval)
 
+        if retval == JOB_RETURN_CODES.OK:
+            ## Possible stages: probe, process, tail for automatic
+            ## splitting.  All other splitting modes have a stage called
+            ## conventional.
+            if self.stage == 'probe':
+                retval = self.createJobs()
+            elif self.stage == 'process':
+                retval = self.createSubjobs()
+
         ## If return value is not 0 (success) write env variables to a file if it is not
         ## present and print job ads in PostJob log file.
         ## All this information is useful for debugging purpose.
         if retval != JOB_RETURN_CODES.OK:
             #Print system environment and job classads
             self.print_env_and_ads()
-        else:
-            ## Possible stages: probe, process, tail for automatic
-            ## splitting.  All other splitting modes have a stage called
-            ## conventional.
-            if self.stage == 'probe':
-                self.createJobs()
-            elif self.stage == 'process':
-                self.createSubjobs()
-
         self.log_finish_msg(retval)
 
         return retval
@@ -1627,10 +1627,11 @@ class PostJob():
             self.logger.info("Splitting results:")
             for g in split_result.result[0]:
                 msg = "Created jobgroup with length {0}".format(len(g.getJobs()))
-                self.logger.error(msg)
-
-        except TaskWorkerException:
-            self.logger.error("Error during splitting")
+                self.logger.info(msg)
+        except TaskWorkerException as e:
+            self.logger.error("Error during splitting:\n{0}".format(e))
+            self.set_dashboard_state('FAILED')
+            return JOB_RETURN_CODES.FATAL_ERROR
         try:
             creator = DagmanCreator(config, server=None, resturi='')
             _, _, subdags = creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, stage='process')
@@ -1638,6 +1639,10 @@ class PostJob():
             self.createSubdagSubmission(subdags)
         except TaskWorkerException:
             self.logger.error('Error during subdag creation')
+            self.set_dashboard_state('FAILED')
+            return JOB_RETURN_CODES.FATAL_ERROR
+
+        return JOB_RETURN_CODES.OK
 
     def createSubjobs(self):
         with open('datadiscovery.pkl', 'rb') as fd:
@@ -1703,15 +1708,20 @@ class PostJob():
             self.logger.info("Splitting results:")
             for g in split_result.result[0]:
                 msg = "Created jobgroup with length {0}".format(len(g.getJobs()))
-                self.logger.error(msg)
-
-        except TaskWorkerException:
-            self.logger.error("Error during splitting")
+                self.logger.info(msg)
+        except TaskWorkerException as e:
+            self.logger.error("Error during splitting:\n{0}".format(e))
+            self.set_dashboard_state('FAILED')
+            return JOB_RETURN_CODES.FATAL_ERROR
         try:
             creator = DagmanCreator(config, server=None, resturi='')
             creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0, stage='tail')
         except TaskWorkerException:
             self.logger.error('Error during subdag creation')
+            self.set_dashboard_state('FAILED')
+            return JOB_RETURN_CODES.FATAL_ERROR
+
+        return JOB_RETURN_CODES.OK
 
     def createSubdagSubmission(self, subdags):
         for dag in subdags:
