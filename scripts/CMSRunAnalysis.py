@@ -946,7 +946,7 @@ if __name__ == "__main__":
         if not 'CRAB3_RUNTIME_DEBUG' in os.environ:
             try:
                 AddPsetHash(report, scram)
-            except Exception as ex::
+            except Exception as ex:
                 msg = "Unable to compute pset hash for job output. Got exception:"
                 msg += "\n" + str(ex) + "\n"
                 handleException("FAILED", EC_PsetHash, msg)
