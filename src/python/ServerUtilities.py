@@ -90,7 +90,7 @@ def USER_SANDBOX_EXCLUSIONS(tarmembers):
         return ['PSet.py', 'PSet.pkl', 'debug/crabConfig.py', 'debug/originalPSet.py.py']
     else:
         return ['debug/crabConfig.py', 'debug/originalPSet.py.py']
-    
+
 def NEW_USER_SANDBOX_EXCLUSIONS(tarmembers):
     """ Exclusion function used with the new crabclient (>= 3.3.1607). Since the new client sandbox no longer
         contains the debug files, it's pointless to exclude them. Also, this function is used when getting
@@ -106,6 +106,20 @@ def NEW_USER_SANDBOX_EXCLUSIONS(tarmembers):
 
 def isCouchDBURL(url):
     return 'couchdb' in url
+
+
+def truncateError(msg):
+    """Truncate the error message to the first 7400 chars if needed, and add a message if we truncate it.
+       See https://github.com/dmwm/CRABServer/pull/4867#commitcomment-12086393
+    """
+    MSG_LIMIT = 7500
+    if len(msg) > MSG_LIMIT:
+        truncMsg = msg[:MSG_LIMIT - 100]
+        truncMsg += "\n[... message truncated to the first 7400 chars ...]"
+        return truncMsg
+    else:
+        return msg
+
 
 def checkOutLFN(lfn, username):
     if lfn.startswith('/store/user/'):
