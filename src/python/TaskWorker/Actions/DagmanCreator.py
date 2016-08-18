@@ -740,7 +740,8 @@ class DagmanCreator(TaskAction.TaskAction):
             raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
         msg = "Some blocks from dataset '%s' were skipped " % (kwargs['task']['tm_input_dataset'])
         if blocksWithNoLocations:
-            msg += " because they have no locations.\n List is: %s.\n" % (sorted(list(blocksWithNoLocations)))
+            msgBlocklist = sorted(list(blocksWithNoLocations[:10])) + ['...']
+            msg += " because they have no locations.\n List is (first 10 elements only): %s.\n" % msgBlocklist
         if blocksWithBannedLocations:
             msg += " because they are only present at blacklisted sites.\n List is: %s.\n" % (sorted(list(blocksWithBannedLocations)))
             msg += getBlacklistMsg()
