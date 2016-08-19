@@ -1665,6 +1665,7 @@ class PostJob():
             config = Configuration()
             config.TaskWorker = ConfigSection(name="TaskWorker")
             config.TaskWorker.scratchDir = '.' # XXX
+            config.TaskWorker.maxJobsPerTask = task['tm_split_args']['job_limit']
             splitter = Splitter(config, server=None, resturi='')
             split_result = splitter.execute(dataset, task=task)
             self.logger.info("Splitting results:")
