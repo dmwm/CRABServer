@@ -20,8 +20,11 @@ class Splitter(TaskAction):
     def execute(self, *args, **kwargs):
         wmwork = Workflow(name=kwargs['task']['tm_taskname'])
 
+        maxJobs = getattr(self.config.TaskWorker, 'maxJobsPerTask', 10000)
+
         splitparam = kwargs['task']['tm_split_args']
         splitparam['algorithm'] = kwargs['task']['tm_split_algo']
+        splitparam['job_limit'] = maxJobs
         if kwargs['task']['tm_job_type'] == 'Analysis':
             if kwargs['task']['tm_split_algo'] == 'FileBased':
                 splitparam['total_files'] = kwargs['task']['tm_totalunits']
@@ -43,11 +46,14 @@ class Splitter(TaskAction):
         wmsubs = Subscription(fileset=args[0], workflow=wmwork,
                                split_algo=splitparam['algorithm'],
                                type=self.jobtypeMapper[kwargs['task']['tm_job_type']])
-        splitter = SplitterFactory()
-        jobfactory = splitter(subscription=wmsubs)
-        factory = jobfactory(**splitparam)
-        numJobs = sum([len(jobgroup.getJobs()) for jobgroup in factory])
-        maxJobs = getattr(self.config.TaskWorker, 'maxJobsPerTask', 10000)
+        try:
+            splitter = SplitterFactory()
+            jobfactory = splitter(subscription=wmsubs)
+            factory = jobfactory(**splitparam)
+            numJobs = sum([len(jobgroup.getJobs()) for jobgroup in factory])
+        except RuntimeError:
+            msg = "The splitting on your task generated more than {0} jobs (the maximum).".format(maxJobs)
+            raise TaskWorkerException(msg)
         if numJobs == 0:
             msg  = "The CRAB3 server backend could not submit any job to the Grid scheduler:"
             msg += " Splitting task %s" % (kwargs['task']['tm_taskname'])
