@@ -1511,7 +1511,7 @@ class PostJob():
             if self.stage == 'probe':
                 retval = self.createJobs()
             elif self.stage == 'process':
-                retval = self.createSubjobs()
+                retval = self.createJobs(completion=True)
 
         ## If return value is not 0 (success) write env variables to a file if it is not
         ## present and print job ads in PostJob log file.
@@ -1598,17 +1598,69 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def createJobs(self):
+    def adjustLumisForCompletion(self, task):
+        """
+        Sets the run, lumi information in the task information for the
+        completion jobs.  Returns True if completion jobs are needed,
+        otherwise False.
+        """
+        self.logger.info("====== Starting to parse the lumi file")
+        try:
+            tmpdir = tempfile.mkdtemp()
+            f = tarfile.open("run_and_lumis.tar.gz")
+            fn = "job_lumis_{0}.json".format(self.job_id)
+            f.extract(fn, path=tmpdir)
+            with open(os.path.join(tmpdir, fn)) as fd:
+                injson = json.load(fd)
+                inlumis = LumiList(compactList=injson)
+        finally:
+            f.close()
+            shutil.rmtree(tmpdir)
+
+        outlumis = LumiList()
+        for input_ in self.job_report['steps']['cmsRun']['input']['source']:
+            outlumis += LumiList(runsAndLumis=input_['runs'])
+
+        missing = inlumis - outlumis
+        self.logger.info("Lumis expected to be processed: {0}".format(len(inlumis.getLumis())))
+        self.logger.info("Lumis actually processed:       {0}".format(len(outlumis.getLumis())))
+        self.logger.info("Difference in lumis:            {0}".format(len(missing.getLumis())))
+        if len(missing.getLumis()) == 0:
+            # we don't want to create the subjobs if the job processed everything
+            return False
+        missing_compact = missing.getCompactList()
+        runs = missing.getRuns()
+        lumis = [",".join(map(str, reduce(lambda x, y:x + y, missing_compact[run]))) for run in runs]
+
+        task['tm_split_args']['runs'] = runs
+        task['tm_split_args']['lumis'] = lumis
+
+        return True
+
+    def createJobs(self, completion=False):
         self.logger.info("====== Creating jobs")
         with open('datadiscovery.pkl', 'rb') as fd:
             dataset = pickle.load(fd)
         with open('taskinformation.pkl', 'rb') as fd:
             task = pickle.load(fd)
 
-        target = int(task['tm_split_args']['seconds_per_job'])
+        if completion:
+            if not task['completion_jobs']:
+                return JOB_RETURN_CODES.OK
+            if not self.adjustLumisForCompletion(task):
+                return JOB_RETURN_CODES.OK
+
+            target = int(task['tm_split_args']['seconds_per_job']) / 8
+            # Target completion jobs to have a 45 minute runtime
+            target = max(target, 45 * 60)
+        else:
+            # Build in a 50% error margin in the runtime to not create too
+            # many tails.  This essentially moves the peak to lower
+            # runtimes and cuts off less of the job distribution tail.
+            target = int(0.66 * task['tm_split_args']['seconds_per_job'])
+
         report = self.job_report['steps']['cmsRun']['performance']
-        # Build in a 50% error margin in the runtime to not create too many tails
-        events = int(0.66 * target / float(report['cpu']['AvgEventTime']))
+        events = int(target / float(report['cpu']['AvgEventTime']))
         totalJobSeconds = float(report['cpu']['TotalJobTime'])
 
         self.logger.info("Target runtime: {0}".format(target))
@@ -1634,88 +1686,12 @@ class PostJob():
             return JOB_RETURN_CODES.FATAL_ERROR
         try:
             creator = DagmanCreator(config, server=None, resturi='')
-            _, _, subdags = creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, stage='process')
-            subdags.append('RunJobs0.subdag')
-            self.createSubdagSubmission(subdags)
-        except TaskWorkerException:
-            self.logger.error('Error during subdag creation')
-            self.set_dashboard_state('FAILED')
-            return JOB_RETURN_CODES.FATAL_ERROR
-
-        return JOB_RETURN_CODES.OK
-
-    def createSubjobs(self):
-        with open('datadiscovery.pkl', 'rb') as fd:
-            dataset = pickle.load(fd)
-        with open('taskinformation.pkl', 'rb') as fd:
-            task = pickle.load(fd)
-        if not task['completion_jobs']:
-            return
-
-        ## Parse the lumis send to process
-        self.logger.info("====== Creating subjobs")
-        self.logger.info("====== Starting to parse the lumi file")
-        try:
-            tmpdir = tempfile.mkdtemp()
-            f = tarfile.open("run_and_lumis.tar.gz")
-            fn = "job_lumis_{0}.json".format(self.job_id)
-            f.extract(fn, path=tmpdir)
-            with open(os.path.join(tmpdir, fn)) as fd:
-                injson = json.load(fd)
-                inlumis = LumiList(compactList=injson)
-        finally:
-            f.close()
-            shutil.rmtree(tmpdir)
-
-        outlumis = LumiList()
-        for input_ in self.job_report['steps']['cmsRun']['input']['source']:
-            outlumis += LumiList(runsAndLumis=input_['runs'])
-
-        missing = inlumis - outlumis
-        self.logger.info("Lumis expected to be processed: {0}".format(len(inlumis.getLumis())))
-        self.logger.info("Lumis actually processed:       {0}".format(len(outlumis.getLumis())))
-        self.logger.info("Difference in lumis:            {0}".format(len(missing.getLumis())))
-        if len(missing.getLumis()) == 0:
-            # we don't want to create the subjobs if the job processed everything
-            return
-        missing_compact = missing.getCompactList()
-        runs = missing.getRuns()
-        lumis = [",".join(map(str, reduce(lambda x, y:x + y, missing_compact[run]))) for run in runs]
-
-        target = int(task['tm_split_args']['seconds_per_job']) / 8
-        # Target completion jobs to have a 45 minute runtime
-        target = max(target, 45 * 60)
-        report = self.job_report['steps']['cmsRun']['performance']
-
-        events = int(target / float(report['cpu']['AvgEventTime']))
-        totalJobSeconds = float(report['cpu']['TotalJobTime'])
-
-        self.logger.info("New target runtime: {0}".format(target))
-        self.logger.info("CPU time per event: {0}".format(report['cpu']['AvgEventTime']))
-        self.logger.info("Resplitting with ~{0} events per job".format(events))
-
-        task['tm_split_algo'] = 'EventAwareLumiBased'
-        task['tm_split_args']['events_per_job'] = events
-        task['tm_split_args']['runs'] = runs
-        task['tm_split_args']['lumis'] = lumis
-
-        try:
-            config = Configuration()
-            config.TaskWorker = ConfigSection(name="TaskWorker")
-            config.TaskWorker.scratchDir = '.' # XXX
-            splitter = Splitter(config, server=None, resturi='')
-            split_result = splitter.execute(dataset, task=task)
-            self.logger.info("Splitting results:")
-            for g in split_result.result[0]:
-                msg = "Created jobgroup with length {0}".format(len(g.getJobs()))
-                self.logger.info(msg)
-        except TaskWorkerException as e:
-            self.logger.error("Error during splitting:\n{0}".format(e))
-            self.set_dashboard_state('FAILED')
-            return JOB_RETURN_CODES.FATAL_ERROR
-        try:
-            creator = DagmanCreator(config, server=None, resturi='')
-            creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0, stage='tail')
+            if completion:
+                creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0, stage='tail')
+            else:
+                _, _, subdags = creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, stage='process')
+                subdags.append('RunJobs0.subdag')
+                self.createSubdagSubmission(subdags)
         except TaskWorkerException:
             self.logger.error('Error during subdag creation')
             self.set_dashboard_state('FAILED')
