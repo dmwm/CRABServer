@@ -1504,15 +1504,6 @@ class PostJob():
         ## the jobs has failed).
         retval = self.check_abort_dag(retval)
 
-        if retval == JOB_RETURN_CODES.OK:
-            ## Possible stages: probe, process, tail for automatic
-            ## splitting.  All other splitting modes have a stage called
-            ## conventional.
-            if self.stage == 'probe':
-                retval = self.createJobs()
-            elif self.stage == 'process':
-                retval = self.createJobs(completion=True)
-
         ## If return value is not 0 (success) write env variables to a file if it is not
         ## present and print job ads in PostJob log file.
         ## All this information is useful for debugging purpose.
@@ -1683,7 +1674,8 @@ class PostJob():
         except TaskWorkerException as e:
             self.logger.error("Error during splitting:\n{0}".format(e))
             self.set_dashboard_state('FAILED')
-            return JOB_RETURN_CODES.FATAL_ERROR
+            retmsg = "Splitting failed with:\n{0}".format(e)
+            return JOB_RETURN_CODES.FATAL_ERROR, retmsg
         try:
             creator = DagmanCreator(config, server=None, resturi='')
             if completion:
@@ -1692,10 +1684,11 @@ class PostJob():
                 _, _, subdags = creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, stage='process')
                 subdags.append('RunJobs0.subdag')
                 self.createSubdagSubmission(subdags)
-        except TaskWorkerException:
-            self.logger.error('Error during subdag creation')
+        except TaskWorkerException as e:
+            self.logger.error('Error during subdag creation\n{0}'.format(e))
             self.set_dashboard_state('FAILED')
-            return JOB_RETURN_CODES.FATAL_ERROR
+            retmsg = "DAG creation failed with:\n{0}".format(e)
+            return JOB_RETURN_CODES.FATAL_ERROR, retmsg
 
         return JOB_RETURN_CODES.OK
 
@@ -1930,6 +1923,14 @@ class PostJob():
             self.logger.info("====== Finished upload of input files metadata.")
             return self.check_retry_count(80001), retmsg
         self.logger.info("====== Finished upload of input files metadata.")
+
+        ## Possible stages: probe, process, tail for automatic
+        ## splitting.  All other splitting modes have a stage called
+        ## conventional.
+        if self.stage in ('probe', 'process'):
+            retval, retmsg = self.createJobs(completion=(self.stage == 'process'))
+            if retval != JOB_RETURN_CODES.OK:
+                return retval, retmsg
 
         self.set_dashboard_state('FINISHED')
 
