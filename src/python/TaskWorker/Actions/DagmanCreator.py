@@ -896,7 +896,8 @@ class DagmanCreator(TaskAction.TaskAction):
                 target_se += ','
             target_se += site
         ml_info = info.setdefault('apmon', [])
-        for idx in range(1, info['jobcount']+1):
+        shift = 0 if stage == 'probe' else 1
+        for idx in range(shift, info['jobcount']+shift):
             taskid = kwargs['task']['tm_taskname']
             jinfo = {'broker': os.environ.get('HOSTNAME', ''),
                      'bossId': str(idx),
