@@ -39,6 +39,7 @@ class FileMetaData(object):
                            fmd_direct_stageout AS directstageout
                     FROM filemetadata \
                     WHERE tm_taskname = :taskname \
+                    AND rownum <= CASE :howmany WHEN -1 then 10000 ELSE :howmany END \
                     AND fmd_type IN (SELECT REGEXP_SUBSTR(:filetype, '[^,]+', 1, LEVEL) FROM DUAL CONNECT BY LEVEL <= REGEXP_COUNT(:filetype, ',') + 1) \
                     ORDER BY fmd_creation_time DESC
              """

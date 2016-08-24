@@ -82,24 +82,14 @@ class HTCondorDataWorkflow(DataWorkflow):
                              row.user_dn, row.username, row.user_role, row.user_group, userproxy)
 
     def logs2(self, workflow, howmany, jobids, userdn, userproxy=None):
-        self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
-
-        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
-        row = self.Task.ID_tuple(*row)
-
-        return self.getFiles2(workflow, howmany, jobids, ['LOG'], row.user_dn,
-                             row.username, row.user_role, row.user_group, userproxy)
+        self.logger.info("About to get log of workflow: %s." % workflow)
+        return self.getFiles2(workflow, howmany, jobids, ['LOG'], userproxy)
 
     def output2(self, workflow, howmany, jobids, userdn, userproxy=None):
-        self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
+        self.logger.info("About to get output of workflow: %s." % workflow)
+        return self.getFiles2(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], userproxy)
 
-        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
-        row = self.Task.ID_tuple(*row)
-
-        return self.getFiles2(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], row.user_dn,
-                              row.username, row.user_role, row.user_group, userproxy)
-
-    def getFiles2(self, workflow, howmany, jobids, filetype, userdn, username, role, group, userproxy = None):
+    def getFiles2(self, workflow, howmany, jobids, filetype, userproxy = None):
         """
         Retrieves the output PFN aggregating output in final and temporary locations.
 
@@ -107,15 +97,21 @@ class HTCondorDataWorkflow(DataWorkflow):
         :arg int howmany: the limit on the number of PFN to return
         :return: a generator of list of outputs"""
 
+        # Looking up task information from the DB
+        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
+        row = self.Task.ID_tuple(*row)
+        userdn = row.user_dn
+        username = row.username
+        role = row.user_role
+        group = row.user_group
+
         file_type = 'log' if filetype == ['LOG'] else 'output'
 
         self.logger.debug("Retrieving the %s files of the following jobs: %s" % (file_type, jobids))
 
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow, howmany = howmany)
 
         rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
-        if howmany != -1:
-            rows = rows[:howmany]
 
         for row in rows:
             yield {'jobid': row[GetFromTaskAndType.PANDAID],
@@ -156,10 +152,8 @@ class HTCondorDataWorkflow(DataWorkflow):
             return
 
         self.logger.debug("Retrieving the %s files of the following jobs: %s" % (file_type, jobids))
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow, howmany = howmany)
         rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
-        if howmany != -1:
-            rows = rows[:howmany]
         #jobids=','.join(map(str,jobids)), limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
         for row in rows:
             try:
