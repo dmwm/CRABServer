@@ -1637,9 +1637,9 @@ class PostJob():
 
         if completion:
             if not task['completion_jobs']:
-                return JOB_RETURN_CODES.OK
+                return JOB_RETURN_CODES.OK, ''
             if not self.adjustLumisForCompletion(task):
-                return JOB_RETURN_CODES.OK
+                return JOB_RETURN_CODES.OK, ''
 
             target = int(task['tm_split_args']['seconds_per_job']) / 8
             # Target completion jobs to have a 45 minute runtime
@@ -1691,7 +1691,7 @@ class PostJob():
             retmsg = "DAG creation failed with:\n{0}".format(e)
             return JOB_RETURN_CODES.FATAL_ERROR, retmsg
 
-        return JOB_RETURN_CODES.OK
+        return JOB_RETURN_CODES.OK, ''
 
     def createSubdagSubmission(self, subdags):
         for dag in subdags:
