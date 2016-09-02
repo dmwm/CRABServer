@@ -1644,7 +1644,7 @@ class PostJob():
             target = max(target, 45 * 60)
         elif task['completion_jobs']:
             # Build in a 33% error margin in the runtime to not create too
-            # many tails.  This essentially moves the peak to lower
+            # many tails. This essentially moves the peak to lower
             # runtimes and cuts off less of the job distribution tail.
             target = int(0.75 * task['tm_split_args']['seconds_per_job'])
         else:
