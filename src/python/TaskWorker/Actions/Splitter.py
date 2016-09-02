@@ -68,7 +68,7 @@ class Splitter(TaskAction):
         minRuntime = getattr(self.config.TaskWorker, 'minAutomaticRuntime', 3 * 60 ** 2)
         if kwargs['task']['tm_split_algo'] == 'Automatic' and \
                 kwargs['task']['tm_split_args']['seconds_per_job'] < minRuntime:
-            msg = "Minimum runtime requirement for automatic splitting is {} seconds.".format(minRuntime)
+            msg = "Minimum runtime requirement for automatic splitting is {0} seconds.".format(minRuntime)
             raise TaskWorkerException(msg)
 
         #printing duplicated lumis if any
