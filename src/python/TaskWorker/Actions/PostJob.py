@@ -71,7 +71,6 @@ import pickle
 import pprint
 import shutil
 import signal
-import urllib
 import tarfile
 import hashlib
 import logging
@@ -94,7 +93,6 @@ from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
-from TaskWorker.Actions.DagmanCreator import SPLIT_ARG_MAP
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, isCouchDBURL, oracleOutputMapping
@@ -1645,10 +1643,10 @@ class PostJob():
             # Target completion jobs to have a 45 minute runtime
             target = max(target, 45 * 60)
         else:
-            # Build in a 50% error margin in the runtime to not create too
+            # Build in a 33% error margin in the runtime to not create too
             # many tails.  This essentially moves the peak to lower
             # runtimes and cuts off less of the job distribution tail.
-            target = int(0.66 * task['tm_split_args']['seconds_per_job'])
+            target = int(0.75 * task['tm_split_args']['seconds_per_job'])
 
         report = self.job_report['steps']['cmsRun']['performance']
         events = int(target / float(report['cpu']['AvgEventTime']))

@@ -618,7 +618,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         kwargs['task']['max_runtime'] = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
         if kwargs['task']['tm_split_algo'] == 'Automatic' and stage == 'conventional':
-            kwargs['task']['max_runtime'] = 5 * 60
+            kwargs['task']['max_runtime'] = getattr(self.config.TaskWorker, 'splittingPilotRuntime', 15 * 60)
             kwargs['task']['completion_jobs'] = getattr(self.config.TaskWorker, 'completionJobs', False)
             outfiles = []
             stage = 'probe'
