@@ -112,6 +112,20 @@ def NEW_USER_SANDBOX_EXCLUSIONS(tarmembers):
 def isCouchDBURL(url):
     return 'couchdb' in url
 
+
+def truncateError(msg):
+    """Truncate the error message to the first 7400 chars if needed, and add a message if we truncate it.
+       See https://github.com/dmwm/CRABServer/pull/4867#commitcomment-12086393
+    """
+    MSG_LIMIT = 7500
+    if len(msg) > MSG_LIMIT:
+        truncMsg = msg[:MSG_LIMIT - 100]
+        truncMsg += "\n[... message truncated to the first 7400 chars ...]"
+        return truncMsg
+    else:
+        return msg
+
+
 def checkOutLFN(lfn, username):
     if lfn.startswith('/store/user/'):
         if lfn.split('/')[3] != username:

@@ -269,6 +269,7 @@ def storeNodesInfoInFile():
     parseJobLog(jobsLog, nodes, node_map)
     read_until = jobsLog.tell()
     jobsLog.close()
+
     for fn in glob.glob("node_state*"):
         with open(fn, 'r') as node_state:
             parseNodeStateV2(node_state, nodes)

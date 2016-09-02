@@ -11,25 +11,13 @@ from logging import FileHandler
 from httplib import HTTPException
 from logging.handlers import TimedRotatingFileHandler
 
+from ServerUtilities import truncateError
 from RESTInteractions import HTTPRequests
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.WorkerExceptions import WorkerHandlerException
 
 ## Creating configuration globals to avoid passing these around at every request
 global WORKER_CONFIG
-
-
-def truncateError(msg):
-    """Truncate the error message to the first 7400 chars if needed, and add a message if we truncate it.
-       See https://github.com/dmwm/CRABServer/pull/4867#commitcomment-12086393
-    """
-    MSG_LIMIT = 7500
-    if len(msg) > MSG_LIMIT:
-        truncMsg = msg[:MSG_LIMIT - 100]
-        truncMsg += "\n[... message truncated to the first 7400 chars ...]"
-        return truncMsg
-    else:
-        return msg
 
 
 def addTaskLogHandler(logger, username, taskname):

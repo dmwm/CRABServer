@@ -387,6 +387,15 @@ class DagmanCreator(TaskAction.TaskAction):
         return self.task['tm_activity']
 
 
+    def isGlobalBlacklistIgnored(self, kwargs):
+        """ Determine wether the user wants to ignore the globalblacklist
+        """
+        extrajdls = literal_eval(kwargs['task']['tm_extrajdl'])
+        for ej in extrajdls:
+            if ej.find('CRAB_IgnoreGlobalBlacklist') in [0, 1]: #there might be a + before
+                return True
+        return False
+
     def makeJobSubmit(self, task):
         """
         Create the submit file.  This is reused by all jobs in the task; differences
@@ -635,8 +644,9 @@ class DagmanCreator(TaskAction.TaskAction):
         # This is needed for Site Metrics
         # It should not block any site for Site Metrics and if needed for other activities
         # self.config.TaskWorker.ActivitiesToRunEverywhere = ['hctest', 'hcdev']
-        if hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere') and \
-                   kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere:
+        # The other case where the blacklist is ignored is if the user sset this explicitly in his configuration
+        if self.isGlobalBlacklistIgnored(kwargs) or (hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere') and \
+                   kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere):
             global_blacklist = set()
             self.logger.debug("Ignoring the CRAB site blacklist.")
 
@@ -644,6 +654,8 @@ class DagmanCreator(TaskAction.TaskAction):
         siteinfo = {'group_sites': {}, 'group_datasites': {}}
 
         blocksWithNoLocations = set()
+        blocksWithBannedLocations = set()
+        allblocks = set()
 
         siteWhitelist = set(kwargs['task']['tm_site_whitelist'])
         siteBlacklist = set(kwargs['task']['tm_site_blacklist'])
@@ -670,11 +682,12 @@ class DagmanCreator(TaskAction.TaskAction):
             self.logger.error(type(jobgroup))
             jobs = jobgroup.getJobs()
 
-            blocks = set()
+            jgblocks = set() #job group blocks
             for job in jobs:
                 for inputfile in job['input_files']:
-                    blocks.add(inputfile['block'])
-            self.logger.debug("Blocks: %s" % list(blocks))
+                    jgblocks.add(inputfile['block'])
+                    allblocks.add(inputfile['block'])
+            self.logger.debug("Blocks: %s" % list(jgblocks))
 
             if not jobs:
                 locations = set()
@@ -682,10 +695,10 @@ class DagmanCreator(TaskAction.TaskAction):
                 locations = set(jobs[0]['input_files'][0]['locations'])
             self.logger.debug("Locations: %s" % (list(locations)))
 
-            ## Discard the blocks that have no locations. This can happen when a block is
+            ## Discard the jgblocks that have no locations. This can happen when a block is
             ## still open in PhEDEx. Newly created datasets from T0 (at least) have a large
             ## chance of having some block which is closed in DBS but not in PhEDEx.
-            ## Open blocks in PhEDEx can have a location; it is WMCore who is returning no
+            ## Open jgblocks in PhEDEx can have a location; it is WMCore who is returning no
             ## location.
             ## This is how a block is constructed during data taking:
             ## 1) an open block in T0 is injected in PhEDEx;
@@ -696,7 +709,7 @@ class DagmanCreator(TaskAction.TaskAction):
             ##      no knowledge about the block);
             ##   b) block is closed in PhEDEx.
             if not locations and not ignoreLocality:
-                blocksWithNoLocations = blocksWithNoLocations.union(blocks)
+                blocksWithNoLocations = blocksWithNoLocations.union(jgblocks)
                 continue
 
             if ignoreLocality:
@@ -719,46 +732,23 @@ class DagmanCreator(TaskAction.TaskAction):
             ## Apply the global site blacklist.
             availablesites = possiblesites - global_blacklist
 
-            ## TODO: The messsages below do not clarify that here it only matters the part
-            ## of the dataset that passed the lumi-mask/run-range selection.
-
-            ## Abort the submission of the task if (part of?) the dataset is available only
-            ## on sites that are blacklisted by the CRAB server.
-            ## Or should we submit at least the jobs on the part of the dataset that
-            ## survives the blacklisting? Comment S.Belforte Sep,2015: So far DDM policy
-            ## is to replicate entire datasets, not scatter them around. Once we will have
-            ## very large datasets that can happen, but it is not the case now.
+            ## See https://github.com/dmwm/CRABServer/issues/5241
+            ## for a discussion about blocksWithBannedLocations
             if not availablesites:
-                msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler."
-                msg += " No site available for submission of task %s" % (kwargs['task']['tm_taskname'])
-                msg += "\n\t\t\t\tThe sites available for submission of task %s are blacklisted by the CRAB3 server." % (kwargs['task']['tm_taskname'])
-                msg += "\n\t\t\t\tThis is the list of in principle available sites: %s" % (list(possiblesites))
-                msg += "\n\t\t\t\tThis is the list of sites that are blacklisted by the CRAB3 server: %s" % (list(global_blacklist))
-                raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+                blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
+                continue
 
-            ## Abort the submission of the task if (part of?) the dataset is available only
-            ## on sites that are removed after applying the user site blacklist/whitelist.
-            ## Or should we submit at least the jobs on the part of the dataset that
-            ## survives the blacklisting/whitelisting? (See S.Belforte comment above.)
             # NOTE: User can still shoot themselves in the foot with the resubmit blacklist
             # However, this is the last chance we have to warn the users about an impossible task at submit time.
             available = set(availablesites)
             if siteWhitelist:
                 available &= siteWhitelist
                 if not available:
-                    msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler."
-                    msg += " You put %s as site whitelist," % (list(siteWhitelist))
-                    msg += " but the input dataset '%s' can only be accessed at these sites: %s." % (kwargs['task']['tm_input_dataset'], list(availablesites))
-                    msg += " Please check your site whitelist."
-                    raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+                    blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
             available -= (siteBlacklist - siteWhitelist)
             if not available:
-                msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler."
-                msg += " You put %s as site blacklist," % (list(siteBlacklist - siteWhitelist))
-                msg += " when the input dataset '%s' can actually only be accessed at these sites: %s." % (kwargs['task']['tm_input_dataset'], list(availablesites))
-                msg += " Please check in DAS the locations of the input dataset."
-                msg += " Hint: the ignoreLocality option might help."
-                raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+                blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
+                continue
 
             availablesites = [str(i) for i in availablesites]
             datasites = jobs[0]['input_files'][0]['locations']
@@ -769,19 +759,38 @@ class DagmanCreator(TaskAction.TaskAction):
                 msg += " This is expected to result in DESIRED_SITES = %s" % (list(available))
                 self.logger.debug(msg)
 
-            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, list(blocks)[0], availablesites, datasites, outfiles, startjobid, subjob=subjob, stage=stage)
+            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, list(jgblocks)[0], availablesites, datasites, outfiles, startjobid, subjob=subjob, stage=stage)
             dagSpecs += jobgroupDagSpecs
+
+        def getBlacklistMsg():
+            if len(global_blacklist)!=0:
+                tmp = " Global CRAB3 blacklist is %s.\n" % global_blacklist
+            if len(siteBlacklist)!=0:
+                tmp += " User blacklist is %s.\n" % siteBlacklist
+            if len(siteWhitelist)!=0:
+                tmp += " User whitelist is %s.\n" % siteWhitelist
+            return tmp
 
         if not dagSpecs:
             msg = "No jobs created for task %s." % (kwargs['task']['tm_taskname'])
-            if blocksWithNoLocations:
-                msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler."
-                msg += " No locations found for dataset '%s'" % (kwargs['task']['tm_input_dataset'])
-                msg += " (or at least for the part of the dataset that passed the lumi-mask and/or run-range selection)."
+            if blocksWithNoLocations or blocksWithBannedLocations:
+                msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler. "
+                msg += "No locations found for dataset '%s'. " % (kwargs['task']['tm_input_dataset'])
+                msg += "(or at least for the part of the dataset that passed the lumi-mask and/or run-range selection).\n"
+            if blocksWithBannedLocations:
+                msg += " Found %s (out of %s) blocks present only at blacklisted sites." % (len(blocksWithBannedLocations), len(allblocks))
+                msg += getBlacklistMsg()
             raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+        msg = "Some blocks from dataset '%s' were skipped " % (kwargs['task']['tm_input_dataset'])
         if blocksWithNoLocations:
-            msg  = "The following blocks from dataset '%s' were skipped," % (kwargs['task']['tm_input_dataset'])
-            msg += " because they have no locations: %s." % (sorted(list(blocksWithNoLocations)))
+            msgBlocklist = sorted(list(blocksWithNoLocations[:10])) + ['...']
+            msg += " because they have no locations.\n List is (first 10 elements only): %s.\n" % msgBlocklist
+        if blocksWithBannedLocations:
+            msg += " because they are only present at blacklisted sites.\n List is: %s.\n" % (sorted(list(blocksWithBannedLocations)))
+            msg += getBlacklistMsg()
+        if blocksWithNoLocations or blocksWithBannedLocations:
+            msg += (" Dataset processing will be incomplete because %s (out of %s) blocks are only present at blacklisted site(s)" %
+                (len(blocksWithNoLocations)+len(blocksWithBannedLocations), len(allblocks)))
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
 

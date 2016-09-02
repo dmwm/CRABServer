@@ -7,6 +7,9 @@
 #------------------------------
 #$TAG $VERSION $CMSSW_VERSION $SCRAMARCH $WORK_DIR $MAIN_DIR $CRAB_SOURCE_SCRIPT $CLIENT $STORAGE_SITE $INSTANCE
 
+echo
+echo "---Entering submit environment"
+
 TAG=$1
 VERSION=$2
 CMSSW_VERSION=$3
@@ -64,40 +67,46 @@ if [ ! -d logs ];then
 fi
 
 LOGFILE="$WORK_DIR/logs/$CMSSW_VERSION-on-$SCRAMARCH.log"
+LOGFILE="./$CMSSW_VERSION-on-$SCRAMARCH.log"
+
 
 # create a working dir
 if [ ! -d CMSSW_TESTS ];then
    mkdir CMSSW_TESTS
 fi
 
-echo '==================== INITIAL ENVIRONMENT =========================' > $LOGFILE
-env >> $LOGFILE
-echo '==========================================================' >> $LOGFILE
+echo
+echo '==================== INITIAL ENVIRONMENT ========================='
+env
+echo '=========================================================='
+echo
 
 # this is needed because we have a bare minimun environment
-source /afs/cern.ch/cms/cmsset_default.sh 2>&1 >> $LOGFILE
+source /afs/cern.ch/cms/cmsset_default.sh
 file_name='MinBias_PrivateMC_EventBased_CMSSW_version.py'
 
-echo "Testing $CMSSW_VERSION on $SCRAMARCH" >> $LOGFILE
+#echo "Testing $CMSSW_VERSION on $SCRAMARCH"
 export SCRAM_ARCH=$SCRAMARCH
 
 cd $WORK_DIR/CMSSW_TESTS
 
 if [ ! -d $CMSSW_VERSION ];then
-  cmsrel $CMSSW_VERSION 2>&1 >> $LOGFILE
+  cmsrel $CMSSW_VERSION #2>&1 >
 fi
 
 cd $CMSSW_VERSION/src
-cmsenv 2>&1 >> $LOGFILE
+cmsenv
 
 #load crab client environment
-echo "Sourcing the client" >> $LOGFILE
-source $CLIENT 2>&1 >> $LOGFILE
+echo "---Sourcing the client"
+
+source $CLIENT
 
 
-echo '==================== FINAL ENVIRONMENT =========================' >> $LOGFILE
-env >> $LOGFILE
-echo '==========================================================' >> $LOGFILE
+
+#echo '==================== FINAL ENVIRONMENT ========================='
+#env
+#echo '=========================================================='
 
 if [ ! -d psets ];then
   mkdir psets
@@ -106,12 +115,17 @@ fi
 cp -R $MAIN_DIR/config/MinBias_PrivateMC_EventBased_CMSSW_version.py ./
 cp -R $MAIN_DIR/config/psets/pset_tutorial_MC_generation.py ./psets
 
-file_name_temp=${file_name:0:(${#file_name})-3};
+file_name_temp=${file_name:0:(${#file_name})-3}
+
 #Generate new name
-new_name=$TAG-$VERSION-$file_name_temp-${CMSSW_VERSION}-${SCRAMARCH}
+new_name=$TAG-${CMSSW_VERSION}-$VERSION-${SCRAMARCH}-$file_name_temp
 publish_name=$new_name-`date +%s`
 echo $new_name
 sed_new_data $file_name $new_name True True $TAG-$VERSION True $publish_name False False
-#crab submit -c $file_name
+crab submit -c $file_name
+#2>&1 >
 
-
+echo
+echo "---Leaving submit environment"
+echo
+echo

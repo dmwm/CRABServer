@@ -5,6 +5,7 @@ import logging
 from base64 import b64encode
 from httplib import HTTPException
 
+from ServerUtilities import truncateError
 from RESTInteractions import HTTPRequests
 
 class TaskAction(object):
@@ -38,12 +39,13 @@ class TaskAction(object):
 
 
     def uploadWarning(self, warning, userProxy, taskname):
+        truncWarning = truncateError(warning)
         try:
             userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2,
                                       logger = self.logger)
             configreq = {'subresource': 'addwarning',
                          'workflow': taskname,
-                         'warning': b64encode(warning)}
+                         'warning': b64encode(truncWarning)}
             userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
         except HTTPException as hte:
             self.logger.error(hte.headers)

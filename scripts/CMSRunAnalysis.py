@@ -41,7 +41,7 @@ EC_CMSRunWrapper =      10040
 EC_MoveOutErr =         99999 #TODO define an error code
 EC_ReportHandlingErr =  50115
 EC_WGET =               99998 #TODO define an error code
-EC_PsetHash           = 60453
+EC_PsetHash           = 80453
 
 def mintime():
     mymin = 20*60
@@ -956,8 +956,10 @@ if __name__ == "__main__":
         if not 'CRAB3_RUNTIME_DEBUG' in os.environ:
             try:
                 AddPsetHash(report, scram)
-            except:
-                handleException("FAILED", EC_PsetHash, "Unable to compute pset hash for job output")
+            except Exception as ex:
+                msg = "Unable to compute pset hash for job output. Got exception:"
+                msg += "\n" + str(ex) + "\n"
+                handleException("FAILED", EC_PsetHash, msg)
                 mintime()
                 sys.exit(EC_PsetHash)
         if jobExitCode: #TODO check exitcode from fwjr
