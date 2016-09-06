@@ -1642,15 +1642,16 @@ class PostJob():
             target = int(task['tm_split_args']['seconds_per_job']) / 8
             # Target completion jobs to have a 45 minute runtime
             target = max(target, 45 * 60)
-        else:
+        elif task['completion_jobs']:
             # Build in a 33% error margin in the runtime to not create too
             # many tails.  This essentially moves the peak to lower
             # runtimes and cuts off less of the job distribution tail.
             target = int(0.75 * task['tm_split_args']['seconds_per_job'])
+        else:
+            target = int(task['tm_split_args']['seconds_per_job'])
 
         report = self.job_report['steps']['cmsRun']['performance']
-        events = int(target / float(report['cpu']['AvgEventTime']))
-        totalJobSeconds = float(report['cpu']['TotalJobTime'])
+        events = int(target * float(report['cpu']['EventThroughput']))
 
         self.logger.info("Target runtime: {0}".format(target))
         self.logger.info("CPU time per event: {0}".format(report['cpu']['AvgEventTime']))
