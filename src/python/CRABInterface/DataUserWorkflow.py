@@ -143,6 +143,14 @@ class DataUserWorkflow(object):
            :arg str workflow: a workflow name"""
         return self.workflow.resubmit(workflow, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority, userdn, userproxy)
 
+    def resubmit2(self, workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority,
+                  userproxy=None):
+        """Request to Resubmit a workflow.
+
+           :arg str workflow: a workflow name"""
+        return self.workflow.resubmit2(workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority,
+                                       userproxy)
+
     def status(self, workflow, userdn, userproxy=None, verbose=False):
         """Retrieve the status of the workflow
 

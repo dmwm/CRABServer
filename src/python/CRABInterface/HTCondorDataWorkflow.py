@@ -20,7 +20,7 @@ from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 
 from CRABInterface.Utils import conn_handler, global_user_throttle
-from ServerUtilities import FEEDBACKMAIL, isCouchDBURL, PUBLICATIONDB_STATES
+from ServerUtilities import FEEDBACKMAIL, PUBLICATIONDB_STATES, isCouchDBURL, getEpochFromDBTime
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 
 import HTCondorUtils
@@ -397,7 +397,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % workflow)
 
-        result['submissionTime'] = calendar.timegm(row.start_time.utctimetuple())
+        result['submissionTime'] = getEpochFromDBTime(row.start_time)
         if row.task_command:
             result['command'] = row.task_command
 
