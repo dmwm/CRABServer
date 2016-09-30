@@ -81,6 +81,48 @@ class HTCondorDataWorkflow(DataWorkflow):
         return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], transferingIds, finishedIds, \
                              row.user_dn, row.username, row.user_role, row.user_group, userproxy)
 
+    def logs2(self, workflow, howmany, jobids, userdn, userproxy=None):
+        self.logger.info("About to get log of workflow: %s." % workflow)
+        return self.getFiles2(workflow, howmany, jobids, ['LOG'], userproxy)
+
+    def output2(self, workflow, howmany, jobids, userdn, userproxy=None):
+        self.logger.info("About to get output of workflow: %s." % workflow)
+        return self.getFiles2(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], userproxy)
+
+    def getFiles2(self, workflow, howmany, jobids, filetype, userproxy = None):
+        """
+        Retrieves the output PFN aggregating output in final and temporary locations.
+
+        :arg str workflow: the unique workflow name
+        :arg int howmany: the limit on the number of PFN to return
+        :return: a generator of list of outputs"""
+
+        # Looking up task information from the DB
+        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
+        row = self.Task.ID_tuple(*row)
+        userdn = row.user_dn
+        username = row.username
+        role = row.user_role
+        group = row.user_group
+
+        file_type = 'log' if filetype == ['LOG'] else 'output'
+
+        self.logger.debug("Retrieving the %s files of the following jobs: %s" % (file_type, jobids))
+
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow, howmany = howmany)
+
+        rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
+
+        for row in rows:
+            yield {'jobid': row[GetFromTaskAndType.PANDAID],
+                   'lfn': row[GetFromTaskAndType.LFN],
+                   'site': row[GetFromTaskAndType.LOCATION],
+                   'tmplfn': row[GetFromTaskAndType.TMPLFN],
+                   'tmpsite': row[GetFromTaskAndType.TMPLOCATION],
+                   'directstageout': row[GetFromTaskAndType.DIRECTSTAGEOUT],
+                   'size': row[GetFromTaskAndType.SIZE],
+                   'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
+                  }
 
     @conn_handler(services=['phedex'])
     def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, username, role, group, userproxy = None):
@@ -110,10 +152,8 @@ class HTCondorDataWorkflow(DataWorkflow):
             return
 
         self.logger.debug("Retrieving the %s files of the following jobs: %s" % (file_type, jobids))
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow, howmany = howmany)
         rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
-        if howmany != -1:
-            rows = rows[:howmany]
         #jobids=','.join(map(str,jobids)), limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
         for row in rows:
             try:
