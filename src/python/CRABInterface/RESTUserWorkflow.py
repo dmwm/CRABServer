@@ -657,6 +657,10 @@ class RESTUserWorkflow(RESTEntity):
                 result = self.userworkflowmgr.logs(workflow, limit, exitcode, jobids, userdn=userdn)
             elif subresource == 'data':
                 result = self.userworkflowmgr.output(workflow, limit, jobids, userdn=userdn)
+            elif subresource == 'logs2':
+                result = self.userworkflowmgr.logs2(workflow, limit, jobids, userdn=userdn)
+            elif subresource == 'data2':
+                result = self.userworkflowmgr.output2(workflow, limit, jobids, userdn=userdn)
             elif subresource == 'errors':
                 result = self.userworkflowmgr.errors(workflow, shortformat)
             elif subresource == 'report':
