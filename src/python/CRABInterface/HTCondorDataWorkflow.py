@@ -217,10 +217,9 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## Retrieve the filemetadata of output and input files. (The filemetadata are
         ## uploaded by the post-job after stageout has finished for all output and log
         ## files in the job.)
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow, howmany=-1)
 
         # Return only the info relevant to the client.
-        # TODO: Information about jobs not in finished state will be filtered out on the client. Is that fine?
         res['runsAndLumis'] = {}
         for row in rows:
             jobidstr = str(row[GetFromTaskAndType.PANDAID])
@@ -372,7 +371,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## Retrieve the filemetadata of output and input files. (The filemetadata are
         ## uploaded by the post-job after stageout has finished for all output and log
         ## files in the job.)
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow, howmany=-1)
         ## Extract from the filemetadata the necessary information.
         res['runsAndLumis'] = {}
         for row in rows:
