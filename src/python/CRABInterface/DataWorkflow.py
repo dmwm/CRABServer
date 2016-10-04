@@ -1,7 +1,6 @@
 import copy
 import time
 import logging
-import calendar
 import datetime
 from ast import literal_eval
 
@@ -635,7 +634,7 @@ class DataWorkflow(object):
             database = server.connectDatabase(asodb)
         except Exception as ex:
             msg = "Error while trying to connect to CouchDB: %s" % (str(ex))
-            raise TaskWorkerException(msg)
+            raise Exception(msg)
         try:
             failedPublications = database.loadView('DBSPublisher', 'PublicationFailedByWorkflow', {'reduce': False, 'startkey': [taskname], 'endkey': [taskname, {}]})['rows']
         except Exception as ex:

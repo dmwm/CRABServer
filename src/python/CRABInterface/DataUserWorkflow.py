@@ -55,7 +55,7 @@ class DataUserWorkflow(object):
            :return: a generator of list of logs pfns"""
         return self.workflow.logs(workflow, howmany, exitcode, jobids, userdn, userproxy)
 
-    def logs2(self, workflow, howmany, jobids, userdn, userproxy=None):
+    def logs2(self, workflow, howmany, jobids):
         """Returns information about the workflow log files.
            The client uses this information to get the pfn and initiate the download.
 
@@ -63,7 +63,7 @@ class DataUserWorkflow(object):
            :arg int howmany: the limit on the number of PFN to return
            :arg int exitcode: the log has to be of a job ended with this exit_code
            :return: a generator of list of logs pfns"""
-        return self.workflow.logs2(workflow, howmany, jobids, userdn, userproxy)
+        return self.workflow.logs2(workflow, howmany, jobids)
 
     def output(self, workflow, howmany, jobids, userdn, userproxy=None):
         """Returns the workflow output PFN. It takes care of the LFN - PFN conversion too.
@@ -73,14 +73,14 @@ class DataUserWorkflow(object):
            :return: a generator of list of output pfns"""
         return self.workflow.output(workflow, howmany, jobids, userdn, userproxy)
 
-    def output2(self, workflow, howmany, jobids, userdn, userproxy=None):
+    def output2(self, workflow, howmany, jobids):
         """Returns information about the workflow output files.
            The client uses this information to get the pfn and initiate the download.
 
            :arg str list workflow: a workflow name
            :arg int howmany: the limit on the number of PFN to return
            :return: a generator of output file info lists - site, lfn, ... for each file"""
-        return self.workflow.output2(workflow, howmany, jobids, userdn, userproxy)
+        return self.workflow.output2(workflow, howmany, jobids)
 
     def submit(self, *args, **kwargs):
         """Perform the workflow injection

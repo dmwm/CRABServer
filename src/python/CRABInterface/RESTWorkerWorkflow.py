@@ -10,8 +10,6 @@ from CRABInterface.Regexps import RX_TASKNAME, RX_BLOCK, RX_WORKER_NAME, RX_STAT
                                   RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE
 
 # external dependecies here
-import cherrypy
-import calendar
 from ast import literal_eval
 from base64 import b64decode
 
