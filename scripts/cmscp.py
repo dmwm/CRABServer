@@ -481,7 +481,7 @@ def perform_local_stageout(local_stageout_mgr, \
         signal.alarm(0)
     if retval == 0:
         dest_temp_file_name = os.path.split(dest_temp_lfn)[-1]
-        dest_temp_se = stageout_info['SEName']
+        dest_temp_se = stageout_info['PNN']
 
         ## Fallback to previous behaviour where phedex is queried for location
         if source_site == 'unknown':
