@@ -121,7 +121,7 @@ class DagmanResubmitter(TaskAction):
                     ## files are in the directory resubmit_info in the schedd).
                     for adparam, taskparam in params.iteritems():
                         if taskparam in ad:
-                            schedd.edit(rootConst, adparam, ad[taskparam])
+                            schedd.edit(rootConst, adparam, ad.lookup(taskparam))
                         elif task['resubmit_'+taskparam] != None:
                             schedd.edit(rootConst, adparam, str(task['resubmit_'+taskparam]))
                     schedd.act(htcondor.JobAction.Hold, rootConst)
