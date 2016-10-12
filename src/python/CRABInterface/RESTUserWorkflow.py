@@ -665,6 +665,8 @@ class RESTUserWorkflow(RESTEntity):
                 result = self.userworkflowmgr.errors(workflow, shortformat)
             elif subresource == 'report':
                 result = self.userworkflowmgr.report(workflow, userdn=userdn, usedbs=shortformat)
+            elif subresource == 'report2':
+                result = self.userworkflowmgr.report2(workflow, userdn=userdn, usedbs=shortformat)
             # if here means that no valid subresource has been requested
             # flow should never pass through here since validation restrict this
             else:

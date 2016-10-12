@@ -394,3 +394,11 @@ def getTimeFromTaskname(taskname):
     #convert the time
     dtime = time.strptime(stime, '%y%m%d_%H%M%S') #d stands for data structured
     return calendar.timegm(dtime)
+
+def getColumn(dictresult, columnName):
+    columnIndex = dictresult['desc']['columns'].index(columnName)
+    value = dictresult['result'][columnIndex]
+    if value == 'None':
+        return None
+    else:
+        return value

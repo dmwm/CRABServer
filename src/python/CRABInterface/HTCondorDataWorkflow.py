@@ -188,6 +188,53 @@ class HTCondorDataWorkflow(DataWorkflow):
                   }
 
 
+    def report2(self, workflow, userdn):
+        """
+        Queries the TaskDB for the webdir, input/output datasets, publication flag.
+        Also gets input/output file metadata from the FileMetaDataDB.
+
+        Any other information that the client needs to compute the report is available
+        without querying the server.
+        """
+
+        res = {}
+
+        ## Get the jobs status first.
+        self.logger.info("Fetching report2 information for workflow %s. Getting status first." % (workflow))
+
+        ## Get the information we need from the Task DB.
+        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
+        row = self.Task.ID_tuple(*row)
+
+        outputDatasets = literal_eval(row.output_dataset.read() if row.output_dataset else '[]')
+        publication = True if row.publication == 'T' else False
+
+        res['taskDBInfo'] = {"userWebDirURL": row.user_webdir, "inputDataset": row.input_dataset,
+                             "outputDatasets": outputDatasets, "publication": publication}
+
+        ## What each job has processed
+        ## ---------------------------
+        ## Retrieve the filemetadata of output and input files. (The filemetadata are
+        ## uploaded by the post-job after stageout has finished for all output and log
+        ## files in the job.)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow, howmany=-1)
+
+        # Return only the info relevant to the client.
+        res['runsAndLumis'] = {}
+        for row in rows:
+            jobidstr = str(row[GetFromTaskAndType.PANDAID])
+            retRow = {'parents': row[GetFromTaskAndType.PARENTS].read(),
+                      'runlumi': row[GetFromTaskAndType.RUNLUMI].read(),
+                      'events': row[GetFromTaskAndType.INEVENTS],
+                      'type': row[GetFromTaskAndType.TYPE],
+                      'lfn': row[GetFromTaskAndType.LFN],
+                      }
+            if jobidstr not in res['runsAndLumis']:
+                res['runsAndLumis'][jobidstr] = []
+            res['runsAndLumis'][jobidstr].append(retRow)
+
+        yield res
+
     def report(self, workflow, userdn):
         """
         Computes the report for the workflow.
@@ -324,7 +371,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## Retrieve the filemetadata of output and input files. (The filemetadata are
         ## uploaded by the post-job after stageout has finished for all output and log
         ## files in the job.)
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow, howmany=-1)
         ## Extract from the filemetadata the necessary information.
         res['runsAndLumis'] = {}
         for row in rows:

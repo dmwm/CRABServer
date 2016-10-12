@@ -46,6 +46,9 @@ class DataUserWorkflow(object):
            :return: what?"""
         return self.workflow.report(workflow, userdn)
 
+    def report2(self, workflow, userdn, usedbs):
+        return self.workflow.report2(workflow, userdn)
+
     def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
 
