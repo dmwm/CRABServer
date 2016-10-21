@@ -83,5 +83,7 @@ UPDATE tasks SET tm_task_status='NEW',tm_task_command='SUBMIT' WHERE tm_task_sta
 alter table tasks add (clusterid NUMBER(10));
 --Changes that will be needed for version 3.3.1607
 alter table tasks add (tm_debug_files VARCHAR(255));
+
 --Changse that will be needed for version 3.3.1611
 alter table tasks add (tm_submitter_ip_addr VARCHAR(45));
+alter table tasks add (tm_ignore_global_blacklist VARCHAR(1))

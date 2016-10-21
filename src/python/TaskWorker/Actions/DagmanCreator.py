@@ -386,7 +386,9 @@ class DagmanCreator(TaskAction.TaskAction):
         for ej in extrajdls:
             if ej.find('CRAB_IgnoreGlobalBlacklist') in [0, 1]: #there might be a + before
                 return True
-        return False
+
+        return kwargs['task']['tm_ignore_global_blacklist'] == 'T'
+
 
     def makeJobSubmit(self, task):
         """

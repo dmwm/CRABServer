@@ -104,7 +104,7 @@ class DataWorkflow(object):
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, asodb=None, scriptexe=None, scriptargs=None,
                scheddname=None, extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None,
-               debugfilename=None, submitipaddr=None):
+               debugfilename=None, submitipaddr=None, ignoreglobalblacklist=False):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -243,7 +243,8 @@ class DataWorkflow(object):
                             ignore_locality  = ['T' if ignorelocality else 'F'],
                             fail_limit       = [faillimit],
                             one_event_mode   = ['T' if oneEventMode else 'F'],
-                            submitter_ip_addr= [submitipaddr]
+                            submitter_ip_addr= [submitipaddr],
+                            ignore_global_blacklist = ['T' if ignoreglobalblacklist else 'F']
         )
 
         return [{'RequestName': workflow}]
