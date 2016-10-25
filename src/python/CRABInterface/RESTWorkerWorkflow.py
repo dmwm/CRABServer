@@ -3,14 +3,13 @@ from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
 from WMCore.REST.Error import InvalidParameter
 
+from ServerUtilities import getEpochFromDBTime
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import RX_TASKNAME, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, \
                                   RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE
 
 # external dependecies here
-import cherrypy
-import calendar
 from ast import literal_eval
 from base64 import b64decode
 
@@ -117,7 +116,7 @@ def fixupTask(task):
     #fixup timestamps
     for field in ['tm_start_time', 'tm_start_injection', 'tm_end_injection']:
         current = result[field]
-        result[field] = str(calendar.timegm(current.utctimetuple())) if current else ''
+        result[field] = str(getEpochFromDBTime(current)) if current else ''
 
     #fixup CLOBS values by calling read (only for Oracle)
     for field in ['tm_task_failure', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles', 'tm_edm_outfiles',

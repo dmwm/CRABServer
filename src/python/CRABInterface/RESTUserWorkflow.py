@@ -613,7 +613,8 @@ class RESTUserWorkflow(RESTEntity):
                                        submitipaddr=cherrypy.request.headers['X-Forwarded-For'], ignoreglobalblacklist=ignoreglobalblacklist)
 
     @restcall
-    def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority):
+    def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, 
+             numcores, priority):
         """Resubmit or continue an existing workflow. The caller needs to be a CMS user owner of the workflow.
 
            :arg str workflow: unique name identifier of the workflow;
@@ -633,6 +634,16 @@ class RESTUserWorkflow(RESTEntity):
                                                  numcores=numcores,
                                                  priority=priority,
                                                  userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+        elif subresource == 'resubmit2':
+            return self.userworkflowmgr.resubmit2(workflow=workflow,
+                                                 publication=publication,
+                                                 jobids=jobids,
+                                                 siteblacklist=siteblacklist,
+                                                 sitewhitelist=sitewhitelist,
+                                                 maxjobruntime=maxjobruntime,
+                                                 maxmemory=maxmemory,
+                                                 numcores=numcores,
+                                                 priority=priority)
         elif subresource == 'proceed':
             return self.userworkflowmgr.proceed(workflow=workflow)
 
@@ -660,9 +671,9 @@ class RESTUserWorkflow(RESTEntity):
             elif subresource == 'data':
                 result = self.userworkflowmgr.output(workflow, limit, jobids, userdn=userdn)
             elif subresource == 'logs2':
-                result = self.userworkflowmgr.logs2(workflow, limit, jobids, userdn=userdn)
+                result = self.userworkflowmgr.logs2(workflow, limit, jobids)
             elif subresource == 'data2':
-                result = self.userworkflowmgr.output2(workflow, limit, jobids, userdn=userdn)
+                result = self.userworkflowmgr.output2(workflow, limit, jobids)
             elif subresource == 'errors':
                 result = self.userworkflowmgr.errors(workflow, shortformat)
             elif subresource == 'report':

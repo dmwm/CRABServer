@@ -20,7 +20,7 @@ from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 
 from CRABInterface.Utils import conn_handler, global_user_throttle
-from ServerUtilities import FEEDBACKMAIL, isCouchDBURL, PUBLICATIONDB_STATES
+from ServerUtilities import FEEDBACKMAIL, PUBLICATIONDB_STATES, isCouchDBURL, getEpochFromDBTime
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 
 import HTCondorUtils
@@ -81,15 +81,15 @@ class HTCondorDataWorkflow(DataWorkflow):
         return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], transferingIds, finishedIds, \
                              row.user_dn, row.username, row.user_role, row.user_group, userproxy)
 
-    def logs2(self, workflow, howmany, jobids, userdn, userproxy=None):
+    def logs2(self, workflow, howmany, jobids):
         self.logger.info("About to get log of workflow: %s." % workflow)
-        return self.getFiles2(workflow, howmany, jobids, ['LOG'], userproxy)
+        return self.getFiles2(workflow, howmany, jobids, ['LOG'])
 
-    def output2(self, workflow, howmany, jobids, userdn, userproxy=None):
+    def output2(self, workflow, howmany, jobids):
         self.logger.info("About to get output of workflow: %s." % workflow)
-        return self.getFiles2(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], userproxy)
+        return self.getFiles2(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'])
 
-    def getFiles2(self, workflow, howmany, jobids, filetype, userproxy = None):
+    def getFiles2(self, workflow, howmany, jobids, filetype):
         """
         Retrieves the output PFN aggregating output in final and temporary locations.
 
@@ -100,10 +100,6 @@ class HTCondorDataWorkflow(DataWorkflow):
         # Looking up task information from the DB
         row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
         row = self.Task.ID_tuple(*row)
-        userdn = row.user_dn
-        username = row.username
-        role = row.user_role
-        group = row.user_group
 
         file_type = 'log' if filetype == ['LOG'] else 'output'
 
@@ -444,7 +440,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % workflow)
 
-        result['submissionTime'] = calendar.timegm(row.start_time.utctimetuple())
+        result['submissionTime'] = getEpochFromDBTime(row.start_time)
         if row.task_command:
             result['command'] = row.task_command
 
