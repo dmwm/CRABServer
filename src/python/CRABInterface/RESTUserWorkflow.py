@@ -458,6 +458,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("collector", param, safe, RX_COLLECTOR, optional=True)
             validate_strlist("extrajdl", param, safe, RX_SCRIPTARGS)
             validate_num("dryrun", param, safe, optional=True)
+            validate_num("ignoreglobalblacklist", param, safe, optional=True)
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
@@ -536,7 +537,7 @@ class RESTUserWorkflow(RESTEntity):
                 savelogsflag, publication, publishname, publishname2, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
                 tfileoutfiles, edmoutfiles, runs, lumis,
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
-                faillimit, ignorelocality, userfiles, asourl, asodb, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun):
+                faillimit, ignorelocality, userfiles, asourl, asodb, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun, ignoreglobalblacklist):
         """Perform the workflow injection
 
            :arg str workflow: request name defined by the user;
@@ -609,7 +610,7 @@ class RESTUserWorkflow(RESTEntity):
                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfn=lfn,
                                        ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, asourl=asourl, asodb=asodb,
                                        scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun,
-                                       submitipaddr=cherrypy.request.headers['X-Forwarded-For'])
+                                       submitipaddr=cherrypy.request.headers['X-Forwarded-For'], ignoreglobalblacklist=ignoreglobalblacklist)
 
     @restcall
     def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority):
