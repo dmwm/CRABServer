@@ -61,7 +61,7 @@ class HTCondorLocator(object):
         """
         collector = self.getCollector()
 
-        htcondor.param['COLLECTOR_HOST'] = collector
+        htcondor.param['COLLECTOR_HOST'] = collector.encode('ascii', 'ignore')
         coll = htcondor.Collector()
         schedds = coll.query(htcondor.AdTypes.Schedd, 'StartSchedulerUniverse =?= true && CMSGWMS_Type=?="crabschedd" && IsOK=?=True', 
                              ['Name', 'DetectedMemory','TotalFreeMemoryMB','TransferQueueNumUploading', 'TransferQueueMaxUploading', 
@@ -76,9 +76,9 @@ class HTCondorLocator(object):
         Return a tuple (schedd, address) containing an object representing the
         remote schedd and its corresponding address.
         """
-        htcondor.param['COLLECTOR_HOST'] = self.getCollector()
+        htcondor.param['COLLECTOR_HOST'] = self.getCollector().encode('ascii', 'ignore')
         coll = htcondor.Collector()
-        schedds = coll.query(htcondor.AdTypes.Schedd, 'regexp(%s, Name)' % HTCondorUtils.quote(schedd))
+        schedds = coll.query(htcondor.AdTypes.Schedd, 'regexp(%s, Name)' % HTCondorUtils.quote(schedd.encode('ascii', 'ignore')))
         self.scheddAd = ""
         if not schedds:
             self.scheddAd = self.getCachedCollectorOutput(schedd)

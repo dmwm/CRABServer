@@ -302,7 +302,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.logger.exception("%s: %s", workflow, msg)
             raise TaskWorkerException(msg, retry=True)
 
-        rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
+        rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || '\
+                    'CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow.encode('ascii', 'ignore'))
 
         self.logger.debug("Duplicate check is querying the schedd: %s", rootConst)
         results = list(schedd.xquery(rootConst, []))
@@ -447,7 +448,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["Cmd"] = cmd
         dagAd['Args'] = arg
         dagAd["TransferInput"] = str(info['inputFilesString'])
-        dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"])
+        dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"].encode('ascii', 'ignore'))
         # Putting JobStatus == 4 since LeaveJobInQueue is for completed jobs (probably redundant)
         LEAVE_JOB_IN_QUEUE_EXPR = "(JobStatus == 4) && ((time()-CRAB_TaskSubmitTime) < %s)" % TASKLIFETIME
         dagAd["LeaveJobInQueue"] = classad.ExprTree(LEAVE_JOB_IN_QUEUE_EXPR)
