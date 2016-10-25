@@ -25,14 +25,15 @@ def capacityMetricsChoices(schedds, goodSchedds, logger=None):
         Return a list of scheddobj and the weight to be used in the weighted choice
     """
     schedds_usage = {}
-    totalMemory = sum([ schedd['DetectedMemory'] for schedd in schedds if 'DetectedMemory' in schedd])
+    totalMemory = sum([ schedd['TotalFreeMemoryMB'] for schedd in schedds if 'TotalFreeMemoryMB' in schedd])
     totalJobs = sum([ schedd['MaxJobsRunning'] for schedd in schedds if 'MaxJobsRunning' in schedd])
     totalUploads = sum([ schedd['TransferQueueMaxUploading'] for schedd in schedds if 'TransferQueueMaxUploading' in schedd])
     for schedd in schedds:
-        logger.debug("%s: Mem %s, Mx %s;  Run %s, Mx %s;  Trf %s, Max %s", schedd['Name'], schedd['DetectedMemory'], totalMemory,
-                     schedd['JobsRunning'], totalJobs, schedd['TransferQueueNumUploading'], totalUploads)
-        schedds_usage[schedd['Name']] = max(schedd['DetectedMemory']/totalMemory,
+        logger.debug("%s: Mem %s, Mx %s;  Run %s, Mx %s;  Trf %s, Max %s, isOk: %s", schedd['Name'], schedd['TotalFreeMemoryMB'], totalMemory,
+                     schedd['JobsRunning'], totalJobs, schedd['TransferQueueNumUploading'], totalUploads, schedd['IsOK'])
+        schedds_usage[schedd['Name']] = max(schedd['TotalFreeMemoryMB']/totalMemory,
                                             schedd['JobsRunning']/totalJobs, schedd['TransferQueueNumUploading']/totalUploads)
+
 
     choices = [(schedd, 1/schedds_usage.get(schedd, .5)) for schedd in goodSchedds]
     return choices
@@ -63,7 +64,7 @@ class HTCondorLocator(object):
 
         htcondor.param['COLLECTOR_HOST'] = collector.encode('ascii', 'ignore')
         coll = htcondor.Collector()
-        schedds = coll.query(htcondor.AdTypes.Schedd, 'StartSchedulerUniverse =?= true && CMSGWMS_Type=?="crabschedd" && IsOK=?=True', 
+        schedds = coll.query(htcondor.AdTypes.Schedd, 'StartSchedulerUniverse =?= true && CMSGWMS_Type=?="crabschedd"', 
                              ['Name', 'DetectedMemory','TotalFreeMemoryMB','TransferQueueNumUploading', 'TransferQueueMaxUploading', 
                              'TotalRunningJobs', 'JobsRunning','MaxJobsRunning', 'IsOK'])
         if self.config and "htcondorSchedds" in self.config:
