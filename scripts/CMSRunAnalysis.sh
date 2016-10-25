@@ -18,6 +18,8 @@ sigterm() {
   df -h
   echo "Logging disk usage in directory:"
   du -h
+  echo "Logging work directory file sizes:"
+  ls -lnh
   DashboardFailure 50669
   if [ ! -e logCMSSWSaved.txt ];
   then

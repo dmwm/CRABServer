@@ -415,3 +415,11 @@ def checkTaskLifetime(submissionTime):
 
 def getEpochFromDBTime(startTime):
     return calendar.timegm(startTime.utctimetuple())
+
+def getColumn(dictresult, columnName):
+    columnIndex = dictresult['desc']['columns'].index(columnName)
+    value = dictresult['result'][columnIndex]
+    if value == 'None':
+        return None
+    else:
+        return value

@@ -608,7 +608,8 @@ class RESTUserWorkflow(RESTEntity):
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfn=lfn,
                                        ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, asourl=asourl, asodb=asodb,
-                                       scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun)
+                                       scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun,
+                                       submitipaddr=cherrypy.request.headers['X-Forwarded-For'])
 
     @restcall
     def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, 
@@ -676,6 +677,8 @@ class RESTUserWorkflow(RESTEntity):
                 result = self.userworkflowmgr.errors(workflow, shortformat)
             elif subresource == 'report':
                 result = self.userworkflowmgr.report(workflow, userdn=userdn, usedbs=shortformat)
+            elif subresource == 'report2':
+                result = self.userworkflowmgr.report2(workflow, userdn=userdn, usedbs=shortformat)
             # if here means that no valid subresource has been requested
             # flow should never pass through here since validation restrict this
             else:

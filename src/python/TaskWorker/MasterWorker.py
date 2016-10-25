@@ -245,6 +245,7 @@ class MasterWorker(object):
         while(not self.STOP):
             limit = self.slaves.queueableTasks()
             if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
+                time.sleep(self.config.TaskWorker.polling)
                 continue
 
             pendingwork = self._getWork(limit=limit, getstatus='HOLDING')
