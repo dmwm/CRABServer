@@ -62,7 +62,7 @@ class HTCondorLocator(object):
 
         htcondor.param['COLLECTOR_HOST'] = collector
         coll = htcondor.Collector()
-        schedds = coll.query(htcondor.AdTypes.Schedd, 'StartSchedulerUniverse =?= true && CMSGWMS_Type=?="crabschedd" && IsOK=?=True', ['Name', 'TotalFreeMemoryMB', 'DetectedMemory',
+        schedds = coll.query(htcondor.AdTypes.Schedd, 'StartSchedulerUniverse =?= true && CMSGWMS_Type=?="crabschedd"', ['Name', 'TotalFreeMemoryMB', 'DetectedMemory',
                             'TransferQueueNumUploading', 'TransferQueueMaxUploading', 'TotalRunningJobs', 'JobsRunning',
                             'MaxJobsRunning', 'IsOK'])
         if self.config and "htcondorSchedds" in self.config:
