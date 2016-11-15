@@ -407,3 +407,32 @@ def getTimeFromTaskname(taskname):
     #convert the time
     dtime = time.strptime(stime, '%y%m%d_%H%M%S') #d stands for data structured
     return calendar.timegm(dtime)
+
+def checkTaskLifetime(submissionTime):
+    """ Verify that at least 7 days are left before the task periodic remove expression
+        evaluates to true. This is to let job finish and possibly not remove a task with
+        running jobs.
+
+        submissionTime are the seconds since epoch of the task submission time in the DB
+    """
+
+    msg = "ok"
+    ## resubmitLifeTime is 23 days expressed in seconds
+    resubmitLifeTime = TASKLIFETIME - NUM_DAYS_FOR_RESUBMITDRAIN * 24 * 60 * 60
+    if time.time() > (submissionTime + resubmitLifeTime):
+        msg = "Resubmission of the task is not possble since less than %s days are left before the task is removed from the schedulers.\n" % NUM_DAYS_FOR_RESUBMITDRAIN
+        msg += "A task expires %s days after its submission\n" % (TASKLIFETIME / (24 * 60 * 60))
+        msg += "You can submit a 'recovery task' if you need to execute again the failed jobs\n"
+        msg += "See https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ for more information about recovery tasks"
+    return msg
+
+def getEpochFromDBTime(startTime):
+    return calendar.timegm(startTime.utctimetuple())
+
+def getColumn(dictresult, columnName):
+    columnIndex = dictresult['desc']['columns'].index(columnName)
+    value = dictresult['result'][columnIndex]
+    if value == 'None':
+        return None
+    else:
+        return value

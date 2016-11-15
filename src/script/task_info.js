@@ -162,8 +162,8 @@ $(document).ready(function() {
                 $("#task-pset-paragraph").text(data);
             });
 
-        $("#task-config-link").attr("href", userWebDir + "/debug/crabConfig.py");
-        $("#task-pset-link").attr("href", userWebDir + "/debug/originalPSet.py");
+        $("#task-config-link").attr("href", proxiedWebDirUrl + "/debug/crabConfig.py");
+        $("#task-pset-link").attr("href", proxiedWebDirUrl + "/debug/originalPSet.py");
     }
 
     function queryWebDirProxyApi() {
@@ -267,7 +267,7 @@ $(document).ready(function() {
                 $("#script-exe-paragraph").text(data);
             });
 
-        $("#script-exe-link").attr("href", userWebDir + "/debug/" + scriptExe);
+        $("#script-exe-link").attr("href", proxiedWebDirUrl + "/debug/" + scriptExe);
     }
 
 
@@ -283,7 +283,14 @@ $(document).ready(function() {
             var dasUrl = "https://cmsweb.cern.ch/das/request?view=list&limit=50" + "&instance=" + dbsInstance + "&input=" + inputDataset;
 
             $("#main-dashboard-link").attr("href", dashboardUrl);
-            $("#main-webdir-link").attr("href", userWebDir);
+
+            webDirUrlToDisplay = "";
+            if (proxiedWebDirUrl === "") {
+                webDirUrlToDisplay = userWebDir;
+            } else {
+                webDirUrlToDisplay = proxiedWebDirUrl;
+            }
+            $("#main-webdir-link").attr("href", webDirUrlToDisplay);
             $("#main-das-link").attr("href", dasUrl);
 
             var url = taskStatusUrl + inputTaskName;

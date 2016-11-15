@@ -14,9 +14,11 @@ class DataFileMetadata(object):
         self.logger = logging.getLogger("CRABLogger.DataFileMetadata")
         self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
 
-    def getFiles(self, taskname, filetype):
+    def getFiles(self, taskname, filetype, howmany):
         self.logger.debug("Calling jobmetadata for task %s and filetype %s" % (taskname, filetype))
-        binds = {'taskname': taskname, 'filetype': filetype}
+        if howmany == None:
+            howmany = -1
+        binds = {'taskname': taskname, 'filetype': filetype, 'howmany': howmany}
         rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, **binds)
         for row in rows:
             row = self.FileMetaData.GetFromTaskAndType_sql(*row)

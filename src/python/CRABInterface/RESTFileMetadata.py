@@ -66,6 +66,7 @@ class RESTFileMetadata(RESTEntity):
         elif method in ['GET']:
             validate_str("taskname", param, safe, RX_TASKNAME, optional=False)
             validate_str("filetype", param, safe, RX_OUTTYPES, optional=False)
+            validate_num("howmany", param, safe, optional=True)
         elif method in ['DELETE']:
             authz_operator()
             validate_str("taskname", param, safe, RX_TASKNAME, optional=True)
@@ -100,13 +101,14 @@ class RESTFileMetadata(RESTEntity):
         return self.jobmetadata.changeState(taskname=taskname, outlfn=outlfn, filestate=filestate)
 
     @restcall
-    def get(self, taskname, filetype):
+    def get(self, taskname, filetype, howmany):
         """Retrieves a specific job metadata information.
 
            :arg str taskname: unique name identifier of the task;
            :arg str filetype: filter the file type to return;
-           :retrun: generator looping through the resulting db rows."""
-        return self.jobmetadata.getFiles(taskname, filetype)
+           :arg int howmany: how many rows to retrieve;
+           :return: generator looping through the resulting db rows."""
+        return self.jobmetadata.getFiles(taskname, filetype, howmany)
 
     @restcall
     def delete(self, taskname, hours):

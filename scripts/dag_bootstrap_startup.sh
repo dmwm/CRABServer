@@ -150,7 +150,7 @@ else
     # which is done by passing the cluster_id of the dagman to the daemon process via the jdl. With this, we are
     # able to use condor_q in the daemon to check if the task/job status will no longed be updated
     # and if the daemon needs to exit.
-    if [ -f /etc/enable_task_daemon ];
+    if [ -f /etc/enable_task_daemon ] && [ ! -f task_process/task_process_running ];
     then
         echo "creating and executing task process daemon jdl"
 cat > task_process/daemon.jdl << EOF
@@ -166,7 +166,7 @@ EOF
         chmod 777 task_process/task_proc_wrapper.sh
         condor_submit task_process/daemon.jdl
     else
-        echo "/etc/enable_task_daemon not found, not submitting the daemon task"
+        echo "/etc/enable_task_daemon not found or task_process/task_process_runing found, not submitting the daemon task"
     fi
     # --- End new status prototype ---
 

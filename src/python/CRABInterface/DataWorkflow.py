@@ -1,14 +1,17 @@
 import copy
 import time
 import logging
+import datetime
 from ast import literal_eval
 
 ## WMCore dependecies
 from WMCore.REST.Error import ExecutionError
+from WMCore.Database.CMSCouch import CouchServer
 
 ## CRAB dependencies
 from ServerUtilities import TASKLIFETIME
 from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
+from ServerUtilities import isCouchDBURL, getEpochFromDBTime
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
 
 
@@ -106,7 +109,7 @@ class DataWorkflow(object):
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, asodb=None, scriptexe=None, scriptargs=None,
                scheddname=None, extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None,
-               debugfilename=None):
+               debugfilename=None, submitipaddr=None, ignoreglobalblacklist=False):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -244,7 +247,9 @@ class DataWorkflow(object):
                             output_lfn       = [lfn],
                             ignore_locality  = ['T' if ignorelocality else 'F'],
                             fail_limit       = [faillimit],
-                            one_event_mode   = ['T' if oneEventMode else 'F']
+                            one_event_mode   = ['T' if oneEventMode else 'F'],
+                            submitter_ip_addr= [submitipaddr],
+                            ignore_global_blacklist = ['T' if ignoreglobalblacklist else 'F']
         )
 
         return [{'RequestName': workflow}]
@@ -268,6 +273,138 @@ class DataWorkflow(object):
             msg += "See https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ for more information about recovery tasks"
         return msg
 
+    def publicationStatusWrapper(self, workflow, asourl, asodb, username, publicationenabled):
+        publicationInfo = {}
+        if (publicationenabled == 'T'):
+            # value is used in the publicationStatus method.
+            self.isCouchDBURL = isCouchDBURL(asourl)
+
+            #let's default asodb to asynctransfer, for old task this is empty!
+            asodb = asodb or 'asynctransfer'
+            publicationInfo = self.publicationStatus(workflow, asourl, asodb, username)
+            self.logger.info("Publication status for workflow %s done", workflow)
+        else:
+            publicationInfo['status'] = {'disabled': []}
+        return publicationInfo
+
+    @conn_handler(services=['servercert'])
+    def resubmit2(self, workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory,
+                  numcores, priority, userproxy):
+        """Request to reprocess what the workflow hasn't finished to reprocess.
+           This needs to create a new workflow in the same campaign
+        """
+        retmsg = "ok"
+        self.logger.info("Getting task ID tuple from DB for task %s" % workflow)
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
+        try:
+            #just one row is picked up by the previous query
+            row = self.Task.ID_tuple(*next(row))
+        except StopIteration:
+            raise ExecutionError("Impossible to find task %s in the database." % workflow)
+
+        submissionTime = getEpochFromDBTime(row.start_time)
+
+        self.logger.info("Checking if resubmission is possible: we don't allow resubmission %s days before task expiration date", NUM_DAYS_FOR_RESUBMITDRAIN)
+        retmsg = self.checkTaskLifetime(submissionTime)
+        if retmsg != "ok":
+            return [{'result': retmsg}]
+
+        task_status = row.task_status
+
+        resubmitWhat = "publications" if publication else "jobs"
+        self.logger.info("About to resubmit %s for workflow: %s." % (resubmitWhat, workflow))
+
+        ## Ignore the following options if this is a publication resubmission or if the
+        ## task was never submitted.
+        if publication or task_status == 'SUBMITFAILED':
+            jobids = None
+            siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority = None, None, None, None, None, None
+
+        # We only allow resubmission of tasks that are in a final state, listed here:
+        allowedTaskStates = ['SUBMITTED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
+
+        # Do not resubmit publication for tasks that were not submitted since they don't have any output.
+        if not publication:
+            allowedTaskStates += ['SUBMITFAILED'] #NB submitfailed goes to NEW, not RESUBMIT
+        ## If the task status is not an allowed one, fail the resubmission.
+        if task_status not in allowedTaskStates:
+            msg = "You cannot resubmit %s if the task is in status %s." % (resubmitWhat, task_status)
+            raise ExecutionError(msg)
+
+        if task_status != 'SUBMITFAILED':
+            if publication:
+                ## Retrieve publication information.
+                publicationEnabled = row.publication
+                asourl = row.asourl
+                asodb = row.asodb
+                username = row.username
+                publicationInfo = self.publicationStatusWrapper(workflow, asourl, asodb, username, publicationEnabled)
+
+                if 'status' not in publicationInfo:
+                    msg  = "Cannot resubmit publication."
+                    msg += " Unable to retrieve the publication status."
+                    raise ExecutionError(msg)
+                if 'disabled' in publicationInfo:
+                    msg  = "Cannot resubmit publication."
+                    msg += " Publication was disabled in the CRAB configuration."
+                    raise ExecutionError(msg)
+                if 'error' in publicationInfo:
+                    msg  = "Cannot resubmit publication."
+                    msg += " Error in publication status: %s" % (publicationInfo['error'])
+                    raise ExecutionError(msg)
+                if publicationInfo['status'].get('publication_failed', 0) == 0:
+                    msg = "There are no failed publications to resubmit."
+                    raise ExecutionError(msg)
+                ## Here we can add a check on the publication status of the documents
+                ## corresponding to the job ids in resubmitjobids and jobids. So far the
+                ## publication resubmission will resubmit all the failed publications.
+                self.resubmitPublication(asourl, asodb, userproxy, workflow)
+                return [{'result': retmsg}]
+            else:
+                self.logger.info("Jobs to resubmit: %s" % (jobids))
+
+            ## If these parameters are not set, give them the same values they had in the
+            ## original task submission.
+            if (siteblacklist is None) or (sitewhitelist is None) or (maxjobruntime is None) or (maxmemory is None) or (numcores is None) or (priority is None):
+                ## origValues = [orig_siteblacklist, orig_sitewhitelist, orig_maxjobruntime, orig_maxmemory, orig_numcores, orig_priority]
+                origValues = next(self.api.query(None, None, self.Task.GetResubmitParams_sql, taskname = workflow))
+                if siteblacklist is None:
+                    siteblacklist = literal_eval(origValues[0])
+                if sitewhitelist is None:
+                    sitewhitelist = literal_eval(origValues[1])
+                if maxjobruntime is None:
+                    maxjobruntime = origValues[2]
+                if maxmemory is None:
+                    maxmemory = origValues[3]
+                if numcores is None:
+                    numcores = origValues[4]
+                if priority is None:
+                    priority = origValues[5]
+            ## These are the parameters that we want to writte down in the 'tm_arguments'
+            ## column of the Tasks DB each time a resubmission is done.
+            ## DagmanResubmitter will read these parameters and write them into the task ad.
+            arguments = {'resubmit_jobids' : jobids,
+                         'site_blacklist'  : siteblacklist,
+                         'site_whitelist'  : sitewhitelist,
+                         'maxjobruntime'   : maxjobruntime,
+                         'maxmemory'       : maxmemory,
+                         'numcores'        : numcores,
+                         'priority'        : priority,
+                         'resubmit_publication' : publication
+                        }
+            ## Change the 'tm_arguments' column of the Tasks DB for this task to contain the
+            ## above parameters.
+            self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow], arguments = [str(arguments)])
+
+        ## Change the status of the task in the Tasks DB to RESUBMIT (or NEW).
+        if task_status == 'SUBMITFAILED':
+            newstate = ["NEW"]
+            newcommand = ["SUBMIT"]
+        else:
+            newstate = ["NEW"]
+            newcommand = ["RESUBMIT"]
+        self.api.modify(self.Task.SetStatusTask_sql, status = newstate, command = newcommand, taskname = [workflow])
+        return [{'result': retmsg}]
 
     def resubmit(self, workflow, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority, userdn, userproxy):
         """Request to reprocess what the workflow hasn't finished to reprocess.
@@ -476,3 +613,48 @@ class DataWorkflow(object):
             self.api.modify(self.Task.SetStatusTask_sql, taskname=[workflow], status=['NEW'], command=['SUBMIT'])
 
         return [{'result': 'ok'}]
+
+    def resubmitPublication(self, asourl, asodb, proxy, taskname):
+        if isCouchDBURL(asourl):
+            return self.resubmitCouchPublication(asourl, asodb, proxy, taskname)
+        else:
+            return self.resubmitOraclePublication()
+
+    def resubmitCouchPublication(self, asourl, asodb, proxy, taskname):
+        """
+        Resubmit failed publications by resetting the publication
+        status in the CouchDB documents.
+        """
+        server = CouchServer(dburl=asourl, ckey=proxy, cert=proxy)
+        try:
+            database = server.connectDatabase(asodb)
+        except Exception as ex:
+            msg = "Error while trying to connect to CouchDB: %s" % (str(ex))
+            raise Exception(msg)
+        try:
+            failedPublications = database.loadView('DBSPublisher', 'PublicationFailedByWorkflow', {'reduce': False, 'startkey': [taskname], 'endkey': [taskname, {}]})['rows']
+        except Exception as ex:
+            msg = "Error while trying to load view 'DBSPublisher.PublicationFailedByWorkflow' from CouchDB: %s" % (str(ex))
+            raise Exception(msg)
+        msg = "There are %d failed publications to resubmit: %s" % (len(failedPublications), failedPublications)
+        self.logger.info(msg)
+        for doc in failedPublications:
+            docid = doc['id']
+            if doc['key'][0] != taskname: # this should never happen...
+                msg = "Skipping document %s as it seems to correspond to another task: %s" % (docid, doc['key'][0])
+                self.logger.warning(msg)
+                continue
+            data = {'last_update': time.time(),
+                    'retry': str(datetime.datetime.now()),
+                    'publication_state': 'not_published',
+                   }
+            try:
+                database.updateDocument(docid, 'DBSPublisher', 'updateFile', data)
+                self.logger.info("updating document %s " % docid)
+            except Exception as ex:
+                msg = "Error updating document %s in CouchDB: %s" % (docid, str(ex))
+                self.logger.error(msg)
+        return
+
+    def resubmitOraclePublication(self):
+        raise NotImplementedError

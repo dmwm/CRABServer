@@ -20,7 +20,7 @@ from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 
 from CRABInterface.Utils import conn_handler, global_user_throttle
-from ServerUtilities import FEEDBACKMAIL, isCouchDBURL, PUBLICATIONDB_STATES
+from ServerUtilities import FEEDBACKMAIL, PUBLICATIONDB_STATES, isCouchDBURL, getEpochFromDBTime
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 
 import HTCondorUtils
@@ -81,6 +81,44 @@ class HTCondorDataWorkflow(DataWorkflow):
         return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], transferingIds, finishedIds, \
                              row.user_dn, row.username, row.user_role, row.user_group, userproxy)
 
+    def logs2(self, workflow, howmany, jobids):
+        self.logger.info("About to get log of workflow: %s." % workflow)
+        return self.getFiles2(workflow, howmany, jobids, ['LOG'])
+
+    def output2(self, workflow, howmany, jobids):
+        self.logger.info("About to get output of workflow: %s." % workflow)
+        return self.getFiles2(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'])
+
+    def getFiles2(self, workflow, howmany, jobids, filetype):
+        """
+        Retrieves the output PFN aggregating output in final and temporary locations.
+
+        :arg str workflow: the unique workflow name
+        :arg int howmany: the limit on the number of PFN to return
+        :return: a generator of list of outputs"""
+
+        # Looking up task information from the DB
+        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
+        row = self.Task.ID_tuple(*row)
+
+        file_type = 'log' if filetype == ['LOG'] else 'output'
+
+        self.logger.debug("Retrieving the %s files of the following jobs: %s" % (file_type, jobids))
+
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow, howmany = howmany)
+
+        rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
+
+        for row in rows:
+            yield {'jobid': row[GetFromTaskAndType.PANDAID],
+                   'lfn': row[GetFromTaskAndType.LFN],
+                   'site': row[GetFromTaskAndType.LOCATION],
+                   'tmplfn': row[GetFromTaskAndType.TMPLFN],
+                   'tmpsite': row[GetFromTaskAndType.TMPLOCATION],
+                   'directstageout': row[GetFromTaskAndType.DIRECTSTAGEOUT],
+                   'size': row[GetFromTaskAndType.SIZE],
+                   'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
+                  }
 
     @conn_handler(services=['phedex'])
     def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, username, role, group, userproxy = None):
@@ -110,10 +148,8 @@ class HTCondorDataWorkflow(DataWorkflow):
             return
 
         self.logger.debug("Retrieving the %s files of the following jobs: %s" % (file_type, jobids))
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow, howmany = howmany)
         rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
-        if howmany != -1:
-            rows = rows[:howmany]
         #jobids=','.join(map(str,jobids)), limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
         for row in rows:
             try:
@@ -147,6 +183,53 @@ class HTCondorDataWorkflow(DataWorkflow):
                    'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
                   }
 
+
+    def report2(self, workflow, userdn):
+        """
+        Queries the TaskDB for the webdir, input/output datasets, publication flag.
+        Also gets input/output file metadata from the FileMetaDataDB.
+
+        Any other information that the client needs to compute the report is available
+        without querying the server.
+        """
+
+        res = {}
+
+        ## Get the jobs status first.
+        self.logger.info("Fetching report2 information for workflow %s. Getting status first." % (workflow))
+
+        ## Get the information we need from the Task DB.
+        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
+        row = self.Task.ID_tuple(*row)
+
+        outputDatasets = literal_eval(row.output_dataset.read() if row.output_dataset else '[]')
+        publication = True if row.publication == 'T' else False
+
+        res['taskDBInfo'] = {"userWebDirURL": row.user_webdir, "inputDataset": row.input_dataset,
+                             "outputDatasets": outputDatasets, "publication": publication}
+
+        ## What each job has processed
+        ## ---------------------------
+        ## Retrieve the filemetadata of output and input files. (The filemetadata are
+        ## uploaded by the post-job after stageout has finished for all output and log
+        ## files in the job.)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow, howmany=-1)
+
+        # Return only the info relevant to the client.
+        res['runsAndLumis'] = {}
+        for row in rows:
+            jobidstr = str(row[GetFromTaskAndType.PANDAID])
+            retRow = {'parents': row[GetFromTaskAndType.PARENTS].read(),
+                      'runlumi': row[GetFromTaskAndType.RUNLUMI].read(),
+                      'events': row[GetFromTaskAndType.INEVENTS],
+                      'type': row[GetFromTaskAndType.TYPE],
+                      'lfn': row[GetFromTaskAndType.LFN],
+                      }
+            if jobidstr not in res['runsAndLumis']:
+                res['runsAndLumis'][jobidstr] = []
+            res['runsAndLumis'][jobidstr].append(retRow)
+
+        yield res
 
     def report(self, workflow, userdn):
         """
@@ -284,7 +367,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## Retrieve the filemetadata of output and input files. (The filemetadata are
         ## uploaded by the post-job after stageout has finished for all output and log
         ## files in the job.)
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow)
+        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow, howmany=-1)
         ## Extract from the filemetadata the necessary information.
         res['runsAndLumis'] = {}
         for row in rows:
@@ -357,7 +440,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % workflow)
 
-        result['submissionTime'] = calendar.timegm(row.start_time.utctimetuple())
+        result['submissionTime'] = getEpochFromDBTime(row.start_time)
         if row.task_command:
             result['command'] = row.task_command
 

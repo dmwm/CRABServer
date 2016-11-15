@@ -458,6 +458,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("collector", param, safe, RX_COLLECTOR, optional=True)
             validate_strlist("extrajdl", param, safe, RX_SCRIPTARGS)
             validate_num("dryrun", param, safe, optional=True)
+            validate_num("ignoreglobalblacklist", param, safe, optional=True)
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
@@ -536,7 +537,7 @@ class RESTUserWorkflow(RESTEntity):
                 savelogsflag, publication, publishname, publishname2, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
                 tfileoutfiles, edmoutfiles, runs, lumis,
                 totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
-                faillimit, ignorelocality, userfiles, asourl, asodb, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun):
+                faillimit, ignorelocality, userfiles, asourl, asodb, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun, ignoreglobalblacklist):
         """Perform the workflow injection
 
            :arg str workflow: request name defined by the user;
@@ -608,10 +609,12 @@ class RESTUserWorkflow(RESTEntity):
                                        edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
                                        maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfn=lfn,
                                        ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, asourl=asourl, asodb=asodb,
-                                       scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun)
+                                       scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun,
+                                       submitipaddr=cherrypy.request.headers['X-Forwarded-For'], ignoreglobalblacklist=ignoreglobalblacklist)
 
     @restcall
-    def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority):
+    def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory,
+             numcores, priority):
         """Resubmit or continue an existing workflow. The caller needs to be a CMS user owner of the workflow.
 
            :arg str workflow: unique name identifier of the workflow;
@@ -631,6 +634,16 @@ class RESTUserWorkflow(RESTEntity):
                                                  numcores=numcores,
                                                  priority=priority,
                                                  userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+        elif subresource == 'resubmit2':
+            return self.userworkflowmgr.resubmit2(workflow=workflow,
+                                                 publication=publication,
+                                                 jobids=jobids,
+                                                 siteblacklist=siteblacklist,
+                                                 sitewhitelist=sitewhitelist,
+                                                 maxjobruntime=maxjobruntime,
+                                                 maxmemory=maxmemory,
+                                                 numcores=numcores,
+                                                 priority=priority)
         elif subresource == 'proceed':
             return self.userworkflowmgr.proceed(workflow=workflow)
 
@@ -657,10 +670,16 @@ class RESTUserWorkflow(RESTEntity):
                 result = self.userworkflowmgr.logs(workflow, limit, exitcode, jobids, userdn=userdn)
             elif subresource == 'data':
                 result = self.userworkflowmgr.output(workflow, limit, jobids, userdn=userdn)
+            elif subresource == 'logs2':
+                result = self.userworkflowmgr.logs2(workflow, limit, jobids)
+            elif subresource == 'data2':
+                result = self.userworkflowmgr.output2(workflow, limit, jobids)
             elif subresource == 'errors':
                 result = self.userworkflowmgr.errors(workflow, shortformat)
             elif subresource == 'report':
                 result = self.userworkflowmgr.report(workflow, userdn=userdn, usedbs=shortformat)
+            elif subresource == 'report2':
+                result = self.userworkflowmgr.report2(workflow, userdn=userdn, usedbs=shortformat)
             # if here means that no valid subresource has been requested
             # flow should never pass through here since validation restrict this
             else:

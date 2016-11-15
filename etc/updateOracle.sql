@@ -85,6 +85,10 @@ alter table tasks add (clusterid NUMBER(10));
 --Changes that will be needed for version 3.3.1607
 alter table tasks add (tm_debug_files VARCHAR(255));
 
+--Changse that will be needed for version 3.3.1611
+alter table tasks add (tm_submitter_ip_addr VARCHAR(45));
+alter table tasks add (tm_ignore_global_blacklist VARCHAR(1))
+
 --Changes needed for the Autmatic Splitting (or resplitting)
 alter table filemetadata add (job_id VARCHAR(20));
 alter table filemetadata modify (panda_job_id null);

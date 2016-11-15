@@ -109,6 +109,7 @@ CRAB_Id = $(count)
 +CRAB_PrimaryDataset = %(primarydataset)s
 +TaskType = "Job"
 +AccountingGroup = %(accounting_group)s
++CRAB_SubmitterIpAddr = %(submitter_ip_addr)s
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
 +DESIRED_OpSyses = %(desired_opsys)s
@@ -224,7 +225,7 @@ def transform_strings(input):
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
                'stageoutpolicy', 'taskType', 'worker_name', 'desired_opsys', 'desired_opsysvers', \
-               'desired_arch', 'accounting_group', 'resthost', 'resturinoapi':
+               'desired_arch', 'accounting_group', 'resthost', 'resturinoapi', 'submitter_ip_addr':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -394,7 +395,9 @@ class DagmanCreator(TaskAction.TaskAction):
         for ej in extrajdls:
             if ej.find('CRAB_IgnoreGlobalBlacklist') in [0, 1]: #there might be a + before
                 return True
-        return False
+
+        return kwargs['task']['tm_ignore_global_blacklist'] == 'T'
+
 
     def makeJobSubmit(self, task):
         """
@@ -447,6 +450,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
         info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
+        info['submitter_ip_addr'] = task['tm_submitter_ip_addr']
 
         self.populateGlideinMatching(info)
 
