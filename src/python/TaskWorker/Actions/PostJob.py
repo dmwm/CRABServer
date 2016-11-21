@@ -88,6 +88,7 @@ import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.DataStructs.LumiList import LumiList
 
 from TaskWorker import __version__
+from ServerUtilities import getLock
 from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.RetryJob import RetryJob
@@ -354,8 +355,13 @@ class ASOServerJob(object):
             starttime = self.aso_start_timestamp
         if first_pj_execution():
             self.logger.info("====== Starting to monitor ASO transfers.")
-        ## Get the transfer status in all documents listed in self.docs_in_transfer.
-        transfers_statuses = self.get_transfers_statuses()
+        try:
+            with getLock('get_transfers_statuses'):
+                ## Get the transfer status in all documents listed in self.docs_in_transfer.
+                transfers_statuses = self.get_transfers_statuses()
+        except TransferCacheLoadError as e:
+            self.logger.info("Error getting the status of the transfers. Deferring PJ. Got: %s" % e)
+            return 4
         msg = "Got statuses: %s; %.1f hours since transfer submit."
         msg = msg % (", ".join(transfers_statuses), (time.time()-starttime)/3600.0)
         self.logger.info(msg)
@@ -818,12 +824,28 @@ class ASOServerJob(object):
             returnMsg = self.couch_database.commitOne(doc)[0]
         return returnMsg
 
+    ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def build_failed_cache(self):
+        aso_info = {
+            "query_timestamp": time.time(),
+            "query_succeded": False,
+            "query_jobid": self.job_id,
+        }
+        tmp_fname = "aso_status.%d.json" % (os.getpid())
+        with open(tmp_fname, 'w') as fd:
+            json.dump(aso_info, fd)
+        os.rename(tmp_fname, "aso_status.json")
+
+    ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
     def get_transfers_statuses(self):
         """
         Retrieve the status of all transfers from the cached file 'aso_status.json'
         or by querying an ASO database view if the file is more than 5 minutes old
-        or if we injected a document after the file was last updated. Otherwise call
-        get_transfers_statuses_fallback().
+        or if we injected a document after the file was last updated. Calls to
++       get_transfers_statuses_fallback() have been removed to not generate load
+        on couch.
         """
         statuses = []
         query_view = False
@@ -836,16 +858,25 @@ class ASOServerJob(object):
                 with open("aso_status.json") as fd:
                     aso_info = json.load(fd)
             except:
-                self.logger.exception("Failed to load common ASO status.")
-                return self.get_transfers_statuses_fallback()
+                msg = "Failed to load transfer cache."
+                self.logger.exception(msg)
+                raise TransferCacheLoadError(msg)
             last_query = aso_info.get("query_timestamp", 0)
+            last_jobid = aso_info.get("query_jobid", "unknown")
+            last_succeded = aso_info.get("query_succeded", True)
             # We can use the cached data if:
             # - It is from the last 5 minutes, AND
             # - It is from after we submitted the transfer.
             # Without the second condition, we run the risk of using the previous stageout
             # attempts results.
-            if (time.time() - last_query < 300) and (last_query > self.aso_start_timestamp):
+            if (time.time() - last_query < 600) and (last_query > self.aso_start_timestamp):
                 query_view = False
+                if not last_succeded:
+                    #no point in continuing if the last query failed. Just defer the PJ and retry later
+                    msg = ("Not using info about transfer statuses from the trasnfer cache. "
+                           "Deferring the postjob."
+                           "PJ num %s failed to load the information from the DB and cache has not expired yet." % last_jobid)
+                    raise TransferCacheLoadError(msg)
             for doc_info in self.docs_in_transfer:
                 doc_id = doc_info['doc_id']
                 if doc_id not in aso_info.get("results", {}):
@@ -861,21 +892,33 @@ class ASOServerJob(object):
                     for view_result in view_results:
                         view_results_dict[view_result['id']] = view_result
                 except:
-                    self.logger.exception("Error while querying the RDBMS database.")
-                    return self.get_transfers_statuses_fallback()
-                aso_info = {"query_timestamp": time.time(), "results": view_results_dict}
+                    msg = "Error while querying the NoSQL (Couch) database."
+                    self.logger.exception(msg)
+                    self.build_failed_cache()
+                    raise TransferCacheLoadError(msg)
+                aso_info = {
+                    "query_timestamp": time.time(),
+                    "query_succeded": True,
+                    "query_jobid": self.job_id,
+                    "results": view_results_dict,
+                }
                 tmp_fname = "aso_status.%d.json" % (os.getpid())
                 with open(tmp_fname, 'w') as fd:
                     json.dump(aso_info, fd)
                 os.rename(tmp_fname, "aso_status.json")
             else:
                 self.logger.debug("Using cached ASO results.")
+            #Is this ever happening?
             if not aso_info:
-                return self.get_transfers_statuses_fallback()
+                raise TransferCacheLoadError("Unexpected error. aso_info is not set. Deferring postjob")
             for doc_info in self.docs_in_transfer:
                 doc_id = doc_info['doc_id']
                 if doc_id not in aso_info.get("results", {}):
-                    return self.get_transfers_statuses_fallback()
+                    ## This is a legitimate use case. It can happen if the document has just been injected
+                    ## (e.g.: transfer injected in the PJ and not in the WN). In this case the cache does not
+                    ## have the document yet, so we defer the postjob.
+                    msg = "Document with id %s not found in the transfer cache." % doc_id
+                    raise TransferCacheLoadError(msg)
                 ## Use the start_time parameter to check whether the transfer state in aso_info
                 ## corresponds to the document we have to monitor. The reason why we have to do
                 ## this check is because the information in aso_info might have been obtained by
@@ -917,9 +960,16 @@ class ASOServerJob(object):
                     for document in view_results_dict:
                         view_results_dict[document][0]['state'] = TRANSFERDB_STATES[view_results_dict[document][0]['transfer_state']].lower()
                 except:
-                    self.logger.exception("Error while querying the RDBMS database.")
-                    return self.get_transfers_statuses_fallback()
-                aso_info = {"query_timestamp": time.time(), "results": view_results_dict}
+                    msg = "Error while querying the RDBMS (Oracle) database."
+                    self.logger.exception(msg)
+                    self.build_failed_cache()
+                    raise TransferCacheLoadError(msg)
+                aso_info = {
+                    "query_timestamp": time.time(),
+                    "query_succeded": True,
+                    "query_jobid": self.job_id,
+                    "results": view_results_dict,
+                }
                 tmp_fname = "aso_status.%d.json" % (os.getpid())
                 with open(tmp_fname, 'w') as fd:
                     json.dump(aso_info, fd)
@@ -927,12 +977,12 @@ class ASOServerJob(object):
             else:
                 self.logger.debug("Using cached ASO results.")
             if not aso_info:
-                return self.get_transfers_statuses_fallback()
+                raise TransferCacheLoadError("Unexpected error. aso_info is not set. Deferring postjob")
             for doc_info in self.docs_in_transfer:
                 doc_id = doc_info['doc_id']
                 if doc_id not in aso_info.get("results", {}):
-                    return self.get_transfers_statuses_fallback()
-                ## Not checking timestamps for oracle since we are not injecting from WN
+                    msg = "Document with id %s not found in the transfer cache. Deferring PJ." % doc_id
+                    raise TransferCacheLoadError(msg)                ## Not checking timestamps for oracle since we are not injecting from WN
                 ## and it cannot happen that condor restarts screw up things.
                 transfer_status = aso_info['results'][doc_id][0]['state']
                 statuses.append(transfer_status)
@@ -1087,7 +1137,7 @@ class ASOServerJob(object):
                         notfailedFiles = killedFiles[0]['result'][0]['killed']
                         if failedFiles:
                             not_cancelled.append(docIdKill)
-                        elif notFailedFiles:
+                        elif notfailedFiles:
                             cancelled.append(docIdKill)
                     else:
                         cancelled.append(docIdKill)
@@ -2717,8 +2767,10 @@ class PostJob():
 class PermanentStageoutError(RuntimeError):
     pass
 
-
 class RecoverableStageoutError(RuntimeError):
+    pass
+
+class TransferCacheLoadError(RuntimeError):
     pass
 
 ##==============================================================================

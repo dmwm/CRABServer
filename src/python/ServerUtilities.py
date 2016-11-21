@@ -436,3 +436,10 @@ def getColumn(dictresult, columnName):
         return None
     else:
         return value
+
+
+@contextlib.contextmanager
+def getLock(name):
+    with open(name + '.lock', 'a+') as fd:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield fd
