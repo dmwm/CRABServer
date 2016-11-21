@@ -106,8 +106,19 @@ class DagmanResubmitter(TaskAction):
         overwrite = False
         for taskparam in params.values():
             if ('resubmit_'+taskparam in task) and task['resubmit_'+taskparam] != None:
+                # In case resubmission parameters contain a list of unicode strings, 
+                # convert it to a list of ascii strings because of HTCondor unicode
+                # incompatibility.
+                # Note that unicode strings that are not in a list are not handled,
+                # but so far they don't exist in this part of the code.
                 if isinstance(task['resubmit_'+taskparam], list):
-                    ad[taskparam] = task['resubmit_'+taskparam]
+                    nonUnicodeList = []
+                    for p in task['resubmit_'+taskparam]:
+                        if isinstance(p, unicode):
+                            nonUnicodeList.append(p.encode('ascii', 'ignore'))
+                        else:
+                            nonUnicodeList.append(p)
+                    ad[taskparam] = nonUnicodeList
                 if taskparam != 'jobids':
                     overwrite = True
 
@@ -137,7 +148,7 @@ class DagmanResubmitter(TaskAction):
                                 self.logger.debug("Setting %s = True in the task ad." % (adparam))
                                 schedd.edit(rootConst, adparam, classad.ExprTree("true"))
                             else:
-                                schedd.edit(rootConst, adparam, ad[taskparam])
+                                schedd.edit(rootConst, adparam, ad.lookup(taskparam))
                         elif task['resubmit_'+taskparam] != None:
                             schedd.edit(rootConst, adparam, str(task['resubmit_'+taskparam]))
                     schedd.act(htcondor.JobAction.Release, rootConst)
