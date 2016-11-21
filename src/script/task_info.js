@@ -16,8 +16,10 @@ $(document).ready(function() {
         userWebDir = "",
         scriptExe = "",
         inputDataset = "",
+        outputDataset = "",
         proxiedWebDirUrl = "",
-        dbsInstance = "";
+        dbsInstance = "",
+        dbsPublicationInstance = "";
 
     // If a parameter "task" exists in the URL, tries to load task info the same way a form submit loads it.
     processPageUrl();
@@ -64,7 +66,8 @@ $(document).ready(function() {
      * Has to be run after displayTaskInfo
      */
     function loadGlobalDataFromTaskInfo() {
-        userWebDir = "", username = "", cacheUrl = "", scriptExe = "", inputDataset = "";
+        userWebDir = "", username = "", cacheUrl = "", scriptExe = "", inputDataset = "",
+        outputDataset = "";
 
         if (taskInfo != undefined && taskInfo != "") {
             for (var i = 0; i < taskInfo.desc.columns.length; i++) {
@@ -89,6 +92,20 @@ $(document).ready(function() {
                         // RegExp to extract the DBS instance
                         re = /(\/cmsweb.cern.ch\/dbs\/)(.+)(\/DBSReader)/;
                         dbsInstance = taskInfo.result[i].match(re)[2];
+                        break;
+                    case "tm_publish_dbs_url":
+                        // RegExp to extract the DBS publication instance
+                        re = /(\/cmsweb.cern.ch\/dbs\/)(.+)(\/DBSWriter)/;
+                        dbsPublicationInstance = taskInfo.result[i].match(re)[2];
+                        break;
+                    case "tm_output_dataset":
+                        // Extract the output dataset name (/A/B/C) from a string like this:
+                        // ['/A/B/C']
+                        re = /\['(.+)'\]/;
+                        if (taskInfo.result[i] !== "None") {
+                            outputDataset = taskInfo.result[i].match(re)[1];
+                        }
+                        break;
                     default:
                         break;
                 }
@@ -280,7 +297,14 @@ $(document).ready(function() {
             var dashboardUrl = "http://dashb-cms-job.cern.ch/dashboard/templates/" +
                 "task-analysis/#user=" + username + "&table=" + inputTaskName + "$table=Mains&pattern=" + inputTaskName;
 
-            var dasUrl = "https://cmsweb.cern.ch/das/request?view=list&limit=50" + "&instance=" + dbsInstance + "&input=" + inputDataset;
+            var dasInputUrl = "https://cmsweb.cern.ch/das/request?view=list&limit=50&instance=" + dbsInstance + "&input=" + inputDataset;
+
+            if (outputDataset !== "") {
+                var dasOutputUrl = "https://cmsweb.cern.ch/das/request?instance=" + dbsPublicationInstance + "&input=" + outputDataset;
+                $("#main-das-link-output").removeClass("disabled");
+                $("#main-das-link-output").attr("href", dasOutputUrl);
+                $("#main-das-link-output").text("DAS Output");
+            }
 
             $("#main-dashboard-link").attr("href", dashboardUrl);
 
@@ -290,8 +314,9 @@ $(document).ready(function() {
             } else {
                 webDirUrlToDisplay = proxiedWebDirUrl;
             }
+
             $("#main-webdir-link").attr("href", webDirUrlToDisplay);
-            $("#main-das-link").attr("href", dasUrl);
+            $("#main-das-link-input").attr("href", dasInputUrl);
 
             var url = taskStatusUrl + inputTaskName;
 
@@ -575,6 +600,15 @@ $(document).ready(function() {
     }
 
     function clearPreviousContent() {
+        $("#main-dashboard-link").attr("href", "#");
+        $("#main-webdir-link").attr("href", "#");
+        $("#main-das-link-input").attr("href", "#");
+
+        $("#main-das-link-output").addClass("disabled");
+        $("#main-das-link-output").attr("href", "#");
+        $("#main-das-link-output").text("Publication info unavailable");
+
+
         $("#taskworker-log-link").attr("href", "#");
         $("#upload-log-link").attr("href", "#");
 
