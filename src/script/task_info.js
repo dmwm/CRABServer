@@ -295,7 +295,7 @@ $(document).ready(function() {
         if (userWebDir !== "" && inputTaskName !== "" && inputTaskName !== undefined) {
 
             var dashboardUrl = "http://dashb-cms-job.cern.ch/dashboard/templates/" +
-                "task-analysis/#user=" + username + "&table=" + inputTaskName + "$table=Mains&pattern=" + inputTaskName;
+                "task-analysis/#user=" + username + "&table=Mains&pattern=" + inputTaskName;
 
             var dasInputUrl = "https://cmsweb.cern.ch/das/request?view=list&limit=50&instance=" + dbsInstance + "&input=" + inputDataset;
 
