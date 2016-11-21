@@ -14,6 +14,7 @@ import calendar
 import datetime
 import traceback
 import subprocess
+import contextlib
 from httplib import HTTPException
 from WMCore.WMExceptions import STAGEOUT_ERRORS
 
@@ -423,3 +424,10 @@ def getColumn(dictresult, columnName):
         return None
     else:
         return value
+
+
+@contextlib.contextmanager
+def getLock(name):
+    with open(name + '.lock', 'a+') as fd:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield fd
