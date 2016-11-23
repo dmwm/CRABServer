@@ -8,6 +8,7 @@ from __future__ import absolute_import
 import os
 import re
 import time
+import fcntl
 import urllib
 import hashlib
 import calendar
