@@ -2094,7 +2094,7 @@ class PostJob():
             self.logger.warning(msg)
             temp_storage_site = self.executed_site
         configreq = {'taskname'        : self.reqname,
-                     'obid'      : self.job_id,
+                     'jobid'      : self.job_id,
                      'outsize'         : self.job_report.get(u'log_size', 0),
                      'publishdataname' : self.publish_name,
                      'appver'          : self.job_sw,
