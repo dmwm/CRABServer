@@ -869,7 +869,7 @@ class ASOServerJob(object):
             # - It is from after we submitted the transfer.
             # Without the second condition, we run the risk of using the previous stageout
             # attempts results.
-            if (time.time() - last_query < 600) and (last_query > self.aso_start_timestamp):
+            if (time.time() - last_query < 900) and (last_query > self.aso_start_timestamp):
                 query_view = False
                 if not last_succeded:
                     #no point in continuing if the last query failed. Just defer the PJ and retry later
