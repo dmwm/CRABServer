@@ -89,6 +89,11 @@ alter table tasks add (tm_debug_files VARCHAR(255));
 alter table tasks add (tm_submitter_ip_addr VARCHAR(45));
 alter table tasks add (tm_ignore_global_blacklist VARCHAR(1))
 
---Changes needed for the Autmatic Splitting (or resplitting)
+--Changse that will be needed for version 3.3.1612
+
+--Changes for the Autmatic Splitting (or resplitting).
 alter table filemetadata add (job_id VARCHAR(20));
 alter table filemetadata modify (panda_job_id null);
+
+--Other changes
+alter table tasks add (tm_last_publication TIMESTAMP);

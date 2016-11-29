@@ -222,7 +222,7 @@ class RESTTask(RESTEntity):
         row = self.Task.ID_tuple(*rows[0])
         warnings = literal_eval(row.task_warnings.read() if row.task_warnings else '[]')
         if warning in warnings:
-            self.logger.info("Warning message already present in the task database. Will not add it again.") 
+            self.logger.info("Warning message already present in the task database. Will not add it again.")
             return []
         if len(warnings)>10:
             raise ExecutionError("You cannot add more than 10 warnings to a task")
@@ -247,6 +247,22 @@ class RESTTask(RESTEntity):
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
 
         self.api.modify(self.Task.UpdateSchedd_sql, scheddname=[str(kwargs['scheddname'])], workflow=[workflow])
+
+        return []
+
+
+    def updatepublicationtime(self, **kwargs):
+        """ Change last publication time for task.
+            curl -X POST 'https://mmascher-gwms.cern.ch/crabserver/dev/task' -ks --key $X509_USER_PROXY --cert $X509_USER_PROXY --cacert $X509_USER_PROXY \
+                    -d 'subresource=updatepublicationtime&workflow=161128_202743:mmascher_crab_test_preprodaso_preprodorammascher-gwms_0' -v
+        """
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+
+        workflow = kwargs['workflow']
+        authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
+
+        self.api.modify(self.Task.UpdatePublicationTime_sql, workflow=[workflow])
 
         return []
 

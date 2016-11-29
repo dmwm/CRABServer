@@ -88,3 +88,6 @@ class Task(object):
 
     UpdateSchedd_sql = """UPDATE tasks SET tm_schedd = %(scheddname)s \
                               WHERE tm_taskname = %(workflow)s"""
+
+    UpdatePublicationTime_sql = """UPDATE tasks SET tm_last_publication = UTC_TIMESTAMP() \
+                              WHERE tm_taskname = %(workflow)s"""
