@@ -368,6 +368,9 @@ class RESTFileTransfers(RESTEntity):
             sqlQuery, binds = self.getGroupedPublicationQuery(grouping, username, taskname, asoworker)
             rows = self.api.query(None, None, sqlQuery, **binds)
             return rows
+        elif subresource == 'activeUsers':
+            rows = self.api.query(None, None, self.transferDB.GetActiveUsers_sql)
+            return rows
 
 
     @restcall

@@ -104,7 +104,7 @@ RX_SCHEDULER = re.compile(r"^panda|condor$")
 
 # File Transfers api
 RX_SUBPOSTTRANSFER = re.compile(r"^acquireTransfers|acquirePublication|updateTransfers|updatePublication|retryPublication|retryTransfers|killTransfers$")
-RX_SUBGETTRANSFER = re.compile(r"^acquiredTransfers|acquiredPublication|getVOMSAttributesForTask|groupedTransferStatistics|groupedPublishStatistics$")
+RX_SUBGETTRANSFER = re.compile(r"^acquiredTransfers|acquiredPublication|getVOMSAttributesForTask|groupedTransferStatistics|groupedPublishStatistics|activeUsers$")
 RX_USERGROUP = RX_ANYTHING
 RX_USERROLE = RX_ANYTHING
 # 0 - False
