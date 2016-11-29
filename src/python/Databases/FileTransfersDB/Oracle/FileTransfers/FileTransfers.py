@@ -23,6 +23,7 @@ class FileTransfers(object):
                                tm_transfer_state = :new_transfer_state \
                             WHERE tm_aso_worker IS NULL AND \
                                   tm_transfer_state = :transfer_state AND \
+                                  tm_username = :username AND \
                                   rownum <= :limit"
 
     AcquirePublication_sql = "UPDATE filetransfersdb SET tm_last_update = :last_update, \

@@ -39,6 +39,7 @@ class RESTFileTransfers(RESTEntity):
             # and all validation is in post function
             validate_str("subresource", param, safe, RX_SUBPOSTTRANSFER, optional=False)
             validate_str("asoworker", param, safe, RX_ASO_WORKERNAME, optional=False)
+            validate_str("username", param, safe, RX_USERNAME, optional=True)
             validate_str("list_of_ids", param, safe, RX_ANYTHING, optional=True)
             validate_str("list_of_transfer_state", param, safe, RX_ANYTHING, optional=True)
             validate_str("list_of_failure_reason", param, safe, RX_ANYTHING, optional=True)
@@ -88,6 +89,7 @@ class RESTFileTransfers(RESTEntity):
             binds['limit'] = [1000]
             binds['transfer_state'] = [TRANSFERDB_STATUSES['NEW']]
             binds['new_transfer_state'] = [TRANSFERDB_STATUSES['ACQUIRED']]
+            binds['username'] = [kwargs['username']]
             return self.api.modifynocheck(self.transferDB.AcquireTransfers_sql, **binds)
 
         elif subresource == 'acquirePublication':
