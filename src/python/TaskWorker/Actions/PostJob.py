@@ -473,13 +473,13 @@ class ASOServerJob(object):
         ## Add the post-job exit code and error message to the job report.
         job_report = {}
         try:
-            with open(G_JOB_REPORT_NAME_NEW) as fd:
+            with open(G_JOB_REPORT_NAME) as fd:
                 job_report = json.load(fd)
         except (IOError, ValueError):
             pass
-        job_report['aso_start_time'] = int(time.time())
-        job_report['aso_start_timestamp'] = str(datetime.datetime.now())
-        with open(G_JOB_REPORT_NAME_NEW, 'w') as fd:
+        job_report['aso_start_timestamp'] = int(time.time())
+        job_report['aso_start_time'] = str(datetime.datetime.now())
+        with open(G_JOB_REPORT_NAME, 'w') as fd:
             json.dump(job_report, fd)
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
