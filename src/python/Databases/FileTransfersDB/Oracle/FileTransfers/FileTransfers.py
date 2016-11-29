@@ -23,6 +23,7 @@ class FileTransfers(object):
                                tm_transfer_state = :new_transfer_state \
                             WHERE tm_aso_worker IS NULL AND \
                                   tm_transfer_state = :transfer_state AND \
+                                  tm_username = :username AND \
                                   rownum <= :limit"
 
     AcquirePublication_sql = "UPDATE filetransfersdb SET tm_last_update = :last_update, \
@@ -244,3 +245,6 @@ class FileTransfers(object):
                                      WHERE tm_username = :username AND tm_taskname = :taskname"  # ORDER BY tm_job_retry_count"
     GetTaskStatusForPublication_sql = "SELECT tm_id, tm_jobid, tm_publication_state, tm_start_time, tm_last_update FROM filetransfersdb \
                                        WHERE tm_username = :username AND tm_taskname = :taskname"  # ORDER BY tm_job_retry_count"
+
+    GetActiveUsers_sql = "SELECT DISTINCT(tm_username) FROM filetransfersdb WHERE tm_transfer_state=0 AND tm_aso_worker=NULL"
+

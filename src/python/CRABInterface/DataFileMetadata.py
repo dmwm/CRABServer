@@ -21,9 +21,10 @@ class DataFileMetadata(object):
         binds = {'taskname': taskname, 'filetype': filetype, 'howmany': howmany}
         rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, **binds)
         for row in rows:
-            row = self.FileMetaData.GetFromTaskAndType_sql(*row)
+            row = self.FileMetaData.GetFromTaskAndType_tuple(*row)
             yield json.dumps({'taskname': taskname,
                    'filetype': filetype,
+                   #TODO pandajobid should not be used. Let's wait a "quiet release" and remove it
                    'pandajobid': row.pandajobid,
                    'jobid': row.jobid,
                    'outdataset': row.outdataset,

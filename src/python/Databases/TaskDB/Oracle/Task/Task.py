@@ -161,3 +161,7 @@ class Task(object):
     #UpdateSchedd_sql
     UpdateSchedd_sql = """UPDATE tasks SET tm_schedd = :scheddname \
                               WHERE tm_taskname = :workflow"""
+
+    #UpdatePublicationTime_sql
+    UpdatePublicationTime_sql = """UPDATE tasks SET tm_last_publication = SYS_EXTRACT_UTC(SYSTIMESTAMP) \
+                              WHERE tm_taskname = :workflow"""

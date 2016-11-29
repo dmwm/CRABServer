@@ -17,11 +17,11 @@ class FileMetaData(object):
     ChangeFileState_sql = """UPDATE filemetadata SET fmd_filestate=:filestate \
                              WHERE fmd_lfn=:outlfn and tm_taskname=:taskname """
 
-    GetFromTaskAndType_tuple = namedtuple("GetFromTaskAndType", ["panda_job_id",
+    GetFromTaskAndType_tuple = namedtuple("GetFromTaskAndType", ["pandajobid",
                            "jobid",
                            "outdataset",
-                           "acqera",
-                           "swver",
+                           "acquisitionera",
+                           "swversion",
                            "inevents",
                            "globaltag",
                            "publishname",
@@ -32,13 +32,13 @@ class FileMetaData(object):
                            "cksum",
                            "md5",
                            "lfn",
-                           "size",
-                           "parent",
-                           "filestate",
-                           "creationtime",
+                           "filesize",
+                           "parents",
+                           "state",
+                           "created",
                            "tmplfn",
                            "type",
-                           "directstageoutt"])
+                           "directstageout"])
     GetFromTaskAndType_sql = """SELECT panda_job_id AS pandajobid, \
                            job_id AS jobid, \
                            fmd_outdataset AS outdataset, \
