@@ -831,6 +831,7 @@ class ASOServerJob(object):
             "query_timestamp": time.time(),
             "query_succeded": False,
             "query_jobid": self.job_id,
+            "results": {},
         }
         tmp_fname = "aso_status.%d.json" % (os.getpid())
         with open(tmp_fname, 'w') as fd:
