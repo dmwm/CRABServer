@@ -289,7 +289,7 @@ $(document).ready(function() {
 
 
     /**
-     * Displays main page information - sets correct links and loads task status.
+     * Displays main page information - sets correct links and loads task status
      */
     function displayMainPage(errHandler) {
         if (userWebDir !== "" && inputTaskName !== "" && inputTaskName !== undefined) {

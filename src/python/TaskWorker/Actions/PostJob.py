@@ -866,7 +866,7 @@ class ASOServerJob(object):
             last_jobid = aso_info.get("query_jobid", "unknown")
             last_succeded = aso_info.get("query_succeded", True)
             # We can use the cached data if:
-            # - It is from the last 5 minutes, AND
+            # - It is from the last 15 minutes, AND
             # - It is from after we submitted the transfer.
             # Without the second condition, we run the risk of using the previous stageout
             # attempts results.
