@@ -5,7 +5,7 @@ from WMCore.REST.Error import InvalidParameter, UnsupportedMethod
 
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_operator_without_raise
-from CRABInterface.Regexps import RX_USERNAME, RX_TASKNAME, RX_SUBGETTRANSFER, RX_SUBPOSTTRANSFER, \
+from CRABInterface.Regexps import RX_USERNAME, RX_VOPARAMS, RX_TASKNAME, RX_SUBGETTRANSFER, RX_SUBPOSTTRANSFER, \
                                   RX_USERGROUP, RX_USERROLE, RX_CMSSITE, RX_ASO_WORKERNAME, RX_ANYTHING
 
 from ServerUtilities import TRANSFERDB_STATUSES, PUBLICATIONDB_STATUSES
@@ -52,6 +52,8 @@ class RESTFileTransfers(RESTEntity):
         elif method in ['GET']:
             validate_str("subresource", param, safe, RX_SUBGETTRANSFER, optional=False)
             validate_str("username", param, safe, RX_USERNAME, optional=True)
+            validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
+            validate_str("vorole", param, safe, RX_VOPARAMS, optional=True)
             validate_str("taskname", param, safe, RX_TASKNAME, optional=True)
             validate_str("destination", param, safe, RX_CMSSITE, optional=True)
             validate_str("source", param, safe, RX_CMSSITE, optional=True)
@@ -109,7 +111,7 @@ class RESTFileTransfers(RESTEntity):
             # by meaning if we have 2 ASO concurrent running, each of them can acquire multiple files
             # from same task. Maybe is good to enforce acquire only for tasks which do not have
             # asoworker defined. This would enforce to group files per and lower a bit load on dbs.
-	    binds['publish_flag'] = [1]
+            binds['publish_flag'] = [1]
             binds['transfer_state'] = [TRANSFERDB_STATUSES['DONE']]
             binds['publication_state'] = [PUBLICATIONDB_STATUSES['NEW']]
             binds['new_publication_state'] = [PUBLICATIONDB_STATUSES['ACQUIRED']]
@@ -127,7 +129,7 @@ class RESTFileTransfers(RESTEntity):
             # 2 items, Required keys are:
             # ([str, str]) list_of_ids: list of ids which are in database.
             # ([str, str]) list_of_transfer_state: transfer_state which is one of: ['FAILED', 'DONE', 'RETRY', 'SUBMITTED', 'KILLED']
-	    # optional: ([str, str]) list_of_failure_reason
+            # optional: ([str, str]) list_of_failure_reason
             # :::::::
             # 4 items, Required keys are:
             # ([str, str]) list_of_ids: list of ids which are in database.
@@ -258,7 +260,7 @@ class RESTFileTransfers(RESTEntity):
                 self.api.modify(self.transferDB.KillTransfers_sql, **binds)
 
     @restcall
-    def get(self, subresource, username, taskname, destination, source, asoworker, grouping, limit):
+    def get(self, subresource, username, vogroup, vorole, taskname, destination, source, asoworker, grouping, limit):
         """ Retrieve all docs from DB for specific parameters.
             """
         binds = {}
@@ -311,8 +313,12 @@ class RESTFileTransfers(RESTEntity):
                     # Return: Docs, which match these conditions: asoworker, state = ACQUIRED, username
                     # ---------------------------------------------
                     if not username:
-                        raise InvalidParameter('Taskname is not defined')
+                        raise InvalidParameter('Username is not defined')
+                    #Oracle treats NULL diffrently in query, you have to specifically do param is NULL., param = NULL does not work.
+                    #Replacing with 'None' here and using NVL in the query fixes this issue
                     binds['username'] = username
+                    binds['vogroup'] = vogroup if vogroup is not None else 'None'
+                    binds['vorole'] = vorole if vorole is not None else 'None'
                     sqlQuery = self.transferDB.GetDocsTransfer1_sql
                 elif grouping == 2:
                     # ---------------------------------------------
@@ -369,7 +375,7 @@ class RESTFileTransfers(RESTEntity):
             rows = self.api.query(None, None, sqlQuery, **binds)
             return rows
         elif subresource == 'activeUsers':
-            rows = self.api.query(None, None, self.transferDB.GetActiveUsers_sql)
+            rows = self.api.query(None, None, self.transferDB.GetActiveUsers_sql, asoworker=asoworker)
             return rows
 
 

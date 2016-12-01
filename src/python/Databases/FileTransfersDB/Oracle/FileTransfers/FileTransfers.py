@@ -96,6 +96,8 @@ class FileTransfers(object):
 			    LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
                             WHERE f.tm_transfer_state = :state AND \
                                   f.tm_username = :username AND \
+                                  NVL(t.tm_user_role, 'None') = :vorole AND \
+                                  NVL(t.tm_user_group, 'None') = :vogroup AND \
                                   f.tm_aso_worker = :asoworker AND \
                                   rownum < :limit \
                             ORDER BY rownum"
@@ -246,5 +248,7 @@ class FileTransfers(object):
     GetTaskStatusForPublication_sql = "SELECT tm_id, tm_jobid, tm_publication_state, tm_start_time, tm_last_update FROM filetransfersdb \
                                        WHERE tm_username = :username AND tm_taskname = :taskname"  # ORDER BY tm_job_retry_count"
 
-    GetActiveUsers_sql = "SELECT DISTINCT(tm_username) FROM filetransfersdb WHERE tm_transfer_state=0 AND tm_aso_worker=NULL"
+    GetActiveUsers_sql = "SELECT t.tm_username, t.tm_user_role, t.tm_user_group, count(*) FROM filetransfersdb f LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
+                                       WHERE (tm_transfer_state=0 AND tm_aso_worker IS NULL) OR (tm_transfer_state=1 AND tm_aso_worker=:asoworker) GROUP BY t.tm_username,t.tm_user_role,t.tm_user_group"
+
 
