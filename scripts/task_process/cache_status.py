@@ -180,14 +180,11 @@ def parseJobLog(fp, nodes, node_map):
         while len(info['WallDurations']) > len(info['SiteHistory']):
             info['SiteHistory'].append("Unknown")
 
-def parseErrorReport(fp, nodes):
-    def last(joberrors):
-        return joberrors[max(joberrors, key=int)]
-    data = json.load(fp)
+def parseErrorReport(data, nodes):
     #iterate over the jobs and set the error dict for those which are failed
     for jobid, statedict in nodes.iteritems():
         if 'State' in statedict and statedict['State'] == 'failed' and jobid in data:
-            statedict['Error'] = last(data[jobid]) #data[jobid] contains all retries. take the last one
+            statedict['Error'] = data[jobid].values()[0] #data[jobid] contains all retries. take the last one
 
 def parseNodeStateV2(fp, nodes):
     """
@@ -251,23 +248,25 @@ def storeNodesInfoInFile():
             logging.debug("cache file found, opening and reading")
             nodes_storage = open(filename, "r")
 
-            last_read_until = int(nodes_storage.readline())
+            job_log_checkpoint = int(nodes_storage.readline())
+            fjr_parse_res_checkpoint = int(nodes_storage.readline())
             nodes = ast.literal_eval(nodes_storage.readline())
             node_map = ast.literal_eval(nodes_storage.readline())
             nodes_storage.close()
         else:
             logging.debug("cache file not found, creating")
-            last_read_until = 0
+            job_log_checkpoint = 0
+            fjr_parse_res_checkpoint = 0
             nodes = {}
             node_map = {}
     except Exception:
         logging.exception("error during status_cache handling")
     jobsLog = open("job_log", "r")
 
-    jobsLog.seek(last_read_until)
+    jobsLog.seek(job_log_checkpoint)
 
     parseJobLog(jobsLog, nodes, node_map)
-    read_until = jobsLog.tell()
+    new_job_log_checkpoint = jobsLog.tell()
     jobsLog.close()
 
     for fn in glob.glob("node_state*"):
@@ -275,10 +274,9 @@ def storeNodesInfoInFile():
             parseNodeStateV2(node_state, nodes)
 
     try:
-        errorSummary = open("error_summary.json", "r")
-        errorSummary.seek(0)
-        parseErrorReport(errorSummary, nodes)
-        errorSummary.close()
+        errorSummary, new_fjr_parse_res_checkpoint = summarizeFjrParseResults(fjr_parse_res_checkpoint)
+        if errorSummary and new_fjr_parse_res_checkpoint:
+            parseErrorReport(errorSummary, nodes)
     except IOError:
         logging.exception("error during error_summary file handling")
 
@@ -287,12 +285,41 @@ def storeNodesInfoInFile():
     temp_filename = (filename + ".%s") % os.getpid()
 
     nodes_storage = open(temp_filename, "w")
-    nodes_storage.write(str(read_until) + "\n")
+    nodes_storage.write(str(new_job_log_checkpoint) + "\n")
+    nodes_storage.write(str(new_fjr_parse_res_checkpoint) + "\n")
     nodes_storage.write(str(nodes) + "\n")
     nodes_storage.write(str(node_map) + "\n")
     nodes_storage.close()
 
     move(temp_filename, filename)
+
+def summarizeFjrParseResults(checkpoint):
+    '''
+    Reads the fjr_parse_results file line by line. The file likely contains multiple
+    errors for the same job_id coming from different retries, we only care about
+    the last error for each job_id. Since each postjob writes this information
+    sequentially (job retry #2 will be written after job retry #1), overwrite
+    whatever information there was before for each job_id.
+
+    Return the updated error dictionary and also the location until which the
+    fjr_parse_results file was read so that we can store it and
+    don't have t re-read the same information next time the cache_status.py runs.
+    '''
+
+    if os.path.exists("task_process/fjr_parse_results.txt"):
+        with open("task_process/fjr_parse_results.txt", "r") as f:
+            f.seek(checkpoint)
+            content = f.readlines()
+            new_checkpoint = f.tell()
+
+        err_dict = {}
+        for line in content:
+            fjr_result = ast.literal_eval(line)
+            job_id = fjr_result.keys()[0]
+            err_dict[job_id] = fjr_result[job_id]
+        return err_dict, new_checkpoint
+    else:
+        return None, 0
 
 def main():
     try:
