@@ -157,11 +157,11 @@ class HTCondorDataWorkflow(DataWorkflow):
         transferingIds = [str(intTransferingId) for intTransferingId in transferingIds]
         finishedIds = [str(intFinishedId) for intFinishedId in finishedIds]
 
-        rows = filter(lambda row: row[GetFromTaskAndType.JOBID] in jobids, rows)
+        rows = filter(lambda row: ((row[GetFromTaskAndType.JOBID] in jobids) or (str(row[GetFromTaskAndType.PANDAID])) in jobids), rows)
         #jobids=','.join(map(str,jobids)), limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
         for row in rows:
             try:
-                jobid = row[GetFromTaskAndType.JOBID]
+                jobid = row[GetFromTaskAndType.JOBID] or str(row[GetFromTaskAndType.PANDAID])
                 if row[GetFromTaskAndType.DIRECTSTAGEOUT]:
                     lfn  = row[GetFromTaskAndType.LFN]
                     site = row[GetFromTaskAndType.LOCATION]
@@ -226,7 +226,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         # Return only the info relevant to the client.
         res['runsAndLumis'] = {}
         for row in rows:
-            jobidstr = str(row[GetFromTaskAndType.PANDAID])
+            jobidstr = row[GetFromTaskAndType.JOBID] or str(row[GetFromTaskAndType.PANDAID])
             retRow = {'parents': row[GetFromTaskAndType.PARENTS].read(),
                       'runlumi': row[GetFromTaskAndType.RUNLUMI].read(),
                       'events': row[GetFromTaskAndType.INEVENTS],
@@ -379,7 +379,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## Extract from the filemetadata the necessary information.
         res['runsAndLumis'] = {}
         for row in rows:
-            jobidstr = str(row[GetFromTaskAndType.PANDAID])
+            jobidstr = row[GetFromTaskAndType.JOBID] or str(row[GetFromTaskAndType.PANDAID])
             if statusPerJob.get(jobidstr) in ['finished']:
                 if jobidstr not in res['runsAndLumis']:
                     res['runsAndLumis'][jobidstr] = []
