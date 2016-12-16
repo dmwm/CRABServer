@@ -67,5 +67,5 @@ class Create(DBCreator):
         CONSTRAINT id_pk PRIMARY KEY(tm_id),
         CONSTRAINT fk_tm_taskname_ftdb FOREIGN KEY (tm_taskname) REFERENCES tasks (tm_taskname)
         )
-"""
+    """
 

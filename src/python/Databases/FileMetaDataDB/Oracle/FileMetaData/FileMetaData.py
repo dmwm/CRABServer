@@ -7,8 +7,8 @@ class GetFromTaskAndType():
     """ Used for indexing columns retrieved by the GetFromTaskAndType_sql query
         Order of parameters must be the same as it is in query GetFromTaskAndType_sql
     """
-    PANDAID, OUTDS, ACQERA, SWVER, INEVENTS, GLOBALTAG, PUBLISHNAME, LOCATION, TMPLOCATION, RUNLUMI, ADLER32, CKSUM, MD5, LFN, SIZE, PARENTS, STATE,\
-    CREATIONTIME, TMPLFN, TYPE, DIRECTSTAGEOUT = range(21)
+    PANDAID, JOBID, OUTDS, ACQERA, SWVER, INEVENTS, GLOBALTAG, PUBLISHNAME, LOCATION, TMPLOCATION, RUNLUMI, ADLER32, CKSUM, MD5, LFN, SIZE, PARENTS, STATE,\
+    CREATIONTIME, TMPLFN, TYPE, DIRECTSTAGEOUT = range(22)
 
 class FileMetaData(object):
     """
