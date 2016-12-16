@@ -23,6 +23,7 @@ class Create(DBCreator):
 
         self.create = {}
         self.constraints = {}
+        self.create['i_transfers'] = "CREATE INDEX TM_TASKNAME_IDX ON FILETRANSFERSDB (TM_TASKNAME)"
         #  //
         # // Define create statements for each table
         # //
@@ -64,6 +65,7 @@ class Create(DBCreator):
         tm_start_time NUMBER(11) NOT NULL,
         tm_end_time NUMBER(11),
         CONSTRAINT id_pk PRIMARY KEY(tm_id),
-        CONSTRAINT fk_tm_taskname FOREIGN KEY (tm_taskname) REFERENCES tasks (tm_taskname)
+        CONSTRAINT fk_tm_taskname_ftdb FOREIGN KEY (tm_taskname) REFERENCES tasks (tm_taskname)
         )
-        """
+"""
+
