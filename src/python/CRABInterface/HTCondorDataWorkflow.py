@@ -149,23 +149,31 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         self.logger.debug("Retrieving the %s files of the following jobs: %s" % (file_type, jobids))
         rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow, howmany = howmany)
-        rows = filter(lambda row: row[GetFromTaskAndType.PANDAID] in jobids, rows)
+
+        # HOTFIX: Convert integer jobId lists to string because the JobIds
+        # coming from the database after automatic splitting changes are strings
+        # (can look like '2-1').
+        jobids = [str(intJobId) for intJobId in jobids]
+        transferingIds = [str(intTransferingId) for intTransferingId in transferingIds]
+        finishedIds = [str(intFinishedId) for intFinishedId in finishedIds]
+
+        rows = filter(lambda row: ((row[GetFromTaskAndType.JOBID] in jobids) or (str(row[GetFromTaskAndType.PANDAID])) in jobids), rows)
         #jobids=','.join(map(str,jobids)), limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
         for row in rows:
             try:
-                jobid = row[GetFromTaskAndType.PANDAID]
+                jobid = row[GetFromTaskAndType.JOBID] or str(row[GetFromTaskAndType.PANDAID])
                 if row[GetFromTaskAndType.DIRECTSTAGEOUT]:
                     lfn  = row[GetFromTaskAndType.LFN]
                     site = row[GetFromTaskAndType.LOCATION]
                     self.logger.debug("LFN: %s and site %s" % (lfn, site))
                     pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
                 else:
-                    if jobid in finishedIds:
+                    if jobid in transferingIds:
                         lfn  = row[GetFromTaskAndType.LFN]
                         site = row[GetFromTaskAndType.LOCATION]
                         self.logger.debug("LFN: %s and site %s" % (lfn, site))
                         pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
-                    elif jobid in transferingIds:
+                    elif jobid in finishedIds:
                         lfn  = row[GetFromTaskAndType.TMPLFN]
                         site = row[GetFromTaskAndType.TMPLOCATION]
                         self.logger.debug("LFN: %s and site %s" % (lfn, site))
@@ -218,7 +226,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         # Return only the info relevant to the client.
         res['runsAndLumis'] = {}
         for row in rows:
-            jobidstr = str(row[GetFromTaskAndType.PANDAID])
+            jobidstr = row[GetFromTaskAndType.JOBID] or str(row[GetFromTaskAndType.PANDAID])
             retRow = {'parents': row[GetFromTaskAndType.PARENTS].read(),
                       'runlumi': row[GetFromTaskAndType.RUNLUMI].read(),
                       'events': row[GetFromTaskAndType.INEVENTS],
@@ -371,7 +379,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## Extract from the filemetadata the necessary information.
         res['runsAndLumis'] = {}
         for row in rows:
-            jobidstr = str(row[GetFromTaskAndType.PANDAID])
+            jobidstr = row[GetFromTaskAndType.JOBID] or str(row[GetFromTaskAndType.PANDAID])
             if statusPerJob.get(jobidstr) in ['finished']:
                 if jobidstr not in res['runsAndLumis']:
                     res['runsAndLumis'][jobidstr] = []

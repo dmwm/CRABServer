@@ -9,6 +9,7 @@ import json
 import sys
 import classad
 import glob
+import copy
 from shutil import move
 # Need to import HTCondorUtils from a parent directory, not easy when the files are not in python packages.
 # Solution by ajay, SO: http://stackoverflow.com/questions/11536764
@@ -69,7 +70,7 @@ def parseJobLog(fp, nodes, nodeMap):
             if m:
                 node = m.groups()[0]
                 proc = event['Cluster'], event['Proc']
-                info = nodes.setdefault(node, NODE_DEFAULTS)
+                info = nodes.setdefault(node, copy.deepcopy(NODE_DEFAULTS))
                 info['State'] = 'idle'
                 info['JobIds'].append("%d.%d" % proc)
                 info['RecordedSite'] = False
@@ -214,7 +215,7 @@ def parseNodeStateV2(fp, nodes):
         status = ad.get('NodeStatus', -1)
         retry = ad.get('RetryCount', -1)
         msg = ad.get("StatusDetails", "")
-        info = nodes.setdefault(nodeid, NODE_DEFAULTS)
+        info = nodes.setdefault(nodeid, copy.deepcopy(NODE_DEFAULTS))
         if status == 1: # STATUS_READY
             if info.get("State") == "transferring":
                 info["State"] = "cooloff"
