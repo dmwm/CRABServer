@@ -186,7 +186,6 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
                     msg  = "Updating error summary for jobid %s retry %s with following information:" % (job_id, crab_retry)
                     msg += "\n'exit code' = %s" % (exit_code)
                     msg += "\n'exit message' = %s" % (exit_msg)
-                    msg += "\n'error message' = %s" % (rep['steps']['cmsRun']['errors'][0])
                     logger.info(msg)
                     error_summary = [exit_code, exit_msg, {}]
                     error_summary_changed = True
