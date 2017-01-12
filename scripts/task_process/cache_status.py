@@ -33,15 +33,18 @@ NODE_DEFAULTS = {
     'JobIds': []
 }
 
+STATUS_CACHE_FILE = "task_process/status_cache.txt"
+FJR_PARSE_RES_FILE = "task_process/fjr_parse_results.txt"
+
 #
 # insertCpu, parseJobLog, parsNodeStateV2 and parseErrorReport
 # code copied from the backend HTCondorDataWorkflow.py with minimal changes.
 #
 
-cpu_re = re.compile(r"Usr \d+ (\d+):(\d+):(\d+), Sys \d+ (\d+):(\d+):(\d+)")
+cpuRe = re.compile(r"Usr \d+ (\d+):(\d+):(\d+), Sys \d+ (\d+):(\d+):(\d+)")
 def insertCpu(event, info):
     if 'TotalRemoteUsage' in event:
-        m = cpu_re.match(event['TotalRemoteUsage'])
+        m = cpuRe.match(event['TotalRemoteUsage'])
         if m:
             g = [int(i) for i in m.groups()]
             user = g[0]*3600 + g[1]*60 + g[2]
@@ -54,16 +57,16 @@ def insertCpu(event, info):
         if 'RemoteUserCpu' in event:
             info['TotalUserCpuTimeHistory'][-1] = float(event['RemoteUserCpu'])
 
-node_name_re = re.compile("DAG Node: Job(\d+(?:-\d+)?)")
-node_name2_re = re.compile("Job(\d+(?:-\d+)?)")
+nodeNameRe = re.compile("DAG Node: Job(\d+(?:-\d+)?)")
+nodeName2Re = re.compile("Job(\d+(?:-\d+)?)")
 
-def parseJobLog(fp, nodes, node_map):
+def parseJobLog(fp, nodes, nodeMap):
     count = 0
     for event in HTCondorUtils.readEvents(fp):
         count += 1
         eventtime = time.mktime(time.strptime(event['EventTime'], "%Y-%m-%dT%H:%M:%S"))
         if event['MyType'] == 'SubmitEvent':
-            m = node_name_re.match(event['LogNotes'])
+            m = nodeNameRe.match(event['LogNotes'])
             if m:
                 node = m.groups()[0]
                 proc = event['Cluster'], event['Proc']
@@ -77,14 +80,14 @@ def parseJobLog(fp, nodes, node_map):
                 info['WallDurations'].append(0)
                 info['ResidentSetSize'].append(0)
                 info['Retries'] = len(info['SubmitTimes'])-1
-                node_map[proc] = node
+                nodeMap[proc] = node
         elif event['MyType'] == 'ExecuteEvent':
-            node = node_map[event['Cluster'], event['Proc']]
+            node = nodeMap[event['Cluster'], event['Proc']]
             nodes[node]['StartTimes'].append(eventtime)
             nodes[node]['State'] = 'running'
             nodes[node]['RecordedSite'] = False
         elif event['MyType'] == 'JobTerminatedEvent':
-            node = node_map[event['Cluster'], event['Proc']]
+            node = nodeMap[event['Cluster'], event['Proc']]
             nodes[node]['EndTimes'].append(eventtime)
             nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
             insertCpu(event, nodes[node])
@@ -96,7 +99,7 @@ def parseJobLog(fp, nodes, node_map):
             else:
                 nodes[node]['State'] = 'cooloff'
         elif event['MyType'] == 'PostScriptTerminatedEvent':
-            m = node_name2_re.match(event['DAGNodeName'])
+            m = nodeName2Re.match(event['DAGNodeName'])
             if m:
                 node = m.groups()[0]
                 if event['TerminatedNormally']:
@@ -109,7 +112,7 @@ def parseJobLog(fp, nodes, node_map):
                 else:
                     nodes[node]['State'] = 'cooloff'
         elif event['MyType'] == 'ShadowExceptionEvent' or event["MyType"] == "JobReconnectFailedEvent" or event['MyType'] == 'JobEvictedEvent':
-            node = node_map[event['Cluster'], event['Proc']]
+            node = nodeMap[event['Cluster'], event['Proc']]
             if nodes[node]['State'] != 'idle':
                 nodes[node]['EndTimes'].append(eventtime)
                 if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
@@ -124,7 +127,7 @@ def parseJobLog(fp, nodes, node_map):
                 nodes[node]['JobIds'].append(nodes[node]['JobIds'][-1])
                 nodes[node]['Restarts'] += 1
         elif event['MyType'] == 'JobAbortedEvent':
-            node = node_map[event['Cluster'], event['Proc']]
+            node = nodeMap[event['Cluster'], event['Proc']]
             if nodes[node]['State'] == "idle" or nodes[node]['State'] == "held":
                 nodes[node]['StartTimes'].append(-1)
                 if not nodes[node]['RecordedSite']:
@@ -132,7 +135,7 @@ def parseJobLog(fp, nodes, node_map):
             nodes[node]['State'] = 'killed'
             insertCpu(event, nodes[node])
         elif event['MyType'] == 'JobHeldEvent':
-            node = node_map[event['Cluster'], event['Proc']]
+            node = nodeMap[event['Cluster'], event['Proc']]
             if nodes[node]['State'] == 'running':
                 nodes[node]['EndTimes'].append(eventtime)
                 if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
@@ -147,16 +150,16 @@ def parseJobLog(fp, nodes, node_map):
                 nodes[node]['Restarts'] += 1
             nodes[node]['State'] = 'held'
         elif event['MyType'] == 'JobReleaseEvent':
-            node = node_map[event['Cluster'], event['Proc']]
+            node = nodeMap[event['Cluster'], event['Proc']]
             nodes[node]['State'] = 'idle'
         elif event['MyType'] == 'JobAdInformationEvent':
-            node = node_map[event['Cluster'], event['Proc']]
+            node = nodeMap[event['Cluster'], event['Proc']]
             if (not nodes[node]['RecordedSite']) and ('JOBGLIDEIN_CMSSite' in event) and not event['JOBGLIDEIN_CMSSite'].startswith("$$"):
                 nodes[node]['SiteHistory'].append(event['JOBGLIDEIN_CMSSite'])
                 nodes[node]['RecordedSite'] = True
             insertCpu(event, nodes[node])
         elif event['MyType'] == 'JobImageSizeEvent':
-            node = node_map[event['Cluster'], event['Proc']]
+            node = nodeMap[event['Cluster'], event['Proc']]
             nodes[node]['ResidentSetSize'][-1] = int(event['ResidentSetSize'])
             if nodes[node]['StartTimes']:
                 nodes[node]['WallDurations'][-1] = eventtime - nodes[node]['StartTimes'][-1]
@@ -173,22 +176,22 @@ def parseJobLog(fp, nodes, node_map):
         if node == 'DagStatus':
             # StartTimes and WallDurations are not present, though crab status2 uses this record to get the DagStatus.
             continue
-        last_start = now
+        lastStart = now
         if info['StartTimes']:
-            last_start = info['StartTimes'][-1]
+            lastStart = info['StartTimes'][-1]
         while len(info['WallDurations']) < len(info['SiteHistory']):
-            info['WallDurations'].append(now - last_start)
+            info['WallDurations'].append(now - lastStart)
         while len(info['WallDurations']) > len(info['SiteHistory']):
             info['SiteHistory'].append("Unknown")
 
-def parseErrorReport(fp, nodes):
-    def last(joberrors):
-        return joberrors[max(joberrors, key=int)]
-    data = json.load(fp)
+def parseErrorReport(data, nodes):
     #iterate over the jobs and set the error dict for those which are failed
     for jobid, statedict in nodes.iteritems():
         if 'State' in statedict and statedict['State'] == 'failed' and jobid in data:
-            statedict['Error'] = last(data[jobid]) #data[jobid] contains all retries. take the last one
+            # data[jobid] is a dictionary with the retry number as a key and error summary information as a value.
+            # Here we want to get the error summary information, and since values() returns a list
+            # (even if there's only a single value) it has to be indexed to zero.
+            statedict['Error'] = data[jobid].values()[0] #data[jobid] contains all retries. take the last one
 
 def parseNodeStateV2(fp, nodes):
     """
@@ -245,55 +248,84 @@ def parseNodeStateV2(fp, nodes):
 # --- New code ----
 
 def storeNodesInfoInFile():
-    filename = "task_process/status_cache.txt"
     # Open cache file and get the location until which the jobs_log was parsed last time
     try:
-        if os.path.exists(filename) and os.stat(filename).st_size > 0:
+        if os.path.exists(STATUS_CACHE_FILE) and os.stat(STATUS_CACHE_FILE).st_size > 0:
             logging.debug("cache file found, opening and reading")
-            nodes_storage = open(filename, "r")
+            nodesStorage = open(STATUS_CACHE_FILE, "r")
 
-            last_read_until = int(nodes_storage.readline())
-            nodes = ast.literal_eval(nodes_storage.readline())
-            node_map = ast.literal_eval(nodes_storage.readline())
-            nodes_storage.close()
+            jobLogCheckpoint = int(nodesStorage.readline())
+            fjrParseResCheckpoint = int(nodesStorage.readline())
+            nodes = ast.literal_eval(nodesStorage.readline())
+            nodeMap = ast.literal_eval(nodesStorage.readline())
+            nodesStorage.close()
         else:
             logging.debug("cache file not found, creating")
-            last_read_until = 0
+            jobLogCheckpoint = 0
+            fjrParseResCheckpoint = 0
             nodes = {}
-            node_map = {}
+            nodeMap = {}
     except Exception:
         logging.exception("error during status_cache handling")
     jobsLog = open("job_log", "r")
 
-    jobsLog.seek(last_read_until)
+    jobsLog.seek(jobLogCheckpoint)
 
-    parseJobLog(jobsLog, nodes, node_map)
-    read_until = jobsLog.tell()
+    parseJobLog(jobsLog, nodes, nodeMap)
+    newJobLogCheckpoint = jobsLog.tell()
     jobsLog.close()
 
     for fn in glob.glob("node_state*"):
-        with open(fn, 'r') as node_state:
-            parseNodeStateV2(node_state, nodes)
+        with open(fn, 'r') as nodeState:
+            parseNodeStateV2(nodeState, nodes)
 
     try:
-        errorSummary = open("error_summary.json", "r")
-        errorSummary.seek(0)
-        parseErrorReport(errorSummary, nodes)
-        errorSummary.close()
+        errorSummary, newFjrParseResCheckpoint = summarizeFjrParseResults(fjrParseResCheckpoint)
+        if errorSummary and newFjrParseResCheckpoint:
+            parseErrorReport(errorSummary, nodes)
     except IOError:
         logging.exception("error during error_summary file handling")
 
     # First write the new cache file under a temporary name, so that other processes
     # don't get an incomplete result. Then replace the old one with the new one.
-    temp_filename = (filename + ".%s") % os.getpid()
+    tempFilename = (STATUS_CACHE_FILE + ".%s") % os.getpid()
 
-    nodes_storage = open(temp_filename, "w")
-    nodes_storage.write(str(read_until) + "\n")
-    nodes_storage.write(str(nodes) + "\n")
-    nodes_storage.write(str(node_map) + "\n")
-    nodes_storage.close()
+    nodesStorage = open(tempFilename, "w")
+    nodesStorage.write(str(newJobLogCheckpoint) + "\n")
+    nodesStorage.write(str(newFjrParseResCheckpoint) + "\n")
+    nodesStorage.write(str(nodes) + "\n")
+    nodesStorage.write(str(nodeMap) + "\n")
+    nodesStorage.close()
 
-    move(temp_filename, filename)
+    move(tempFilename, STATUS_CACHE_FILE)
+
+def summarizeFjrParseResults(checkpoint):
+    '''
+    Reads the fjr_parse_results file line by line. The file likely contains multiple
+    errors for the same jobId coming from different retries, we only care about
+    the last error for each jobId. Since each postjob writes this information
+    sequentially (job retry #2 will be written after job retry #1), overwrite
+    whatever information there was before for each jobId.
+
+    Return the updated error dictionary and also the location until which the
+    fjr_parse_results file was read so that we can store it and
+    don't have t re-read the same information next time the cache_status.py runs.
+    '''
+
+    if os.path.exists(FJR_PARSE_RES_FILE):
+        with open(FJR_PARSE_RES_FILE, "r") as f:
+            f.seek(checkpoint)
+            content = f.readlines()
+            newCheckpoint = f.tell()
+
+        errDict = {}
+        for line in content:
+            fjrResult = ast.literal_eval(line)
+            jobId = fjrResult.keys()[0]
+            errDict[jobId] = fjrResult[jobId]
+        return errDict, newCheckpoint
+    else:
+        return None, 0
 
 def main():
     try:
