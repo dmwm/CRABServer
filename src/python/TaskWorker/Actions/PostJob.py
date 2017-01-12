@@ -251,8 +251,8 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
     ## If we have updated the error summary, write it to the json file.
     ## Use a temporary file and rename to avoid concurrent writing of the file.
     if error_summary_changed:
+        fsummary.truncate(0)
         fsummary.seek(0)
-        fsummary.truncate()
         json.dump(error_summary_new_content, fsummary)
     logger.debug("Writen error summary file")
 
