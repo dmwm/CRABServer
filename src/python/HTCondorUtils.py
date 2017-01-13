@@ -1,4 +1,5 @@
 import os
+import time
 import pickle
 import traceback
 
@@ -80,5 +81,8 @@ class AuthenticatedSubprocess(object):
                 self.wpipe.close()
                 os._exit(1)
         else:
-            os.waitpid(self.pid, 0)
+            res = (0,0)
+            while res==(0,0):
+                res = os.waitpid(self.pid, os.WNOHANG)
+                time.sleep(10)
 

@@ -450,6 +450,10 @@ def parseArgs():
                       dest='seeding',
                       type='string',
                       default=None)
+    parser.add_option('--numberOfCores',
+                      dest='numberOfCores',
+                      type='string',
+                      default=None)
     parser.add_option('--userFiles',
                       dest='userFiles',
                       type='string')
@@ -491,6 +495,7 @@ def parseArgs():
         print("lastEvent:     ", opts.lastEvent)
         print("firstRun:      ", opts.firstRun)
         print("seeding:       ", opts.seeding)
+        print("numberOfCores: ", opts.numberOfCores)
         print("userFiles:     ", opts.userFiles)
         print("oneEventMode:  ", opts.oneEventMode)
         print("scriptExe:     ", opts.scriptExe)
@@ -589,6 +594,7 @@ def executeScriptExe(opts, scram):
                                                           '--firstLumi=%s '+
                                                           '--firstRun=%s '+
                                                           '--seeding=%s '+
+                                                          '--numberOfCores=%s '+
                                                           '--lheInputFiles=%s '+
                                                           '--oneEventMode=%s ' +
                                                           '--eventsPerLumi=%s ' +
@@ -601,6 +607,7 @@ def executeScriptExe(opts, scram):
                                                            opts.firstLumi,
                                                            opts.firstRun,
                                                            opts.seeding,
+                                                           opts.numberOfCores,
                                                            opts.lheInputFiles,
                                                            opts.oneEventMode,
                                                            opts.eventsPerLumi,
@@ -676,6 +683,7 @@ def executeCMSSWStack(opts, scram):
                                                           '--firstLumi=%s '+
                                                           '--firstRun=%s '+
                                                           '--seeding=%s '+
+                                                          '--numberOfCores=%s '+
                                                           '--lheInputFiles=%s '+
                                                           '--oneEventMode=%s ' +
                                                           '--eventsPerLumi=%s ' +
@@ -688,6 +696,7 @@ def executeCMSSWStack(opts, scram):
                                                            opts.firstLumi,
                                                            opts.firstRun,
                                                            opts.seeding,
+                                                           opts.numberOfCores,
                                                            opts.lheInputFiles,
                                                            opts.oneEventMode,
                                                            opts.eventsPerLumi,

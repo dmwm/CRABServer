@@ -55,7 +55,7 @@ class StepConfiguration(Configuration):
     def listOutputModules(self):
         om = StepConfiguration.outputMods
         #like return {"output1" : self.output1, "output2" : self.output2 ...} for each output1, output2 ... in self.outputMods
-        return dict(list(zip(om, map( lambda out: getattr(self, out), om))))
+        return dict(list(zip(om, map(lambda out: getattr(self, out), om))))
     def getOutputModule(self, name):
         return getattr(self, name)
 
@@ -90,8 +90,8 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
     oneEventMode:   toggles one event mode
     eventsPerLumi:  start a new lumi section after the specified amount of events.  None disables this.
     """
-    def __init__(self, location, inputFiles, runAndLumis, agentNumber, lfnBase, outputMods, firstEvent=0, lastEvent=-1, firstLumi=None,\
-                    firstRun=None, seeding=None, lheInputFiles=False, oneEventMode=False, eventsPerLumi=None, maxRuntime=None):
+    def __init__(self, location, inputFiles, runAndLumis, agentNumber, lfnBase, outputMods, firstEvent=0, lastEvent=-1, firstLumi=None, \
+                 firstRun=None, seeding=None, lheInputFiles=False, oneEventMode=False, eventsPerLumi=None, maxRuntime=None, numberOfCores=1):
         ScriptInterface.__init__(self)
         self.stepSpace = ConfigSection()
         self.stepSpace.location = location
@@ -111,7 +111,9 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
             self.step.data.application.configuration.eventsPerLumi = eventsPerLumi
         if maxRuntime:
             self.step.data.application.configuration.maxSecondsUntilRampdown = maxRuntime
+        #MM I do not anymore see "multicore.enabled" used anywhere in WMCore. Maybe we can remove it?
         self.step.data.application.multicore.enabled = False
+        self.step.data.application.multicore.numberOfCores = numberOfCores
         self.step.data.section_("input")
         self.job = jobDict(lheInputFiles, seeding)
         self.job["input_files"] = []
@@ -155,7 +157,7 @@ def readFileFromTarball(file, tarball):
             break
         except KeyError as er:
             #Don`t exit due to KeyError, print error. EventBased and FileBased does not have run and lumis
-            print('Failed to get information from tarball %s and file %s. Error : %s' %(tarball, file, er))
+            print('Failed to get information from tarball %s and file %s. Error : %s' % (tarball, file, er))
             break
     tar_file.close()
     return literal_eval(content)
@@ -177,6 +179,7 @@ parser.add_option('--lastEvent', dest='lastEvent')
 parser.add_option('--firstLumi', dest='firstLumi')
 parser.add_option('--firstRun', dest='firstRun')
 parser.add_option('--seeding', dest='seeding')
+parser.add_option('--numberOfCores', dest='numberOfCores')
 parser.add_option('--lheInputFiles', dest='lheInputFiles')
 parser.add_option('--oneEventMode', dest='oneEventMode', default=False)
 parser.add_option('--eventsPerLumi', dest='eventsPerLumi', default=None)
@@ -193,9 +196,9 @@ if opts.runAndLumis:
 inputFile = {}
 if opts.inputFile:
     inputFile = readFileFromTarball(opts.inputFile, 'input_files.tar.gz')
-pset = SetupCMSSWPsetCore( opts.location, inputFile, runAndLumis, agentNumber, lfnBase, outputMods,\
-                           literal_eval(opts.firstEvent), literal_eval(opts.lastEvent), literal_eval(opts.firstLumi),\
+pset = SetupCMSSWPsetCore(opts.location, inputFile, runAndLumis, agentNumber, lfnBase, outputMods, \
+                           literal_eval(opts.firstEvent), literal_eval(opts.lastEvent), literal_eval(opts.firstLumi), \
                            literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode, \
-                           literal_eval(opts.eventsPerLumi), literal_eval(opts.maxRuntime))
+                           literal_eval(opts.eventsPerLumi), literal_eval(opts.maxRuntime), opts.numberOfCores)
 
 pset()
