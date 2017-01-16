@@ -9,16 +9,16 @@ echo "Beginning dag_bootstrap.sh (stderr)" 1>&2
 if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]
 then
 
-	command -v python2.6 > /dev/null
+	command -v python > /dev/null
 	rc=$?
 	if [[ $rc != 0 ]]
 	then
-		echo "Error: Python2.6 isn't available on `hostname`." >&2
-		echo "Error: bootstrap execution requires python2.6" >&2
+		echo "Error: Python isn't available on `hostname`." >&2
+		echo "Error: bootstrap execution requires python" >&2
 		exit 1
 	else
-		echo "I found python2.6 at.."
-		echo `which python2.6`
+		echo "I found python at.."
+		echo `which python`
 	fi
 
 	if [ "x$CRAB3_VERSION" = "x" ]; then
@@ -94,7 +94,6 @@ fi
 export PATH="/opt/glidecondor/bin:/opt/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export PATH="/data/srv/glidecondor/bin:/data/srv/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export PYTHONPATH=/opt/glidecondor/lib/python:$PYTHONPATH
-export PYTHONPATH=/data/srv/glidecondor/lib/python2.6:$PYTHONPATH
 export LD_LIBRARY_PATH=/opt/glidecondor/lib:/opt/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/data/srv/glidecondor/lib:/data/srv/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 export PYTHONUNBUFFERED=1
@@ -105,4 +104,4 @@ if [ "X$_CONDOR_JOB_AD" != "X" ]; then
   cat $_CONDOR_JOB_AD
 fi
 echo "Now running the job in `pwd`..."
-exec nice -n 19 python2.6 -m TaskWorker.TaskManagerBootstrap "$@"
+exec nice -n 19 python -m TaskWorker.TaskManagerBootstrap "$@"
