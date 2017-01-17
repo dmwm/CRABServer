@@ -14,7 +14,6 @@ done
 export PATH="/opt/glidecondor/bin:/opt/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export PATH="/data/srv/glidecondor/bin:/data/srv/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export PYTHONPATH=/opt/glidecondor/lib/python:$PYTHONPATH
-export PYTHONPATH=/data/srv/glidecondor/lib/python2.6:$PYTHONPATH
 export LD_LIBRARY_PATH=/opt/glidecondor/lib:/opt/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/data/srv/glidecondor/lib:/data/srv/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 
@@ -64,16 +63,16 @@ fi
 # Bootstrap the runtime - we want to do this before DAG is submitted
 # so all the children don't try this at once.
 if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]; then
-    command -v python2.6 > /dev/null
+    command -v python > /dev/null
     rc=$?
     if [[ $rc != 0 ]]; then
-        echo "Error: Python2.6 isn't available on `hostname`." >&2
-        echo "Error: Bootstrap execution requires python2.6" >&2
-        condor_qedit $CONDOR_ID DagmanHoldReason "'Error: Bootstrap execution requires python2.6.'"
+        echo "Error: Python isn't available on `hostname`." >&2
+        echo "Error: Bootstrap execution requires python" >&2
+        condor_qedit $CONDOR_ID DagmanHoldReason "'Error: Bootstrap execution requires python.'"
         exit 1
     else
-        echo "I found python2.6 at.."
-        echo `which python2.6`
+        echo "I found python at.."
+        echo `which python`
     fi
 
     if [[ "X$CRAB_TASKMANAGER_TARBALL" == "X" ]]; then
@@ -110,7 +109,7 @@ fi
 
 # Recalculate the black / whitelist
 if [ -e AdjustSites.py ]; then
-    python2.6 AdjustSites.py
+    python AdjustSites.py
 else
     echo "Error: AdjustSites.py does not exist." >&2
     condor_qedit $CONDOR_ID DagmanHoldReason "'AdjustSites.py does not exist.'"
