@@ -20,22 +20,61 @@ def weighted_choice(choices):
     i = bisect.bisect(cum_weights, x)
     return values[i]
 
-def capacityMetricsChoices(schedds, goodSchedds, logger=None):
-    """ Choose the schedd based on the DetectedMemory classad present in the schedds object
-        Return a list of scheddobj and the weight to be used in the weighted choice
+def filterScheddsByClassAds(schedds, classAds, logger=None):
+    """ Check a list of schedds for missing classAds
+        Used when choosing a schedd to see if each schedd has the needed classads defined.
+        Return a list of valid schedds to choose from
     """
-    schedds_usage = {}
-    totalMemory = sum([ schedd['TotalFreeMemoryMB'] for schedd in schedds if 'TotalFreeMemoryMB' in schedd])
-    totalJobs = sum([ schedd['MaxJobsRunning'] for schedd in schedds if 'MaxJobsRunning' in schedd])
-    totalUploads = sum([ schedd['TransferQueueMaxUploading'] for schedd in schedds if 'TransferQueueMaxUploading' in schedd])
+
+    validSchedds = []
+
+    # Create a list of schedds to be ignored
     for schedd in schedds:
-        logger.debug("%s: Mem %s, Mx %s;  Run %s, Mx %s;  Trf %s, Max %s, isOk: %s", schedd['Name'], schedd['TotalFreeMemoryMB'], totalMemory,
-                     schedd['JobsRunning'], totalJobs, schedd['TransferQueueNumUploading'], totalUploads, schedd['IsOK'])
-        schedds_usage[schedd['Name']] = max(schedd['TotalFreeMemoryMB']/totalMemory,
-                                            schedd['JobsRunning']/totalJobs, schedd['TransferQueueNumUploading']/totalUploads)
+        scheddValid = True
+        for classAd in classAds:
+            if classAd not in schedd:
+                logger.debug("Ignoring %s schedd since it is missing the %s ClassAd." % (schedd['Name'], classAd))
+                scheddValid = False
+        if scheddValid:
+            validSchedds.append(schedd)
 
+    return validSchedds
 
-    choices = [(schedd, 1/schedds_usage.get(schedd, .5)) for schedd in goodSchedds]
+def capacityMetricsChoicesHybrid(schedds, goodSchedds, logger=None):
+    """ Mix of Jadir's way and Marco's way.
+        Return a list of scheddobj and the weight to be used in the weighted choice.
+        If all of the schedds are full, pick randomly from the ones in the REST config.
+    """
+
+    classAdsRequired = ['DetectedMemory', 'TotalFreeMemoryMB', 'MaxJobsRunning', 'TotalRunningJobs', 'TransferQueueMaxUploading', 'TransferQueueNumUploading', 'Name']
+    schedds = filterScheddsByClassAds(schedds, classAdsRequired)
+
+    # Get only those schedds that are in our external rest configuration and their status is ok
+    schedds = [schedd for schedd in schedds if schedd['Name'] in goodSchedds and classad.ExprTree.eval(schedd['IsOk'])]
+
+    totalMemory = totalJobs = totalUploads = 0
+    for schedd in schedds:
+        totalMemory += schedd['DetectedMemory']
+        totalJobs += schedd['MaxJobsRunning']
+        totalUploads += schedd['TransferQueueMaxUploading']
+
+    weights = {}
+    for schedd in schedds:
+        memPerc = schedd['TotalFreeMemoryMB']/totalMemory
+        uplPerc = (schedd['TransferQueueMaxUploading']-schedd['TransferQueueNumUploading'])/totalUploads
+        jobPerc = (schedd['MaxJobsRunning']-schedd['TotalRunningJobs'])/totalJobs
+        weight = max(memPerc, uplPerc, jobPerc)
+        weights[schedd['Name']] = weight
+        logger.debug("%s: Mem %s, Mx %s;  Run %s, Mx %s;  Trf %s, Max %s, weight: %f" % (schedd['Name'], schedd['TotalFreeMemoryMB'], totalMemory,
+                schedd['JobsRunning'], totalJobs, schedd['TransferQueueNumUploading'], totalUploads, weight))
+
+    if schedds:
+        choices = [(schedd['Name'], weights[schedd['Name']]) for schedd in schedds]
+    else:
+        # In case the query to the collector doesn't return any schedds,
+        # for example when all of them are full of tasks.
+        # Pick from the schedds in the good schedulers list with equal weights.
+        choices = [(schedd, 1) for schedd in goodSchedds]
     return choices
 
 def memoryBasedChoices(schedds, goodSchedds, logger=None):
