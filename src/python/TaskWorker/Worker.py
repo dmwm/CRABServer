@@ -51,13 +51,13 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger):
             ## Get (and remove) an item from the input queue. If the queue is empty, wait
             ## until an item is available.
             workid, work, task, failstatus, inputargs = inputs.get()
+            if work == 'STOP':
+                break
             taskhandler = addTaskLogHandler(logger, task['tm_username'], task['tm_taskname'])
         except (EOFError, IOError):
             crashMessage = "Hit EOF/IO in getting new work\n"
             crashMessage += "Assuming this is a graceful break attempt.\n"
             logger.error(crashMessage)
-            break
-        if work == 'STOP':
             break
 
         outputs = None
