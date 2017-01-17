@@ -191,14 +191,14 @@ $(document).ready(function() {
                 if (proxiedWebDirUrl === undefined || proxiedWebDirUrl == "None") {
                     proxiedWebDirUrl = "";
                 }
-
-                displayConfigAndPSet(handleConfigPSetErr);
-                displayScriptExe(handleScriptExeErr);
             })
             .fail(function(xhr) {
                 proxiedWebDirUrl = "";
+            })
+            .complete(function(xhr) {
                 displayConfigAndPSet(handleConfigPSetErr);
                 displayScriptExe(handleScriptExeErr);
+                displayMainPage(handleMainErr);
             });
     }
 
@@ -596,7 +596,6 @@ $(document).ready(function() {
         displayTaskWorkerLog(handleTaskWorkerLogErr);
         displayUploadLog(handleUploadLogErr);
         // displayScriptExe(handleScriptExeErr);
-        displayMainPage(handleMainErr);
     }
 
     function clearPreviousContent() {
