@@ -16,23 +16,11 @@ from RESTInteractions import HTTPRequests
 from ServerUtilities import getProxiedWebDir
 
 
-if '_CONDOR_JOB_AD' not in os.environ or not os.path.exists(os.environ["_CONDOR_JOB_AD"]):
-    sys.exit(0)
-
-
-newstdout = "adjust_out.txt"
-logfd = os.open(newstdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
-if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
-    os.dup2(logfd, 1)
-    os.dup2(logfd, 2)
-os.close(logfd)
-
-
 def printLog(msg):
     print("%s: %s" % (datetime.utcnow(), msg))
 
 
-def adjustPostScriptExitStatus(resubmitJobIds):
+def adjustPostScriptExitStatus(resubmitJobIds, filename):
     """
     Edit the DAG .nodes.log file changing the POST script exit code from 0|2 to 1
     (i.e., in RetryJob terminology, from OK|FATAL_ERROR to RECOVERABLE_ERROR) for
@@ -64,12 +52,12 @@ def adjustPostScriptExitStatus(resubmitJobIds):
         retvalue_re = re.compile(r"Normal termination \(return value 2\)")
     else:
         retvalue_re = re.compile(r"Normal termination \(return value [0|2]\)")
-    node_re = re.compile(r"DAG Node: Job(\d+)")
+    node_re = re.compile(r"DAG Node: Job(\d+(-\d+)?)")
     ra_buffer = []
     alt = None
     output = ''
     adjustedJobIds = []
-    for line in open("RunJobs.dag.nodes.log").readlines():
+    for line in open(filename).readlines():
         if len(ra_buffer) == 0:
             m = terminator_re.search(line)
             if m:
@@ -122,11 +110,12 @@ def adjustPostScriptExitStatus(resubmitJobIds):
     # temporary one.  There's a huge race condition here, but it seems to be the
     # best we can do given the constraints.  Note that we don't race with the
     # shadow as we have a write lock on the file itself.
-    output_fd = open("RunJobs.dag.nodes.log.tmp", "w")
+    tmpfilename = filename + ".tmp"
+    output_fd = open(tmpfilename, "w")
     output_fd.write(output)
     output_fd.close()
-    os.unlink("RunJobs.dag.nodes.log.tmp")
-    output_fd = open("RunJobs.dag.nodes.log", "w")
+    os.unlink(tmpfilename)
+    output_fd = open(filename, "w")
     output_fd.write(output)
     output_fd.close()
     return adjustedJobIds
@@ -145,43 +134,46 @@ def adjustMaxRetries(adjustJobIds, ad):
         return
     ## Get the latest retry count of each DAG node from the node status file.
     retriesDict = {}
-    if os.path.exists("node_state"):
-        with open("node_state", 'r') as fd:
+    filenames = glob.glob("node_state*")
+    for fn in filenames:
+        with open(fn, 'r') as fd:
             for nodeStatusAd in classad.parseAds(fd):
                 if nodeStatusAd['Type'] != "NodeStatus":
                     continue
                 node = nodeStatusAd.get('Node', '')
-                if not node.startswith("Job"):
+                if (not node.startswith("Job")) or node.endswith("SubJobs"):
                     continue
                 jobId = node[3:]
                 retriesDict[jobId] = int(nodeStatusAd.get('RetryCount', -1))
     ## Search for the RETRY directives in the DAG file for the job ids passed in the
     ## resubmitJobIds argument and change the maximum retries to the current retry
     ## count + CRAB_NumAutomJobRetries.
-    retry_re = re.compile(r'RETRY Job([0-9]+) ([0-9]+) ')
+    retry_re = re.compile(r'RETRY Job(\d+(?:\d+)?) (\d+) ')
     output = ""
     adjustAll = (adjustJobIds == True)
     numAutomJobRetries = int(ad.get('CRAB_NumAutomJobRetries', 2))
-    with open("RunJobs.dag", 'r') as fd:
-        for line in fd.readlines():
-            match_retry_re = retry_re.search(line)
-            if match_retry_re:
-                jobId = match_retry_re.groups()[0]
-                if adjustAll or (jobId in adjustJobIds):
-                    if jobId in retriesDict and retriesDict[jobId] != -1:
-                        lastRetry = retriesDict[jobId]
-                        ## The 1 is to account for the resubmission itself; then, if the job fails, we
-                        ## allow up to numAutomJobRetries automatic retries from DAGMan.
-                        maxRetries = lastRetry + (1 + numAutomJobRetries)
-                    else:
-                        try:
-                            maxRetries = int(match_retry_re.groups()[1]) + (1 + numAutomJobRetries)
-                        except ValueError:
-                            maxRetries = numAutomJobRetries
-                    line = retry_re.sub(r'RETRY Job%s %d ' % (jobId, maxRetries), line)
-            output += line
-    with open("RunJobs.dag", 'w') as fd:
-        fd.write(output)
+    filenames = glob.glob("RunJobs*.dag")
+    for fn in filenames:
+        with open(fn, 'r') as fd:
+            for line in fd.readlines():
+                match_retry_re = retry_re.search(line)
+                if match_retry_re:
+                    jobId = match_retry_re.groups()[0]
+                    if adjustAll or (jobId in adjustJobIds):
+                        if jobId in retriesDict and retriesDict[jobId] != -1:
+                            lastRetry = retriesDict[jobId]
+                            ## The 1 is to account for the resubmission itself; then, if the job fails, we
+                            ## allow up to numAutomJobRetries automatic retries from DAGMan.
+                            maxRetries = lastRetry + (1 + numAutomJobRetries)
+                        else:
+                            try:
+                                maxRetries = int(match_retry_re.groups()[1]) + (1 + numAutomJobRetries)
+                            except ValueError:
+                                maxRetries = numAutomJobRetries
+                        line = retry_re.sub(r'RETRY Job%s %d ' % (jobId, maxRetries), line)
+                output += line
+        with open(fn, 'w') as fd:
+            fd.write(output)
 
 
 def makeWebDir(ad):
@@ -297,11 +289,27 @@ def clearAutomaticBlacklist():
             printLog("ERROR when clearing statistics: %s" % str(e))
 
 
+def setupLog():
+    newstdout = "adjust_out.txt"
+    printLog("Redirecting output to %s" % newstdout)
+    logfd = os.open(newstdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
+    if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
+        os.dup2(logfd, 1)
+        os.dup2(logfd, 2)
+    os.close(logfd)
+
+
 def main():
     """
     Need a doc string here.
     """
-    printLog("Starting AdjustSites")
+    setupLog()
+
+    if '_CONDOR_JOB_AD' not in os.environ or not os.path.exists(os.environ["_CONDOR_JOB_AD"]):
+        printLog("Exiting AdjustSites since _CONDOR_JOB_AD is not in the environment or does not exist")
+        sys.exit(0)
+
+    printLog("Starting AdjustSites with _CONDOR_JOB_AD=%s" % os.environ['_CONDOR_JOB_AD'])
 
     with open(os.environ['_CONDOR_JOB_AD']) as fd:
         ad = classad.parseOld(fd)
@@ -337,15 +345,17 @@ def main():
             resubmitJobIds = True
     if resubmitJobIds:
         adjustedJobIds = []
-        if hasattr(htcondor, 'lock'):
-            # While dagman is not running at this point, the schedd may be writing events to this
-            # file; hence, we only edit the file while holding an appropriate lock.
-            # Note this lock method didn't exist until 8.1.6; prior to this, we simply
-            # run dangerously.
-            with htcondor.lock(open("RunJobs.dag.nodes.log", 'a'), htcondor.LockType.WriteLock):
-                adjustedJobIds = adjustPostScriptExitStatus(resubmitJobIds)
-        else:
-            adjustedJobIds = adjustPostScriptExitStatus(resubmitJobIds)
+        filenames = glob.glob("RunJobs*.*dag.nodes.log")
+        for fn in filenames:
+            if hasattr(htcondor, 'lock'):
+                # While dagman is not running at this point, the schedd may be writing events to this
+                # file; hence, we only edit the file while holding an appropriate lock.
+                # Note this lock method didn't exist until 8.1.6; prior to this, we simply
+                # run dangerously.
+                with htcondor.lock(open(fn, 'a'), htcondor.LockType.WriteLock):
+                    adjustedJobIds = adjustPostScriptExitStatus(resubmitJobIds, fn)
+            else:
+                adjustedJobIds = adjustPostScriptExitStatus(resubmitJobIds, fn)
         ## Adjust the maximum allowed number of retries only for the job ids for which
         ## the POST script exit status was adjusted. Why only for these job ids and not
         ## for all job ids in resubmitJobIds? Because if resubmitJobIds = True, which as
