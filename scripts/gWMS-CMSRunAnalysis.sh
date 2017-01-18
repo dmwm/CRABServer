@@ -109,7 +109,8 @@ then
         CRAB_oneEventMode=0
     fi
     CRAB_localOutputFiles=`grep '^CRAB_localOutputFiles =' $_CONDOR_JOB_AD | tr -d '"' | tr -d ',' | sed 's/CRAB_localOutputFiles = //'`
-    CRAB_Id=`grep '^CRAB_Id =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
+    export CRAB_Id=`grep '^CRAB_Id =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
+    export CRAB_Retry=`grep '^CRAB_Retry =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
     JOB_CMSSite=`grep '^JOB_CMSSite =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
     if [ "X$CRAB_Id" = "X" ];
     then
