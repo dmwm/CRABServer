@@ -1,10 +1,11 @@
 from __future__ import division
 from __future__ import absolute_import
+import time
 import bisect
 import random
-import time
-import htcondor
 
+import classad
+import htcondor
 import HTCondorUtils
 
 CollectorCache = {}
