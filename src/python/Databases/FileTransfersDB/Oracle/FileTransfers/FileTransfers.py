@@ -27,9 +27,10 @@ class FileTransfers(object):
                                   rownum <= :limit"
 
     AcquirePublication_sql = "UPDATE filetransfersdb SET tm_last_update = :last_update, \
-                                                         tm_publication_state = :new_publication_state \
-                              WHERE tm_aso_worker = :asoworker AND \
-				    tm_transfer_state = :transfer_state AND \
+                                                         tm_publication_state = :new_publication_state, \
+                                                         tm_aso_worker = :asoworker \
+                              WHERE (tm_aso_worker = :asoworker or tm_aso_worker is NULL) AND \
+			                        tm_transfer_state = :transfer_state AND \
                                     tm_publish = :publish_flag AND \
                                     tm_publication_state = :publication_state"
 
