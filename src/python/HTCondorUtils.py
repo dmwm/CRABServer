@@ -1,5 +1,9 @@
+
 import os
+import time
 import pickle
+import signal
+import logging
 import traceback
 
 import classad
@@ -37,10 +41,12 @@ class OutputObj:
 
 class AuthenticatedSubprocess(object):
 
-    def __init__(self, proxy, pickleOut=False, outputObj = None):
+    def __init__(self, proxy, pickleOut=False, outputObj = None, logger = logging):
         self.proxy = proxy
         self.pickleOut = pickleOut
         self.outputObj = outputObj
+        self.timedout = False
+        self.logger = logger
 
     def __enter__(self):
         self.r, self.w = os.pipe()
@@ -80,5 +86,16 @@ class AuthenticatedSubprocess(object):
                 self.wpipe.close()
                 os._exit(1)
         else:
-            os.waitpid(self.pid, 0)
+            timestart = time.time()
+            self.timedout = True
+            while (time.time() - timestart) < 3600:
+                res = os.waitpid(self.pid, os.WNOHANG)
+                if res != (0,0):
+                    self.timedout = False
+                    break
+                time.sleep(20)
+            if self.timedout:
+                self.logger.warning("Subprocess with PID %s (executed in AuthenticatedSubprocess) timed out. Killing it." % self.pid)
+                os.kill(self.pid, signal.SIGTERM)
+                #we should probably wait again and send SIGKILL is the kill does not work
 

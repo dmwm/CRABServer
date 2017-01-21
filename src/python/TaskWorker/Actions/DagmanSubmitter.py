@@ -479,7 +479,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["OnExitHold"] = classad.ExprTree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
 
         condorIdDict = {}
-        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True, outputObj=condorIdDict) as (parent, rpipe):
+        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True, outputObj=condorIdDict, logger=self.logger) as (parent, rpipe):
             if not parent:
                 resultAds = []
                 condorIdDict['ClusterId'] = schedd.submit(dagAd, 1, True, resultAds)
@@ -490,7 +490,12 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     id_ = "%s.%s" % (resultAds[0]['ClusterId'], resultAds[0]['ProcId'])
                     schedd.edit([id_], "LeaveJobInQueue", classad.ExprTree(LEAVE_JOB_IN_QUEUE_EXPR))
 
-        results = pickle.load(rpipe)
+        try:
+            results = pickle.load(rpipe)
+        except EOFError:
+            #Do not want to retry this since error may happen after submit (during edit for example).
+            #And this can cause the task to be submitted twice (although we have a protection in the duplicatedCheck)
+            raise TaskWorkerException("Timeout executing condor submit command.", retry=False)
 
         #notice that the clusterId might be set even if there was a failure. This is if the schedd.submit succeded, but the spool  call failed
         if 'ClusterId' in results.outputObj:

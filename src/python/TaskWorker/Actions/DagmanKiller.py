@@ -105,10 +105,13 @@ class DagmanKiller(TaskAction):
     def killJobs(self, ids, const):
         ad = classad.ClassAd()
         ad['foo'] = ids
-        with HTCondorUtils.AuthenticatedSubprocess(self.proxy) as (parent, rpipe):
+        with HTCondorUtils.AuthenticatedSubprocess(self.proxy, logger=self.logger) as (parent, rpipe):
             if not parent:
                 self.schedd.act(htcondor.JobAction.Remove, const)
-        results = rpipe.read()
+        try:
+            results = rpipe.read()
+        except EOFError:
+            results = "Timeout executing condor remove command"
         if results != "OK":
             msg  = "The CRAB server backend was not able to kill these jobs %s," % (ids)
             msg += " because the Grid scheduler answered with an error."
