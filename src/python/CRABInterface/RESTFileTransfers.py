@@ -115,7 +115,7 @@ class RESTFileTransfers(RESTEntity):
             binds['transfer_state'] = [TRANSFERDB_STATUSES['DONE']]
             binds['publication_state'] = [PUBLICATIONDB_STATUSES['NEW']]
             binds['new_publication_state'] = [PUBLICATIONDB_STATUSES['ACQUIRED']]
-            self.api.modifynocheck(self.transferDB.AcquirePublication_sql, **binds)
+            return self.api.modifynocheck(self.transferDB.AcquirePublication_sql, **binds)
 
         elif subresource == 'updateTransfers':
             ###############################################
