@@ -825,6 +825,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             fp.close()
             hbuf.close()
 
+    @conn_handler(services=['servercert'])
     def publicationStatus(self, workflow, asourl, asodb, user):
         """Here is what basically the function return, a dict called publicationInfo in the subcalls:
                 publicationInfo['status']: something like {'publishing': 0, 'publication_failed': 0, 'not_published': 0, 'published': 5}.
@@ -833,7 +834,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                                                     Later on goes into dictresult['publication']['error']
                 publicationInfo['failure_reasons']: errors of single files (not yet implemented for oracle..)
         """
-        if self.isCouchDBURL:
+        if isCouchDBURL(asourl):
             return self.publicationStatusCouch(workflow, asourl, asodb)
         else:
             return self.publicationStatusOracle(workflow, asourl, asodb, user)

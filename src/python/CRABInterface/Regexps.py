@@ -70,7 +70,7 @@ RX_CLUSTERID = re.compile(r"^[0-9.]+$")
 RX_CERT = re.compile(r'^[-]{5}BEGIN CERTIFICATE[-]{5}[\w\W]+[-]{5}END CERTIFICATE[-]{5}\n$')
 
 #subresourced of DataUserWorkflow (/workflow) resource
-RX_SUBRESTAT = re.compile(r"^errors|report|logs|data|logs2|data2|resubmit|resubmit2|proceed$")
+RX_SUBRESTAT = re.compile(r"^errors|report|logs|data|logs2|data2|resubmit|resubmit2|proceed|publicationstatus$")
 
 #subresources of the ServerInfo (/info) and Task (/task) resources
 RX_SUBRES_SI = re.compile(r"^delegatedn|backendurls|version|bannedoutdest|scheddaddress|ignlocalityblacklist|$")

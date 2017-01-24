@@ -276,9 +276,6 @@ class DataWorkflow(object):
     def publicationStatusWrapper(self, workflow, asourl, asodb, username, publicationenabled):
         publicationInfo = {}
         if (publicationenabled == 'T'):
-            # value is used in the publicationStatus method.
-            self.isCouchDBURL = isCouchDBURL(asourl)
-
             #let's default asodb to asynctransfer, for old task this is empty!
             asodb = asodb or 'asynctransfer'
             publicationInfo = self.publicationStatus(workflow, asourl, asodb, username)
