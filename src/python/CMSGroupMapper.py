@@ -21,13 +21,13 @@ def get_egroup_users(egroup_name):
     """ Given an egroup name it returns the whole list of user contained in this egroup
     """
     res = set()
-    searchFilter = "memberOf=CN=%s,OU=e-groups,OU=Workgroups,DC=cern,DC=ch" % egroup_name
-    searchAttribute = ["sAMAccountName"]
+    search_filter = "memberOf=CN=%s,OU=e-groups,OU=Workgroups,DC=cern,DC=ch" % egroup_name
+    search_attribute = ["sAMAccountName"]
     l = ldap.initialize("ldaps://xldap.cern.ch:636")
     basedn = "DC=cern,DC=ch"
-    searchScope = ldap.SCOPE_SUBTREE
+    search_scope = ldap.SCOPE_SUBTREE
 
-    ldap_result_id = l.search(basedn, searchScope, searchFilter, searchAttribute)
+    ldap_result_id = l.search(basedn, search_scope, search_filter, search_attribute)
 
     result_type, result_data = l.result(ldap_result_id, timeout=100)
     for item in result_data:
@@ -37,7 +37,7 @@ def get_egroup_users(egroup_name):
     return res
 
 
-def cache_users(logFunction=print):
+def cache_users(log_function=print):
     """ Cache the entries in the variuos local-users.txt files
         Those entries are saved in a global variable with this
         format:
@@ -59,7 +59,7 @@ def cache_users(logFunction=print):
         if os.path.isdir(base_dir):
             sites = os.listdir(base_dir)
     except OSError as ose:
-        logFunction("Cannot list SITECONF directories in cvmfs:" + str(ose))
+        log_function("Cannot list SITECONF directories in cvmfs:" + str(ose))
     if not sites:
         g_expire_time = time.time() + 60
         return
@@ -77,7 +77,7 @@ def cache_users(logFunction=print):
                         group_set = cache.setdefault(user, set())
                         group_set.add(entry)
             except OSError as ose:
-                logFunction("Cannot list SITECONF directories in cvmfs:" + str(ose))
+                log_function("Cannot list SITECONF directories in cvmfs:" + str(ose))
                 raise
         #then do the same for users in local-egroups.txt
         full_path = os.path.join(base_dir, entry, 'GlideinConfig', 'local-egroups.txt')
@@ -93,10 +93,10 @@ def cache_users(logFunction=print):
                             group_set = cache.setdefault(user, set())
                             group_set.add(entry)
             except OSError as ose:
-                logFunction("Cannot list SITECONF egroups in cvmfs:" + str(ose))
+                log_function("Cannot list SITECONF egroups in cvmfs:" + str(ose))
                 raise
             except ldap.LDAPError as le:
-                logFunction("Cannot get user list from egroup: %s. Error: %s\n\t" % (egroup, str(le)))
+                log_function("Cannot get user list from egroup: %s. Error: %s\n\t" % (egroup, str(le)))
 
     g_cache = cache
     g_expire_time = time.time() + 15*60
