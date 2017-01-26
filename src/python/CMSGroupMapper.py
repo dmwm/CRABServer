@@ -2,7 +2,15 @@ from __future__ import print_function
 
 import os
 import re
-import ldap
+USE_LDAP = False
+try:
+    import ldap
+    USE_LDAP = True
+except ImportError:
+    #At import time the logging framework is not set up. This message will go to stdout,
+    #likely the nohup.out file
+    print("Cannot import ldap")
+
 import time
 
 g_cache = {}
@@ -73,7 +81,7 @@ def cache_users(logFunction=print):
                 raise
         #then do the same for users in local-egroups.txt
         full_path = os.path.join(base_dir, entry, 'GlideinConfig', 'local-egroups.txt')
-        if os.path.isfile(full_path):
+        if os.path.isfile(full_path) and USE_LDAP:
             egroup = ''
             try:
                 fd = open(full_path)
