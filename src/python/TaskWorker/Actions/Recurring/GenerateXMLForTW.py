@@ -1,3 +1,4 @@
+# report to SLS TW and schedd's statistics for monitorin via kibana
 import os
 import sys
 import time
