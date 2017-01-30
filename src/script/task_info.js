@@ -40,7 +40,7 @@ $(document).ready(function() {
         taskInfo = "";
 
         // Change the URL so that it can be copied/pasted more easily
-        var temp = window.location.href.split("/ui")[0] + "/ui/task/" + inputTaskName;
+        var temp = window.location.href.split("/ui")[0] + "/ui/task/" + encodeURIComponent(inputTaskName);
 
         // If default db version is overriden, add it to url parameters
         if (getDbVersionSelector() !== getDefaultDbVersion()) {
@@ -577,7 +577,7 @@ $(document).ready(function() {
         }
 
         if (taskIndex != -1 && urlArray.length > taskIndex && urlArray[taskIndex + 1] !== "") {
-            inputTaskName = urlArray[taskIndex + 1];
+            inputTaskName = decodeURIComponent(urlArray[taskIndex + 1]);
             $("#task-search-form-input").val(inputTaskName);
 
             setUrls(dbVersion);
