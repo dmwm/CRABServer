@@ -181,8 +181,8 @@ class CRAB3CreateXML(object):
 # the number of idle SchedulerJobs on a schedd :-(
 # let's try
                 scheddName = oneShadow[0]
-                scheddAd = self.coll.locate(htcondor.DaemonTypes.Schedd,schedName)
-                schedd = htcondor.Schedd(schedAdd)
+                scheddAdd = self.coll.locate(htcondor.DaemonTypes.Schedd,scheddName)
+                schedd = htcondor.Schedd(scheddAdd)
                 idleDags = list(schedd.xquery(pickSchedulerIdle))
                 #runningDags = list(schedd.xquery(pickSchedulerRunning))
                 runningTPs =  list(schedd.xquery(pickLocalRunning))
