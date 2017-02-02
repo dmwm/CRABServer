@@ -1,6 +1,3 @@
-#
-# report to SLS TW and schedd's statistics for monitorin via kibana
-#
 import os
 import sys
 import time
@@ -39,6 +36,8 @@ class CRAB3CreateXML(object):
         self.pool = ''
         self.schedds = []
         self.resthost = "cmsweb.cern.ch"
+        collName = "cmsgwms-collector-global.cern.ch,cmssrv221.fnal.gov"
+        self.coll = htcondor.Collector(collName)
         #self.restInstance = "prod" # this is to prepare for monitoring other cmsweb instances
         #self.restUri = "/crabserver/%/task"%self.restInstance
 
@@ -75,18 +74,18 @@ class CRAB3CreateXML(object):
             traceback.print_tb(e[2])
             return []
 
-    def getJobsRunning(self):
+    def getShadowsRunning(self):
         #collName = "cmsgwms-collector-global.cern.ch"
         #collName = "cmssrv221.fnal.gov"
-        collName = "cmsgwms-collector-global.cern.ch,cmssrv221.fnal.gov"
+        #collName = "cmsgwms-collector-global.cern.ch,cmssrv221.fnal.gov"
         data = []
         try:
-            coll=htcondor.Collector(collName)                                               
-            result = coll.query(htcondor.AdTypes.Schedd,'CMSGWMS_Type=?="crabschedd"',['Name','JobsRunning','TotalSchedulerJobsRunning','TotalIdleJobs','TotalRunningJobs','TotalHeldJobs'])
+            #coll=htcondor.Collector(collName)                                               
+            result = self.coll.query(htcondor.AdTypes.Schedd,'CMSGWMS_Type=?="crabschedd"',['Name','ShadowsRunning','TotalSchedulerJobsRunning','TotalIdleJobs','TotalRunningJobs','TotalHeldJobs'])
             for schedd in result:  # oneshadow[0].split('@')[1].split('.')[0]
-                data.append([schedd['Name'],schedd['JobsRunning'],schedd['TotalSchedulerJobsRunning'],schedd['TotalIdleJobs'],schedd['TotalRunningJobs'],schedd['TotalHeldJobs']])
+                data.append([schedd['Name'],schedd['ShadowsRunning'],schedd['TotalSchedulerJobsRunning'],schedd['TotalIdleJobs'],schedd['TotalRunningJobs'],schedd['TotalHeldJobs']])
         except  Exception, e:
-            self.logger.debug("Error in getJobsRunning: %s"%str(e))
+            self.logger.debug("Error in getShadowsRunning: %s"%str(e))
         return data
 
     def execute(self):
@@ -157,39 +156,57 @@ class CRAB3CreateXML(object):
                 numericval.text = 'n/a'
 
         # get the number of condor_shadown process per schedd
-        numberOfJobs = self.getJobsRunning()
+        numberOfShadows = self.getShadowsRunning()
 	totalRunningTasks = 0
-	totalIdleTasks = 33
-        if len(numberOfJobs) > 0:
-            for oneJob in numberOfJobs:
-                numericval = SubElement(data,"numericvalue")
-                numericval.set("name","number_of_shadows_process_for_%s"%(oneJob[0]))
-                numericval.text = str(oneJob[1])
+	totalIdleTasks = 0
+	totalRunningTP = 0
+        pickSchedulerIdle = 'JobUniverse==7 && JobStatus==1'
+        pickSchedulerRunning = 'JobUniverse==7 && JobStatus==2'
+        pickLocalRunning = 'JobUniverse==12 && JobStatus==2'
 
-            for oneJob in numberOfJobs:
+        if len(numberOfShadows) > 0:
+            for oneShadow in numberOfShadows:
                 numericval = SubElement(data,"numericvalue")
-                numericval.set("name","number_of_schedulers_jobs_running_for_%s"%(oneJob[0]))
-                numericval.text = str(oneJob[2])
-		totalRunningTasks += oneJob[2]
+                numericval.set("name","number_of_shadows_process_for_%s"%(oneShadow[0]))
+                numericval.text = str(oneShadow[1])
+
+            for oneShadow in numberOfShadows:
+                numericval = SubElement(data,"numericvalue")
+                numericval.set("name","number_of_schedulers_jobs_running_for_%s"%(oneShadow[0]))
+                numericval.text = str(oneShadow[2])
+		totalRunningTasks += oneShadow[2]
 
 #STEFANO
 # here I could fill totalIdleTasks if I had a way to retrieve
 # the number of idle SchedulerJobs on a schedd :-(
-#STEFANO
-            for oneJob in numberOfJobs:
-                numericval = SubElement(data,"numericvalue")
-                numericval.set("name","number_of_idle_jobs_for_at_%s"%(oneJob[0]))
-                numericval.text = str(oneJob[3])
+# let's try
+                scheddName = oneShadow[0]
+                scheddAd = self.coll.locate(htcondor.DaemonTypes.Schedd,schedName)
+                schedd = htcondor.Schedd(schedAdd)
+                idleDags = list(schedd.xquery(pickSchedulerIdle))
+                #runningDags = list(schedd.xquery(pickSchedulerRunning))
+                runningTPs =  list(schedd.xquery(pickLocalRunning))
+                #numDagRun = len(runningDags)
+                numDagIdle = len(idleDags)
+                numTPRun = len(runningTPs)
+                totalIdleTasks += numDagIdle
+                totalRunningTP += numTPRun
 
-            for oneJob in numberOfJobs:
+#STEFANO
+            for oneShadow in numberOfShadows:
                 numericval = SubElement(data,"numericvalue")
-                numericval.set("name","number_of_running_jobs_running_for_at_%s"%(oneJob[0]))
-                numericval.text = str(oneJob[4])
+                numericval.set("name","number_of_idle_jobs_for_at_%s"%(oneShadow[0]))
+                numericval.text = str(oneShadow[3])
+
+            for oneShadow in numberOfShadows:
+                numericval = SubElement(data,"numericvalue")
+                numericval.set("name","number_of_running_jobs_running_for_at_%s"%(oneShadow[0]))
+                numericval.text = str(oneShadow[4])
                  
-            for oneJob in numberOfJobs:
+            for oneShadow in numberOfShadows:
                 numericval = SubElement(data,"numericvalue")
-                numericval.set("name","number_of_held_jobs_for_at_%s"%(oneJob[0]))
-                numericval.text = str(oneJob[5])
+                numericval.set("name","number_of_held_jobs_for_at_%s"%(oneShadow[0]))
+                numericval.text = str(oneShadow[5])
 
 	numericval = SubElement(data,"numericvalue")
         numericval.set("name","totalRunningTasks")
@@ -198,6 +215,10 @@ class CRAB3CreateXML(object):
         numericval = SubElement(data,"numericvalue")
         numericval.set("name","totalIdleTasks")
         numericval.text = str(totalIdleTasks)
+
+        numericval = SubElement(data,"numericvalue")
+        numericval.set("name","totalRunningTPs")
+        numericval.text = str(totalRunningTP)
 
 
         # Write all this information to a temp file and move to correct location

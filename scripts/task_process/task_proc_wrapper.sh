@@ -4,13 +4,9 @@ if [ ! -f /etc/enable_task_daemon ]; then
     exit 1
 fi
 
-if [ -f task_process/task_process_running ]; then
-    echo "task_process/task_process_running file already present, not starting a new task_process and exiting"
-    exit 1
-else
-    touch task_process/task_process_running
-    echo "task_process/task_process_running file not found, starting a new task_process"
-fi
+touch task_process/task_process_running
+echo "Starting a new task_process, creating task_process_running file"
+
 
 HOURS_BETWEEN_QUERIES=24
 
