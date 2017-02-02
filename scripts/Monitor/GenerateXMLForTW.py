@@ -74,10 +74,7 @@ class CRAB3CreateXML(object):
             traceback.print_tb(e[2])
             return []
 
-    def getShadowsRunning(self):
-        #collName = "cmsgwms-collector-global.cern.ch"
-        #collName = "cmssrv221.fnal.gov"
-        #collName = "cmsgwms-collector-global.cern.ch,cmssrv221.fnal.gov"
+    def getScheddsInfo(self):
         data = []
         try:
             #coll=htcondor.Collector(collName)                                               
@@ -97,9 +94,9 @@ class CRAB3CreateXML(object):
 
         subprocesses_config = 6 #  In this case 5 + 1 MasterWorker process
         sub_grep_command="ps -ef | grep MasterWorker | grep -v 'grep' | wc -l"
-        # If any subproccess is dead or not working, modify percentage of availability
+        # If any subprocess is dead or not working, modify percentage of availability
         # If subprocesses are not working - service availability 0%
-        proccess_count = int(subprocess.Popen(sub_grep_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout.read())
+        process_count = int(subprocess.Popen(sub_grep_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout.read())
 
         # Get current time
         now_utc = datetime.now().strftime(fmt)
@@ -108,7 +105,7 @@ class CRAB3CreateXML(object):
 
         child_status = SubElement(root,"status")
 
-        if subprocesses_config == proccess_count:
+        if subprocesses_config == process_count:
             # This means that everything is fine
             child_status.text = "available"
         else:
@@ -156,7 +153,7 @@ class CRAB3CreateXML(object):
                 numericval.text = 'n/a'
 
         # get the number of condor_shadown process per schedd
-        numberOfShadows = self.getShadowsRunning()
+        ListOfSchedds = self.getScheddsInfo()
 	totalRunningTasks = 0
 	totalIdleTasks = 0
 	totalRunningTP = 0
@@ -164,19 +161,19 @@ class CRAB3CreateXML(object):
         pickSchedulerRunning = 'JobUniverse==7 && JobStatus==2'
         pickLocalRunning = 'JobUniverse==12 && JobStatus==2'
 
-        if len(numberOfShadows) > 0:
-            for oneShadow in numberOfShadows:
+        if len(ListOfSchedds) > 0:
+            for oneSchedd in ListOfSchedds:
                 numericval = SubElement(data,"numericvalue")
-                numericval.set("name","number_of_shadows_process_for_%s"%(oneShadow[0]))
-                numericval.text = str(oneShadow[1])
+                numericval.set("name","number_of_shadows_process_for_%s"%(oneSchedd[0]))
+                numericval.text = str(oneSchedd[1])
 
-            for oneShadow in numberOfShadows:
+            for oneSchedd in ListOfSchedds:
                 numericval = SubElement(data,"numericvalue")
-                numericval.set("name","number_of_schedulers_jobs_running_for_%s"%(oneShadow[0]))
-                numericval.text = str(oneShadow[2])
-		totalRunningTasks += oneShadow[2]
+                numericval.set("name","number_of_schedulers_jobs_running_for_%s"%(oneSchedd[0]))
+                numericval.text = str(oneSchedd[2])
+		totalRunningTasks += oneSchedd[2]
 
-                scheddName = oneShadow[0]
+                scheddName = oneSchedd[0]
                 scheddAdd = self.coll.locate(htcondor.DaemonTypes.Schedd,scheddName)
                 schedd = htcondor.Schedd(scheddAdd)
                 # if one schedd does not answer, go on and try the others
@@ -195,20 +192,20 @@ class CRAB3CreateXML(object):
                 totalIdleTasks += numDagIdle
                 totalRunningTP += numTPRun
 
-            for oneShadow in numberOfShadows:
+            for oneSchedd in ListOfSchedds:
                 numericval = SubElement(data,"numericvalue")
-                numericval.set("name","number_of_idle_jobs_for_at_%s"%(oneShadow[0]))
-                numericval.text = str(oneShadow[3])
+                numericval.set("name","number_of_idle_jobs_for_at_%s"%(oneSchedd[0]))
+                numericval.text = str(oneSchedd[3])
 
-            for oneShadow in numberOfShadows:
+            for oneSchedd in ListOfSchedds:
                 numericval = SubElement(data,"numericvalue")
-                numericval.set("name","number_of_running_jobs_running_for_at_%s"%(oneShadow[0]))
-                numericval.text = str(oneShadow[4])
+                numericval.set("name","number_of_running_jobs_running_for_at_%s"%(oneSchedd[0]))
+                numericval.text = str(oneSchedd[4])
                  
-            for oneShadow in numberOfShadows:
+            for oneSchedd in ListOfSchedds:
                 numericval = SubElement(data,"numericvalue")
-                numericval.set("name","number_of_held_jobs_for_at_%s"%(oneShadow[0]))
-                numericval.text = str(oneShadow[5])
+                numericval.set("name","number_of_held_jobs_for_at_%s"%(oneSchedd[0]))
+                numericval.text = str(oneSchedd[5])
 
 	numericval = SubElement(data,"numericvalue")
         numericval.set("name","totalRunningTasks")
