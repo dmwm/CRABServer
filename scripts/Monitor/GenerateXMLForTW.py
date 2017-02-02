@@ -176,23 +176,25 @@ class CRAB3CreateXML(object):
                 numericval.text = str(oneShadow[2])
 		totalRunningTasks += oneShadow[2]
 
-#STEFANO
-# here I could fill totalIdleTasks if I had a way to retrieve
-# the number of idle SchedulerJobs on a schedd :-(
-# let's try
                 scheddName = oneShadow[0]
                 scheddAdd = self.coll.locate(htcondor.DaemonTypes.Schedd,scheddName)
                 schedd = htcondor.Schedd(scheddAdd)
-                idleDags = list(schedd.xquery(pickSchedulerIdle))
-                #runningDags = list(schedd.xquery(pickSchedulerRunning))
-                runningTPs =  list(schedd.xquery(pickLocalRunning))
-                #numDagRun = len(runningDags)
+                # if one schedd does not answer, go on and try the others
+                try: 
+                  idleDags = list(schedd.xquery(pickSchedulerIdle))
+                except:
+                  idleDags=0
+                  pass
+                try:
+                  runningTPs =  list(schedd.xquery(pickLocalRunning))
+                except:
+                  runningTPs=0
+                  pass
                 numDagIdle = len(idleDags)
                 numTPRun = len(runningTPs)
                 totalIdleTasks += numDagIdle
                 totalRunningTP += numTPRun
 
-#STEFANO
             for oneShadow in numberOfShadows:
                 numericval = SubElement(data,"numericvalue")
                 numericval.set("name","number_of_idle_jobs_for_at_%s"%(oneShadow[0]))
@@ -252,7 +254,7 @@ if __name__ == '__main__':
     pr.execute()
 
     # push the XML to elasticSearch 
-    cmd = "curl -i -F file=@/home/crab3/CRAB3_SCHEDD_XML_Report2.xml xsls.cern.ch"
+    cmd = "curl -i -F file=@%s xsls.cern.ch" % xmllocation
     try:
         pu = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except Exception, e:
