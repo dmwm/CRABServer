@@ -157,6 +157,7 @@ class CRAB3CreateXML(object):
 	totalRunningTasks = 0
 	totalIdleTasks = 0
 	totalRunningTP = 0
+        # see https://htcondor-wiki.cs.wisc.edu/index.cgi/wiki?p=MagicNumbers
         pickSchedulerIdle = 'JobUniverse==7 && JobStatus==1'
         pickSchedulerRunning = 'JobUniverse==7 && JobStatus==2'
         pickLocalRunning = 'JobUniverse==12 && JobStatus==2'
