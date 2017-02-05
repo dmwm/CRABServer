@@ -30,9 +30,9 @@
     },
     {
       "notice": false,
-      "collapsable": false,
+      "collapsable": true,
       "collapse": false,
-      "title": "",
+      "title": "TASK WORKER AND GLEXEC",
       "editable": true,
       "height": "350px",
       "panels": [
@@ -108,7 +108,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": "#64B0C8",
-                  "zerofill": true,
+                  "zerofill": false,
                   "alias": "Submitted",
                   "mode": "mean",
                   "queries": [
@@ -120,7 +120,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": "#890F02",
-                  "zerofill": true,
+                  "zerofill": false,
                   "alias": "Failed",
                   "mode": "mean",
                   "queries": [
@@ -132,7 +132,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": "#58140C",
-                  "zerofill": true,
+                  "zerofill": false,
                   "alias": "Killed",
                   "mode": "mean",
                   "queries": [
@@ -144,7 +144,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": null,
-                  "zerofill": true,
+                  "zerofill": false,
                   "alias": "ResubmitFailed",
                   "mode": "mean",
                   "queries": [
@@ -156,7 +156,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": null,
-                  "zerofill": true,
+                  "zerofill": false,
                   "alias": "SubmitFailed",
                   "mode": "mean",
                   "queries": [
@@ -168,7 +168,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": null,
-                  "zerofill": true,
+                  "zerofill": false,
                   "alias": "KillFailed",
                   "mode": "mean",
                   "queries": [
@@ -257,7 +257,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": "#64B0C8",
-                  "zerofill": true,
+                  "zerofill": false,
                   "alias": "New",
                   "mode": "total",
                   "queries": [
@@ -269,7 +269,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": "#DEDAF7",
-                  "zerofill": true,
+                  "zerofill": false,
                   "alias": "Resubmit",
                   "mode": "total",
                   "queries": [
@@ -281,7 +281,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": "#890F02",
-                  "zerofill": true,
+                  "zerofill": false,
                   "alias": "Kill",
                   "mode": "total",
                   "queries": [
@@ -293,7 +293,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": null,
-                  "zerofill": true,
+                  "zerofill": false,
                   "alias": "Queued",
                   "mode": "total",
                   "queries": [
@@ -365,12 +365,12 @@
       "title": "TIPS AND INFO",
       "height": "100px",
       "editable": true,
-      "collapse": false,
+      "collapse": true,
       "collapsable": true,
       "panels": [
         {
           "error": false,
-          "span": 4,
+          "span": 3,
           "editable": true,
           "type": "text",
           "loadingEditor": false,
@@ -380,7 +380,7 @@
           "title": "TIPS"
         },
         {
-          "span": 4,
+          "span": 6,
           "editable": true,
           "type": "hits",
           "loadingEditor": false,
