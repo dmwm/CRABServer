@@ -282,7 +282,7 @@ class PreJob:
         use_resubmit_info = False
         resubmit_jobids = []
         if 'CRAB_ResubmitList' in self.task_ad:
-            resubmit_jobids = self.task_ad['CRAB_ResubmitList']
+            resubmit_jobids = map(str, self.task_ad['CRAB_ResubmitList'])
             try:
                 resubmit_jobids = set(resubmit_jobids)
                 if resubmit_jobids and self.job_id not in resubmit_jobids:
