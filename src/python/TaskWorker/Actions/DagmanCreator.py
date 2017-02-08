@@ -458,7 +458,10 @@ class DagmanCreator(TaskAction.TaskAction):
         info['runs'] = []
         info['lumis'] = []
         info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
-        info['accounting_group'] = 'analysis.%s' % info['userhn']
+        if info['userhn'] in getattr(self.config.TaskWorker, 'highPrioUsers', []):
+            info['accounting_group'] = 'highprio.%s' % info['userhn']
+        else:
+            info['accounting_group'] = 'analysis.%s' % info['userhn']
         info = transform_strings(info)
         info['faillimit'] = task['tm_fail_limit']
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
