@@ -5,12 +5,14 @@ import random
 import logging
 import cherrypy
 from base64 import b64decode
+from httplib import HTTPException
+from httplib2 import HttpLib2Error
 
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
-from WMCore.HTTPFrontEnd.RequestManager.ReqMgrWebTools import allScramArchsAndVersions, TAG_COLLECTOR_URL
+from WMCore.Services.TagCollector.TagCollector import TagCollector
 from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
 
 # CRABServer dependecies here
@@ -287,17 +289,18 @@ class RESTUserWorkflow(RESTEntity):
             If the list of releases is empty (reason may be an ExpatError) then report an error message
             If the asked released is not there then report an error message
         """
+        tagCollector = TagCollector()
         msg = False
         goodReleases = {}
         try:
-            goodReleases = allScramArchsAndVersions()
-        except IOError:
-            msg = "Error connecting to %s and determine the list of available releases. " % TAG_COLLECTOR_URL + \
-                  "Skipping the check of the releases"
+            goodReleases = tagCollector.releases_by_architecture()
+        except (IOError, HTTPException, HttpLib2Error):
+            msg = "Error connecting to %s (params: %s) and determining the list of available releases. " % \
+                  (tagCollector['endpoint'], tagCollector.tcArgs) + "Skipping the check of the releases"
         else:
             if goodReleases == {}:
-                msg = "The list of releases at %s is empty. " % TAG_COLLECTOR_URL + \
-                      "Skipping the check of the releases"
+                msg = "The list of releases at %s (params: %s) is empty. " % \
+                      (tagCollector['endpoint'], tagCollector.tcArgs) + "Skipping the check of the releases"
             elif jobarch not in goodReleases or jobsw not in goodReleases[jobarch]:
                 msg = "ERROR: %s on %s is not among supported releases" % (jobsw, jobarch)
                 msg += "\nUse config.JobType.allowUndistributedCMSSW = True if you are sure of what you are doing"
