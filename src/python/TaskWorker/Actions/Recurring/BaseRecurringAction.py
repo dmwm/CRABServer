@@ -9,7 +9,7 @@ def handleRecurring(resthost, resturi, config, task, procnum, action):
 
 class BaseRecurringAction:
     def __init__(self):
-        self.lastExecution = time.time()
+        self.lastExecution = 0
         #set the logger
         self.logger = logging.getLogger(__name__)
         if not self.logger.handlers:
