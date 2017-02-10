@@ -36,6 +36,7 @@ class RESTUserWorkflow(RESTEntity):
         self.allPNNNames = CMSSitesCache(cachetime=0, sites={})
         self.centralcfg = centralcfg
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
+        self.tagCollector = TagCollector(anytype = 1, anyarch = 0)
 
     def _expandSites(self, sites, pnn=False):
         """Check if there are sites cotaining the '*' wildcard and convert them in the corresponding list
@@ -289,11 +290,10 @@ class RESTUserWorkflow(RESTEntity):
             If the list of releases is empty (reason may be an ExpatError) then report an error message
             If the asked released is not there then report an error message
         """
-        tagCollector = TagCollector()
         msg = False
         goodReleases = {}
         try:
-            goodReleases = tagCollector.releases_by_architecture()
+            goodReleases = self.tagCollector.releases_by_architecture()
         except (IOError, HTTPException, HttpLib2Error):
             msg = "Error connecting to %s (params: %s) and determining the list of available releases. " % \
                   (tagCollector['endpoint'], tagCollector.tcArgs) + "Skipping the check of the releases"
