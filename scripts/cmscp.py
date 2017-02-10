@@ -733,8 +733,9 @@ def perform_direct_stageout(direct_stageout_impl, \
         ## Do the direct stageout.
         try:
             print("       -----> Stageout implementation log start")
+            options = "--nochecksum" if direct_stageout_command == "gfal2" else None
             direct_stageout_impl(direct_stageout_protocol, \
-                                 source_file, dest_pfn, None, None)
+                                 source_file, dest_pfn, options, None)
             print("       <----- Stageout implementation log finish")
         except Alarm:
             print("       <----- Stageout implementation log finish")
