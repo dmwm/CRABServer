@@ -187,7 +187,7 @@
       "list": {
         "0": {
           "field": "@timestamp",
-          "from": "now-3h",
+          "from": "now-12h",
           "alias": "",
           "to": "now",
           "mandate": "must",
@@ -249,6 +249,33 @@
           "query": "vocms0118 AND @message.nv_name:\"number_of_NEW_tasks_in_the_last_minute\"",
           "type": "lucene",
           "id": 4
+        },
+        "5": {
+          "id": 5,
+          "color": "#7EB26D",
+          "alias": "Running Tasks",
+          "pin": true,
+          "type": "lucene",
+          "enable": true,
+          "query": "vocms0118 AND @message.nv_name:\"totalRunningTasks\""
+        },
+        "6": {
+          "id": 6,
+          "color": "#EAB839",
+          "alias": "Idle Tasks",
+          "pin": true,
+          "type": "lucene",
+          "enable": true,
+          "query": "vocms0118 AND @message.nv_name:\"totalIdleTasks\""
+        },
+       "7": {
+          "id": 7, 
+          "color": "#8091ff",
+          "alias": "Running TPs",
+          "pin": true,
+          "type": "lucene",
+          "enable": true,
+          "query": "vocms0118 AND @message.nv_name:\"totalRunningTPs\""
         },
         "15": {
           "enable": true,

@@ -169,7 +169,7 @@ done
 cat dashboard-template2.tpl
 
 # Panel with number of shadows per Schedd
-panelStarts "[3] Number of Shadows per Schedd"
+panelStarts "[3] Number of Running Jobs per Schedd"
 # all schedd series for number of shadows
 SCHEDD_QID=100
 for schedd in ${SCHEDD_SNAME[@]};do
@@ -181,7 +181,7 @@ for schedd in ${SCHEDD_SNAME[@]};do
             \t  "scale": 1,\n
             \t  "scaleSeconds": true,\n
             \t  "color": null,\n
-            \t  "zerofill": true,\n
+            \t  "zerofill": false,\n
             \t  "alias": "${schedd}",\n
             \t  "mode": "mean",\n
             \t  "queries": [\n
@@ -212,7 +212,7 @@ for schedd in ${SCHEDD_SNAME[@]};do
             \t  "scale": 1,\n
             \t  "scaleSeconds": true,\n
             \t  "color": null,\n
-            \t  "zerofill": true,\n
+            \t  "zerofill": false,\n
             \t  "alias": "${schedd}",\n
             \t  "mode": "mean",\n
             \t  "queries": [\n
@@ -243,7 +243,7 @@ for schedd in ${SCHEDD_SNAME[@]};do
             \t  "scale": 1,\n
             \t  "scaleSeconds": true,\n
             \t  "color": null,\n
-            \t  "zerofill": true,\n
+            \t  "zerofill": false,\n
             \t  "alias": "${schedd}",\n
             \t  "mode": "mean",\n
             \t  "queries": [\n
@@ -269,7 +269,7 @@ cat << EOF
       "title": "SCHEDDS HOST METRICS/NOTIFICATIONS",
       "height": "100px",
       "editable": true,
-      "collapse": false,
+      "collapse": true,
       "collapsable": true,
       "panels": [
         {
@@ -419,7 +419,10 @@ cat << EOF
         2,
         3,
         4,
-        15,
+        5,
+        6,
+	7,
+	15,
         16,
         17,
         18,
