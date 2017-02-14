@@ -255,7 +255,6 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
         with open(tempFilename, "w") as tempFile:
             json.dump(error_summary_new_content, tempFile)
         move(tempFilename, G_ERROR_SUMMARY_FILE_NAME)
-        os.remove(tempFilename)
         logger.debug("Written error summary file")
 
 ##==============================================================================
