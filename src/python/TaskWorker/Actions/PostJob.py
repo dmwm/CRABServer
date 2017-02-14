@@ -81,6 +81,7 @@ import tempfile
 import traceback
 import subprocess
 import logging.handlers
+from shutil import move
 from httplib import HTTPException
 
 import DashboardAPI
