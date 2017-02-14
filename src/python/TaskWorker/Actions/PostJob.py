@@ -235,11 +235,10 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
 
     # Read, update and re-write the error_summary.json file
     try:
+        error_summary_old_content = {}
         if os.stat(G_ERROR_SUMMARY_FILE_NAME).st_size != 0:
             fsummary.seek(0)
             error_summary_old_content = json.load(fsummary)
-        else:
-            error_summary_old_content = {}
     except (IOError, ValueError):
         ## There is nothing to do if the error_summary file doesn't exist or is invalid.
         ## Just recreate it.
@@ -247,14 +246,16 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
     error_summary_new_content = error_summary_old_content
     error_summary_new_content[job_id] = {crab_retry : error_summary}
 
-    logger.debug("Writing error summary file")
     ## If we have updated the error summary, write it to the json file.
     ## Use a temporary file and rename to avoid concurrent writing of the file.
     if error_summary_changed:
-        fsummary.truncate(0)
-        fsummary.seek(0)
-        json.dump(error_summary_new_content, fsummary)
-    logger.debug("Writen error summary file")
+        logger.debug("Writing error summary file")
+        tempFilename = (G_ERROR_SUMMARY_FILE_NAME + ".%s") % os.getpid()
+        with open(tempFilename, "w") as tempFile:
+            json.dump(error_summary_new_content, tempFile)
+        move(tempFilename, G_ERROR_SUMMARY_FILE_NAME)
+        os.remove(tempFilename)
+        logger.debug("Written error summary file")
 
 ##==============================================================================
 
@@ -1539,12 +1540,12 @@ class PostJob():
         ## Prepare the error report. Enclosing it in a try except as we don't want to
         ## fail jobs because this fails.
         self.logger.info("====== Starting to prepare error report.")
+        self.logger.debug("Acquiring lock on error summary file.")
         try:
-            with open(G_ERROR_SUMMARY_FILE_NAME, "a+") as fsummary:
-                self.logger.debug("Acquiring lock on error summary file.")
-                fcntl.flock(fsummary.fileno(), fcntl.LOCK_EX)
+            with getLock(G_ERROR_SUMMARY_FILE_NAME):
                 self.logger.debug("Acquired lock on error summary file.")
-                prepareErrorSummary(self.logger, fsummary, self.job_id, self.crab_retry)
+                with open(G_ERROR_SUMMARY_FILE_NAME, "a+") as fsummary:
+                    prepareErrorSummary(self.logger, fsummary, self.job_id, self.crab_retry)
         except:
             msg = "Unknown error while preparing the error report."
             self.logger.exception(msg)
