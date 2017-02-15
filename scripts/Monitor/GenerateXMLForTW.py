@@ -238,6 +238,7 @@ if __name__ == '__main__':
     """
 
     start_time = time.time()
+
 # make sure no other instance of this script is running
     lockFile = '/home/crab3/CRAB3_SCHEDD_XML.Lock'
     if os.path.isfile(lockFile) :
