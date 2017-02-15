@@ -460,7 +460,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         if row.collector:
             result['collector'] = row.collector
 
-        self.isCouchDBURL = isCouchDBURL(row.asourl)
+        self.asoDBURL = row.asourl
 
         # 0 - simple crab status
         # 1 - crab status -long
@@ -1057,7 +1057,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         data = json.load(fp)
         for docid, result in data['results'].iteritems():
             #Oracle has an improved structure in aso_status
-            if self.isCouchDBURL:
+            if isCouchDBURL(self.asoDBURL):
                 result = result['value']
             else:
                 result = result[0]
