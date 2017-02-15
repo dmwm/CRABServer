@@ -108,7 +108,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": "#64B0C8",
-                  "zerofill": false,
+                  "zerofill": true,
                   "alias": "Submitted",
                   "mode": "mean",
                   "queries": [
@@ -120,7 +120,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": "#890F02",
-                  "zerofill": false,
+                  "zerofill": true,
                   "alias": "Failed",
                   "mode": "mean",
                   "queries": [
@@ -132,7 +132,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": "#58140C",
-                  "zerofill": false,
+                  "zerofill": true,
                   "alias": "Killed",
                   "mode": "mean",
                   "queries": [
@@ -144,7 +144,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": null,
-                  "zerofill": false,
+                  "zerofill": true,
                   "alias": "ResubmitFailed",
                   "mode": "mean",
                   "queries": [
@@ -156,7 +156,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": null,
-                  "zerofill": false,
+                  "zerofill": true,
                   "alias": "SubmitFailed",
                   "mode": "mean",
                   "queries": [
@@ -168,7 +168,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": null,
-                  "zerofill": false,
+                  "zerofill": true,
                   "alias": "KillFailed",
                   "mode": "mean",
                   "queries": [
@@ -257,7 +257,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": "#64B0C8",
-                  "zerofill": false,
+                  "zerofill": true,
                   "alias": "New",
                   "mode": "total",
                   "queries": [
@@ -269,7 +269,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": "#DEDAF7",
-                  "zerofill": false,
+                  "zerofill": true,
                   "alias": "Resubmit",
                   "mode": "total",
                   "queries": [
@@ -281,7 +281,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": "#890F02",
-                  "zerofill": false,
+                  "zerofill": true,
                   "alias": "Kill",
                   "mode": "total",
                   "queries": [
@@ -293,7 +293,7 @@
                   "value_field": "@message.nv_value",
                   "scale": 1,
                   "color": null,
-                  "zerofill": false,
+                  "zerofill": true,
                   "alias": "Queued",
                   "mode": "total",
                   "queries": [

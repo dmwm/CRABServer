@@ -181,7 +181,7 @@ for schedd in ${SCHEDD_SNAME[@]};do
             \t  "scale": 1,\n
             \t  "scaleSeconds": true,\n
             \t  "color": null,\n
-            \t  "zerofill": false,\n
+            \t  "zerofill": true,\n
             \t  "alias": "${schedd}",\n
             \t  "mode": "mean",\n
             \t  "queries": [\n
@@ -212,7 +212,7 @@ for schedd in ${SCHEDD_SNAME[@]};do
             \t  "scale": 1,\n
             \t  "scaleSeconds": true,\n
             \t  "color": null,\n
-            \t  "zerofill": false,\n
+            \t  "zerofill": true,\n
             \t  "alias": "${schedd}",\n
             \t  "mode": "mean",\n
             \t  "queries": [\n
@@ -243,7 +243,7 @@ for schedd in ${SCHEDD_SNAME[@]};do
             \t  "scale": 1,\n
             \t  "scaleSeconds": true,\n
             \t  "color": null,\n
-            \t  "zerofill": false,\n
+            \t  "zerofill": true,\n
             \t  "alias": "${schedd}",\n
             \t  "mode": "mean",\n
             \t  "queries": [\n

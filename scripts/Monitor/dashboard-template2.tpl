@@ -33,7 +33,7 @@
               "mode": "mean",
               "value_field": "@message.nv_value",
               "scale": 1,
-              "zerofill": false,
+              "zerofill": true,
               "derivative": false,
               "queries": [
                 5
@@ -45,7 +45,7 @@
               "mode": "mean",
               "value_field": "@message.nv_value",
               "scale": 1,
-              "zerofill": false,
+              "zerofill": true,
               "derivative": false,
               "queries": [
                 6
@@ -57,7 +57,7 @@
               "mode": "mean",
               "value_field": "@message.nv_value",
               "scale": 1, 
-              "zerofill": false,
+              "zerofill": true,
               "derivative": false,
               "queries": [
                 7
