@@ -84,9 +84,9 @@
               "desc"
             ]
           },
-          "auto_int": true,
+          "auto_int": false,
           "resolution": 100,
-          "interval": "10m",
+          "interval": "5m",
           "intervals": [
             "auto",
             "1s",
