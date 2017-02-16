@@ -514,6 +514,10 @@ class RESTUserWorkflow(RESTEntity):
             ## used by errors and report (short format in report means we do not query DBS)
             validate_num('shortformat', param, safe, optional=True)
 
+            # used by publicationStatus
+            validate_str("asourl", param, safe, RX_ASOURL, optional=True)
+            validate_str("asodb", param, safe, RX_ASODB, optional=True)
+
             ## validation parameters
             if not safe.kwargs['workflow'] and safe.kwargs['subresource']:
                 raise InvalidParameter("Invalid input parameters")
@@ -651,7 +655,7 @@ class RESTUserWorkflow(RESTEntity):
             return self.userworkflowmgr.proceed(workflow=workflow)
 
     @restcall
-    def get(self, workflow, subresource, username, limit, shortformat, exitcode, jobids, verbose, timestamp):
+    def get(self, workflow, subresource, username, limit, shortformat, exitcode, jobids, verbose, timestamp, asourl, asodb):
         """Retrieves the workflow information, like a status summary, in case the workflow unique name is specified.
            Otherwise returns all workflows since (now - age) for which the user is the owner.
            The caller needs to be a valid CMS user.
@@ -683,6 +687,8 @@ class RESTUserWorkflow(RESTEntity):
                 result = self.userworkflowmgr.report(workflow, userdn=userdn, usedbs=shortformat)
             elif subresource == 'report2':
                 result = self.userworkflowmgr.report2(workflow, userdn=userdn, usedbs=shortformat)
+            elif subresource == 'publicationstatus':
+                result = self.userworkflowmgr.publicationStatus(workflow, asourl, asodb, username)
             # if here means that no valid subresource has been requested
             # flow should never pass through here since validation restrict this
             else:
