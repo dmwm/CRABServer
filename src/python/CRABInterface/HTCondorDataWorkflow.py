@@ -837,7 +837,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         if isCouchDBURL(asourl):
             return self.publicationStatusCouch(workflow, asourl, asodb)
         else:
-            return self.publicationStatusOracle(workflow, asourl, asodb, user)
+            return self.publicationStatusOracle(workflow, user)
 
     def publicationStatusCouch(self, workflow, asourl, asodb):
         publicationInfo = {'status': {}, 'failure_reasons': {}}
@@ -891,7 +891,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         return publicationInfo
 
-    def publicationStatusOracle(self, workflow, asourl, asodb, user):
+    def publicationStatusOracle(self, workflow, user):
         publicationInfo = {}
 
         #query oracle for the information
