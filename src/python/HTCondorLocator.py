@@ -34,7 +34,8 @@ def filterScheddsByClassAds(schedds, classAds, logger=None):
         scheddValid = True
         for classAd in classAds:
             if classAd not in schedd:
-                logger.debug("Ignoring %s schedd since it is missing the %s ClassAd." % (schedd['Name'], classAd))
+                if logger:
+                    logger.debug("Ignoring %s schedd since it is missing the %s ClassAd." % (schedd['Name'], classAd))
                 scheddValid = False
         if scheddValid:
             validSchedds.append(schedd)
@@ -48,7 +49,7 @@ def capacityMetricsChoicesHybrid(schedds, goodSchedds, logger=None):
     """
 
     classAdsRequired = ['DetectedMemory', 'TotalFreeMemoryMB', 'MaxJobsRunning', 'TotalRunningJobs', 'TransferQueueMaxUploading', 'TransferQueueNumUploading', 'Name']
-    schedds = filterScheddsByClassAds(schedds, classAdsRequired)
+    schedds = filterScheddsByClassAds(schedds, classAdsRequired, logger)
 
     # Get only those schedds that are in our external rest configuration and their status is ok
     schedds = [schedd for schedd in schedds if schedd['Name'] in goodSchedds and classad.ExprTree.eval(schedd['IsOk'])]

@@ -211,7 +211,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         currentBackendurls['htcondorSchedds'] = dict([(s,restSchedulers[s]) for s in restSchedulers if s not in alreadyTriedSchedds])
         if len(currentBackendurls['htcondorSchedds']) == 0:
             return None
-        loc = HTCondorLocator.HTCondorLocator(currentBackendurls)
+        loc = HTCondorLocator.HTCondorLocator(currentBackendurls, self.logger)
         if hasattr(self.config.TaskWorker, 'scheddPickerFunction'):
             schedd = loc.getSchedd(chooserFunction=self.config.TaskWorker.scheddPickerFunction)
         else:
