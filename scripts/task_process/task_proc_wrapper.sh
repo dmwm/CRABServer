@@ -38,14 +38,14 @@ do
         echo "Query done on $(date)"
     fi
 
-    # Once the dag reaches one of the final states (5 or 6), no further updates are expected to the log files
+    # Once the dag reaches one of the final states (4, 5 or 6), no further updates are expected to the log files
     # and the task_process can exit.
     # In a rare case (if this script does condor_q right after the the dag changes states),
     # it is actually possible that task_process would exit before the changes contributing to the status are propagated.
     # Adding a short sleep would solve this, however, that then presents another problem of task_process not starting
     # at all if the task is resubmitted during this short sleep period.
     echo "Dag status code: $CONDOR_RES"
-    if [[ "$CONDOR_RES" == 5 || "$CONDOR_RES" == 6 ]]; then
+    if [[ "$CONDOR_RES" == 4 || "$CONDOR_RES" == 5 || "$CONDOR_RES" == 6 ]]; then
         echo "Dag is in one of the final states. Removing the task_process/task_process_running file and exiting."
         rm task_process/task_process_running
 
