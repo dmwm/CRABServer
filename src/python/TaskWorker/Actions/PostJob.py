@@ -2181,26 +2181,6 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def file_exists(self, lfn, type):
-        """ Because of a bug in Oracle we need to do this if we get an exception while executing the filemetadata insert. See:
-            https://cern.service-now.com/nav_to.do?uri=incident.do?sys_id=92982f051d497500c7138e7019d56af9%26sysparm_view=RPT72d916c9f0d3d94079046a0c9f0e01d6
-            With the February deployment we should change the merge to an insert/update
-        """
-
-        try:
-            configreq = {"taskname" : self.job_ad['CRAB_ReqName'],
-                         "filetype" : type
-            }
-            res, _, _ = self.server.get(self.rest_uri_no_api + '/filemetadata', data = encodeRequest(configreq))
-            lfns = [x['lfn'] for x in res[u'result']]
-        except HTTPException as hte:
-            msg = "Error getting list of file metadata: %s" % (str(hte.headers))
-            self.logger.error(msg)
-            return False
-        return (lfn in lfns)
-
-    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
     def upload_input_files_metadata(self):
         """
         Upload the (primary) input files metadata. We care about the number of events
@@ -2264,12 +2244,6 @@ class PostJob():
             except HTTPException as hte:
                 msg = "Error uploading input file metadata: %s" % (str(hte.headers))
                 self.logger.error(msg)
-                if not self.file_exists(lfn, 'POOLIN'):
-                    raise
-                else:
-                    msg = "Ignoring the error since the file %s is already in the database" % lfn
-                    self.logger.debug(msg)
-
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -2349,11 +2323,6 @@ class PostJob():
                 ## If the file made it back alright, I suppose we can proceed.
                 msg = "Error uploading output file metadata: %s" % (str(hte.headers))
                 self.logger.error(msg)
-                if not self.file_exists(file_info['outlfn'], file_info['filetype']):
-                    raise
-                else:
-                    msg = "Ignoring the error since the file %s is already in the database" % lfn
-                    self.logger.debug(msg)
 
         if not os.path.exists('output_datasets') and output_datasets:
             configreq = [('subresource', 'addoutputdatasets'),
