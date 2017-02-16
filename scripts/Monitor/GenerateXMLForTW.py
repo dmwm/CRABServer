@@ -236,8 +236,18 @@ if __name__ == '__main__':
         instance you need to change resthost, resturi, and twconfig.
         If you want to monitor your own machine, you have to enable it in puppet configuration.
     """
+
+    start_time = time.time()
+
+# make sure no other instance of this script is running
+    lockFile = '/home/crab3/CRAB3_SCHEDD_XML.Lock'
+    if os.path.isfile(lockFile) :
+       print "%s already exists, abandon this run" % lockFile
+       exit()
+    else:
+       open(lockFile,'wa').close()  # create the lock
+     
     resthost = 'cmsweb.cern.ch'
-    #xmllocation = 'teste.xml'
     xmllocation = '/home/crab3/CRAB3_SCHEDD_XML_Report2.xml'
     logger = logging.getLogger()
     handler = logging.StreamHandler(sys.stdout)
@@ -257,4 +267,13 @@ if __name__ == '__main__':
         pu = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except Exception, e:
         logger.debug(str(e))
+    end_time = time.time()
+    elapsed = end_time - start_time
+    now = time.strftime("%H:%M:%S", time.gmtime(end_time))
+    elapsed_min="%3d:%02d" % divmod(elapsed,60)
+    # uncomment following two lines to keep a log of how long this script takes
+    #with open ("timing.log","a") as f:
+    #    f.write("at %s took %s\n" % (now, elapsed_min))
+
+    os.remove(lockFile)
 
