@@ -685,8 +685,6 @@ class DagmanCreator(TaskAction.TaskAction):
         self.logger.debug("Ignore locality: %s" % (ignoreLocality))
 
         for jobgroup in splitterResult[0]:
-            self.logger.error(dir(jobgroup))
-            self.logger.error(type(jobgroup))
             jobs = jobgroup.getJobs()
 
             jgblocks = set() #job group blocks
