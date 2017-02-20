@@ -60,15 +60,18 @@ def capacityMetricsChoicesHybrid(schedds, goodSchedds, logger=None):
         totalJobs += schedd['MaxJobsRunning']
         totalUploads += schedd['TransferQueueMaxUploading']
 
+    logger.debug("Total Mem: %d, Total Jobs: %d, Total Uploads: %d" % (totalMemory, totalJobs, totalUploads))
     weights = {}
     for schedd in schedds:
         memPerc = schedd['TotalFreeMemoryMB']/totalMemory
-        uplPerc = (schedd['TransferQueueMaxUploading']-schedd['TransferQueueNumUploading'])/totalUploads
         jobPerc = (schedd['MaxJobsRunning']-schedd['TotalRunningJobs'])/totalJobs
-        weight = max(memPerc, uplPerc, jobPerc)
+        uplPerc = (schedd['TransferQueueMaxUploading']-schedd['TransferQueueNumUploading'])/totalUploads
+        weight = min(memPerc, uplPerc, jobPerc)
         weights[schedd['Name']] = weight
-        logger.debug("%s: Mem %s, Mx %s;  Run %s, Mx %s;  Trf %s, Max %s, weight: %f" % (schedd['Name'], schedd['TotalFreeMemoryMB'], totalMemory,
-                schedd['JobsRunning'], totalJobs, schedd['TransferQueueNumUploading'], totalUploads, weight))
+        logger.debug("%s: Mem %d, MemPrct %0.2f, Run %d, RunPrct %0.2f, Trf %d, TrfPrct %0.2f, weight: %f" %
+                    (schedd['Name'], schedd['TotalFreeMemoryMB'], memPerc,
+                     schedd['JobsRunning'], jobPerc,
+                     schedd['TransferQueueNumUploading'], uplPerc, weight))
 
     if schedds:
         choices = [(schedd['Name'], weights[schedd['Name']]) for schedd in schedds]
