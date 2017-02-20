@@ -21,9 +21,14 @@ def get_egroup_users(egroup_name):
     """ Given an egroup name it returns the whole list of user contained in this egroup
     """
     res = set()
+
+    # Need to set the location of trusted CA certs, they should be here by default.
+    ca_cert_dir = "/etc/openldap/cacerts"
+    ldap.set_option(ldap.OPT_X_TLS_CACERTDIR, ca_cert_dir)
+    l = ldap.initialize("ldaps://xldap.cern.ch:636")
+
     search_filter = "memberOf=CN=%s,OU=e-groups,OU=Workgroups,DC=cern,DC=ch" % egroup_name
     search_attribute = ["sAMAccountName"]
-    l = ldap.initialize("ldaps://xldap.cern.ch:636")
     basedn = "DC=cern,DC=ch"
     search_scope = ldap.SCOPE_SUBTREE
 
