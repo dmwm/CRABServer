@@ -254,7 +254,7 @@ if __name__ == '__main__':
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.ERROR)
 
     from WMCore.Configuration import loadConfigurationFile
 
