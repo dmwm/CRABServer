@@ -181,12 +181,12 @@ class CRAB3CreateXML(object):
                 try: 
                   idleDags = list(schedd.xquery(pickSchedulerIdle))
                 except:
-                  idleDags=0
+                  idleDags = []
                   pass
                 try:
-                  runningTPs =  list(schedd.xquery(pickLocalRunning))
+                  runningTPs = list(schedd.xquery(pickLocalRunning))
                 except:
-                  runningTPs=0
+                  runningTPs = []
                   pass
                 numDagIdle = len(idleDags)
                 numTPRun = len(runningTPs)
