@@ -467,11 +467,14 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd['Args'] = arg
         dagAd["TransferInput"] = str(info['inputFilesString'])
         dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"].encode('ascii', 'ignore'))
+        # increasing the time for keeping the dagman into the queue with 10 days in order to
+        # start a proper cleanup script after the task lifetime has expired
+        extendedLifetime = TASKLIFETIME + 10*24*60*60
         # Putting JobStatus == 4 since LeaveJobInQueue is for completed jobs (probably redundant)
-        LEAVE_JOB_IN_QUEUE_EXPR = "(JobStatus == 4) && ((time()-CRAB_TaskSubmitTime) < %s)" % TASKLIFETIME
+        LEAVE_JOB_IN_QUEUE_EXPR = "(JobStatus == 4) && ((time()-CRAB_TaskSubmitTime) < %s)" % extendedLifetime
         dagAd["LeaveJobInQueue"] = classad.ExprTree(LEAVE_JOB_IN_QUEUE_EXPR)
         # Removing a task after the expiration date no matter what its status is
-        dagAd["PeriodicRemove"] = classad.ExprTree("((time()-CRAB_TaskSubmitTime) > %s)" % TASKLIFETIME)
+        dagAd["PeriodicRemove"] = classad.ExprTree("((time()-CRAB_TaskSubmitTime) > %s)" % extendedLifetime)
         dagAd["TransferOutput"] = info['outputFilesString']
         dagAd["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
         dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
