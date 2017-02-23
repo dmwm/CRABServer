@@ -124,7 +124,7 @@ class HTCondorLocator(object):
         htcondor.param['COLLECTOR_HOST'] = self.getCollector().encode('ascii', 'ignore')
         coll = htcondor.Collector()
         schedds = coll.query(htcondor.AdTypes.Schedd, 'Name=?=%s' % HTCondorUtils.quote(schedd.encode('ascii', 'ignore')),
-                             ["AddressV1", "CondorPlatform", "CondorVersion", "Machine", "MyAddress", "Name", "MyType", "ScheddIpAddr"])
+                             ["AddressV1", "CondorPlatform", "CondorVersion", "Machine", "MyAddress", "Name", "MyType", "ScheddIpAddr", "RemoteCondorSetup"])
         self.scheddAd = ""
         if not schedds:
             self.scheddAd = self.getCachedCollectorOutput(schedd)
