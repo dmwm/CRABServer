@@ -185,7 +185,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             msg += " Jobs may not find a site where to run."
             msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
             self.logger.warning(msg)
-            args[0][1]['tm_maxjobruntime'] = str(stdmaxjobruntime)
+            args[0][0]['tm_maxjobruntime'] = str(stdmaxjobruntime)
             self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
         if task['tm_maxmemory'] > stdmaxmemory:
             msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (task['tm_maxmemory'], stdmaxmemory)
