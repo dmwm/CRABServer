@@ -1490,7 +1490,8 @@ def main():
         except Exception:
             print("       <----- Stageout manager log finish")
             msg  = "WARNING: Error initializing StageOutMgr."
-            msg += " Will not be able to do local stageouts."
+            msg += " Will not be able to do local stageouts.\n"
+            msg += traceback.format_exc()
             print(msg)
             cmscp_status['init_local_stageout_mgr']['return_code'] = 60311
             cmscp_status['init_local_stageout_mgr']['return_msg'] = msg
