@@ -13,7 +13,7 @@ $(document).ready(function() {
     var transtable= $("#transfer-table").DataTable({
         colReorder: true,
         fixedHeader: true,
-        autoWidth: false
+        autoWidth: false,
         });
 
     // initialize table for document 
@@ -28,14 +28,51 @@ $(document).ready(function() {
     // for other tabs
     $('.nav-tabs a').click(function(){
         if(this.id=='transferTab' && !transferInfo_loaded){
-
+            setupLoading();
             displayTransferInfo(handleTransferInfoErr);       
             transferInfo_loaded = true;
 
         }
     });
 
-    // set X scroll
+    // setup spinning animation for transfer info table
+    function setupLoading() {    
+        $('<div id="divSpin" />').appendTo(document.body);
+
+        var target = document.getElementById("divSpin");
+
+        var opts = {
+            lines: 13, // The number of lines to draw
+            length: 20, // The length of each line
+            width: 10, // The line thickness
+            radius: 30, // The radius of the inner circle
+            corners: 1, // Corner roundness (0..1)
+            rotate: 8, // The rotation offset
+            direction: 1, // 1: clockwise, -1: counterclockwise
+            color: '#000', // #rgb or #rrggbb or array of colors
+            speed: 1, // Rounds per second
+            trail: 60, // Afterglow percentage
+            shadow: false, // Whether to render a shadow
+            hwaccel: false, // Whether to use hardware acceleration
+            className: 'mySpin', // The CSS class to assign to the spinner
+            zIndex: 2e9, // The z-index (defaults to 2000000000)
+            top: '50%', // Top position relative to parent
+            left: '50%' // Left position relative to parent
+        };
+
+        mySpinner = new Spinner(opts).spin(target);
+    };
+
+    function removeLoading(){
+        mySpinner.stop();
+    }
+
+    function showLoading() {
+        mySpinner.spin();
+    }
+
+
+    // set datatable X scroll
     jQuery('.dataTable').wrap('<div class="dataTables_scroll" />');
 
     // Task name that was entered by the user, is set on form submission
@@ -90,8 +127,6 @@ $(document).ready(function() {
         clearPreviousContent();
         displayTaskInfo(handleTaskInfoErr);
         transferInfo_loaded = false;
-        //displayTransferInfo(handleTransferInfoErr);
-        //setTimeout(function(){ $("#transfer-table").tablesorter({debug:false}); }, 1000); 
     });
 
     /**
@@ -420,6 +455,7 @@ $(document).ready(function() {
 
                     transtable.columns.adjust().draw();
 
+                    // update progress bar
                     if(data.result.length > 0){
                         var percentage = 100*state["DONE"]/parseFloat(data.result.length)
                         $('#completed').width(percentage+"%")
@@ -436,24 +472,21 @@ $(document).ready(function() {
                         $('#killed').width(percentage+"%")
                     }
 
+                removeLoading();
 
                 })
                 .fail(function(xhr) {
                     var headers = xhr.getAllResponseHeaders().toLowerCase();
                     errHandler(new ServerError(headers));
+                    removeLoading();
                 })
         };
         
-        var spinner = new Spinner().spin(document.getElementById('transfer-table')); 
-
         queryApi(url);
-
-        spinner.stop()
     }
 
     $('#transfer-table tbody').on('click', 'tr', function () {
         var data = transtable.row( this ).data();
-        //$("#doc_table").text( 'You clicked on '+ docInfo + data[1] +' row' )
         url = docInfo + data[1]
 
         function queryApi(url) {
@@ -464,8 +497,6 @@ $(document).ready(function() {
 
                     doctable.clear();
                     for (i = 0; i < data.desc.columns.length; i++) {
-                        //$("#doc-table tbody")
-                       //     .append("<tr><td>" + data.desc.columns[i] + "</td><td>" + data.result[0][i] + "</td></tr>");
                              doctable.row.add( [data.desc.columns[i],data.result[0][i]] ).draw()
                     }
 
@@ -495,6 +526,7 @@ $(document).ready(function() {
             }
         } );
 
+        // set searchbox width
         $( 'input', this.footer() ).each( function () {
             if(this.placeholder=="File ID") this.style["width"] = "300px";
             else if(this.placeholder=="Transfer State") this.style["width"] = "120px";
@@ -737,10 +769,10 @@ $(document).ready(function() {
     function setUrls(dbVersion) {
         switch (dbVersion) {
             case "prod":
-                taskInfoUrl = "https://" + document.domain + "/crabserver/prod/task?subresource=search&workflow=";
-                taskStatusUrl = "https://" + document.domain + "/crabserver/prod/workflow?workflow=";
-                webDirProxyApiUrl = "https://" + document.domain + "/crabserver/prod/task?subresource=webdirprx&workflow="
-                transferInfo = "https://" + document.domain + "/crabserver/prod/fileusertransfers?subresource=getTransferStatus&taskname="
+                taskInfoUrl = "https://cmsweb.cern.ch/crabserver/prod/task?subresource=search&workflow=";
+                taskStatusUrl = "https://cmsweb.cern.ch/crabserver/prod/workflow?workflow=";
+                webDirProxyApiUrl = "https://cmsweb.cern.ch/crabserver/prod/task?subresource=webdirprx&workflow="
+                transferInfo = "https://cmsweb.cern.ch/crabserver/prod/fileusertransfers?subresource=getTransferStatus&taskname="
                 docInfo = "https://" + document.domain + "/crabserver/prod/fileusertransfers?subresource=getById&id="
                 break;
             case "preprod":
