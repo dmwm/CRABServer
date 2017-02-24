@@ -142,14 +142,23 @@ class RESTFileTransfers(RESTEntity):
             ###############################################
             binds['last_update'] = [timeNow]
             # TODO: fix case: if 'fts_instance' in kwargs
-            if 'fts_instance' in kwargs:
-                del errorMsg
-                for num in range(kwargs['list_of_ids']):
-                    binds['id'] = kwargs['list_of_ids'][num]
-                    binds['transfer_state'] = [TRANSFERDB_STATUSES[kwargs['list_of_transfer_state'][num]]]
-                    binds['fts_instance'] = kwargs['list_of_fts_instance'][num]
-                    binds['fts_id'] = kwargs['list_of_fts_id'][num]
-                    self.api.modify(self.transferDB.UpdateTransfers_sql, **binds)
+            if kwargs['list_of_fts_instance']:
+                #del errorMsg
+                ids = (kwargs['list_of_ids'].translate(None,"[ ]'")).split(",")
+                states = (kwargs['list_of_transfer_state'].translate(None,"[ ]'")).split(",")
+                retry = [0 for x in states]
+                reasons = ["" for x in states]
+                instances = (str(kwargs['list_of_fts_instance'].translate(None,"[ ]'"))).split(",")
+                fts_id = (str(kwargs['list_of_fts_id'].translate(None,"[ ]'"))).split(",")
+
+                for num in range(len(ids)):
+                    binds['id'] = [ids[num]]
+                    binds['transfer_state'] = [TRANSFERDB_STATUSES[states[num]]] 
+                    binds['fts_instance'] = [str(instances[num])] 
+                    binds['fts_id'] = [str(fts_id[num])]
+                    binds['fail_reason'] = [reasons[num]]
+                    binds['retry_value'] = [int(retry[num])]
+                    self.api.modifynocheck(self.transferDB.UpdateTransfers_sql, **binds)
             else:
                 ids = (kwargs['list_of_ids'].translate(None,"[ ]'")).split(",")
                 states = (kwargs['list_of_transfer_state'].translate(None,"[ ]'")).split(",")
