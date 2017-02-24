@@ -10,9 +10,12 @@ import traceback
 import subprocess
 from datetime import datetime
 from httplib import HTTPException
-from RESTInteractions import HTTPRequests
 from socket import gethostname
 from pprint import pprint
+
+from RESTInteractions import HTTPRequests
+from WMCore.Configuration import loadConfigurationFile
+
 from TaskWorker.__init__ import __version__ as __tw__version__
 
 fmt = "%Y-%m-%dT%H:%M:%S%z"
@@ -36,7 +39,8 @@ class CRAB3CreateXML(object):
         self.pool = ''
         self.schedds = []
         self.resthost = "cmsweb.cern.ch"
-        collName = "cmsgwms-collector-global.cern.ch,cmssrv221.fnal.gov"
+        # use child collector on port 9620 to get schedd attributes
+        collName = "cmsgwms-collector-global.cern.ch:9620,cmssrv221.fnal.gov:9620"
         self.coll = htcondor.Collector(collName)
         #self.restInstance = "prod" # this is to prepare for monitoring other cmsweb instances
         #self.restUri = "/crabserver/%/task"%self.restInstance
@@ -175,9 +179,12 @@ class CRAB3CreateXML(object):
 		totalRunningTasks += oneSchedd[2]
 
                 scheddName = oneSchedd[0]
-                scheddAdd = self.coll.locate(htcondor.DaemonTypes.Schedd,scheddName)
-                schedd = htcondor.Schedd(scheddAdd)
                 # if one schedd does not answer, go on and try the others
+                try:
+                  scheddAdd = self.coll.locate(htcondor.DaemonTypes.Schedd,scheddName)
+                except:
+                  continue 
+                schedd = htcondor.Schedd(scheddAdd)
                 try: 
                   idleDags = list(schedd.xquery(pickSchedulerIdle))
                 except:
@@ -238,15 +245,6 @@ if __name__ == '__main__':
     """
 
     start_time = time.time()
-
-# make sure no other instance of this script is running
-    lockFile = '/home/crab3/CRAB3_SCHEDD_XML.Lock'
-    if os.path.isfile(lockFile) :
-       print "%s already exists, abandon this run" % lockFile
-       exit()
-    else:
-       open(lockFile,'wa').close()  # create the lock
-     
     resthost = 'cmsweb.cern.ch'
     xmllocation = '/home/crab3/CRAB3_SCHEDD_XML_Report2.xml'
     logger = logging.getLogger()
@@ -256,9 +254,15 @@ if __name__ == '__main__':
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
 
-    from WMCore.Configuration import loadConfigurationFile
-
     pr = CRAB3CreateXML( resthost, xmllocation, logger)
+
+# before running make sure no other instance of this script is running
+    lockFile = '/home/crab3/CRAB3_SCHEDD_XML.Lock'
+    if os.path.isfile(lockFile) :
+       print "%s already exists, abandon this run" % lockFile
+       exit()
+    else:
+       open(lockFile,'wa').close()  # create the lock
     pr.execute()
 
     # push the XML to elasticSearch 
