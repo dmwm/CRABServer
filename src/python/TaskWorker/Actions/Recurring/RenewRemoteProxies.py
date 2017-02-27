@@ -91,14 +91,12 @@ class CRAB3ProxyRenewer(object):
         return userproxy
 
     def renew_proxy(self, schedd, ad, proxy):
-        now = time.time()
         self.logger.info("Renewing proxy for task %s." % ad['CRAB_ReqName'])
         if not hasattr(schedd, 'refreshGSIProxy'):
             raise NotImplementedError()
         with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
             if not parent:
-                lifetime = schedd.refreshGSIProxy(ad['ClusterId'], ad['ProcID'], proxy, -1)
-                schedd.edit(['%s.%s' % (ad['ClusterId'], ad['ProcId'])], 'x509userproxyexpiration', str(int(now+lifetime)))
+                schedd.refreshGSIProxy(ad['ClusterId'], ad['ProcID'], proxy, -1)
         results = rpipe.read()
         if results != "OK":
             raise Exception("Failure when renewing HTCondor task proxy: '%s'" % results)
