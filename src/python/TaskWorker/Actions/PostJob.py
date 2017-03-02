@@ -2244,6 +2244,7 @@ class PostJob():
             except HTTPException as hte:
                 msg = "Error uploading input file metadata: %s" % (str(hte.headers))
                 self.logger.error(msg)
+                raise
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -2323,6 +2324,7 @@ class PostJob():
                 ## If the file made it back alright, I suppose we can proceed.
                 msg = "Error uploading output file metadata: %s" % (str(hte.headers))
                 self.logger.error(msg)
+                raise
 
         if not os.path.exists('output_datasets') and output_datasets:
             configreq = [('subresource', 'addoutputdatasets'),
