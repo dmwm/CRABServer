@@ -64,6 +64,7 @@ class Create(DBCreator):
         tm_last_update NUMBER(11) NOT NULL,
         tm_start_time NUMBER(11) NOT NULL,
         tm_end_time NUMBER(11),
+        tm_creation_time TIMESTAMP NOT NULL,
         CONSTRAINT id_pk PRIMARY KEY(tm_id),
         CONSTRAINT fk_tm_taskname_ftdb FOREIGN KEY (tm_taskname) REFERENCES tasks (tm_taskname)
         )
