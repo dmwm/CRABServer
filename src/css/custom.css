@@ -59,3 +59,14 @@ body {
 	border-radius: 0;
 	width: 3em;
 }
+.dataTables_scroll
+{
+    overflow:auto;
+}
+
+input, textarea {
+width: 100px;
+}
+
+.dataTables_filter input { width: 300px }
+

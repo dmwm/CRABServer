@@ -259,7 +259,7 @@
                   "color": "#64B0C8",
                   "zerofill": true,
                   "alias": "New",
-                  "mode": "total",
+                  "mode": "mean",
                   "queries": [
                     42
                   ],
@@ -271,7 +271,7 @@
                   "color": "#DEDAF7",
                   "zerofill": true,
                   "alias": "Resubmit",
-                  "mode": "total",
+                  "mode": "mean",
                   "queries": [
                     43
                   ],
@@ -283,7 +283,7 @@
                   "color": "#890F02",
                   "zerofill": true,
                   "alias": "Kill",
-                  "mode": "total",
+                  "mode": "mean",
                   "queries": [
                     44
                   ],
@@ -295,7 +295,7 @@
                   "color": null,
                   "zerofill": true,
                   "alias": "Queued",
-                  "mode": "total",
+                  "mode": "mean",
                   "queries": [
                     53
                   ],

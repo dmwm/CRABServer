@@ -30,7 +30,7 @@ class FileTransfers(object):
                                                          tm_publication_state = :new_publication_state, \
                                                          tm_aso_worker = :asoworker \
                               WHERE (tm_aso_worker = :asoworker or tm_aso_worker is NULL) AND \
-			                        tm_transfer_state = :transfer_state AND \
+                                    tm_transfer_state = :transfer_state AND \
                                     tm_publish = :publish_flag AND \
                                     tm_publication_state = :publication_state"
 
@@ -244,7 +244,7 @@ class FileTransfers(object):
     GetById_sql = "SELECT * FROM filetransfersdb where tm_id = :id"
 
 # As jobs can be retried we should look only at the last ones. For that specific case this needs to be relooked.
-    GetTaskStatusForTransfers_sql = "SELECT tm_id, tm_jobid, tm_transfer_state, tm_start_time, tm_last_update FROM filetransfersdb \
+    GetTaskStatusForTransfers_sql = "SELECT tm_id, tm_jobid, tm_transfer_state, tm_start_time, tm_last_update, tm_fts_id, tm_fts_instance FROM filetransfersdb \
                                      WHERE tm_username = :username AND tm_taskname = :taskname"  # ORDER BY tm_job_retry_count"
     GetTaskStatusForPublication_sql = "SELECT tm_id, tm_jobid, tm_publication_state, tm_start_time, tm_last_update FROM filetransfersdb \
                                        WHERE tm_username = :username AND tm_taskname = :taskname"  # ORDER BY tm_job_retry_count"

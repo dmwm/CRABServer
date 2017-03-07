@@ -11,8 +11,6 @@ from CRABInterface.Regexps import RX_SUBRES_SI, RX_TASKNAME
 from CRABInterface.Utils import conn_handler
 from CRABInterface.__init__ import __version__
 
-import HTCondorLocator
-
 
 class RESTServerInfo(RESTEntity):
     """REST entity for workflows and relative subresources"""
@@ -54,18 +52,6 @@ class RESTServerInfo(RESTEntity):
     @conn_handler(services=['centralconfig'])
     def version(self , **kwargs):
         yield self.centralcfg.centralconfig['compatible-version']+[__version__]
-
-    @conn_handler(services=['centralconfig'])
-    def scheddaddress(self, **kwargs):
-        backendurl=self.centralcfg.centralconfig['backend-urls']
-        workflow = kwargs['workflow']
-        try:
-            loc = HTCondorLocator.HTCondorLocator(backendurl)
-            schedd, address = loc.getScheddObjNew(workflow)
-        except Exception as ex:
-            self.logger.exception(ex)
-            raise ExecutionError("Unable to get schedd address for task %s" % (workflow))
-        yield loc.scheddAd['Machine']
 
     @conn_handler(services=['centralconfig'])
     def bannedoutdest(self, **kwargs):
