@@ -115,6 +115,16 @@ class RESTTask(RESTEntity):
         yield row.user_webdir
 
 
+    def getpublishurl(self, **kwargs):
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+        workflow = kwargs['workflow']
+        try:
+            row = next(self.api.query(None, None, self.Task.GetPublishUrl_sql, taskname=workflow))
+        except StopIteration:
+            raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"])
+        return row
+
     @conn_handler(services=['centralconfig'])
     def webdirprx(self, **kwargs):
         """ Returns the proxied url for the schedd if the schedd has any, returns an empty list instead. Raises in case of other errors.
