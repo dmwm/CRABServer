@@ -118,12 +118,11 @@ class RESTTask(RESTEntity):
     def getpublishurl(self, **kwargs):
         if 'workflow' not in kwargs or not kwargs['workflow']:
             raise InvalidParameter("Task name not found in the input parameters")
-        workflow = kwargs['workflow']
         try:
-            row = next(self.api.query(None, None, self.Task.GetPublishUrl_sql, taskname=workflow))
+            row = next(self.api.query(None, None, self.Task.GetPublishUrl_sql, taskname=kwargs['workflow']))
         except StopIteration:
-            raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"])
-        return row
+            raise ExecutionError("Impossible to find task %s in the database." % kwargs['workflow'])
+        yield row
 
     @conn_handler(services=['centralconfig'])
     def webdirprx(self, **kwargs):
