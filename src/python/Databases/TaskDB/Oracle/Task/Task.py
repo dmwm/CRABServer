@@ -97,6 +97,8 @@ class Task(object):
                              FROM tasks \
                              WHERE tm_taskname = :taskname"
 
+    GetPublishUrl_sql = "SELECT tm_publish_dbs_url FROM tasks WHERE tm_taskname = :taskname"
+
     #SetArgumentsTask -- Used by DataWorkflow.resubmit (crab resubmit), and DataWorkflow.resubmit (crab resubmit)
     SetArgumentsTask_sql = "UPDATE tasks SET tm_arguments = :arguments WHERE tm_taskname = :taskname"
 
