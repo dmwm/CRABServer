@@ -100,6 +100,22 @@ class HTCondorLocator(object):
         self.config = config
         self.logger = logger
 
+
+    def adjustWeights(self, choices):
+        """ The method iterates over the htcondorSchedds dict from the REST and ajust schedds
+            weights based on the weightfactor key.
+
+            param choices: a list containing schedds and their weight, such as
+                        [(u'crab3-5@vocms05.cern.ch', 24576), (u'crab3-5@vocms059.cern.ch', 23460L)]
+        """
+
+        i = 0
+        for schedd, weight in choices:
+            newweight = weight * self.config['htcondorSchedds'].get(schedd, {}).get("weightfactor", 1)
+            choices[i] = (schedd, newweight)
+            i += 1
+
+
     def getSchedd(self, chooserFunction=memoryBasedChoices):
         """
         Determine a schedd to use for this task.
@@ -113,6 +129,7 @@ class HTCondorLocator(object):
                              'TotalRunningJobs', 'JobsRunning','MaxJobsRunning', 'IsOK'])
         if self.config and "htcondorSchedds" in self.config:
             choices = chooserFunction(schedds, self.config['htcondorSchedds'], self.logger)
+            self.adjustWeights(choices)
         schedd = weighted_choice(choices)
         return schedd
 
