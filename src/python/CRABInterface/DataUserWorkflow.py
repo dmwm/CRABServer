@@ -85,6 +85,14 @@ class DataUserWorkflow(object):
            :return: a generator of output file info lists - site, lfn, ... for each file"""
         return self.workflow.output2(workflow, howmany, jobids)
 
+    def taskads(self, workflow):
+        """Calls the getRootTasks method to query condor and return a list of predefined attributes.
+
+           :arg str workflow: a workflow name
+           :return: a dict of attributes returned by the getRootTasks method
+        """
+        return self.workflow.taskads(workflow)
+
     def submit(self, *args, **kwargs):
         """Perform the workflow injection
 
