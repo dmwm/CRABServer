@@ -47,7 +47,9 @@ do
     # at all if the task is resubmitted during this short sleep period.
     echo "Dag status code: $DAG_STATUS"
     if [[ "$DAG_STATUS" != 1 && "$DAG_STATUS" != 2 && "$DAG_STATUS" != "init" ]]; then
-        echo "Dag is in one of the final states. Removing the task_process/task_process_running file and exiting."
+        echo "Dag is in one of the final states"
+        echo "Caching the status one last time, removing the task_process/task_process_running file and exiting."
+        python task_process/cache_status.py
         rm task_process/task_process_running
 
         exit 0
