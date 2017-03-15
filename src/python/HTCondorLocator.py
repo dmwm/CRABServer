@@ -154,7 +154,7 @@ class HTCondorLocator(object):
 
     def cacheCollectorOutput(self, cacheName, output):
         """
-        Saves Collector output in tmp directory.
+        Saves Collector output in a memory cache
         """
         global CollectorCache
         if cacheName in CollectorCache.keys():
