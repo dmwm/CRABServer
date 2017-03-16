@@ -23,6 +23,7 @@ import TaskWorker.DataObjects.Result
 import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE
+from CMSGroupMapper import get_egroup_users
 
 import WMCore.WMSpec.WMTask
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
@@ -458,7 +459,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['runs'] = []
         info['lumis'] = []
         info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
-        if info['userhn'] in getattr(self.config.TaskWorker, 'highPrioUsers', []):
+        if info['userhn'] in self.getHighPrioUsers():
             info['accounting_group'] = 'highprio.%s' % info['userhn']
         else:
             info['accounting_group'] = 'analysis.%s' % info['userhn']
@@ -969,6 +970,14 @@ class DagmanCreator(TaskAction.TaskAction):
                     kw['task']['user_proxy'], kw['task']['tm_taskname'])
 
         return
+
+
+    def getHighPrioUsers(self):
+        egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
+        highPrioUsers = set()
+        for egroup in egroups:
+            highPrioUsers.update(get_egroup_users(egroup))
+        return highPrioUsers
 
 
     def executeInternal(self, *args, **kw):
