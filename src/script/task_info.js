@@ -561,7 +561,9 @@ $(document).ready(function() {
             if (proxiedWebDirUrl === "") {
                 webDirUrlToDisplay = userWebDir;
             } else {
-                webDirUrlToDisplay = proxiedWebDirUrl;
+                // Adding a slash at the end to ensure redirection works correctly
+                // https://hypernews.cern.ch/HyperNews/CMS/get/webInterfaces/1360.html
+                webDirUrlToDisplay = proxiedWebDirUrl + "/";
             }
 
             $("#main-webdir-link").attr("href", webDirUrlToDisplay);
