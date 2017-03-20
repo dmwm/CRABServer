@@ -33,23 +33,31 @@ do
 
     # Calculate how much time has passed since the last condor_q and perform it again if it has been long enough.
     if [ $(($(date +"%s") - $TIME_OF_LAST_QUERY)) -gt $(($HOURS_BETWEEN_QUERIES * 3600)) ]; then
-        DAG_STATUS=$(condor_q $CLUSTER_ID -af JobStatus)
+        read DAG_STATUS ENTERED_CUR_STATUS <<< `condor_q $CLUSTER_ID -af JobStatus EnteredCurrentStatus`
         TIME_OF_LAST_QUERY=$(date +"%s")
 
-        echo "Query done on $(date)"
+        echo "Query done on $(date '+%Y/%m/%d %H:%M:%S %Z')"
     fi
 
     # Once the dag's status changes from 1 (idle) or 2 (running) to something else,
-    # no further updates are expected to the log files and the task_process can exit.
-    # In a rare case (if this script does condor_q right after the the dag changes states),
-    # it is actually possible that task_process would exit before the changes contributing to the status are propagated.
-    # Adding a short sleep would solve this, however, that then presents another problem of task_process not starting
-    # at all if the task is resubmitted during this short sleep period.
-    echo "Dag status code: $DAG_STATUS"
+    # (normally) no further updates are expected to the log files and the task_process can exit.
+    # However, in the case that a crab kill command is issued, Task Worker performs two operations:
+    # 1) Hold the DAG with condor_hold,
+    # 2) Remove all of the jobs with condor_rm.
+    # If a task is large, it will take some time for all of the jobs to be removed. If during this time
+    # we run condor_q, see that the DAG is held and decide to exit immediately, some jobs may still be
+    # in the process of getting removed and their status may not be updated before the wrapper exits. To get around this,
+    # we won't exit until the dag has spent at least 24 hours in it's latest state (EnteredCurrentStatus classad).
+    # This should give enough time for any changes to be propagated to the log files that we parse in the caching script.
+    # This method is better than a simple sleep because of the possibility of resubmission.
+    echo "Dag status code: $DAG_STATUS Entered current status date: $(date -d @$ENTERED_CUR_STATUS '+%Y/%m/%d %H:%M:%S %Z')"
     if [[ "$DAG_STATUS" != 1 && "$DAG_STATUS" != 2 && "$DAG_STATUS" != "init" ]]; then
-        echo "Dag is in one of the final states. Removing the task_process/task_process_running file and exiting."
-        rm task_process/task_process_running
+        CAN_SAFELY_EXIT=$(( ( $(date +"%s") - $ENTERED_CUR_STATUS ) > 24 * 3600 ))
+        if [[ "$CAN_SAFELY_EXIT" -eq 1 ]]; then
+            echo "Dag has been in one of the final states for over 24 hours. Removing the task_process/task_process_running file and exiting."
+            rm task_process/task_process_running
 
-        exit 0
+            exit 0
+        fi
     fi
 done
