@@ -689,6 +689,8 @@ class RESTUserWorkflow(RESTEntity):
                 result = self.userworkflowmgr.report2(workflow, userdn=userdn, usedbs=shortformat)
             elif subresource == 'publicationstatus':
                 result = self.userworkflowmgr.publicationStatus(workflow, asourl, asodb, username)
+            elif subresource == 'taskads':
+                result = self.userworkflowmgr.taskads(workflow)
             # if here means that no valid subresource has been requested
             # flow should never pass through here since validation restrict this
             else:
