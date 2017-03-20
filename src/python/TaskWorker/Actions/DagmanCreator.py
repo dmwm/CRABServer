@@ -14,6 +14,7 @@ import tarfile
 import hashlib
 import tempfile
 import commands
+from ldap import LDAPError
 from ast import literal_eval
 from httplib import HTTPException
 
@@ -459,7 +460,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['runs'] = []
         info['lumis'] = []
         info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
-        if info['userhn'] in self.getHighPrioUsers():
+        if info['userhn'] in self.getHighPrioUsers(info['user_proxy'], info['workflow']):
             info['accounting_group'] = 'highprio.%s' % info['userhn']
         else:
             info['accounting_group'] = 'analysis.%s' % info['userhn']
@@ -972,11 +973,18 @@ class DagmanCreator(TaskAction.TaskAction):
         return
 
 
-    def getHighPrioUsers(self):
+    def getHighPrioUsers(self, userProxy, workflow):
         egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
         highPrioUsers = set()
-        for egroup in egroups:
-            highPrioUsers.update(get_egroup_users(egroup))
+        try:
+            for egroup in egroups:
+                highPrioUsers.update(get_egroup_users(egroup))
+        except LDAPError as le:
+            msg = "Error when getting the high priority users list." \
+                  " Will ignore the high priority list and continue normally." \
+                  " Error reason: %s" % str(le)
+            self.uploadWarning(msg, userProxy, workflow)
+            return []
         return highPrioUsers
 
 
