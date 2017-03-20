@@ -347,8 +347,9 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("lfn", param, safe, RX_LFN, optional=True)
             self._checkOutLFN(safe.kwargs, username)
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE, custom_err="Incorrect 'JobType.outputFiles' parameter. " \
-                    "Allowed regexp: '%s'." % RX_ADDFILE.pattern)
-            validate_strlist("userfiles", param, safe, RX_USERFILE)
+                    "Allowed regexp for each filename: '%s'." % RX_ADDFILE.pattern)
+            validate_strlist("userfiles", param, safe, RX_USERFILE, custom_err="Incorrect 'Data.userInputFiles' parameter. " \
+                    "Allowed regexp for each filename: '%s'." % RX_USERFILE.pattern)
             validate_num("savelogsflag", param, safe, optional=False)
             validate_num("saveoutput", param, safe, optional=True)
             validate_num("faillimit", param, safe, optional=True)
