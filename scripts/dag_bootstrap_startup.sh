@@ -110,6 +110,12 @@ fi
 # Recalculate the black / whitelist
 if [ -e AdjustSites.py ]; then
     python AdjustSites.py
+    ret=$?
+    if [ $ret -e 1 ]; then
+        echo "Error: AdjustSites.py failed to update the webdir." >&2
+        condor_qedit $CONDOR_ID DagmanHoldReason "'AdjustSites.py failed to update the webdir.'"
+        exit 1
+    fi
 else
     echo "Error: AdjustSites.py does not exist." >&2
     condor_qedit $CONDOR_ID DagmanHoldReason "'AdjustSites.py does not exist.'"
