@@ -6,7 +6,7 @@ from httplib import HTTPException
 
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
-from WMCore.WorkQueue.WorkQueueUtils import get_dbs
+from WMCore.Services.DBS.DBSReader import DBSReader
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
@@ -74,7 +74,7 @@ class DBSDataDiscovery(DataDiscovery):
             dbsurl = self.config.Services.DBSUrl
             if kwargs['task']['tm_dbs_url']:
                 dbsurl = kwargs['task']['tm_dbs_url']
-            self.dbs = get_dbs(dbsurl)
+            self.dbs = DBSReader(dbsurl)
             self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
         finally:
             if old_cert_val != None:
