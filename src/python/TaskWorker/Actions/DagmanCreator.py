@@ -14,7 +14,6 @@ import tarfile
 import hashlib
 import tempfile
 import commands
-from ldap import LDAPError
 from ast import literal_eval
 from httplib import HTTPException
 
@@ -974,6 +973,8 @@ class DagmanCreator(TaskAction.TaskAction):
 
 
     def getHighPrioUsers(self, userProxy, workflow):
+        from ldap import LDAPError
+
         egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
         highPrioUsers = set()
         try:
