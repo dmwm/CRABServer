@@ -327,6 +327,10 @@ def main():
             time.sleep(retries * 20)
         retries += 1
 
+    if exitCode !=0:
+        printLog("Exiting AdjustSites because the webdir upload failed three times.")
+        sys.exit(1)
+
     printLog("Webdir URL has been uploaded, exit code is %s. Setting the classad for the proxied webdir" % exitCode)
 
     saveProxiedWebdir(ad)
