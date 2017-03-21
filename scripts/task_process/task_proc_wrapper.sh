@@ -1,4 +1,9 @@
 #!/bin/bash
+
+function cache_status {
+    python task_process/cache_status.py
+}
+
 if [ ! -f /etc/enable_task_daemon ]; then
     echo "/etc/enable_task_daemon file not found, not starting the task daemon and exiting"
     exit 1
@@ -28,7 +33,7 @@ echo "Starting task daemon wrapper"
 while true
 do
     # Run the parsing script
-    python task_process/cache_status.py
+    cache_status
     sleep 300s
 
     # Calculate how much time has passed since the last condor_q and perform it again if it has been long enough.
@@ -49,7 +54,7 @@ do
     if [[ "$DAG_STATUS" != 1 && "$DAG_STATUS" != 2 && "$DAG_STATUS" != "init" ]]; then
         echo "Dag is in one of the final states"
         echo "Caching the status one last time, removing the task_process/task_process_running file and exiting."
-        python task_process/cache_status.py
+        cache_status
         rm task_process/task_process_running
 
         exit 0
