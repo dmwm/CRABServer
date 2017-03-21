@@ -111,7 +111,7 @@ fi
 if [ -e AdjustSites.py ]; then
     python AdjustSites.py
     ret=$?
-    if [ $ret -e 1 ]; then
+    if [ $ret -eq 1 ]; then
         echo "Error: AdjustSites.py failed to update the webdir." >&2
         condor_qedit $CONDOR_ID DagmanHoldReason "'AdjustSites.py failed to update the webdir.'"
         exit 1
