@@ -10,12 +10,8 @@ import pprint
 
 import classad
 
-import TaskWorker.Actions.DBSDataDiscovery as DBSDataDiscovery
-import TaskWorker.Actions.Splitter as Splitter
-import TaskWorker.Actions.DagmanCreator as DagmanCreator
 import TaskWorker.Actions.PostJob as PostJob
 import TaskWorker.Actions.PreJob as PreJob
-import TaskWorker.Actions.Final as Final
 import HTCondorUtils
 
 import WMCore.Configuration as Configuration
@@ -27,10 +23,6 @@ def bootstrap():
         return PostJob.PostJob().execute(*sys.argv[2:])
     elif command == "PREJOB":
         return PreJob.PreJob().execute(*sys.argv[2:])
-    elif command == "FINAL":
-        return Final.Final().execute(*sys.argv[2:])
-    elif command == "ASO":
-        return ASO.async_stageout(*sys.argv[2:])
 
     infile, outfile = sys.argv[2:]
 
@@ -76,15 +68,8 @@ def bootstrap():
     ad['tarball_location'] = os.environ.get('CRAB_TARBALL_LOCATION', '')
     print("TaskManagerBootstrap got this ad:")
     pprint.pprint(ad)
-    if command == "DBS":
-        task = DBSDataDiscovery.DBSDataDiscovery(config)
-    elif command == "SPLIT":
-        task = Splitter.Splitter(config)
-        print("Got this result from the splitter")
-        pprint.pprint(task)
+
     results = task.execute(in_args, task=ad).result
-    if command == "SPLIT":
-        results = DagmanCreator.create_subdag(results, task=ad)
 
     print(results)
     with open(outfile, "w") as fd:

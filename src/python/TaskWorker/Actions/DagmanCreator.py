@@ -14,7 +14,6 @@ import tarfile
 import hashlib
 import tempfile
 import commands
-from ldap import LDAPError
 from ast import literal_eval
 from httplib import HTTPException
 
@@ -974,6 +973,11 @@ class DagmanCreator(TaskAction.TaskAction):
 
 
     def getHighPrioUsers(self, userProxy, workflow):
+        # Import needed because the DagmanCreator module is also imported in the schedd,
+        # where there is no ldap available. This function however is only called
+        # in the TW (where ldap is installed) during submission.
+        from ldap import LDAPError
+
         egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
         highPrioUsers = set()
         try:
