@@ -769,8 +769,9 @@ class DagmanCreator(TaskAction.TaskAction):
             dagSpecs += jobgroupDagSpecs
 
         def getBlacklistMsg():
+            tmp = ""
             if len(global_blacklist)!=0:
-                tmp = " Global CRAB3 blacklist is %s.\n" % global_blacklist
+                tmp += " Global CRAB3 blacklist is %s.\n" % global_blacklist
             if len(siteBlacklist)!=0:
                 tmp += " User blacklist is %s.\n" % siteBlacklist
             if len(siteWhitelist)!=0:
