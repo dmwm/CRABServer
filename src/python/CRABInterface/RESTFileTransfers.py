@@ -196,17 +196,17 @@ class RESTFileTransfers(RESTEntity):
             #if compareOut:
             #    del errorMsg
             ids = (kwargs['list_of_ids'].translate(None,"[ ]'")).split(",")
-	    states = (kwargs['list_of_publication_state'].translate(None,"[ ]'")).split(",")
-	    retry = [0 for x in states]
-	    reasons = ["" for x in states]
-	    if kwargs['list_of_retry_value'] is not None:
-	        reasons = (kwargs['list_of_failure_reason'].translate(None,"[]'")).split(",")
-	        retry = (kwargs['list_of_retry_value'].translate(None,"[ ]'")).split(",")
-            for num in range(len(ids)):
-                binds['publication_state'] = [PUBLICATIONDB_STATUSES[states[num]]]
-                binds['id'] = [ids[num]]
-	        binds['fail_reason'] = [reasons[num]]
-	        binds['retry_value'] = [int(retry[num])]
+            states = (kwargs['list_of_publication_state'].translate(None,"[ ]'")).split(",")
+            retry = [0 for x in states]
+            reasons = ["" for x in states]
+            if kwargs['list_of_retry_value'] is not None:
+                reasons = (kwargs['list_of_failure_reason'].translate(None,"[]'")).split(",")
+                retry = (kwargs['list_of_retry_value'].translate(None,"[ ]'")).split(",")
+                for num in range(len(ids)):
+                    binds['publication_state'] = [PUBLICATIONDB_STATUSES[states[num]]]
+                    binds['id'] = [ids[num]]
+                binds['fail_reason'] = [reasons[num]]
+                binds['retry_value'] = [int(retry[num])]
                 self.api.modify(self.transferDB.UpdatePublication_sql, **binds)
 
         elif subresource == 'retryPublication':
@@ -370,6 +370,23 @@ class RESTFileTransfers(RESTEntity):
                     sqlQuery = self.transferDB.GetDocsPublication1_sql
                 rows = self.api.query(None, None, sqlQuery, **binds)
                 return rows
+
+        if subresource == 'getTransfersToKill':
+            # ---------------------------------------------
+            # (str) taskname: taskname
+            # Return: Docs, which match these conditions: asoworker, state = KILL
+            # ---------------------------------------------
+            if grouping == 0:
+                if not asoworker:
+                    raise InvalidParameter("Required asoworker parameter is not set.")
+                if not limit:
+                    limit = 5000
+                binds['limit'] = limit if limit < 5000 else 5000
+                binds['asoworker'] = asoworker
+                binds['state'] = TRANSFERDB_STATUSES['KILL']
+                sqlQuery = self.transferDB.GetDocsTransfer0_sql
+                rows = self.api.query(None, None, sqlQuery, **binds)
+            return rows
 
         elif subresource == 'groupedTransferStatistics':
             if grouping > 5:
