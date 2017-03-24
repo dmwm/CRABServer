@@ -374,7 +374,7 @@ class RESTFileTransfers(RESTEntity):
         if subresource == 'getTransfersToKill':
             # ---------------------------------------------
             # (str) taskname: taskname
-            # Return: Docs, which match these conditions: asoworker, state = ACQUIRED, username
+            # Return: Docs, which match these conditions: asoworker, state = KILL
             # ---------------------------------------------
             if grouping == 0:
                 if not asoworker:
