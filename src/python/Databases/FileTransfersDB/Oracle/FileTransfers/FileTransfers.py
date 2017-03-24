@@ -142,9 +142,9 @@ class FileTransfers(object):
     GetGroupedTransferStatistics0_sql = "SELECT count(*) as count, tm_aso_worker, tm_transfer_state FROM filetransfersdb \
                                          GROUP BY tm_aso_worker, tm_transfer_state"
 
-    GetGroupedTransferStatistics1_sql = "SELECT count(*) as count, tm_aso_worker, tm_username, tm_transfer_state FROM filetransfersdb \
+    GetGroupedTransferStatistics1_sql = "SELECT count(*) as count, tm_aso_worker, tm_username, tm_transfer_state, tm_source, tm_destination FROM filetransfersdb \
                                          WHERE tm_username = :username AND tm_aso_worker = :asoworker \
-                                         GROUP BY tm_aso_worker, tm_username, tm_transfer_state"
+                                         GROUP BY tm_aso_worker, tm_username, tm_transfer_state, tm_source, tm_destination"
 
 
     GetGroupedTransferStatistics1a_sql = "SELECT count(*) as count, tm_username, tm_transfer_state FROM filetransfersdb \
