@@ -136,7 +136,7 @@ Log = job_log
 Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) --cmsswVersion=$(CRAB_JobSW) --scramArch=$(CRAB_JobArch) '--inputFile=$(inputFiles)' '--runAndLumis=$(runAndLumiMask)' --lheInputFiles=$(lheInputFiles) --firstEvent=$(firstEvent) --firstLumi=$(firstLumi) --lastEvent=$(lastEvent) --firstRun=$(firstRun) --seeding=$(seeding) --scriptExe=$(scriptExe) --eventsPerLumi=$(eventsPerLumi) --maxRuntime=$(maxRuntime) '--scriptArgs=$(scriptArgs)' -o $(CRAB_AdditionalOutputFiles)"
 
 transfer_input_files = CMSRunAnalysis.sh, cmscp.py%(additional_input_file)s
-transfer_output_files = jobReport.json.$(count)
+transfer_output_files = jobReport.json.$(count), WMArchiveReport.json.$(count)
 # TODO: fold this into the config file instead of hardcoding things.
 Environment = "SCRAM_ARCH=$(CRAB_JobArch) %(additional_environment_options)s"
 should_transfer_files = YES

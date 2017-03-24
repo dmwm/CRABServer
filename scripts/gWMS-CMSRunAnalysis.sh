@@ -96,6 +96,7 @@ echo "Arguments are $@"
 
 exec 2>&1
 touch jobReport.json
+touch WMArchiveReport.json
 
 echo "SCRAM_ARCH=$SCRAM_ARCH"
 CRAB_oneEventMode=0
@@ -128,7 +129,9 @@ then
    echo "======== HTCONDOR JOB SUMMARY at $(TZ=GMT date) FINISH ========"
 fi
 
+#MM: Are these two lines needed?
 touch jobReport.json.$CRAB_Id
+touch WMArchiveReport.json.$CRAB_Id
 
 echo "======== PROXY INFORMATION START at $(TZ=GMT date) ========"
 voms-proxy-info -all
@@ -142,6 +145,8 @@ echo "CMSRunAnalysis.sh complete at $(TZ=GMT date) with (short) exit status $EXI
 echo "======== CMSRunAnalsysis.sh at $(TZ=GMT date) FINISHING ========"
 
 mv jobReport.json jobReport.json.$CRAB_Id
+mv WMArchiveReport.json WMArchiveReport.json.$CRAB_Id
+
 
 if [[ $EXIT_STATUS == 137 ]]
 then
