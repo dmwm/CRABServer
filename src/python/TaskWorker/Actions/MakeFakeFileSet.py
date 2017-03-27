@@ -28,7 +28,7 @@ class MakeFakeFileSet(TaskAction):
             future we would like to take this list from the SSB.
         """
         sites = self.sbj.getAllCMSNames()
-        filteredSites = [site for site in sites if not site.startswith("T1_")]
+        filteredSites = [site for site in sites if not site.startswith(("T0_", "T1_"))]
 
         return filteredSites
 
