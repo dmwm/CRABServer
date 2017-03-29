@@ -32,6 +32,17 @@ DAG_STATUS="init"
 echo "Starting task daemon wrapper"
 while true
 do
+    # This is part of the logic for handling empty condor_q results. Because condor_q can sometimes return empty,
+    # and this script needs to know if the dag is in a final state before exiting, we ignore empty condor_q results
+    # and continue looping. However, because this could also mean that the dag has been removed from the queue,
+    # we check for the existence of the caching script. This file, along with everything else in the spool directory,
+    # is removed almost immediately by htcondor after the dag disappears from the queue. Otherwise, this wrapper script
+    # which is loaded in memory, would keep trying to execute the non-existent file.
+    if [[ ! -f task_process/cache_status.py  ]]; then
+        echo "task_process/cache_status.py file not found, exiting."
+        exit 1
+    fi
+
     # Run the parsing script
     cache_status
     sleep 300s
@@ -55,8 +66,12 @@ do
     # we won't exit until the dag has spent at least 24 hours in it's latest state (EnteredCurrentStatus classad).
     # This should give enough time for any changes to be propagated to the log files that we parse in the caching script.
     # This method is better than a simple sleep because of the possibility of resubmission.
+    #
+    # Note that here we also ignore an empty DAG_STATUS result because it could be a temporary problem with condor_q
+    # simply returning empty. If the dag isn't actually in the queue anymore, the check for an existing caching script
+    # at the start of the loop should catch that and exit.
     echo "Dag status code: $DAG_STATUS Entered current status date: $(date -d @$ENTERED_CUR_STATUS '+%Y/%m/%d %H:%M:%S %Z')"
-    if [[ "$DAG_STATUS" != 1 && "$DAG_STATUS" != 2 && "$DAG_STATUS" != "init" ]]; then
+    if [[ "$DAG_STATUS" != 1 && "$DAG_STATUS" != 2 && "$DAG_STATUS" != "init" && "$DAG_STATUS" ]]; then
         CAN_SAFELY_EXIT=$(( ( $(date +"%s") - $ENTERED_CUR_STATUS ) > 24 * 3600 ))
         if [[ "$CAN_SAFELY_EXIT" -eq 1 ]]; then
             echo "Dag has been in one of the final states for over 24 hours."
