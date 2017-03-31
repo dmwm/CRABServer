@@ -1,27 +1,18 @@
 import os
 import sys
 import time
-import json
-import urllib
 import logging
-import classad
 import htcondor
 import traceback
 import subprocess
 from datetime import datetime
-from httplib import HTTPException
 from socket import gethostname
 from pprint import pprint
 import requests
 from RESTInteractions import HTTPRequests
 import json
-from WMCore.Configuration import loadConfigurationFile
-
-
-from TaskWorker.__init__ import __version__ as __tw__version__
 
 fmt = "%Y-%m-%dT%H:%M:%S%z"
-
 
 def send(document):
     return requests.post('http://monit-metrics:10012/', data=json.dumps(document),
@@ -32,7 +23,6 @@ def send_and_check(document, should_fail=False):
     response = send(document)
     assert ((response.status_code in [200]) != should_fail), \
         'With document: {0}. Status code: {1}. Message: {2}'.format(document, response.status_code, response.text)
-
 
 class CRAB3CreateJson(object):
 
@@ -55,13 +45,10 @@ class CRAB3CreateJson(object):
         # use child collector on port 9620 to get schedd attributes
         collName = "cmsgwms-collector-global.cern.ch:9620,cmssrv221.fnal.gov:9620"
         self.coll = htcondor.Collector(collName)
-        #self.restInstance = "prod" # this is to prepare for monitoring other cmsweb instances
-        #self.restUri = "/crabserver/%/task"%self.restInstance
 
     def getCountTasksByStatus(self):
         try:
             resturi = "/crabserver/prod/task"
-            # resturi = self.restUri%self.restInstance  # this is to prepare for monitoring other cmsweb instances
             configreq = {'minutes': "120", 'subresource': "counttasksbystatus"}
             server = HTTPRequests(self.resthost,
                                   "/data/certs/backup-service-certs/servicecert.pem",
@@ -104,7 +91,7 @@ class CRAB3CreateJson(object):
                                       'TotalIdleJobs',
                                       'TotalRunningJobs',
                                       'TotalHeldJobs'])
-            for schedd in result:  # oneshadow[0].split('@')[1].split('.')[0]
+            for schedd in result:
                 data.append([schedd['Name'],
                              schedd['ShadowsRunning'],
                              schedd['TotalSchedulerJobsRunning'],
@@ -116,12 +103,6 @@ class CRAB3CreateJson(object):
         return data
 
     def execute(self):
-        # from xml.etree.ElementTree import Element, SubElement, tostring
-        # root = Element('serviceupdate')
-        # root.set("xmlns",  "http://sls.cern.ch/SLS/XML/update")
-        # child = SubElement(root, "id")
-        # child.text = gethostname().split('.')[0]
-
         subprocesses_config = 6
         # In this case 5 + 1 MasterWorker process
         sub_grep_command="ps -ef | grep MasterWorker | grep -v 'grep' | wc -l"
@@ -129,24 +110,14 @@ class CRAB3CreateJson(object):
         # If subprocesses are not working - service availability 0%
         process_count = int(subprocess.Popen(sub_grep_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout.read())
 
-        # Get current time
-        now_utc = datetime.now().strftime(fmt)
-        #child_timestamp = SubElement(root, "timestamp")
-        #child_timestamp.text = str(now_utc),
-
         if subprocesses_config == process_count:
             # This means that everything is fine
             self.jsonDoc['status'] = "available"
         else:
             self.jsonDoc['status'] = "degraded"
 
-        # child_status.text = "available"
-
-        # print "TaskWorker version: %s "%__tw__version__ # does not work yet
-
         # Get the number of tasks per status
         twStatus = self.getCountTasksByStatus()
-        #data = SubElement(root, "data")
 
         states_filter = ['SUBMITTED', 'FAILED', 'QUEUED', 'NEW', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED',
                          'SUBMITFAILED']
@@ -172,7 +143,6 @@ class CRAB3CreateJson(object):
         totalRunningTP = 0
         # see https://htcondor-wiki.cs.wisc.edu/index.cgi/wiki?p=MagicNumbers
         pickSchedulerIdle = 'JobUniverse==7 && JobStatus==1'
-        pickSchedulerRunning = 'JobUniverse==7 && JobStatus==2'
         pickLocalRunning = 'JobUniverse==12 && JobStatus==2'
 
         if len(ListOfSchedds) > 0:
@@ -244,7 +214,8 @@ if __name__ == '__main__':
     xmllocation = '/home/crab3/CRAB3_SCHEDD_XML_Report2.xml'
     logger = logging.getLogger()
     handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s",
+                                  datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.setLevel(logging.ERROR)
@@ -262,7 +233,7 @@ if __name__ == '__main__':
 
     pr = CRAB3CreateJson(resthost, jsonDoc, logger)
 
-# before running make sure no other instance of this script is running
+    # before running make sure no other instance of this script is running
     lockFile = '/home/crab3/CRAB3_SCHEDD_JSON.Lock'
     if os.path.isfile(lockFile):
         print "%s already exists, abandon this run" % lockFile
