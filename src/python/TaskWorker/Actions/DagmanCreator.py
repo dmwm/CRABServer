@@ -459,7 +459,8 @@ class DagmanCreator(TaskAction.TaskAction):
         info['runs'] = []
         info['lumis'] = []
         info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
-        if info['userhn'] in self.getHighPrioUsers(info['user_proxy'], info['workflow']):
+        egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
+        if egroups and info['userhn'] in self.getHighPrioUsers(info['user_proxy'], info['workflow'], egroups):
             info['accounting_group'] = 'highprio.%s' % info['userhn']
         else:
             info['accounting_group'] = 'analysis.%s' % info['userhn']
@@ -973,13 +974,12 @@ class DagmanCreator(TaskAction.TaskAction):
         return
 
 
-    def getHighPrioUsers(self, userProxy, workflow):
+    def getHighPrioUsers(self, userProxy, workflow, egroups):
         # Import needed because the DagmanCreator module is also imported in the schedd,
         # where there is no ldap available. This function however is only called
         # in the TW (where ldap is installed) during submission.
         from ldap import LDAPError
 
-        egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
         highPrioUsers = set()
         try:
             for egroup in egroups:
