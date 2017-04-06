@@ -143,8 +143,8 @@ Environment = "SCRAM_ARCH=$(CRAB_JobArch) %(additional_environment_options)s"
 should_transfer_files = YES
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
-# TODO: Uncomment this when we get out of testing mode
-Requirements = ((target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)) %(opsys_req)s
+%(opsys_req)s
+Requirements = ((target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED))
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
 # Remove if
 # a) job is in the 'held' status for more than 7 minutes
@@ -468,9 +468,11 @@ class DagmanCreator(TaskAction.TaskAction):
         info['faillimit'] = task['tm_fail_limit']
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
         if info['jobarch_flatten'].startswith("slc6_"):
-            info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
+            info['opsys_req'] = 'REQUIRED_OS="rhel6"'
+        if info['jobarch_flatten'].startswith("slc7_"):
+            info['opsys_req'] = 'REQUIRED_OS="rhel7"'
         else:
-            info['opsys_req'] = ''
+            info['opsys_req'] = 'REQUIRED_OS="any"'
 
         info.setdefault("additional_environment_options", '')
         info.setdefault("additional_input_file", "")
