@@ -237,6 +237,7 @@ def updateWebDir(ad):
     data['webdirurl'] = ad['CRAB_UserWebDir']
     cert = ad['X509UserProxy']
     try:
+        printLog("Uploading webdir %s to %s" % (ad['CRAB_UserWebDir'], host))
         server = HTTPRequests(host, cert, cert)
         server.post(uri, data=urllib.urlencode(data))
         return 0

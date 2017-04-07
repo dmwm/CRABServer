@@ -293,10 +293,19 @@ class DagmanSubmitter(TaskAction.TaskAction):
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
 
         schedd = ""
+        oldx509 = os.environ.get("X509_USER_PROXY", None)
         try:
             self.logger.debug("Duplicate check is getting the schedd obj. Collector is: %s", task['tm_collector'])
+            os.environ["X509_USER_PROXY"] = task['user_proxy']
             schedd, dummyAddress = loc.getScheddObjNew(task['tm_schedd'])
             self.logger.debug("Got schedd obj for %s ", task['tm_schedd'])
+
+            rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || '\
+                        'CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow.encode('ascii', 'ignore'))
+
+            self.logger.debug("Duplicate check is querying the schedd: %s", rootConst)
+            results = list(schedd.xquery(rootConst, []))
+            self.logger.debug("Schedd queried %s", results)
         except Exception as exp:
             msg = "The CRAB server backend was not able to contact the Grid scheduler."
             msg += " Please try again later."
@@ -304,13 +313,11 @@ class DagmanSubmitter(TaskAction.TaskAction):
             msg += " Message from the scheduler: %s" % (str(exp))
             self.logger.exception("%s: %s", workflow, msg)
             raise TaskWorkerException(msg, retry=True)
-
-        rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || '\
-                    'CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow.encode('ascii', 'ignore'))
-
-        self.logger.debug("Duplicate check is querying the schedd: %s", rootConst)
-        results = list(schedd.xquery(rootConst, []))
-        self.logger.debug("Schedd queried %s", results)
+        finally:
+            if oldx509:
+                os.environ["X509_USER_PROXY"] = oldx509
+            else:
+                del os.environ["X509_USER_PROXY"]
 
         if not results:
             # Task not already in schedd

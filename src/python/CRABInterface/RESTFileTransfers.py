@@ -371,6 +371,23 @@ class RESTFileTransfers(RESTEntity):
                 rows = self.api.query(None, None, sqlQuery, **binds)
                 return rows
 
+        if subresource == 'getTransfersToKill':
+            # ---------------------------------------------
+            # (str) taskname: taskname
+            # Return: Docs, which match these conditions: asoworker, state = KILL
+            # ---------------------------------------------
+            if grouping == 0:
+                if not asoworker:
+                    raise InvalidParameter("Required asoworker parameter is not set.")
+                if not limit:
+                    limit = 5000
+                binds['limit'] = limit if limit < 5000 else 5000
+                binds['asoworker'] = asoworker
+                binds['state'] = TRANSFERDB_STATUSES['KILL']
+                sqlQuery = self.transferDB.GetDocsTransfer0_sql
+                rows = self.api.query(None, None, sqlQuery, **binds)
+            return rows
+
         elif subresource == 'groupedTransferStatistics':
             if grouping > 5:
                 raise InvalidParameter('This grouping level is not implemented')
