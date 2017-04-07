@@ -202,9 +202,9 @@ class RESTFileTransfers(RESTEntity):
             if kwargs['list_of_retry_value'] is not None:
                 reasons = (kwargs['list_of_failure_reason'].translate(None,"[]'")).split(",")
                 retry = (kwargs['list_of_retry_value'].translate(None,"[ ]'")).split(",")
-                for num in range(len(ids)):
-                    binds['publication_state'] = [PUBLICATIONDB_STATUSES[states[num]]]
-                    binds['id'] = [ids[num]]
+            for num in range(len(ids)):
+                binds['publication_state'] = [PUBLICATIONDB_STATUSES[states[num]]]
+                binds['id'] = [ids[num]]
                 binds['fail_reason'] = [reasons[num]]
                 binds['retry_value'] = [int(retry[num])]
                 self.api.modify(self.transferDB.UpdatePublication_sql, **binds)
