@@ -196,17 +196,17 @@ class RESTFileTransfers(RESTEntity):
             #if compareOut:
             #    del errorMsg
             ids = (kwargs['list_of_ids'].translate(None,"[ ]'")).split(",")
-	    states = (kwargs['list_of_publication_state'].translate(None,"[ ]'")).split(",")
-	    retry = [0 for x in states]
-	    reasons = ["" for x in states]
-	    if kwargs['list_of_retry_value'] is not None:
-	        reasons = (kwargs['list_of_failure_reason'].translate(None,"[]'")).split(",")
-	        retry = (kwargs['list_of_retry_value'].translate(None,"[ ]'")).split(",")
+            states = (kwargs['list_of_publication_state'].translate(None,"[ ]'")).split(",")
+            retry = [0 for x in states]
+            reasons = ["" for x in states]
+            if kwargs['list_of_retry_value'] is not None:
+                reasons = (kwargs['list_of_failure_reason'].translate(None,"[]'")).split(",")
+                retry = (kwargs['list_of_retry_value'].translate(None,"[ ]'")).split(",")
             for num in range(len(ids)):
                 binds['publication_state'] = [PUBLICATIONDB_STATUSES[states[num]]]
                 binds['id'] = [ids[num]]
-	        binds['fail_reason'] = [reasons[num]]
-	        binds['retry_value'] = [int(retry[num])]
+                binds['fail_reason'] = [reasons[num]]
+                binds['retry_value'] = [int(retry[num])]
                 self.api.modify(self.transferDB.UpdatePublication_sql, **binds)
 
         elif subresource == 'retryPublication':
