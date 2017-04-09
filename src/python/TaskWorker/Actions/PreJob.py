@@ -333,7 +333,8 @@ class PreJob:
         self.resubmit_info[outkey]['CRAB_ResubmitList_in_taskad'] = CRAB_ResubmitList_in_taskad
         ## Add the resubmission parameters to the Job.<job_id>.submit content.
         if maxjobruntime is not None:
-            new_submit_text += '+MaxWallTimeMins = %s\n' % (str(maxjobruntime))
+            new_submit_text += '+EstimatedWallTimeMins = %s\n' % str(maxjobruntime)
+            new_submit_text += '+MaxWallTimeMins = (JobStatus=?=1) ? EstimatedWallTimeMins : %s\n' % str(maxjobruntime)
         if maxmemory is not None:
             new_submit_text += '+RequestMemory = %s\n' % (str(maxmemory))
         if numcores is not None:
