@@ -11,6 +11,7 @@ from WMCore.Database.CMSCouch import CouchServer
 ## CRAB dependencies
 from ServerUtilities import TASKLIFETIME
 from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
+from ServerUtilities import checkTaskLifetime
 from ServerUtilities import isCouchDBURL, getEpochFromDBTime
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
 
@@ -254,25 +255,6 @@ class DataWorkflow(object):
 
         return [{'RequestName': workflow}]
 
-
-    def checkTaskLifetime(self, submissionTime):
-        """ Verify that at least 7 days are left before the task periodic remove expression
-            evaluates to true. This is to let job finish and possibly not remove a task with
-            running jobs.
-
-            submissionTime are the seconds since epoch of the task submission time in the DB
-        """
-
-        msg = "ok"
-        ## resubmitLifeTime is 23 days expressed in seconds
-        resubmitLifeTime = TASKLIFETIME - NUM_DAYS_FOR_RESUBMITDRAIN * 24 * 60 * 60
-        if time.time() > (submissionTime + resubmitLifeTime):
-            msg = "Resubmission of the task is not possble since less than %s days are left before the task is removed from the schedulers.\n" % NUM_DAYS_FOR_RESUBMITDRAIN
-            msg += "A task expires %s days after its submission\n" % (TASKLIFETIME / (24 * 60 * 60))
-            msg += "You can submit a 'recovery task' if you need to execute again the failed jobs\n"
-            msg += "See https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ for more information about recovery tasks"
-        return msg
-
     def publicationStatusWrapper(self, workflow, asourl, asodb, username, publicationenabled):
         publicationInfo = {}
         if (publicationenabled == 'T'):
@@ -302,7 +284,7 @@ class DataWorkflow(object):
         submissionTime = getEpochFromDBTime(row.start_time)
 
         self.logger.info("Checking if resubmission is possible: we don't allow resubmission %s days before task expiration date", NUM_DAYS_FOR_RESUBMITDRAIN)
-        retmsg = self.checkTaskLifetime(submissionTime)
+        retmsg = checkTaskLifetime(submissionTime)
         if retmsg != "ok":
             return [{'result': retmsg}]
 
@@ -421,7 +403,7 @@ class DataWorkflow(object):
 
         ## Check lifetime of the task and raise ExecutionError if appropriate
         self.logger.info("Checking if resubmission is possible: we don't allow resubmission %s days before task expiration date", NUM_DAYS_FOR_RESUBMITDRAIN)
-        retmsg = self.checkTaskLifetime(statusRes['submissionTime'])
+        retmsg = checkTaskLifetime(statusRes['submissionTime'])
         if retmsg != "ok":
             return [{'result': retmsg}]
 
