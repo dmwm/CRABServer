@@ -11,9 +11,9 @@ from logging import FileHandler
 from httplib import HTTPException
 from logging.handlers import TimedRotatingFileHandler
 
-from ServerUtilities import truncateError
 from RESTInteractions import HTTPRequests
 from TaskWorker.DataObjects.Result import Result
+from ServerUtilities import truncateError, executeCommand
 from TaskWorker.WorkerExceptions import WorkerHandlerException
 
 ## Creating configuration globals to avoid passing these around at every request
@@ -97,6 +97,14 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger):
                     logger.exception('Traceback follows:')
         t1 = time.time()
         logger.debug("%s: ...work on %s completed in %d seconds: %s", procName, task['tm_taskname'], t1-t0, outputs)
+
+        try:
+            out, _, _ = executeCommand("ps u -p %s | awk '{sum=sum+$6}; END {print sum/1024}'" % os.getpid())
+            msg = "RSS after finishing %s: %s MB" % (task['tm_taskname'], out.strip())
+            logger.debug(msg)
+        except:
+            logger.exception("Problem getting worker RSS:")
+
         removeTaskLogHandler(logger, taskhandler)
 
         results.put({
