@@ -49,7 +49,12 @@ class Create(DBCreator):
               fmd_filestate VARCHAR(20),
               fmd_direct_stageout VARCHAR(1),
               fmd_tmplfn VARCHAR(500),
-              CONSTRAINT pk_tasklfn PRIMARY KEY(tm_taskname, fmd_lfn),
-              CONSTRAINT fk_tm_taskname FOREIGN KEY (tm_taskname) REFERENCES tasks (tm_taskname)
+              CONSTRAINT pk_tasklfn_part PRIMARY KEY(tm_taskname, fmd_lfn),
+              CONSTRAINT fk_tm_taskname_part FOREIGN KEY (tm_taskname) REFERENCES tasks (tm_taskname)
+            )
+            PARTITION by RANGE (fmd_creation_time)
+            INTERVAL (NUMTOYMINTERVAL(1, 'MONTH'))
+            (
+              PARTITION P1 VALUES LESS THAN (TO_DATE('2017-04-14 00:00:00', 'SYYYY-MM-DD HH24:MI:SS', 'NLS_CALENDAR=GREGORIAN'))
             )
         """
