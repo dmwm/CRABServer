@@ -110,6 +110,12 @@ fi
 # Recalculate the black / whitelist
 if [ -e AdjustSites.py ]; then
     python AdjustSites.py
+    ret=$?
+    if [ $ret -eq 1 ]; then
+        echo "Error: AdjustSites.py failed to update the webdir." >&2
+        condor_qedit $CONDOR_ID DagmanHoldReason "'AdjustSites.py failed to update the webdir.'"
+        exit 1
+    fi
 else
     echo "Error: AdjustSites.py does not exist." >&2
     condor_qedit $CONDOR_ID DagmanHoldReason "'AdjustSites.py does not exist.'"
@@ -152,13 +158,15 @@ else
     if [ -f /etc/enable_task_daemon ] && [ ! -f task_process/task_process_running ];
     then
         echo "creating and executing task process daemon jdl"
+        TASKNAME=`grep '^CRAB_ReqName =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
 cat > task_process/daemon.jdl << EOF
-Universe   = local
-Executable = task_process/task_proc_wrapper.sh
-Arguments  = $CLUSTER_ID
-Log        = task_process/daemon.PC.log
-Output     = task_process/daemon.out.\$(Cluster).\$(Process)
-Error      = task_process/daemon.err.\$(Cluster).\$(Process)
+Universe      = local
+Executable    = task_process/task_proc_wrapper.sh
+Arguments     = $CLUSTER_ID
+Log           = task_process/daemon.PC.log
+Output        = task_process/daemon.out.\$(Cluster).\$(Process)
+Error         = task_process/daemon.err.\$(Cluster).\$(Process)
++CRAB_ReqName = $TASKNAME
 Queue 1
 EOF
         # TODO - remove chmod

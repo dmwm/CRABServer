@@ -23,6 +23,7 @@ import TaskWorker.DataObjects.Result
 import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE
+from CMSGroupMapper import get_egroup_users
 
 import WMCore.WMSpec.WMTask
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
@@ -142,8 +143,8 @@ Environment = "SCRAM_ARCH=$(CRAB_JobArch) %(additional_environment_options)s"
 should_transfer_files = YES
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
-# TODO: Uncomment this when we get out of testing mode
-Requirements = ((target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED)) %(opsys_req)s
+%(opsys_req)s
+Requirements = ((target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED))
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
 # Remove if
 # a) job is in the 'held' status for more than 7 minutes
@@ -458,7 +459,8 @@ class DagmanCreator(TaskAction.TaskAction):
         info['runs'] = []
         info['lumis'] = []
         info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
-        if info['userhn'] in getattr(self.config.TaskWorker, 'highPrioUsers', []):
+        egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
+        if egroups and info['userhn'] in self.getHighPrioUsers(info['user_proxy'], info['workflow'], egroups):
             info['accounting_group'] = 'highprio.%s' % info['userhn']
         else:
             info['accounting_group'] = 'analysis.%s' % info['userhn']
@@ -466,9 +468,11 @@ class DagmanCreator(TaskAction.TaskAction):
         info['faillimit'] = task['tm_fail_limit']
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
         if info['jobarch_flatten'].startswith("slc6_"):
-            info['opsys_req'] = '&& (GLIDEIN_REQUIRED_OS=?="rhel6" || OpSysMajorVer =?= 6)'
+            info['opsys_req'] = 'REQUIRED_OS="rhel6"'
+        if info['jobarch_flatten'].startswith("slc7_"):
+            info['opsys_req'] = 'REQUIRED_OS="rhel7"'
         else:
-            info['opsys_req'] = ''
+            info['opsys_req'] = 'REQUIRED_OS="any"'
 
         info.setdefault("additional_environment_options", '')
         info.setdefault("additional_input_file", "")
@@ -768,8 +772,9 @@ class DagmanCreator(TaskAction.TaskAction):
             dagSpecs += jobgroupDagSpecs
 
         def getBlacklistMsg():
+            tmp = ""
             if len(global_blacklist)!=0:
-                tmp = " Global CRAB3 blacklist is %s.\n" % global_blacklist
+                tmp += " Global CRAB3 blacklist is %s.\n" % global_blacklist
             if len(siteBlacklist)!=0:
                 tmp += " User blacklist is %s.\n" % siteBlacklist
             if len(siteWhitelist)!=0:
@@ -969,6 +974,25 @@ class DagmanCreator(TaskAction.TaskAction):
                     kw['task']['user_proxy'], kw['task']['tm_taskname'])
 
         return
+
+
+    def getHighPrioUsers(self, userProxy, workflow, egroups):
+        # Import needed because the DagmanCreator module is also imported in the schedd,
+        # where there is no ldap available. This function however is only called
+        # in the TW (where ldap is installed) during submission.
+        from ldap import LDAPError
+
+        highPrioUsers = set()
+        try:
+            for egroup in egroups:
+                highPrioUsers.update(get_egroup_users(egroup))
+        except LDAPError as le:
+            msg = "Error when getting the high priority users list." \
+                  " Will ignore the high priority list and continue normally." \
+                  " Error reason: %s" % str(le)
+            self.uploadWarning(msg, userProxy, workflow)
+            return []
+        return highPrioUsers
 
 
     def executeInternal(self, *args, **kw):

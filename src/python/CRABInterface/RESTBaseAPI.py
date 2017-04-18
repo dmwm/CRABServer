@@ -13,7 +13,6 @@ from WMCore.REST.Error import ExecutionError
 from . import Utils
 from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTTask import RESTTask
-from CRABInterface.RESTCampaign import RESTCampaign
 from CRABInterface.RESTServerInfo import RESTServerInfo
 from CRABInterface.RESTFileMetadata import RESTFileMetadata
 from CRABInterface.RESTFileTransfers import RESTFileTransfers
@@ -22,7 +21,6 @@ from CRABInterface.RESTWorkerWorkflow import RESTWorkerWorkflow
 from CRABInterface.DataFileMetadata import DataFileMetadata
 from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
-from CRABInterface.DataCampaign import DataCampaign
 
 #In case the log level is not specified in the configuration we use the NullHandler and we do not print messages
 #The NullHandler is included as of python 3.1
@@ -56,7 +54,6 @@ class RESTBaseAPI(DatabaseRESTApi):
         ## TODO need a check to verify the format depending on the resource
         ##      the RESTFileMetadata has the specifc requirement of getting xml reports
         self._add( {'workflow': RESTUserWorkflow(app, self, config, mount, extconfig),
-                    'campaign': RESTCampaign(app, self, config, mount),
                     'info': RESTServerInfo(app, self, config, mount, serverdn, extconfig),
                     'filemetadata': RESTFileMetadata(app, self, config, mount),
                     'workflowdb': RESTWorkerWorkflow(app, self, config, mount),

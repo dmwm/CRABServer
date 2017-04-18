@@ -237,6 +237,7 @@ def updateWebDir(ad):
     data['webdirurl'] = ad['CRAB_UserWebDir']
     cert = ad['X509UserProxy']
     try:
+        printLog("Uploading webdir %s to %s" % (ad['CRAB_UserWebDir'], host))
         server = HTTPRequests(host, cert, cert)
         server.post(uri, data=urllib.urlencode(data))
         return 0
@@ -326,6 +327,10 @@ def main():
         if exitCode != 0:
             time.sleep(retries * 20)
         retries += 1
+
+    if exitCode !=0:
+        printLog("Exiting AdjustSites because the webdir upload failed three times.")
+        sys.exit(1)
 
     printLog("Webdir URL has been uploaded, exit code is %s. Setting the classad for the proxied webdir" % exitCode)
 

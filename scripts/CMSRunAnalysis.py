@@ -265,6 +265,7 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
 def stopDashboardMonitoring(myad):
     params = {
         'ExeEnd': 'cmsRun',
+        'NCores': myad['RequestCpus'],
     }
     populateDashboardMonitorInfo(myad, params)
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)

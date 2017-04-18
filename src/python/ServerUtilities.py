@@ -25,6 +25,12 @@ from WMCore.WMExceptions import STAGEOUT_ERRORS
 BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
 
+# Parameters for User File Cache
+# 100MB is the maximum allowed size of a single file
+FILE_SIZE_LIMIT = 104857600
+# 0.5MB is the maximum limit for file completely loaded into memory
+FILE_MEMORY_LIMIT = 512*1024
+
 # Fatal error limits for job resource usage
 # Defaults are used if unable to load from .job.ad
 # Otherwise it uses these values.

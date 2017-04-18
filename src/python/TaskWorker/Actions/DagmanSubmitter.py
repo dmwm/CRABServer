@@ -172,7 +172,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             raise TaskWorkerException(msg) #we already tried 20 times, give up
 
 
-    def checkMemoryWalltime(self, args, task):
+    def checkMemoryWalltime(self, info, task):
         """ Check memory and walltime and if user requires too much:
             - upload warning back to crabserver
             - change walltime to max 47h Issue: #4742
@@ -185,7 +185,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             msg += " Jobs may not find a site where to run."
             msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
             self.logger.warning(msg)
-            args[0][1]['tm_maxjobruntime'] = str(stdmaxjobruntime)
+            info['tm_maxjobruntime'] = str(stdmaxjobruntime)
             self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
         if task['tm_maxmemory'] > stdmaxmemory:
             msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (task['tm_maxmemory'], stdmaxmemory)
@@ -231,8 +231,11 @@ class DagmanSubmitter(TaskAction.TaskAction):
         """
         task =  kwargs['task']
         schedd = task['tm_schedd']
+        info = args[0][0]
+        dashboardParams = args[0][1]
+        inputFiles = args[0][2]
 
-        self.checkMemoryWalltime(args, task)
+        self.checkMemoryWalltime(info, task)
 
         if not schedd:
             schedd = self.pickAndSetSchedd(task)
@@ -247,7 +250,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         for retry in range(self.config.TaskWorker.max_retry + 1): #max_retry can be 0
             self.logger.debug("Trying to submit task %s to schedd %s for the %s time.", task['tm_taskname'], schedd, str(retry))
             try:
-                execInt = self.executeInternal(*args, **kwargs)
+                execInt = self.executeInternal(info, dashboardParams, inputFiles, **kwargs)
                 scheddStats.success(schedd, self.clusterId)
                 return execInt
             except Exception as ex: #pylint: disable=broad-except
@@ -290,10 +293,19 @@ class DagmanSubmitter(TaskAction.TaskAction):
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
 
         schedd = ""
+        oldx509 = os.environ.get("X509_USER_PROXY", None)
         try:
             self.logger.debug("Duplicate check is getting the schedd obj. Collector is: %s", task['tm_collector'])
+            os.environ["X509_USER_PROXY"] = task['user_proxy']
             schedd, dummyAddress = loc.getScheddObjNew(task['tm_schedd'])
             self.logger.debug("Got schedd obj for %s ", task['tm_schedd'])
+
+            rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || '\
+                        'CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow.encode('ascii', 'ignore'))
+
+            self.logger.debug("Duplicate check is querying the schedd: %s", rootConst)
+            results = list(schedd.xquery(rootConst, []))
+            self.logger.debug("Schedd queried %s", results)
         except Exception as exp:
             msg = "The CRAB server backend was not able to contact the Grid scheduler."
             msg += " Please try again later."
@@ -301,13 +313,11 @@ class DagmanSubmitter(TaskAction.TaskAction):
             msg += " Message from the scheduler: %s" % (str(exp))
             self.logger.exception("%s: %s", workflow, msg)
             raise TaskWorkerException(msg, retry=True)
-
-        rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || '\
-                    'CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow.encode('ascii', 'ignore'))
-
-        self.logger.debug("Duplicate check is querying the schedd: %s", rootConst)
-        results = list(schedd.xquery(rootConst, []))
-        self.logger.debug("Schedd queried %s", results)
+        finally:
+            if oldx509:
+                os.environ["X509_USER_PROXY"] = oldx509
+            else:
+                del os.environ["X509_USER_PROXY"]
 
         if not results:
             # Task not already in schedd
@@ -345,7 +355,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         return Result.Result(task=task, result=(-1))
 
 
-    def executeInternal(self, *args, **kwargs):
+    def executeInternal(self, info, dashboardParams, inputFiles, **kwargs):
         """Internal execution to submit to selected scheduler
            Before submission it does duplicate check to see if
            task was not submitted by previous time"""
@@ -354,10 +364,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         task = kwargs['task']
         workflow = task['tm_taskname']
-        info = args[0][0]
-        #self.logger.debug("Task input information: %s" % str(info))
-        dashboardParams = args[0][1]
-        inputFiles = args[0][2]
 
         cwd = os.getcwd()
         os.chdir(kwargs['tempDir'])

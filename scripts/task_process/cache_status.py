@@ -242,8 +242,7 @@ def parseNodeStateV2(fp, nodes):
             # some status parsing logic to try and guess whether the job would
             # be tried again in the near future.  This behavior is no longer
             # observed; STATUS_ERROR is terminal.
-            if info['State'] != 'killed':
-                info['State'] = 'failed'
+            info['State'] = 'failed'
 
 # --- New code ----
 

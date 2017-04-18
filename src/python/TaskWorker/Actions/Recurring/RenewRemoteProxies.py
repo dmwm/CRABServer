@@ -15,7 +15,7 @@ from RESTInteractions import HTTPRequests
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
 class RenewRemoteProxies(BaseRecurringAction):
-    pollingTime = 360 #minutes
+    pollingTime = 2880 #minutes
 
     def _execute(self, resthost, resturi, config, task):
         renewer = CRAB3ProxyRenewer(config, resthost, resturi.replace("workflowdb", "info"), self.logger)
@@ -91,14 +91,12 @@ class CRAB3ProxyRenewer(object):
         return userproxy
 
     def renew_proxy(self, schedd, ad, proxy):
-        now = time.time()
         self.logger.info("Renewing proxy for task %s." % ad['CRAB_ReqName'])
         if not hasattr(schedd, 'refreshGSIProxy'):
             raise NotImplementedError()
         with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
             if not parent:
-                lifetime = schedd.refreshGSIProxy(ad['ClusterId'], ad['ProcID'], proxy, -1)
-                schedd.edit(['%s.%s' % (ad['ClusterId'], ad['ProcId'])], 'x509userproxyexpiration', str(int(now+lifetime)))
+                schedd.refreshGSIProxy(ad['ClusterId'], ad['ProcID'], proxy, -1)
         results = rpipe.read()
         if results != "OK":
             raise Exception("Failure when renewing HTCondor task proxy: '%s'" % results)
@@ -110,7 +108,7 @@ class CRAB3ProxyRenewer(object):
         self.logger.info("Schedd found at %s" % schedd_ad['MyAddress'])
         schedd = htcondor.Schedd(schedd_ad)
         self.logger.info("Querying schedd for CRAB3 tasks.")
-        task_ads = list(schedd.xquery('JobStatus =!= 4 && TaskType =?= "ROOT" && CRAB_HC =!= "True"', QUERY_ATTRS))
+        task_ads = list(schedd.xquery('TaskType =?= "ROOT" && CRAB_HC =!= "True"', QUERY_ATTRS))
         self.logger.info("There were %d tasks found." % len(task_ads))
         ads = {}
         now = time.time()

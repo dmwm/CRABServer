@@ -37,6 +37,34 @@ class HTCondorDataWorkflow(DataWorkflow):
     """ HTCondor implementation of the status command.
     """
 
+    def taskads(self, workflow):
+        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
+        row = self.Task.ID_tuple(*row)
+
+        backend_urls = copy.deepcopy(self.centralcfg.centralconfig["backend-urls"])
+        if row.schedd and row.collector:
+            # Override the collector because it may be different from what's in the external configuration
+            # (if the task was submitted by specifying a different collector in the config, for example)
+            backend_urls['htcondorPool'] = row.collector
+
+            self.logger.debug("Running condor query for task %s." % workflow)
+            try:
+                locator = HTCondorLocator.HTCondorLocator(backend_urls)
+                schedd, _ = locator.getScheddObjNew(row.schedd)
+                results = self.getRootTasks(workflow, schedd)
+            except Exception as exp: # Empty results are caught here, because getRootTasks raises InvalidParameter exception.
+                self.logger.exception("Exception while querying schedd")
+                msg = " Message from the scheduler: %s" % (str(exp))
+                self.logger.exception("%s: %s" % (workflow, msg))
+
+            # Convert a classad list object into a dict that can be sent back to the client
+            parsedRes = {}
+            for ad in results:
+                parsedRes[ad] = str(results[ad])
+
+            yield parsedRes
+        yield None
+
     def getRootTasks(self, workflow, schedd):
         rootConst = 'TaskType =?= "ROOT" && CRAB_ReqName =?= %s && (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)' % HTCondorUtils.quote(workflow)
         rootAttrList = ["JobStatus", "ExitCode", 'CRAB_JobCount', 'CRAB_ReqName', 'TaskType', "HoldReason", "HoldReasonCode", "CRAB_UserWebDir",
