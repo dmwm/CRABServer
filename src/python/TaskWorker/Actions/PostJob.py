@@ -809,7 +809,7 @@ class ASOServerJob(object):
                           'source': doc['source'],
                           'source_lfn': doc['source_lfn'],
                           'filesize': doc['filesize'],
-                          'transfer_state': 'NEW',
+                          'transfer_state': doc.get('state', 'NEW').upper(),
                           'publication_state': 'NEW' if doc['publish'] else 'NOT_REQUIRED',
                           'job_id': doc['jobid'],
                           'job_retry_count': doc['job_retry_count'],
