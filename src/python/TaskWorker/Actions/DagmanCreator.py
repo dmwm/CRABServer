@@ -10,6 +10,7 @@ import json
 import shutil
 import string
 import pickle
+import random
 import tarfile
 import hashlib
 import tempfile
@@ -693,6 +694,8 @@ class DagmanCreator(TaskAction.TaskAction):
 
             jgblocks = set() #job group blocks
             for job in jobs:
+                if stage == 'probe':
+                    random.shuffle(job['input_files'])
                 for inputfile in job['input_files']:
                     jgblocks.add(inputfile['block'])
                     allblocks.add(inputfile['block'])
