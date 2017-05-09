@@ -232,8 +232,8 @@ class FileTransfers(object):
 
     RetryUserPublication_sql = "UPDATE filetransfersdb SET tm_publication_state = :new_publication_state, \
                                                        tm_last_update = :last_update, \
-                            WHERE tm_username = :username AND tm_taskname = :taskname \
-                            AND tm_publication_state = :publication_state"
+                                WHERE tm_taskname = :taskname \
+                                AND tm_publication_state = :publication_state"
 
     RetryUserTransfers_sql = "UPDATE filetransfersdb SET tm_transfer_state = :new_transfer_state, \
                                                          tm_last_update = :last_update \

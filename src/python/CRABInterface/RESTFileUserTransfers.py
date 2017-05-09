@@ -214,7 +214,6 @@ class RESTFileUserTransfers(RESTEntity):
             # taskname: taskname to which this file belongs
             ###############################################
             binds['taskname'] = [taskname]
-            binds['username'] = [username]
             binds['publication_state'] = PUBLICATIONDB_STATUSES['FAILED']
             binds['new_publication_state'] = PUBLICATIONDB_STATUSES['NEW']
             self.api.modify(self.transferDB.RetryUserPublication_sql, **binds)
