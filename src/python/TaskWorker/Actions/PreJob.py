@@ -302,7 +302,11 @@ class PreJob:
             #    if self.task_ad['MaxWallTimeMins_RAW'] != 1315:
             #        maxjobruntime = self.task_ad.lookup('MaxWallTimeMins_RAW')
             #        self.resubmit_info['maxjobruntime'] = maxjobruntime
-            if 'MaxWallTimeMins' in self.task_ad:
+            if 'MaxWallTimeMinsProbe' in self.task_ad and self.stage == 'probe':
+                maxjobruntime = int(str(self.task_ad.lookup('MaxWallTimeMinsProbe')))
+            elif 'MaxWallTimeMinsTail' in self.task_ad and self.stage == 'tail':
+                maxjobruntime = int(str(self.task_ad.lookup('MaxWallTimeMinsTail')))
+            elif 'MaxWallTimeMins' in self.task_ad:
                 maxjobruntime = int(str(self.task_ad.lookup('MaxWallTimeMins')))
             if 'RequestMemory' in self.task_ad:
                 maxmemory = int(str(self.task_ad.lookup('RequestMemory')))
@@ -510,6 +514,7 @@ class PreJob:
         self.parent = args[2]
         self.taskname = args[3] # this is not used
         self.backend = args[4]
+        self.stage = args[5]
 
         ## Calculate the CRAB retry count.
         crab_retry, calculate_crab_retry_msg = self.calculate_crab_retry()

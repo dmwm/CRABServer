@@ -50,7 +50,7 @@ NODE_STATUS_FILE node_state{nodestate} 30 ALWAYS-UPDATE
 
 DAG_FRAGMENT = """
 JOB Job{count} Job.{count}.submit
-SCRIPT {prescriptDefer} PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {parent} {taskname} {backend}
+SCRIPT {prescriptDefer} PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {parent} {taskname} {backend} {stage}
 SCRIPT DEFER 4 1800 POST Job{count} dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES {taskname} {count} {tempDest} {outputDest} cmsRun_{count}.log.tar.gz {stage} {remoteOutputFiles}
 #PRE_SKIP Job{count} 3
 RETRY Job{count} {maxretries} UNLESS-EXIT 2
@@ -226,7 +226,8 @@ def transform_strings(input):
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
                'stageoutpolicy', 'taskType', 'worker_name', 'desired_opsys', 'desired_opsysvers', \
-               'desired_arch', 'accounting_group', 'resthost', 'resturinoapi', 'submitter_ip_addr':
+               'desired_arch', 'accounting_group', 'resthost', 'resturinoapi', 'submitter_ip_addr', \
+               'maxproberuntime', 'maxtailruntime':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -627,9 +628,15 @@ class DagmanCreator(TaskAction.TaskAction):
         ## file and we would take it from the Task DB.
         kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
 
+        proberuntime = getattr(self.config.TaskWorker, 'splittingPilotRuntime', 15 * 60)
+        tailruntime = getattr(self.config.TaskWorker, 'splittingTailRuntime', 45 * 60)  # Not used yet
+
         kwargs['task']['max_runtime'] = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
+        # include a factor of 4 as a buffer
+        kwargs['task']['maxproberuntime'] = (proberuntime * 4) // 60
+        kwargs['task']['maxtailruntime'] = (tailruntime * 4) // 60
         if kwargs['task']['tm_split_algo'] == 'Automatic' and stage == 'conventional':
-            kwargs['task']['max_runtime'] = getattr(self.config.TaskWorker, 'splittingPilotRuntime', 15 * 60)
+            kwargs['task']['max_runtime'] = proberuntime
             kwargs['task']['completion_jobs'] = getattr(self.config.TaskWorker, 'completionJobs', False)
             outfiles = []
             stage = 'probe'
