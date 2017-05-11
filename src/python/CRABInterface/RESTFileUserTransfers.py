@@ -213,10 +213,10 @@ class RESTFileUserTransfers(RESTEntity):
             # user: username
             # taskname: taskname to which this file belongs
             ###############################################
-            raise NotImplementedError
-            # binds['publication_state'] = PUBLICATIONDB_STATUSES['FAILED']
-            # binds['new_publication_state'] = PUBLICATIONDB_STATUSES['NEW']
-            # self.api.modify(self.transferDB.RetryUserPublication_sql, **binds)
+            binds['taskname'] = [taskname]
+            binds['publication_state'] = PUBLICATIONDB_STATUSES['FAILED']
+            binds['new_publication_state'] = PUBLICATIONDB_STATUSES['NEW']
+            self.api.modify(self.transferDB.RetryUserPublication_sql, **binds)
 
         elif subresource == 'retryTransfers':
             raise NotImplementedError
