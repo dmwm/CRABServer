@@ -14,7 +14,7 @@ from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
 from ServerUtilities import checkTaskLifetime
 from ServerUtilities import isCouchDBURL, getEpochFromDBTime
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
-
+from RESTInteractions import HTTPRequests
 
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
@@ -597,7 +597,7 @@ class DataWorkflow(object):
         if isCouchDBURL(asourl):
             return self.resubmitCouchPublication(asourl, asodb, proxy, taskname)
         else:
-            return self.resubmitOraclePublication()
+            return self.resubmitOraclePublication(asourl, asodb, proxy, taskname)
 
     def resubmitCouchPublication(self, asourl, asodb, proxy, taskname):
         """
@@ -635,5 +635,26 @@ class DataWorkflow(object):
                 self.logger.error(msg)
         return
 
-    def resubmitOraclePublication(self):
-        raise NotImplementedError
+    def resubmitOraclePublication(self, asourl, asodb, proxy, taskname):
+        try:
+            oracleDB = HTTPRequests(asourl.split('/crabserver')[0],
+                                    proxy,
+                                    proxy)
+        except Exception:
+            self.logger.exception('failed to connect to Oracle')
+            raise 
+
+       try:
+            data = dict()
+            data['subresource'] = 'retryPublication'
+            data['taskname'] = taskname
+
+            result = oracleDB.post('/crabserver' + asourl.split('/crabserver')[1].
+                                                          replace('filetransfers','fileusertransfers'),
+                                        data=encodeRequest(data))
+            self.logger.debug("Resubmitted publication for %s" % taskname)
+        except Exception:
+            self.logger.exception('Error updating documents')
+
+        return
+
