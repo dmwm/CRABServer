@@ -200,23 +200,6 @@ class RESTFileUserTransfers(RESTEntity):
                 killStatus['killed'].append(item)
             return [killStatus]
 
-        elif subresource == 'retryPublication':
-            ###############################################
-            # retryPublication API
-            # ---------------------------------------------
-            # Description:
-            # Users can call this API and force to retry publication which status is in FAILED.
-            # NEW state indicates that publication there so far not acquired by ASO.
-            # P.S So far this is not turned ON!!!! For the future to allow users to retry Publication
-            # ---------------------------------------------
-            # Always required variables:
-            # user: username
-            # taskname: taskname to which this file belongs
-            ###############################################
-            binds['taskname'] = [taskname]
-            binds['publication_state'] = PUBLICATIONDB_STATUSES['FAILED']
-            binds['new_publication_state'] = PUBLICATIONDB_STATUSES['NEW']
-            self.api.modify(self.transferDB.RetryUserPublication_sql, **binds)
 
         elif subresource == 'retryTransfers':
             raise NotImplementedError

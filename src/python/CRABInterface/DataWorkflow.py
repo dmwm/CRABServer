@@ -597,7 +597,7 @@ class DataWorkflow(object):
         if isCouchDBURL(asourl):
             return self.resubmitCouchPublication(asourl, asodb, proxy, taskname)
         else:
-            return self.resubmitOraclePublication()
+            return self.resubmitOraclePublication(taskname)
 
     def resubmitCouchPublication(self, asourl, asodb, proxy, taskname):
         """
@@ -635,5 +635,10 @@ class DataWorkflow(object):
                 self.logger.error(msg)
         return
 
-    def resubmitOraclePublication(self):
-        raise NotImplementedError
+    def resubmitOraclePublication(self, taskname):
+        binds['taskname'] = [taskname]
+        binds['publication_state'] = PUBLICATIONDB_STATUSES['FAILED']
+        binds['new_publication_state'] = PUBLICATIONDB_STATUSES['NEW']
+        self.api.modify(self.transferDB.RetryUserPublication_sql, **binds)
+        return
+
