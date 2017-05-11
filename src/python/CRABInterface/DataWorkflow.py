@@ -639,9 +639,6 @@ class DataWorkflow(object):
         binds['taskname'] = [taskname]
         binds['publication_state'] = PUBLICATIONDB_STATUSES['FAILED']
         binds['new_publication_state'] = PUBLICATIONDB_STATUSES['NEW']
-        try:
-            self.api.modify(self.transferDB.RetryUserPublication_sql, **binds)
-        except:
-            self.logger.exception('Failure during documents update.')
+        self.api.modify(self.transferDB.RetryUserPublication_sql, **binds)
         return
 
