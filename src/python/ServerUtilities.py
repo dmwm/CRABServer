@@ -20,7 +20,6 @@ import traceback
 import subprocess
 import contextlib
 from httplib import HTTPException
-from WMCore.WMExceptions import STAGEOUT_ERRORS
 
 BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
@@ -294,6 +293,8 @@ def isFailurePermanent(reason, gridJob=False):
     Method that decides whether a failure reason should be considered as a
     permanent failure and submit task or not.
     """
+    from WMCore.WMExceptions import STAGEOUT_ERRORS
+
     checkQuota = " Please check that you have write access to destination site and that your quota is not exceeded, use crab checkwrite for more informations."
     refuseToSubmit = " Can't submit task because write check at destination site fails."
     if gridJob:
