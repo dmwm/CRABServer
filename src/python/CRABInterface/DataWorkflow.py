@@ -331,7 +331,7 @@ class DataWorkflow(object):
                     msg  = "Cannot resubmit publication."
                     msg += " Error in publication status: %s" % (publicationInfo['error'])
                     raise ExecutionError(msg)
-                if publicationInfo['status'].get('publication_failed', 0) == 0:
+                if isCouchDBURL(asourl) and publicationInfo['status'].get('publication_failed', 0) == 0:
                     msg = "There are no failed publications to resubmit."
                     raise ExecutionError(msg)
                 ## Here we can add a check on the publication status of the documents
@@ -466,7 +466,7 @@ class DataWorkflow(object):
                     msg  = "Cannot resubmit publication."
                     msg += " Error in publication status: %s" % (statusRes['publication']['error'])
                     raise ExecutionError(msg)
-                if statusRes['publication'].get('publication_failed', 0) == 0:
+                if isCouchDBURL(statusRes['ASOURL']) and statusRes['publication'].get('publication_failed', 0) == 0:
                     msg = "There are no failed publications to resubmit."
                     raise ExecutionError(msg)
                 ## Here we can add a check on the publication status of the documents
