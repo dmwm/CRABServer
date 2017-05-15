@@ -20,7 +20,6 @@ import traceback
 import subprocess
 import contextlib
 from httplib import HTTPException
-from WMCore.WMExceptions import STAGEOUT_ERRORS
 
 BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
@@ -294,6 +293,8 @@ def isFailurePermanent(reason, gridJob=False):
     Method that decides whether a failure reason should be considered as a
     permanent failure and submit task or not.
     """
+    from WMCore.WMExceptions import STAGEOUT_ERRORS
+
     checkQuota = " Please check that you have write access to destination site and that your quota is not exceeded, use crab checkwrite for more informations."
     refuseToSubmit = " Can't submit task because write check at destination site fails."
     if gridJob:
@@ -367,6 +368,12 @@ def encodeRequest(configreq, listParams=[]):
             if len(configreq[lparam]) > 0:
                 encodedLists += ('&%s=' % lparam) + ('&%s=' % lparam).join(map(urllib.quote, configreq[lparam]))
             del configreq[lparam]
+    #Make sure parameters we encode are streing. Otherwise u'IamAstring' may become 'uIamAstring' in the DB
+    for k, v in configreq.iteritems():
+        if isinstance(v, basestring):
+            configreq[k] = str(v)
+        if isinstance(v, list):
+            configreq[k] = [ str(x) if isinstance(x, basestring) else x for x in v ]
     encoded = urllib.urlencode(configreq) + encodedLists
     return str(encoded)
 

@@ -403,6 +403,9 @@ class RESTFileTransfers(RESTEntity):
         elif subresource == 'activeUsers':
             rows = self.api.query(None, None, self.transferDB.GetActiveUsers_sql, asoworker=asoworker)
             return rows
+        elif subresource == 'activeUserPublications':
+            rows = self.api.query(None, None, self.transferDB.GetActiveUserPublication_sql, asoworker=asoworker)
+            return rows
 
 
     @restcall

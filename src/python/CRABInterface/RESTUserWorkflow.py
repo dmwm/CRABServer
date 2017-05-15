@@ -36,7 +36,7 @@ class RESTUserWorkflow(RESTEntity):
         self.allPNNNames = CMSSitesCache(cachetime=0, sites={})
         self.centralcfg = centralcfg
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
-        self.tagCollector = TagCollector(anytype = 1, anyarch = 0)
+        self.tagCollector = TagCollector(logger = self.logger, anytype = 1, anyarch = 0)
 
     def _expandSites(self, sites, pnn=False):
         """Check if there are sites cotaining the '*' wildcard and convert them in the corresponding list

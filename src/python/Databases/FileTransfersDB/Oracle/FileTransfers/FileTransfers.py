@@ -232,9 +232,8 @@ class FileTransfers(object):
 
     RetryUserPublication_sql = "UPDATE filetransfersdb SET tm_publication_state = :new_publication_state, \
                                                        tm_last_update = :last_update, \
-                                                       tm_aso_worker = NULL, \
-                            WHERE tm_username = :username AND tm_taskname = :takname \
-                            AND tm_publication_state = :publication_state"
+                                WHERE tm_taskname = :taskname \
+                                AND tm_publication_state = :publication_state"
 
     RetryUserTransfers_sql = "UPDATE filetransfersdb SET tm_transfer_state = :new_transfer_state, \
                                                          tm_last_update = :last_update \
@@ -252,4 +251,6 @@ class FileTransfers(object):
     GetActiveUsers_sql = "SELECT t.tm_username, t.tm_user_role, t.tm_user_group, count(*) FROM filetransfersdb f LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
                                        WHERE (tm_transfer_state=0 AND tm_aso_worker IS NULL) OR (tm_transfer_state=1 AND tm_aso_worker=:asoworker) GROUP BY t.tm_username,t.tm_user_role,t.tm_user_group"
 
+    GetActiveUserPublications_sql = "SELECT t.tm_username, t.tm_user_role, t.tm_user_group, count(*) FROM filetransfersdb f LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
+                                       WHERE (tm_publication_state=0 OR tm_publication_state = 1) AND tm_aso_worker=:asoworker AND tm_publish = 1 GROUP BY t.tm_username,t.tm_user_role,t.tm_user_group"
 

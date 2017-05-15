@@ -32,9 +32,10 @@ import gc
 import os
 import sys
 import json
-import psutil
 import random
 import string
+
+from ServerUtilities import executeCommand
 
 #global variable containing the function used to convert the dictionary
 g_conversion = None
@@ -101,6 +102,11 @@ def filemetadataDict(nfiles, lumisPerFile):
         })
 
 
+def getMemory():
+    out, _, _ = executeCommand("ps u -p %s | awk '{sum=sum+$6}; END {print sum/1024}'" % os.getpid())
+    return float(out)
+
+
 def printInfo(nfiles, lumisPerFile):
     """ Print the information after creating a dict of nfiles files each
         containing lumisPerFile lumis. Print the memory info after garbage collecting the object
@@ -108,13 +114,11 @@ def printInfo(nfiles, lumisPerFile):
     print("Task with %s files and %s lumis" % (nfiles, lumisPerFile))
     d = list(filemetadataDict(nfiles, lumisPerFile))
     s = str(d)
-    print("Dictionary generated and converted to string. String len is %s. Memory usage" % (len(s)/1024))
-    print(process.get_memory_info()[0]/1024)
+    print("Dictionary generated and converted to string. String len is %s. Memory usage %s" % (len(s)/1024, getMemory()))
     d = None
     s = None
     gc.collect()
-    print("Memory usage after running the garbage collector")
-    print(process.get_memory_info()[0]/1024)
+    print("Memory usage after running the garbage collector %s" % getMemory())
 
 
 if __name__ == "__main__":
@@ -130,10 +134,7 @@ if __name__ == "__main__":
 
     g_conversion = convFunctions[dataType]
 
-    process = psutil.Process(os.getpid())
-
-    print("Memory starting the program")
-    print(process.get_memory_info()[0]/1024)
+    print("Memory starting the program %s" % getMemory())
 
     printInfo(100, 30) #small task
     printInfo(1000, 100) #Average case (1k jobs, 300 lumis per job) ?

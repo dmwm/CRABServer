@@ -5,6 +5,7 @@ Submit a DAG directory created by the DagmanCreator component.
 
 import os
 import copy
+import json
 import time
 import pickle
 import urllib
@@ -79,6 +80,8 @@ SUBMIT_INFO = [ \
     ('RequestMemory', 'tm_maxmemory'),
     ('RequestCpus', 'tm_numcores'),
     ('MaxWallTimeMins', 'tm_maxjobruntime'),
+    ('MaxWallTimeMinsProbe', 'maxproberuntime'),
+    ('MaxWallTimeMinsTail', 'maxtailruntime'),
     ('JobPrio', 'tm_priority'),
     ('CRAB_ASOURL', 'tm_asourl'),
     ('CRAB_ASODB', 'tm_asodb'),
@@ -463,6 +466,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     value = classad.quote(v)
                 elif isinstance(v, classad.ExprTree):
                     value = repr(v)
+                elif isinstance(v, list):
+                    value = "{{{0}}}".format(json.dumps(v)[1:-1])
                 else:
                     value = v
                 fd.write('+{0} = {1}\n'.format(k, value))
