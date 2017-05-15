@@ -63,6 +63,20 @@ class DBSDataDiscovery(DataDiscovery):
             if value == set([]):
                 locationsMap.pop(key)
 
+
+    def checkBlocksSize(self, blocks):
+        """ Make sure no single blocks has more than 100k lumis. See
+            https://hypernews.cern.ch/HyperNews/CMS/get/dmDevelopment/2022/1/1/1/1/1/1/2.html
+        """
+        MAX_LUMIS = 100000
+        for block in blocks:
+            blockInfo = self.dbs.getDBSSummaryInfo(block=block)
+            if blockInfo['NumberOfLumis'] > MAX_LUMIS:
+                msg = "Block %s contains more than %s lumis and cannot be processed for splitting. " % (block, MAX_LUMIS)
+                msg += "For memory/time contraint big blocks are not allowed. Use another dataset as input."
+                raise TaskWorkerException(msg)
+
+
     def execute(self, *args, **kwargs):
         self.logger.info("Data discovery with DBS") ## to be changed into debug
         old_cert_val = os.getenv("X509_USER_CERT")
@@ -97,6 +111,7 @@ class DBSDataDiscovery(DataDiscovery):
             if str(dbsexc).find('No matching data'):
                 raise TaskWorkerException("The CRAB3 server backend could not find dataset %s in this DBS instance: %s" % (kwargs['task']['tm_input_dataset'], dbsurl))
             raise
+        self.checkBlocksSize(blocks)
         ## Create a map for block's locations: for each block get the list of locations.
         ## Note: listFileBlockLocation() gets first the locations from PhEDEx, and if no
         ## locations are found it gets the original locations from DBS. So it should
