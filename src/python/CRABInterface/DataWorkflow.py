@@ -636,6 +636,7 @@ class DataWorkflow(object):
         return
 
     def resubmitOraclePublication(self, taskname):
+        binds = {}
         binds['taskname'] = [taskname]
         binds['publication_state'] = PUBLICATIONDB_STATUSES['FAILED']
         binds['new_publication_state'] = PUBLICATIONDB_STATUSES['NEW']
