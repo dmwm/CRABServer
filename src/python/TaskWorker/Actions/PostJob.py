@@ -1696,78 +1696,6 @@ class PostJob():
 
         return True
 
-    def createJobs(self, completion=False):
-        self.logger.info("====== Creating jobs")
-        with open('datadiscovery.pkl', 'rb') as fd:
-            dataset = pickle.load(fd)
-        with open('taskinformation.pkl', 'rb') as fd:
-            task = pickle.load(fd)
-
-        if completion:
-            if not task['completion_jobs']:
-                return JOB_RETURN_CODES.OK, ''
-            if not self.adjustLumisForCompletion(task):
-                return JOB_RETURN_CODES.OK, ''
-
-            target = int(task['tm_split_args']['seconds_per_job']) / 8
-            # Target completion jobs to have a 45 minute runtime
-            target = max(target, 45 * 60)
-        elif task['completion_jobs']:
-            # Build in a 33% error margin in the runtime to not create too
-            # many tails. This essentially moves the peak to lower
-            # runtimes and cuts off less of the job distribution tail.
-            target = int(0.75 * task['tm_split_args']['seconds_per_job'])
-        else:
-            target = int(task['tm_split_args']['seconds_per_job'])
-
-        report = self.job_report['steps']['cmsRun']['performance']
-        events = int(target * float(report['cpu']['EventThroughput']))
-
-        self.logger.info("Target runtime: {0}".format(target))
-        self.logger.info("CPU time per event: {0}".format(report['cpu']['AvgEventTime']))
-        self.logger.info("Resplitting with ~{0} events per job".format(events))
-
-        task['tm_split_algo'] = 'EventAwareLumiBased'
-        task['tm_split_args']['events_per_job'] = events
-
-        try:
-            config = Configuration()
-            config.TaskWorker = ConfigSection(name="TaskWorker")
-            config.TaskWorker.scratchDir = '.' # XXX
-            config.TaskWorker.maxJobsPerTask = task['tm_split_args']['job_limit']
-            splitter = Splitter(config, server=None, resturi='')
-            split_result = splitter.execute(dataset, task=task)
-            self.logger.info("Splitting results:")
-            for g in split_result.result[0]:
-                msg = "Created jobgroup with length {0}".format(len(g.getJobs()))
-                self.logger.info(msg)
-        except TaskWorkerException as e:
-            self.logger.error("Error during splitting:\n{0}".format(e))
-            self.set_dashboard_state('FAILED')
-            retmsg = "Splitting failed with:\n{0}".format(e)
-            return JOB_RETURN_CODES.FATAL_ERROR, retmsg
-        try:
-            creator = DagmanCreator(config, server=None, resturi='')
-            if completion:
-                creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0, stage='tail')
-            else:
-                _, _, subdags = creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, stage='process')
-                subdags.append('RunJobs0.subdag')
-                self.createSubdagSubmission(subdags)
-        except TaskWorkerException as e:
-            self.logger.error('Error during subdag creation\n{0}'.format(e))
-            self.set_dashboard_state('FAILED')
-            retmsg = "DAG creation failed with:\n{0}".format(e)
-            return JOB_RETURN_CODES.FATAL_ERROR, retmsg
-
-        return JOB_RETURN_CODES.OK, ''
-
-    def createSubdagSubmission(self, subdags):
-        for dag in subdags:
-            subprocess.check_call(['condor_submit_dag', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', '1000',
-                '-MaxPost', str(self.job_ad.get('CRAB_MaxPost', 20)), '-no_submit', '-insert_sub_file', 'subdag.ad',
-                '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), dag), dag])
-
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1993,14 +1921,6 @@ class PostJob():
             self.logger.info("====== Finished upload of input files metadata.")
             return self.check_retry_count(80001), retmsg
         self.logger.info("====== Finished upload of input files metadata.")
-
-        ## Possible stages: probe, process, tail for automatic
-        ## splitting.  All other splitting modes have a stage called
-        ## conventional.
-        if self.stage in ('probe', 'process'):
-            retval, retmsg = self.createJobs(completion=(self.stage == 'process'))
-            if retval != JOB_RETURN_CODES.OK:
-                return retval, retmsg
 
         self.set_dashboard_state('FINISHED')
 
