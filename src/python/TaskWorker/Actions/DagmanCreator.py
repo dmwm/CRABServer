@@ -61,7 +61,10 @@ ABORT-DAG-ON Job{count} 3
 
 SUBDAG_FRAGMENT = """
 SUBDAG EXTERNAL Job{count}SubJobs RunJobs{count}.subdag
-PARENT Job{count} CHILD Job{count}SubJobs
+SCRIPT DEFER 4 900 PRE Job{count}SubJobs PreDAG.py {stage} {completion} {count}
+"""
+SUBDAG_INHERITANCE = """
+PARENT Job{parent}SubJobs CHILD Job{child}SubJobs
 """
 
 JOB_SUBMIT = \
@@ -520,7 +523,7 @@ class DagmanCreator(TaskAction.TaskAction):
         return prescriptDeferString
 
 
-    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, subjob=None, stage='conventional'):
+    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, parent=None, stage='conventional'):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
@@ -545,14 +548,11 @@ class DagmanCreator(TaskAction.TaskAction):
             lastEvent = str(job['mask']['LastEvent'])
             firstLumi = str(job['mask']['FirstLumi'])
             firstRun = str(job['mask']['FirstRun'])
-            if subjob is None:
-                i = int(i) + 1
+            i = int(i) + 1
+            if parent is None or parent == "":
                 count = str(i)
             else:
-                if isinstance(i, basestring):
-                    i = int(i.split('-', 1)[0])
-                subjob += 1
-                count = '{parent}-{subjob}'.format(parent=i, subjob=subjob)
+                count = '{parent}-{i}'.format(parent=parent, i=i)
             sitead['Job{0}'.format(count)] = list(availablesites)
             siteinfo[count] = groupid
             remoteOutputFiles = []
@@ -613,7 +613,7 @@ class DagmanCreator(TaskAction.TaskAction):
     def createSubdag(self, splitterResult, **kwargs):
 
         startjobid = kwargs.get('startjobid', 0)
-        subjob = kwargs.get('subjob', None)
+        parent = kwargs.get('parent', None)
         stage = kwargs.get('stage', 'conventional')
         self.logger.debug('starting createSubdag, kwargs are:')
         self.logger.debug(str(kwargs))
@@ -629,26 +629,28 @@ class DagmanCreator(TaskAction.TaskAction):
         ## file and we would take it from the Task DB.
         kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
 
-        proberuntime = getattr(self.config.TaskWorker, 'splittingPilotRuntime', 15 * 60)
-        tailruntime = getattr(self.config.TaskWorker, 'splittingTailRuntime', 45 * 60)  # Not used yet
+        proberuntime = getattr(self.config.TaskWorker, 'automaticProbeRuntime', 15 * 60)
+        tailruntime = getattr(self.config.TaskWorker, 'automaticTailRuntime', 45 * 60)
+        overhead = getattr(self.config.TaskWorker, 'automaticProcessingOverhead', 60 * 60)
 
-        kwargs['task']['max_runtime'] = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
+        runtime = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
+
+        kwargs['task']['max_runtime'] = runtime
         # include a factor of 4 as a buffer
         kwargs['task']['maxproberuntime'] = (proberuntime * 4) // 60
-        kwargs['task']['maxtailruntime'] = (tailruntime * 4) // 60
-        if kwargs['task']['tm_split_algo'] == 'Automatic' and stage == 'conventional':
-            kwargs['task']['max_runtime'] = proberuntime
-            kwargs['task']['completion_jobs'] = getattr(self.config.TaskWorker, 'completionJobs', False)
-            outfiles = []
-            stage = 'probe'
-        if stage == 'process' and not kwargs['task']['completion_jobs']:
-            kwargs['task']['max_runtime'] = -1
+        kwargs['task']['maxtailruntime'] = (tailruntime * 5) // 60
+        if kwargs['task']['tm_split_algo'] == 'Automatic':
+            if stage == 'conventional':
+                kwargs['task']['max_runtime'] = proberuntime
+                outfiles = []
+                stage = 'probe'
+            elif stage == 'processing':
+                # include a buffer of one hour for overhead beyond the time
+                # given to CMSSW
+                kwargs['task']['tm_maxjobruntime'] = min((runtime + overhead) // 60, kwargs['task']['tm_maxjobruntime'])
+            elif stage == 'tail':
+                kwargs['task']['max_runtime'] = -1
 
-        if stage == 'probe':
-            parent = None
-            startjobid = -1
-        else:
-            parent = startjobid
 
         info = self.makeJobSubmit(kwargs['task'])
 
@@ -669,8 +671,18 @@ class DagmanCreator(TaskAction.TaskAction):
             global_blacklist = set()
             self.logger.debug("Ignoring the CRAB site blacklist.")
 
-        sitead = classad.ClassAd()
-        siteinfo = {'group_sites': {}, 'group_datasites': {}}
+        # Create site-ad and info.  DagmanCreator should only be run in
+        # succession, never parallel for a task!
+        if os.path.exists("site.ad.json"):
+            with open("site.ad.json") as fd:
+                siteinfo = json.load(fd)
+        else:
+            siteinfo = {'group_sites': {}, 'group_datasites': {}}
+        if os.path.exists("site.ad"):
+            with open("site.ad") as fd:
+                sitead = classad.parse(fd)
+        else:
+            sitead = classad.ClassAd()
 
         blocksWithNoLocations = set()
         blocksWithBannedLocations = set()
@@ -778,7 +790,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 msg += " This is expected to result in DESIRED_SITES = %s" % (list(available))
                 self.logger.debug(msg)
 
-            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, list(jgblocks)[0], availablesites, datasites, outfiles, startjobid, subjob=subjob, stage=stage)
+            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, list(jgblocks)[0], availablesites, datasites, outfiles, startjobid, parent=parent, stage=stage)
             dagSpecs += jobgroupDagSpecs
 
         def getBlacklistMsg():
@@ -820,16 +832,31 @@ class DagmanCreator(TaskAction.TaskAction):
                 resthost=kwargs['task']['resthost'],
                 resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
         if stage == 'probe':
-            # We want only one probe job
-            dagSpecs = dagSpecs[:1]
+            dagSpecs = dagSpecs[:getattr(self.config.TaskWorker, 'numAutomaticProbes', 5)]
         for dagSpec in dagSpecs:
             dag += DAG_FRAGMENT.format(**dagSpec)
-            if stage == 'probe' or (stage == 'process' and kwargs['task']['completion_jobs']):
-                dag += SUBDAG_FRAGMENT.format(**dagSpec)
-                subdag = "RunJobs{0}.subdag".format(dagSpec['count'])
+        if stage in ('probe', 'processing'):
+            # default for probe DAG: only one processing DAG after 100% of the probe jobs have completed
+            subdagCompletions = [100]
+            nextStage = {'probe': 'processing', 'processing': 'tail'}[stage]
+
+            if stage == 'processing' and len(dagSpec) > getattr(self.config.TaskWorker, 'minAutomaticTailSize', 100):
+                subdagCompletions = getattr(self.config.TaskWorker, 'minAutomaticTailTriggers', [50, 80, 100])
+
+            for n, percent in enumerate(subdagCompletions, 0 if stage == 'probe' else 1):
+                subdagSpec = {
+                    'count': n,
+                    'stage': nextStage,
+                    'completion': (len(dagSpec) * 100) // percent
+                }
+                dag += SUBDAG_FRAGMENT.format(**subdagSpec)
+                subdag = "RunJobs{count}.subdag".format(**subdagSpec)
                 with open(subdag, "w") as fd:
                     fd.write("")
                 subdags.append(subdag)
+            nums = range(subdagCompletions)
+            for parent, child in zip(nums, nums[1:]):
+                dag += SUBDAG_INHERITANCE.format(parent=parent, child=child)
 
         ## Create a tarball with all the job lumi files.
         with getLock('splitting_data'):
@@ -879,16 +906,19 @@ class DagmanCreator(TaskAction.TaskAction):
             ## Cache task information
             with open("taskinformation.pkl", "wb") as fd:
                 pickle.dump(kwargs['task'], fd)
+
+            ## Cache TaskWorker configuration
+            with open("taskworkerconfig.pkl", "wb") as fd:
+                pickle.dump(self.config, fd)
         else:
             name = "RunJobs{0}.subdag".format(parent)
 
-        if stage != 'tail':
-            ## Cache site information
-            with open("site.ad", "w") as fd:
-                fd.write(str(sitead))
+        ## Cache site information
+        with open("site.ad", "w") as fd:
+            fd.write(str(sitead))
 
-            with open("site.ad.json", "w") as fd:
-                json.dump(siteinfo, fd)
+        with open("site.ad.json", "w") as fd:
+            json.dump(siteinfo, fd)
 
         ## Save the DAG into a file.
         with open(name, "w") as fd:
@@ -1057,7 +1087,8 @@ class DagmanCreator(TaskAction.TaskAction):
             params = self.sendDashboardTask()
 
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
-                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'run_and_lumis.tar.gz', 'input_files.tar.gz']
+                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',
+                      'run_and_lumis.tar.gz', 'input_files.tar.gz']
 
         self.extractMonitorFiles(inputFiles, **kw)
 
