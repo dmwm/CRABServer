@@ -23,6 +23,7 @@ import os
 import re
 import sys
 import glob
+import errno
 import pickle
 import logging
 import subprocess
@@ -37,11 +38,21 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 #TODO In general better logging and documentation
 
 class PreDAG:
-    def __init__(self, stage_, completion_, prefix_):
-        """ Iinit method """
-        self.stage, self.completion, self.prefix = stage_, completion_, prefix_
-        self.statusCacheInfo = None #Will be filled with the status from the status cache
+    def __init__(self):
+        """
+        PreDAG constructor.
+        """
+        self.stage = None
+        self.completion = None
+        self.prefix = None
         self.logger = logging.getLogger()
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", \
+                                      datefmt = "%a, %d %b %Y %H:%M:%S %Z(%z)")
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.propagate = False
 
     def readJobStatus(self):
         """ Read the job status(es) from the cache_status file
@@ -69,9 +80,36 @@ class PreDAG:
                     return True
         return False
 
-    def main(self):
-        """ The main method return 4 if the "completion" threshold is not reached, 0 otherwise
+    def execute(self, *args):
+        """ The execution method return 4 if the "completion" threshold is not reached, 0 otherwise
         """
+        self.stage = args[0]
+        self.completion = args[1]
+        self.prefix = args[2]
+
+        ## Create a directory in the schedd where to store the predag logs.
+        logpath = os.path.join(os.getcwd(), "prejob_logs")
+        try:
+            os.makedirs(logpath)
+        except OSError as ose:
+            if ose.errno != errno.EEXIST:
+                logpath = os.getcwd()
+        ## Create (open) the pre-dag log file predag.<prefix>.txt.
+        predag_log_file_name = os.path.join(logpath, "predag.{0}.txt".format(self.prefix))
+        fd_predag_log = os.open(predag_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
+        os.chmod(predag_log_file_name, 0o644)
+
+        ## Redirect stdout and stderr to the pre-dag log file.
+        if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
+            print("Pre-DAG started with no output redirection.")
+        else:
+            os.dup2(fd_predag_log, 1)
+            os.dup2(fd_predag_log, 2)
+            msg = "Pre-DAG started with output redirected to %s" % (predag_log_file_name)
+            self.logger.info(msg)
+
+        self.statusCacheInfo = None #Will be filled with the status from the status cache
+
         self.readJobStatus()
         if not self.hitCompletionThreshold():
             pass
@@ -142,8 +180,4 @@ class PreDAG:
 
 
 if __name__ == '__main__':
-    stage = sys.argv[1]
-    completion = int(sys.argv[2])
-    prefix = sys.argv[3]
-    predag = PreDAG(stage, completion, prefix)
-    sys.exit(predag.main())
+    sys.exit(PreDAG().execute(sys.argv[1:]))

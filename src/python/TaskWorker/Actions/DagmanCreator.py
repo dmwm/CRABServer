@@ -61,7 +61,7 @@ ABORT-DAG-ON Job{count} 3
 
 SUBDAG_FRAGMENT = """
 SUBDAG EXTERNAL Job{count}SubJobs RunJobs{count}.subdag
-SCRIPT DEFER 4 900 PRE Job{count}SubJobs PreDAG.py {stage} {completion} {count}
+SCRIPT DEFER 4 900 PRE Job{count}SubJobs dag_bootstrap.sh PREDAG {stage} {completion} {count}
 """
 SUBDAG_INHERITANCE = """
 PARENT Job{parent}SubJobs CHILD Job{child}SubJobs
