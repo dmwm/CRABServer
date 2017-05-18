@@ -2177,6 +2177,7 @@ class PostJob():
             msg = "Uploading output metadata for %s to https://%s: %s" % (lfn, rest_url, configreq)
             self.logger.debug(msg)
             try:
+                configreq = dict(configreq)
                 self.server.put(rest_uri, data = encodeRequest(configreq))
             except HTTPException as hte:
                 msg = "Error uploading input file metadata: %s" % (str(hte.headers))

@@ -58,6 +58,8 @@ class PreDAG:
         """ Read the job status(es) from the cache_status file
         """
         #XXX Maybe the status_cache filname should be in a variable in ServerUtilities?
+        if not os.path.exists("task_process/status_cache.txt"):
+            return
         with open("task_process/status_cache.txt") as fd:
             fileContent = fd.read()
             #TODO Splitting '\n' and accessing the second element is really fragile.
@@ -74,7 +76,7 @@ class PreDAG:
         completedCount = 0
         for jobnr, jobdict in self.statusCacheInfo.iteritems():
             state = jobdict.get('State')
-            if stagere[stage].match(jobnr) and state == 'finished':
+            if stagere[self.stage].match(jobnr) and state == 'finished':
                 completedCount += 1
                 if completedCount == completion:
                     return True
@@ -108,12 +110,11 @@ class PreDAG:
             msg = "Pre-DAG started with output redirected to %s" % (predag_log_file_name)
             self.logger.info(msg)
 
-        self.statusCacheInfo = None #Will be filled with the status from the status cache
+        self.statusCacheInfo = {} #Will be filled with the status from the status cache
 
         self.readJobStatus()
         if not self.hitCompletionThreshold():
-            pass
-            #return 4
+            return 4
         with open('datadiscovery.pkl', 'rb') as fd:
             dataset = pickle.load(fd)
         with open('taskinformation.pkl', 'rb') as fd:
@@ -160,7 +161,7 @@ class PreDAG:
                 return 1
             try:
                 creator = DagmanCreator(config, server=None, resturi='')
-                _, _, subdags = creator.createSubdag(split_result.result, task=task, startjobid=0, stage='process')
+                _, _, subdags = creator.createSubdag(split_result.result, task=task, parent=None, stage='process')
                 subdags.append('RunJobs0.subdag')
                 self.createSubdagSubmission(subdags, getattr(config.TaskWorker, 'maxPost', 20))
             except TaskWorkerException as e:
