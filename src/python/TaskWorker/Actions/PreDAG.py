@@ -78,15 +78,16 @@ class PreDAG:
             state = jobdict.get('State')
             if stagere[self.stage].match(jobnr) and state == 'finished':
                 completedCount += 1
-                if completedCount == completion:
+                if completedCount == self.completion:
                     return True
+        self.logger.info("found {0} completed jobs".format(completedCount))
         return False
 
     def execute(self, *args):
         """ The execution method return 4 if the "completion" threshold is not reached, 0 otherwise
         """
         self.stage = args[0]
-        self.completion = args[1]
+        self.completion = int(args[1])
         self.prefix = args[2]
 
         ## Create a directory in the schedd where to store the predag logs.
@@ -119,12 +120,8 @@ class PreDAG:
             dataset = pickle.load(fd)
         with open('taskinformation.pkl', 'rb') as fd:
             task = pickle.load(fd)
-#        with open('taskworkerconfig.pkl', 'rb') as fd:
-#            twconf = pickle.load(fd)
-        #TODO Get the config uncommenting the upper two lines
-        config = Configuration()
-        config.TaskWorker = ConfigSection(name="TaskWorker")
-        config.TaskWorker.maxJobsPerTask = task['tm_split_args']['job_limit']
+        with open('taskworkerconfig.pkl', 'rb') as fd:
+            config = pickle.load(fd)
         maxpost = getattr(config.TaskWorker, 'maxPost', 20)
 
         #TODO refactor

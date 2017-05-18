@@ -846,7 +846,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 subdagSpec = {
                     'count': n,
                     'stage': nextStage,
-                    'completion': (len(dagSpec) * 100) // percent
+                    'completion': (len(dagSpecs) * 100) // percent
                 }
                 dag += SUBDAG_FRAGMENT.format(**subdagSpec)
                 subdag = "RunJobs{count}.subdag".format(**subdagSpec)
