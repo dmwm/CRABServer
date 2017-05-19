@@ -1657,12 +1657,24 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def adjustLumisForCompletion(self, task):
+    def saveAutomaticSplittingData(self):
         """
         Sets the run, lumi information in the task information for the
         completion jobs.  Returns True if completion jobs are needed,
         otherwise False.
         """
+        if self.stage == 'tail':
+            return
+
+        throughputFileName = "automatic_splitting/throughputs/{0}".format(self.job_id)
+        if not os.path.exists(os.path.dirname(throughputFileName)):
+            os.makedirs(os.path.dirname(throughputFileName))
+        with open(throughputFileName, 'w') as fd:
+            report = self.job_report['steps']['cmsRun']['performance']
+            fd.write(report['cpu']['EventThroughput'])
+
+        if self.stage == 'probe':
+            return
         self.logger.info("====== Starting to parse the lumi file")
         try:
             tmpdir = tempfile.mkdtemp()
@@ -1686,16 +1698,12 @@ class PostJob():
         self.logger.info("Difference in lumis:            {0}".format(len(missing.getLumis())))
         if len(missing.getLumis()) == 0:
             # we don't want to create the subjobs if the job processed everything
-            return False
-        missing_compact = missing.getCompactList()
-        runs = missing.getRuns()
-        lumis = [",".join(map(str, reduce(lambda x, y:x + y, missing_compact[run]))) for run in runs]
-
-        task['tm_split_args']['runs'] = runs
-        task['tm_split_args']['lumis'] = lumis
-
-        return True
-
+            return
+        missingLumisFileName = "automatic_splitting/missing_lumis/{0}".format(self.job_id)
+        if not os.path.exists(os.path.dirname(missingLumisFileName)):
+            os.makedirs(os.path.dirname(missingLumisFileName))
+        with open(missingLumisFileName, 'w') as fd:
+            fd.write(str(missing))
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1790,6 +1798,11 @@ class PostJob():
             retmsg = "Failure parsing the job report."
             return JOB_RETURN_CODES.FATAL_ERROR, retmsg
         self.logger.info("====== Finished to parse job report.")
+
+        self.logger.info("====== Starting saving data for automatic splitting.")
+        self.saveAutomaticSplittingData()
+        self.logger.info("====== Finished saving data for automatic splitting.")
+
         ## If this is a deferred post-job execution, put back the log level to DEBUG.
         if not first_pj_execution():
             self.logger.setLevel(logging.DEBUG)
@@ -2427,13 +2440,6 @@ class PostJob():
         self.fill_output_files_info() ## Fill self.output_files_info by parsing the job report.
         self.aso_start_time = self.job_report.get("aso_start_time", None)
         self.aso_start_timestamp = self.job_report.get("aso_start_timestamp", None)
-
-        throughputFileName = "automatic_splitting/throughputs/{0}".format(self.job_id)
-        if not os.path.exists(os.path.dirname(throughputFileName)):
-            os.makedirs(os.path.dirname(throughputFileName))
-        with open(throughputFileName, 'w') as fd:
-            report = self.job_report['steps']['cmsRun']['performance']
-            fd.write(report['cpu']['EventThroughput'])
 
         return 0
 

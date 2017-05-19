@@ -22,6 +22,7 @@ from __future__ import print_function
 import os
 import re
 import sys
+import json
 import glob
 import errno
 import pickle
@@ -29,8 +30,8 @@ import logging
 import subprocess
 
 from ast import literal_eval
-from WMCore.Configuration import Configuration
-from WMCore.Configuration import ConfigSection
+from WMCore.DataStructs.LumiList import LumiList
+
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.WorkerExceptions import TaskWorkerException
@@ -140,33 +141,35 @@ class PreDAG:
                     count += 1
             eventsThr = sumEventsThr / count
             events = int(target * eventsThr)
-            task['tm_split_algo'] = 'EventAwareLumiBased'
-            task['tm_split_args']['events_per_job'] = events
+        elif self.stage == 'tail':
+            target = self.config.TaskWorker.automaticTailRuntime
+        task['tm_split_algo'] = 'EventAwareLumiBased'
+        task['tm_split_args']['events_per_job'] = events
 
-            try:
-                config.TaskWorker.scratchDir = './scratchdir' # XXX
-                splitter = Splitter(config, server=None, resturi='')
-                split_result = splitter.execute(dataset, task=task)
-                self.logger.info("Splitting results:")
-                for g in split_result.result[0]:
-                    msg = "Created jobgroup with length {0}".format(len(g.getJobs()))
-                    self.logger.info(msg)
-            except TaskWorkerException as e:
-                self.logger.error("Error during splitting:\n{0}".format(e))
-                self.set_dashboard_state('FAILED')
-                retmsg = "Splitting failed with:\n{0}".format(e)
-                return 1
-            try:
-                creator = DagmanCreator(config, server=None, resturi='')
-                parent = self.prefix if self.stage == 'tail' else None
-                _, _, subdags = creator.createSubdag(split_result.result, task=task, parent=parent, stage='processing')
-                self.logger.info("creating following subdags: {0}".format(", ".join(subdags)))
-                self.createSubdagSubmission(subdags, getattr(config.TaskWorker, 'maxPost', 20))
-            except TaskWorkerException as e:
-                self.logger.error('Error during subdag creation\n{0}'.format(e))
-                self.set_dashboard_state('FAILED')
-                retmsg = "DAG creation failed with:\n{0}".format(e)
-                return 1
+        try:
+            config.TaskWorker.scratchDir = './scratchdir' # XXX
+            splitter = Splitter(config, server=None, resturi='')
+            split_result = splitter.execute(dataset, task=task)
+            self.logger.info("Splitting results:")
+            for g in split_result.result[0]:
+                msg = "Created jobgroup with length {0}".format(len(g.getJobs()))
+                self.logger.info(msg)
+        except TaskWorkerException as e:
+            self.logger.error("Error during splitting:\n{0}".format(e))
+            self.set_dashboard_state('FAILED')
+            retmsg = "Splitting failed with:\n{0}".format(e)
+            return 1
+        try:
+            creator = DagmanCreator(config, server=None, resturi='')
+            parent = self.prefix if self.stage == 'tail' else None
+            _, _, subdags = creator.createSubdag(split_result.result, task=task, parent=parent, stage='processing')
+            self.logger.info("creating following subdags: {0}".format(", ".join(subdags)))
+            self.createSubdagSubmission(subdags, getattr(config.TaskWorker, 'maxPost', 20))
+        except TaskWorkerException as e:
+            self.logger.error('Error during subdag creation\n{0}'.format(e))
+            self.set_dashboard_state('FAILED')
+            retmsg = "DAG creation failed with:\n{0}".format(e)
+            return 1
         return 0
 
     def createSubdagSubmission(self, subdags, maxpost):
@@ -175,6 +178,51 @@ class PreDAG:
             subprocess.check_call(['condor_submit_dag', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', '1000',
                 '-MaxPost', str(maxpost), '-no_submit', '-insert_sub_file', 'subdag.ad',
                 '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), dag), dag])
+
+    def adjustLumisForCompletion(self, task):
+        """
+        Sets the run, lumi information in the task information for the
+        completion jobs.  Returns True if completion jobs are needed,
+        otherwise False.
+        """
+        cacheFileName = "automatic_splitting/processed"
+        missingDir = "automatic_splitting/missing_lumis/" #TODO in ServerUtilities to be shared with PJ
+
+        try:
+            with open(cacheFileName) as fd:
+                processed = set(json.load(fd))
+        except IOError:
+            processed = set()
+
+        try:
+            available = set(os.listdir(missingDir)) - processed
+        except OSError:
+            available = set()
+
+        missing = LumiList()
+        for missingFile in available:
+            with open(os.path.join(missingDir, missingFile)) as fd:
+                missing = missing + LumiList(literal_eval(fd.read()))
+        missing_compact = missing.getCompactList()
+        runs = missing.getRuns()
+        #Compact list is like
+        #{
+        #'1': [[1, 33], [35, 35], [37, 47], [49, 75], [77, 130], [133, 136]],
+        #'2':[[1,45],[50,80]]
+        #}
+        #Now we turn lumis it into something like:
+        #lumis=['1, 33, 35, 35, 37, 47, 49, 75, 77, 130, 133, 136','1,45,50,80']
+        #which is the format expected by buildLumiMask in the splitting algorithm
+        lumis = [",".join(map(str, reduce(lambda x, y:x + y, missing_compact[run]))) for run in runs]
+
+        task['tm_split_args']['runs'] = runs
+        task['tm_split_args']['lumis'] = lumis
+
+        #Save the cache
+        with open(cacheFileName, 'w') as fd:
+            json.dump(list(processed) + list(available), fd)
+
+        return True
 
 
 
