@@ -827,7 +827,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         ## Write down the DAG as needed by DAGMan.
         dag = DAG_HEADER.format(
-                nodestate='' if not parent else '.{0}'.format(parent),
+                nodestate='.{0}'.format(parent) if parent else ('.0' if stage == 'processing' else ''),
                 resthost=kwargs['task']['resthost'],
                 resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
         if stage == 'probe':

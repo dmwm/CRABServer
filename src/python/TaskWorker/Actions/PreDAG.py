@@ -142,7 +142,7 @@ class PreDAG:
             eventsThr = sumEventsThr / count
             events = int(target * eventsThr)
         elif self.stage == 'tail':
-            target = self.config.TaskWorker.automaticTailRuntime
+            target = getattr(self.config.TaskWorker, 'automaticTailRuntime', 45 * 60)
         task['tm_split_algo'] = 'EventAwareLumiBased'
         task['tm_split_args']['events_per_job'] = events
 
@@ -163,6 +163,8 @@ class PreDAG:
             creator = DagmanCreator(config, server=None, resturi='')
             parent = self.prefix if self.stage == 'tail' else None
             _, _, subdags = creator.createSubdag(split_result.result, task=task, parent=parent, stage='processing')
+            if self.stage == 'processing':
+                subdags.append('RunJobs0.subdag')
             self.logger.info("creating following subdags: {0}".format(", ".join(subdags)))
             self.createSubdagSubmission(subdags, getattr(config.TaskWorker, 'maxPost', 20))
         except TaskWorkerException as e:
