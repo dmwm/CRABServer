@@ -158,8 +158,9 @@ class PreDAG:
                 return 1
             try:
                 creator = DagmanCreator(config, server=None, resturi='')
-                _, _, subdags = creator.createSubdag(split_result.result, task=task, parent=None, stage='process')
-                subdags.append('RunJobs0.subdag')
+                parent = self.prefix if self.stage == 'tail' else None
+                _, _, subdags = creator.createSubdag(split_result.result, task=task, parent=parent, stage='processing')
+                self.logger.info("creating following subdags: {0}".format(", ".join(subdags)))
                 self.createSubdagSubmission(subdags, getattr(config.TaskWorker, 'maxPost', 20))
             except TaskWorkerException as e:
                 self.logger.error('Error during subdag creation\n{0}'.format(e))

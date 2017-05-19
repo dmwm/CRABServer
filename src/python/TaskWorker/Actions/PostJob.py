@@ -2427,6 +2427,14 @@ class PostJob():
         self.fill_output_files_info() ## Fill self.output_files_info by parsing the job report.
         self.aso_start_time = self.job_report.get("aso_start_time", None)
         self.aso_start_timestamp = self.job_report.get("aso_start_timestamp", None)
+
+        throughputFileName = "automatic_splitting/throughputs/{0}".format(self.job_id)
+        if not os.path.exists(os.path.dirname(throughputFileName)):
+            os.makedirs(os.path.dirname(throughputFileName))
+        with open(throughputFileName, 'w') as fd:
+            report = self.job_report['steps']['cmsRun']['performance']
+            fd.write(report['cpu']['EventThroughput'])
+
         return 0
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
