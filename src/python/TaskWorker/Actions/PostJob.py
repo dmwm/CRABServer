@@ -2775,6 +2775,7 @@ class PostJob():
             job['doc']["timestamp"] = int(time.time())
             archiveDoc = createArchiverDoc(job)
             archiveDoc['task'] = self.reqname
+            archiveDoc["meta_data"]['crab_id'] = self.job_id
         with open(G_WMARCHIVE_REPORT_NAME_NEW, 'w') as fd:
             json.dump(archiveDoc, fd)
         if not os.path.isdir(WMARCHIVE_BASE_LOCATION):
