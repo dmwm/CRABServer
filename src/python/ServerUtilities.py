@@ -369,7 +369,7 @@ def encodeRequest(configreq, listParams=[]):
                 encodedLists += ('&%s=' % lparam) + ('&%s=' % lparam).join(map(urllib.quote, configreq[lparam]))
             del configreq[lparam]
     #Make sure parameters we encode are streing. Otherwise u'IamAstring' may become 'uIamAstring' in the DB
-    for k, v in configreq.iteritems():
+    for k, v in dict(configreq).iteritems():
         if isinstance(v, basestring):
             configreq[k] = str(v)
         if isinstance(v, list):
