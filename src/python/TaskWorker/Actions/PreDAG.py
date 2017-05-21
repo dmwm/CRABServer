@@ -67,22 +67,37 @@ class PreDAG:
             #It is what it is done in the client though, but we should change it
             self.statusCacheInfo = literal_eval(fileContent.split('\n')[2])
 
-    def hitCompletionThreshold(self):
+    def readProcessedJobs(self):
+        """
+        Read processed job ids
+        """
+        if not os.path.exists("automatic_splitting/processed"):
+            self.processedJobs = set()
+            return
+        with open("automatic_splitting/processed", "rb") as fd:
+            self.processedJobs = pickle.load(fd)
+
+    def saveProcessedJobs(self, jobs):
+        """
+        Update processed job ids
+        """
+        with open("automatic_splitting/processed", "wb") as fd:
+            pickle.dump(self.processedJobs.union(jobs), fd)
+
+    def completedJobs(self):
         """ The method checks if N==completion jobs are in the 'finished' state
             If so it returns True, otherwise it returns False
         """
         stagere = {}
         stagere['processing'] = re.compile(r"^0-\d+$")
-        stagere['completion'] = re.compile(r"^[1-9]\d+$")
+        stagere['tail'] = re.compile(r"^[1-9]\d*$")
         completedCount = 0
         for jobnr, jobdict in self.statusCacheInfo.iteritems():
             state = jobdict.get('State')
             if stagere[self.stage].match(jobnr) and state == 'finished':
                 completedCount += 1
-                if completedCount == self.completion:
-                    return True
+                yield jobnr
         self.logger.info("found {0} completed jobs".format(completedCount))
-        return False
 
     def execute(self, *args):
         """ The execution method return 4 if the "completion" threshold is not reached, 0 otherwise
@@ -115,8 +130,12 @@ class PreDAG:
         self.statusCacheInfo = {} #Will be filled with the status from the status cache
 
         self.readJobStatus()
-        if not self.hitCompletionThreshold():
+        self.readProcessedJobs()
+        completed = set(self.completedJobs())
+        if len(completed) < self.completion:
             return 4
+        unprocessed = completed - self.processedJobs
+
         with open('datadiscovery.pkl', 'rb') as fd:
             dataset = pickle.load(fd)
         with open('taskinformation.pkl', 'rb') as fd:
@@ -126,25 +145,32 @@ class PreDAG:
         maxpost = getattr(config.TaskWorker, 'maxPost', 20)
 
         #TODO refactor
+        # Read the automatic_splitting/throughputs/0-N files where the PJ
+        # saved the EventThroughput (report['steps']['cmsRun']['performance']['cpu']['EventThroughput'])
+        sumEventsThr = 0
+        count = 0
+        for jid in unprocessed:
+            fn = "automatic_splitting/throughputs/{0}".format(jid)
+            with open(fn) as fd:
+                sumEventsThr += float(fd.read())
+                count += 1
+        eventsThr = sumEventsThr / count
+        self.logger.info("average throughput for {1} jobs: {0}".format(eventsThr, count))
         if self.stage == "processing":
             # Build in a 33% error margin in the runtime to not create too
             # many tails. This essentially moves the peak to lower
             # runtimes and cuts off less of the job distribution tail.
             target = int(0.75 * task['tm_split_args']['seconds_per_job'])
-            # Read the automatic_splitting/throughputs/0-N files where the PJ
-            # saved the EventThroughput (report['steps']['cmsRun']['performance']['cpu']['EventThroughput'])
-            sumEventsThr = 0
-            count = 0
-            for fn in glob.glob("automatic_splitting/throughputs/0-*"):
-                with open(fn) as fd:
-                    sumEventsThr += float(fd.read())
-                    count += 1
-            eventsThr = sumEventsThr / count
-            events = int(target * eventsThr)
         elif self.stage == 'tail':
-            target = getattr(self.config.TaskWorker, 'automaticTailRuntime', 45 * 60)
+            target = getattr(config.TaskWorker, 'automaticTailRuntime', 45 * 60)
+        events = int(target * eventsThr)
         task['tm_split_algo'] = 'EventAwareLumiBased'
         task['tm_split_args']['events_per_job'] = events
+
+        if not self.adjustLumisForCompletion(task, unprocessed):
+            self.logger.info("nothing to process for completion")
+            self.saveProcessedJobs(unprocessed)
+            return 0
 
         try:
             config.TaskWorker.scratchDir = './scratchdir' # XXX
@@ -162,7 +188,7 @@ class PreDAG:
         try:
             creator = DagmanCreator(config, server=None, resturi='')
             parent = self.prefix if self.stage == 'tail' else None
-            _, _, subdags = creator.createSubdag(split_result.result, task=task, parent=parent, stage='processing')
+            _, _, subdags = creator.createSubdag(split_result.result, task=task, parent=parent, stage=self.stage)
             if self.stage == 'processing':
                 subdags.append('RunJobs0.subdag')
             self.logger.info("creating following subdags: {0}".format(", ".join(subdags)))
@@ -172,6 +198,7 @@ class PreDAG:
             self.set_dashboard_state('FAILED')
             retmsg = "DAG creation failed with:\n{0}".format(e)
             return 1
+        self.saveProcessedJobs(unprocessed)
         return 0
 
     def createSubdagSubmission(self, subdags, maxpost):
@@ -181,25 +208,21 @@ class PreDAG:
                 '-MaxPost', str(maxpost), '-no_submit', '-insert_sub_file', 'subdag.ad',
                 '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), dag), dag])
 
-    def adjustLumisForCompletion(self, task):
+    def adjustLumisForCompletion(self, task, unprocessed):
         """
         Sets the run, lumi information in the task information for the
         completion jobs.  Returns True if completion jobs are needed,
         otherwise False.
         """
-        cacheFileName = "automatic_splitting/processed"
         missingDir = "automatic_splitting/missing_lumis/" #TODO in ServerUtilities to be shared with PJ
 
         try:
-            with open(cacheFileName) as fd:
-                processed = set(json.load(fd))
-        except IOError:
-            processed = set()
-
-        try:
-            available = set(os.listdir(missingDir)) - processed
+            available = set(os.listdir(missingDir)) & processed
         except OSError:
             available = set()
+
+        if len(available) == 0:
+            return False
 
         missing = LumiList()
         for missingFile in available:
@@ -219,10 +242,6 @@ class PreDAG:
 
         task['tm_split_args']['runs'] = runs
         task['tm_split_args']['lumis'] = lumis
-
-        #Save the cache
-        with open(cacheFileName, 'w') as fd:
-            json.dump(list(processed) + list(available), fd)
 
         return True
 
