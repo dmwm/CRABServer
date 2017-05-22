@@ -839,7 +839,7 @@ class DagmanCreator(TaskAction.TaskAction):
             subdagCompletions = [100]
             nextStage = {'probe': 'processing', 'processing': 'tail'}[stage]
 
-            if stage == 'processing' and len(dagSpec) > getattr(self.config.TaskWorker, 'minAutomaticTailSize', 100):
+            if stage == 'processing' and len(dagSpecs) > getattr(self.config.TaskWorker, 'minAutomaticTailSize', 100):
                 subdagCompletions = getattr(self.config.TaskWorker, 'minAutomaticTailTriggers', [50, 80, 100])
 
             for n, percent in enumerate(subdagCompletions, 0 if stage == 'probe' else 1):
