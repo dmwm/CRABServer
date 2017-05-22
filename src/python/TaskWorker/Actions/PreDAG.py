@@ -135,6 +135,7 @@ class PreDAG:
         if len(completed) < self.completion:
             return 4
         unprocessed = completed - self.processedJobs
+        self.logger.info("jobs remaining to process: {0}".format(", ".join(unprocessed)))
 
         with open('datadiscovery.pkl', 'rb') as fd:
             dataset = pickle.load(fd)
@@ -167,7 +168,7 @@ class PreDAG:
         task['tm_split_algo'] = 'EventAwareLumiBased'
         task['tm_split_args']['events_per_job'] = events
 
-        if not self.adjustLumisForCompletion(task, unprocessed):
+        if self.stage == 'tail' and not self.adjustLumisForCompletion(task, unprocessed):
             self.logger.info("nothing to process for completion")
             self.saveProcessedJobs(unprocessed)
             return 0
