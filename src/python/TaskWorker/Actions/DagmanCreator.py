@@ -846,14 +846,14 @@ class DagmanCreator(TaskAction.TaskAction):
                 subdagSpec = {
                     'count': n,
                     'stage': nextStage,
-                    'completion': (len(dagSpecs) * 100) // percent
+                    'completion': (len(dagSpecs) * percent) // 100
                 }
                 dag += SUBDAG_FRAGMENT.format(**subdagSpec)
                 subdag = "RunJobs{count}.subdag".format(**subdagSpec)
                 with open(subdag, "w") as fd:
                     fd.write("")
                 subdags.append(subdag)
-            nums = range(len(subdagCompletions))
+            nums = range(1, len(subdagCompletions) + 1)
             for parent, child in zip(nums, nums[1:]):
                 dag += SUBDAG_INHERITANCE.format(parent=parent, child=child)
 
