@@ -63,9 +63,6 @@ SUBDAG_FRAGMENT = """
 SUBDAG EXTERNAL Job{count}SubJobs RunJobs{count}.subdag
 SCRIPT DEFER 4 300 PRE Job{count}SubJobs dag_bootstrap.sh PREDAG {stage} {completion} {count}
 """
-SUBDAG_INHERITANCE = """
-PARENT Job{parent}SubJobs CHILD Job{child}SubJobs
-"""
 
 JOB_SUBMIT = \
 """
@@ -853,9 +850,6 @@ class DagmanCreator(TaskAction.TaskAction):
                 with open(subdag, "w") as fd:
                     fd.write("")
                 subdags.append(subdag)
-            nums = range(1, len(subdagCompletions) + 1)
-            for parent, child in zip(nums, nums[1:]):
-                dag += SUBDAG_INHERITANCE.format(parent=parent, child=child)
 
         ## Create a tarball with all the job lumi files.
         with getLock('splitting_data'):
