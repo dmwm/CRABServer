@@ -25,7 +25,7 @@ cp $BASEDIR/../scripts/gWMS-CMSRunAnalysis.sh $STARTDIR || exit 3
 rm -rf $WMCOREDIR && mkdir -p $WMCOREDIR
 rm -rf $CRABSERVERDIR && mkdir -p $CRABSERVERDIR
 
-if [[ -n "$CRAB_OVERRIDE_SOURCE" ]]; then 
+if [[ -n "$CRAB_OVERRIDE_SOURCE" ]]; then
     REPLACEMENT_ABSOLUTE=$(readlink -f $CRAB_OVERRIDE_SOURCE)
 elif [[ "x$1" != "x" ]]; then
     REPLACEMENT_ABSOLUTE=$(readlink -f $1)
