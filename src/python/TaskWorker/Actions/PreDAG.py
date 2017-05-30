@@ -218,7 +218,7 @@ class PreDAG:
         missingDir = "automatic_splitting/missing_lumis/" #TODO in ServerUtilities to be shared with PJ
 
         try:
-            available = set(os.listdir(missingDir)) & processed
+            available = set(os.listdir(missingDir)) & unprocessed
         except OSError:
             available = set()
 
