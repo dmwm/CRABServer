@@ -113,7 +113,7 @@ class PreDAG:
         """ Excecute executeInternal in locked mode
         """
         self.logger.debug("Acquiring PreDAG lock")
-        with getLock("/tmp/PreDAG") as _lock:
+        with getLock("PreDAG") as _lock:
             self.logger.debug("PreDAGlock acquired")
             self.executeInternal(*args)
         self.logger.debug("PreDAG lock released")
