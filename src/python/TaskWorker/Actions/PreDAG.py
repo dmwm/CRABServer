@@ -26,7 +26,10 @@ import json
 import glob
 import errno
 import pickle
+import shutil
 import logging
+import tarfile
+import tempfile
 import subprocess
 
 from ast import literal_eval
@@ -49,6 +52,7 @@ class PreDAG:
         self.prefix = None
         self.statusCacheInfo = None
         self.processedJobs = None
+        self.failedJobs = None
         self.logger = logging.getLogger()
         handler = logging.StreamHandler(sys.stdout)
         formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", \
@@ -88,16 +92,19 @@ class PreDAG:
             pickle.dump(self.processedJobs.union(jobs), fd)
 
     def completedJobs(self):
-        """ The method checks if N==completion jobs are in the 'finished' state
-            If so it returns True, otherwise it returns False
+        """ Yield job IDs of completed (finished or failed) jobs.  All
+            failed jobs are saved in self.failedJobs, too.
         """
+        self.failedJobs = []
         stagere = {}
         stagere['processing'] = re.compile(r"^0-\d+$")
         stagere['tail'] = re.compile(r"^[1-9]\d*$")
         completedCount = 0
         for jobnr, jobdict in self.statusCacheInfo.iteritems():
             state = jobdict.get('State')
-            if stagere[self.stage].match(jobnr) and state == 'finished':
+            if stagere[self.stage].match(jobnr) and state in ('finished', 'failed'):
+                if state == 'failed':
+                    self.failedJobs.append(jobnr)
                 completedCount += 1
                 yield jobnr
         self.logger.info("found {0} completed jobs".format(completedCount))
@@ -226,13 +233,27 @@ class PreDAG:
         except OSError:
             available = set()
 
-        if len(available) == 0:
+        failed = set(self.failedJobs) & unprocessed
+
+        if len(available) == 0 and len(failed) == 0:
             return False
 
         missing = LumiList()
         for missingFile in available:
             with open(os.path.join(missingDir, missingFile)) as fd:
                 missing = missing + LumiList(literal_eval(fd.read()))
+        for failedId in failed:
+            try:
+                tmpdir = tempfile.mkdtemp()
+                f = tarfile.open("run_and_lumis.tar.gz")
+                fn = "job_lumis_{0}.json".format(failedId)
+                f.extract(fn, path=tmpdir)
+                with open(os.path.join(tmpdir, fn)) as fd:
+                    injson = json.load(fd)
+                    missing = missing + LumiList(compactList=injson)
+            finally:
+                f.close()
+                shutil.rmtree(tmpdir)
         missing_compact = missing.getCompactList()
         runs = missing.getRuns()
         #Compact list is like
