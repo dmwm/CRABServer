@@ -170,6 +170,8 @@ class PreDAG:
         sumEventsThr = 0
         count = 0
         for jid in unprocessed:
+            if jid in self.failedJobs:
+                continue
             fn = "automatic_splitting/throughputs/{0}".format(jid)
             with open(fn) as fd:
                 sumEventsThr += float(fd.read())
