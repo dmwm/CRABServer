@@ -110,6 +110,15 @@ class PreDAG:
         self.logger.info("found {0} completed jobs".format(completedCount))
 
     def execute(self, *args):
+        """ Excecute executeInternal in locked mode
+        """
+        self.logger.debug("Acquiring PreDAG lock")
+        with getLock("/tmp/PreDAG") as _lock:
+            self.logger.debug("PreDAGlock acquired")
+            self.executeInternal(*args)
+        self.logger.debug("PreDAG lock released")
+
+    def executeInternal(self, *args):
         """ The execution method return 4 if the "completion" threshold is not reached, 0 otherwise
         """
         self.stage = args[0]
@@ -274,9 +283,4 @@ class PreDAG:
 
 
 if __name__ == '__main__':
-    pd = PreDAG()
-    pd.logger.debug("Acquiring PreDAG lock")
-    with getLock("PreDAG") as _lock:
-        pd.logger.debug("PreDAG lock acquired")
-        sys.exit(pd.execute(sys.argv[1:]))
-    pd.logger.debug("PreDAG lock released")
+    sys.exit(PreDAG().execute(sys.argv[1:]))
