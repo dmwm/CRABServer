@@ -168,10 +168,11 @@ class PreDAG:
         elif self.stage == 'tail':
             target = getattr(config.TaskWorker, 'automaticTailRuntime', 45 * 60)
         events = int(target * eventsThr)
-        task['tm_split_algo'] = 'EventAwareLumiBased'
-        task['tm_split_args']['events_per_job'] = events
+        splitTask = dict(task)
+        splitTask['tm_split_algo'] = 'EventAwareLumiBased'
+        splitTask['tm_split_args']['events_per_job'] = events
 
-        if self.stage == 'tail' and not self.adjustLumisForCompletion(task, unprocessed):
+        if self.stage == 'tail' and not self.adjustLumisForCompletion(splitTask, unprocessed):
             self.logger.info("nothing to process for completion")
             self.saveProcessedJobs(unprocessed)
             return 0
@@ -179,7 +180,7 @@ class PreDAG:
         try:
             config.TaskWorker.scratchDir = './scratchdir' # XXX
             splitter = Splitter(config, server=None, resturi='')
-            split_result = splitter.execute(dataset, task=task)
+            split_result = splitter.execute(dataset, task=splitTask)
             self.logger.info("Splitting results:")
             for g in split_result.result[0]:
                 msg = "Created jobgroup with length {0}".format(len(g.getJobs()))
