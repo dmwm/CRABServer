@@ -115,8 +115,9 @@ class PreDAG:
         self.logger.debug("Acquiring PreDAG lock")
         with getLock("PreDAG") as _lock:
             self.logger.debug("PreDAGlock acquired")
-            self.executeInternal(*args)
+            retval = self.executeInternal(*args)
         self.logger.debug("PreDAG lock released")
+        return retval
 
     def executeInternal(self, *args):
         """ The execution method return 4 if the "completion" threshold is not reached, 0 otherwise
@@ -252,7 +253,8 @@ class PreDAG:
         missing = LumiList()
         for missingFile in available:
             with open(os.path.join(missingDir, missingFile)) as fd:
-                missing = missing + LumiList(literal_eval(fd.read()))
+                self.logger.info("Adding missing lumis from job %s", missingFile)
+                missing = missing + LumiList(compactList=literal_eval(fd.read()))
         for failedId in failed:
             try:
                 tmpdir = tempfile.mkdtemp()
@@ -262,6 +264,7 @@ class PreDAG:
                 with open(os.path.join(tmpdir, fn)) as fd:
                     injson = json.load(fd)
                     missing = missing + LumiList(compactList=injson)
+                    self.logger.info("Adding lumis from failed job %s", failedId)
             finally:
                 f.close()
                 shutil.rmtree(tmpdir)
