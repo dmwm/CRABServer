@@ -32,6 +32,7 @@ import subprocess
 from ast import literal_eval
 from WMCore.DataStructs.LumiList import LumiList
 
+from ServerUtilities import getLock
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.WorkerExceptions import TaskWorkerException
@@ -251,4 +252,9 @@ class PreDAG:
 
 
 if __name__ == '__main__':
-    sys.exit(PreDAG().execute(sys.argv[1:]))
+    pd = PreDAG()
+    pd.logger.debug("Acquiring PreDAG lock")
+    with getLock("PreDAG") as _lock:
+        pd.logger.debug("PreDAG lock acquired")
+        sys.exit(pd.execute(sys.argv[1:]))
+    pd.logger.debug("PreDAG lock released")
