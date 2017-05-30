@@ -46,6 +46,8 @@ class PreDAG:
         self.stage = None
         self.completion = None
         self.prefix = None
+        self.statusCacheInfo = None
+        self.processedJobs = None
         self.logger = logging.getLogger()
         handler = logging.StreamHandler(sys.stdout)
         formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", \
@@ -114,17 +116,17 @@ class PreDAG:
             if ose.errno != errno.EEXIST:
                 logpath = os.getcwd()
         ## Create (open) the pre-dag log file predag.<prefix>.txt.
-        predag_log_file_name = os.path.join(logpath, "predag.{0}.txt".format(self.prefix))
-        fd_predag_log = os.open(predag_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
-        os.chmod(predag_log_file_name, 0o644)
+        predagLogFileName = os.path.join(logpath, "predag.{0}.txt".format(self.prefix))
+        fdPredagLog = os.open(predagLogFileName, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
+        os.chmod(predagLogFileName, 0o644)
 
         ## Redirect stdout and stderr to the pre-dag log file.
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             print("Pre-DAG started with no output redirection.")
         else:
-            os.dup2(fd_predag_log, 1)
-            os.dup2(fd_predag_log, 2)
-            msg = "Pre-DAG started with output redirected to %s" % (predag_log_file_name)
+            os.dup2(fdPredagLog, 1)
+            os.dup2(fdPredagLog, 2)
+            msg = "Pre-DAG started with output redirected to %s" % (predagLogFileName)
             self.logger.info(msg)
 
         self.statusCacheInfo = {} #Will be filled with the status from the status cache
@@ -182,9 +184,9 @@ class PreDAG:
                 msg = "Created jobgroup with length {0}".format(len(g.getJobs()))
                 self.logger.info(msg)
         except TaskWorkerException as e:
-            self.logger.error("Error during splitting:\n{0}".format(e))
-            self.set_dashboard_state('FAILED')
             retmsg = "Splitting failed with:\n{0}".format(e)
+            self.logger.error(msg)
+            self.set_dashboard_state('FAILED')
             return 1
         try:
             creator = DagmanCreator(config, server=None, resturi='')
@@ -195,9 +197,9 @@ class PreDAG:
             self.logger.info("creating following subdags: {0}".format(", ".join(subdags)))
             self.createSubdagSubmission(subdags, getattr(config.TaskWorker, 'maxPost', 20))
         except TaskWorkerException as e:
-            self.logger.error('Error during subdag creation\n{0}'.format(e))
-            self.set_dashboard_state('FAILED')
             retmsg = "DAG creation failed with:\n{0}".format(e)
+            self.logger.error(retmsg)
+            self.set_dashboard_state('FAILED')
             return 1
         self.saveProcessedJobs(unprocessed)
         return 0

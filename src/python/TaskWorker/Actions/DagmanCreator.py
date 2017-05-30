@@ -968,17 +968,6 @@ class DagmanCreator(TaskAction.TaskAction):
             insertJobIdSid(jinfo, idx, taskid, 0)
             ml_info.append(jinfo)
 
-        # When running in standalone mode, we want to record the number of jobs in the task
-        if ('CRAB_ReqName' in kwargs['task']) and ('CRAB_UserDN' in kwargs['task']):
-            const = 'TaskType =?= \"ROOT\" && CRAB_ReqName =?= "%s" && CRAB_UserDN =?= "%s"' % (task_name, userdn)
-            cmd = "condor_qedit -const '%s' CRAB_JobCount %d" % (const, len(dagSpecs))
-            self.logger.debug("+ %s" % cmd)
-            status, output = commands.getstatusoutput(cmd)
-            if status:
-                self.logger.error(output)
-                self.logger.error("Failed to record the number of jobs.")
-                return 1
-
         return info, splitterResult, subdags
 
 
