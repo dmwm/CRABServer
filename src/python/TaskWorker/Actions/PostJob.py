@@ -462,7 +462,8 @@ class ASOServerJob(object):
         This is the main method in ASOServerJob. Should be called after initializing
         an instance.
         """
-        self.docs_in_transfer = self.inject_to_aso()
+        with getLock('get_transfers_statuses'):
+            self.docs_in_transfer = self.inject_to_aso()
         if self.docs_in_transfer == False:
             exmsg = "Couldn't upload document to ASO database"
             raise RuntimeError(exmsg)
