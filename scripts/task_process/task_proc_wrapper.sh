@@ -5,16 +5,16 @@ function cache_status {
 }
 
 function check_exit {
-    ARG_DAG_STATUS=$1
-    ARG_ENTERED_CUR_STATUS=$2
     # Checks if the TP can exit without losing any possible future updates to the status of the task
     # First checks that the DAG is in a final state
     # If that passes, checks if the dag has been in a final state for long enough (currently 24h)
     # It will echo 1 if TP can exit, otherwise 0
 
-    if [[ "$ARG_DAG_STATUS" != "1" && "$ARG_DAG_STATUS" != "2" && "$ARG_DAG_STATUS" != "init" && "$ARG_DAG_STATUS" ]]; then
+    # TP will only exit if the dag is not in a temporary state ( not idle(1) and not running(2) ), if at least one condor_q
+    # was performed (DAG_STATUS is not "init") and if the last perfomed condor_q was successfull (DAG_STATUS is not empty)
+    if [[ "$DAG_STATUS" != "1" && "$DAG_STATUS" != "2" && "$DAG_STATUS" != "init" && "$DAG_STATUS" ]]; then
         # If the dag is in a final state, check the age of ENTERED_CUR_STATUS.
-        echo $(( ( $(date +"%s") - $ARG_ENTERED_CUR_STATUS ) >  24 * 3600 ))
+        echo $(( ( $(date +"%s") - $ENTERED_CUR_STATUS ) > 24 * 3600))
         return
     fi
     # Cannot exit yet
@@ -91,7 +91,7 @@ do
     # simply returning empty. If the dag isn't actually in the queue anymore, the check for an existing caching script
     # at the start of the loop should catch that and exit.
     echo "Dag status code: $DAG_STATUS Entered current status date: $(date -d @$ENTERED_CUR_STATUS '+%Y/%m/%d %H:%M:%S %Z')"
-    if [ "$(check_exit $DAG_STATUS $ENTERED_CUR_STATUS)" == "1" ]; then
+    if [ "$(check_exit)" == "1" ]; then
         # Before we really decide to exit, we should run condor_q once more 
         # to get the latest info about DAG_STATUS and ENTERED_CUR_STATUS. Even though check_exit may pass successfully,
         # because we do condor_q only every 24h (and also wait for 24 hours after ENTERED_CUR_STATUS),
@@ -99,7 +99,7 @@ do
         # after our last condor_q, for example.
         echo "Running an extra condor_q check before exitting"
         perform_condorq
-        if [ "$(check_exit $DAG_STATUS $ENTERED_CUR_STATUS)" == "1" ]; then
+        if [ "$(check_exit)" == "1" ]; then
 
             echo "Dag has been in one of the final states for over 24 hours."
             echo "Caching the status one last time, removing the task_process/task_process_running file and exiting."
