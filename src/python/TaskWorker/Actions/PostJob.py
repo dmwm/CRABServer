@@ -110,7 +110,7 @@ G_JOB_REPORT_NAME_NEW = None
 G_WMARCHIVE_REPORT_NAME = None
 G_WMARCHIVE_REPORT_NAME_NEW = None
 G_ERROR_SUMMARY_FILE_NAME = "error_summary.json"
-G_FJR_PARSE_RESULTS_FILE_NAME= "task_process/fjr_parse_results.txt"
+G_FJR_PARSE_RESULTS_FILE_NAME = "task_process/fjr_parse_results.txt"
 
 def sighandler(*args):
     if ASO_JOB:
@@ -470,7 +470,7 @@ class ASOServerJob(object):
             self.logger.info("No files to transfer via ASO. Done!")
             return 0
         self.save_docs_in_transfer()
-        return self.check_transfers()
+        return 4
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -876,6 +876,7 @@ class ASOServerJob(object):
             # Without the second condition, we run the risk of using the previous stageout
             # attempts results.
             if (time.time() - last_query < 900) and (last_query > self.aso_start_timestamp):
+                self.logger.info("Using the cache since it is up to date (last_query=%s) and it is after we submitted the transfer (aso_start_timestamp=%s)", last_query, self.aso_start_timestamp)
                 query_view = False
                 if not last_succeded:
                     #no point in continuing if the last query failed. Just defer the PJ and retry later
@@ -886,6 +887,7 @@ class ASOServerJob(object):
             for doc_info in self.docs_in_transfer:
                 doc_id = doc_info['doc_id']
                 if doc_id not in aso_info.get("results", {}):
+                    self.logger.debug("Changing query_view back to true")
                     query_view = True
                     break
         if isCouchDBURL(self.aso_db_url):
