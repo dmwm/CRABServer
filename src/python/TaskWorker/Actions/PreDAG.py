@@ -179,13 +179,17 @@ class PreDAG:
                 count += 1
         eventsThr = sumEventsThr / count
         self.logger.info("average throughput for {1} jobs: {0}".format(eventsThr, count))
+        runtime = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
         if self.stage == "processing":
             # Build in a 33% error margin in the runtime to not create too
             # many tails. This essentially moves the peak to lower
             # runtimes and cuts off less of the job distribution tail.
-            target = int(0.75 * task['tm_split_args']['seconds_per_job'])
+            target = int(0.75 * runtime)
         elif self.stage == 'tail':
-            target = getattr(config.TaskWorker, 'automaticTailRuntime', 45 * 60)
+            target = max(
+                getattr(config.TaskWorker, 'automaticTailRuntimeMinimum', 45 * 60),
+                getattr(config.TaskWorker, 'automaticTailRuntimeFraction', 0.2) * runtime
+            )
         events = int(target * eventsThr)
         splitTask = dict(task)
         splitTask['tm_split_algo'] = 'EventAwareLumiBased'

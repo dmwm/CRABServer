@@ -624,11 +624,15 @@ class DagmanCreator(TaskAction.TaskAction):
         ## file and we would take it from the Task DB.
         kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
 
-        proberuntime = getattr(self.config.TaskWorker, 'automaticProbeRuntime', 15 * 60)
-        tailruntime = getattr(self.config.TaskWorker, 'automaticTailRuntime', 45 * 60)
-        overhead = getattr(self.config.TaskWorker, 'automaticProcessingOverhead', 60 * 60)
-
         runtime = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
+
+        proberuntime = getattr(self.config.TaskWorker, 'automaticProbeRuntime', 15 * 60)
+        tailruntime = max(
+            getattr(self.config.TaskWorker, 'automaticTailRuntimeMinimum', 45 * 60),
+            getattr(self.config.TaskWorker, 'automaticTailRuntimeFraction', 0.2) * runtime
+        )
+
+        overhead = getattr(self.config.TaskWorker, 'automaticProcessingOverhead', 60 * 60)
 
         kwargs['task']['max_runtime'] = runtime
         # include a factor of 4 as a buffer
