@@ -2574,7 +2574,10 @@ class PostJob():
                 file_info['outfilelumis'] = []
                 for run, lumis in output_file_info[u'runs'].items():
                     file_info['outfileruns'].append(str(run))
-                    file_info['outfilelumis'].append(','.join(map(str, lumis)))
+                    # Creating a string like '100:20,101:21,105:20...'
+                    # where the lumi is followed by a colon and number of events in that lumi
+                    lumisAndEvents = ','.join(['{0}:{1}'.format(str(lumi), str(numEvents)) for lumi, numEvents in lumis.iteritems()])
+                    file_info['outfilelumis'].append(lumisAndEvents)
             else:
                 msg = "Output file info for %s not found in job report." % (orig_file_name)
                 self.logger.error(msg)
