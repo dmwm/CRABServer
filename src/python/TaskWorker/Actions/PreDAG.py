@@ -179,7 +179,7 @@ class PreDAG:
                 count += 1
         eventsThr = sumEventsThr / count
         self.logger.info("average throughput for {1} jobs: {0}".format(eventsThr, count))
-        runtime = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
+        runtime = task['tm_split_args'].get('seconds_per_job', -1)
         if self.stage == "processing":
             # Build in a 33% error margin in the runtime to not create too
             # many tails. This essentially moves the peak to lower
