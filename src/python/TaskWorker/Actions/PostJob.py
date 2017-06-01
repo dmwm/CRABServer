@@ -2257,7 +2257,7 @@ class PostJob():
             rest_api = 'filemetadata'
             rest_uri = self.rest_uri_no_api + '/' + rest_api
             rest_url = self.rest_host + rest_uri
-            msg = "Uploading output metadata for %s to https://%s: %s" % (lfn, rest_url, configreq)
+            msg = "Uploading input metadata for %s to https://%s: %s" % (lfn, rest_url, configreq)
             self.logger.debug(msg)
             try:
                 self.server.put(rest_uri, data = encodeRequest(configreq))
