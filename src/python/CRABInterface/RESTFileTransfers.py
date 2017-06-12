@@ -304,7 +304,7 @@ class RESTFileTransfers(RESTEntity):
                 raise InvalidParameter("Required asoworker parameter is not set.")
             if not limit:
                 limit = 1000
-            binds['limit'] = limit if limit < 1000 else 1000
+            binds['limit'] = limit
             binds['asoworker'] = asoworker
             sqlQuery = ""
             if subresource == 'acquiredTransfers':
