@@ -458,6 +458,21 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1 CONDOR_ID=", ClusterId, ".", ProcId," %s")' % " ".join(info['additional_environment_options'].split(";")))
         dagAd["RemoteCondorSetup"] = info['remote_condor_setup']
 
+        dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"].encode('ascii', 'ignore'))
+        # increasing the time for keeping the dagman into the queue with 10 days in order to
+        # start a proper cleanup script after the task lifetime has expired
+        extendedLifetime = TASKLIFETIME + 10*24*60*60
+        # Putting JobStatus == 4 since LeaveJobInQueue is for completed jobs (probably redundant)
+        LEAVE_JOB_IN_QUEUE_EXPR = "(JobStatus == 4) && ((time()-CRAB_TaskSubmitTime) < %s)" % extendedLifetime
+        dagAd["LeaveJobInQueue"] = classad.ExprTree(LEAVE_JOB_IN_QUEUE_EXPR)
+        # Removing a task after the expiration date no matter what its status is
+        dagAd["PeriodicRemove"] = classad.ExprTree("((time()-CRAB_TaskSubmitTime) > %s)" % extendedLifetime)
+        dagAd["TransferOutput"] = info['outputFilesString']
+        dagAd["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
+        dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
+        dagAd["RemoveKillSig"] = "SIGUSR1"
+        dagAd["OnExitHold"] = classad.ExprTree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
+
         with open('subdag.ad' ,'w') as fd:
             for k, v in dagAd.items():
                 if k == 'X509UserProxy':
@@ -477,20 +492,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["Cmd"] = cmd
         dagAd['Args'] = arg
         dagAd["TransferInput"] = str(info['inputFilesString'])
-        dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"].encode('ascii', 'ignore'))
-        # increasing the time for keeping the dagman into the queue with 10 days in order to
-        # start a proper cleanup script after the task lifetime has expired
-        extendedLifetime = TASKLIFETIME + 10*24*60*60
-        # Putting JobStatus == 4 since LeaveJobInQueue is for completed jobs (probably redundant)
-        LEAVE_JOB_IN_QUEUE_EXPR = "(JobStatus == 4) && ((time()-CRAB_TaskSubmitTime) < %s)" % extendedLifetime
-        dagAd["LeaveJobInQueue"] = classad.ExprTree(LEAVE_JOB_IN_QUEUE_EXPR)
-        # Removing a task after the expiration date no matter what its status is
-        dagAd["PeriodicRemove"] = classad.ExprTree("((time()-CRAB_TaskSubmitTime) > %s)" % extendedLifetime)
-        dagAd["TransferOutput"] = info['outputFilesString']
-        dagAd["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
-        dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
-        dagAd["RemoveKillSig"] = "SIGUSR1"
-        dagAd["OnExitHold"] = classad.ExprTree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
 
         condorIdDict = {}
         with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True, outputObj=condorIdDict, logger=self.logger) as (parent, rpipe):
