@@ -186,10 +186,10 @@ class PreDAG:
             # runtimes and cuts off less of the job distribution tail.
             target = int(0.75 * runtime)
         elif self.stage == 'tail':
-            target = max(
+            target = int(max(
                 getattr(config.TaskWorker, 'automaticTailRuntimeMinimum', 45 * 60),
                 getattr(config.TaskWorker, 'automaticTailRuntimeFraction', 0.2) * runtime
-            )
+            ))
         events = int(target * eventsThr)
         splitTask = dict(task)
         splitTask['tm_split_algo'] = 'EventAwareLumiBased'
