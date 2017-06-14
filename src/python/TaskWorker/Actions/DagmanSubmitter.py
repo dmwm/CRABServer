@@ -454,7 +454,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["HoldKillSig"] = "SIGUSR1"
         dagAd["X509UserProxy"] = info['user_proxy']
         dagAd["Requirements"] = classad.ExprTree('true || false')
-        dagAd["TaskType"] = "ROOT"
         dagAd["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1 CONDOR_ID=", ClusterId, ".", ProcId," %s")' % " ".join(info['additional_environment_options'].split(";")))
         dagAd["RemoteCondorSetup"] = info['remote_condor_setup']
 
@@ -487,6 +486,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     value = v
                 fd.write('+{0} = {1}\n'.format(k, value))
 
+        dagAd["TaskType"] = "ROOT"
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
         dagAd["Err"] = str(os.path.join(info['scratch'], "request.err"))
         dagAd["Cmd"] = cmd

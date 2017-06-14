@@ -234,7 +234,8 @@ class PreDAG:
         for dag in subdags:
             subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', '1000',
                 '-MaxPost', str(maxpost), '-no_submit', '-insert_sub_file', 'subdag.ad',
-                '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), dag), dag])
+                '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), dag),
+                '-append', '+TaskType = "{0}"'.format(self.stage.upper), dag])
 
     def adjustLumisForCompletion(self, task, unprocessed):
         """
