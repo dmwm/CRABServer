@@ -11,7 +11,7 @@ from httplib2 import HttpLib2Error
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 from WMCore.Services.TagCollector.TagCollector import TagCollector
 from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
 
@@ -467,7 +467,7 @@ class RESTUserWorkflow(RESTEntity):
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_str("subresource", param, safe, RX_SUBRESTAT, optional=True)
-            validate_numlist('jobids', param, safe)
+            validate_strlist('jobids', param, safe, RX_JOBID)
             ## In a resubmission, the site black- and whitelists need to be interpreted
             ## differently than in an initial task submission. If there is no site black-
             ## or whitelist, set it to None and DataWorkflow will use the corresponding
@@ -510,7 +510,7 @@ class RESTUserWorkflow(RESTEntity):
             ## used by get log, get data
             validate_num('limit', param, safe, optional=True)
             validate_num('exitcode', param, safe, optional=True)
-            validate_numlist('jobids', param, safe)
+            validate_strlist('jobids', param, safe, RX_JOBID)
 
             ## used by errors and report (short format in report means we do not query DBS)
             validate_num('shortformat', param, safe, optional=True)
@@ -528,7 +528,7 @@ class RESTUserWorkflow(RESTEntity):
         elif method in ['DELETE']:
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_num("force", param, safe, optional=True)
-            validate_numlist('jobids', param, safe)
+            validate_strlist('jobids', param, safe, RX_JOBID)
             validate_str("killwarning", param, safe, RX_TEXT_FAIL, optional=True)
             #decode killwarning message if present
             if safe.kwargs['killwarning']:
