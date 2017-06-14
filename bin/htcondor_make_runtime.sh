@@ -14,7 +14,7 @@ WMCOREVER=1.0.14_crab_4
 WMCOREREPO=dmwm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
-CRABSERVERVER=3.3.8.rc7
+CRABSERVERVER=3.3.1706.rc2
 CRABSERVERREPO=dmwm
 
 [[ -d $STARTDIR ]] || mkdir -p $STARTDIR
@@ -25,7 +25,7 @@ cp $BASEDIR/../scripts/gWMS-CMSRunAnalysis.sh $STARTDIR || exit 3
 rm -rf $WMCOREDIR && mkdir -p $WMCOREDIR
 rm -rf $CRABSERVERDIR && mkdir -p $CRABSERVERDIR
 
-if [[ -n "$CRAB_OVERRIDE_SOURCE" ]]; then 
+if [[ -n "$CRAB_OVERRIDE_SOURCE" ]]; then
     REPLACEMENT_ABSOLUTE=$(readlink -f $CRAB_OVERRIDE_SOURCE)
 elif [[ "x$1" != "x" ]]; then
     REPLACEMENT_ABSOLUTE=$(readlink -f $1)
@@ -104,7 +104,7 @@ else
     fi
 
     if [[ ! -e httplib2.tar.gz ]]; then
-        curl -L https://httplib2.googlecode.com/files/httplib2-0.8.tar.gz > httplib2.tar.gz || exit 2
+        curl -L https://pypi.python.org/packages/ff/a9/5751cdf17a70ea89f6dde23ceb1705bfb638fd8cee00f845308bf8d26397/httplib2-0.9.2.tar.gz#md5=bd1b1445b3b2dfa7276b09b1a07b7f0e > httplib2.tar.gz || exit 2
     fi
     if [[ ! -e cherrypy.tar.gz ]]; then
         curl -L http://download.cherrypy.org/cherrypy/3.1.2/CherryPy-3.1.2.tar.gz > cherrypy.tar.gz || exit 2
@@ -117,7 +117,7 @@ else
     tar xzf cherrypy.tar.gz || exit 2
     tar xzf nose.tar.gz || exit 2
 
-    pushd httplib2-0.8/python2
+    pushd httplib2-0.9.2/python2
     zip -rq $STARTDIR/CRAB3.zip httplib2  -x \*.pyc || exit 3
     zip -r $STARTDIR/WMCore.zip httplib2  -x \*.pyc || exit 3
     popd
