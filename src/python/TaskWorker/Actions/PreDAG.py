@@ -218,9 +218,9 @@ class PreDAG:
             parent = self.prefix if self.stage == 'tail' else None
             _, _, subdags = creator.createSubdag(split_result.result, task=task, parent=parent, stage=self.stage)
             if self.stage == 'processing':
-                subdags.append('RunJobs0.subdag')
+                self.createSubdagSubmission(['RunJobs0.subdag'], getattr(config.TaskWorker, 'maxPost', 20), 'processing')
             self.logger.info("creating following subdags: {0}".format(", ".join(subdags)))
-            self.createSubdagSubmission(subdags, getattr(config.TaskWorker, 'maxPost', 20))
+            self.createSubdagSubmission(subdags, getattr(config.TaskWorker, 'maxPost', 20), 'tail')
         except TaskWorkerException as e:
             retmsg = "DAG creation failed with:\n{0}".format(e)
             self.logger.error(retmsg)
@@ -229,13 +229,13 @@ class PreDAG:
         self.saveProcessedJobs(unprocessed)
         return 0
 
-    def createSubdagSubmission(self, subdags, maxpost):
+    def createSubdagSubmission(self, subdags, maxpost, stage):
         #TODO Not tested, did not work
         for dag in subdags:
             subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', '1000',
                 '-MaxPost', str(maxpost), '-no_submit', '-insert_sub_file', 'subdag.ad',
                 '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), dag),
-                '-append', '+TaskType = "{0}"'.format(self.stage.upper), dag])
+                '-append', '+TaskType = "{0}"'.format(stage.upper()), dag])
 
     def adjustLumisForCompletion(self, task, unprocessed):
         """
