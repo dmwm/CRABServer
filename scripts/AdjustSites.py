@@ -121,6 +121,13 @@ def adjustPostScriptExitStatus(resubmitJobIds, filename):
     return adjustedJobIds
 
 
+def getGlob(ad, normal, automatic):
+    if ad.get('CRAB_SplitAlgo') == 'Automatic':
+        return glob.glob(automatic)
+    else:
+        return [normal]
+
+
 def adjustMaxRetries(adjustJobIds, ad):
     """
     Edit the DAG file adjusting the maximum allowed number of retries to the current
@@ -134,7 +141,7 @@ def adjustMaxRetries(adjustJobIds, ad):
         return
     ## Get the latest retry count of each DAG node from the node status file.
     retriesDict = {}
-    filenames = glob.glob("node_state*")
+    filenames = getGlob(ad, "node_state", "node_state.[1-9]*")
     for fn in filenames:
         with open(fn, 'r') as fd:
             for nodeStatusAd in classad.parseAds(fd):
@@ -152,7 +159,7 @@ def adjustMaxRetries(adjustJobIds, ad):
     output = ""
     adjustAll = (adjustJobIds == True)
     numAutomJobRetries = int(ad.get('CRAB_NumAutomJobRetries', 2))
-    filenames = glob.glob("RunJobs*.dag")
+    filenames = getGlob(ad, "RunJobs.dag", "RunJobs[1-9]*.subdag")
     for fn in filenames:
         with open(fn, 'r') as fd:
             for line in fd.readlines():
@@ -338,6 +345,13 @@ def main():
 
     printLog("Proxied webdir saved. Clearing the automatic blacklist and handling RunJobs.dag.nodes.log for resubmissions")
 
+    schedd = htcondor.Schedd()
+    tailconst = "TaskType =?= \"TAIL\" && CRAB_ReqName =?= %s" % classad.quote(ad.get("CRAB_ReqName"))
+    if ad.get('CRAB_SplitAlgo') == 'Automatic':
+        printLog("Killing tail DAGs")
+        schedd.edit(tailconst, "HoldKillSig", 'SIGKILL')
+        schedd.act(htcondor.JobAction.Hold, tailconst)
+
     clearAutomaticBlacklist()
 
     resubmitJobIds = []
@@ -350,7 +364,7 @@ def main():
             resubmitJobIds = True
     if resubmitJobIds:
         adjustedJobIds = []
-        filenames = glob.glob("RunJobs*.*dag.nodes.log")
+        filenames = getGlob(ad, "RunJobs.dag.nodes.log", "RunJobs[1-9]*.subdag.nodes.log")
         for fn in filenames:
             if hasattr(htcondor, 'lock'):
                 # While dagman is not running at this point, the schedd may be writing events to this
@@ -376,6 +390,10 @@ def main():
         siteAd.update(newSiteAd)
         with open("site.ad", "w") as fd:
             fd.write(str(siteAd))
+
+    if ad.get('CRAB_SplitAlgo') == 'Automatic':
+        schedd.edit(tailconst, "HoldKillSig", 'SIGUSR1')
+        schedd.act(htcondor.JobAction.Release, tailconst)
 
     printLog("Exiting AdjustSite")
 

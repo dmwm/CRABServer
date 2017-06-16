@@ -155,7 +155,7 @@ class PreDAG:
         if len(completed) < self.completion:
             return 4
         unprocessed = completed - self.processedJobs
-        self.logger.info("jobs remaining to process: {0}".format(", ".join(unprocessed)))
+        self.logger.info("jobs remaining to process: {0}".format(", ".join(sorted(unprocessed))))
 
         with open('datadiscovery.pkl', 'rb') as fd:
             dataset = pickle.load(fd)
