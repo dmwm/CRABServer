@@ -345,13 +345,6 @@ def main():
 
     printLog("Proxied webdir saved. Clearing the automatic blacklist and handling RunJobs.dag.nodes.log for resubmissions")
 
-    schedd = htcondor.Schedd()
-    tailconst = "TaskType =?= \"TAIL\" && CRAB_ReqName =?= %s" % classad.quote(ad.get("CRAB_ReqName"))
-    if ad.get('CRAB_SplitAlgo') == 'Automatic':
-        printLog("Killing tail DAGs")
-        schedd.edit(tailconst, "HoldKillSig", 'SIGKILL')
-        schedd.act(htcondor.JobAction.Hold, tailconst)
-
     clearAutomaticBlacklist()
 
     resubmitJobIds = []
@@ -362,6 +355,15 @@ def main():
             resubmitJobIds = [str(i) for i in resubmitJobIds]
         except TypeError:
             resubmitJobIds = True
+
+    schedd = htcondor.Schedd()
+    tailconst = "TaskType =?= \"TAIL\" && CRAB_ReqName =?= %s" % classad.quote(ad.get("CRAB_ReqName"))
+    if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
+        if ad.get('CRAB_SplitAlgo') == 'Automatic':
+            printLog("Killing tail DAGs")
+            schedd.edit(tailconst, "HoldKillSig", 'SIGKILL')
+            schedd.act(htcondor.JobAction.Hold, tailconst)
+
     if resubmitJobIds:
         adjustedJobIds = []
         filenames = getGlob(ad, "RunJobs.dag.nodes.log", "RunJobs[1-9]*.subdag.nodes.log")
@@ -391,7 +393,7 @@ def main():
         with open("site.ad", "w") as fd:
             fd.write(str(siteAd))
 
-    if ad.get('CRAB_SplitAlgo') == 'Automatic':
+    if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
         schedd.edit(tailconst, "HoldKillSig", 'SIGUSR1')
         schedd.act(htcondor.JobAction.Release, tailconst)
 
