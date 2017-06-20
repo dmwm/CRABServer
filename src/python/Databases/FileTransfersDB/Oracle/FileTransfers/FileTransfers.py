@@ -56,7 +56,7 @@ class FileTransfers(object):
 							tm_publication_failure_reason = :fail_reason, \
 							tm_publication_retry_count = tm_publication_retry_count + :retry_value \
                              WHERE tm_id = :id AND \
-                                   tm_aso_worker = :asoworker"
+                                   tm_aso_worker LIKE :asoworker"
 
     RetryPublication_sql = "UPDATE filetransfersdb SET tm_publication_state = :new_publication_state, \
                                                        tm_last_update = :last_update, \
