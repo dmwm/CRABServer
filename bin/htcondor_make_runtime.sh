@@ -64,11 +64,6 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
     zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py TaskWorker CRABInterface  -x \*.pyc || exit 3
     popd
 
-    pushd $VO_CMS_SW_DIR/$SCRAM_ARCH/external/py2-httplib2/*/lib/python2.7/site-packages
-    zip -rq $STARTDIR/CRAB3.zip httplib2 -x \*.pyc
-    zip -r $STARTDIR/WMCore.zip httplib2  -x \*.pyc || exit 3
-    popd
-
     pushd $VO_CMS_SW_DIR/$SCRAM_ARCH/external/cherrypy/*/lib/python2.7/site-packages
     zip -rq $STARTDIR/CRAB3.zip cherrypy -x \*.pyc
     popd
@@ -103,9 +98,6 @@ else
         CRABSERVER_PATH="CRABServer-$CRABSERVERVER"
     fi
 
-    if [[ ! -e httplib2.tar.gz ]]; then
-        curl -L https://httplib2.googlecode.com/files/httplib2-0.8.tar.gz > httplib2.tar.gz || exit 2
-    fi
     if [[ ! -e cherrypy.tar.gz ]]; then
         curl -L http://download.cherrypy.org/cherrypy/3.1.2/CherryPy-3.1.2.tar.gz > cherrypy.tar.gz || exit 2
     fi
@@ -113,14 +105,8 @@ else
         curl -L https://github.com/nose-devs/nose/archive/release_1.3.0.tar.gz > nose.tar.gz || exit 2
     fi
 
-    tar xzf httplib2.tar.gz || exit 2
     tar xzf cherrypy.tar.gz || exit 2
     tar xzf nose.tar.gz || exit 2
-
-    pushd httplib2-0.8/python2
-    zip -rq $STARTDIR/CRAB3.zip httplib2  -x \*.pyc || exit 3
-    zip -r $STARTDIR/WMCore.zip httplib2  -x \*.pyc || exit 3
-    popd
 
     pushd CherryPy-3.1.2/
     zip -rq $STARTDIR/CRAB3.zip cherrypy  -x \*.pyc || exit 3
