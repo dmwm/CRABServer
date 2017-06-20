@@ -208,7 +208,7 @@ def makeWebDir(ad):
         os.symlink(os.path.abspath(os.path.join(".", "task_process/status_cache.txt")), os.path.join(path, "status_cache"))
         ## Symlinks to ease operator navigation across spool/web directories
         os.symlink(os.path.abspath("."), os.path.join(path, "SPOOL_DIR"))
-        os.symlink(path, os.path.abspath(os.path.join(".","WEB_DIR")))
+        os.symlink(path, os.path.abspath(os.path.join(".", "WEB_DIR")))
     except Exception as ex:
         printLog("Failed to copy/symlink files in the user web directory: %s" % str(ex))
 
