@@ -2575,7 +2575,8 @@ class PostJob():
                 for run, lumis in output_file_info[u'runs'].items():
                     file_info['outfileruns'].append(str(run))
                     # Creating a string like '100:20,101:21,105:20...'
-                    # where the lumi is followed by a colon and number of events in that lumi
+                    # where the lumi is followed by a colon and number of events in that lumi.
+                    # Note that the events per lumi information is provided by WMCore version >=1.1.2 when parsing FWJR.
                     lumisAndEvents = ','.join(['{0}:{1}'.format(str(lumi), str(numEvents)) for lumi, numEvents in lumis.iteritems()])
                     file_info['outfilelumis'].append(lumisAndEvents)
             else:
