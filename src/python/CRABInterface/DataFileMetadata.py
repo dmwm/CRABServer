@@ -111,7 +111,7 @@ class DataFileMetadata(object):
             self.logger.debug("Deleting all the files older than %s hours" % hours)
             self.api.modifynocheck(self.FileMetaData.DeleteFilesByTime_sql, hours=[hours])
 
-    def preprocessLumiStrings(lumis):
+    def preprocessLumiStrings(self, lumis):
         """ Takes a list of strings of lumis and updates
             their format if necessary.
             Old: 'lumi1,lumi2,lumi3...'
