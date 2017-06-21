@@ -215,6 +215,28 @@ def makeLFNPrefixes(task):
 
     return temp_dest, dest
 
+def validateLFNs(path, files):
+    """
+    validate against standard Lexicon the LFN's that this task will try to publish in DBS
+    :param path: string: the path as created by CRAB starting from task name and possibly user LNFbase
+    :param files: list of strings: the filenames that will be published
+    :return: nothing if all OK. Raise assert exception if failure (as Lexicon functions do)
+    This is meant to be used early in the task preparation,
+    when the path and files passed do not have yet the directory counter and job_id counter,
+    so will insert take ones here when doing the check to ensure LFN lenght is correct
+    """
+    from WMCore import Lexicon
+    count = 10000     # at most 10k jobs in a task, 4 chars must suffice
+    counter = '0001'  # 4 digits for the directory counter
+    for origFile in files:
+        info = origFile.rsplit(".", 1)
+        if len(info) == 2:
+            fileName = "%s_%s.%s" % (info[0], count, info[1])
+        else:
+            fileName = "%s_%s" % (origFile, count)
+        testLfn = os.path.join(path, counter, fileName)
+        Lexicon.lfn(testLfn)  # will raise if testLfn is not a valid lfn
+    return
 
 def transform_strings(input):
     """
@@ -524,6 +546,14 @@ class DagmanCreator(TaskAction.TaskAction):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
+        if task['tm_publication'] :
+            try:
+                validateLFNs(dest,outfiles)
+            except Exception as ex:
+                msg  = "Your task speficies an output LFN which fails validation in"
+                msg += "\n WMCore/Lexicon and therefore can not be published in DBS"
+                msg += "\nError detail: %s" % (str(ex))
+                raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
         groupid = len(siteinfo['group_sites'])
         siteinfo['group_sites'][groupid] = list(availablesites)
         siteinfo['group_datasites'][groupid] = list(datasites)
