@@ -52,7 +52,11 @@ RX_OUTFILES  = re.compile(r"^(?=.{0,255}$)%s$"%lfnParts['root'])
 RX_JOBID     = re.compile(r"^\d+(-\d+){0,1}$")
 RX_RUNS      = re.compile(r"^\d+$")
 RX_LUMIRANGE = re.compile(r"^\d+,\d+(,\d+,\d+)*$")
-RX_LUMILIST  = re.compile(r"^\d+(,\d+)*$")
+
+# Supports two formats for backward compatibility:
+# '1,4,6,8,9,10...' (old format which is still present in old postjobs)
+# '1:20,4:20,6:21,8:20,9:20,10:21...' (new format with events per each lumi)
+RX_LUMILIST = re.compile(r"^(\d+(,\d+)*)$|^((\d+:(\d+|None))(,\d+:(\d+|None))*)$")
 RX_GLOBALTAG = re.compile(r'^[a-zA-Z0-9\s\.\-_:]{1,100}$')
 RX_OUTTYPES  = re.compile(r'^EDM|LOG|TFILE|FAKE|POOLIN$')
 RX_CHECKSUM  = re.compile(r'^[A-Za-z0-9\-]+$')
