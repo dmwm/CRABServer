@@ -215,26 +215,25 @@ def makeLFNPrefixes(task):
 
     return temp_dest, dest
 
-def validateLFNs(path, files):
+def validateLFNs(path, outputFiles):
     """
     validate against standard Lexicon the LFN's that this task will try to publish in DBS
-    :param path: string: the path as created by CRAB starting from task name and possibly user LNFbase
-    :param files: list of strings: the filenames that will be published
-    :return: nothing if all OK. Raise assert exception if failure (as Lexicon functions do)
-    This is meant to be used early in the task preparation,
-    when the path and files passed do not have yet the directory counter and job_id counter,
-    so will insert take ones here when doing the check to ensure LFN lenght is correct
+    :param path: string: the path part of the LFN's, w/o the directory counter
+    :param outputFiles: list of strings: the filenames to be published (w/o the jobId, i.e. out.root not out_1.root) 
+    :return: nothing if all OK. If LFN is not valid Lexicon raises an AssertionError exception
     """
     from WMCore import Lexicon
-    count = 10000     # at most 10k jobs in a task, 4 chars must suffice
-    counter = '0001'  # 4 digits for the directory counter
-    for origFile in files:
+    # fake values to get proper LFN length, actual numbers chance job by job
+    jobId = '10000'       # current max is 10k jobs per task
+    dirCounter = '0001'   # need to be same length as 'counter' used later in makeDagSpecs
+
+    for origFile in outputFiles:
         info = origFile.rsplit(".", 1)
-        if len(info) == 2:
-            fileName = "%s_%s.%s" % (info[0], count, info[1])
+        if len(info) == 2:    # filename ends with .<something>, put jobId before the dot
+            fileName = "%s_%s.%s" % (info[0], jobId, info[1])
         else:
-            fileName = "%s_%s" % (origFile, count)
-        testLfn = os.path.join(path, counter, fileName)
+            fileName = "%s_%s" % (origFile, jobId)
+        testLfn = os.path.join(path, dirCounter, fileName)
         Lexicon.lfn(testLfn)  # will raise if testLfn is not a valid lfn
     return
 
@@ -549,8 +548,8 @@ class DagmanCreator(TaskAction.TaskAction):
         if task['tm_publication'] :
             try:
                 validateLFNs(dest,outfiles)
-            except Exception as ex:
-                msg  = "Your task speficies an output LFN which fails validation in"
+            except AssertionError as ex:
+                msg  = "\nYour task speficies an output LFN which fails validation in"
                 msg += "\n WMCore/Lexicon and therefore can not be published in DBS"
                 msg += "\nError detail: %s" % (str(ex))
                 raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
