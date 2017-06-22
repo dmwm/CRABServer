@@ -462,7 +462,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         # start a proper cleanup script after the task lifetime has expired
         extendedLifetime = TASKLIFETIME + 10*24*60*60
         # Putting JobStatus == 4 since LeaveJobInQueue is for completed jobs (probably redundant)
-        LEAVE_JOB_IN_QUEUE_EXPR = "((time()-CRAB_TaskSubmitTime) < %s)" % extendedLifetime
+        LEAVE_JOB_IN_QUEUE_EXPR = '((JobStatus =?= 4 || TaskType =!= "ROOT") && (time()-CRAB_TaskSubmitTime) < %s)' % extendedLifetime
         dagAd["LeaveJobInQueue"] = classad.ExprTree(LEAVE_JOB_IN_QUEUE_EXPR)
         # Removing a task after the expiration date no matter what its status is
         dagAd["PeriodicRemove"] = classad.ExprTree("((time()-CRAB_TaskSubmitTime) > %s)" % extendedLifetime)
@@ -470,7 +470,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
         dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
         dagAd["RemoveKillSig"] = "SIGUSR1"
-        dagAd["OnExitHold"] = classad.ExprTree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
 
         with open('subdag.ad' ,'w') as fd:
             for k, v in dagAd.items():
@@ -487,6 +486,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 fd.write('+{0} = {1}\n'.format(k, value))
 
         dagAd["TaskType"] = "ROOT"
+        dagAd["OnExitHold"] = classad.ExprTree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
         dagAd["Err"] = str(os.path.join(info['scratch'], "request.err"))
         dagAd["Cmd"] = cmd

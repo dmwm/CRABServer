@@ -359,10 +359,9 @@ def main():
     schedd = htcondor.Schedd()
     tailconst = "TaskType =?= \"TAIL\" && CRAB_ReqName =?= %s" % classad.quote(ad.get("CRAB_ReqName"))
     if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
-        if ad.get('CRAB_SplitAlgo') == 'Automatic':
-            printLog("Killing tail DAGs")
-            schedd.edit(tailconst, "HoldKillSig", 'SIGKILL')
-            schedd.act(htcondor.JobAction.Hold, tailconst)
+        printLog("Killing tail DAGs")
+        schedd.edit(tailconst, "HoldKillSig", 'SIGKILL')
+        schedd.act(htcondor.JobAction.Hold, tailconst)
 
     if resubmitJobIds:
         adjustedJobIds = []
