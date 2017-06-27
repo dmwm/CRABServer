@@ -6,7 +6,6 @@ import logging
 import cherrypy
 from base64 import b64decode
 from httplib import HTTPException
-from httplib2 import HttpLib2Error
 
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
@@ -294,7 +293,7 @@ class RESTUserWorkflow(RESTEntity):
         goodReleases = {}
         try:
             goodReleases = self.tagCollector.releases_by_architecture()
-        except (IOError, HTTPException, HttpLib2Error):
+        except:
             msg = "Error connecting to %s (params: %s) and determining the list of available releases. " % \
                   (tagCollector['endpoint'], tagCollector.tcArgs) + "Skipping the check of the releases"
         else:

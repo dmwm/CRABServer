@@ -10,9 +10,11 @@ from WMCore.Database.CMSCouch import CouchServer
 
 ## CRAB dependencies
 from ServerUtilities import TASKLIFETIME
-from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
 from ServerUtilities import checkTaskLifetime
+from ServerUtilities import PUBLICATIONDB_STATUSES
+from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
 from ServerUtilities import isCouchDBURL, getEpochFromDBTime
+
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
 
 
@@ -636,9 +638,11 @@ class DataWorkflow(object):
         return
 
     def resubmitOraclePublication(self, taskname):
+        binds = {}
         binds['taskname'] = [taskname]
-        binds['publication_state'] = PUBLICATIONDB_STATUSES['FAILED']
-        binds['new_publication_state'] = PUBLICATIONDB_STATUSES['NEW']
-        self.api.modify(self.transferDB.RetryUserPublication_sql, **binds)
+        binds['last_update'] = [int(time.time())]
+        binds['publication_state'] = [PUBLICATIONDB_STATUSES['FAILED']]
+        binds['new_publication_state'] = [PUBLICATIONDB_STATUSES['NEW']]
+        self.api.modifynocheck(self.transferDB.RetryUserPublication_sql, **binds)
         return
 

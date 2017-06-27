@@ -110,7 +110,7 @@ G_JOB_REPORT_NAME_NEW = None
 G_WMARCHIVE_REPORT_NAME = None
 G_WMARCHIVE_REPORT_NAME_NEW = None
 G_ERROR_SUMMARY_FILE_NAME = "error_summary.json"
-G_FJR_PARSE_RESULTS_FILE_NAME= "task_process/fjr_parse_results.txt"
+G_FJR_PARSE_RESULTS_FILE_NAME = "task_process/fjr_parse_results.txt"
 
 def sighandler(*args):
     if ASO_JOB:
@@ -462,7 +462,8 @@ class ASOServerJob(object):
         This is the main method in ASOServerJob. Should be called after initializing
         an instance.
         """
-        self.docs_in_transfer = self.inject_to_aso()
+        with getLock('get_transfers_statuses'):
+            self.docs_in_transfer = self.inject_to_aso()
         if self.docs_in_transfer == False:
             exmsg = "Couldn't upload document to ASO database"
             raise RuntimeError(exmsg)
@@ -470,7 +471,7 @@ class ASOServerJob(object):
             self.logger.info("No files to transfer via ASO. Done!")
             return 0
         self.save_docs_in_transfer()
-        return self.check_transfers()
+        return 4
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -876,6 +877,7 @@ class ASOServerJob(object):
             # Without the second condition, we run the risk of using the previous stageout
             # attempts results.
             if (time.time() - last_query < 900) and (last_query > self.aso_start_timestamp):
+                self.logger.info("Using the cache since it is up to date (last_query=%s) and it is after we submitted the transfer (aso_start_timestamp=%s)", last_query, self.aso_start_timestamp)
                 query_view = False
                 if not last_succeded:
                     #no point in continuing if the last query failed. Just defer the PJ and retry later
@@ -886,6 +888,7 @@ class ASOServerJob(object):
             for doc_info in self.docs_in_transfer:
                 doc_id = doc_info['doc_id']
                 if doc_id not in aso_info.get("results", {}):
+                    self.logger.debug("Changing query_view back to true")
                     query_view = True
                     break
         if isCouchDBURL(self.aso_db_url):
@@ -2254,7 +2257,7 @@ class PostJob():
             rest_api = 'filemetadata'
             rest_uri = self.rest_uri_no_api + '/' + rest_api
             rest_url = self.rest_host + rest_uri
-            msg = "Uploading output metadata for %s to https://%s: %s" % (lfn, rest_url, configreq)
+            msg = "Uploading input metadata for %s to https://%s: %s" % (lfn, rest_url, configreq)
             self.logger.debug(msg)
             try:
                 self.server.put(rest_uri, data = encodeRequest(configreq))
@@ -2571,7 +2574,11 @@ class PostJob():
                 file_info['outfilelumis'] = []
                 for run, lumis in output_file_info[u'runs'].items():
                     file_info['outfileruns'].append(str(run))
-                    file_info['outfilelumis'].append(','.join(map(str, lumis)))
+                    # Creating a string like '100:20,101:21,105:20...'
+                    # where the lumi is followed by a colon and number of events in that lumi.
+                    # Note that the events per lumi information is provided by WMCore version >=1.1.2 when parsing FWJR.
+                    lumisAndEvents = ','.join(['{0}:{1}'.format(str(lumi), str(numEvents)) for lumi, numEvents in lumis.iteritems()])
+                    file_info['outfilelumis'].append(lumisAndEvents)
             else:
                 msg = "Output file info for %s not found in job report." % (orig_file_name)
                 self.logger.error(msg)

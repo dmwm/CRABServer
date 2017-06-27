@@ -192,7 +192,6 @@ class PreJob:
         try:
             self.logger.info("Loading classads from: %s" % os.environ['_CONDOR_JOB_AD'])
             self.task_ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
-            self.logger.info(os.listdir('.'))
             self.logger.info(str(self.task_ad))
         except:
             msg = "Got exception while trying to parse the job ad."

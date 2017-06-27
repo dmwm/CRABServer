@@ -57,7 +57,7 @@ then
     if [[ $rc != 0 ]]
     then
         echo "==== Sourcing cmsset_default.sh failed at $(TZ=GMT date). ===="
-        tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
+        tar xzmf CMSRunAnalysis.tar.gz || exit 10042
         DashboardFailure 10032
     fi
     set -x
@@ -80,14 +80,14 @@ then
 else
     echo "Error: neither OSG_APP, CVMFS, nor VO_CMS_SW_DIR environment variables were set" >&2
     echo "Error: Because of this, we can't load CMSSW. Not good." >&2
-    tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
+    tar xzmf CMSRunAnalysis.tar.gz || exit 10042
     DashboardFailure 10031
 fi
 set +x
 if [[ $rc != 0 ]]
 then
     echo "==== Sourcing cmsset_default.sh failed at $(TZ=GMT date). ===="
-    tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
+    tar xzmf CMSRunAnalysis.tar.gz || exit 10042
     DashboardFailure 10032
 else
     echo "==== CMSSW pre-execution environment bootstrap FINISHING at $(TZ=GMT date) ===="
@@ -146,10 +146,10 @@ set -x
 if [[ "X$CRAB3_RUNTIME_DEBUG" == "X" ]]; then
     if [[ $CRAB_RUNTIME_TARBALL == "local" ]]; then
         # Tarball was shipped with condor
-        tar xvzmf CMSRunAnalysis.tar.gz || exit 10042
+        tar xzmf CMSRunAnalysis.tar.gz || exit 10042
     else
         # Allow user to override the choice
-        curl $CRAB_RUNTIME_TARBALL | tar xvzm || exit 10042
+        curl $CRAB_RUNTIME_TARBALL | tar xzm || exit 10042
     fi
 else
     echo "I am in runtime debug mode. I will not extract the sandbox"
