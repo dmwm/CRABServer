@@ -215,6 +215,27 @@ def makeLFNPrefixes(task):
 
     return temp_dest, dest
 
+def validateLFNs(path, outputFiles):
+    """
+    validate against standard Lexicon the LFN's that this task will try to publish in DBS
+    :param path: string: the path part of the LFN's, w/o the directory counter
+    :param outputFiles: list of strings: the filenames to be published (w/o the jobId, i.e. out.root not out_1.root) 
+    :return: nothing if all OK. If LFN is not valid Lexicon raises an AssertionError exception
+    """
+    from WMCore import Lexicon
+    # fake values to get proper LFN length, actual numbers chance job by job
+    jobId = '10000'       # current max is 10k jobs per task
+    dirCounter = '0001'   # need to be same length as 'counter' used later in makeDagSpecs
+
+    for origFile in outputFiles:
+        info = origFile.rsplit(".", 1)
+        if len(info) == 2:    # filename ends with .<something>, put jobId before the dot
+            fileName = "%s_%s.%s" % (info[0], jobId, info[1])
+        else:
+            fileName = "%s_%s" % (origFile, jobId)
+        testLfn = os.path.join(path, dirCounter, fileName)
+        Lexicon.lfn(testLfn)  # will raise if testLfn is not a valid lfn
+    return
 
 def transform_strings(input):
     """
@@ -524,6 +545,14 @@ class DagmanCreator(TaskAction.TaskAction):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
+        if task['tm_publication'] :
+            try:
+                validateLFNs(dest,outfiles)
+            except AssertionError as ex:
+                msg  = "\nYour task speficies an output LFN which fails validation in"
+                msg += "\n WMCore/Lexicon and therefore can not be published in DBS"
+                msg += "\nError detail: %s" % (str(ex))
+                raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
         groupid = len(siteinfo['group_sites'])
         siteinfo['group_sites'][groupid] = list(availablesites)
         siteinfo['group_datasites'][groupid] = list(datasites)
