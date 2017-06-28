@@ -1,20 +1,20 @@
-""" Usage: PreDAG.py stage completion prefix
+"""Usage: PreDAG.py stage completion prefix
 
-    This is the PreDAG script that is executed after the probe jobs finishes and
-    after the processing jobs finishes.
+This is the PreDAG script that is executed after the probe jobs finishes and
+after the processing jobs finishes.
 
-    It accepts three parameters: stage (which can either be processing or tail),
-    completion that determines when the script starts doing things, and prefix that
-    in case of completion jobs is prefixed to the subjobs numbers (1-1, 1-2, 1-3 for
-    completion job number 1).
+It accepts three parameters: stage (which can either be processing or tail),
+completion that determines when the script starts doing things, and prefix that
+in case of completion jobs is prefixed to the subjobs numbers (1-1, 1-2, 1-3 for
+completion job number 1).
 
-    In processing mode it looks for Job0-\\d+ (probe jobs) and when N=completion jobs have finished
-    it starts and it does the "regular splitting" creating the processing jobs.
+In processing mode it looks for Job0-\\d+ (probe jobs) and when N=completion jobs have finished
+it starts and it does the "regular splitting" creating the processing jobs.
 
-    In tail mode it looks for Job[1-9]\\d+$ (the processing jobs), and again
-    it starts when N=Completion jobs have finished. Again, the splitting is
-    performed but using as lumi mask the unprocessed lumis (lumis missing from
-    jobs that did not complete in tiem). Including failed jobs is under discussion.
+In tail mode it looks for Job[1-9]\\d+$ (the processing jobs), and again
+it starts when N=Completion jobs have finished. Again, the splitting is
+performed but using as lumi mask the unprocessed lumis (lumis missing from
+jobs that did not complete in time). It also includes failed jobs.
 """
 from __future__ import division
 from __future__ import print_function
@@ -23,7 +23,6 @@ import os
 import re
 import sys
 import json
-import glob
 import errno
 import pickle
 import shutil
@@ -44,9 +43,7 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 
 class PreDAG:
     def __init__(self):
-        """
-        PreDAG constructor.
-        """
+        """PreDAG constructor"""
         self.stage = None
         self.completion = None
         self.prefix = None
@@ -63,8 +60,7 @@ class PreDAG:
         self.logger.propagate = False
 
     def readJobStatus(self):
-        """ Read the job status(es) from the cache_status file
-        """
+        """Read the job status(es) from the cache_status file and save the relevant info into self.statusCacheInfo"""
         #XXX Maybe the status_cache filname should be in a variable in ServerUtilities?
         if not os.path.exists("task_process/status_cache.txt"):
             return
@@ -75,9 +71,7 @@ class PreDAG:
             self.statusCacheInfo = literal_eval(fileContent.split('\n')[2])
 
     def readProcessedJobs(self):
-        """
-        Read processed job ids
-        """
+        """Read processed job ids"""
         if not os.path.exists("automatic_splitting/processed"):
             self.processedJobs = set()
             return
@@ -85,15 +79,13 @@ class PreDAG:
             self.processedJobs = pickle.load(fd)
 
     def saveProcessedJobs(self, jobs):
-        """
-        Update processed job ids
-        """
+        """Update processed job ids"""
         with open("automatic_splitting/processed", "wb") as fd:
             pickle.dump(self.processedJobs.union(jobs), fd)
 
     def completedJobs(self):
-        """ Yield job IDs of completed (finished or failed) jobs.  All
-            failed jobs are saved in self.failedJobs, too.
+        """Yield job IDs of completed (finished or failed) jobs.  All
+        failed jobs are saved in self.failedJobs, too.
         """
         self.failedJobs = []
         stagere = {}
@@ -110,7 +102,7 @@ class PreDAG:
         self.logger.info("found {0} completed jobs".format(completedCount))
 
     def execute(self, *args):
-        """ Excecute executeInternal in locked mode
+        """Excecute executeInternal in locked mode
         """
         self.logger.debug("Acquiring PreDAG lock")
         with getLock("PreDAG") as _lock:
@@ -119,13 +111,10 @@ class PreDAG:
         self.logger.debug("PreDAG lock released")
         return retval
 
-    def executeInternal(self, *args):
-        """ The execution method return 4 if the "completion" threshold is not reached, 0 otherwise
+    def setupLog(self):
+        """Create the predag.prefix.txt file and make sure stdout and stderr file handlers are
+        duplicated and then redirected there
         """
-        self.stage = args[0]
-        self.completion = int(args[1])
-        self.prefix = args[2]
-
         ## Create a directory in the schedd where to store the predag logs.
         logpath = os.path.join(os.getcwd(), "prejob_logs")
         try:
@@ -137,7 +126,6 @@ class PreDAG:
         predagLogFileName = os.path.join(logpath, "predag.{0}.txt".format(self.prefix))
         fdPredagLog = os.open(predagLogFileName, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
         os.chmod(predagLogFileName, 0o644)
-
         ## Redirect stdout and stderr to the pre-dag log file.
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             print("Pre-DAG started with no output redirection.")
@@ -146,26 +134,35 @@ class PreDAG:
             os.dup2(fdPredagLog, 2)
             msg = "Pre-DAG started with output redirected to %s" % (predagLogFileName)
             self.logger.info(msg)
+        return msg
+
+    def executeInternal(self, *args):
+        """The executeInternal method return 4 if the "completion" threshold is not reached, 0 otherwise"""
+        self.stage = args[0]
+        self.completion = int(args[1])
+        self.prefix = args[2]
+
+        msg = self.setupLog()
 
         self.statusCacheInfo = {} #Will be filled with the status from the status cache
 
         self.readJobStatus()
-        self.readProcessedJobs()
         completed = set(self.completedJobs())
         if len(completed) < self.completion:
             return 4
+
+        self.readProcessedJobs()
         unprocessed = completed - self.processedJobs
         self.logger.info("jobs remaining to process: {0}".format(", ".join(sorted(unprocessed))))
 
+        # The TaskWorker saves some files that now we are gonna read
         with open('datadiscovery.pkl', 'rb') as fd:
-            dataset = pickle.load(fd)
+            dataset = pickle.load(fd) #Output from the discovery process
         with open('taskinformation.pkl', 'rb') as fd:
-            task = pickle.load(fd)
+            task = pickle.load(fd) #A dictionary containing information about the task as in the Oracle DB
         with open('taskworkerconfig.pkl', 'rb') as fd:
-            config = pickle.load(fd)
-        maxpost = getattr(config.TaskWorker, 'maxPost', 20)
+            config = pickle.load(fd) #Task worker configuration
 
-        #TODO refactor
         # Read the automatic_splitting/throughputs/0-N files where the PJ
         # saved the EventThroughput (report['steps']['cmsRun']['performance']['cpu']['EventThroughput'])
         sumEventsThr = 0
@@ -238,8 +235,7 @@ class PreDAG:
                 '-append', '+TaskType = "{0}"'.format(stage.upper()), dag])
 
     def adjustLumisForCompletion(self, task, unprocessed):
-        """
-        Sets the run, lumi information in the task information for the
+        """Sets the run, lumi information in the task information for the
         completion jobs.  Returns True if completion jobs are needed,
         otherwise False.
         """
@@ -289,7 +285,6 @@ class PreDAG:
         task['tm_split_args']['lumis'] = lumis
 
         return True
-
 
 
 if __name__ == '__main__':
