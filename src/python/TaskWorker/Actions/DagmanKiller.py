@@ -19,8 +19,6 @@ from ServerUtilities import insertJobIdSid
 import HTCondorLocator
 import HTCondorUtils
 
-import WMCore.Database.CMSCouch as CMSCouch
-
 import ApmonIf
 
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
@@ -37,7 +35,6 @@ class DagmanKiller(TaskAction):
         if 'task' not in kwargs:
             raise ValueError("No task specified.")
         self.task = kwargs['task']
-        self.killAllFlag = len(self.task['kill_ids']) == 0
         if 'tm_taskname' not in self.task:
             raise ValueError("No taskname specified")
         self.workflow = self.task['tm_taskname']
@@ -67,17 +64,12 @@ class DagmanKiller(TaskAction):
             self.logger.exception("%s: %s" % (self.workflow, msg))
             raise TaskWorkerException(msg)
 
-        ad = classad.ClassAd()
-        ad['foo'] = self.task['kill_ids']
         try:
             hostname = socket.getfqdn()
         except:
             hostname = ''
 
-        if not self.killAllFlag:
-            const = "CRAB_ReqName =?= %s && member(CRAB_Id, %s) && member(CRAB_ParentId, %s)" % (HTCondorUtils.quote(self.workflow), ad.lookup("foo").__repr__(), ad.lookup("foo").__repr__())
-        else:
-            const = 'CRAB_ReqName =?= %s && TaskType=?="Job"' % HTCondorUtils.quote(self.workflow)
+        const = 'CRAB_ReqName =?= %s && TaskType=?="Job"' % HTCondorUtils.quote(self.workflow)
         try:
             for ad in list(self.schedd.xquery(const, ['CRAB_Id', 'CRAB_Retry'])):
                 if ('CRAB_Id' not in ad) or ('CRAB_Retry' not in ad):
@@ -96,30 +88,7 @@ class DagmanKiller(TaskAction):
 
         # Note that we can not send kills for jobs not in queue at this time; we'll need the
         # DAG FINAL node to be fixed and the node status to include retry number.
-        if self.killAllFlag:
-            return self.killAll(const)
-        else:
-            return self.killJobs(self.task['kill_ids'], const)
-
-
-    def killJobs(self, ids, const):
-        ad = classad.ClassAd()
-        ad['foo'] = ids
-        with HTCondorUtils.AuthenticatedSubprocess(self.proxy, logger=self.logger) as (parent, rpipe):
-            if not parent:
-                self.schedd.act(htcondor.JobAction.Remove, const)
-        try:
-            results = rpipe.read()
-        except EOFError:
-            results = "Timeout executing condor remove command"
-        if results != "OK":
-            msg  = "The CRAB server backend was not able to kill these jobs %s," % (ids)
-            msg += " because the Grid scheduler answered with an error."
-            msg += " This is probably a temporary glitch. Please try again later."
-            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
-            msg += " Error reason: %s" % (results)
-            raise TaskWorkerException(msg)
-
+        return self.killAll(const)
 
     def killAll(self, jobConst):
 
@@ -177,7 +146,7 @@ class DagmanKiller(TaskAction):
                 ## task for which all jobs have already finished -successfully or not-).
                 configreq = {'subresource': 'state',
                              'workflow': kwargs['task']['tm_taskname'],
-                             'status': 'KILLED' if self.killAllFlag else 'SUBMITTED'}
+                             'status': 'KILLED'}
                 self.logger.debug("Setting the task as successfully killed with %s" % (str(configreq)))
                 self.server.post(self.resturi, data = urllib.urlencode(configreq))
             except HTTPException as hte:
