@@ -478,6 +478,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd['Args'] = arg
         dagAd["TransferInput"] = str(info['inputFilesString'])
         dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"].encode('ascii', 'ignore'))
+        dagAd['CRAB_TaskLifetimeDays'] = TASKLIFETIME // 24 // 60 // 60
+        dagAd['CRAB_TaskEndTime'] = int(info["start_time"]) + TASKLIFETIME
         # increasing the time for keeping the dagman into the queue with 10 days in order to
         # start a proper cleanup script after the task lifetime has expired
         extendedLifetime = TASKLIFETIME + 10*24*60*60
