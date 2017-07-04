@@ -2767,7 +2767,9 @@ class PostJob():
 
     def processWMArchive(self, retval):
         WMARCHIVE_BASE_LOCATION = json.load(open("/etc/wmarchive.json")).get("BASE_DIR", "/data/wmarchive")
+        WMARCHIVE_BASE_LOCATION = os.path.join(WMARCHIVE_BASE_LOCATION, 'new')
 
+        now = int(time.time())
         archiveDoc = {}
         with open(G_WMARCHIVE_REPORT_NAME) as fd:
             job = {}
@@ -2776,15 +2778,69 @@ class PostJob():
             job['doc']["fwjr"] = json.load(fd)
             job['doc']["jobtype"] = 'CRAB3'
             job['doc']["jobstate"] = 'success' if retval == 0 else 'failed'
-            job['doc']["timestamp"] = int(time.time())
+            job['doc']["timestamp"] = now
             archiveDoc = createArchiverDoc(job)
             archiveDoc['task'] = self.reqname
+            archiveDoc["meta_data"]['crab_id'] = self.job_id
+            archiveDoc["meta_data"]['crab_exit_code'] = self.job_report['exitCode']
+            archiveDoc["steps"].append(
+                {
+                    "errors": [
+                        {
+                            "details": getattr(ASO_JOB, 'failures', ""),
+                            "exitCode": 0,
+                            "type": ""
+                        }
+                    ],
+                    "input": [
+                        {
+                            "inputLFNs": [],
+                            "inputPFNs": [],
+                            "runs": [
+                                {
+                                    "eventsPerLumi": [],
+                                    "lumis": []
+                                }
+                            ]
+                        }
+                    ],
+                    "name": "aso",
+                    "output": [
+                        {
+                            "inputLFNs": [],
+                            "inputPFNs": [],
+                            "outputLFNs": [],
+                            "outputPFNs": [],
+                            "runs": [
+                                {
+                                    "eventsPerLumi": [],
+                                    "lumis": []
+                                }
+                            ]
+                        }
+                    ],
+                    "performance": {
+                        "multicore": {},
+                        "storage": {},
+                        "cpu": {},
+                        "memory": {}
+                    },
+                    "site": self.dest_site,
+                    "start": self.aso_start_timestamp or 0,
+                    "status": 0,
+                    "stop": now
+                }
+            )
+
+
+
         with open(G_WMARCHIVE_REPORT_NAME_NEW, 'w') as fd:
             json.dump(archiveDoc, fd)
         if not os.path.isdir(WMARCHIVE_BASE_LOCATION):
-            os.makedirs(WMARCHIVE_BASE_LOCATION)
+            os.makedirs(os.path.join(WMARCHIVE_BASE_LOCATION))
         #not using shutil.move because I want to move the file in the same disk
-        os.rename(G_WMARCHIVE_REPORT_NAME_NEW, os.path.join(WMARCHIVE_BASE_LOCATION, 'new', "%s_%s" % (self.reqname, G_WMARCHIVE_REPORT_NAME_NEW)))
+        self.logger.info("%s , %s" % (G_WMARCHIVE_REPORT_NAME_NEW, os.path.join(WMARCHIVE_BASE_LOCATION, "%s_%s" % (self.reqname, G_WMARCHIVE_REPORT_NAME_NEW))))
+        os.rename(G_WMARCHIVE_REPORT_NAME_NEW, os.path.join(WMARCHIVE_BASE_LOCATION, "%s_%s" % (self.reqname, G_WMARCHIVE_REPORT_NAME_NEW)))
 
 ##==============================================================================
 
