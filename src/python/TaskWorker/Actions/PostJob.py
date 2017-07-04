@@ -2001,7 +2001,7 @@ class PostJob():
             self.logger.info("====== Finished upload of output files metadata.")
 
             if ASO_JOB:
-                self.logger.info("====== About to update publication flags of trasnfered files.")
+                self.logger.info("====== About to update publication flags of transfered files.")
                 for doc in getattr(ASO_JOB, 'docs_in_transfer', []):
                     doc_id = doc.get('doc_id')
                     self.logger.debug("Found doc %s" % doc_id)
@@ -2015,11 +2015,11 @@ class PostJob():
                         try:
                             self.server.post(self.rest_uri_no_api + "/filetransfers", data=encodeRequest(newDoc))
                         except Exception as ex:
-                            retmsg = "Fatal error uploading output files metadata: %s" % (str(ex))
+                            retmsg = "Fatal error uploading  publication flags of transfered files: %s" % (str(ex))
                             self.logger.exception(retmsg)
-                            self.logger.info("====== Finished to update publication flags of trasnfered files.")
+                            self.logger.info("====== Finished to update publication flags of transfered files.")
                             return self.check_retry_count(80001), retmsg
-                self.logger.info("====== Finished to update publication flags of trasnfered files.")
+                self.logger.info("====== Finished to update publication flags of transfered files.")
 
         ## Upload the input files metadata.
         self.logger.info("====== Starting upload of input files metadata.")
