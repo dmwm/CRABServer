@@ -53,7 +53,28 @@ class DataFileMetadata(object):
         binds = {}
         for name in bindnames:
             binds[name] = [str(kwargs[name])]
-        binds['runlumi'] = [str(dict(list(zip(map(str, kwargs['outfileruns']), [map(str, lumilist.split(',')) for lumilist in kwargs['outfilelumis']]))))]
+
+        # Modify all incoming metadata to have the structure 'lumi1:events1,lumi2:events2..'
+        # instead of 'lumi1,lumi2,lumi3...' if necessary.
+        # This provides backwards compatibility for old postjobs and also
+        # changes the input metadata structure. Input metadata, however,
+        # will always have 'None' as the number of events.
+        outfilelumis = self.preprocessLumiStrings(kwargs['outfilelumis'])
+
+        # Construct a dict like
+        # {'runNum1': {'lumi1': 'events1', 'lumi2': 'events2'}, 'runNum2': {'lumi3': 'events3', 'lumi4': 'events4'}}
+        # from two lists of runs and lumi info strings that look like:
+        # runs: ['runNum1', 'runNum2']
+        # lumi info: ['lumi1:events1,lumi2:events2', 'lumi3:events3,lumi4:events4]
+        # By their index, run numbers correspond to the lumi info strings 
+        # which is why we can use zip when creating the dict.
+        lumiEventList = []
+        for lumis in map(str, outfilelumis):
+            lumiDict = dict((lumiEvents.split(":")) for lumiEvents in lumis.split(","))
+            lumiEventList.append(lumiDict)
+        # Convert runs to strings to keep it consistent
+        strOutFileRuns = map(str, kwargs['outfileruns'])
+        binds['runlumi'] = [str(dict(zip(strOutFileRuns, lumiEventList)))]
 
         #Changed to Select if exist, update, else insert
         binds['outtmplfn'] = binds['outlfn']
@@ -89,3 +110,29 @@ class DataFileMetadata(object):
         if hours:
             self.logger.debug("Deleting all the files older than %s hours" % hours)
             self.api.modifynocheck(self.FileMetaData.DeleteFilesByTime_sql, hours=[hours])
+
+    def preprocessLumiStrings(self, lumis):
+        """ Takes a list of strings of lumis and updates
+            their format if necessary.
+            Old: 'lumi1,lumi2,lumi3...'
+            New: 'lumi1:events1,lumi2:events2...'
+
+            If the format is old, the lumi strings will be
+            "padded" with 'None' strings instead of event counts
+            to show that information about events per each
+            lumi is unavailable. This needs to be done when an old
+            PostJob wants to upload the output metadata, but it does not have the code
+            for parsing the events per lumi info and does not upload it to the server.
+
+            Because input metadata uploads are using the same API, input metadata
+            will also be padded to keep the format consistent. However, input metadata
+            will always have 'None' instead of event counts because currently we do not
+            care about input metadata event counts per each lumi.
+        """
+        res = []
+        for lumistring in lumis:
+            if ":" not in lumistring:
+                res.append(','.join([lumi+":None" for lumi in lumistring.split(",")]))
+            else:
+                return lumis
+        return res
