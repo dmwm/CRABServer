@@ -19,6 +19,8 @@ from ast import literal_eval
 from httplib import HTTPException
 
 from ServerUtilities import getLock
+from ServerUtilities import TASKLIFETIME
+
 import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
 import TaskWorker.Actions.TaskAction as TaskAction
@@ -112,6 +114,8 @@ CRAB_Id = $(count)
 +TaskType = "Job"
 +AccountingGroup = %(accounting_group)s
 +CRAB_SubmitterIpAddr = %(submitter_ip_addr)s
++CRAB_TaskLifetimeDays = %(task_lifetime_days)s
++CRAB_TaskEndTime = %(task_endtime)s
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
 +DESIRED_OpSyses = %(desired_opsys)s
@@ -162,12 +166,14 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
                      (MemoryUsage > RequestMemory) || \
                      (MaxWallTimeMins*60 < time() - EnteredCurrentStatus) || \
                      (DiskUsage > %(max_disk_space)s))) || \
+                     (time() > CRAB_TaskEndTime) || \
                   ((JobStatus =?= 1) && (time() > (x509UserProxyExpiration + 86400)))
 +PeriodicRemoveReason = ifThenElse(time() - EnteredCurrentStatus > 7*24*60*60 && isUndefined(MemoryUsage), "Removed due to idle time limit", \
                           ifThenElse(time() > x509UserProxyExpiration, "Removed job due to proxy expiration", \
                             ifThenElse(MemoryUsage > RequestMemory, "Removed due to memory use", \
                               ifThenElse(MaxWallTimeMins*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
                                 ifThenElse(DiskUsage >  %(max_disk_space)s, "Removed due to disk usage", \
+                                  ifThenElse(time() > CRAB_TaskEndTime, "Removed due to reached CRAB_TaskEndTime", \
                                   "Removed due to job being held")))))
 %(extra_jdl)s
 queue
@@ -219,7 +225,7 @@ def validateLFNs(path, outputFiles):
     """
     validate against standard Lexicon the LFN's that this task will try to publish in DBS
     :param path: string: the path part of the LFN's, w/o the directory counter
-    :param outputFiles: list of strings: the filenames to be published (w/o the jobId, i.e. out.root not out_1.root) 
+    :param outputFiles: list of strings: the filenames to be published (w/o the jobId, i.e. out.root not out_1.root)
     :return: nothing if all OK. If LFN is not valid Lexicon raises an AssertionError exception
     """
     from WMCore import Lexicon
@@ -249,7 +255,7 @@ def transform_strings(input):
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
                'stageoutpolicy', 'taskType', 'worker_name', 'desired_opsys', 'desired_opsysvers', \
                'desired_arch', 'accounting_group', 'resthost', 'resturinoapi', 'submitter_ip_addr', \
-               'maxproberuntime', 'maxtailruntime':
+               'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -475,6 +481,10 @@ class DagmanCreator(TaskAction.TaskAction):
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
         info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
         info['submitter_ip_addr'] = task['tm_submitter_ip_addr']
+
+        #Classads for task lifetime management, see https://github.com/dmwm/CRABServer/issues/5505
+        info['task_lifetime_days'] = TASKLIFETIME // 24 // 60 // 60
+        info['task_endtime'] = int(task["tm_start_time"]) + TASKLIFETIME
 
         self.populateGlideinMatching(info)
 
