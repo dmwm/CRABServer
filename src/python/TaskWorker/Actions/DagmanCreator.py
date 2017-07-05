@@ -174,7 +174,7 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
                               ifThenElse(MaxWallTimeMins*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
                                 ifThenElse(DiskUsage >  %(max_disk_space)s, "Removed due to disk usage", \
                                   ifThenElse(time() > CRAB_TaskEndTime, "Removed due to reached CRAB_TaskEndTime", \
-                                  "Removed due to job being held")))))
+                                  "Removed due to job being held"))))))
 %(extra_jdl)s
 queue
 """
