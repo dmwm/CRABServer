@@ -2821,7 +2821,7 @@ class PostJob():
                 {
                     "errors": [
                         {
-                            "details": getattr(ASO_JOB, 'failures', ""),
+                            "details": str(getattr(ASO_JOB, 'failures', "")),
                             "exitCode": 0,
                             "type": ""
                         }
