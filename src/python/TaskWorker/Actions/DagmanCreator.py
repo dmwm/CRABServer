@@ -555,7 +555,7 @@ class DagmanCreator(TaskAction.TaskAction):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
-        if task['tm_publication'] :
+	if task['tm_publication'] == 'T' :
             try:
                 validateLFNs(dest,outfiles)
             except AssertionError as ex:
