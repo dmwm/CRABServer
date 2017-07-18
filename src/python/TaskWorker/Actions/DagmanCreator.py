@@ -112,7 +112,8 @@ CRAB_Id = $(count)
 +CRAB_ASODB = %(tm_asodb)s
 +CRAB_PrimaryDataset = %(primarydataset)s
 +TaskType = "Job"
-+AccountingGroup = %(accounting_group)s
+accounting_group = %(accounting_group)s
+accounting_group_user = %(accounting_group_user)s
 +CRAB_SubmitterIpAddr = %(submitter_ip_addr)s
 +CRAB_TaskLifetimeDays = %(task_lifetime_days)s
 +CRAB_TaskEndTime = %(task_endtime)s
@@ -254,13 +255,16 @@ def transform_strings(input):
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
                'stageoutpolicy', 'taskType', 'worker_name', 'desired_opsys', 'desired_opsysvers', \
-               'desired_arch', 'accounting_group', 'resthost', 'resturinoapi', 'submitter_ip_addr', \
+               'desired_arch', 'resthost', 'resturinoapi', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
         else:
             info[var] = json.dumps(val)
+
+    for var in 'accounting_group', 'accounting_group_user':
+        info[var] = input[var]
 
     for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'publishgroupname':
         info[var] = int(input[var])
@@ -494,9 +498,10 @@ class DagmanCreator(TaskAction.TaskAction):
         info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
         egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
         if egroups and info['userhn'] in self.getHighPrioUsers(info['user_proxy'], info['workflow'], egroups):
-            info['accounting_group'] = 'highprio.%s' % info['userhn']
+            info['accounting_group'] = 'highprio'
         else:
-            info['accounting_group'] = 'analysis.%s' % info['userhn']
+            info['accounting_group'] = 'analysis'
+        info['accounting_group_user'] = info['userhn']
         info = transform_strings(info)
         info['faillimit'] = task['tm_fail_limit']
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
