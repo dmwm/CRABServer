@@ -19,6 +19,8 @@ from ast import literal_eval
 from httplib import HTTPException
 
 from ServerUtilities import getLock
+from ServerUtilities import TASKLIFETIME
+
 import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
 import TaskWorker.Actions.TaskAction as TaskAction
@@ -112,6 +114,8 @@ CRAB_Id = $(count)
 +TaskType = "Job"
 +AccountingGroup = %(accounting_group)s
 +CRAB_SubmitterIpAddr = %(submitter_ip_addr)s
++CRAB_TaskLifetimeDays = %(task_lifetime_days)s
++CRAB_TaskEndTime = %(task_endtime)s
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
 +DESIRED_OpSyses = %(desired_opsys)s
@@ -162,13 +166,15 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
                      (MemoryUsage > RequestMemory) || \
                      (MaxWallTimeMins*60 < time() - EnteredCurrentStatus) || \
                      (DiskUsage > %(max_disk_space)s))) || \
+                     (time() > CRAB_TaskEndTime) || \
                   ((JobStatus =?= 1) && (time() > (x509UserProxyExpiration + 86400)))
 +PeriodicRemoveReason = ifThenElse(time() - EnteredCurrentStatus > 7*24*60*60 && isUndefined(MemoryUsage), "Removed due to idle time limit", \
                           ifThenElse(time() > x509UserProxyExpiration, "Removed job due to proxy expiration", \
                             ifThenElse(MemoryUsage > RequestMemory, "Removed due to memory use", \
                               ifThenElse(MaxWallTimeMins*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
                                 ifThenElse(DiskUsage >  %(max_disk_space)s, "Removed due to disk usage", \
-                                  "Removed due to job being held")))))
+                                  ifThenElse(time() > CRAB_TaskEndTime, "Removed due to reached CRAB_TaskEndTime", \
+                                  "Removed due to job being held"))))))
 %(extra_jdl)s
 queue
 """
@@ -215,6 +221,27 @@ def makeLFNPrefixes(task):
 
     return temp_dest, dest
 
+def validateLFNs(path, outputFiles):
+    """
+    validate against standard Lexicon the LFN's that this task will try to publish in DBS
+    :param path: string: the path part of the LFN's, w/o the directory counter
+    :param outputFiles: list of strings: the filenames to be published (w/o the jobId, i.e. out.root not out_1.root)
+    :return: nothing if all OK. If LFN is not valid Lexicon raises an AssertionError exception
+    """
+    from WMCore import Lexicon
+    # fake values to get proper LFN length, actual numbers chance job by job
+    jobId = '10000'       # current max is 10k jobs per task
+    dirCounter = '0001'   # need to be same length as 'counter' used later in makeDagSpecs
+
+    for origFile in outputFiles:
+        info = origFile.rsplit(".", 1)
+        if len(info) == 2:    # filename ends with .<something>, put jobId before the dot
+            fileName = "%s_%s.%s" % (info[0], jobId, info[1])
+        else:
+            fileName = "%s_%s" % (origFile, jobId)
+        testLfn = os.path.join(path, dirCounter, fileName)
+        Lexicon.lfn(testLfn)  # will raise if testLfn is not a valid lfn
+    return
 
 def transform_strings(input):
     """
@@ -228,7 +255,7 @@ def transform_strings(input):
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
                'stageoutpolicy', 'taskType', 'worker_name', 'desired_opsys', 'desired_opsysvers', \
                'desired_arch', 'accounting_group', 'resthost', 'resturinoapi', 'submitter_ip_addr', \
-               'maxproberuntime', 'maxtailruntime':
+               'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
@@ -455,6 +482,10 @@ class DagmanCreator(TaskAction.TaskAction):
         info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
         info['submitter_ip_addr'] = task['tm_submitter_ip_addr']
 
+        #Classads for task lifetime management, see https://github.com/dmwm/CRABServer/issues/5505
+        info['task_lifetime_days'] = TASKLIFETIME // 24 // 60 // 60
+        info['task_endtime'] = int(task["tm_start_time"]) + TASKLIFETIME
+
         self.populateGlideinMatching(info)
 
         # TODO: pass through these correctly.
@@ -524,6 +555,14 @@ class DagmanCreator(TaskAction.TaskAction):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
+        if task['tm_publication'] == 'T':
+            try:
+                validateLFNs(dest,outfiles)
+            except AssertionError as ex:
+                msg  = "\nYour task speficies an output LFN which fails validation in"
+                msg += "\n WMCore/Lexicon and therefore can not be published in DBS"
+                msg += "\nError detail: %s" % (str(ex))
+                raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
         groupid = len(siteinfo['group_sites'])
         siteinfo['group_sites'][groupid] = list(availablesites)
         siteinfo['group_datasites'][groupid] = list(datasites)

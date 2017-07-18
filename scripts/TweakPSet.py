@@ -92,7 +92,7 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
     """
     def __init__(self, location, inputFiles, runAndLumis, agentNumber, lfnBase, outputMods, firstEvent=0, lastEvent=-1, firstLumi=None,\
                     firstRun=None, seeding=None, lheInputFiles=False, oneEventMode=False, eventsPerLumi=None, maxRuntime=None):
-        ScriptInterface.__init__(self)
+        SetupCMSSWPset.__init__(self, crabPSet=True)
         self.stepSpace = ConfigSection()
         self.stepSpace.location = location
         self.step = StepConfiguration(lfnBase, outputMods)
@@ -111,7 +111,6 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
             self.step.data.application.configuration.eventsPerLumi = eventsPerLumi
         if maxRuntime:
             self.step.data.application.configuration.maxSecondsUntilRampdown = maxRuntime
-        self.step.data.application.multicore.enabled = False
         self.step.data.section_("input")
         self.job = jobDict(lheInputFiles, seeding)
         self.job["input_files"] = []
