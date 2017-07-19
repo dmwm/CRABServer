@@ -516,6 +516,7 @@ class ASOServerJob(object):
         if str(self.job_ad['CRAB_UserGroup']).lower() == 'undefined':
             group = ''
 
+        task_publish = int(self.job_ad['CRAB_Publish'])
 
         # TODO: Add a method to resolve a single PFN.
         if self.transfer_outputs:
@@ -590,7 +591,6 @@ class ASOServerJob(object):
                 doc_new_info['state'] = 'done'
                 doc_new_info['end_time'] = now
             ## Set the publication flag.
-            task_publish = int(self.job_ad['CRAB_Publish'])
             publication_msg = None
             if file_type == 'output':
                 publish = task_publish
@@ -614,7 +614,6 @@ class ASOServerJob(object):
                 aso_tasks.append("transfer")
             if publish:
                 aso_tasks.append("publication")
-            delayed_publicationflag_update = False 
             if not (needs_transfer or publish):
                 ## This file doesn't need transfer nor publication, so we don't need to upload
                 ## a document to ASO database.
@@ -625,18 +624,6 @@ class ASOServerJob(object):
                 msg  = msg % (filename)
                 self.logger.info(msg)
             else:
-                ## If the file needs both transfer and publication we turn the publication flag off and
-                ## we will update the database once the filemetadata are uploaded
-                ## The other cases are:
-                ##   1) Publication already off: we obviously do not need to do anything
-                ##   2) Transfer not required (e.g.: direct stageout) but publication necessary:
-                ##      In this case we just upload the document now with publication requested
-                if needs_transfer and publish:
-                    publish = 0
-                    delayed_publicationflag_update = True
-                    msg = "Temporarily disabling publication flag."
-                    msg += "It will be updated once the transfer is done (and filemetadata uploaded)."
-                    self.logger.info(msg)
                 ## This file needs transfer and/or publication. If a document (for the current
                 ## job retry) is not yet in ASO database, we need to do the upload.
                 needs_commit = True
@@ -753,8 +740,7 @@ class ASOServerJob(object):
                 ## Record all files for which we want the post-job to monitor their transfer.
                 if needs_transfer:
                     doc_info = {'doc_id'     : doc_id,
-                                'start_time' : doc.get('start_time'),
-                                'delayed_publicationflag_update' : delayed_publicationflag_update
+                                'start_time' : doc.get('start_time')
                                }
                     docs_in_transfer.append(doc_info)
 
@@ -2000,27 +1986,6 @@ class PostJob():
                 return self.check_retry_count(80001), retmsg
             self.logger.info("====== Finished upload of output files metadata.")
 
-            if ASO_JOB:
-                self.logger.info("====== About to update publication flags of transfered files.")
-                for doc in getattr(ASO_JOB, 'docs_in_transfer', []):
-                    doc_id = doc.get('doc_id')
-                    self.logger.debug("Found doc %s" % doc_id)
-                    if doc.get('delayed_publicationflag_update'):
-                        newDoc = {
-                            'subresource' : 'updatePublication',
-                            'list_of_ids' : doc_id,
-                            'list_of_publication_state' : 'NEW',
-                            'asoworker' : '%'
-                        }
-                        try:
-                            self.server.post(self.rest_uri_no_api + "/filetransfers", data=encodeRequest(newDoc))
-                        except Exception as ex:
-                            retmsg = "Fatal error uploading  publication flags of transfered files: %s" % (str(ex))
-                            self.logger.exception(retmsg)
-                            self.logger.info("====== Finished to update publication flags of transfered files.")
-                            return self.check_retry_count(80001), retmsg
-                self.logger.info("====== Finished to update publication flags of transfered files.")
-
         ## Upload the input files metadata.
         self.logger.info("====== Starting upload of input files metadata.")
         try:
@@ -2122,6 +2087,7 @@ class PostJob():
 
         ## If no transfers failed, return success immediately.
         if aso_job_retval == 0:
+            ASO_JOB = None
             return 0
 
         ## Return code 2 means post-job timed out waiting for transfer to complete and
