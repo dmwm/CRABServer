@@ -148,6 +148,5 @@ def fixupTask(task):
     result['resubmit_maxmemory'] = extraargs['maxmemory'] if 'maxmemory' in extraargs else None
     result['resubmit_numcores'] = extraargs['numcores'] if 'numcores' in extraargs else None
     result['resubmit_priority'] = extraargs['priority'] if 'priority' in extraargs else None
-    result['kill_ids'] = extraargs['killList'] if 'killList' in extraargs else []
 
     return result

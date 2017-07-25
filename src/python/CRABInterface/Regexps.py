@@ -52,7 +52,11 @@ RX_OUTFILES  = re.compile(r"^(?=.{0,255}$)%s$"%lfnParts['root'])
 RX_JOBID     = re.compile(r"^\d+(-\d+){0,1}$")
 RX_RUNS      = re.compile(r"^\d+$")
 RX_LUMIRANGE = re.compile(r"^\d+,\d+(,\d+,\d+)*$")
-RX_LUMILIST  = re.compile(r"^\d+(,\d+)*$")
+
+# Supports two formats for backward compatibility:
+# '1,4,6,8,9,10...' (old format which is still present in old postjobs)
+# '1:20,4:20,6:21,8:20,9:20,10:21...' (new format with events per each lumi)
+RX_LUMILIST = re.compile(r"^(\d+(,\d+)*)$|^((\d+:(\d+|None))(,\d+:(\d+|None))*)$")
 RX_GLOBALTAG = re.compile(r'^[a-zA-Z0-9\s\.\-_:]{1,100}$')
 RX_OUTTYPES  = re.compile(r'^EDM|LOG|TFILE|FAKE|POOLIN$')
 RX_CHECKSUM  = re.compile(r'^[A-Za-z0-9\-]+$')
@@ -60,7 +64,7 @@ RX_FILESTATE  = re.compile(r'^TRANSFERRING|FINISHED|FAILED|COOLOFF$')
 RX_LFNPATH   = re.compile(r"^(?=.{0,500}$)%(subdir)s(/%(subdir)s)*/?$" % lfnParts)
 RX_HOURS   = re.compile(r"^\d{0,6}$") #should be able to erase the last 100 years with 6 digits
 RX_URL = re.compile(r"^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w :\.-])*$")
-RX_SCRIPTARGS = re.compile(r'^[+a-zA-Z0-9\-.,_:?/"]+=[a-zA-Z0-9\-=.,_:?/"()]+$')
+RX_SCRIPTARGS = re.compile(r'^[+a-zA-Z0-9\-.,_:?/"]+ ?= ?[a-zA-Z0-9\-=.,_:?/"()]+$')
 RX_SCHEDD_NAME = re.compile(r"^[A-Za-z0-9._-]+[@.][A-Za-z0-9._-]+\.[A-Za-z]{2,6}$")
 RX_COLLECTOR = re.compile(r"^(([A-Za-z0-9._-]+\.[A-Za-z]{2,6}),?)+$")
 #TODO!
@@ -77,7 +81,7 @@ RX_SUBRES_SI = re.compile(r"^delegatedn|backendurls|version|bannedoutdest|schedd
 RX_SUBRES_TASK = re.compile(r"^allinfo|allusers|summary|search|taskbystatus|getpublishurl|addwarning|addwebdir|addoutputdatasets|webdir|counttasksbystatus|lastfailures|updateschedd|updatepublicationtime$")
 
 #worker workflow
-RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._]{1,100}$")
+RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._%]{1,100}$")
 ## this can be improved by putting a dependency on CAFUtilities task state machine
 RX_STATUS = re.compile(r"^[A-Za-z_]{1,20}$")
 

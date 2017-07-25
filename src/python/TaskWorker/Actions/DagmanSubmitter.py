@@ -458,14 +458,11 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["RemoteCondorSetup"] = info['remote_condor_setup']
 
         dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"].encode('ascii', 'ignore'))
-        # increasing the time for keeping the dagman into the queue with 10 days in order to
-        # start a proper cleanup script after the task lifetime has expired
-        extendedLifetime = TASKLIFETIME + 10*24*60*60
-        # Putting JobStatus == 4 since LeaveJobInQueue is for completed jobs (probably redundant)
-        LEAVE_JOB_IN_QUEUE_EXPR = '(JobStatus == 4 || TaskType =!= "ROOT") && ((time()-CRAB_TaskSubmitTime) < %s)' % extendedLifetime
-        dagAd["LeaveJobInQueue"] = classad.ExprTree(LEAVE_JOB_IN_QUEUE_EXPR)
-        # Removing a task after the expiration date no matter what its status is
-        dagAd["PeriodicRemove"] = classad.ExprTree("((time()-CRAB_TaskSubmitTime) > %s)" % extendedLifetime)
+        dagAd['CRAB_TaskLifetimeDays'] = TASKLIFETIME // 24 // 60 // 60
+        dagAd['CRAB_TaskEndTime'] = int(info["start_time"]) + TASKLIFETIME
+        #For task management info see https://github.com/dmwm/CRABServer/issues/4681#issuecomment-302336451
+        dagAd["LeaveJobInQueue"] = classad.ExprTree("true")
+        dagAd["PeriodicHold"] = classad.ExprTree("time() > CRAB_TaskEndTime")
         dagAd["TransferOutput"] = info['outputFilesString']
         dagAd["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
         dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
@@ -503,7 +500,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 # see https://github.com/dmwm/CRABServer/pull/5212#issuecomment-216519749
                 if resultAds:
                     id_ = "%s.%s" % (resultAds[0]['ClusterId'], resultAds[0]['ProcId'])
-                    schedd.edit([id_], "LeaveJobInQueue", classad.ExprTree(LEAVE_JOB_IN_QUEUE_EXPR))
+                    schedd.edit([id_], "LeaveJobInQueue", classad.ExprTree("true"))
 
         try:
             results = pickle.load(rpipe)

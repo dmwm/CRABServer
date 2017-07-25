@@ -87,7 +87,7 @@ alter table tasks add (tm_debug_files VARCHAR(255));
 
 --Changse that will be needed for version 3.3.1611
 alter table tasks add (tm_submitter_ip_addr VARCHAR(45));
-alter table tasks add (tm_ignore_global_blacklist VARCHAR(1))
+alter table tasks add (tm_ignore_global_blacklist VARCHAR(1));
 
 --Changse that will be needed for version 3.3.1612
 

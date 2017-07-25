@@ -192,7 +192,6 @@ class PreJob:
         try:
             self.logger.info("Loading classads from: %s" % os.environ['_CONDOR_JOB_AD'])
             self.task_ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
-            self.logger.info(os.listdir('.'))
             self.logger.info(str(self.task_ad))
         except:
             msg = "Got exception while trying to parse the job ad."
@@ -444,6 +443,10 @@ class PreJob:
         ## on the whitelist).
         siteblacklist.update(automatic_siteblacklist)
         available -= (siteblacklist - sitewhitelist)
+        if not available:
+          self.logger.error("Can not submit since DESIRED_Sites list is empty")
+          self.prejob_exit_code = 1
+          sys.exit(self.prejob_exit_code)
         ## Add DESIRED_SITES to the Job.<job_id>.submit content.
         new_submit_text = '+DESIRED_SITES="%s"\n%s' % (",".join(available), new_submit_text)
         new_submit_text = '+DESIRED_CMSDataLocations="%s"\n%s' % (",".join(datasites), new_submit_text)

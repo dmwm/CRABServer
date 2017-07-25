@@ -110,7 +110,7 @@ G_JOB_REPORT_NAME_NEW = None
 G_WMARCHIVE_REPORT_NAME = None
 G_WMARCHIVE_REPORT_NAME_NEW = None
 G_ERROR_SUMMARY_FILE_NAME = "error_summary.json"
-G_FJR_PARSE_RESULTS_FILE_NAME= "task_process/fjr_parse_results.txt"
+G_FJR_PARSE_RESULTS_FILE_NAME = "task_process/fjr_parse_results.txt"
 
 def sighandler(*args):
     if ASO_JOB:
@@ -462,7 +462,8 @@ class ASOServerJob(object):
         This is the main method in ASOServerJob. Should be called after initializing
         an instance.
         """
-        self.docs_in_transfer = self.inject_to_aso()
+        with getLock('get_transfers_statuses'):
+            self.docs_in_transfer = self.inject_to_aso()
         if self.docs_in_transfer == False:
             exmsg = "Couldn't upload document to ASO database"
             raise RuntimeError(exmsg)
@@ -470,7 +471,7 @@ class ASOServerJob(object):
             self.logger.info("No files to transfer via ASO. Done!")
             return 0
         self.save_docs_in_transfer()
-        return self.check_transfers()
+        return 4
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -515,7 +516,6 @@ class ASOServerJob(object):
         if str(self.job_ad['CRAB_UserGroup']).lower() == 'undefined':
             group = ''
 
-        task_publish = int(self.job_ad['CRAB_Publish'])
 
         # TODO: Add a method to resolve a single PFN.
         if self.transfer_outputs:
@@ -590,6 +590,7 @@ class ASOServerJob(object):
                 doc_new_info['state'] = 'done'
                 doc_new_info['end_time'] = now
             ## Set the publication flag.
+            task_publish = int(self.job_ad['CRAB_Publish'])
             publication_msg = None
             if file_type == 'output':
                 publish = task_publish
@@ -613,6 +614,7 @@ class ASOServerJob(object):
                 aso_tasks.append("transfer")
             if publish:
                 aso_tasks.append("publication")
+            delayed_publicationflag_update = False
             if not (needs_transfer or publish):
                 ## This file doesn't need transfer nor publication, so we don't need to upload
                 ## a document to ASO database.
@@ -623,6 +625,18 @@ class ASOServerJob(object):
                 msg  = msg % (filename)
                 self.logger.info(msg)
             else:
+                ## If the file needs both transfer and publication we turn the publication flag off and
+                ## we will update the database once the filemetadata are uploaded
+                ## The other cases are:
+                ##   1) Publication already off: we obviously do not need to do anything
+                ##   2) Transfer not required (e.g.: direct stageout) but publication necessary:
+                ##      In this case we just upload the document now with publication requested
+                if needs_transfer and publish:
+                    publish = 0
+                    delayed_publicationflag_update = True
+                    msg = "Temporarily disabling publication flag."
+                    msg += "It will be updated once the transfer is done (and filemetadata uploaded)."
+                    self.logger.info(msg)
                 ## This file needs transfer and/or publication. If a document (for the current
                 ## job retry) is not yet in ASO database, we need to do the upload.
                 needs_commit = True
@@ -739,7 +753,8 @@ class ASOServerJob(object):
                 ## Record all files for which we want the post-job to monitor their transfer.
                 if needs_transfer:
                     doc_info = {'doc_id'     : doc_id,
-                                'start_time' : doc.get('start_time')
+                                'start_time' : doc.get('start_time'),
+                                'delayed_publicationflag_update' : delayed_publicationflag_update
                                }
                     docs_in_transfer.append(doc_info)
 
@@ -876,6 +891,7 @@ class ASOServerJob(object):
             # Without the second condition, we run the risk of using the previous stageout
             # attempts results.
             if (time.time() - last_query < 900) and (last_query > self.aso_start_timestamp):
+                self.logger.info("Using the cache since it is up to date (last_query=%s) and it is after we submitted the transfer (aso_start_timestamp=%s)", last_query, self.aso_start_timestamp)
                 query_view = False
                 if not last_succeded:
                     #no point in continuing if the last query failed. Just defer the PJ and retry later
@@ -886,6 +902,7 @@ class ASOServerJob(object):
             for doc_info in self.docs_in_transfer:
                 doc_id = doc_info['doc_id']
                 if doc_id not in aso_info.get("results", {}):
+                    self.logger.debug("Changing query_view back to true")
                     query_view = True
                     break
         if isCouchDBURL(self.aso_db_url):
@@ -1924,6 +1941,27 @@ class PostJob():
                 return self.check_retry_count(80001), retmsg
             self.logger.info("====== Finished upload of output files metadata.")
 
+            if ASO_JOB:
+                self.logger.info("====== About to update publication flags of transfered files.")
+                for doc in getattr(ASO_JOB, 'docs_in_transfer', []):
+                    doc_id = doc.get('doc_id')
+                    self.logger.debug("Found doc %s" % doc_id)
+                    if doc.get('delayed_publicationflag_update'):
+                        newDoc = {
+                            'subresource' : 'updatePublication',
+                            'list_of_ids' : doc_id,
+                            'list_of_publication_state' : 'NEW',
+                            'asoworker' : '%'
+                        }
+                        try:
+                            self.server.post(self.rest_uri_no_api + "/filetransfers", data=encodeRequest(newDoc))
+                        except Exception as ex:
+                            retmsg = "Fatal error uploading  publication flags of transfered files: %s" % (str(ex))
+                            self.logger.exception(retmsg)
+                            self.logger.info("====== Finished to update publication flags of transfered files.")
+                            return self.check_retry_count(80001), retmsg
+                self.logger.info("====== Finished to update publication flags of transfered files.")
+
         ## Upload the input files metadata.
         self.logger.info("====== Starting upload of input files metadata.")
         try:
@@ -2017,7 +2055,6 @@ class PostJob():
 
         ## If no transfers failed, return success immediately.
         if aso_job_retval == 0:
-            ASO_JOB = None
             return 0
 
         ## Return code 2 means post-job timed out waiting for transfer to complete and
@@ -2187,7 +2224,7 @@ class PostJob():
             rest_api = 'filemetadata'
             rest_uri = self.rest_uri_no_api + '/' + rest_api
             rest_url = self.rest_host + rest_uri
-            msg = "Uploading output metadata for %s to https://%s: %s" % (lfn, rest_url, configreq)
+            msg = "Uploading input metadata for %s to https://%s: %s" % (lfn, rest_url, configreq)
             self.logger.debug(msg)
             try:
                 configreq = dict(configreq)
@@ -2506,7 +2543,11 @@ class PostJob():
                 file_info['outfilelumis'] = []
                 for run, lumis in output_file_info[u'runs'].items():
                     file_info['outfileruns'].append(str(run))
-                    file_info['outfilelumis'].append(','.join(map(str, lumis)))
+                    # Creating a string like '100:20,101:21,105:20...'
+                    # where the lumi is followed by a colon and number of events in that lumi.
+                    # Note that the events per lumi information is provided by WMCore version >=1.1.2 when parsing FWJR.
+                    lumisAndEvents = ','.join(['{0}:{1}'.format(str(lumi), str(numEvents)) for lumi, numEvents in lumis.iteritems()])
+                    file_info['outfilelumis'].append(lumisAndEvents)
             else:
                 msg = "Output file info for %s not found in job report." % (orig_file_name)
                 self.logger.error(msg)
@@ -2695,7 +2736,9 @@ class PostJob():
 
     def processWMArchive(self, retval):
         WMARCHIVE_BASE_LOCATION = json.load(open("/etc/wmarchive.json")).get("BASE_DIR", "/data/wmarchive")
+        WMARCHIVE_BASE_LOCATION = os.path.join(WMARCHIVE_BASE_LOCATION, 'new')
 
+        now = int(time.time())
         archiveDoc = {}
         with open(G_WMARCHIVE_REPORT_NAME) as fd:
             job = {}
@@ -2704,15 +2747,69 @@ class PostJob():
             job['doc']["fwjr"] = json.load(fd)
             job['doc']["jobtype"] = 'CRAB3'
             job['doc']["jobstate"] = 'success' if retval == 0 else 'failed'
-            job['doc']["timestamp"] = int(time.time())
+            job['doc']["timestamp"] = now
             archiveDoc = createArchiverDoc(job)
             archiveDoc['task'] = self.reqname
+            archiveDoc["meta_data"]['crab_id'] = self.job_id
+            archiveDoc["meta_data"]['crab_exit_code'] = self.job_report['exitCode']
+            archiveDoc["steps"].append(
+                {
+                    "errors": [
+                        {
+                            "details": str(getattr(ASO_JOB, 'failures', "")),
+                            "exitCode": 0,
+                            "type": ""
+                        }
+                    ],
+                    "input": [
+                        {
+                            "inputLFNs": [],
+                            "inputPFNs": [],
+                            "runs": [
+                                {
+                                    "eventsPerLumi": [],
+                                    "lumis": []
+                                }
+                            ]
+                        }
+                    ],
+                    "name": "aso",
+                    "output": [
+                        {
+                            "inputLFNs": [],
+                            "inputPFNs": [],
+                            "outputLFNs": [],
+                            "outputPFNs": [],
+                            "runs": [
+                                {
+                                    "eventsPerLumi": [],
+                                    "lumis": []
+                                }
+                            ]
+                        }
+                    ],
+                    "performance": {
+                        "multicore": {},
+                        "storage": {},
+                        "cpu": {},
+                        "memory": {}
+                    },
+                    "site": self.dest_site,
+                    "start": self.aso_start_timestamp or 0,
+                    "status": 0,
+                    "stop": now
+                }
+            )
+
+
+
         with open(G_WMARCHIVE_REPORT_NAME_NEW, 'w') as fd:
             json.dump(archiveDoc, fd)
         if not os.path.isdir(WMARCHIVE_BASE_LOCATION):
-            os.makedirs(WMARCHIVE_BASE_LOCATION)
+            os.makedirs(os.path.join(WMARCHIVE_BASE_LOCATION))
         #not using shutil.move because I want to move the file in the same disk
-        os.rename(G_WMARCHIVE_REPORT_NAME_NEW, os.path.join(WMARCHIVE_BASE_LOCATION, 'new', "%s_%s" % (self.reqname, G_WMARCHIVE_REPORT_NAME_NEW)))
+        self.logger.info("%s , %s" % (G_WMARCHIVE_REPORT_NAME_NEW, os.path.join(WMARCHIVE_BASE_LOCATION, "%s_%s" % (self.reqname, G_WMARCHIVE_REPORT_NAME_NEW))))
+        os.rename(G_WMARCHIVE_REPORT_NAME_NEW, os.path.join(WMARCHIVE_BASE_LOCATION, "%s_%s" % (self.reqname, G_WMARCHIVE_REPORT_NAME_NEW)))
 
 ##==============================================================================
 
