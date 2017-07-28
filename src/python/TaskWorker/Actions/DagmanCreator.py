@@ -333,30 +333,30 @@ class DagmanCreator(TaskAction.TaskAction):
         self.phedex = PhEDEx.PhEDEx() #TODO use config certs!
 
 
-    def buildDashboardInfo(self):
-        taskType = self.getDashboardTaskType()
+    def buildDashboardInfo(self, task):
+        taskType = self.getDashboardTaskType(task)
 
         params = {'tool': 'crab3',
                   'SubmissionType':'crab3',
                   'JSToolVersion': '3.3.0',
                   'tool_ui': os.environ.get('HOSTNAME', ''),
                   'scheduler': 'GLIDEIN',
-                  'GridName': self.task['tm_user_dn'],
-                  'ApplicationVersion': self.task['tm_job_sw'],
+                  'GridName': task['tm_user_dn'],
+                  'ApplicationVersion': task['tm_job_sw'],
                   'taskType': taskType,
                   'vo': 'cms',
-                  'CMSUser': self.task['tm_username'],
-                  'user': self.task['tm_username'],
-                  'taskId': self.task['tm_taskname'],
-                  'datasetFull': self.task['tm_input_dataset'],
-                  'resubmitter': self.task['tm_username'],
+                  'CMSUser': task['tm_username'],
+                  'user': task['tm_username'],
+                  'taskId': task['tm_taskname'],
+                  'datasetFull': task['tm_input_dataset'],
+                  'resubmitter': task['tm_username'],
                   'exe': 'cmsRun' }
         return params
 
 
-    def sendDashboardTask(self):
+    def sendDashboardTask(self, task):
         apmon = ApmonIf()
-        params = self.buildDashboardInfo()
+        params = self.buildDashboardInfo(task)
         params_copy = dict(params)
         params_copy['jobId'] = 'TaskMeta'
         self.logger.debug("Dashboard task info: %s" % str(params_copy))
@@ -413,12 +413,12 @@ class DagmanCreator(TaskAction.TaskAction):
                 info['desired_arch'] = "X86_64"
 
 
-    def getDashboardTaskType(self):
+    def getDashboardTaskType(self, task):
         """ Get the dashboard activity name for the task.
         """
-        if self.task['tm_activity'] in (None, ''):
+        if task['tm_activity'] in (None, ''):
             return getattr(self.config.TaskWorker, 'dashboardTaskType', 'analysistest')
-        return self.task['tm_activity']
+        return task['tm_activity']
 
 
     def isGlobalBlacklistIgnored(self, kwargs):
@@ -479,7 +479,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['ASOURL'] = task['tm_asourl']
         asodb = task.get('tm_asodb', 'asynctransfer') or 'asynctransfer'
         info['ASODB'] = asodb
-        info['taskType'] = self.getDashboardTaskType()
+        info['taskType'] = self.getDashboardTaskType(task)
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
         info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
@@ -1112,11 +1112,10 @@ class DagmanCreator(TaskAction.TaskAction):
 
         kw['task']['resthost'] = self.server['host']
         kw['task']['resturinoapi'] = self.restURInoAPI
-        self.task = kw['task']
 
         params = {}
         if kw['task']['tm_dry_run'] == 'F':
-            params = self.sendDashboardTask()
+            params = self.sendDashboardTask(kw['task'])
 
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
                       'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',

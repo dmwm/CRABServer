@@ -134,7 +134,6 @@ class PreDAG:
             os.dup2(fdPredagLog, 2)
             msg = "Pre-DAG started with output redirected to %s" % (predagLogFileName)
             self.logger.info(msg)
-        return msg
 
     def executeInternal(self, *args):
         """The executeInternal method return 4 if the "completion" threshold is not reached, 0 otherwise"""
@@ -142,7 +141,7 @@ class PreDAG:
         self.completion = int(args[1])
         self.prefix = args[2]
 
-        msg = self.setupLog()
+        self.setupLog()
 
         self.statusCacheInfo = {} #Will be filled with the status from the status cache
 
@@ -208,7 +207,7 @@ class PreDAG:
         except TaskWorkerException as e:
             retmsg = "Splitting failed with:\n{0}".format(e)
             self.logger.error(msg)
-            self.set_dashboard_state('FAILED')
+#            self.set_dashboard_state('FAILED')
             return 1
         try:
             creator = DagmanCreator(config, server=None, resturi='')
@@ -221,7 +220,7 @@ class PreDAG:
         except TaskWorkerException as e:
             retmsg = "DAG creation failed with:\n{0}".format(e)
             self.logger.error(retmsg)
-            self.set_dashboard_state('FAILED')
+#            self.set_dashboard_state('FAILED')
             return 1
         self.saveProcessedJobs(unprocessed)
         return 0
