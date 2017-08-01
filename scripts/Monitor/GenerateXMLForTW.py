@@ -85,7 +85,7 @@ class CRAB3CreateXML(object):
             result = self.coll.query(htcondor.AdTypes.Schedd,'CMSGWMS_Type=?="crabschedd"',['Name','ShadowsRunning','TotalSchedulerJobsRunning','TotalIdleJobs','TotalRunningJobs','TotalHeldJobs'])
             for schedd in result:  # oneshadow[0].split('@')[1].split('.')[0]
                 data.append([schedd['Name'],schedd['ShadowsRunning'],schedd['TotalSchedulerJobsRunning'],schedd['TotalIdleJobs'],schedd['TotalRunningJobs'],schedd['TotalHeldJobs']])
-        except  Exception, e:
+        except  Exception as e:
             self.logger.debug("Error in getShadowsRunning: %s"%str(e))
         return data
 
@@ -128,7 +128,7 @@ class CRAB3CreateXML(object):
             for name in ['SUBMITTED', 'FAILED', 'QUEUED', 'NEW', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'SUBMITFAILED']:
                 numericval = SubElement(data, "numericvalue")
                 numericval.set("name","number_of_%s_tasks_in_the_last_minute"%(name))
-                if twStatus.has_key(name):
+                if name in twStatus:
                     numericval.text = str(twStatus[name])
                 else:
                     numericval.text = '0'
@@ -146,7 +146,7 @@ class CRAB3CreateXML(object):
             for name in ['KILL', 'RESUBMIT', 'NEW', 'QUEUED', 'KILLFAILED', 'RESUBMITFAILED', 'SUBMITFAILED', 'UPLOADED']:
                 numericval = SubElement(data, "numericvalue")
                 numericval.set("name","numberOfTasksIn_%s_State"%(name))
-                if twStatus.has_key(name):
+                if name in twStatus:
                     numericval.text = str(twStatus[name])
                 else:
                     numericval.text = '0'
@@ -234,7 +234,7 @@ class CRAB3CreateXML(object):
             with open(temp_xmllocation, 'w') as f:
                 f.write(tostring(root))
             os.system('mv %s %s' % (temp_xmllocation, self.xmllocation))
-        except Exception, e:
+        except Exception as e:
             self.logger.debug(str(e))
 
 if __name__ == '__main__':
@@ -269,7 +269,7 @@ if __name__ == '__main__':
     cmd = "curl -i -F file=@%s xsls.cern.ch" % xmllocation
     try:
         pu = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    except Exception, e:
+    except Exception as e:
         logger.debug(str(e))
     end_time = time.time()
     elapsed = end_time - start_time

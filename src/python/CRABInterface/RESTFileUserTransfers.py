@@ -1,3 +1,4 @@
+from __future__ import print_function
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_num, validate_strlist
@@ -32,7 +33,7 @@ class RESTFileUserTransfers(RESTEntity):
             # Now what is put in CouchDB is not validated
             # And all put are prepared by us in JOB wrappers, so it should already be correct.
             # P.S. Validation is done in function and it double check if all required keys are available
-            print param, safe
+            print (param, safe)
             validate_str("id", param, safe, RX_ANYTHING, optional=False)
             validate_str("username", param, safe, RX_ANYTHING, optional=False)
             validate_str("taskname", param, safe, RX_ANYTHING, optional=False)
@@ -244,7 +245,7 @@ class RESTFileUserTransfers(RESTEntity):
             raise InvalidParameter('TaskName is not defined')
         binds['username'] = username
         binds['taskname'] = taskname
-        print binds
+        print (binds)
         if subresource == 'getTransferStatus':
             ###############################################
             # getTransferStatus API

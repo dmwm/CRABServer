@@ -102,6 +102,7 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, isCouchDBURL, oracleOutputMapping
 
 from WMCore.Configuration import Configuration, ConfigSection
+from functools import reduce
 
 
 ASO_JOB = None
