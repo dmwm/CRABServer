@@ -16,7 +16,7 @@ from distutils.spawn import spawn
 
 systems = \
 {
-    'U19421689iCRABClient': #Will be used if we moved the CRABClient repository
+    'CRABClient': #Will be used if we moved the CRABClient repository
     {
         'py_modules': ['PandaServerInterface', 'RESTInteractions', 'ServerUtilities'],
         'python': [],
