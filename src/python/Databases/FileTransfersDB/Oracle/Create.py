@@ -24,6 +24,7 @@ class Create(DBCreator):
         self.create = {}
         self.constraints = {}
         self.create['i_transfers'] = "CREATE INDEX TM_TASKNAME_IDX ON FILETRANSFERSDB (TM_TASKNAME)"
+        self.create['i_workers'] = "CREATE INDEX TM_WORKER_STATE ON FILETRANSFERSDB (TM_ASO_WORKER, TM_TRANSFER_STATE) COMPRESS 2"
         #  //
         # // Define create statements for each table
         # //
