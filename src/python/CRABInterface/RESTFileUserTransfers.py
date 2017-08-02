@@ -5,7 +5,7 @@ from WMCore.REST.Error import InvalidParameter, UnsupportedMethod
 
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_user_action, authz_login_valid
-from CRABInterface.Regexps import RX_USERNAME, RX_TASKNAME, RX_SUBGETUSERTRANSFER, RX_SUBPOSTUSERTRANSFER, RX_ANYTHING
+from CRABInterface.Regexps import RX_USERNAME, RX_TASKNAME, RX_SUBGETUSERTRANSFER, RX_SUBPOSTUSERTRANSFER, RX_JOBID, RX_ANYTHING
 
 from ServerUtilities import TRANSFERDB_STATUSES, PUBLICATIONDB_STATUSES
 # external dependecies here
@@ -42,7 +42,7 @@ class RESTFileUserTransfers(RESTEntity):
             validate_str("source_lfn", param, safe, RX_ANYTHING, optional=False)
             validate_num("filesize", param, safe, optional=False)
             validate_num("publish", param, safe, optional=False)
-            validate_num("job_id", param, safe, optional=False)
+            validate_str("job_id", param, safe, RX_JOBID, optional=False)
             validate_num("job_retry_count", param, safe, optional=False)
             validate_str("type", param, safe, RX_ANYTHING, optional=False)
             validate_str("asoworker", param, safe, RX_ANYTHING, optional=True)
@@ -72,7 +72,7 @@ class RESTFileUserTransfers(RESTEntity):
             validate_str("transfer_state", param, safe, RX_ANYTHING, optional=True)
             validate_num("transfer_retry_count", param, safe, optional=True)
             validate_str("publication_state", param, safe, RX_ANYTHING, optional=True)
-            validate_num("job_id", param, safe, optional=True)
+            validate_str("job_id", param, safe, RX_JOBID, optional=True)
             validate_num("job_retry_count", param, safe, optional=True)
             validate_strlist("listOfIds", param, safe, RX_ANYTHING)  # Interesting... TODO. Have optional in strlist
         elif method in ['GET']:

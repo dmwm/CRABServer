@@ -97,3 +97,10 @@ alter table filemetadata modify (panda_job_id null);
 
 --Other changes
 alter table tasks add (tm_last_publication TIMESTAMP);
+
+--change the type of the column tm_jobid
+ALTER TABLE filetransfersdb ADD tm_jobid_varchar VARCHAR(20);
+UPDATE filetransfersdb SET tm_jobid_varchar = tm_jobid;
+ALTER TABLE filetransfersdb DROP COLUMN tm_jobid;
+ALTER TABLE filetransfersdb RENAME COLUMN tm_jobid_varchar TO tm_jobid;
+
