@@ -2008,6 +2008,7 @@ class PostJob():
                     if doc.get('delayed_publicationflag_update'):
                         newDoc = {
                             'subresource' : 'updatePublication',
+                            'publish_flag' : 1,
                             'list_of_ids' : doc_id,
                             'list_of_publication_state' : 'NEW',
                             'asoworker' : '%'
