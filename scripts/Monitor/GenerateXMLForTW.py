@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import sys
 import time
@@ -259,7 +260,7 @@ if __name__ == '__main__':
 # before running make sure no other instance of this script is running
     lockFile = '/home/crab3/CRAB3_SCHEDD_XML.Lock'
     if os.path.isfile(lockFile) :
-       print "%s already exists, abandon this run" % lockFile
+       print ("%s already exists, abandon this run" % lockFile)
        exit()
     else:
        open(lockFile,'wa').close()  # create the lock
