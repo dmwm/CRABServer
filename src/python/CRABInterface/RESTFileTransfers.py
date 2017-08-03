@@ -49,6 +49,7 @@ class RESTFileTransfers(RESTEntity):
             validate_str("list_of_fts_id", param, safe, RX_ANYTHING, optional=True)
             validate_str("list_of_publication_state", param, safe, RX_ANYTHING, optional=True)
             validate_num("time_to", param, safe, optional=True)
+            validate_num("publish_flag", param, safe, optional=True)
 
         elif method in ['GET']:
             validate_str("subresource", param, safe, RX_SUBGETTRANSFER, optional=False)
@@ -208,6 +209,7 @@ class RESTFileTransfers(RESTEntity):
                 binds['id'] = [ids[num]]
                 binds['fail_reason'] = [reasons[num]]
                 binds['retry_value'] = [int(retry[num])]
+                binds['publish'] = [kwargs["publish_flag"] or None]
                 self.api.modify(self.transferDB.UpdatePublication_sql, **binds)
 
         elif subresource == 'retryPublication':

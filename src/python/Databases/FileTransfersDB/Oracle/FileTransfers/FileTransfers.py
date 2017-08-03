@@ -38,7 +38,7 @@ class FileTransfers(object):
                                                       tm_last_update = :last_update, \
 						      tm_transfer_failure_reason = :fail_reason, \
 						      tm_transfer_retry_count = tm_transfer_retry_count + :retry_value, \
-					          tm_fts_id = CASE WHEN :fts_id is NULL THEN tm_fts_id ELSE :fts_id END,\
+					          tm_fts_id = CASE WHEN :fts_id is NULL THEN tm_fts_id ELSE :fts_id END, \
 						      tm_fts_instance = CASE WHEN :fts_instance is NULL THEN tm_fts_instance ELSE :fts_instance END\
                            WHERE tm_id = :id AND \
                                  tm_aso_worker = :asoworker"
@@ -53,10 +53,11 @@ class FileTransfers(object):
 
     UpdatePublication_sql = "UPDATE filetransfersdb SET tm_publication_state = :publication_state, \
                                                         tm_last_update = :last_update, \
-							tm_publication_failure_reason = :fail_reason, \
-							tm_publication_retry_count = tm_publication_retry_count + :retry_value \
+                                                        tm_publication_failure_reason = :fail_reason, \
+                                                        tm_publication_retry_count = tm_publication_retry_count + :retry_value, \
+                                                        tm_publish = CASE WHEN :publish is NULL THEN tm_publish ELSE :publish END \
                              WHERE tm_id = :id AND \
-                                   tm_aso_worker LIKE :asoworker"
+                                   (tm_aso_worker LIKE :asoworker OR tm_aso_worker is NULL)"
 
     RetryPublication_sql = "UPDATE filetransfersdb SET tm_publication_state = :new_publication_state, \
                                                        tm_last_update = :last_update, \
