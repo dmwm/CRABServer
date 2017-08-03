@@ -196,6 +196,14 @@ class PreDAG:
             self.saveProcessedJobs(unprocessed)
             return 0
 
+        # Disable retries for processing: every lumi is attempted to be
+        # processed once in processing, thrice in the tails -> four times.
+        # That should be enough "retries"
+        #
+        # See note in DagmanCreator about getting this from the Task DB
+        if self.stage == "processing":
+            config.TaskWorker.numAutomJobRetries = 0
+
         try:
             config.TaskWorker.scratchDir = './scratchdir' # XXX
             splitter = Splitter(config, server=None, resturi='')
