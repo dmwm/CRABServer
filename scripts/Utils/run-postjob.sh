@@ -62,7 +62,7 @@ export X509_USER_PROXY=`ls|egrep  [a-z,0-9]{40}`
 # grab args from the dagman config
 PJargs=`cat RunJobs*.*dag | grep "POST Job${jobId}" | awk 'BEGIN { FS="MAX_RETRIES" }; {print $2}'`
 
-# find the condor clusterId for the job 
+# find the condor clusterId for the job
 jobClusterId=`ls -l finished_jobs/job.${jobId}.${jobRetry} | awk '{print $NF}'|cut -d. -f2-3`
 
 # reset PJ count

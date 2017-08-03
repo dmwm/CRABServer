@@ -66,7 +66,7 @@ class DataFileMetadata(object):
         # from two lists of runs and lumi info strings that look like:
         # runs: ['runNum1', 'runNum2']
         # lumi info: ['lumi1:events1,lumi2:events2', 'lumi3:events3,lumi4:events4]
-        # By their index, run numbers correspond to the lumi info strings 
+        # By their index, run numbers correspond to the lumi info strings
         # which is why we can use zip when creating the dict.
         lumiEventList = []
         for lumis in map(str, outfilelumis):
@@ -78,7 +78,7 @@ class DataFileMetadata(object):
 
         #Changed to Select if exist, update, else insert
         binds['outtmplfn'] = binds['outlfn']
-        row = self.api.query(None, None, self.FileMetaData.GetCurrent_sql, 
+        row = self.api.query(None, None, self.FileMetaData.GetCurrent_sql,
                               outlfn=binds['outlfn'][0], taskname=binds['taskname'][0])
         try:
             #just one row is picked up by the previous query

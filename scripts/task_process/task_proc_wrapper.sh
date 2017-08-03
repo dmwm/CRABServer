@@ -92,10 +92,10 @@ do
     # at the start of the loop should catch that and exit.
     echo "Dag status code: $DAG_STATUS Entered current status date: $(date -d @$ENTERED_CUR_STATUS '+%Y/%m/%d %H:%M:%S %Z')"
     if [ "$(check_exit)" == "1" ]; then
-        # Before we really decide to exit, we should run condor_q once more 
+        # Before we really decide to exit, we should run condor_q once more
         # to get the latest info about DAG_STATUS and ENTERED_CUR_STATUS. Even though check_exit may pass successfully,
         # because we do condor_q only every 24h (and also wait for 24 hours after ENTERED_CUR_STATUS),
-        # the information used in check_exit could be out of date - the task may have been resubmitted 
+        # the information used in check_exit could be out of date - the task may have been resubmitted
         # after our last condor_q, for example.
         echo "Running an extra condor_q check before exitting"
         perform_condorq

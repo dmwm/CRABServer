@@ -24,7 +24,6 @@ class Splitter(TaskAction):
 
         splitparam = kwargs['task']['tm_split_args']
         splitparam['algorithm'] = kwargs['task']['tm_split_algo']
-        splitparam['job_limit'] = maxJobs
         if kwargs['task']['tm_job_type'] == 'Analysis':
             if kwargs['task']['tm_split_algo'] == 'FileBased':
                 splitparam['total_files'] = kwargs['task']['tm_totalunits']
@@ -35,7 +34,8 @@ class Splitter(TaskAction):
             elif kwargs['task']['tm_split_algo'] == 'Automatic':
                 splitparam['algorithm'] = 'FileBased'
                 splitparam['total_files'] = len(args[0].getFiles())
-                splitparam['files_per_job'] = len(args[0].getFiles())
+                numProbes = getattr(self.config.TaskWorker, 'numAutomaticProbes', 5)
+                splitparam['files_per_job'] = (len(args[0].getFiles()) + numProbes - 1) // numProbes
         elif kwargs['task']['tm_job_type'] == 'PrivateMC':
             if 'tm_events_per_lumi' in kwargs['task'] and kwargs['task']['tm_events_per_lumi']:
                 splitparam['events_per_lumi'] = kwargs['task']['tm_events_per_lumi']

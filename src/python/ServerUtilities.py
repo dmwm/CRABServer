@@ -115,6 +115,10 @@ def NEW_USER_SANDBOX_EXCLUSIONS(tarmembers):
         return []
 
 
+def getTestDataDirectory():
+    testdirList = __file__.split(os.sep)[:-3] + ["test", "data"]
+    return os.sep.join(testdirList)
+
 def isCouchDBURL(url):
     return 'couchdb' in url
 

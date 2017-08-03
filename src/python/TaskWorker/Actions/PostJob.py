@@ -615,7 +615,7 @@ class ASOServerJob(object):
                 aso_tasks.append("transfer")
             if publish:
                 aso_tasks.append("publication")
-            delayed_publicationflag_update = False 
+            delayed_publicationflag_update = False
             if not (needs_transfer or publish):
                 ## This file doesn't need transfer nor publication, so we don't need to upload
                 ## a document to ASO database.
@@ -1675,12 +1675,24 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def adjustLumisForCompletion(self, task):
+    def saveAutomaticSplittingData(self):
         """
         Sets the run, lumi information in the task information for the
         completion jobs.  Returns True if completion jobs are needed,
         otherwise False.
         """
+        if self.stage == 'tail':
+            return
+
+        throughputFileName = "automatic_splitting/throughputs/{0}".format(self.job_id)
+        if not os.path.exists(os.path.dirname(throughputFileName)):
+            os.makedirs(os.path.dirname(throughputFileName))
+        with open(throughputFileName, 'w') as fd:
+            report = self.job_report['steps']['cmsRun']['performance']
+            fd.write(report['cpu']['EventThroughput'])
+
+        if self.stage == 'probe':
+            return
         self.logger.info("====== Starting to parse the lumi file")
         try:
             tmpdir = tempfile.mkdtemp()
@@ -1704,88 +1716,12 @@ class PostJob():
         self.logger.info("Difference in lumis:            {0}".format(len(missing.getLumis())))
         if len(missing.getLumis()) == 0:
             # we don't want to create the subjobs if the job processed everything
-            return False
-        missing_compact = missing.getCompactList()
-        runs = missing.getRuns()
-        lumis = [",".join(map(str, reduce(lambda x, y:x + y, missing_compact[run]))) for run in runs]
-
-        task['tm_split_args']['runs'] = runs
-        task['tm_split_args']['lumis'] = lumis
-
-        return True
-
-    def createJobs(self, completion=False):
-        self.logger.info("====== Creating jobs")
-        with open('datadiscovery.pkl', 'rb') as fd:
-            dataset = pickle.load(fd)
-        with open('taskinformation.pkl', 'rb') as fd:
-            task = pickle.load(fd)
-
-        if completion:
-            if not task['completion_jobs']:
-                return JOB_RETURN_CODES.OK, ''
-            if not self.adjustLumisForCompletion(task):
-                return JOB_RETURN_CODES.OK, ''
-
-            target = int(task['tm_split_args']['seconds_per_job']) / 8
-            # Target completion jobs to have a 45 minute runtime
-            target = max(target, 45 * 60)
-        elif task['completion_jobs']:
-            # Build in a 33% error margin in the runtime to not create too
-            # many tails. This essentially moves the peak to lower
-            # runtimes and cuts off less of the job distribution tail.
-            target = int(0.75 * task['tm_split_args']['seconds_per_job'])
-        else:
-            target = int(task['tm_split_args']['seconds_per_job'])
-
-        report = self.job_report['steps']['cmsRun']['performance']
-        events = int(target * float(report['cpu']['EventThroughput']))
-
-        self.logger.info("Target runtime: {0}".format(target))
-        self.logger.info("CPU time per event: {0}".format(report['cpu']['AvgEventTime']))
-        self.logger.info("Resplitting with ~{0} events per job".format(events))
-
-        task['tm_split_algo'] = 'EventAwareLumiBased'
-        task['tm_split_args']['events_per_job'] = events
-
-        try:
-            config = Configuration()
-            config.TaskWorker = ConfigSection(name="TaskWorker")
-            config.TaskWorker.scratchDir = '.' # XXX
-            config.TaskWorker.maxJobsPerTask = task['tm_split_args']['job_limit']
-            splitter = Splitter(config, server=None, resturi='')
-            split_result = splitter.execute(dataset, task=task)
-            self.logger.info("Splitting results:")
-            for g in split_result.result[0]:
-                msg = "Created jobgroup with length {0}".format(len(g.getJobs()))
-                self.logger.info(msg)
-        except TaskWorkerException as e:
-            self.logger.error("Error during splitting:\n{0}".format(e))
-            self.set_dashboard_state('FAILED')
-            retmsg = "Splitting failed with:\n{0}".format(e)
-            return JOB_RETURN_CODES.FATAL_ERROR, retmsg
-        try:
-            creator = DagmanCreator(config, server=None, resturi='')
-            if completion:
-                creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, subjob=0, stage='tail')
-            else:
-                _, _, subdags = creator.createSubdag(split_result.result, task=task, startjobid=self.job_id, stage='process')
-                subdags.append('RunJobs0.subdag')
-                self.createSubdagSubmission(subdags)
-        except TaskWorkerException as e:
-            self.logger.error('Error during subdag creation\n{0}'.format(e))
-            self.set_dashboard_state('FAILED')
-            retmsg = "DAG creation failed with:\n{0}".format(e)
-            return JOB_RETURN_CODES.FATAL_ERROR, retmsg
-
-        return JOB_RETURN_CODES.OK, ''
-
-    def createSubdagSubmission(self, subdags):
-        for dag in subdags:
-            subprocess.check_call(['condor_submit_dag', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', '1000',
-                '-MaxPost', str(self.job_ad.get('CRAB_MaxPost', 20)), '-no_submit', '-insert_sub_file', 'subdag.ad',
-                '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), dag), dag])
-
+            return
+        missingLumisFileName = "automatic_splitting/missing_lumis/{0}".format(self.job_id)
+        if not os.path.exists(os.path.dirname(missingLumisFileName)):
+            os.makedirs(os.path.dirname(missingLumisFileName))
+        with open(missingLumisFileName, 'w') as fd:
+            fd.write(str(missing))
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1880,6 +1816,11 @@ class PostJob():
             retmsg = "Failure parsing the job report."
             return JOB_RETURN_CODES.FATAL_ERROR, retmsg
         self.logger.info("====== Finished to parse job report.")
+
+        self.logger.info("====== Starting saving data for automatic splitting.")
+        self.saveAutomaticSplittingData()
+        self.logger.info("====== Finished saving data for automatic splitting.")
+
         ## If this is a deferred post-job execution, put back the log level to DEBUG.
         if not first_pj_execution():
             self.logger.setLevel(logging.DEBUG)
@@ -2032,14 +1973,6 @@ class PostJob():
             self.logger.info("====== Finished upload of input files metadata.")
             return self.check_retry_count(80001), retmsg
         self.logger.info("====== Finished upload of input files metadata.")
-
-        ## Possible stages: probe, process, tail for automatic
-        ## splitting.  All other splitting modes have a stage called
-        ## conventional.
-        if self.stage in ('probe', 'process'):
-            retval, retmsg = self.createJobs(completion=(self.stage == 'process'))
-            if retval != JOB_RETURN_CODES.OK:
-                return retval, retmsg
 
         self.set_dashboard_state('FINISHED')
 
@@ -2295,6 +2228,7 @@ class PostJob():
             msg = "Uploading input metadata for %s to https://%s: %s" % (lfn, rest_url, configreq)
             self.logger.debug(msg)
             try:
+                configreq = dict(configreq)
                 self.server.put(rest_uri, data = encodeRequest(configreq))
             except HTTPException as hte:
                 msg = "Error uploading input file metadata: %s" % (str(hte.headers))
@@ -2544,6 +2478,7 @@ class PostJob():
         self.fill_output_files_info() ## Fill self.output_files_info by parsing the job report.
         self.aso_start_time = self.job_report.get("aso_start_time", None)
         self.aso_start_timestamp = self.job_report.get("aso_start_timestamp", None)
+
         return 0
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
