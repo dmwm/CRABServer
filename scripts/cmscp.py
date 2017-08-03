@@ -31,10 +31,7 @@ import WMCore.Storage.StageOutError as StageOutError
 from WMCore.Storage.Registry import retrieveStageOutImpl
 from WMCore.Algorithms.Alarm import Alarm, alarmHandler
 import WMCore.WMException as WMException
-import WMCore.Database.CMSCouch as CMSCouch
-import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 import DashboardAPI
-from WMCore.Services.Requests import Requests
 from httplib import HTTPException
 
 ## See the explanation of this sentry file in CMSRunAnalysis.py.
@@ -139,10 +136,6 @@ G_ASO_TRANSFER_REQUESTS = []
 
 ## Dictionary with the job's HTCondor ClassAd.
 G_JOB_AD = {}
-
-## Dictionary with the mapping of node storage element name to site name.
-## Will be filled in by the make_node_map() function using PhEDEx.
-G_NODE_MAP = {}
 
 ##==============================================================================
 ## FUNCTIONS USED BY THE CODE.
@@ -399,25 +392,6 @@ def add_to_file_in_job_report(file_name, is_log, key_value_pairs):
 
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-def make_node_map():
-    """
-    Fill in the G_NODE_MAP dictionary with the mapping of node storage element
-    name to site name.
-    """
-    phedex = PhEDEx.PhEDEx()
-    nodes = phedex.getNodeMap()['phedex']['node']
-    global G_NODE_MAP
-    for node in nodes:
-        ## Not sure these two ifs can happen, but better to have them.
-        if str(node[u'se']) in ['', 'None']:
-            continue
-        if str(node[u'name']) in ['', 'None']:
-            msg = "WARNING: Could not retrieve PhEDEx Node Name for SE name '%s'" % (str(node[u'se']))
-            print(msg)
-        G_NODE_MAP[str(node[u'se'])] = str(node[u'name'])
-
-## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
 def perform_stageout(local_stageout_mgr, direct_stageout_impl, \
                      direct_stageout_command, direct_stageout_protocol, \
                      policy, \
@@ -509,182 +483,6 @@ def perform_local_stageout(local_stageout_mgr, \
     return retval, retmsg
 
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-def inject_to_aso(file_transfer_info):
-    """
-    Inject a document to the ASO database.
-    """
-    for attr in ['CRAB_ASOURL', 'CRAB_ASODB', 'CRAB_AsyncDest', 'DESIRED_CMSDataset', \
-                 'CRAB_UserGroup', 'CRAB_UserRole', 'CRAB_DBSURL', \
-                 'CRAB_ReqName', 'CRAB_UserHN', 'CRAB_Publish', \
-                 'CRAB_RestHost', 'CRAB_RestURInoAPI', 'CRAB_PrimaryDataset']:
-        if attr not in G_JOB_AD:
-            msg  = "ERROR: Job's HTCondor ClassAd is missing attribute %s." % (attr)
-            msg += " Cannot inject to ASO."
-            print(msg)
-            return 80000, msg
-    if 'X509_USER_PROXY' not in os.environ:
-        msg  = "ERROR: X509_USER_PROXY missing in user environment."
-        msg += " Cannot inject to ASO."
-        print(msg)
-        return 80000, msg
-    if not os.path.exists(os.environ['X509_USER_PROXY']):
-        msg  = "ERROR: User proxy %s missing on disk." % (os.environ['X509_USER_PROXY'])
-        msg += " Cannot inject to ASO."
-        print(msg)
-        return 80000, msg
-
-    file_name = os.path.split(file_transfer_info['source']['lfn'])[-1]
-    file_type = 'log' if file_transfer_info['is_log'] else 'output'
-
-    orig_file_name, _ = get_job_id(file_name)
-    if file_transfer_info['is_log']:
-        size = get_from_job_report('log_size', 0)
-        # Copied from PostJob.py, but not sure if it does anything. BB
-        checksums = {'adler32': 'abc'}
-    else:
-        output_file_info = get_output_file_from_job_report(orig_file_name)
-        if output_file_info:
-            checksums = output_file_info.get(u'checksums', {'cksum': '0', 'adler32': '0'})
-            size = output_file_info.get(u'size', 0)
-            is_edm = (output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
-                      output_file_info.get(u'ouput_module_class',  '') == u'PoolOutputModule')
-        else:
-            checksums = {'cksum': '0', 'adler32': '0'}
-            size = 0
-            is_edm = False
-
-    source_site = file_transfer_info['source']['site']
-    if source_site in ['', 'None', 'unknown']:
-        msg  = "ERROR: Unable to determine local node name."
-        msg += " Cannot inject to ASO."
-        print(msg)
-        return 80000, msg
-
-    role = str(G_JOB_AD['CRAB_UserRole'])
-    if str(G_JOB_AD['CRAB_UserRole']).lower() == 'undefined':
-        role = ''
-    group = str(G_JOB_AD['CRAB_UserGroup'])
-    if str(G_JOB_AD['CRAB_UserGroup']).lower() == 'undefined':
-        group = ''
-    task_publish = int(G_JOB_AD['CRAB_Publish'])
-    publish = int(task_publish and file_type == 'output' and is_edm)
-    if task_publish and file_type == 'output' and not is_edm:
-        msg  = "Disabling publication of output file %s," % (file_name)
-        msg += " since it is not of EDM type (not produced by PoolOutputModule)."
-        print(msg)
-    publish = int(publish and G_JOB_WRAPPER_EXIT_CODE == 0)
-
-    last_update = int(time.time())
-    global G_NOW
-    global G_NOW_EPOCH
-    if G_NOW == None:
-        G_NOW = str(datetime.datetime.now())
-        G_NOW_EPOCH = last_update
-
-    ## NOTE: it's almost certainly a mistake to include the source LFN in the
-    ## hash here as it includes /store/temp/user/foo.$HASH. We should normalize
-    ## based on the final LFN (/store/user/foo/).
-    doc_id = hashlib.sha224(file_transfer_info['source']['lfn']).hexdigest()
-    doc_new_info = {'state': 'new',
-                    'source': source_site,
-                    'destination': G_JOB_AD['CRAB_AsyncDest'],
-                    'lfn': file_transfer_info['source']['lfn'],
-                    'checksums': checksums,
-                    'size': size,
-                    # The following four times - and how they're calculated - makes no sense to me. BB
-                    'last_update': last_update,
-                    'start_time': G_NOW,
-                    'end_time': '',
-                    'job_end_time': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
-                    'retry_count': [],
-                    'failure_reason': [],
-                    'job_retry_count': G_JOB_AD.get('CRAB_Retry', -1),
-                   }
-    msg = "Stageout request document so far:\n%s" % (pprint.pformat(doc_new_info))
-    print(msg)
-
-    cur_retval, cur_retmsg = upload_to_couch(doc_id, doc_new_info, file_transfer_info, publish, file_type, role, group)
-    return cur_retval, cur_retmsg
-
-
-def upload_to_couch(doc_id, doc_new_info, file_transfer_info, publish, file_type, role, group):
-    couch_server = CMSCouch.CouchServer(dburl = G_JOB_AD['CRAB_ASOURL'], \
-                                        ckey = os.environ['X509_USER_PROXY'], \
-                                        cert = os.environ['X509_USER_PROXY'])
-    couch_database = couch_server.connectDatabase(G_JOB_AD['CRAB_ASODB'], create = False)
-
-    needs_commit = True
-    try:
-        doc = couch_database.document(doc_id)
-        ## The document is already in ASO database. This means we are retrying
-        ## the job and the document was injected by a previous job retry. The
-        ## transfer status must be terminal ('done', 'failed' or 'killed'),
-        ## since the post-job doesn't exit until all transfers are finished.
-        transfer_status = doc.get('state')
-        msg = "LFN %s (id %s) is already in ASO database (file transfer status is '%s')."
-        msg = msg % (file_transfer_info['source']['lfn'], doc_id, transfer_status)
-        if transfer_status in ['new', 'acquired', 'retry']:
-            msg += "\nFile transfer status is not terminal ('done', 'failed' or 'killed')."
-            msg += " Will not upload a new stageout request for the current job retry."
-            needs_commit = False
-        else:
-            msg += " Uploading new stageout request for the current job retry."
-        print(msg)
-    except CMSCouch.CouchNotFoundError:
-        ## The document is not yet in ASO database. We commit a new document.
-        msg  = "LFN %s (id %s) is not yet in ASO database."
-        msg  = msg % (file_transfer_info['source']['lfn'], doc_id)
-        msg += " Uploading new stageout request."
-        print(msg)
-        input_dataset = G_JOB_AD['DESIRED_CMSDataset']
-        if str(G_JOB_AD['DESIRED_CMSDataset']).lower() == 'undefined':
-            input_dataset = ''
-        primary_dataset = G_JOB_AD['CRAB_PrimaryDataset']
-        if input_dataset:
-            input_dataset_or_primary_dataset = input_dataset
-        elif primary_dataset:
-            input_dataset_or_primary_dataset = '/'+primary_dataset # Adding the '/' until we fix ASO
-        else:
-            input_dataset_or_primary_dataset = '/'+'NotDefined' # Adding the '/' until we fix ASO
-        doc = {'_id': doc_id,
-               'workflow': G_JOB_AD['CRAB_ReqName'],
-               'jobid': G_JOB_AD['CRAB_Id'],
-               'rest_host': G_JOB_AD['CRAB_RestHost'],
-               'rest_uri': G_JOB_AD['CRAB_RestURInoAPI'],
-               'inputdataset': input_dataset_or_primary_dataset,
-               'dbs_url': str(G_JOB_AD['CRAB_DBSURL']),
-               'lfn': file_transfer_info['source']['lfn'],
-               'source_lfn': file_transfer_info['source']['lfn'],
-               'destination_lfn': file_transfer_info['destination']['lfn'],
-               'type': file_type,
-               'publish': publish,
-               'publication_state': 'not_published',
-               'publication_retry_count': [],
-               'user': G_JOB_AD['CRAB_UserHN'],
-               'role': role,
-               'group': group,
-              }
-    except Exception:
-        msg  = "Error loading document from ASO database."
-        msg += " Transfer submission failed."
-        msg += "\n%s" % (traceback.format_exc())
-        print(msg)
-        return 60320, msg
-    if needs_commit:
-        doc.update(doc_new_info)
-        commit_result = couch_database.commitOne(doc)[0]
-        if 'error' in commit_result:
-            msg = "Couldn't add to ASO database; error follows:\n%s" % (commit_result)
-            print(msg)
-            return 60320, msg
-        msg = "Final stageout job description:\n%s" % (pprint.pformat(doc))
-        print(msg)
-        setASOStartTime()
-    return 0, None
-
-## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
 
 def setASOStartTime():
     if get_from_job_report('aso_start_time') is None or \
@@ -902,86 +700,6 @@ def clean_stageout_area(local_stageout_mgr, direct_stageout_impl, policy, \
         msg  = "WARNING: Unknown stageout policy '%s'." % (policy)
         msg += " Skipping cleanup of stageout area."
         print(msg)
-
-## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-def upload_log_file_metadata(dest_temp_lfn, dest_lfn):
-    """
-    Upload the logs archive file metadata.
-    """
-    if 'X509_USER_PROXY' not in os.environ:
-        msg  = "ERROR: X509_USER_PROXY missing in user environment."
-        msg += " Unable to upload file metadata."
-        print(msg)
-        return 80000, msg
-    if not os.path.exists(os.environ['X509_USER_PROXY']):
-        msg  = "ERROR: User proxy %s missing on disk." % (os.environ['X509_USER_PROXY'])
-        msg += " Unable to upload file metadata."
-        print(msg)
-        return 80000, msg
-    for attr in ['CRAB_ReqName', 'CRAB_Id', 'CRAB_PublishName', 'CRAB_JobSW', \
-                 'CRAB_RestHost', 'CRAB_RestURInoAPI']:
-        if attr not in G_JOB_AD:
-            msg  = "ERROR: Job's HTCondor ClassAd is missing attribute %s." % (attr)
-            msg += " Unable to upload file metadata."
-            print(msg)
-            return 80000, msg
-    temp_storage_site = str(get_from_job_report('temp_storage_site', 'unknown'))
-    if temp_storage_site == 'unknown':
-        msg  = "WARNING: Temporary storage site for logs archive file not defined in job report."
-        msg += " This is expected if there was no attempt to stage out the file into a temporary storage."
-        msg += " Will use the executed site as the temporary storage site in the file metadata."
-        print(msg)
-        temp_storage_site = str(get_from_job_report('executed_site', 'unknown'))
-        if temp_storage_site == 'unknown':
-            msg  = "WARNING: Unable to determine executed site from job report."
-            msg += " Aborting logs archive file metadata upload."
-            print(msg)
-            return 80000, msg
-    configreq = {'taskname'        : G_JOB_AD['CRAB_ReqName'],
-                 'jobid'           : G_JOB_AD['CRAB_Id'],
-                 'outsize'         : int(get_from_job_report('log_size', 0)),
-                 'publishdataname' : G_JOB_AD['CRAB_PublishName'],
-                 'appver'          : G_JOB_AD['CRAB_JobSW'],
-                 'outtype'         : 'LOG',
-                 'checksummd5'     : 'asda', # Not implemented
-                 'checksumcksum'   : '3701783610', # Not implemented
-                 'checksumadler32' : '6d1096fe', # Not implemented
-                 'acquisitionera'  : 'null', # Not implemented
-                 'events'          : 0,
-                 'outlocation'     : G_JOB_AD['CRAB_AsyncDest'],
-                 'outlfn'          : dest_lfn,
-                 'outtmplocation'  : temp_storage_site,
-                 'outtmplfn'       : dest_temp_lfn,
-                 'outdatasetname'  : '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER',
-                 'directstageout'  : int(get_from_job_report('direct_stageout', 0))
-                }
-    rest_host = G_JOB_AD['CRAB_RestHost']
-    if not rest_host.startswith('http'):
-        rest_host = 'https://' + rest_host
-    rest_uri_no_api = G_JOB_AD['CRAB_RestURInoAPI']
-    rest_api = 'filemetadata'
-    rest_uri = rest_uri_no_api + '/' + rest_api
-    rest_url = rest_host + rest_uri
-    msg = "Uploading file metadata for %s to %s: %s"
-    msg = msg % (os.path.basename(dest_temp_lfn), rest_url, configreq)
-    print(msg)
-    server = Requests(rest_host, {'key' : os.environ['X509_USER_PROXY'], \
-                                  'cert': os.environ['X509_USER_PROXY']})
-    headers = {'Accept': '*/*'} #'User-agent': 'CRABClient/3.3.10'}
-    try:
-        server.put(rest_uri, configreq, headers)
-    except HTTPException as hte:
-        msg  = "Got HTTP exception when uploading logs archive file metadata:"
-        msg += "%s \n%s" % (str(hte.headers), traceback.format_exc())
-        print(msg)
-        return 80001, msg
-    except Exception:
-        msg  = "Got exception when uploading logs archive file metadata."
-        msg += "\n%s" % (traceback.format_exc())
-        print(msg)
-        return 80001, msg
-    return 0, None
 
 ##==============================================================================
 ## THE MAIN FUNCTION THAT RUNS CMSCP.
@@ -1506,16 +1224,6 @@ def main():
     ## Finish LOCAL STAGEOUT MANAGER INITIALIZATION
     ##--------------------------------------------------------------------------
 
-    ## Fill in the G_NODE_MAP dictionary with the mapping of node storage
-    ## name to site name. Currently only used to translate the SE name
-    ## returned by the local stageout manager into a site name.
-    if source_site == 'unknown':
-        msg  = "Temp site name not found (likely not present in site-local-config.xml or job report). "
-        msg += "Falling back to querying the phedex for site name."
-        print(msg)
-        if cmscp_status['init_local_stageout_mgr']['return_code'] == 0:
-            make_node_map()
-
     ##--------------------------------------------------------------------------
     ## Start DIRECT STAGEOUT IMPLEMENTATION INITIALIZATION
     ##--------------------------------------------------------------------------
@@ -1775,155 +1483,6 @@ def main():
                              first_stageout_failure_msg)
     ##--------------------------------------------------------------------------
     ## Finish STAGEOUT OF USER LOGS TARBALL AND USER OUTPUTS
-    ##--------------------------------------------------------------------------
-
-    ##--------------------------------------------------------------------------
-    ## Start INJECTION FOR ASO
-    ##--------------------------------------------------------------------------
-    ## Do the injection of the transfer request documents to the ASO database
-    ## only if all the local or direct stageouts have succeeded.
-    ##--------------------------------------------------------------------------
-    condition_inject_outputs = (cmscp_status['outputs_stageout']['local']['return_code'] == 0 and \
-                                cmscp_status['outputs_stageout']['remote']['return_code'] != 0)
-    not_inject_msg_outputs = ''
-    if transfer_outputs:
-        if not condition_inject_outputs:
-            not_inject_msg_outputs = "Will not inject transfer requests to ASO for the user output files,"
-            if cmscp_status['outputs_stageout']['remote']['return_code'] == 0:
-                not_inject_msg_outputs += " because they were staged out directly to the permanent storage."
-            else:
-                not_inject_msg_outputs += " because their local stageouts were not successful"
-                not_inject_msg_outputs += " (or files were removed from local temporary storage"
-                not_inject_msg_outputs += " or local stageout was not even performed)."
-    condition_inject_logs = (cmscp_status['logs_stageout']['local']['return_code'] == 0 and \
-                             cmscp_status['logs_stageout']['remote']['return_code'] != 0)
-    not_inject_msg_logs = ''
-    if transfer_logs:
-        if not condition_inject_logs:
-            not_inject_msg_logs = "Will not inject transfer request to ASO for the user logs archive file,"
-            if cmscp_status['logs_stageout']['remote']['return_code'] == 0:
-                not_inject_msg_logs += " because it was staged out directly to the permanent storage."
-            else:
-                not_inject_msg_logs += " because its local stageout was not successful"
-                not_inject_msg_logs += " (or file was removed from local temporary storage"
-                not_inject_msg_logs += " or local stageout was not even performed)."
-    condition = condition_inject_outputs or condition_inject_logs
-    if 'CRAB_ASOURL' in G_JOB_AD and G_JOB_AD['CRAB_ASOURL'] and not isCouchDBURL(G_JOB_AD['CRAB_ASOURL']):
-        msg  = "WARNING: url for transfer is not couchdb (likely an Oracle transfer)."
-        msg += " Skipping injection of transfer requests to ASO."
-        print(msg)
-    elif skip['aso_injection']:
-        msg  = "WARNING: Internal wrapper flag skip['aso_injection'] is True."
-        msg += " Skipping injection of transfer requests to ASO."
-        print(msg)
-    elif condition:
-        msg  = "====== %s: " % (time.asctime(time.gmtime()))
-        msg += "Starting injection of transfer requests to ASO."
-        print(msg)
-        if not_inject_msg_logs:
-            print(not_inject_msg_logs)
-        if not_inject_msg_outputs:
-            print(not_inject_msg_outputs)
-        num_docs_to_inject = 0
-        for file_transfer_info in G_ASO_TRANSFER_REQUESTS:
-            if file_transfer_info['inject']:
-                num_docs_to_inject += 1
-        if num_docs_to_inject > 0:
-            msg = "Will inject %d %sdocument%s."
-            msg = msg % (num_docs_to_inject, \
-                         'other ' if not_inject_msg_outputs else '', \
-                         's' if num_docs_to_inject > 1 else '')
-            print(msg)
-            if 'CRAB_ASOURL' in G_JOB_AD and G_JOB_AD['CRAB_ASOURL']:
-                msg = "Will use ASO server at %s." % (G_JOB_AD['CRAB_ASOURL'])
-                msg += "ASO db name is %s." % G_JOB_AD['CRAB_ASODB']
-                print(msg)
-            for file_transfer_info in G_ASO_TRANSFER_REQUESTS:
-                if not file_transfer_info['inject']:
-                    continue
-                file_name = os.path.basename(file_transfer_info['source']['lfn'])
-                msg  = "-----> %s: " % (time.asctime(time.gmtime()))
-                msg += "Starting injection for %s." % (file_name)
-                print(msg)
-                try:
-                    cur_retval, cur_retmsg = inject_to_aso(file_transfer_info)
-                except Exception:
-                    msg  = "ERROR: Unhandled exception when injecting document to ASO."
-                    msg += "\n%s" % (traceback.format_exc())
-                    print(msg)
-                    if cur_retval in [None, 0]:
-                        cur_retval, cur_retmsg = 60318, msg
-                msg  = "<----- %s: " % (time.asctime(time.gmtime()))
-                msg += "Finished injection for %s" % (file_name)
-                msg += " (status %d)." % (cur_retval)
-                print(msg)
-                if cmscp_status['aso_injection']['return_code'] in [None, 0]:
-                    cmscp_status['aso_injection']['return_code'] = cur_retval
-                    cmscp_status['aso_injection']['return_msg'] = cur_retmsg
-        else:
-            msg = "There are no %sdocuments to inject."
-            msg = msg % ('other ' if not_inject_msg_outputs or not_inject_msg_logs else '')
-            print(msg)
-        msg  = "====== %s: " % (time.asctime(time.gmtime()))
-        msg += "Finished injection of transfer requests to ASO"
-        msg += " (status %d)." % (cmscp_status['aso_injection']['return_code'])
-        print(msg)
-    else:
-        if not_inject_msg_logs:
-            print(not_inject_msg_logs)
-        if not_inject_msg_outputs:
-            print(not_inject_msg_outputs)
-    ## We don't care to update the cmscp return code with the injection return
-    ## code, because the injection of the transfer request documents to the ASO
-    ## database will be retried by the post-job for those injections that failed
-    ## in cmscp.
-    ##--------------------------------------------------------------------------
-    ## Finish INJECTION TO ASO
-    ##--------------------------------------------------------------------------
-
-    ##--------------------------------------------------------------------------
-    ## Start LOG FILE METADATA UPLOAD
-    ##--------------------------------------------------------------------------
-    ## Upload of the log file metadata to the crab cache. Ignore any failure
-    ## since the post-job can always retry the upload.
-    condition = (is_log_in_storage['local'] or is_log_in_storage['remote'])
-    if skip['logs_metadata_upload']:
-        msg  = "WARNING: Internal wrapper flag skip['logs_metadata_upload'] is True."
-        msg += " Skipping upload of logs archive file metadata."
-        print(msg)
-    elif condition:
-        msg  = "====== %s: " % (time.asctime(time.gmtime()))
-        msg += "Starting upload of logs archive file metadata."
-        print(msg)
-        try:
-            cmscp_status['logs_metadata_upload']['return_code'], \
-            cmscp_status['logs_metadata_upload']['return_msg'] = \
-                                                upload_log_file_metadata(logs_arch_dest_temp_lfn, \
-                                                                         logs_arch_dest_lfn)
-        except Exception:
-            msg  = "ERROR: Unhandled exception when uploading logs archive file metadata."
-            msg += "\n%s" % (traceback.format_exc())
-            print(msg)
-            if cmscp_status['logs_metadata_upload']['return_code'] in [None, 0]:
-                cmscp_status['logs_metadata_upload']['return_code'] = 80001
-                cmscp_status['logs_metadata_upload']['return_msg'] = msg
-        if cmscp_status['logs_metadata_upload']['return_code'] not in [None, 0]:
-            msg  = "WARNING: Failed to upload logs archive file metadata."
-            msg += " Will ignore the failure, since the post-job can retry the upload."
-            print(msg)
-        add_to_file_in_job_report(logs_arch_dest_file_name, True, \
-                                  [('file_metadata_upload', not bool(cmscp_status['logs_metadata_upload']['return_code']))])
-        msg  = "====== %s: " % (time.asctime(time.gmtime()))
-        msg += "Finished upload of logs archive file metadata"
-        msg += " (status %d)." % (cmscp_status['logs_metadata_upload']['return_code'])
-        print(msg)
-    else:
-        if transfer_logs:
-            msg  = "Will not upload logs archive file metadata,"
-            msg += " since the logs archive file is not in a storage area."
-            print(msg)
-    ##--------------------------------------------------------------------------
-    ## Finish LOG FILE METADATA UPLOAD
     ##--------------------------------------------------------------------------
 
     return exit_info

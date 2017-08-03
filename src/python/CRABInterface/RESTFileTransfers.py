@@ -1,3 +1,4 @@
+from __future__ import print_function
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_num, validate_strlist
@@ -29,7 +30,7 @@ class RESTFileTransfers(RESTEntity):
                 authz_operator_without_raise('crab3', 'operator')):
             # TODO: do not forget to uncomment this
             # so far just print a warning
-            print 'WARNING. NOT AUTHORIZED'
+            print ('WARNING. NOT AUTHORIZED')
             #raise ForbiddenAccess('Access is restricted to this API')
         if method in ['PUT']:
             raise UnsupportedMethod('This method is not supported in this API!')

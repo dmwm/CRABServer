@@ -172,14 +172,14 @@ class DataUserWorkflow(object):
         """
         return self.workflow.status(workflow, userdn, userproxy, verbose=verbose)
 
-    def kill(self, workflow, force, jobids, killwarning, userdn, userproxy=None):
+    def kill(self, workflow, force, killwarning, userdn, userproxy=None):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name
            :arg str force: a flag to know if kill should be brutal
            :arg str userproxy: the user proxy retrieved by `retrieveUserCert`
            :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
-        return self.workflow.kill(workflow, force, jobids, killwarning, userdn, userproxy)
+        return self.workflow.kill(workflow, force, killwarning, userdn, userproxy)
 
     def proceed(self, workflow):
         """Continue a task initialized with 'crab submit --dryrun'.

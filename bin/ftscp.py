@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import print_function
 import re
 import sys
 import time
@@ -34,22 +35,22 @@ class FTSJob(object):
     def cancel(self):
         if self._id:
             cmd = "glite-transfer-cancel -s %s %s" % (fts_server, self._id)
-            print "+", cmd
+            print ("+", cmd)
             os.system(cmd)
 
     def submit(self):
         cmd = "glite-transfer-submit -s %s %s %s" % (fts_server, self._source, self._dest)
-        print "+", cmd
+        print ("+", cmd)
         status, output = commands.getstatusoutput(cmd)
         if status:
             raise Exception("glite-transfer-submit exited with status %s.\n%s" % (status, output))
         output = output.strip()
-        print "Resulting transfer ID: %s" % output
+        print ("Resulting transfer ID: %s" % output)
         return output
 
     def status(self):
         cmd = "glite-transfer-status -s %s %s" % (fts_server, self._id)
-        print "+", cmd
+        print ("+", cmd)
         status, output = commands.getstatusoutput(cmd)
         if status:
             raise Exception("glite-transfer-status exited with status %s.\n%s" % (status, output))
@@ -64,7 +65,7 @@ class FTSJob(object):
             idx += 1
             time.sleep(self._sleep)
             status = self.status()
-            print status
+            print (status)
 
             if status in ['Submitted', 'Pending', 'Ready', 'Active', 'Canceling', 'Hold']:
                 continue
@@ -88,12 +89,12 @@ def resolvePFNs(url1, url2):
 
 def main():
     if len(sys.argv) != 3:
-        print "Usage: ftscp <source> <dest>"
-        print "\nSource and destination should be of the format $SITE:$LFN"
+        print ("Usage: ftscp <source> <dest>")
+        print ("\nSource and destination should be of the format $SITE:$LFN")
         sys.exit(1)
 
     source, dest = resolvePFNs(sys.argv[1], sys.argv[2])
-    print "Copying %s to %s" % (source, dest)
+    print ("Copying %s to %s" % (source, dest))
 
     global g_Job
     g_Job = FTSJob(source, dest)

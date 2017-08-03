@@ -6,7 +6,6 @@ import logging
 import cherrypy
 from base64 import b64decode
 from httplib import HTTPException
-from httplib2 import HttpLib2Error
 
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
@@ -294,13 +293,13 @@ class RESTUserWorkflow(RESTEntity):
         goodReleases = {}
         try:
             goodReleases = self.tagCollector.releases_by_architecture()
-        except (IOError, HTTPException, HttpLib2Error):
+        except:
             msg = "Error connecting to %s (params: %s) and determining the list of available releases. " % \
-                  (tagCollector['endpoint'], tagCollector.tcArgs) + "Skipping the check of the releases"
+                  (self.tagCollector['endpoint'], self.tagCollector.tcArgs) + "Skipping the check of the releases"
         else:
             if goodReleases == {}:
                 msg = "The list of releases at %s (params: %s) is empty. " % \
-                      (tagCollector['endpoint'], tagCollector.tcArgs) + "Skipping the check of the releases"
+                      (self.tagCollector['endpoint'], self.tagCollector.tcArgs) + "Skipping the check of the releases"
             elif jobarch not in goodReleases or jobsw not in goodReleases[jobarch]:
                 msg = "ERROR: %s on %s is not among supported releases" % (jobsw, jobarch)
                 msg += "\nUse config.JobType.allowUndistributedCMSSW = True if you are sure of what you are doing"
@@ -528,7 +527,6 @@ class RESTUserWorkflow(RESTEntity):
         elif method in ['DELETE']:
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_num("force", param, safe, optional=True)
-            validate_numlist('jobids', param, safe)
             validate_str("killwarning", param, safe, RX_TEXT_FAIL, optional=True)
             #decode killwarning message if present
             if safe.kwargs['killwarning']:
@@ -705,7 +703,7 @@ class RESTUserWorkflow(RESTEntity):
         return result
 
     @restcall
-    def delete(self, workflow, force, jobids, killwarning):
+    def delete(self, workflow, force, killwarning):
         """Aborts a workflow. The user needs to be a CMS owner of the workflow.
 
            :arg str list workflow: list of unique name identifiers of workflows;
@@ -714,4 +712,4 @@ class RESTUserWorkflow(RESTEntity):
 
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.api, [workflow], self.Task)
-        return self.userworkflowmgr.kill(workflow, force, jobids, killwarning, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+        return self.userworkflowmgr.kill(workflow, force, killwarning, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
