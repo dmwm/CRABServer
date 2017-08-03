@@ -1,5 +1,7 @@
 #! /usr/bin/env python
-
+""" Test module for the PreDAG class
+"""
+from __future__ import division
 from __future__ import print_function
 
 import os
@@ -12,16 +14,20 @@ from ServerUtilities import getTestDataDirectory
 from TaskWorker.Actions.PreDAG import PreDAG
 
 
-MISSING_LUMI_EXAMPLE = '{"1": [[41068, 41068], [41663, 41663], [42366, 42366], [42594, 42594], [43892, 43892], [44183, 44183], [44593, 44593], [45596, 45596], [45598, 45599], [45601, 45601], [46023, 46023], [46197, 46197], [46460, 46460], [47199, 47199], [47203, 47203], [47282, 47282], [50211, 50211], [50715, 50715], [50745, 50745], [50749, 50749], [50812, 50812], [51808, 51809], [51812, 51812], [52283, 52285], [52287, 52288]]}'
+MISSING_LUMI_EXAMPLE = ('{"1": [[41068, 41068], [41663, 41663], [42366, 42366], [42594, 42594], [43892, 43892], [44183, 44183], [44593, 44593], '
+                        '[45596, 45596], [45598, 45599], [45601, 45601], [46023, 46023], [46197, 46197], [46460, 46460], [47199, 47199], [47203, '
+                        '47203], [47282, 47282], [50211, 50211], [50715, 50715], [50745, 50745], [50749, 50749], [50812, 50812], [51808, 51809], '
+                        '[51812, 51812], [52283, 52285], [52287, 52288]]}')
 
 
 class PreDAGTest(unittest.TestCase):
-    """
-    _PreDAGTest_
+    """ _PreDAGTest_
 
     """
 
     def setUp(self):
+        """ Create the all the necessary files
+        """
         self.probes = ["0-{0}".format(i) for i in xrange(1, 6)]
         self.done = [str(i) for i in xrange(1, 7)]
         #we will work in a temporary directory and copy/create things there
@@ -60,16 +66,22 @@ class PreDAGTest(unittest.TestCase):
 
 
     def teardown(self):
-        #back to the old dir and delete the temporary one
+        """ Back to the old dir and delete the temporary one
+        """
         os.chdir(self.olddir)
         shutil.rmtree(self.tempdir)
 
     def testSplitting(self):
+        """ Test that the PreDAG works when probe jobs finishes
+        """
         predag = PreDAG()
+        #Mock the createSubdagSubmission function
         predag.createSubdagSubmission = lambda *args: True
         self.assertEqual(predag.execute("processing", 5, 0), 0)
 
     def testTailSplitting(self):
+        """ Test that the PreDAG works when there are tail jobs to create
+        """
         predag = PreDAG()
         predag.createSubdagSubmission = lambda *args: True
         predag.completedJobs = lambda *args: self.done
@@ -79,6 +91,8 @@ class PreDAGTest(unittest.TestCase):
             self.assertEqual(sum(1 for _ in (line for line in fd if line.startswith('JOB'))), 1)
 
     def testProcessingJobsWithNoRetry(self):
+        """ Check that the number of retries for processng jobs is changed to 0
+        """
         self.testSplitting()
         self.testTailSplitting()
         with open('RunJobs0.subdag') as fd:

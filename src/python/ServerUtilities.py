@@ -9,11 +9,8 @@ import os
 import re
 import time
 import fcntl
-import shutil
 import urllib
 import hashlib
-import tarfile
-import tempfile
 import calendar
 import datetime
 import traceback
@@ -116,10 +113,14 @@ def NEW_USER_SANDBOX_EXCLUSIONS(tarmembers):
 
 
 def getTestDataDirectory():
+    """ Get the /path/to/repository/test/data direcotry to locate files for unit tests
+    """
     testdirList = __file__.split(os.sep)[:-3] + ["test", "data"]
     return os.sep.join(testdirList)
 
 def isCouchDBURL(url):
+    """ Return True if the url proviced is a couchdb one
+    """
     return 'couchdb' in url
 
 
@@ -137,6 +138,8 @@ def truncateError(msg):
 
 
 def checkOutLFN(lfn, username):
+    """ Check if the lfn provided contains the username or is /store/local/ or /store/local/
+    """
     if lfn.startswith('/store/user/'):
         if lfn.split('/')[3] != username:
             return False
@@ -148,7 +151,7 @@ def checkOutLFN(lfn, username):
     return True
 
 
-def getProxiedWebDir(task, host, uri, cert, logFunction = print):
+def getProxiedWebDir(task, host, uri, cert, logFunction=print):
     """ The function simply queries the REST interface specified to get the proxied webdir to use
         for the task. Returns None in case the API could not find the url (either an error or the schedd
         is not configured)
@@ -162,8 +165,8 @@ def getProxiedWebDir(task, host, uri, cert, logFunction = print):
            }
     res = None
     try:
-        server = HTTPRequests(host, cert, cert, retry = 2)
-        dictresult, _, _ = server.get(uri, data = data) #the second and third parameters are deprecated
+        server = HTTPRequests(host, cert, cert, retry=2)
+        dictresult, _, _ = server.get(uri, data=data) #the second and third parameters are deprecated
         if dictresult.get('result'):
             res = dictresult['result'][0]
     except HTTPException as hte:
@@ -176,6 +179,8 @@ def getProxiedWebDir(task, host, uri, cert, logFunction = print):
 
 #setDashboardLogs function is shared between the postjob and the job wrapper. Sharing it here
 def setDashboardLogs(params, webdir, jobid, retry):
+    """ Method to prepare some common dictionary keys for dashboard reporting
+    """
     log_files = [("job_out", "txt"), ("postjob", "txt")]
     for i, log_file in enumerate(log_files):
         log_file_basename, log_file_extension = log_file
@@ -188,15 +193,16 @@ def setDashboardLogs(params, webdir, jobid, retry):
 
 
 def insertJobIdSid(jinfo, jobid, workflow, jobretry):
-    """
-    Modifies passed dictionary (jinfo) to contain jobId and sid keys and values.
-    Used when creating dashboard reports.
+    """ Modifies passed dictionary (jinfo) to contain jobId and sid keys and values.
+        Used when creating dashboard reports.
     """
     jinfo['jobId'] = "%s_https://glidein.cern.ch/%s/%s_%s" % (jobid, jobid, workflow.replace("_", ":"), jobretry)
     jinfo['sid'] = "https://glidein.cern.ch/%s%s" % (jobid, workflow.replace("_", ":"))
 
 
 def getWebdirForDb(reqname, storage_rules):
+    """ Get the location of the webdir. This method is called on the schedd by AdjustSites
+    """
     path = os.path.expanduser("~/%s" % reqname)
     sinfo = storage_rules.split(",")
     storage_re = re.compile(sinfo[0])
@@ -205,8 +211,7 @@ def getWebdirForDb(reqname, storage_rules):
 
 
 def cmd_exist(cmd):
-    """
-    Check if linux command exist
+    """ Check if linux command exist
     """
     try:
         null = open("/dev/null", "w")
@@ -221,8 +226,7 @@ def cmd_exist(cmd):
 
 
 def getCheckWriteCommand(proxy, logger):
-    """
-    Return prepared gfal or lcg commands for checkwrite
+    """ Return prepared gfal or lcg commands for checkwrite
     """
     cpCmd = None
     rmCmd = None
@@ -240,8 +244,7 @@ def getCheckWriteCommand(proxy, logger):
 
 
 def createDummyFile(filename, logger):
-    """
-    Create dummy file for checking write permissions
+    """ Create dummy file for checking write permissions
     """
     abspath = os.path.abspath(filename)
     try:
@@ -253,8 +256,7 @@ def createDummyFile(filename, logger):
 
 
 def removeDummyFile(filename, logger):
-    """
-    Remove created dummy file
+    """ Remove created dummy file
     """
     abspath = os.path.abspath(filename)
     try:
@@ -269,7 +271,7 @@ def getPFN(proxy, lfnsaddprefix, filename, sitename, logger):
     phedex = PhEDEx({"cert": proxy, "key": proxy, "logger": logger})
     lfnsadd = os.path.join(lfnsaddprefix, filename)
     try:
-        pfndict = phedex.getPFN(nodes = [sitename], lfns = [lfnsadd])
+        pfndict = phedex.getPFN(nodes=[sitename], lfns=[lfnsadd])
         pfn = pfndict[(sitename, lfnsadd)]
         if not pfn:
             logger.info('Error: Failed to get PFN from the site. Please check the site status')
@@ -282,20 +284,18 @@ def getPFN(proxy, lfnsaddprefix, filename, sitename, logger):
 
 
 def executeCommand(command):
+    """ Execute passed bash command. There is no check for command success or failure. Who`s calling
+        this command, has to check exitcode, out and err
     """
-    Execute passed bash command. There is no check for command success or failure. Who`s calling
-    this command, has to check exitcode, out and err
-    """
-    process = subprocess.Popen(command, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     out, err = process.communicate()
     exitcode = process.returncode
     return out, err, exitcode
 
 
 def isFailurePermanent(reason, gridJob=False):
-    """
-    Method that decides whether a failure reason should be considered as a
-    permanent failure and submit task or not.
+    """ Method that decides whether a failure reason should be considered as a
+        permanent failure and submit task or not.
     """
     from WMCore.WMExceptions import STAGEOUT_ERRORS
 
@@ -312,6 +312,8 @@ def isFailurePermanent(reason, gridJob=False):
 
 
 def parseJobAd(filename):
+    """ Parse the jobad file provided as argument and return a dict representing it
+    """
     jobAd = {}
     with open(filename) as fd:
         #classad.parseOld(fd)
@@ -333,6 +335,8 @@ def parseJobAd(filename):
 
 
 def mostCommon(lst, default=0):
+    """ Return the most common error among the list
+    """
     try:
         return max(set(lst), key=lst.count)
     except ValueError:
@@ -341,20 +345,22 @@ def mostCommon(lst, default=0):
 
 @contextlib.contextmanager
 def getLock(name):
+    """ Create a "name".lock file and, using fcnt, lock it (or wait for the lock to be released) before proceeding)
+    """
     with open(name + '.lock', 'a+') as fd:
         fcntl.flock(fd, fcntl.LOCK_EX)
         yield fd
 
 
 def getHashLfn(lfn):
-    """
-    Provide a hashed lfn from an lfn.
+    """ Provide a hashed lfn from an lfn.
     """
     return hashlib.sha224(lfn).hexdigest()
 
 
 def generateTaskName(username, requestname, timestamp=None):
-    """Generate a taskName which is saved in database"""
+    """ Generate a taskName which is saved in database
+    """
     if not timestamp:
         timestamp = time.strftime('%y%m%d_%H%M%S', time.gmtime())
     taskname = "%s:%s_%s" % (timestamp, username, requestname)
@@ -362,10 +368,11 @@ def generateTaskName(username, requestname, timestamp=None):
 
 
 # TODO: Remove this from CRABClient. This is kind of common for WMCore not only for CRAB. Maybe better place to have this in WMCore?
-def encodeRequest(configreq, listParams=[]):
+def encodeRequest(configreq, listParams=None):
     """ Used to encode the request from a dict to a string. Include the code needed for transforming lists in the format required by
         cmsweb, e.g.:   adduserfiles = ['file1','file2']  ===>  [...]adduserfiles=file1&adduserfiles=file2[...]
     """
+    listParams = listParams or []
     encodedLists = ''
     for lparam in listParams:
         if lparam in configreq:
@@ -378,17 +385,17 @@ def encodeRequest(configreq, listParams=[]):
             if isinstance(v, basestring):
                 configreq[k] = str(v)
             if isinstance(v, list):
-                configreq[k] = [ str(x) if isinstance(x, basestring) else x for x in v ]
+                configreq[k] = [str(x) if isinstance(x, basestring) else x for x in v]
     encoded = urllib.urlencode(configreq) + encodedLists
     return str(encoded)
 
 
 def oracleOutputMapping(result, key=None):
-    """If key is defined, it will use id as a key and will return dictionary which contains all items with this specific key
-       Otherwise it will return a list of dictionaries.
-       Up to caller to check for catch KeyError,ValueError and any other related failures.
-       KeyError is raised if wrong key is specified.
-       ValueError is raised if wrong format is provided. So far database provides tuple which has 1 dictionary.
+    """ If key is defined, it will use id as a key and will return dictionary which contains all items with this specific key
+        Otherwise it will return a list of dictionaries.
+        Up to caller to check for catch KeyError,ValueError and any other related failures.
+        KeyError is raised if wrong key is specified.
+        ValueError is raised if wrong format is provided. So far database provides tuple which has 1 dictionary.
     """
     if not(result, tuple):
         raise ValueError('Provided input is not valid tuple')
@@ -438,16 +445,20 @@ def checkTaskLifetime(submissionTime):
     ## resubmitLifeTime is 23 days expressed in seconds
     resubmitLifeTime = TASKLIFETIME - NUM_DAYS_FOR_RESUBMITDRAIN * 24 * 60 * 60
     if time.time() > (submissionTime + resubmitLifeTime):
-        msg = "Resubmission of the task is not possble since less than %s days are left before the task is removed from the schedulers.\n" % NUM_DAYS_FOR_RESUBMITDRAIN
+        msg = ("Resubmission of the task is not possble since less than %s days are left before the task is removed from the""schedulers.\n" % NUM_DAYS_FOR_RESUBMITDRAIN)
         msg += "A task expires %s days after its submission\n" % (TASKLIFETIME / (24 * 60 * 60))
         msg += "You can submit a 'recovery task' if you need to execute again the failed jobs\n"
         msg += "See https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ for more information about recovery tasks"
     return msg
 
 def getEpochFromDBTime(startTime):
+    """ Provide a meaningful description
+    """
     return calendar.timegm(startTime.utctimetuple())
 
 def getColumn(dictresult, columnName):
+    """ Given a dict returned by REST calls, return the value of columnName
+    """
     columnIndex = dictresult['desc']['columns'].index(columnName)
     value = dictresult['result'][columnIndex]
     if value == 'None':

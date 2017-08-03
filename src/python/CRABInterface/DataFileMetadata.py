@@ -1,3 +1,8 @@
+""" This module implement the data part of the filemetadata API (RESTFilemetadata)
+    Its main method is inject (that corerspond to a PUT) that INSERT or UPDATE a file
+    (if it already exists)
+"""
+
 import json
 import logging
 from ast import literal_eval
@@ -5,8 +10,11 @@ from ast import literal_eval
 from CRABInterface.Utils import getDBinstance
 
 class DataFileMetadata(object):
+    """ DataFileMetadata class
+    """
     @staticmethod
     def globalinit(dbapi, config):
+        """ Called by RESTBaseAPI to initialize some parameters that are common between all the DataFileMetadata instances"""
         DataFileMetadata.api = dbapi
         DataFileMetadata.config = config
 
@@ -15,6 +23,8 @@ class DataFileMetadata(object):
         self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
 
     def getFiles(self, taskname, filetype, howmany):
+        """ Given a taskname, a filetype and a number return a list of filemetadata from this task
+        """
         self.logger.debug("Calling jobmetadata for task %s and filetype %s" % (taskname, filetype))
         if howmany == None:
             howmany = -1
@@ -22,31 +32,35 @@ class DataFileMetadata(object):
         rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, **binds)
         for row in rows:
             row = self.FileMetaData.GetFromTaskAndType_tuple(*row)
-            yield json.dumps({'taskname': taskname,
-                   'filetype': filetype,
-                   #TODO pandajobid should not be used. Let's wait a "quiet release" and remove it
-                   'pandajobid': row.pandajobid,
-                   'jobid': row.jobid,
-                   'outdataset': row.outdataset,
-                   'acquisitionera': row.acquisitionera,
-                   'swversion': row.swversion,
-                   'inevents': row.inevents,
-                   'globaltag': row.globaltag,
-                   'publishname': row.publishname,
-                   'location': row.location,
-                   'tmplocation': row.tmplocation,
-                   'runlumi': literal_eval(row.runlumi.read()),
-                   'adler32': row.adler32,
-                   'cksum': row.cksum,
-                   'md5': row.md5,
-                   'lfn': row.lfn,
-                   'filesize': row.filesize,
-                   'parents': literal_eval(row.parents.read()),
-                   'state': row.state,
-                   'created': str(row.parents),
-                   'tmplfn': row.tmplfn})
+            yield json.dumps({
+                'taskname': taskname,
+                'filetype': filetype,
+                #TODO pandajobid should not be used. Let's wait a "quiet release" and remove it
+                'pandajobid': row.pandajobid,
+                'jobid': row.jobid,
+                'outdataset': row.outdataset,
+                'acquisitionera': row.acquisitionera,
+                'swversion': row.swversion,
+                'inevents': row.inevents,
+                'globaltag': row.globaltag,
+                'publishname': row.publishname,
+                'location': row.location,
+                'tmplocation': row.tmplocation,
+                'runlumi': literal_eval(row.runlumi.read()),
+                'adler32': row.adler32,
+                'cksum': row.cksum,
+                'md5': row.md5,
+                'lfn': row.lfn,
+                'filesize': row.filesize,
+                'parents': literal_eval(row.parents.read()),
+                'state': row.state,
+                'created': str(row.parents),
+                'tmplfn': row.tmplfn
+            })
 
-    def inject(self, *args, **kwargs):
+    def inject(self, **kwargs):
+        """ Insert or update a record in the database
+        """
         self.logger.debug("Calling jobmetadata inject with parameters %s" % kwargs)
 
         bindnames = set(kwargs.keys()) - set(['outfileruns', 'outfilelumis'])
@@ -98,12 +112,17 @@ class DataFileMetadata(object):
         self.api.modify(self.FileMetaData.Update_sql, **update_bind)
         return []
 
-    def changeState(self, *args, **kwargs):#kwargs are (taskname, outlfn, filestate)
+    def changeState(self, **kwargs): #kwargs are (taskname, outlfn, filestate)
+        """ UNUSED method that change the fmd_filestate column of a filemetadata record
+        """
         self.logger.debug("Changing state of file %(outlfn)s in task %(taskname)s to %(filestate)s" % kwargs)
 
         self.api.modify(self.FileMetaData.ChangeFileState_sql, **dict((k, [v]) for k, v in kwargs.iteritems()))
 
     def delete(self, taskname, hours):
+        """ UNUSED method that deletes record from the FILEMETADATA table
+            The database old record cleanup is done through database partitioning
+        """
         if taskname:
             self.logger.debug("Deleting all the files associated to task: %s" % taskname)
             self.api.modifynocheck(self.FileMetaData.DeleteTaskFiles_sql, taskname=[taskname])
@@ -111,7 +130,8 @@ class DataFileMetadata(object):
             self.logger.debug("Deleting all the files older than %s hours" % hours)
             self.api.modifynocheck(self.FileMetaData.DeleteFilesByTime_sql, hours=[hours])
 
-    def preprocessLumiStrings(self, lumis):
+    @staticmethod
+    def preprocessLumiStrings(lumis):
         """ Takes a list of strings of lumis and updates
             their format if necessary.
             Old: 'lumi1,lumi2,lumi3...'
