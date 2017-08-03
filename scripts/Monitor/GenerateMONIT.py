@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import sys
 import time
@@ -98,7 +99,7 @@ class CRAB3CreateJson(object):
                              schedd['TotalIdleJobs'],
                              schedd['TotalRunningJobs'],
                              schedd['TotalHeldJobs']])
-        except Exception, e:
+        except Exception as e:
             self.logger.debug("Error in getShadowsRunning: %s"%str(e))
         return data
 
@@ -191,11 +192,11 @@ class CRAB3CreateJson(object):
                 totalIdleTasks += numDagIdle
                 totalRunningTP += numTPRun
 
-            print metrics
+            print (metrics)
             try:
                 send_and_check(metrics)
             except Exception as ex:
-                print(ex)
+                print (ex)
         self.jsonDoc['total_running_tasks'] = totalRunningTasks
         self.jsonDoc['total_idle_tasks'] = totalIdleTasks
         self.jsonDoc['total_running_tp'] = totalRunningTP
@@ -236,13 +237,13 @@ if __name__ == '__main__':
     # before running make sure no other instance of this script is running
     lockFile = '/home/crab3/CRAB3_SCHEDD_JSON.Lock'
     if os.path.isfile(lockFile):
-        print "%s already exists, abandon this run" % lockFile
+        print ("%s already exists, abandon this run" % lockFile)
         exit()
     else:
         open(lockFile, 'wa').close()  # create the lock
     metrics = pr.execute()
 
-    print metrics
+    print (metrics)
     try:
         send_and_check([jsonDoc])
     except Exception as ex:
