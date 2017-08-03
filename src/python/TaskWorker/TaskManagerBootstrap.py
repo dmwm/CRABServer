@@ -12,6 +12,7 @@ import classad
 
 import TaskWorker.Actions.PostJob as PostJob
 import TaskWorker.Actions.PreJob as PreJob
+import TaskWorker.Actions.PreDAG as PreDAG
 import HTCondorUtils
 
 import WMCore.Configuration as Configuration
@@ -23,6 +24,8 @@ def bootstrap():
         return PostJob.PostJob().execute(*sys.argv[2:])
     elif command == "PREJOB":
         return PreJob.PreJob().execute(*sys.argv[2:])
+    elif command == "PREDAG":
+        return PreDAG.PreDAG().execute(*sys.argv[2:])
 
     infile, outfile = sys.argv[2:]
 

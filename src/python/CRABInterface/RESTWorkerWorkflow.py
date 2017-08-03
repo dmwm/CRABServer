@@ -1,13 +1,13 @@
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 from WMCore.REST.Error import InvalidParameter
 
 from ServerUtilities import getEpochFromDBTime
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import RX_TASKNAME, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, \
-                                  RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE
+                                  RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_JOBID
 
 # external dependecies here
 from ast import literal_eval
@@ -33,7 +33,7 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("command", param, safe, RX_STATUS, optional=True)
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
             validate_str("failure", param, safe, RX_TEXT_FAIL, optional=True)
-            validate_numlist("resubmittedjobs", param, safe)
+            validate_strlist("resubmittedjobs", param, safe, RX_JOBID)
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("subresource", param, safe, RX_SUBPOSTWORKER, optional=True)
             validate_num("limit", param, safe, optional=True)
