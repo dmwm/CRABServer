@@ -330,7 +330,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def __init__(self, *args, **kwargs):
         TaskAction.TaskAction.__init__(self, *args, **kwargs)
-        self.phedex = PhEDEx.PhEDEx() #TODO use config certs!
+        self.phedex = PhEDEx.PhEDEx({'pycurl': True}) #TODO use config certs!
 
 
     def buildDashboardInfo(self, task):
