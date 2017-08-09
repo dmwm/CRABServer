@@ -1,16 +1,17 @@
 #!/usr/bin/python
 from __future__ import print_function, division
 import re
-import time
-import logging
 import os
 import ast
-import json
 import sys
-import classad
+import time
+import json
 import glob
 import copy
 import fcntl
+import logging
+import classad
+import argparse
 from shutil import move
 # Need to import HTCondorUtils from a parent directory, not easy when the files are not in python packages.
 # Solution by ajay, SO: http://stackoverflow.com/questions/11536764
@@ -240,8 +241,6 @@ def parseNodeStateV2(fp, nodes):
             # observed; STATUS_ERROR is terminal.
             info['State'] = 'failed'
 
-class InvalidConfigException(Exception):
-    pass
 
 class StatusCacher:
     """
@@ -254,22 +253,17 @@ class StatusCacher:
     cfgDict = {
         "statusCacheFile": "task_process/status_cache.txt",
         "fjrParseResFile": "task_process/fjr_parse_results.txt",
-        "jobLogFile": "job_log",
-        "loggingFile": "task_process/cache_status.log"
+        "jobLogFile": "job_log"
         }
 
     def __init__(self, **kwargs):
-        # Check if kwargs contains override settings and apply them to the cfgDict
+        # Check if kwargs contains non-empty override settings and apply them to the cfgDict
         for key in kwargs:
-            if key in self.cfgDict:
+            if key in self.cfgDict and kwargs[key]:
                 self.cfgDict[key] = kwargs[key]
-            else:
-                raise InvalidConfigException()
-        # Assign cfgDict contents as class attributes
+        # Set cfgDict contents as class attributes
         for key in self.cfgDict:
             setattr(self, key, self.cfgDict[key])
-
-        logging.basicConfig(filename=self.loggingFile, level=logging.DEBUG)
 
     def readPreviousInfo(self):
         """
@@ -299,7 +293,7 @@ class StatusCacher:
 
         return previousInfoDict
 
-    def readNewInfo(self, infoDict):
+    def updateInfo(self, infoDict):
         """
         Parses the logs from a certain checkpoint and updates infoDict accordingly.
         """
@@ -309,7 +303,7 @@ class StatusCacher:
             infoDict["jobLogCheckpoint"] = jobsLog.tell()
 
         for fn in glob.glob("node_state*"):
-            with open(fn, 'r') as nodeState:
+            with open(fn, "r") as nodeState:
                 parseNodeStateV2(nodeState, infoDict["nodes"])
 
         try:
@@ -320,7 +314,7 @@ class StatusCacher:
         except IOError:
             logging.exception("Problem during error_summary file handling")
 
-    def storeNodesInfoInFile(self, infoDict):
+    def storeInfoInFile(self, infoDict):
         """
         Writes the contents of infoDict to file.
         """
@@ -334,7 +328,7 @@ class StatusCacher:
             cacheFile.write(str(infoDict["nodeMap"]) + "\n")
 
     def summarizeFjrParseResults(self, checkpoint):
-        '''
+        """
         Reads the fjr_parse_results file line by line. The file likely contains multiple
         errors for the same jobId coming from different retries, we only care about
         the last error for each jobId. Since each postjob writes this information
@@ -344,7 +338,7 @@ class StatusCacher:
         Return the updated error dictionary and also the location until which the
         fjr_parse_results file was read so that we can store it and
         don't have t re-read the same information next time the cache_status.py runs.
-        '''
+        """
 
         if os.path.exists(self.fjrParseResFile):
             with open(self.fjrParseResFile, "r") as f:
@@ -363,17 +357,33 @@ class StatusCacher:
 
     def run(self):
         infoDict = self.readPreviousInfo()
-        self.readNewInfo(infoDict)
-        self.storeNodesInfoInFile(infoDict)
+        self.updateInfo(infoDict)
+        self.storeInfoInFile(infoDict)
 
 def main():
+    cfgDict = {}
+    defaultLoggingFile = "task_process/cache_status.log"
+    if len(sys.argv) > 1:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--statusCacheFile", "-c")
+        parser.add_argument("--fjrParseResFile", "-f")
+        parser.add_argument("--jobLogFile", "-j")
+        parser.add_argument("--loggingFile", "-l")
+
+        cfgDict = vars(parser.parse_args())
+        loggingFile = cfgDict["loggingFile"] or defaultLoggingFile
+        logging.basicConfig(filename=loggingFile, level=logging.DEBUG)
+        logging.debug("DEBUG MODE - Command line args detected, "
+                      "will override default file locations.")
+    else:
+        logging.basicConfig(filename=defaultLoggingFile, level=logging.DEBUG)
+
     try:
-        cacher = StatusCacher()
+        cacher = StatusCacher(**cfgDict)
         cacher.run()
     except Exception:
-        logging.exception("error during main loop")
+        logging.exception("Error during main script execution")
 
 main()
-
 logging.debug("cache_status.py exiting")
 
