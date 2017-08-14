@@ -1,12 +1,12 @@
+""" This module is used to validate requests to the /workflow resource and calls either HTCondorDataWorkflow or DataWorkflow methods
+"""
+
 # external dependecies here
 import re
-import time
 import random
 import logging
 import cherrypy
 from base64 import b64decode
-from httplib import HTTPException
-
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Error import ExecutionError, InvalidParameter
@@ -17,7 +17,10 @@ from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
 # CRABServer dependecies here
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match
-from CRABInterface.Regexps import *
+from CRABInterface.Regexps import (RX_TASKNAME, RX_ACTIVITY, RX_JOBTYPE, RX_GENERATOR, RX_LUMIEVENTS, RX_CMSSW, RX_ARCH, RX_DATASET,
+    RX_CMSSITE, RX_SPLIT, RX_CACHENAME, RX_CACHEURL, RX_LFN, RX_USERFILE, RX_VOPARAMS, RX_DBSURL, RX_LFNPRIMDS, RX_OUTFILES,
+    RX_RUNS, RX_LUMIRANGE, RX_ASOURL, RX_ASODB, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT, RX_JOBID, RX_ADDFILE,
+    RX_ANYTHING, RX_USERNAME, RX_DATE, RX_TEXT_FAIL)
 from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
 from ServerUtilities import checkOutLFN, generateTaskName
 
@@ -46,7 +49,7 @@ class RESTUserWorkflow(RESTEntity):
             if '*' in site:
                 sitere = re.compile(site.replace('*', '.*'))
                 expanded = map(str, filter(sitere.match,
-                    self.allPNNNames.sites if pnn else self.allCMSNames.sites))
+                               self.allPNNNames.sites if pnn else self.allCMSNames.sites))
                 self.logger.debug("Site %s expanded to %s during validate" % (site, expanded))
                 if not expanded:
                     excasync = ValueError("Remote output data site not valid")
@@ -59,7 +62,8 @@ class RESTUserWorkflow(RESTEntity):
                 res.add(site)
         return list(res)
 
-    def _checkOutLFN(self, kwargs, username):
+    @staticmethod
+    def _checkOutLFN(kwargs, username):
         """Check the lfn parameter: it must start with '/store/user/<username>/', '/store/group/groupname/' or '/store/local/something/',
            where username is the one registered in SiteDB (i.e. the one used in the CERN primary account).
            If lfn is not there, default to '/store/user/<username>/'.
@@ -128,7 +132,8 @@ class RESTUserWorkflow(RESTEntity):
 
 
     ## Basically copy and pasted from _checkPublishDataName which will be eventually removed
-    def _checkPublishDataName2(self, kwargs, outlfn, requestname, username):
+    @staticmethod
+    def _checkPublishDataName2(kwargs, outlfn, requestname, username):
         """
         Validate the (user specified part of the) output dataset name for publication
         using the WMCore.Lexicon method userprocdataset(), which does the same
@@ -176,7 +181,8 @@ class RESTUserWorkflow(RESTEntity):
             raise InvalidParameter(msg)
 
 
-    def _checkPrimaryDataset(self, kwargs, optional=False):
+    @staticmethod
+    def _checkPrimaryDataset(kwargs, optional=False):
         """
         Validate the primary dataset name using the WMCore.Lexicon method primdataset(),
         which does the same validation as DBS (see discussion with Yuyi Guo in following
@@ -203,6 +209,8 @@ class RESTUserWorkflow(RESTEntity):
 
 
     def _checkASODestination(self, site):
+        """ Check that the ASO destination is correct and not among the banned ones
+        """
         self._checkSite(site, pnn=True)
         bannedDestinations = self._expandSites(
             self.centralcfg.centralconfig.get('banned-out-destinations', []),
@@ -276,6 +284,8 @@ class RESTUserWorkflow(RESTEntity):
         return asourl, asodb
 
     def _checkSite(self, site, pnn=False):
+        """ Check a single site like T2_IT_Something against sites in sitedb or phedex
+        """
         sites = self.allPNNNames.sites if pnn else self.allCMSNames.sites
         if site not in sites:
             excasync = ValueError("A site name you specified is not valid")
@@ -293,7 +303,7 @@ class RESTUserWorkflow(RESTEntity):
         goodReleases = {}
         try:
             goodReleases = self.tagCollector.releases_by_architecture()
-        except:
+        except: #pylint: disable=bare-except
             msg = "Error connecting to %s (params: %s) and determining the list of available releases. " % \
                   (self.tagCollector['endpoint'], self.tagCollector.tcArgs) + "Skipping the check of the releases"
         else:
@@ -313,7 +323,7 @@ class RESTUserWorkflow(RESTEntity):
             self.logger.warning(msg)
 
     @conn_handler(services=['sitedb', 'centralconfig'])
-    def validate(self, apiobj, method, api, param, safe):
+    def validate(self, apiobj, method, api, param, safe): #pylint: disable=unused-argument
         """Validating all the input parameter as enforced by the WMCore.REST module"""
 
         if method in ['PUT']:
@@ -448,7 +458,6 @@ class RESTUserWorkflow(RESTEntity):
                     "Allowed regexp: '%s'." % RX_OUTFILES.pattern)
             validate_strlist("runs", param, safe, RX_RUNS)
             validate_strlist("lumis", param, safe, RX_LUMIRANGE)
-            #validate_str("scheduler", param, safe, RX_SCHEDULER)
             if len(safe.kwargs["runs"]) != len(safe.kwargs["lumis"]):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
             validate_strlist("adduserfiles", param, safe, RX_ADDFILE)
@@ -539,11 +548,11 @@ class RESTUserWorkflow(RESTEntity):
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, primarydataset, nonvaliddata, useparent, secondarydata, generator, eventsperlumi,
-                siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, debugfilename, cacheurl, addoutputfiles,
-                savelogsflag, publication, publishname, publishname2, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
-                tfileoutfiles, edmoutfiles, runs, lumis,
-                totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
-                faillimit, ignorelocality, userfiles, asourl, asodb, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun, ignoreglobalblacklist):
+            siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, debugfilename, cacheurl, addoutputfiles,
+            savelogsflag, publication, publishname, publishname2, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
+            tfileoutfiles, edmoutfiles, runs, lumis,
+            totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
+            faillimit, ignorelocality, userfiles, asourl, asodb, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun, ignoreglobalblacklist):
         """Perform the workflow injection
 
            :arg str workflow: request name defined by the user;
@@ -580,7 +589,6 @@ class RESTUserWorkflow(RESTEntity):
            :arg str edmoutfiles: list of edm output files
            :arg str list runs: list of run numbers
            :arg str list lumis: list of lumi section numbers
-           :arg str scheduler: Which scheduler to use, can be 'panda' or 'condor'
            :arg int totalunits: number of MC event to be generated
            :arg int adduserfiles: additional user file to be copied in the cmsRun directory
            :arg int oneEventMode: flag enabling oneEventMode
@@ -604,19 +612,19 @@ class RESTUserWorkflow(RESTEntity):
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
         return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch,
-                                       inputdata=inputdata, primarydataset=primarydataset, nonvaliddata=nonvaliddata, use_parent=useparent,
-                                       secondarydata=secondarydata, generator=generator, events_per_lumi=eventsperlumi,
-                                       siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, splitalgo=splitalgo, algoargs=algoargs,
-                                       cachefilename=cachefilename, debugfilename=debugfilename, cacheurl=cacheurl,
-                                       addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
-                                       username=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
-                                       publication=publication, publishname=publishname, publishname2=publishname2, publishgroupname=publishgroupname, asyncdest=asyncdest,
-                                       dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
-                                       edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
-                                       maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfn=lfn,
-                                       ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, asourl=asourl, asodb=asodb,
-                                       scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun,
-                                       submitipaddr=cherrypy.request.headers['X-Forwarded-For'], ignoreglobalblacklist=ignoreglobalblacklist)
+                                           inputdata=inputdata, primarydataset=primarydataset, nonvaliddata=nonvaliddata, use_parent=useparent,
+                                           secondarydata=secondarydata, generator=generator, events_per_lumi=eventsperlumi,
+                                           siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, splitalgo=splitalgo, algoargs=algoargs,
+                                           cachefilename=cachefilename, debugfilename=debugfilename, cacheurl=cacheurl,
+                                           addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
+                                           username=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
+                                           publication=publication, publishname=publishname, publishname2=publishname2, publishgroupname=publishgroupname, asyncdest=asyncdest,
+                                           dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
+                                           edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
+                                           maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfn=lfn,
+                                           ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, asourl=asourl, asodb=asodb,
+                                           scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun,
+                                           submitipaddr=cherrypy.request.headers['X-Forwarded-For'], ignoreglobalblacklist=ignoreglobalblacklist)
 
     @restcall
     def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory,
@@ -642,14 +650,14 @@ class RESTUserWorkflow(RESTEntity):
                                                  userdn=cherrypy.request.headers['Cms-Authn-Dn'])
         elif subresource == 'resubmit2':
             return self.userworkflowmgr.resubmit2(workflow=workflow,
-                                                 publication=publication,
-                                                 jobids=jobids,
-                                                 siteblacklist=siteblacklist,
-                                                 sitewhitelist=sitewhitelist,
-                                                 maxjobruntime=maxjobruntime,
-                                                 maxmemory=maxmemory,
-                                                 numcores=numcores,
-                                                 priority=priority)
+                                                  publication=publication,
+                                                  jobids=jobids,
+                                                  siteblacklist=siteblacklist,
+                                                  sitewhitelist=sitewhitelist,
+                                                  maxjobruntime=maxjobruntime,
+                                                  maxmemory=maxmemory,
+                                                  numcores=numcores,
+                                                  priority=priority)
         elif subresource == 'proceed':
             return self.userworkflowmgr.proceed(workflow=workflow)
 
