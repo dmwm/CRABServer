@@ -8,13 +8,11 @@ import os
 import re
 import json
 import shutil
-import string
 import pickle
 import random
 import tarfile
 import hashlib
 import tempfile
-import commands
 from ast import literal_eval
 from httplib import HTTPException
 
@@ -178,12 +176,11 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
 %(extra_jdl)s
 queue
 """
-
-SPLIT_ARG_MAP = { "Automatic": "seconds_per_job",
-                  "LumiBased": "lumis_per_job",
-                  "EventBased": "events_per_job",
-                  "FileBased": "files_per_job",
-                  "EventAwareLumiBased": "events_per_job",}
+SPLIT_ARG_MAP = {"Automatic": "seconds_per_job",
+                 "LumiBased": "lumis_per_job",
+                 "EventBased": "events_per_job",
+                 "FileBased": "files_per_job",
+                 "EventAwareLumiBased": "events_per_job",}
 
 
 def getCreateTimestamp(taskname):
@@ -214,9 +211,9 @@ def makeLFNPrefixes(task):
     splitlfn = lfn.split('/')
     if splitlfn[2] == 'user':
         #join:                    /       store    /temp   /user  /mmascher.1234    /lfn          /GENSYM    /publishname     /120414_1634
-        temp_dest = os.path.join('/', splitlfn[1], 'temp', 'user', tmp_user, *( splitlfn[4:] + [primaryds, publish_info[0], timestamp] ))
+        temp_dest = os.path.join('/', splitlfn[1], 'temp', 'user', tmp_user, *(splitlfn[4:] + [primaryds, publish_info[0], timestamp]))
     else:
-        temp_dest = os.path.join('/', splitlfn[1], 'temp', 'user', tmp_user, *( splitlfn[3:] + [primaryds, publish_info[0], timestamp] ))
+        temp_dest = os.path.join('/', splitlfn[1], 'temp', 'user', tmp_user, *(splitlfn[3:] + [primaryds, publish_info[0], timestamp]))
     dest = os.path.join(lfn, primaryds, publish_info[0], timestamp)
 
     return temp_dest, dest
@@ -350,7 +347,7 @@ class DagmanCreator(TaskAction.TaskAction):
                   'taskId': task['tm_taskname'],
                   'datasetFull': task['tm_input_dataset'],
                   'resubmitter': task['tm_username'],
-                  'exe': 'cmsRun' }
+                  'exe': 'cmsRun'}
         return params
 
 
@@ -467,7 +464,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['publishdbsurl'] = info['tm_publish_dbs_url']
         info['publication'] = 1 if info['tm_publication'] == 'T' else 0
         info['userdn'] = info['tm_user_dn']
-        info['requestname'] = string.replace(task['tm_taskname'], '"', '')
+        info['requestname'] = task['tm_taskname'].replace('"', '')
         info['savelogsflag'] = 1 if info['tm_save_logs'] == 'T' else 0
         info['blacklistT1'] = 0
         info['siteblacklist'] = task['tm_site_blacklist']
@@ -561,9 +558,9 @@ class DagmanCreator(TaskAction.TaskAction):
         temp_dest, dest = makeLFNPrefixes(task)
         if task['tm_publication'] == 'T':
             try:
-                validateLFNs(dest,outfiles)
+                validateLFNs(dest, outfiles)
             except AssertionError as ex:
-                msg  = "\nYour task speficies an output LFN which fails validation in"
+                msg = "\nYour task speficies an output LFN which fails validation in"
                 msg += "\n WMCore/Lexicon and therefore can not be published in DBS"
                 msg += "\nError detail: %s" % (str(ex))
                 raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
@@ -738,13 +735,13 @@ class DagmanCreator(TaskAction.TaskAction):
         self.logger.debug("Site blacklist: %s" % (list(siteBlacklist)))
 
         if siteWhitelist & global_blacklist:
-            msg  = "The following sites from the user site whitelist are blacklisted by the CRAB server: %s." % (list(siteWhitelist & global_blacklist))
+            msg = "The following sites from the user site whitelist are blacklisted by the CRAB server: %s." % (list(siteWhitelist & global_blacklist))
             msg += " Since the CRAB server blacklist has precedence, these sites are not considered in the user whitelist."
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
 
         if siteBlacklist & siteWhitelist:
-            msg  = "The following sites appear in both the user site blacklist and whitelist: %s." % (list(siteBlacklist & siteWhitelist))
+            msg = "The following sites appear in both the user site blacklist and whitelist: %s." % (list(siteBlacklist & siteWhitelist))
             msg += " Since the whitelist has precedence, these sites are not considered in the blacklist."
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
@@ -793,7 +790,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 try:
                     possiblesites = set(sbj.getAllCMSNames())
                 except Exception as ex:
-                    msg  = "The CRAB3 server backend could not contact SiteDB to get the list of all CMS sites."
+                    msg = "The CRAB3 server backend could not contact SiteDB to get the list of all CMS sites."
                     msg += " This could be a temporary SiteDB glitch."
                     msg += " Please try to submit a new task (resubmit will not work)"
                     msg += " and contact the experts if the error persists."
@@ -830,27 +827,29 @@ class DagmanCreator(TaskAction.TaskAction):
             self.logger.info("Resulting available sites: %s" % (list(availablesites)))
 
             if siteWhitelist or siteBlacklist:
-                msg  = "The site whitelist and blacklist will be applied by the pre-job."
+                msg = "The site whitelist and blacklist will be applied by the pre-job."
                 msg += " This is expected to result in DESIRED_SITES = %s" % (list(available))
                 self.logger.debug(msg)
 
-            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, list(jgblocks)[0], availablesites, datasites, outfiles, startjobid, parent=parent, stage=stage)
+            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo,
+                                                             jobgroup, list(jgblocks)[0], availablesites,
+                                                             datasites, outfiles, startjobid, parent=parent, stage=stage)
             dagSpecs += jobgroupDagSpecs
 
         def getBlacklistMsg():
             tmp = ""
-            if len(global_blacklist)!=0:
+            if len(global_blacklist) != 0:
                 tmp += " Global CRAB3 blacklist is %s.\n" % global_blacklist
-            if len(siteBlacklist)!=0:
+            if len(siteBlacklist) != 0:
                 tmp += " User blacklist is %s.\n" % siteBlacklist
-            if len(siteWhitelist)!=0:
+            if len(siteWhitelist) != 0:
                 tmp += " User whitelist is %s.\n" % siteWhitelist
             return tmp
 
         if not dagSpecs:
             msg = "No jobs created for task %s." % (kwargs['task']['tm_taskname'])
             if blocksWithNoLocations or blocksWithBannedLocations:
-                msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler. "
+                msg = "The CRAB server backend refuses to send jobs to the Grid scheduler. "
                 msg += "No locations found for dataset '%s'. " % (kwargs['task']['tm_input_dataset'])
                 msg += "(or at least for the part of the dataset that passed the lumi-mask and/or run-range selection).\n"
             if blocksWithBannedLocations:
@@ -866,15 +865,14 @@ class DagmanCreator(TaskAction.TaskAction):
             msg += getBlacklistMsg()
         if blocksWithNoLocations or blocksWithBannedLocations:
             msg += (" Dataset processing will be incomplete because %s (out of %s) blocks are only present at blacklisted site(s)" %
-                (len(blocksWithNoLocations)+len(blocksWithBannedLocations), len(allblocks)))
+                   (len(blocksWithNoLocations)+len(blocksWithBannedLocations), len(allblocks)))
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
 
         ## Write down the DAG as needed by DAGMan.
-        dag = DAG_HEADER.format(
-                nodestate='.{0}'.format(parent) if parent else ('.0' if stage == 'processing' else ''),
-                resthost=kwargs['task']['resthost'],
-                resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
+        dag = DAG_HEADER.format(nodestate='.{0}'.format(parent) if parent else ('.0' if stage == 'processing' else ''),
+                                resthost=kwargs['task']['resthost'],
+                                resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
         if stage == 'probe':
             dagSpecs = dagSpecs[:getattr(self.config.TaskWorker, 'numAutomaticProbes', 5)]
         for dagSpec in dagSpecs:
@@ -966,9 +964,6 @@ class DagmanCreator(TaskAction.TaskAction):
         ## Save the DAG into a file.
         with open(name, "w") as fd:
             fd.write(dag)
-
-        task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
-        userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
 
         info["jobcount"] = len(dagSpecs)
         maxpost = getattr(self.config.TaskWorker, 'maxPost', 20)
@@ -1086,7 +1081,7 @@ class DagmanCreator(TaskAction.TaskAction):
         shutil.copy(adjust_location, '.')
 
         # Bootstrap the ISB if we are using UFC
-        if UserFileCache and kw['task']['tm_cache_url'].find('/crabcache')!=-1:
+        if UserFileCache and kw['task']['tm_cache_url'].find('/crabcache') != -1:
             ufc = UserFileCache(mydict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint' : kw['task']['tm_cache_url']})
             try:
                 ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
@@ -1145,7 +1140,7 @@ class DagmanCreator(TaskAction.TaskAction):
         try:
             os.chdir(kw['tempDir'])
             info, params, inputFiles, splitterResult = self.executeInternal(*args, **kw)
-            return TaskWorker.DataObjects.Result.Result(task = kw['task'], result = (info, params, inputFiles, splitterResult))
+            return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(info, params, inputFiles, splitterResult))
         finally:
             os.chdir(cwd)
 
