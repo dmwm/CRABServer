@@ -52,8 +52,8 @@ class CRAB3CreateJson(object):
             resturi = "/crabserver/prod/task"
             configreq = {'minutes': "120", 'subresource': "counttasksbystatus"}
             server = HTTPRequests(self.resthost,
-                                  "/data/certs/backup-service-certs/servicecert.pem",
-                                  "/data/certs/backup-service-certs/servicekey.pem", retry = 3)
+                                  "/data/certs/servicecert.pem",
+                                  "/data/certs/servicekey.pem", retry = 3)
             result = server.get(resturi, data = configreq)
             return dict(result[0]['result'])
         except Exception:
