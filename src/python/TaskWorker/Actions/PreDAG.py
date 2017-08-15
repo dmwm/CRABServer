@@ -38,6 +38,7 @@ from ServerUtilities import getLock
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.WorkerExceptions import TaskWorkerException
+from functools import reduce
 
 class PreDAG(object):
     """ Main class that implement all the necessary features
