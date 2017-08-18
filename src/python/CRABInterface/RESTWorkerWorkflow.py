@@ -1,3 +1,5 @@
+""" Interface used by the TaskWorker to ucquire tasks and change their state
+"""
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
@@ -6,8 +8,8 @@ from WMCore.REST.Error import InvalidParameter
 from ServerUtilities import getEpochFromDBTime
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_TASKNAME, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, \
-                                  RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_JOBID
+from CRABInterface.Regexps import (RX_TASKNAME, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_SUBPOSTWORKER,
+                                  RX_SUBGETWORKER, RX_JOBID)
 
 # external dependecies here
 from ast import literal_eval
@@ -22,7 +24,8 @@ class RESTWorkerWorkflow(RESTEntity):
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
         self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
 
-    def validate(self, apiobj, method, api, param, safe):
+    @staticmethod
+    def validate(apiobj, method, api, param, safe): #pylint: disable=unused-argument
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid() #TODO: should we also call authz_operator here ? Otherwise anybody can get tasks from here.
                             #      Actually, maybe something even more strict is necessary (only the prod TW machine can access this resource)
@@ -64,22 +67,17 @@ class RESTWorkerWorkflow(RESTEntity):
             except TypeError:
                 raise InvalidParameter("Failure message is not in the accepted format")
         methodmap = {"state": {"args": (self.Task.SetStatusTask_sql,), "method": self.api.modify, "kwargs": {"status": [status],
-                                                                               "command": [command], "taskname": [workflow]}},
-                   #TODO MM - I don't see where this start API is used
-                  "start": {"args": (self.Task.SetReadyTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
-                                                                                       "tm_taskname": [workflow]}},
-                  "failure": {"args": (self.Task.SetFailedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
-                                                                                "failure": [failure],
-                                                                               "tm_taskname": [workflow]}},
+                     "command": [command], "taskname": [workflow]}},
+                     #TODO MM - I don't see where this start API is used
+                     "start": {"args": (self.Task.SetReadyTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
+                               "tm_taskname": [workflow]}},
+                     "failure": {"args": (self.Task.SetFailedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
+                                 "failure": [failure], "tm_taskname": [workflow]}},
                   #Used in DagmanSubmitter?
-                  "success": {"args": (self.Task.SetInjectedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
-                                                                                            "tm_taskname": [workflow],
-                                                                                            "clusterid": [clusterid],
-                                                                                            "resubmitted_jobs": [str(resubmittedjobs)]}},
-                  "process": {"args": (self.Task.UpdateWorker_sql,), "method": self.api.modifynocheck, "kwargs": {"tw_name": [workername],
-                                                                                                   "get_status": [getstatus],
-                                                                                                   "limit": [limit],
-                                                                                                   "set_status": [status]}},
+                     "success": {"args": (self.Task.SetInjectedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
+                                 "tm_taskname": [workflow], "clusterid": [clusterid], "resubmitted_jobs": [str(resubmittedjobs)]}},
+                     "process": {"args": (self.Task.UpdateWorker_sql,), "method": self.api.modifynocheck, "kwargs": {"tw_name": [workername],
+                                  "get_status": [getstatus], "limit": [limit], "set_status": [status]}},
         }
 
         if subresource is None:

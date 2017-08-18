@@ -38,10 +38,11 @@ from ServerUtilities import getLock
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.WorkerExceptions import TaskWorkerException
+from functools import reduce
 
-#TODO In general better logging and documentation
-
-class PreDAG:
+class PreDAG(object):
+    """ Main class that implement all the necessary features
+    """
     def __init__(self):
         """PreDAG constructor"""
         self.stage = None
@@ -53,7 +54,7 @@ class PreDAG:
         self.logger = logging.getLogger()
         handler = logging.StreamHandler(sys.stdout)
         formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", \
-                                      datefmt = "%a, %d %b %Y %H:%M:%S %Z(%z)")
+                                      datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         self.logger.setLevel(logging.DEBUG)
@@ -105,7 +106,7 @@ class PreDAG:
         """Excecute executeInternal in locked mode
         """
         self.logger.debug("Acquiring PreDAG lock")
-        with getLock("PreDAG") as _lock:
+        with getLock("PreDAG") as dummyLock:
             self.logger.debug("PreDAGlock acquired")
             retval = self.executeInternal(*args)
         self.logger.debug("PreDAG lock released")
@@ -233,13 +234,15 @@ class PreDAG:
         self.saveProcessedJobs(unprocessed)
         return 0
 
-    def createSubdagSubmission(self, subdags, maxpost, stage):
-        #TODO Not tested, did not work
+    @staticmethod
+    def createSubdagSubmission(subdags, maxpost, stage):
+        """ Create the submission files for the subdags
+        """
         for dag in subdags:
             subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', '1000',
-                '-MaxPost', str(maxpost), '-no_submit', '-insert_sub_file', 'subdag.ad',
-                '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), dag),
-                '-append', '+TaskType = "{0}"'.format(stage.upper()), dag])
+                                  '-MaxPost', str(maxpost), '-no_submit', '-insert_sub_file', 'subdag.ad',
+                                  '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), dag),
+                                '-append', '+TaskType = "{0}"'.format(stage.upper()), dag])
 
     def adjustLumisForCompletion(self, task, unprocessed):
         """Sets the run, lumi information in the task information for the
