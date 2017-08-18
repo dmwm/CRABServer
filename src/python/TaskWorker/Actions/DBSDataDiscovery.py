@@ -116,6 +116,9 @@ class DBSDataDiscovery(DataDiscovery):
         ## Note: listFileBlockLocation() gets first the locations from PhEDEx, and if no
         ## locations are found it gets the original locations from DBS. So it should
         ## never be the case at this point that some blocks have no locations.
+        ## locationsMap is a dictionary, key=blockName, value=list of PhedexNodes, example:
+        ## {'/JetHT/Run2016B-PromptReco-v2/AOD#b10179dc-3723-11e6-9aa5-001e67abf228': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL'],
+        ## '/JetHT/Run2016B-PromptReco-v2/AOD#89b03ca6-1dc9-11e6-b567-001e67ac06a0': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL'}
         try:
             dbsOnly = self.dbsInstance.split('/')[1] != 'global'
             locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly)
