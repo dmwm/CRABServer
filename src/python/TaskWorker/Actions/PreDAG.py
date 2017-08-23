@@ -222,10 +222,7 @@ class PreDAG(object):
             creator = DagmanCreator(config, server=None, resturi='')
             parent = self.prefix if self.stage == 'tail' else None
             _, _, subdags = creator.createSubdag(split_result.result, task=task, parent=parent, stage=self.stage)
-            if self.stage == 'processing':
-                self.createSubdagSubmission(['RunJobs0.subdag'], getattr(config.TaskWorker, 'maxPost', 20), 'processing')
-            self.logger.info("creating following subdags: {0}".format(", ".join(subdags)))
-            self.createSubdagSubmission(subdags, getattr(config.TaskWorker, 'maxPost', 20), 'tail')
+            self.submitSubdag('RunJobs{0}.subdag'.format(self.prefix), getattr(config.TaskWorker, 'maxPost', 20), self.stage)
         except TaskWorkerException as e:
             retmsg = "DAG creation failed with:\n{0}".format(e)
             self.logger.error(retmsg)
@@ -235,14 +232,13 @@ class PreDAG(object):
         return 0
 
     @staticmethod
-    def createSubdagSubmission(subdags, maxpost, stage):
-        """ Create the submission files for the subdags
+    def submitSubdag(subdag, maxpost, stage):
+        """ Submit a subdag
         """
-        for dag in subdags:
-            subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', '1000',
-                                  '-MaxPost', str(maxpost), '-no_submit', '-insert_sub_file', 'subdag.ad',
-                                  '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), dag),
-                                '-append', '+TaskType = "{0}"'.format(stage.upper()), dag])
+        subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', '1000',
+                               '-MaxPost', str(maxpost), '-insert_sub_file', 'subdag.ad',
+                               '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), subdag),
+                               '-append', '+TaskType = "{0}"'.format(stage.upper()), subdag])
 
     def adjustLumisForCompletion(self, task, unprocessed):
         """Sets the run, lumi information in the task information for the
