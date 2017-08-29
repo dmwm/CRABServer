@@ -85,7 +85,7 @@ class PreDAGTest(unittest.TestCase):
         """
         predag = PreDAG()
         predag.createSubdagSubmission = lambda *args: True
-        predag.completedJobs = lambda *args,**kwargs: self.done
+        predag.completedJobs = lambda *args, **kwargs: self.done
         predag.failedJobs = []
         self.assertEqual(predag.execute("tail", 6, 1), 0)
         with open('RunJobs1.subdag') as fd:
@@ -102,11 +102,13 @@ class PreDAGTest(unittest.TestCase):
             self.assertTrue(all([line.split()[2] != '0' for line in fd if line.startswith('RETRY')]))
 
     def testAllProcessingFailed(self):
+        """ Check that we don't fail if all processing jobs fail
+        """
         for p in self.done:
             os.unlink(os.path.join(self.throughputdir, p))
         predag = PreDAG()
         predag.createSubdagSubmission = lambda *args: True
-        predag.completedJobs = lambda *args,**kwargs: self.probes if kwargs['stage']=='processing' else self.done
+        predag.completedJobs = lambda *args, **kwargs: self.probes if kwargs['stage'] == 'processing' else self.done
         predag.failedJobs = self.done
         self.assertEqual(predag.execute("tail", 6, 1), 0)
         with open('RunJobs1.subdag') as fd:

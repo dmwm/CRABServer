@@ -156,7 +156,7 @@ class PreDAG(object):
         unprocessed = completed - self.processedJobs
         estimates = copy.copy(unprocessed)
         self.logger.info("jobs remaining to process: {0}".format(", ".join(sorted(unprocessed))))
-        if self.stage == 'tail' and len(estimates-set(self.failedJobs))==0:
+        if self.stage == 'tail' and len(estimates-set(self.failedJobs)) == 0:
             estimates = set(self.completedJobs(stage='processing'))
         # The TaskWorker saves some files that now we are gonna read
         with open('datadiscovery.pkl', 'rb') as fd:
@@ -281,7 +281,8 @@ class PreDAG(object):
                     missing = missing + LumiList(compactList=injson)
                     self.logger.info("Adding lumis from failed job %s", failedId)
             finally:
-                if f: f.close()
+                if f:
+                    f.close()
                 shutil.rmtree(tmpdir)
         missing_compact = missing.getCompactList()
         runs = missing.getRuns()
