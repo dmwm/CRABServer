@@ -23,6 +23,7 @@ import os
 import re
 import sys
 import json
+import copy
 import errno
 import pickle
 import shutil
@@ -84,7 +85,7 @@ class PreDAG(object):
         with open("automatic_splitting/processed", "wb") as fd:
             pickle.dump(self.processedJobs.union(jobs), fd)
 
-    def completedJobs(self):
+    def completedJobs(self, stage):
         """Yield job IDs of completed (finished or failed) jobs.  All
         failed jobs are saved in self.failedJobs, too.
         """
@@ -95,7 +96,7 @@ class PreDAG(object):
         completedCount = 0
         for jobnr, jobdict in self.statusCacheInfo.iteritems():
             state = jobdict.get('State')
-            if stagere[self.stage].match(jobnr) and state in ('finished', 'failed'):
+            if stagere[stage].match(jobnr) and state in ('finished', 'failed'):
                 if state == 'failed':
                     self.failedJobs.append(jobnr)
                 completedCount += 1
@@ -147,14 +148,16 @@ class PreDAG(object):
         self.statusCacheInfo = {} #Will be filled with the status from the status cache
 
         self.readJobStatus()
-        completed = set(self.completedJobs())
+        completed = set(self.completedJobs(stage=self.stage))
         if len(completed) < self.completion:
             return 4
 
         self.readProcessedJobs()
         unprocessed = completed - self.processedJobs
+        estimates = copy.copy(unprocessed)
         self.logger.info("jobs remaining to process: {0}".format(", ".join(sorted(unprocessed))))
-
+        if self.stage == 'tail' and len(estimates-set(self.failedJobs))==0:
+            estimates = set(self.completedJobs(stage='processing'))
         # The TaskWorker saves some files that now we are gonna read
         with open('datadiscovery.pkl', 'rb') as fd:
             dataset = pickle.load(fd) #Output from the discovery process
@@ -167,7 +170,7 @@ class PreDAG(object):
         # saved the EventThroughput (report['steps']['cmsRun']['performance']['cpu']['EventThroughput'])
         sumEventsThr = 0
         count = 0
-        for jid in unprocessed:
+        for jid in estimates:
             if jid in self.failedJobs:
                 continue
             fn = "automatic_splitting/throughputs/{0}".format(jid)
@@ -267,6 +270,7 @@ class PreDAG(object):
                 self.logger.info("Adding missing lumis from job %s", missingFile)
                 missing = missing + LumiList(compactList=literal_eval(fd.read()))
         for failedId in failed:
+            f = None
             try:
                 tmpdir = tempfile.mkdtemp()
                 f = tarfile.open("run_and_lumis.tar.gz")
@@ -277,7 +281,7 @@ class PreDAG(object):
                     missing = missing + LumiList(compactList=injson)
                     self.logger.info("Adding lumis from failed job %s", failedId)
             finally:
-                f.close()
+                if f: f.close()
                 shutil.rmtree(tmpdir)
         missing_compact = missing.getCompactList()
         runs = missing.getRuns()

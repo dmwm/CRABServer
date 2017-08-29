@@ -46,6 +46,7 @@ class PreDAGTest(unittest.TestCase):
         shutil.copy(os.path.join(getTestDataDirectory(), "Actions", "datadiscovery.pkl"), self.tempdir)
         shutil.copy(os.path.join(getTestDataDirectory(), "Actions", "taskinformation.pkl"), self.tempdir)
         shutil.copy(os.path.join(getTestDataDirectory(), "Actions", "taskworkerconfig.pkl"), self.tempdir)
+        shutil.copy(os.path.join(getTestDataDirectory(), "Actions", "run_and_lumis.tar.gz"), self.tempdir)
 
         #create throughtput files
         self.throughputdir = "automatic_splitting/throughputs/"
@@ -84,7 +85,7 @@ class PreDAGTest(unittest.TestCase):
         """
         predag = PreDAG()
         predag.createSubdagSubmission = lambda *args: True
-        predag.completedJobs = lambda *args: self.done
+        predag.completedJobs = lambda *args,**kwargs: self.done
         predag.failedJobs = []
         self.assertEqual(predag.execute("tail", 6, 1), 0)
         with open('RunJobs1.subdag') as fd:
@@ -99,6 +100,18 @@ class PreDAGTest(unittest.TestCase):
             self.assertTrue(all([line.split()[2] == '0' for line in fd if line.startswith('RETRY')]))
         with open('RunJobs1.subdag') as fd:
             self.assertTrue(all([line.split()[2] != '0' for line in fd if line.startswith('RETRY')]))
+
+    def testAllProcessingFailed(self):
+        for p in self.done:
+            os.unlink(os.path.join(self.throughputdir, p))
+        predag = PreDAG()
+        predag.createSubdagSubmission = lambda *args: True
+        predag.completedJobs = lambda *args,**kwargs: self.probes if kwargs['stage']=='processing' else self.done
+        predag.failedJobs = self.done
+        self.assertEqual(predag.execute("tail", 6, 1), 0)
+        with open('RunJobs1.subdag') as fd:
+            self.assertEqual(sum(1 for _ in (line for line in fd if line.startswith('JOB'))), 17)
+
 
 if __name__ == '__main__':
     unittest.main()
