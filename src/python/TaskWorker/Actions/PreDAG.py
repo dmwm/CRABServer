@@ -100,7 +100,7 @@ class PreDAG(object):
                     self.failedJobs.append(jobnr)
                 completedCount += 1
                 yield jobnr
-        self.logger.info("found {0} completed jobs".format(completedCount))
+        self.logger.info("found %s completed jobs", completedCount)
 
     def execute(self, *args):
         """Excecute executeInternal in locked mode
@@ -153,7 +153,7 @@ class PreDAG(object):
 
         self.readProcessedJobs()
         unprocessed = completed - self.processedJobs
-        self.logger.info("jobs remaining to process: {0}".format(", ".join(sorted(unprocessed))))
+        self.logger.info("jobs remaining to process: %s", ", ".join(sorted(unprocessed)))
 
         # The TaskWorker saves some files that now we are gonna read
         with open('datadiscovery.pkl', 'rb') as fd:
@@ -175,7 +175,7 @@ class PreDAG(object):
                 sumEventsThr += float(fd.read())
                 count += 1
         eventsThr = sumEventsThr / count
-        self.logger.info("average throughput for {1} jobs: {0}".format(eventsThr, count))
+        self.logger.info("average throughput for %s jobs: %s", count, eventsThr)
         runtime = task['tm_split_args'].get('seconds_per_job', -1)
         if self.stage == "processing":
             # Build in a 33% error margin in the runtime to not create too
@@ -219,9 +219,9 @@ class PreDAG(object):
 #            self.set_dashboard_state('FAILED')
             return 1
         try:
-            creator = DagmanCreator(config, server=None, resturi='')
             parent = self.prefix if self.stage == 'tail' else None
-            _, _, subdags = creator.createSubdag(split_result.result, task=task, parent=parent, stage=self.stage)
+            creator = DagmanCreator(config, server=None, resturi='')
+            creator.createSubdag(split_result.result, task=task, parent=parent, stage=self.stage)
             self.submitSubdag('RunJobs{0}.subdag'.format(self.prefix), getattr(config.TaskWorker, 'maxPost', 20), self.stage)
         except TaskWorkerException as e:
             retmsg = "DAG creation failed with:\n{0}".format(e)
@@ -285,7 +285,7 @@ class PreDAG(object):
         #Now we turn lumis it into something like:
         #lumis=['1, 33, 35, 35, 37, 47, 49, 75, 77, 130, 133, 136','1,45,50,80']
         #which is the format expected by buildLumiMask in the splitting algorithm
-        lumis = [",".join(map(str, reduce(lambda x, y:x + y, missing_compact[run]))) for run in runs]
+        lumis = [",".join(str(l) for l in reduce(lambda x, y:x + y, missing_compact[run])) for run in runs]
 
         task['tm_split_args']['runs'] = runs
         task['tm_split_args']['lumis'] = lumis
