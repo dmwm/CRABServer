@@ -60,7 +60,7 @@ ABORT-DAG-ON Job{count} 3
 """
 
 SUBDAG_FRAGMENT = """
-SUBDAG EXTERNAL Job{count}SubJobs RunJobs{count}.subdag
+SUBDAG EXTERNAL Job{count}SubJobs RunJobs{count}.subdag NOOP
 SCRIPT DEFER 4 300 PRE Job{count}SubJobs dag_bootstrap.sh PREDAG {stage} {completion} {count}
 """
 
