@@ -173,20 +173,20 @@ class CRAB3CreateJson(object):
                 totalRunningTasks += int(oneSchedd[2])
                 # if one schedd does not answer, go on and try the others
                 try:
-                  scheddAdd = self.coll.locate(htcondor.DaemonTypes.Schedd, scheddName)
+                    scheddAdd = self.coll.locate(htcondor.DaemonTypes.Schedd, scheddName)
                 except:
-                  continue
+                    continue
                 schedd = htcondor.Schedd(scheddAdd)
                 try:
-                  idleDags = list(schedd.xquery(pickSchedulerIdle))
+                    idleDags = list(schedd.xquery(pickSchedulerIdle))
                 except:
-                  idleDags = []
-                  pass
+                    idleDags = []
+                    pass
                 try:
-                  runningTPs = list(schedd.xquery(pickLocalRunning))
+                    runningTPs = list(schedd.xquery(pickLocalRunning))
                 except:
-                  runningTPs = []
-                  pass
+                    runningTPs = []
+                    pass
                 numDagIdle = len(idleDags)
                 numTPRun = len(runningTPs)
                 totalIdleTasks += numDagIdle
