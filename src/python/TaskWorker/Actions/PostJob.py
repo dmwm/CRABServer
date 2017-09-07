@@ -1681,7 +1681,7 @@ class PostJob():
         completion jobs.  Returns True if completion jobs are needed,
         otherwise False.
         """
-        if self.stage == 'tail':
+        if self.stage not in ('probe', 'processing'):
             return
 
         throughputFileName = "automatic_splitting/throughputs/{0}".format(self.job_id)
