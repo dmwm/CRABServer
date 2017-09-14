@@ -44,7 +44,9 @@ EC_WGET =               99998 #TODO define an error code
 EC_PsetHash           = 80453
 
 def mintime():
-    mymin = 20*60
+    # enforce a minimum running time for failing jobs
+    mymin = 20*60 # 20 minutes
+    mymin = 0
     tottime = time.time()-starttime
     remaining = mymin - tottime
     if remaining > 0 and not "CRAB3_RUNTIME_DEBUG" in os.environ:
