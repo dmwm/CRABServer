@@ -45,8 +45,8 @@ EC_PsetHash           = 80453
 
 def mintime():
     # enforce a minimum running time for failing jobs
-    mymin = 20*60 # 20 minutes
-    mymin = 0
+    mymin = 20*60 # 20 minutes was used in the past
+    mymin = 0 # atm we do not sleep on failing jobs. Keep the code just in case
     tottime = time.time()-starttime
     remaining = mymin - tottime
     if remaining > 0 and not "CRAB3_RUNTIME_DEBUG" in os.environ:
