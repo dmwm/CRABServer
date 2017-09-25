@@ -209,7 +209,7 @@ class RESTFileTransfers(RESTEntity):
                 binds['id'] = [ids[num]]
                 binds['fail_reason'] = [reasons[num]]
                 binds['retry_value'] = [int(retry[num])]
-                binds['publish'] = [kwargs["publish_flag"] or None]
+                binds['publish'] = [kwargs["publish_flag"] or -1]
                 self.api.modify(self.transferDB.UpdatePublication_sql, **binds)
 
         elif subresource == 'retryPublication':
