@@ -125,6 +125,7 @@ class FileTransfers(object):
 			       FROM filetransfersdb f \
 			       LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
                                WHERE tm_publication_state = :state AND \
+                                     tm_transfer_state = :transfer_state AND \
                                      tm_aso_worker = :asoworker AND \
                                      rownum < :limit \
                                ORDER BY rownum"
@@ -136,6 +137,7 @@ class FileTransfers(object):
 			       LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
                                WHERE f.tm_username = :username AND \
                                      tm_publication_state = :state AND \
+                                     tm_transfer_state = :transfer_state AND \
                                      tm_aso_worker = :asoworker AND \
                                      rownum < :limit \
                                ORDER BY rownum"
