@@ -22,7 +22,7 @@ class DataFileMetadata(object):
         self.logger = logging.getLogger("CRABLogger.DataFileMetadata")
         self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
 
-    def getFiles(self, taskname, filetype, howmany):
+    def getFiles(self, taskname, filetype, howmany, lfn):
         """ Given a taskname, a filetype and a number return a list of filemetadata from this task
         """
         self.logger.debug("Calling jobmetadata for task %s and filetype %s" % (taskname, filetype))
@@ -32,30 +32,31 @@ class DataFileMetadata(object):
         rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, **binds)
         for row in rows:
             row = self.FileMetaData.GetFromTaskAndType_tuple(*row)
-            yield json.dumps({
-                'taskname': taskname,
-                'filetype': filetype,
-                #TODO pandajobid should not be used. Let's wait a "quiet release" and remove it
-                'pandajobid': row.pandajobid,
-                'jobid': row.jobid,
-                'outdataset': row.outdataset,
-                'acquisitionera': row.acquisitionera,
-                'swversion': row.swversion,
-                'inevents': row.inevents,
-                'globaltag': row.globaltag,
-                'publishname': row.publishname,
-                'location': row.location,
-                'tmplocation': row.tmplocation,
-                'runlumi': literal_eval(row.runlumi.read()),
-                'adler32': row.adler32,
-                'cksum': row.cksum,
-                'md5': row.md5,
-                'lfn': row.lfn,
-                'filesize': row.filesize,
-                'parents': literal_eval(row.parents.read()),
-                'state': row.state,
-                'created': str(row.parents),
-                'tmplfn': row.tmplfn
+            if lfn==[] or row.lfn in lfn:
+                yield json.dumps({
+                    'taskname': taskname,
+                    'filetype': filetype,
+                    #TODO pandajobid should not be used. Let's wait a "quiet release" and remove it
+                    'pandajobid': row.pandajobid,
+                    'jobid': row.jobid,
+                     'outdataset': row.outdataset,
+                     'acquisitionera': row.acquisitionera,
+                     'swversion': row.swversion,
+                     'inevents': row.inevents,
+                     'globaltag': row.globaltag,
+                     'publishname': row.publishname,
+                     'location': row.location,
+                     'tmplocation': row.tmplocation,
+                     'runlumi': literal_eval(row.runlumi.read()),
+                     'adler32': row.adler32,
+                     'cksum': row.cksum,
+                     'md5': row.md5,
+                     'lfn': row.lfn,
+                     'filesize': row.filesize,
+                     'parents': literal_eval(row.parents.read()),
+                     'state': row.state,
+                     'created': str(row.parents),
+                     'tmplfn': row.tmplfn
             })
 
     def inject(self, **kwargs):
