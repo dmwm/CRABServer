@@ -357,6 +357,7 @@ class RESTFileTransfers(RESTEntity):
                 if grouping > 1:
                     raise InvalidParameter('This grouping level is not implemented')
                 binds['state'] = PUBLICATIONDB_STATUSES['ACQUIRED']
+                binds['transfer_state'] = TRANSFERDB_STATUSES['DONE']
                 if grouping == 0:
                     # ---------------------------------------------
                     # Return: Docs, which match these conditions: asoworker, state = ACQUIRED, username
