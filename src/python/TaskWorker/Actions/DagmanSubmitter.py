@@ -464,6 +464,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["LeaveJobInQueue"] = classad.ExprTree("true")
         dagAd["PeriodicHold"] = classad.ExprTree("time() > CRAB_TaskEndTime")
         dagAd["TransferOutput"] = info['outputFilesString']
+        dagAd["OnExitHold"] = classad.ExprTree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
         dagAd["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
         dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
         dagAd["RemoveKillSig"] = "SIGUSR1"
@@ -483,7 +484,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 fd.write('+{0} = {1}\n'.format(k, value))
 
         dagAd["TaskType"] = "ROOT"
-        dagAd["OnExitHold"] = classad.ExprTree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
         dagAd["Err"] = str(os.path.join(info['scratch'], "request.err"))
         dagAd["Cmd"] = cmd

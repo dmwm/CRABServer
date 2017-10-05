@@ -23,6 +23,7 @@ import os
 import re
 import sys
 import json
+import copy
 import errno
 import pickle
 import shutil
@@ -84,7 +85,7 @@ class PreDAG(object):
         with open("automatic_splitting/processed", "wb") as fd:
             pickle.dump(self.processedJobs.union(jobs), fd)
 
-    def completedJobs(self):
+    def completedJobs(self, stage):
         """Yield job IDs of completed (finished or failed) jobs.  All
         failed jobs are saved in self.failedJobs, too.
         """
@@ -95,12 +96,12 @@ class PreDAG(object):
         completedCount = 0
         for jobnr, jobdict in self.statusCacheInfo.iteritems():
             state = jobdict.get('State')
-            if stagere[self.stage].match(jobnr) and state in ('finished', 'failed'):
+            if stagere[stage].match(jobnr) and state in ('finished', 'failed'):
                 if state == 'failed':
                     self.failedJobs.append(jobnr)
                 completedCount += 1
                 yield jobnr
-        self.logger.info("found {0} completed jobs".format(completedCount))
+        self.logger.info("found %s completed jobs", completedCount)
 
     def execute(self, *args):
         """Excecute executeInternal in locked mode
@@ -147,13 +148,17 @@ class PreDAG(object):
         self.statusCacheInfo = {} #Will be filled with the status from the status cache
 
         self.readJobStatus()
-        completed = set(self.completedJobs())
+        completed = set(self.completedJobs(stage=self.stage))
         if len(completed) < self.completion:
             return 4
 
         self.readProcessedJobs()
         unprocessed = completed - self.processedJobs
+        estimates = copy.copy(unprocessed)
         self.logger.info("jobs remaining to process: {0}".format(", ".join(sorted(unprocessed))))
+        if self.stage == 'tail' and len(estimates-set(self.failedJobs)) == 0:
+            estimates = set(self.completedJobs(stage='processing'))
+        self.logger.info("jobs remaining to process: %s", ", ".join(sorted(unprocessed)))
 
         # The TaskWorker saves some files that now we are gonna read
         with open('datadiscovery.pkl', 'rb') as fd:
@@ -167,7 +172,7 @@ class PreDAG(object):
         # saved the EventThroughput (report['steps']['cmsRun']['performance']['cpu']['EventThroughput'])
         sumEventsThr = 0
         count = 0
-        for jid in unprocessed:
+        for jid in estimates:
             if jid in self.failedJobs:
                 continue
             fn = "automatic_splitting/throughputs/{0}".format(jid)
@@ -175,7 +180,7 @@ class PreDAG(object):
                 sumEventsThr += float(fd.read())
                 count += 1
         eventsThr = sumEventsThr / count
-        self.logger.info("average throughput for {1} jobs: {0}".format(eventsThr, count))
+        self.logger.info("average throughput for %s jobs: %s", count, eventsThr)
         runtime = task['tm_split_args'].get('seconds_per_job', -1)
         if self.stage == "processing":
             # Build in a 33% error margin in the runtime to not create too
@@ -219,13 +224,10 @@ class PreDAG(object):
 #            self.set_dashboard_state('FAILED')
             return 1
         try:
-            creator = DagmanCreator(config, server=None, resturi='')
             parent = self.prefix if self.stage == 'tail' else None
-            _, _, subdags = creator.createSubdag(split_result.result, task=task, parent=parent, stage=self.stage)
-            if self.stage == 'processing':
-                self.createSubdagSubmission(['RunJobs0.subdag'], getattr(config.TaskWorker, 'maxPost', 20), 'processing')
-            self.logger.info("creating following subdags: {0}".format(", ".join(subdags)))
-            self.createSubdagSubmission(subdags, getattr(config.TaskWorker, 'maxPost', 20), 'tail')
+            creator = DagmanCreator(config, server=None, resturi='')
+            creator.createSubdag(split_result.result, task=task, parent=parent, stage=self.stage)
+            self.submitSubdag('RunJobs{0}.subdag'.format(self.prefix), getattr(config.TaskWorker, 'maxPost', 20), self.stage)
         except TaskWorkerException as e:
             retmsg = "DAG creation failed with:\n{0}".format(e)
             self.logger.error(retmsg)
@@ -235,14 +237,13 @@ class PreDAG(object):
         return 0
 
     @staticmethod
-    def createSubdagSubmission(subdags, maxpost, stage):
-        """ Create the submission files for the subdags
+    def submitSubdag(subdag, maxpost, stage):
+        """ Submit a subdag
         """
-        for dag in subdags:
-            subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', '1000',
-                                  '-MaxPost', str(maxpost), '-no_submit', '-insert_sub_file', 'subdag.ad',
-                                  '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), dag),
-                                '-append', '+TaskType = "{0}"'.format(stage.upper()), dag])
+        subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', '1000',
+                               '-MaxPost', str(maxpost), '-insert_sub_file', 'subdag.ad',
+                               '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), subdag),
+                               '-append', '+TaskType = "{0}"'.format(stage.upper()), subdag])
 
     def adjustLumisForCompletion(self, task, unprocessed):
         """Sets the run, lumi information in the task information for the
@@ -267,6 +268,7 @@ class PreDAG(object):
                 self.logger.info("Adding missing lumis from job %s", missingFile)
                 missing = missing + LumiList(compactList=literal_eval(fd.read()))
         for failedId in failed:
+            f = None
             try:
                 tmpdir = tempfile.mkdtemp()
                 f = tarfile.open("run_and_lumis.tar.gz")
@@ -277,7 +279,8 @@ class PreDAG(object):
                     missing = missing + LumiList(compactList=injson)
                     self.logger.info("Adding lumis from failed job %s", failedId)
             finally:
-                f.close()
+                if f:
+                    f.close()
                 shutil.rmtree(tmpdir)
         missing_compact = missing.getCompactList()
         runs = missing.getRuns()
@@ -289,7 +292,7 @@ class PreDAG(object):
         #Now we turn lumis it into something like:
         #lumis=['1, 33, 35, 35, 37, 47, 49, 75, 77, 130, 133, 136','1,45,50,80']
         #which is the format expected by buildLumiMask in the splitting algorithm
-        lumis = [",".join(map(str, reduce(lambda x, y:x + y, missing_compact[run]))) for run in runs]
+        lumis = [",".join(str(l) for l in reduce(lambda x, y:x + y, missing_compact[run])) for run in runs]
 
         task['tm_split_args']['runs'] = runs
         task['tm_split_args']['lumis'] = lumis

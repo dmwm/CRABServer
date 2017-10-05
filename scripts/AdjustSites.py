@@ -148,6 +148,7 @@ def adjustMaxRetries(adjustJobIds, ad):
     (or for all jobs if jobIds = True). Incrementing the maximum allowed number of
     retries is a necessary condition for a job to be resubmitted.
     """
+    printLog("Adjusting retries for job ids: {0}".format(adjustJobIds))
     if not adjustJobIds:
         return
     if not os.path.exists("RunJobs.dag"):
@@ -168,7 +169,7 @@ def adjustMaxRetries(adjustJobIds, ad):
     ## Search for the RETRY directives in the DAG file for the job ids passed in the
     ## resubmitJobIds argument and change the maximum retries to the current retry
     ## count + CRAB_NumAutomJobRetries.
-    retry_re = re.compile(r'RETRY Job(\d+(?:\d+)?) (\d+) ')
+    retry_re = re.compile(r'RETRY Job(\d+(?:-\d+)?) (\d+) ')
     output = ""
     adjustAll = (adjustJobIds == True)
     numAutomJobRetries = int(ad.get('CRAB_NumAutomJobRetries', 2))

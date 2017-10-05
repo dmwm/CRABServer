@@ -55,7 +55,7 @@ class FileTransfers(object):
                                                         tm_last_update = :last_update, \
                                                         tm_publication_failure_reason = :fail_reason, \
                                                         tm_publication_retry_count = tm_publication_retry_count + :retry_value, \
-                                                        tm_publish = CASE WHEN :publish is NULL THEN tm_publish ELSE :publish END \
+                                                        tm_publish = CASE WHEN :publish = -1 THEN tm_publish ELSE :publish END \
                              WHERE tm_id = :id AND \
                                    (tm_aso_worker LIKE :asoworker OR tm_aso_worker is NULL)"
 
@@ -125,6 +125,7 @@ class FileTransfers(object):
 			       FROM filetransfersdb f \
 			       LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
                                WHERE tm_publication_state = :state AND \
+                                     tm_transfer_state = :transfer_state AND \
                                      tm_aso_worker = :asoworker AND \
                                      rownum < :limit \
                                ORDER BY rownum"
@@ -136,6 +137,7 @@ class FileTransfers(object):
 			       LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
                                WHERE f.tm_username = :username AND \
                                      tm_publication_state = :state AND \
+                                     tm_transfer_state = :transfer_state AND \
                                      tm_aso_worker = :asoworker AND \
                                      rownum < :limit \
                                ORDER BY rownum"

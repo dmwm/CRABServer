@@ -93,7 +93,7 @@ class AuthenticatedSubprocess(object):
                 if res != (0,0):
                     self.timedout = False
                     break
-                time.sleep(20)
+                time.sleep(0.100)
             if self.timedout:
                 self.logger.warning("Subprocess with PID %s (executed in AuthenticatedSubprocess) timed out. Killing it." % self.pid)
                 os.kill(self.pid, signal.SIGTERM)
