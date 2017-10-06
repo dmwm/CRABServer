@@ -519,22 +519,25 @@ class ASOServerJob(object):
 
 
         # TODO: Add a method to resolve a single PFN.
+        import pickle
+        with open('taskinformation.pkl', 'rb') as fd:
+            task = pickle.load(fd)
         if self.transfer_outputs:
             for output_module in self.job_report_output.values():
                 for output_file_info in output_module:
                     file_info = {}
+                    file_info['pfn'] = str(output_file_info[u'pfn'])
                     file_info['checksums'] = output_file_info.get(u'checksums', {'cksum': '0', 'adler32': '0'})
                     file_info['outsize'] = output_file_info.get(u'size', 0)
                     file_info['direct_stageout'] = output_file_info.get(u'direct_stageout', False)
-                    if (output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
-                        output_file_info.get(u'ouput_module_class',  '') == u'PoolOutputModule'):
+                    if file_info['pfn'] in task['tm_edm_outfiles']:
                         file_info['filetype'] = 'EDM'
-                    elif output_file_info.get(u'Source', '') == u'TFileService':
+                    elif file_info['pfn'] in task['tm_tfile_outfiles']:
                         file_info['filetype'] = 'TFILE'
+                    elif file_info['pfn'] in task['tm_outfiles']:
+                         file_info['filetype'] = 'FAKE'
                     else:
-                        file_info['filetype'] = 'FAKE'
-                    if u'pfn' in output_file_info:
-                        file_info['pfn'] = str(output_file_info[u'pfn'])
+                        file_info['filetype'] = 'UNKNOWN'
                     output_files.append(file_info)
         found_log = False
         for source_site, filename in zip(self.source_sites, self.filenames):
