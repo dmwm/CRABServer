@@ -774,8 +774,14 @@ class DagmanCreator(TaskAction.TaskAction):
                 continue
 
             if ignoreLocality:
-                sbj = SiteDB.SiteDBJSON({"key": self.config.TaskWorker.cmskey,
-                                         "cert": self.config.TaskWorker.cmscert})
+                # See if we're running on the backend, otherwise use user
+                # cert on the scheduler (automatic splitting)
+                if os.path.isfile(self.config.TaskWorker.cmskey):
+                    sbj = SiteDB.SiteDBJSON({"key": self.config.TaskWorker.cmskey,
+                                             "cert": self.config.TaskWorker.cmscert,
+                                             "pycurl": True})
+                else:
+                    sbj = SiteDB.SiteDBJSON({"pycurl": True})
                 try:
                     possiblesites = set(sbj.getAllCMSNames())
                 except Exception as ex:
