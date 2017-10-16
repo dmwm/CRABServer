@@ -46,7 +46,7 @@ class Create(DBCreator):
         tm_source_lfn VARCHAR(1000) NOT NULL,
         tm_filesize NUMBER(20) NOT NULL,
         tm_publish NUMBER(1) NOT NULL,
-        tm_jobid NUMBER(10) NOT NULL,
+        tm_jobid VARCHAR(20),
         tm_job_retry_count NUMBER(5),
         tm_type VARCHAR(20) NOT NULL,
         tm_aso_worker VARCHAR(100),
@@ -65,6 +65,7 @@ class Create(DBCreator):
         tm_last_update NUMBER(11) NOT NULL,
         tm_start_time NUMBER(11) NOT NULL,
         tm_end_time NUMBER(11),
+        tm_creation_time TIMESTAMP NOT NULL,
         CONSTRAINT id_pk PRIMARY KEY(tm_id),
         CONSTRAINT fk_tm_taskname_ftdb FOREIGN KEY (tm_taskname) REFERENCES tasks (tm_taskname)
         )
