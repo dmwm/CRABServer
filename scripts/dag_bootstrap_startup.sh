@@ -139,6 +139,7 @@ mkdir -p finished_jobs
 CONDOR_VERSION=`condor_version | head -n 1`
 PROC_ID=`grep '^ProcId =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
 CLUSTER_ID=`grep '^ClusterId =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
+REQUEST_NAME=`grep '^CRAB_ReqName =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
 export CONDOR_ID="${CLUSTER_ID}.${PROC_ID}"
 ls -lah
 if [ "X" == "X$X509_USER_PROXY" ] || [ ! -e $X509_USER_PROXY ]; then
@@ -162,7 +163,7 @@ else
 cat > task_process/daemon.jdl << EOF
 Universe      = local
 Executable    = task_process/task_proc_wrapper.sh
-Arguments     = $CLUSTER_ID
+Arguments     = $REQUEST_NAME
 Log           = task_process/daemon.PC.log
 Output        = task_process/daemon.out.\$(Cluster).\$(Process)
 Error         = task_process/daemon.err.\$(Cluster).\$(Process)

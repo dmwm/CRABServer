@@ -1,3 +1,10 @@
+""" This script is called by dag_bootstrap_startup.sh when the job is (re)submitted and:
+    - It creates the webdir if necessary
+    - It updates both the webdir ant the proxied version of it on the REST task db
+    - For resubmission: adjust the exit codes of the PJ in the RunJobs.dag.nodes.log files and
+      the max retries in the RunJobs.dag files
+"""
+
 from __future__ import print_function
 import os
 import re
@@ -17,6 +24,9 @@ from ServerUtilities import getProxiedWebDir
 
 
 def printLog(msg):
+    """ Utility function to print the timestamp in the log. Can be replaced
+        with anything (e.g.: logging.info if we decided to set up a logger here)
+    """
     print("%s: %s" % (datetime.utcnow(), msg))
 
 
@@ -121,6 +131,16 @@ def adjustPostScriptExitStatus(resubmitJobIds, filename):
     return adjustedJobIds
 
 
+def getGlob(ad, normal, automatic):
+    """ Function used to return the correct list of files to modify when we
+        adjust the max retries and the PJ exit codes (automatic splitting has subdags)
+    """
+    if ad.get('CRAB_SplitAlgo') == 'Automatic':
+        return glob.glob(automatic)
+    else:
+        return [normal]
+
+
 def adjustMaxRetries(adjustJobIds, ad):
     """
     Edit the DAG file adjusting the maximum allowed number of retries to the current
@@ -128,13 +148,14 @@ def adjustMaxRetries(adjustJobIds, ad):
     (or for all jobs if jobIds = True). Incrementing the maximum allowed number of
     retries is a necessary condition for a job to be resubmitted.
     """
+    printLog("Adjusting retries for job ids: {0}".format(adjustJobIds))
     if not adjustJobIds:
         return
     if not os.path.exists("RunJobs.dag"):
         return
     ## Get the latest retry count of each DAG node from the node status file.
     retriesDict = {}
-    filenames = glob.glob("node_state*")
+    filenames = getGlob(ad, "node_state", "node_state.[1-9]*")
     for fn in filenames:
         with open(fn, 'r') as fd:
             for nodeStatusAd in classad.parseAds(fd):
@@ -148,11 +169,11 @@ def adjustMaxRetries(adjustJobIds, ad):
     ## Search for the RETRY directives in the DAG file for the job ids passed in the
     ## resubmitJobIds argument and change the maximum retries to the current retry
     ## count + CRAB_NumAutomJobRetries.
-    retry_re = re.compile(r'RETRY Job(\d+(?:\d+)?) (\d+) ')
+    retry_re = re.compile(r'RETRY Job(\d+(?:-\d+)?) (\d+) ')
     output = ""
     adjustAll = (adjustJobIds == True)
     numAutomJobRetries = int(ad.get('CRAB_NumAutomJobRetries', 2))
-    filenames = glob.glob("RunJobs*.dag")
+    filenames = getGlob(ad, "RunJobs.dag", "RunJobs[1-9]*.subdag")
     for fn in filenames:
         with open(fn, 'r') as fd:
             for line in fd.readlines():
@@ -209,12 +230,13 @@ def makeWebDir(ad):
         ## Symlinks to ease operator navigation across spool/web directories
         os.symlink(os.path.abspath("."), os.path.join(path, "SPOOL_DIR"))
         os.symlink(path, os.path.abspath(os.path.join(".", "WEB_DIR")))
-    except Exception as ex:
+    except Exception as ex: #pylint: disable=broad-except
+        #Should we just catch OSError and IOError? Is that enough?
         printLog("Failed to copy/symlink files in the user web directory: %s" % str(ex))
 
     try:
         storage_rules = htcondor.param['CRAB_StorageRules']
-    except:
+    except KeyError:
         storage_rules = "^/home/remoteGlidein,http://submit-5.t2.ucsd.edu/CSstoragePath"
     sinfo = storage_rules.split(",")
     storage_re = re.compile(sinfo[0])
@@ -294,6 +316,9 @@ def clearAutomaticBlacklist():
 
 
 def setupLog():
+    """ Redirect the stdout and the stderr of the script to adjust_out.txt (unless the TEST_DONT_REDIRECT_STDOUT environment variable
+        is set)
+    """
     newstdout = "adjust_out.txt"
     printLog("Redirecting output to %s" % newstdout)
     logfd = os.open(newstdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
@@ -331,7 +356,7 @@ def main():
             time.sleep(retries * 20)
         retries += 1
 
-    if exitCode !=0:
+    if exitCode != 0:
         printLog("Exiting AdjustSites because the webdir upload failed three times.")
         sys.exit(1)
 
@@ -351,9 +376,17 @@ def main():
             resubmitJobIds = [str(i) for i in resubmitJobIds]
         except TypeError:
             resubmitJobIds = True
+
+    schedd = htcondor.Schedd()
+    tailconst = "TaskType =?= \"TAIL\" && CRAB_ReqName =?= %s" % classad.quote(ad.get("CRAB_ReqName"))
+    if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
+        printLog("Killing tail DAGs")
+        schedd.edit(tailconst, "HoldKillSig", 'SIGKILL')
+        schedd.act(htcondor.JobAction.Hold, tailconst)
+
     if resubmitJobIds:
         adjustedJobIds = []
-        filenames = glob.glob("RunJobs*.*dag.nodes.log")
+        filenames = getGlob(ad, "RunJobs.dag.nodes.log", "RunJobs[1-9]*.subdag.nodes.log")
         for fn in filenames:
             if hasattr(htcondor, 'lock'):
                 # While dagman is not running at this point, the schedd may be writing events to this
@@ -379,6 +412,10 @@ def main():
         siteAd.update(newSiteAd)
         with open("site.ad", "w") as fd:
             fd.write(str(siteAd))
+
+    if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
+        schedd.edit(tailconst, "HoldKillSig", 'SIGUSR1')
+        schedd.act(htcondor.JobAction.Release, tailconst)
 
     printLog("Exiting AdjustSite")
 

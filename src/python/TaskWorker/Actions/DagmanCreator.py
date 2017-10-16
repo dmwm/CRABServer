@@ -8,13 +8,11 @@ import os
 import re
 import json
 import shutil
-import string
 import pickle
 import random
 import tarfile
 import hashlib
 import tempfile
-import commands
 from ast import literal_eval
 from httplib import HTTPException
 
@@ -53,17 +51,17 @@ NODE_STATUS_FILE node_state{nodestate} 30 ALWAYS-UPDATE
 
 DAG_FRAGMENT = """
 JOB Job{count} Job.{count}.submit
-SCRIPT {prescriptDefer} PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {parent} {taskname} {backend} {stage}
+SCRIPT {prescriptDefer} PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {taskname} {backend} {stage}
 SCRIPT DEFER 4 1800 POST Job{count} dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES {taskname} {count} {tempDest} {outputDest} cmsRun_{count}.log.tar.gz {stage} {remoteOutputFiles}
 #PRE_SKIP Job{count} 3
 RETRY Job{count} {maxretries} UNLESS-EXIT 2
-VARS Job{count} count="{count}" parent="{parent}" runAndLumiMask="job_lumis_{count}.json" lheInputFiles="{lheInputFiles}" firstEvent="{firstEvent}" firstLumi="{firstLumi}" lastEvent="{lastEvent}" firstRun="{firstRun}" maxRuntime="{maxRuntime}" eventsPerLumi="{eventsPerLumi}" seeding="{seeding}" inputFiles="job_input_file_list_{count}.txt" scriptExe="{scriptExe}" scriptArgs="{scriptArgs}" +CRAB_localOutputFiles="\\"{localOutputFiles}\\"" +CRAB_DataBlock="\\"{block}\\"" +CRAB_Destination="\\"{destination}\\""
+VARS Job{count} count="{count}" runAndLumiMask="job_lumis_{count}.json" lheInputFiles="{lheInputFiles}" firstEvent="{firstEvent}" firstLumi="{firstLumi}" lastEvent="{lastEvent}" firstRun="{firstRun}" maxRuntime="{maxRuntime}" eventsPerLumi="{eventsPerLumi}" seeding="{seeding}" inputFiles="job_input_file_list_{count}.txt" scriptExe="{scriptExe}" scriptArgs="{scriptArgs}" +CRAB_localOutputFiles="\\"{localOutputFiles}\\"" +CRAB_DataBlock="\\"{block}\\"" +CRAB_Destination="\\"{destination}\\""
 ABORT-DAG-ON Job{count} 3
 """
 
 SUBDAG_FRAGMENT = """
-SUBDAG EXTERNAL Job{count}SubJobs RunJobs{count}.subdag
-PARENT Job{count} CHILD Job{count}SubJobs
+SUBDAG EXTERNAL Job{count}SubJobs RunJobs{count}.subdag NOOP
+SCRIPT DEFER 4 300 PRE Job{count}SubJobs dag_bootstrap.sh PREDAG {stage} {completion} {count}
 """
 
 JOB_SUBMIT = \
@@ -104,7 +102,6 @@ CRAB_JobArch = %(jobarch_flatten)s
 CRAB_Archive = %(cachefilename_flatten)s
 CRAB_Id = $(count)
 +CRAB_Id = "$(count)"
-+CRAB_ParentId = "$(parent)"
 +CRAB_OutTempLFNDir = "%(temp_dest)s"
 +CRAB_OutLFNDir = "%(output_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
@@ -112,7 +109,8 @@ CRAB_Id = $(count)
 +CRAB_ASODB = %(tm_asodb)s
 +CRAB_PrimaryDataset = %(primarydataset)s
 +TaskType = "Job"
-+AccountingGroup = %(accounting_group)s
+accounting_group = %(accounting_group)s
+accounting_group_user = %(accounting_group_user)s
 +CRAB_SubmitterIpAddr = %(submitter_ip_addr)s
 +CRAB_TaskLifetimeDays = %(task_lifetime_days)s
 +CRAB_TaskEndTime = %(task_endtime)s
@@ -178,12 +176,11 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
 %(extra_jdl)s
 queue
 """
-
-SPLIT_ARG_MAP = { "Automatic": "seconds_per_job",
-                  "LumiBased": "lumis_per_job",
-                  "EventBased": "events_per_job",
-                  "FileBased": "files_per_job",
-                  "EventAwareLumiBased": "events_per_job",}
+SPLIT_ARG_MAP = {"Automatic": "seconds_per_job",
+                 "LumiBased": "lumis_per_job",
+                 "EventBased": "events_per_job",
+                 "FileBased": "files_per_job",
+                 "EventAwareLumiBased": "events_per_job",}
 
 
 def getCreateTimestamp(taskname):
@@ -214,9 +211,9 @@ def makeLFNPrefixes(task):
     splitlfn = lfn.split('/')
     if splitlfn[2] == 'user':
         #join:                    /       store    /temp   /user  /mmascher.1234    /lfn          /GENSYM    /publishname     /120414_1634
-        temp_dest = os.path.join('/', splitlfn[1], 'temp', 'user', tmp_user, *( splitlfn[4:] + [primaryds, publish_info[0], timestamp] ))
+        temp_dest = os.path.join('/', splitlfn[1], 'temp', 'user', tmp_user, *(splitlfn[4:] + [primaryds, publish_info[0], timestamp]))
     else:
-        temp_dest = os.path.join('/', splitlfn[1], 'temp', 'user', tmp_user, *( splitlfn[3:] + [primaryds, publish_info[0], timestamp] ))
+        temp_dest = os.path.join('/', splitlfn[1], 'temp', 'user', tmp_user, *(splitlfn[3:] + [primaryds, publish_info[0], timestamp]))
     dest = os.path.join(lfn, primaryds, publish_info[0], timestamp)
 
     return temp_dest, dest
@@ -254,13 +251,16 @@ def transform_strings(input):
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
                'stageoutpolicy', 'taskType', 'worker_name', 'desired_opsys', 'desired_opsysvers', \
-               'desired_arch', 'accounting_group', 'resthost', 'resturinoapi', 'submitter_ip_addr', \
+               'desired_arch', 'resthost', 'resturinoapi', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
         val = input.get(var, None)
         if val == None:
             info[var] = 'undefined'
         else:
             info[var] = json.dumps(val)
+
+    for var in 'accounting_group', 'accounting_group_user':
+        info[var] = input[var]
 
     for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'publishgroupname':
         info[var] = int(input[var])
@@ -327,33 +327,33 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def __init__(self, *args, **kwargs):
         TaskAction.TaskAction.__init__(self, *args, **kwargs)
-        self.phedex = PhEDEx.PhEDEx() #TODO use config certs!
+        self.phedex = PhEDEx.PhEDEx({'pycurl': True}) #TODO use config certs!
 
 
-    def buildDashboardInfo(self):
-        taskType = self.getDashboardTaskType()
+    def buildDashboardInfo(self, task):
+        taskType = self.getDashboardTaskType(task)
 
         params = {'tool': 'crab3',
                   'SubmissionType':'crab3',
                   'JSToolVersion': '3.3.0',
                   'tool_ui': os.environ.get('HOSTNAME', ''),
                   'scheduler': 'GLIDEIN',
-                  'GridName': self.task['tm_user_dn'],
-                  'ApplicationVersion': self.task['tm_job_sw'],
+                  'GridName': task['tm_user_dn'],
+                  'ApplicationVersion': task['tm_job_sw'],
                   'taskType': taskType,
                   'vo': 'cms',
-                  'CMSUser': self.task['tm_username'],
-                  'user': self.task['tm_username'],
-                  'taskId': self.task['tm_taskname'],
-                  'datasetFull': self.task['tm_input_dataset'],
-                  'resubmitter': self.task['tm_username'],
-                  'exe': 'cmsRun' }
+                  'CMSUser': task['tm_username'],
+                  'user': task['tm_username'],
+                  'taskId': task['tm_taskname'],
+                  'datasetFull': task['tm_input_dataset'],
+                  'resubmitter': task['tm_username'],
+                  'exe': 'cmsRun'}
         return params
 
 
-    def sendDashboardTask(self):
+    def sendDashboardTask(self, task):
         apmon = ApmonIf()
-        params = self.buildDashboardInfo()
+        params = self.buildDashboardInfo(task)
         params_copy = dict(params)
         params_copy['jobId'] = 'TaskMeta'
         self.logger.debug("Dashboard task info: %s" % str(params_copy))
@@ -410,12 +410,12 @@ class DagmanCreator(TaskAction.TaskAction):
                 info['desired_arch'] = "X86_64"
 
 
-    def getDashboardTaskType(self):
+    def getDashboardTaskType(self, task):
         """ Get the dashboard activity name for the task.
         """
-        if self.task['tm_activity'] in (None, ''):
+        if task['tm_activity'] in (None, ''):
             return getattr(self.config.TaskWorker, 'dashboardTaskType', 'analysistest')
-        return self.task['tm_activity']
+        return task['tm_activity']
 
 
     def isGlobalBlacklistIgnored(self, kwargs):
@@ -464,7 +464,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['publishdbsurl'] = info['tm_publish_dbs_url']
         info['publication'] = 1 if info['tm_publication'] == 'T' else 0
         info['userdn'] = info['tm_user_dn']
-        info['requestname'] = string.replace(task['tm_taskname'], '"', '')
+        info['requestname'] = task['tm_taskname'].replace('"', '')
         info['savelogsflag'] = 1 if info['tm_save_logs'] == 'T' else 0
         info['blacklistT1'] = 0
         info['siteblacklist'] = task['tm_site_blacklist']
@@ -476,7 +476,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['ASOURL'] = task['tm_asourl']
         asodb = task.get('tm_asodb', 'asynctransfer') or 'asynctransfer'
         info['ASODB'] = asodb
-        info['taskType'] = self.getDashboardTaskType()
+        info['taskType'] = self.getDashboardTaskType(task)
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
         info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
@@ -494,9 +494,10 @@ class DagmanCreator(TaskAction.TaskAction):
         info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
         egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
         if egroups and info['userhn'] in self.getHighPrioUsers(info['user_proxy'], info['workflow'], egroups):
-            info['accounting_group'] = 'highprio.%s' % info['userhn']
+            info['accounting_group'] = 'highprio'
         else:
-            info['accounting_group'] = 'analysis.%s' % info['userhn']
+            info['accounting_group'] = 'analysis'
+        info['accounting_group_user'] = info['userhn']
         info = transform_strings(info)
         info['faillimit'] = task['tm_fail_limit']
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
@@ -551,15 +552,15 @@ class DagmanCreator(TaskAction.TaskAction):
         return prescriptDeferString
 
 
-    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, subjob=None, stage='conventional'):
+    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, parent=None, stage='conventional'):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
         if task['tm_publication'] == 'T':
             try:
-                validateLFNs(dest,outfiles)
+                validateLFNs(dest, outfiles)
             except AssertionError as ex:
-                msg  = "\nYour task speficies an output LFN which fails validation in"
+                msg = "\nYour task speficies an output LFN which fails validation in"
                 msg += "\n WMCore/Lexicon and therefore can not be published in DBS"
                 msg += "\nError detail: %s" % (str(ex))
                 raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
@@ -584,14 +585,11 @@ class DagmanCreator(TaskAction.TaskAction):
             lastEvent = str(job['mask']['LastEvent'])
             firstLumi = str(job['mask']['FirstLumi'])
             firstRun = str(job['mask']['FirstRun'])
-            if subjob is None:
-                i = int(i) + 1
+            i = int(i) + 1
+            if parent is None or parent == "":
                 count = str(i)
             else:
-                if isinstance(i, basestring):
-                    i = int(i.split('-', 1)[0])
-                subjob += 1
-                count = '{parent}-{subjob}'.format(parent=i, subjob=subjob)
+                count = '{parent}-{i}'.format(parent=parent, i=i)
             sitead['Job{0}'.format(count)] = list(availablesites)
             siteinfo[count] = groupid
             remoteOutputFiles = []
@@ -617,7 +615,6 @@ class DagmanCreator(TaskAction.TaskAction):
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
             prescriptDeferString = self.getPreScriptDefer(task, i)
             nodeSpec = {'count': count,
-                        'parent': str(i),
                         'prescriptDefer' : prescriptDeferString,
                         'maxretries': task['numautomjobretries'],
                         'taskname': task['tm_taskname'],
@@ -652,7 +649,7 @@ class DagmanCreator(TaskAction.TaskAction):
     def createSubdag(self, splitterResult, **kwargs):
 
         startjobid = kwargs.get('startjobid', 0)
-        subjob = kwargs.get('subjob', None)
+        parent = kwargs.get('parent', None)
         stage = kwargs.get('stage', 'conventional')
         self.logger.debug('starting createSubdag, kwargs are:')
         self.logger.debug(str(kwargs))
@@ -668,26 +665,33 @@ class DagmanCreator(TaskAction.TaskAction):
         ## file and we would take it from the Task DB.
         kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
 
-        proberuntime = getattr(self.config.TaskWorker, 'splittingPilotRuntime', 15 * 60)
-        tailruntime = getattr(self.config.TaskWorker, 'splittingTailRuntime', 45 * 60)  # Not used yet
+        runtime = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
 
-        kwargs['task']['max_runtime'] = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
+        proberuntime = getattr(self.config.TaskWorker, 'automaticProbeRuntime', 15 * 60)
+        tailruntime = int(max(
+            getattr(self.config.TaskWorker, 'automaticTailRuntimeMinimum', 45 * 60),
+            getattr(self.config.TaskWorker, 'automaticTailRuntimeFraction', 0.2) * runtime
+        ))
+
+        overhead = getattr(self.config.TaskWorker, 'automaticProcessingOverhead', 60 * 60)
+
+        kwargs['task']['max_runtime'] = runtime
         # include a factor of 4 as a buffer
         kwargs['task']['maxproberuntime'] = (proberuntime * 4) // 60
-        kwargs['task']['maxtailruntime'] = (tailruntime * 4) // 60
-        if kwargs['task']['tm_split_algo'] == 'Automatic' and stage == 'conventional':
-            kwargs['task']['max_runtime'] = proberuntime
-            kwargs['task']['completion_jobs'] = getattr(self.config.TaskWorker, 'completionJobs', False)
-            outfiles = []
-            stage = 'probe'
-        if stage == 'process' and not kwargs['task']['completion_jobs']:
-            kwargs['task']['max_runtime'] = -1
+        kwargs['task']['maxtailruntime'] = (tailruntime * 5) // 60
+        if kwargs['task']['tm_split_algo'] == 'Automatic':
+            if stage == 'conventional':
+                kwargs['task']['max_runtime'] = proberuntime
+                outfiles = []
+                stage = 'probe'
+                parent = 0
+            elif stage == 'processing':
+                # include a buffer of one hour for overhead beyond the time
+                # given to CMSSW
+                kwargs['task']['tm_maxjobruntime'] = min((runtime + overhead) // 60, kwargs['task']['tm_maxjobruntime'])
+            elif stage == 'tail':
+                kwargs['task']['max_runtime'] = -1
 
-        if stage == 'probe':
-            parent = None
-            startjobid = -1
-        else:
-            parent = startjobid
 
         info = self.makeJobSubmit(kwargs['task'])
 
@@ -708,8 +712,18 @@ class DagmanCreator(TaskAction.TaskAction):
             global_blacklist = set()
             self.logger.debug("Ignoring the CRAB site blacklist.")
 
-        sitead = classad.ClassAd()
-        siteinfo = {'group_sites': {}, 'group_datasites': {}}
+        # Create site-ad and info.  DagmanCreator should only be run in
+        # succession, never parallel for a task!
+        if os.path.exists("site.ad.json"):
+            with open("site.ad.json") as fd:
+                siteinfo = json.load(fd)
+        else:
+            siteinfo = {'group_sites': {}, 'group_datasites': {}}
+        if os.path.exists("site.ad"):
+            with open("site.ad") as fd:
+                sitead = classad.parse(fd)
+        else:
+            sitead = classad.ClassAd()
 
         blocksWithNoLocations = set()
         blocksWithBannedLocations = set()
@@ -721,13 +735,13 @@ class DagmanCreator(TaskAction.TaskAction):
         self.logger.debug("Site blacklist: %s" % (list(siteBlacklist)))
 
         if siteWhitelist & global_blacklist:
-            msg  = "The following sites from the user site whitelist are blacklisted by the CRAB server: %s." % (list(siteWhitelist & global_blacklist))
+            msg = "The following sites from the user site whitelist are blacklisted by the CRAB server: %s." % (list(siteWhitelist & global_blacklist))
             msg += " Since the CRAB server blacklist has precedence, these sites are not considered in the user whitelist."
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
 
         if siteBlacklist & siteWhitelist:
-            msg  = "The following sites appear in both the user site blacklist and whitelist: %s." % (list(siteBlacklist & siteWhitelist))
+            msg = "The following sites appear in both the user site blacklist and whitelist: %s." % (list(siteBlacklist & siteWhitelist))
             msg += " Since the whitelist has precedence, these sites are not considered in the blacklist."
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
@@ -776,7 +790,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 try:
                     possiblesites = set(sbj.getAllCMSNames())
                 except Exception as ex:
-                    msg  = "The CRAB3 server backend could not contact SiteDB to get the list of all CMS sites."
+                    msg = "The CRAB3 server backend could not contact SiteDB to get the list of all CMS sites."
                     msg += " This could be a temporary SiteDB glitch."
                     msg += " Please try to submit a new task (resubmit will not work)"
                     msg += " and contact the experts if the error persists."
@@ -813,27 +827,29 @@ class DagmanCreator(TaskAction.TaskAction):
             self.logger.info("Resulting available sites: %s" % (list(availablesites)))
 
             if siteWhitelist or siteBlacklist:
-                msg  = "The site whitelist and blacklist will be applied by the pre-job."
+                msg = "The site whitelist and blacklist will be applied by the pre-job."
                 msg += " This is expected to result in DESIRED_SITES = %s" % (list(available))
                 self.logger.debug(msg)
 
-            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo, jobgroup, list(jgblocks)[0], availablesites, datasites, outfiles, startjobid, subjob=subjob, stage=stage)
+            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo,
+                                                             jobgroup, list(jgblocks)[0], availablesites,
+                                                             datasites, outfiles, startjobid, parent=parent, stage=stage)
             dagSpecs += jobgroupDagSpecs
 
         def getBlacklistMsg():
             tmp = ""
-            if len(global_blacklist)!=0:
+            if len(global_blacklist) != 0:
                 tmp += " Global CRAB3 blacklist is %s.\n" % global_blacklist
-            if len(siteBlacklist)!=0:
+            if len(siteBlacklist) != 0:
                 tmp += " User blacklist is %s.\n" % siteBlacklist
-            if len(siteWhitelist)!=0:
+            if len(siteWhitelist) != 0:
                 tmp += " User whitelist is %s.\n" % siteWhitelist
             return tmp
 
         if not dagSpecs:
             msg = "No jobs created for task %s." % (kwargs['task']['tm_taskname'])
             if blocksWithNoLocations or blocksWithBannedLocations:
-                msg  = "The CRAB server backend refuses to send jobs to the Grid scheduler. "
+                msg = "The CRAB server backend refuses to send jobs to the Grid scheduler. "
                 msg += "No locations found for dataset '%s'. " % (kwargs['task']['tm_input_dataset'])
                 msg += "(or at least for the part of the dataset that passed the lumi-mask and/or run-range selection).\n"
             if blocksWithBannedLocations:
@@ -849,23 +865,34 @@ class DagmanCreator(TaskAction.TaskAction):
             msg += getBlacklistMsg()
         if blocksWithNoLocations or blocksWithBannedLocations:
             msg += (" Dataset processing will be incomplete because %s (out of %s) blocks are only present at blacklisted site(s)" %
-                (len(blocksWithNoLocations)+len(blocksWithBannedLocations), len(allblocks)))
+                   (len(blocksWithNoLocations)+len(blocksWithBannedLocations), len(allblocks)))
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
 
         ## Write down the DAG as needed by DAGMan.
-        dag = DAG_HEADER.format(
-                nodestate='' if not parent else '.{0}'.format(parent),
-                resthost=kwargs['task']['resthost'],
-                resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
+        dag = DAG_HEADER.format(nodestate='.{0}'.format(parent) if parent else ('.0' if stage == 'processing' else ''),
+                                resthost=kwargs['task']['resthost'],
+                                resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
         if stage == 'probe':
-            # We want only one probe job
-            dagSpecs = dagSpecs[:1]
+            dagSpecs = dagSpecs[:getattr(self.config.TaskWorker, 'numAutomaticProbes', 5)]
         for dagSpec in dagSpecs:
             dag += DAG_FRAGMENT.format(**dagSpec)
-            if stage == 'probe' or (stage == 'process' and kwargs['task']['completion_jobs']):
-                dag += SUBDAG_FRAGMENT.format(**dagSpec)
-                subdag = "RunJobs{0}.subdag".format(dagSpec['count'])
+        if stage in ('probe', 'processing'):
+            # default for probe DAG: only one processing DAG after 100% of the probe jobs have completed
+            subdagCompletions = [100]
+            nextStage = {'probe': 'processing', 'processing': 'tail'}[stage]
+
+            if stage == 'processing' and len(dagSpecs) > getattr(self.config.TaskWorker, 'minAutomaticTailSize', 100):
+                subdagCompletions = getattr(self.config.TaskWorker, 'minAutomaticTailTriggers', [50, 80, 100])
+
+            for n, percent in enumerate(subdagCompletions, 0 if stage == 'probe' else 1):
+                subdagSpec = {
+                    'count': n,
+                    'stage': nextStage,
+                    'completion': (len(dagSpecs) * percent) // 100
+                }
+                dag += SUBDAG_FRAGMENT.format(**subdagSpec)
+                subdag = "RunJobs{count}.subdag".format(**subdagSpec)
                 with open(subdag, "w") as fd:
                     fd.write("")
                 subdags.append(subdag)
@@ -918,23 +945,25 @@ class DagmanCreator(TaskAction.TaskAction):
             ## Cache task information
             with open("taskinformation.pkl", "wb") as fd:
                 pickle.dump(kwargs['task'], fd)
+
+            ## Cache TaskWorker configuration
+            with open("taskworkerconfig.pkl", "wb") as fd:
+                pickle.dump(self.config, fd)
+        elif stage == 'processing':
+            name = "RunJobs0.subdag"
         else:
             name = "RunJobs{0}.subdag".format(parent)
 
-        if stage != 'tail':
-            ## Cache site information
-            with open("site.ad", "w") as fd:
-                fd.write(str(sitead))
+        ## Cache site information
+        with open("site.ad", "w") as fd:
+            fd.write(str(sitead))
 
-            with open("site.ad.json", "w") as fd:
-                json.dump(siteinfo, fd)
+        with open("site.ad.json", "w") as fd:
+            json.dump(siteinfo, fd)
 
         ## Save the DAG into a file.
         with open(name, "w") as fd:
             fd.write(dag)
-
-        task_name = kwargs['task'].get('CRAB_ReqName', kwargs['task'].get('tm_taskname', ''))
-        userdn = kwargs['task'].get('CRAB_UserDN', kwargs['task'].get('tm_user_dn', ''))
 
         info["jobcount"] = len(dagSpecs)
         maxpost = getattr(self.config.TaskWorker, 'maxPost', 20)
@@ -975,17 +1004,6 @@ class DagmanCreator(TaskAction.TaskAction):
                     }
             insertJobIdSid(jinfo, idx, taskid, 0)
             ml_info.append(jinfo)
-
-        # When running in standalone mode, we want to record the number of jobs in the task
-        if ('CRAB_ReqName' in kwargs['task']) and ('CRAB_UserDN' in kwargs['task']):
-            const = 'TaskType =?= \"ROOT\" && CRAB_ReqName =?= "%s" && CRAB_UserDN =?= "%s"' % (task_name, userdn)
-            cmd = "condor_qedit -const '%s' CRAB_JobCount %d" % (const, len(dagSpecs))
-            self.logger.debug("+ %s" % cmd)
-            status, output = commands.getstatusoutput(cmd)
-            if status:
-                self.logger.error(output)
-                self.logger.error("Failed to record the number of jobs.")
-                return 1
 
         return info, splitterResult, subdags
 
@@ -1063,7 +1081,7 @@ class DagmanCreator(TaskAction.TaskAction):
         shutil.copy(adjust_location, '.')
 
         # Bootstrap the ISB if we are using UFC
-        if UserFileCache and kw['task']['tm_cache_url'].find('/crabcache')!=-1:
+        if UserFileCache and kw['task']['tm_cache_url'].find('/crabcache') != -1:
             ufc = UserFileCache(mydict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint' : kw['task']['tm_cache_url']})
             try:
                 ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
@@ -1089,14 +1107,14 @@ class DagmanCreator(TaskAction.TaskAction):
 
         kw['task']['resthost'] = self.server['host']
         kw['task']['resturinoapi'] = self.restURInoAPI
-        self.task = kw['task']
 
         params = {}
         if kw['task']['tm_dry_run'] == 'F':
-            params = self.sendDashboardTask()
+            params = self.sendDashboardTask(kw['task'])
 
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
-                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'run_and_lumis.tar.gz', 'input_files.tar.gz']
+                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',
+                      'run_and_lumis.tar.gz', 'input_files.tar.gz']
 
         self.extractMonitorFiles(inputFiles, **kw)
 
@@ -1122,7 +1140,7 @@ class DagmanCreator(TaskAction.TaskAction):
         try:
             os.chdir(kw['tempDir'])
             info, params, inputFiles, splitterResult = self.executeInternal(*args, **kw)
-            return TaskWorker.DataObjects.Result.Result(task = kw['task'], result = (info, params, inputFiles, splitterResult))
+            return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(info, params, inputFiles, splitterResult))
         finally:
             os.chdir(cwd)
 

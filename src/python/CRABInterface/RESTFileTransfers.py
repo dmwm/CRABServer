@@ -1,3 +1,4 @@
+from __future__ import print_function
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_num, validate_strlist
@@ -29,7 +30,7 @@ class RESTFileTransfers(RESTEntity):
                 authz_operator_without_raise('crab3', 'operator')):
             # TODO: do not forget to uncomment this
             # so far just print a warning
-            print 'WARNING. NOT AUTHORIZED'
+            print ('WARNING. NOT AUTHORIZED')
             #raise ForbiddenAccess('Access is restricted to this API')
         if method in ['PUT']:
             raise UnsupportedMethod('This method is not supported in this API!')
@@ -48,6 +49,7 @@ class RESTFileTransfers(RESTEntity):
             validate_str("list_of_fts_id", param, safe, RX_ANYTHING, optional=True)
             validate_str("list_of_publication_state", param, safe, RX_ANYTHING, optional=True)
             validate_num("time_to", param, safe, optional=True)
+            validate_num("publish_flag", param, safe, optional=True)
 
         elif method in ['GET']:
             validate_str("subresource", param, safe, RX_SUBGETTRANSFER, optional=False)
@@ -207,6 +209,7 @@ class RESTFileTransfers(RESTEntity):
                 binds['id'] = [ids[num]]
                 binds['fail_reason'] = [reasons[num]]
                 binds['retry_value'] = [int(retry[num])]
+                binds['publish'] = [kwargs["publish_flag"] or -1]
                 self.api.modify(self.transferDB.UpdatePublication_sql, **binds)
 
         elif subresource == 'retryPublication':
@@ -354,6 +357,7 @@ class RESTFileTransfers(RESTEntity):
                 if grouping > 1:
                     raise InvalidParameter('This grouping level is not implemented')
                 binds['state'] = PUBLICATIONDB_STATUSES['ACQUIRED']
+                binds['transfer_state'] = TRANSFERDB_STATUSES['DONE']
                 if grouping == 0:
                     # ---------------------------------------------
                     # Return: Docs, which match these conditions: asoworker, state = ACQUIRED, username

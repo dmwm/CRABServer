@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [[ "$0" != "-bash" && "$0" != "bash" ]] ; then
+if [[ "$0" != "/bin/bash" && "$0" != "-bash" && "$0" != "bash" ]] ; then
     echo "BEWARE: THIS SCRIPT NEEDS TO BE source'D NOT EXECUTED"
     exit
 fi
@@ -60,9 +60,9 @@ export X509_USER_PROXY=`ls|egrep  [a-z,0-9]{40}`
 #voms-proxy-info
 
 # grab args from the dagman config
-PJargs=`cat RunJobs.dag | grep "POST Job${jobId}" | awk 'BEGIN { FS="MAX_RETRIES" }; {print $2}'`
+PJargs=`cat RunJobs*.*dag | grep "POST Job${jobId}" | awk 'BEGIN { FS="MAX_RETRIES" }; {print $2}'`
 
-# find the condor clusterId for the job 
+# find the condor clusterId for the job
 jobClusterId=`ls -l finished_jobs/job.${jobId}.${jobRetry} | awk '{print $NF}'|cut -d. -f2-3`
 
 # reset PJ count

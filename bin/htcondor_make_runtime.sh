@@ -14,7 +14,7 @@ WMCOREVER=1.0.14_crab_4
 WMCOREREPO=dmwm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
-CRABSERVERVER=3.3.8.rc7
+CRABSERVERVER=3.3.1706.rc2
 CRABSERVERREPO=dmwm
 
 [[ -d $STARTDIR ]] || mkdir -p $STARTDIR
@@ -61,7 +61,7 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
     popd
 
     pushd $ORIGDIR/build/lib
-    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py TaskWorker CRABInterface  -x \*.pyc || exit 3
+    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  -x \*.pyc || exit 3
     popd
 
     pushd $VO_CMS_SW_DIR/$SCRAM_ARCH/external/cherrypy/*/lib/python2.7/site-packages
@@ -125,7 +125,7 @@ else
     popd
 
     pushd $CRABSERVER_PATH/src/python
-    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py TaskWorker CRABInterface  -x \*.pyc || exit 3
+    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  -x \*.pyc || exit 3
     popd
 
     mkdir -p bin

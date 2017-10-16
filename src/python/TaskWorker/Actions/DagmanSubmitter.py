@@ -454,9 +454,20 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["HoldKillSig"] = "SIGUSR1"
         dagAd["X509UserProxy"] = info['user_proxy']
         dagAd["Requirements"] = classad.ExprTree('true || false')
-        dagAd["TaskType"] = "ROOT"
         dagAd["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1 CONDOR_ID=", ClusterId, ".", ProcId," %s")' % " ".join(info['additional_environment_options'].split(";")))
         dagAd["RemoteCondorSetup"] = info['remote_condor_setup']
+
+        dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"].encode('ascii', 'ignore'))
+        dagAd['CRAB_TaskLifetimeDays'] = TASKLIFETIME // 24 // 60 // 60
+        dagAd['CRAB_TaskEndTime'] = int(info["start_time"]) + TASKLIFETIME
+        #For task management info see https://github.com/dmwm/CRABServer/issues/4681#issuecomment-302336451
+        dagAd["LeaveJobInQueue"] = classad.ExprTree("true")
+        dagAd["PeriodicHold"] = classad.ExprTree("time() > CRAB_TaskEndTime")
+        dagAd["TransferOutput"] = info['outputFilesString']
+        dagAd["OnExitHold"] = classad.ExprTree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
+        dagAd["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
+        dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
+        dagAd["RemoveKillSig"] = "SIGUSR1"
 
         with open('subdag.ad' ,'w') as fd:
             for k, v in dagAd.items():
@@ -472,22 +483,12 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     value = v
                 fd.write('+{0} = {1}\n'.format(k, value))
 
+        dagAd["TaskType"] = "ROOT"
         dagAd["Out"] = str(os.path.join(info['scratch'], "request.out"))
         dagAd["Err"] = str(os.path.join(info['scratch'], "request.err"))
         dagAd["Cmd"] = cmd
         dagAd['Args'] = arg
         dagAd["TransferInput"] = str(info['inputFilesString'])
-        dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"].encode('ascii', 'ignore'))
-        dagAd['CRAB_TaskLifetimeDays'] = TASKLIFETIME // 24 // 60 // 60
-        dagAd['CRAB_TaskEndTime'] = int(info["start_time"]) + TASKLIFETIME
-        #For task management info see https://github.com/dmwm/CRABServer/issues/4681#issuecomment-302336451
-        dagAd["LeaveJobInQueue"] = classad.ExprTree("true")
-        dagAd["PeriodicHold"] = classad.ExprTree("time() > CRAB_TaskEndTime")
-        dagAd["TransferOutput"] = info['outputFilesString']
-        dagAd["OnExitRemove"] = classad.ExprTree("( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))")
-        dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
-        dagAd["RemoveKillSig"] = "SIGUSR1"
-        dagAd["OnExitHold"] = classad.ExprTree("(ExitCode =!= UNDEFINED && ExitCode != 0)")
 
         condorIdDict = {}
         with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True, outputObj=condorIdDict, logger=self.logger) as (parent, rpipe):
