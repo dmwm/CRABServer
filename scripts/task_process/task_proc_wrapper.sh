@@ -22,11 +22,11 @@ function check_exit {
     # Make sure that all DAGs have exited; Count the ones that are still
     # running or are in the current state for less than 24 hours.
     NOT_DONE=0
-    echo "$DAG_INFO"|while read CLUSTER_ID DAG_STATUS ENTERED_CUR_STATUS; do
+    while read CLUSTER_ID DAG_STATUS ENTERED_CUR_STATUS; do
         if [[ "$DAG_STATUS" == "1" || "$DAG_STATUS" == "2" || $(( ($(date +"%s") - $ENTERED_CUR_STATUS) < 24 * 3600 )) ]]; then
             NOT_DONE=$(( $NOT_DONE + 1 ))
         fi
-    done
+    done <<< $DAG_INFO
     echo $(( $NOT_DONE == 0 ))
 }
 
