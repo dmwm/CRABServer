@@ -95,20 +95,22 @@ if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]; then
     fi
 
     TARBALL_NAME=TaskManagerRun.tar.gz
-    tar xvfzm $TARBALL_NAME
+    tar xfzm $TARBALL_NAME
     if [[ $? != 0 ]]; then
         echo "Error: Unable to unpack the task manager runtime environment." >&2
         condor_qedit $CONDOR_ID DagmanHoldReason "'Unable to unpack the task manager runtime environment.'"
         exit 1
     fi
-    unzip -o CRAB3.zip
-    ls -lah
+    echo "unzip CRAB3.zip ..."
+    unzip -oq CRAB3.zip
+    #ls -lagoh
 
     export TASKWORKER_ENV="1"
 fi
 
 # Recalculate the black / whitelist
 if [ -e AdjustSites.py ]; then
+    echo "Execute AdjustSites.py ..."
     python AdjustSites.py
     ret=$?
     if [ $ret -eq 1 ]; then
@@ -134,14 +136,15 @@ export _CONDOR_MAX_DAGMAN_LOG=0
 # Please remember that any condor_q command is expensive to scheduler.
 # See: https://github.com/dmwm/CRABServer/issues/4618
 export _CONDOR_PER_JOB_HISTORY_DIR=`condor_config_val PER_JOB_HISTORY_DIR`
-mkdir -p finished_jobs
+mkdir -pv finished_jobs
 
 CONDOR_VERSION=`condor_version | head -n 1`
 PROC_ID=`grep '^ProcId =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
 CLUSTER_ID=`grep '^ClusterId =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
 REQUEST_NAME=`grep '^CRAB_ReqName =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
 export CONDOR_ID="${CLUSTER_ID}.${PROC_ID}"
-ls -lah
+echo "CONDOR_ID set to ${CONDOR_ID}"
+#ls -lagoh
 if [ "X" == "X$X509_USER_PROXY" ] || [ ! -e $X509_USER_PROXY ]; then
     echo "Failed to find a proxy at: $X509_USER_PROXY"
     condor_qedit $CONDOR_ID DagmanHoldReason "'Failed to find users proxy.'"
@@ -151,6 +154,7 @@ elif [ ! -r $X509_USER_PROXY ]; then
     condor_qedit $CONDOR_ID DagmanHoldReason "'The proxy is unreadable for some reason'"
     EXIT_STATUS=6
 else
+    echo "Proxy found at $X509_USER_PROXY"
     # --- New status prototype ---
     # This jdl is created here because we need to identify the task on which the daemon will run,
     # which is done by passing the cluster_id of the dagman to the daemon process via the jdl. With this, we are
@@ -198,5 +202,6 @@ EOF
     # there in (createSubdagSubmission)!
     exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -DoRecov -AutoRescue 0 -MaxPre 20 -MaxIdle 1000 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
     EXIT_STATUS=$?
+    echo "condor_dagman terminated with EXIT_STATUS=${EXIT_STATUS} at `date`"
 fi
 exit $EXIT_STATUS
