@@ -720,7 +720,6 @@ class ASOServerJob(object):
                            'publication_state': 'not_published',
                            'publication_retry_count': [],
                            'type': file_type,
-                           'publish': publish,
                           }
                     ## TODO: We do the following, only because that's what ASO does when a file has
                     ## been successfully transferred. But this modified LFN makes no sence when it
@@ -742,6 +741,7 @@ class ASOServerJob(object):
                 ## If after all we need to upload a new document to ASO database, let's do it.
                 if needs_commit:
                     doc.update(doc_new_info)
+                    doc['publish'] = publish
                     msg = "ASO job description: %s" % (pprint.pformat(doc))
                     self.logger.info(msg)
                     commit_result_msg = self.updateOrInsertDoc(doc)
