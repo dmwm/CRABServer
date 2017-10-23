@@ -432,7 +432,7 @@ def perform_local_stageout(local_stageout_mgr, \
     signal.alarm(G_TRANSFERS_TIMEOUT)
     ## Do the local stageout.
     retval, retmsg = 0, None
-    stageout_info = None
+    stageout_info = {}
     try:
         ## Throws on any failure.
         print("       -----> Stageout manager log start")
