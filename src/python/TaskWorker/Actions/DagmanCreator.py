@@ -116,8 +116,6 @@ accounting_group_user = %(accounting_group_user)s
 +CRAB_TaskEndTime = %(task_endtime)s
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
-+DESIRED_OpSyses = %(desired_opsys)s
-+DESIRED_OpSysMajorVers = %(desired_opsysvers)s
 +DESIRED_Archs = %(desired_arch)s
 +DESIRED_CMSDataset = %(inputdata)s
 
@@ -250,7 +248,7 @@ def transform_strings(input):
                'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
-               'stageoutpolicy', 'taskType', 'worker_name', 'desired_opsys', 'desired_opsysvers', \
+               'stageoutpolicy', 'taskType', 'worker_name', \
                'desired_arch', 'resthost', 'resturinoapi', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
         val = input.get(var, None)
@@ -391,21 +389,10 @@ class DagmanCreator(TaskAction.TaskAction):
     def populateGlideinMatching(self, info):
         scram_arch = info['tm_job_arch']
         # Set defaults
-        info['desired_opsys'] = "LINUX"
-        info['desired_opsysvers'] = "5,6"
         info['desired_arch'] = "X86_64"
         m = re.match("([a-z]+)(\d+)_(\w+)_(\w+)", scram_arch)
-        # At the time of writing, for opsys and arch, the only supported variant
-        # is the default variant; we actually parse this information so the future maintainer
-        # can see what is needed.  For OpSys version, users can support 5,6 or 6.
         if m:
             os, ver, arch, _ = m.groups()
-            if os == "slc":
-                info['desired_opsys'] = "LINUX"
-            if ver == "5":
-                info['desired_opsysvers'] = "5,6"
-            elif ver == "6":
-                info['desired_opsysvers'] = "6"
             if arch == "amd64":
                 info['desired_arch'] = "X86_64"
 
@@ -502,11 +489,11 @@ class DagmanCreator(TaskAction.TaskAction):
         info['faillimit'] = task['tm_fail_limit']
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
         if info['jobarch_flatten'].startswith("slc6_"):
-            info['opsys_req'] = 'REQUIRED_OS="rhel6"'
+            info['opsys_req'] = '+REQUIRED_OS="rhel6"'
         if info['jobarch_flatten'].startswith("slc7_"):
-            info['opsys_req'] = 'REQUIRED_OS="rhel7"'
+            info['opsys_req'] = '+REQUIRED_OS="rhel7"'
         else:
-            info['opsys_req'] = 'REQUIRED_OS="any"'
+            info['opsys_req'] = '+REQUIRED_OS="any"'
 
         info.setdefault("additional_environment_options", '')
         info.setdefault("additional_input_file", "")
