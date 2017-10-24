@@ -108,10 +108,11 @@ then
     else
         CRAB_oneEventMode=0
     fi
-    CRAB_localOutputFiles=`grep '^CRAB_localOutputFiles =' $_CONDOR_JOB_AD | tr -d '"' | tr -d ',' | sed 's/CRAB_localOutputFiles = //'`
-    export CRAB_Id=`grep '^CRAB_Id =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
-    export CRAB_Retry=`grep '^CRAB_Retry =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
-    JOB_CMSSite=`grep '^JOB_CMSSite =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
+    #The tail -1 is because the classad might be there on multiple lines and we want the last one
+    CRAB_localOutputFiles=`grep '^CRAB_localOutputFiles =' $_CONDOR_JOB_AD | tail -1 | tr -d '"' | tr -d ',' | sed 's/CRAB_localOutputFiles = //'`
+    export CRAB_Id=`grep '^CRAB_Id =' $_CONDOR_JOB_AD | tr -d '"' | tail -1 | awk '{print $NF;}'`
+    export CRAB_Retry=`grep '^CRAB_Retry =' $_CONDOR_JOB_AD | tail -1 | tr -d '"' | awk '{print $NF;}'`
+    JOB_CMSSite=`grep '^JOB_CMSSite =' $_CONDOR_JOB_AD | tr -d '"' | tail -1 | awk '{print $NF;}'`
     if [ "X$CRAB_Id" = "X" ];
     then
         echo "Unable to determine CRAB Id."

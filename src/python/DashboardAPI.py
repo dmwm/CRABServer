@@ -248,6 +248,8 @@ def parseAd():
 
 
 def reportFailureToDashboard(exitCode, ad = None, stageOutReport=None):
+    if 'CRAB3_RUNTIME_DEBUG' in os.environ:
+        return 0
     if ad is None:
         try:
             ad = parseAd()
