@@ -489,7 +489,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['faillimit'] = task['tm_fail_limit']
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
         if info['jobarch_flatten'].startswith("slc5_"):
-            info['opsys_req'] = '+REQUIRED_OS="rhel5,rhel6"'
+            info['opsys_req'] = '+REQUIRED_OS="rhel6"'
         elif info['jobarch_flatten'].startswith("slc6_"):
             info['opsys_req'] = '+REQUIRED_OS="rhel6"'
         elif info['jobarch_flatten'].startswith("slc7_"):
