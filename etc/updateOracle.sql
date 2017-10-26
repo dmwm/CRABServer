@@ -104,3 +104,5 @@ UPDATE filetransfersdb SET tm_jobid_varchar = tm_jobid;
 ALTER TABLE filetransfersdb DROP COLUMN tm_jobid;
 ALTER TABLE filetransfersdb RENAME COLUMN tm_jobid_varchar TO tm_jobid;
 
+--Add the column to be used for the filetrasfersdb partitioning
+ALTER TABLE filetransfersdb ADD tm_creation_time TIMESTAMP;
