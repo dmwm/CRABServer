@@ -389,7 +389,7 @@ class ASOServerJob(object):
                     failed_killed_transfers.append(doc_id)
                     msg = "Stageout job (internal ID %s) failed with status '%s'." % (doc_id, transfer_status)
                     doc = self.load_transfer_document(doc_id)
-                    if doc and ('failure_reason' in doc) and doc['failure_reason']:
+                    if doc and ('transfer_failure_reason' in doc) and doc['transfer_failure_reason']:
                         ## reasons:  The transfer failure reason(s).
                         ## app:      The application that gave the transfer failure reason(s).
                         ##           E.g. 'aso' or '' (meaning the postjob). When printing the
@@ -399,8 +399,9 @@ class ASOServerJob(object):
                         ##           It is set by PostJob in the perform_transfers() function,
                         ##           when is_failure_permanent() is called to determine if a
                         ##           failure is permanent or not.
-                        reasons, app, severity = doc['failure_reason'], 'aso', None
-                        msg += " Failure reasons follow:"
+                        reasons, app, severity = doc['transfer_failure_reason'], 'aso', None
+                        if reasons:
+                            reasons += " [...CUT...] Full log at https://fts3.cern.ch:8449/fts3/ftsmon/#/job/%s" % doc['fts_id']
                         if app:
                             msg += "\n-----> %s log start -----" % str(app).upper()
                         msg += "\n%s" % reasons
