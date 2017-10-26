@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-import logging
-
 class FileTransfers(object):
     """
     """
@@ -85,15 +83,16 @@ class FileTransfers(object):
 # Move to taskDB
     GetVOMSAttr_sql = "SELECT tm_user_role, tm_user_group from tasks WHERE tm_taskname = :taskname AND ROWNUM = 1"
 
-    GetDocsTransfer0_sql = "SELECT f.*, t.tm_user_role, t.tm_user_group \
-			    FROM filetransfersdb f \
-			    LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
-                            WHERE tm_transfer_state = :state AND \
-                                  tm_aso_worker = :asoworker AND \
-                                  rownum < :limit \
-                            ORDER BY rownum"
+#    GetDocsTransfer0_sql = "SELECT f.*, t.tm_user_role, t.tm_user_group \
+#			    FROM filetransfersdb f \
+#			    LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
+#                            WHERE tm_transfer_state = :state AND \
+#                                  tm_aso_worker = :asoworker AND \
+#                                  rownum < :limit \
+#                            ORDER BY rownum"
 
-    GetDocsTransfer1_sql = "SELECT f.*, t.tm_user_role, t.tm_user_group \
+    GetDocsTransfer1_sql = "SELECT f.tm_source, f.tm_destination, f.tm_username, f.tm_transfer_state, f.tm_aso_worker, f.tm_taskname, \
+                                   f.tm_id, f.tm_source_lfn, f.tm_destination_lfn, t.tm_user_role, t.tm_user_group \
 			    FROM filetransfersdb f \
 			    LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
                             WHERE f.tm_transfer_state = :state AND \
@@ -104,41 +103,32 @@ class FileTransfers(object):
                                   rownum < :limit \
                             ORDER BY rownum"
 
-    GetDocsTransfer2_sql = "SELECT * FROM filetransfersdb \
-                            WHERE tm_transfer_state = :state AND \
-                                  tm_source = :source AND \
-                                  tm_aso_worker = :asoworker AND \
-                                  rownum < :limit \
-                            ORDER BY rownum"
-
-    GetDocsTransfer3_sql = "SELECT * FROM filetransfersdb \
-                            WHERE tm_transfer_state = :state AND \
-                                  tm_source = :source AND \
-                                  tm_destination = :destination AND \
-                                  tm_aso_worker = :asoworker AND \
-                                  rownum < :limit \
-                            ORDER BY rownum"
-
-    GetDocsPublication0_sql = "SELECT f.*, t.tm_user_role, t.tm_user_group, \
+    GetDocsPublication0_sql = "SELECT f.tm_publication_state, f.tm_transfer_state, f.tm_aso_worker, f.tm_taskname, f.tm_username, \
+                                      f.tm_destination, f.tm_source_lfn, f.tm_destination_lfn, \
+                                      f.tm_last_update, \
+                                      t.tm_user_role, t.tm_user_group, \
 				      t.tm_input_dataset, t.tm_cache_url, \
 				      t.tm_dbs_url \
 			       FROM filetransfersdb f \
 			       LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
-                               WHERE tm_publication_state = :state AND \
-                                     tm_transfer_state = :transfer_state AND \
-                                     tm_aso_worker = :asoworker AND \
+                               WHERE f.tm_publication_state = :state AND \
+                                     f.tm_transfer_state = :transfer_state AND \
+                                     f.tm_aso_worker = :asoworker AND \
                                      rownum < :limit \
                                ORDER BY rownum"
 
-    GetDocsPublication1_sql = "SELECT f.*, t.tm_user_role, t.tm_user_group, \
+    GetDocsPublication1_sql = "SELECT f.tm_publication_state, f.tm_transfer_state, f.tm_aso_worker, f.tm_taskname, f.tm_username, \
+                                      f.tm_destination, f.tm_source_lfn, f.tm_destination_lfn, \
+                                      f.tm_last_update, \
+                                      t.tm_user_role, t.tm_user_group, \
 				      t.tm_input_dataset, t.tm_cache_url, \
 				      t.tm_dbs_url \
 			       FROM filetransfersdb f \
 			       LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
                                WHERE f.tm_username = :username AND \
-                                     tm_publication_state = :state AND \
-                                     tm_transfer_state = :transfer_state AND \
-                                     tm_aso_worker = :asoworker AND \
+                                     f.tm_publication_state = :state AND \
+                                     f.tm_transfer_state = :transfer_state AND \
+                                     f.tm_aso_worker = :asoworker AND \
                                      rownum < :limit \
                                ORDER BY rownum"
 
@@ -243,7 +233,9 @@ class FileTransfers(object):
                               WHERE tm_username = :username AND tm_transfer_state = :transfer_state \
                               AND tm_taskname = :taskname"
 
-    GetById_sql = "SELECT * FROM filetransfersdb where tm_id = :id"
+    GetById_sql = "SELECT tm_jobid, tm_id, tm_job_retry_count, tm_transfer_retry_count, \
+                          tm_source, tm_taskname \
+                   FROM filetransfersdb where tm_id = :id"
 
 # As jobs can be retried we should look only at the last ones. For that specific case this needs to be relooked.
     GetTaskStatusForTransfers_sql = "SELECT tm_id, tm_jobid, tm_transfer_state, tm_start_time, tm_last_update, tm_fts_id, tm_fts_instance FROM filetransfersdb \
