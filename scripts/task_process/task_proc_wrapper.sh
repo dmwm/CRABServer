@@ -38,7 +38,7 @@ function dag_status {
 }
 
 function perform_condorq {
-    DAG_INFO=$(condor_q -constr 'CRAB_ReqName =?= "'$REQUEST_NAME'" && TaskType =!= "Job"' -af ClusterId JobStatus EnteredCurrentStatus)
+    DAG_INFO=$(condor_q -constr 'CRAB_ReqName =?= "'$REQUEST_NAME'" && TaskType == "ROOT"' -af ClusterId JobStatus EnteredCurrentStatus)
     TIME_OF_LAST_QUERY=$(date +"%s")
     echo "Query done on $(date '+%Y/%m/%d %H:%M:%S %Z')"
 }
