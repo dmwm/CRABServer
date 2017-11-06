@@ -478,7 +478,7 @@ def perform_local_stageout(local_stageout_mgr, \
                                   'inject'             : True
                                  }
             G_ASO_TRANSFER_REQUESTS.append(file_transfer_info)
-    if stageout_info['StageOutReport']:
+    if stageout_info.get('StageOutReport'):
         DashboardAPI.reportFailureToDashboard(G_JOB_WRAPPER_EXIT_CODE, G_JOB_AD, stageout_info['StageOutReport'])
     return retval, retmsg
 
