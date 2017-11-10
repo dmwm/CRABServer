@@ -234,7 +234,7 @@ class FileTransfers(object):
                               AND tm_taskname = :taskname"
 
     GetById_sql = "SELECT tm_jobid, tm_id, tm_job_retry_count, tm_transfer_retry_count, \
-                          tm_source, tm_taskname \
+                          tm_source, tm_taskname, tm_start_time, tm_end_time, tm_transfer_state, tm_publication_state, tm_transfer_failure_reason \
                    FROM filetransfersdb where tm_id = :id"
 
 # As jobs can be retried we should look only at the last ones. For that specific case this needs to be relooked.
