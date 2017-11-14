@@ -233,8 +233,11 @@ class FileTransfers(object):
                               WHERE tm_username = :username AND tm_transfer_state = :transfer_state \
                               AND tm_taskname = :taskname"
 
-    GetById_sql = "SELECT tm_jobid, tm_id, tm_job_retry_count, tm_transfer_retry_count, \
-                          tm_source, tm_taskname, tm_start_time, tm_end_time, tm_transfer_state, tm_publication_state, tm_transfer_failure_reason \
+    GetById_sql = "SELECT tm_id, tm_username, tm_taskname, tm_destination, tm_destination_lfn, tm_source, tm_source_lfn, tm_filesize, tm_publish, \
+                          tm_jobid, tm_job_retry_count, tm_type, tm_aso_worker, tm_transfer_retry_count, tm_transfer_max_retry_count, \
+                          tm_publication_retry_count, tm_publication_max_retry_count, tm_rest_host, tm_rest_uri, tm_transfer_state, \
+                          tm_publication_state, tm_transfer_failure_reason, tm_publication_failure_reason, tm_fts_id, tm_fts_instance, \
+                          tm_last_update, tm_start_time, tm_end_time \
                    FROM filetransfersdb where tm_id = :id"
 
 # As jobs can be retried we should look only at the last ones. For that specific case this needs to be relooked.
