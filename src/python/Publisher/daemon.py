@@ -32,6 +32,10 @@ from AsyncStageOut import getDNFromUserName
 from ServerUtilities import encodeRequest, oracleOutputMapping
 from ServerUtilities import executeCommand, getColumn, getHashLfn, PUBLICATIONDB_STATUSES, encodeRequest, oracleOutputMapping
 
+
+configuration = loadConfigurationFile( os.path.abspath('config.py') )
+
+
 def setProcessLogger(name):
     """ Set the logger for a single process. The file used for it is logs/processes/proc.name.txt and it
         can be retrieved with logging.getLogger(name) in other parts of the code
@@ -54,9 +58,9 @@ class Worker(object):
         Initialise class members
         """
         self.config = config.General
-        self.max_files_per_block = 100
+        self.max_files_per_block = self.config.max_files_per_block
         self.userProxy = self.config.opsProxy
-        self.block_publication_timeout = 3600
+        self.block_publication_timeout = self.config.block_closure_timeout
         self.lfn_map = {}
         #TODO: logger!
         def createLogdir(dirname):
@@ -455,8 +459,7 @@ class Worker(object):
 
 if __name__ == '__main__':
 
-    configuration = loadConfigurationFile( os.path.abspath('config.py') )
     master = Worker(configuration, False)
     while(True):
         master.algorithm()
-        time.sleep(600)
+        time.sleep(configuration.General.pollInterval)

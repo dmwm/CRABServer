@@ -14,24 +14,26 @@ import dbs.apis.dbsClient as dbsClient
 from utils import getProxy
 from ServerUtilities import getHashLfn, PUBLICATIONDB_STATUSES, encodeRequest, oracleOutputMapping
 from RESTInteractions import HTTPRequests
+from WMCore.Configuration import loadConfigurationFile
 
+config = loadConfigurationFile( os.path.abspath('config.py') )
 
 def Proxy(userDN, group, role, logger):
     userProxy = ''
 
     try:
-        serviceCert = '/data/certs/hostcert.pem'
-        serviceKey = '/data/certs/hostkey.pem'
+        serviceCert = config.General.serviceCert
+        serviceKey = config.General.serviceKey
 
         defaultDelegation = {'logger': logger,
                              'credServerPath': 'credentials',
                              'myProxySvr': 'myproxy.cern.ch',
                              'min_time_left': 36000,
-                             'serverDN': "/DC=ch/DC=cern/OU=computers/CN=vocms0105.cern.ch",
-                             'uisource': "/data/srv/tmp.sh"
+                             'serverDN': config.General.serverDN,
+                             'uisource': "/dev/null"
                             }
 
-        cache_area = 'https://vocms035.cern.ch/crabserver/dev/filemetadata'
+        cache_area = config.General.cache_area
         getCache = re.compile('https?://([^/]*)/.*')
         myproxyAccount = getCache.findall(cache_area)[0]
         defaultDelegation['myproxyAccount'] = myproxyAccount
@@ -292,7 +294,7 @@ def requestBlockMigration(workflow, migrateApi, sourceApi, block):
     Submit migration request for one block, checking the request output.
     """
     logger = logging.getLogger(workflow)
-    logging.basicConfig(filename=workflow+'.log', level=logging.INFO)
+    logging.basicConfig(filename=workflow+'.log', level=logging.INFO, format=config.General.logMsgFormat)
 
     wfnamemsg = "%s: " % workflow
     atDestination = False
@@ -357,7 +359,7 @@ def mark_good(workflow, files, oracleDB, logger):
         data['list_of_failure_reason'] = ''
 
         try:
-            result = oracleDB.post('/crabserver/dev/filetransfers',
+            result = oracleDB.post(config.General.oracleFileTrans,
                                    data=encodeRequest(data))
             logger.debug("updated: %s %s " % (docId,result))
         except Exception as ex:
@@ -379,7 +381,7 @@ def mark_failed(workflow, files, oracleDB, logger, failure_reason="", force_fail
         docId = getHashLfn(source_lfn)
         logger.debug("Marking failed %s" % docId)
         try:
-            docbyId = oracleDB.get('/crabserver/dev/fileusertransfers',
+            docbyId = oracleDB.get(config.General.oracleUserTrans,
                                    data=encodeRequest({'subresource': 'getById', 'id': docId}))
         except Exception:
             logger.exception("Error updating failed docs.")
@@ -404,7 +406,7 @@ def mark_failed(workflow, files, oracleDB, logger, failure_reason="", force_fail
 
             logger.debug("fileDoc: %s " % fileDoc)
 
-            result = oracleDB.post('/crabserver/dev/filetransfers',
+            result = oracleDB.post(config.General.oracleFileTrans,
                                    data=encodeRequest(fileDoc))
             logger.debug("updated: %s " % docId)
         except Exception as ex:
@@ -420,7 +422,7 @@ def publishInDBS3( taskname ):
 
     """
     logger = logging.getLogger(taskname)
-    logging.basicConfig(filename=taskname+'.log', level=logging.INFO)
+    logging.basicConfig(filename=taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
 
     
     logger.info("Getting files to publish")
@@ -459,7 +461,7 @@ def publishInDBS3( taskname ):
     READ_PATH = "/DBSReader"
     READ_PATH_1 = "/DBSReader/"
 
-    opsProxy = '/data/srv/asyncstageout/state/asyncstageout/creds/OpsProxy'
+    opsProxy = config.General.opsProxy
 
     # TODO: get user role and group
     try:
@@ -468,7 +470,7 @@ def publishInDBS3( taskname ):
         logger.exception("Failed to retrieve user proxy")
 
     logger.info("userProxy_"+user)
-    oracelInstance = "vocms035.cern.ch"
+    oracelInstance = config.General.oracleDB
     oracleDB = HTTPRequests(oracelInstance,
                             opsProxy,
                             opsProxy)
@@ -763,7 +765,7 @@ def publishInDBS3( taskname ):
     # PublisherWorker call, unless forced to published.
     block_count = 0
     count = 0
-    max_files_per_block = 100
+    max_files_per_block = config.General.max_files_per_block
     while True:
         block_name = "%s#%s" % (dataset, str(uuid.uuid4()))
         files_to_publish = dbsFiles[count:count+max_files_per_block]
