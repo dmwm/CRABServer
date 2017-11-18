@@ -421,10 +421,23 @@ def publishInDBS3( taskname ):
     """
 
     """
-    logger = logging.getLogger(taskname)
-    logging.basicConfig(filename=taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
-
+    def createLogdir(dirname):
+            """ Create the directory dirname ignoring erors in case it exists. Exit if
+            the directory cannot be created.
+        """
+        try:
+            os.mkdir(dirname)
+        except OSError as ose:
+            if ose.errno != 17: #ignore the "Directory already exists error"
+                print(str(ose))
+                print("The task worker need to access the '%s' directory" % dirname)
+                sys.exit(1)
     
+    createLogdir('taskLogs')
+
+    logger = logging.getLogger(taskname)
+    logging.basicConfig(filename='taskLogs/'taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
+
     logger.info("Getting files to publish")
 
     toPublish = []
