@@ -1,24 +1,28 @@
+#pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915
+
 import os
 import uuid
 import time
 import logging
 import sys
 import json
-import pycurl
 import traceback
-import urllib
 import argparse
 import re
-import datetime
+
 import dbs.apis.dbsClient as dbsClient
 from utils import getProxy
-from ServerUtilities import getHashLfn, PUBLICATIONDB_STATUSES, encodeRequest, oracleOutputMapping
+from ServerUtilities import getHashLfn, encodeRequest, oracleOutputMapping
 from RESTInteractions import HTTPRequests
 from WMCore.Configuration import loadConfigurationFile
 
-config = loadConfigurationFile( os.path.abspath('config.py') )
+config = loadConfigurationFile(os.path.abspath('config.py'))
+
 
 def Proxy(userDN, group, role, logger):
+    """
+
+    """
     userProxy = ''
 
     try:
@@ -61,7 +65,7 @@ def Proxy(userDN, group, role, logger):
 
     logger.info("userProxy: %s" % userProxy)
 
-    return userProxy 
+    return userProxy
 
 def format_file_3(file):
     """
@@ -114,7 +118,7 @@ def createBulkBlock(output_config, processing_era_config, primds_config, \
     blockDump['block']['block_size'] = sum([int(file[u'file_size']) for file in files])
     return blockDump
 
-def migrateByBlockDBS3(workflow, migrateApi, destReadApi, sourceApi, dataset, blocks = None):
+def migrateByBlockDBS3(workflow, migrateApi, destReadApi, sourceApi, dataset, blocks=None):
     """
     Submit one migration request for each block that needs to be migrated.
     If blocks argument is not specified, migrate the whole dataset.
@@ -343,7 +347,6 @@ def mark_good(workflow, files, oracleDB, logger):
     Mark the list of files as tranferred
     """
     wfnamemsg = "%s: " % workflow
-    last_update = int(time.time())
     for lfn in files:
         data = {}
         source_lfn = lfn
@@ -361,18 +364,15 @@ def mark_good(workflow, files, oracleDB, logger):
         try:
             result = oracleDB.post(config.General.oracleFileTrans,
                                    data=encodeRequest(data))
-            logger.debug("updated: %s %s " % (docId,result))
+            logger.debug("updated: %s %s " % (docId, result))
         except Exception as ex:
             logger.error("Error during status update: %s" %ex)
 
 
-def mark_failed(workflow, files, oracleDB, logger, failure_reason="", force_failure=False ):
+def mark_failed(files, oracleDB, logger, failure_reason=""):
     """
     Something failed for these files so increment the retry count
     """
-    wfnamemsg = "%s: " % workflow
-    now = str(datetime.datetime.now())
-    last_update = int(time.time())
     h = 0
     for lfn in files:
         h += 1
@@ -406,8 +406,8 @@ def mark_failed(workflow, files, oracleDB, logger, failure_reason="", force_fail
 
             logger.debug("fileDoc: %s " % fileDoc)
 
-            result = oracleDB.post(config.General.oracleFileTrans,
-                                   data=encodeRequest(fileDoc))
+            _ = oracleDB.post(config.General.oracleFileTrans,
+                              data=encodeRequest(fileDoc))
             logger.debug("updated: %s " % docId)
         except Exception as ex:
             msg = "Error updating document: %s" % fileDoc
@@ -417,13 +417,14 @@ def mark_failed(workflow, files, oracleDB, logger, failure_reason="", force_fail
             continue
 
 
-def publishInDBS3( taskname ):
+def publishInDBS3(taskname):
     """
 
     """
     def createLogdir(dirname):
-            """ Create the directory dirname ignoring erors in case it exists. Exit if
-            the directory cannot be created.
+        """
+        Create the directory dirname ignoring erors in case it exists. Exit if
+        the directory cannot be created.
         """
         try:
             os.mkdir(dirname)
@@ -432,11 +433,10 @@ def publishInDBS3( taskname ):
                 print(str(ose))
                 print("The task worker need to access the '%s' directory" % dirname)
                 sys.exit(1)
-    
     createLogdir('taskLogs')
 
     logger = logging.getLogger(taskname)
-    logging.basicConfig(filename='taskLogs/'taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
+    logging.basicConfig(filename='taskLogs/'+taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
 
     logger.info("Getting files to publish")
 
@@ -445,7 +445,7 @@ def publishInDBS3( taskname ):
     with open("/tmp/"+taskname+".json") as f:
         toPublish = json.load(f)
 
-    workflow = taskname 
+    workflow = taskname
 
     if not workflow:
         logger.info("NO TASKNAME: %s" % toPublish[0])
@@ -480,18 +480,18 @@ def publishInDBS3( taskname ):
     try:
         proxy = Proxy(userDN, group, role, logger)
     except:
+        proxy = opsProxy
         logger.exception("Failed to retrieve user proxy")
 
     logger.info("userProxy_"+user)
     oracelInstance = config.General.oracleDB
     oracleDB = HTTPRequests(oracelInstance,
-                            opsProxy,
-                            opsProxy)
+                            proxy,
+                            proxy)
 
     fileDoc = dict()
     fileDoc['subresource'] = 'search'
     fileDoc['workflow'] = workflow
-
 
     try:
         results = oracleDB.get('/crabserver/dev/task',
@@ -595,7 +595,7 @@ def publishInDBS3( taskname ):
     except:
         acquisitionera = acquisition_era_name
 
-    empty, primName, procName, tier = toPublish[0]['outdataset'].split('/')
+    _, primName, procName, tier = toPublish[0]['outdataset'].split('/')
 
     primds_config = {'primary_ds_name': primName, 'primary_ds_type': primary_ds_type}
     msg = "About to insert primary dataset: %s" % (str(primds_config))
@@ -606,7 +606,6 @@ def publishInDBS3( taskname ):
 
     final = {}
     failed = []
-    failed_reason = ''
     publish_in_next_iteration = []
     published = []
 
@@ -820,24 +819,22 @@ def publishInDBS3( taskname ):
     msg += ", results %s" % (final)
     logger.info(wfnamemsg+msg)
 
-     
     try:
         if published:
             mark_good(workflow, published, oracleDB, logger)
         if failed:
             logger.debug("Failed files: %s " % failed)
-            mark_failed(workflow, failed, oracleDB, logger, failure_reason, True)
+            mark_failed(failed, oracleDB, logger, failure_reason)
     except:
         logger.exception("Status update failed")
 
     return 0
 
 if __name__ == '__main__':
-    
+
     parser = argparse.ArgumentParser(description='Publish datasets.')
     parser.add_argument('taskname', metavar='taskname', type=str, help='taskname')
 
     args = parser.parse_args()
 
-    print publishInDBS3( args.taskname )
-
+    print publishInDBS3(args.taskname)

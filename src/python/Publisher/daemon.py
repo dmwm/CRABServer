@@ -1,4 +1,4 @@
-#pylint: disable=C0103,W0105,broad-except,logging-not-lazy
+#pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915
 
 """
 Here's the algorithm
@@ -10,7 +10,6 @@ Here's the algorithm
 """
 import logging
 import os
-import multiprocessing
 import subprocess
 import traceback
 import sys
@@ -19,21 +18,17 @@ import json
 import datetime
 import time
 from multiprocessing import Process
-from MultiProcessingLog import MultiProcessingLog
 from logging.handlers import TimedRotatingFileHandler
 
-from WMCore.WMFactory import WMFactory
-from WMCore.Database.CMSCouch import CouchServer
+from MultiProcessingLog import MultiProcessingLog
 from WMCore.Configuration import loadConfigurationFile
-
 from WMCore.Services.pycurl_manager import RequestHandler
 from RESTInteractions import HTTPRequests
 from AsyncStageOut import getDNFromUserName
-from ServerUtilities import encodeRequest, oracleOutputMapping
-from ServerUtilities import executeCommand, getColumn, getHashLfn, PUBLICATIONDB_STATUSES, encodeRequest, oracleOutputMapping
+from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping
 
 
-configuration = loadConfigurationFile( os.path.abspath('config.py') )
+configuration = loadConfigurationFile(os.path.abspath('config.py'))
 
 
 def setProcessLogger(name):
@@ -62,6 +57,8 @@ class Worker(object):
         self.userProxy = self.config.opsProxy
         self.block_publication_timeout = self.config.block_closure_timeout
         self.lfn_map = {}
+        self.force_publication = False
+        self.force_failure = False
         #TODO: logger!
         def createLogdir(dirname):
             """ Create the directory dirname ignoring erors in case it exists. Exit if
@@ -127,7 +124,6 @@ class Worker(object):
 
 
     def active_tasks(self, db):
-        active_users = []
 
         fileDoc = {}
         fileDoc['asoworker'] = self.config.asoworker
@@ -138,12 +134,12 @@ class Worker(object):
         results = ''
         try:
             results = db.post(self.config.oracleFileTrans,
-                                data=encodeRequest(fileDoc))
+                              data=encodeRequest(fileDoc))
         except Exception as ex:
             self.logger.error("Failed to acquire publications \
                                 from oracleDB: %s" %ex)
             return []
-            
+
         fileDoc = dict()
         fileDoc['asoworker'] = self.config.asoworker
         fileDoc['subresource'] = 'acquiredPublication'
@@ -156,7 +152,7 @@ class Worker(object):
 
         try:
             results = db.get(self.config.oracleFileTrans,
-                                data=encodeRequest(fileDoc))
+                             data=encodeRequest(fileDoc))
             result.extend(oracleOutputMapping(results))
         except Exception as ex:
             self.logger.error("Failed to acquire publications \
@@ -167,15 +163,15 @@ class Worker(object):
 
         self.logger.debug("%s acquired puclications retrieved" % len(result))
         #TODO: join query for publisher (same of submitter)
-        unique_tasks = [list(i) for i in set(tuple([x['username'], 
-                                                    x['user_group'], 
-                                                    x['user_role'], 
+        unique_tasks = [list(i) for i in set(tuple([x['username'],
+                                                    x['user_group'],
+                                                    x['user_role'],
                                                     x['taskname']]
-                                                    ) for x in result if x['transfer_state'] == 3)]
+                                                  ) for x in result if x['transfer_state'] == 3)]
 
         info = []
         for task in unique_tasks:
-            info.append([x for x in result if x['taskname']==task[3]])
+            info.append([x for x in result if x['taskname'] == task[3]])
         return zip(unique_tasks, info)
 
     def getPublDescFiles(self, workflow, lfn_ready):
@@ -183,10 +179,6 @@ class Worker(object):
         Download and read the files describing
         what needs to be published
         """
-        wfnamemsg = "%s: " % workflow
-        buf = cStringIO.StringIO()
-        header = {"Content-Type ": "application/json"}
-
         data = {}
         data['taskname'] = workflow
         data['filetype'] = 'EDM'
@@ -208,7 +200,7 @@ class Worker(object):
 
             try:
                 res = self.oracleDB.get('/crabserver/dev/filemetadata',
-                                        data=encodeRequest(data,listParams=["lfn"]))
+                                        data=encodeRequest(data, listParams=["lfn"]))
                 res = res[0]
             except Exception as ex:
                 self.logger.error("Error during metadata retrieving: %s" %ex)
@@ -232,7 +224,6 @@ class Worker(object):
         tasks = self.active_tasks(self.oracleDB)
 
         self.logger.debug('kicking off pool %s' % [x[0][3] for x in tasks])
-        
         processes = []
 
         try:
@@ -263,7 +254,7 @@ class Worker(object):
             msg += " No need to retrieve task status nor last publication time."
             logger.info(wfnamemsg+msg)
         else:
-            msg  = "At least one dataset has less than %s ready files." % (self.max_files_per_block)
+            msg = "At least one dataset has less than %s ready files." % (self.max_files_per_block)
             logger.info(wfnamemsg+msg)
             # Retrieve the workflow status. If the status can not be retrieved, continue
             # with the next workflow.
@@ -285,7 +276,7 @@ class Worker(object):
             except Exception as ex:
                 if self.config.isOracle:
                     logger.exception('Error retrieving status from cache.')
-                    return 0 
+                    return 0
 
             msg = "Status retrieved from cache. Loading task status."
             logger.info(wfnamemsg+msg)
@@ -326,10 +317,10 @@ class Worker(object):
                 data['workflow'] = workflow
                 data['subresource'] = 'search'
                 try:
-                    result = self.oracleDB.get(self.config.oracleFileTrans.replace('filetransfers','task'),
-                                                data=encodeRequest(data))
+                    result = self.oracleDB.get(self.config.oracleFileTrans.replace('filetransfers', 'task'),
+                                               data=encodeRequest(data))
                     logger.debug("task: %s " %  str(result[0]))
-                    logger.debug("task: %s " %  getColumn(result[0],'tm_last_publication'))
+                    logger.debug("task: %s " %  getColumn(result[0], 'tm_last_publication'))
                 except Exception as ex:
                     logger.error("Error during task doc retrieving: %s" %ex)
                 if last_publication_time:
@@ -383,9 +374,9 @@ class Worker(object):
                                       x['dbs_url'],
                                       x['last_update']
                                      ]}
-                           for x in task[1] if x['transfer_state']==3 and x['publication_state'] not in [2,3,5]]
-               
-                lfn_ready = [] 
+                           for x in task[1] if x['transfer_state'] == 3 and x['publication_state'] not in [2, 3, 5]]
+
+                lfn_ready = []
                 wf_jobs_endtime = []
                 pnn, input_dataset, input_dbs_url = "", "", ""
                 for active_file in active_:
@@ -401,24 +392,17 @@ class Worker(object):
                         pnn = str(active_file['value'][0])
                         input_dataset = str(active_file['value'][3])
                         input_dbs_url = str(active_file['value'][4])
-                    filename = os.path.basename(dest_lfn)
-                    left_piece, jobid_fileext = filename.rsplit('_', 1)
-                    if '.' in jobid_fileext:
-                        fileext = jobid_fileext.rsplit('.', 1)[-1]
-                        orig_filename = left_piece + '.' + fileext
-                    else:
-                        orig_filename = left_piece
                     lfn_ready.append(dest_lfn)
-                
+
                 userDN = ''
                 username = task[0][0]
                 user_group = ""
                 if task[0][1]:
-                    user_group =  task[0][1]
+                    user_group = task[0][1]
                 user_role = ""
                 if task[0][2]:
-                    user_role =  task[0][2]
-                logger.debug("Trying to get DN %s %s %s" % (username,user_group,user_role))
+                    user_role = task[0][2]
+                logger.debug("Trying to get DN %s %s %s" % (username, user_group, user_role))
 
                 try:
                     userDN = getDNFromUserName(username, logger)
@@ -427,14 +411,13 @@ class Worker(object):
                     msg += str(ex)
                     msg += str(traceback.format_exc())
                     logger.error(msg)
-                    init = False
                     return 1
 
                 # Get metadata
                 toPublish = []
                 publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready)
                 for file_ in active_:
-                    for i, doc in enumerate(publDescFiles_list):
+                    for _, doc in enumerate(publDescFiles_list):
                         #logger.info(type(doc))
                         #logger.info(doc)
                         if doc["lfn"] == file_["value"][2]:
@@ -448,7 +431,7 @@ class Worker(object):
                 with open("/tmp/"+workflow+'.json', 'w') as outfile:
                     json.dump(toPublish, outfile)
                 logger.info(". publisher.sh %s" % (workflow))
-                subprocess.call(["/bin/bash","/data/user/MicroASO/microPublisher/python/publisher.sh", workflow])
+                subprocess.call(["/bin/bash", "/data/user/MicroASO/microPublisher/python/publisher.sh", workflow])
 
         except:
             logger.exception("Exception!")

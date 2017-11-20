@@ -1,9 +1,13 @@
+"""
+Configuration file for file publisher
+"""
+
 from WMCore.Configuration import Configuration
 config = Configuration()
 config.section_('General')
 
 config.General.asoworker = 'asodciangot1'
-config.General.isOracle = True 
+config.General.isOracle = True
 config.General.oracleDB = 'vocms035.cern.ch'
 config.General.oracleFileTrans = '/crabserver/dev/filetransfers'
 config.General.oracleUserTrans = '/crabserver/dev/fileusertransfers'
