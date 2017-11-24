@@ -60,7 +60,7 @@ systems = \
     'All':
     {
         'py_modules': [''],
-        'python': ['TaskWorker', 'CRABInterface', 'UserFileCache', 'CRABClient']
+        'python': ['TaskWorker', 'CRABInterface', 'UserFileCache', 'CRABClient', 'Publisher']
     }
 }
 
