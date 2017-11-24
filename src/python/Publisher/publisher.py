@@ -1,5 +1,6 @@
 #pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915
-
+from __future__ import division
+from __future__ import print_function
 import os
 import uuid
 import time
@@ -50,11 +51,11 @@ def Proxy(userDN, group, role, logger):
         defaultDelegation['group'] = group
         defaultDelegation['role'] = role
 
-        print group, role
+        print(group, role)
         valid, proxy = getProxy(defaultDelegation, logger)
     except Exception as ex:
         msg = "Error getting the user proxy"
-        print msg
+        print(msg)
         msg += str(ex)
         msg += str(traceback.format_exc())
         logger.error(msg)
@@ -67,25 +68,25 @@ def Proxy(userDN, group, role, logger):
 
     return userProxy
 
-def format_file_3(file):
+def format_file_3(file_):
     """
     format file for DBS
     """
-    nf = {'logical_file_name': file['lfn'],
+    nf = {'logical_file_name': file_['lfn'],
           'file_type': 'EDM',
-          'check_sum': unicode(file['cksum']),
-          'event_count': file['inevents'],
-          'file_size': file['filesize'],
-          'adler32': file['adler32'],
-          'file_parent_list': [{'file_parent_lfn': i} for i in set(file['parents'])],
+          'check_sum': unicode(file_['cksum']),
+          'event_count': file_['inevents'],
+          'file_size': file_['filesize'],
+          'adler32': file_['adler32'],
+          'file_parent_list': [{'file_parent_lfn': i} for i in set(file_['parents'])],
          }
     file_lumi_list = []
-    for run, lumis in file['runlumi'].items():
+    for run, lumis in file_['runlumi'].items():
         for lumi in lumis:
             file_lumi_list.append({'lumi_section_num': int(lumi), 'run_num': int(run)})
     nf['file_lumi_list'] = file_lumi_list
-    if file.get("md5") != "asda" and file.get("md5") != "NOTSET": # asda is the silly value that MD5 defaults to
-        nf['md5'] = file['md5']
+    if file_.get("md5") != "asda" and file_.get("md5") != "NOTSET": # asda is the silly value that MD5 defaults to
+        nf['md5'] = file_['md5']
     return nf
 
 def createBulkBlock(output_config, processing_era_config, primds_config, \
@@ -95,14 +96,14 @@ def createBulkBlock(output_config, processing_era_config, primds_config, \
     """
     file_conf_list = []
     file_parent_list = []
-    for file in files:
+    for file_ in files:
         file_conf = output_config.copy()
         file_conf_list.append(file_conf)
-        file_conf['lfn'] = file['logical_file_name']
-        for parent_lfn in file.get('file_parent_list', []):
-            file_parent_list.append({'logical_file_name': file['logical_file_name'],
+        file_conf['lfn'] = file_['logical_file_name']
+        for parent_lfn in file_.get('file_parent_list', []):
+            file_parent_list.append({'logical_file_name': file_['logical_file_name'],
                                      'parent_logical_file_name': parent_lfn['file_parent_lfn']})
-        del file['file_parent_list']
+        del file_['file_parent_list']
     blockDump = {
         'dataset_conf_list': [output_config],
         'file_conf_list': file_conf_list,
@@ -115,7 +116,7 @@ def createBulkBlock(output_config, processing_era_config, primds_config, \
         'file_parent_list': file_parent_list
     }
     blockDump['block']['file_count'] = len(files)
-    blockDump['block']['block_size'] = sum([int(file[u'file_size']) for file in files])
+    blockDump['block']['block_size'] = sum([int(file_[u'file_size']) for file_ in files])
     return blockDump
 
 def migrateByBlockDBS3(workflow, migrateApi, destReadApi, sourceApi, dataset, blocks=None):
@@ -310,15 +311,15 @@ def requestBlockMigration(workflow, migrateApi, sourceApi, block):
     data = {'migration_url': sourceURL, 'migration_input': block}
     try:
         result = migrateApi.submitMigration(data)
-    except HTTPError as he:
-        if "is already at destination" in he.msg:
+    except Exception as ex:
+        if "is already at destination" in ex:
             msg = "Block is already at destination."
             logger.info(wfnamemsg+msg)
             atDestination = True
         else:
             msg = "Request to migrate %s failed." % block
             msg += "\nRequest detail: %s" % data
-            msg += "\nDBS3 exception: %s" % he.msg
+            msg += "\nDBS3 exception: %s" % ex
             logger.error(wfnamemsg+msg)
     if not atDestination:
         msg = "Result of migration request: %s" % str(result)
@@ -676,16 +677,16 @@ def publishInDBS3(taskname):
     globalParentBlocks = set()
 
     # Loop over all files to publish.
-    for file in toPublish:
-        logger.info(file)
+    for file_ in toPublish:
+        logger.info(file_)
         # Check if this file was already published and if it is valid.
-        if file['lfn'] not in existingFilesValid:
+        if file_['lfn'] not in existingFilesValid:
             # We have a file to publish.
             # Get the parent files and for each parent file do the following:
             # 1) Add it to the list of parent files.
             # 2) Find the block to which it belongs and insert that block name in
             #    (one of) the set of blocks to be migrated to the destination DBS.
-            for parentFile in list(file['parents']):
+            for parentFile in list(file_['parents']):
                 if parentFile not in parentFiles:
                     parentFiles.add(parentFile)
                     # Is this parent file already in the destination DBS instance?
@@ -721,13 +722,13 @@ def publishInDBS3(taskname):
                 if parentFile in parentsToSkip:
                     msg = "Skipping parent file %s, as it doesn't seem to be known to DBS." % (parentFile)
                     logger.info(wfnamemsg+msg)
-                    if parentFile in file['parents']:
-                        file['parents'].remove(parentFile)
+                    if parentFile in file_['parents']:
+                        file_['parents'].remove(parentFile)
             # Add this file to the list of files to be published.
             dbsFiles.append(format_file_3(file))
             dbsFiles_f.append(file)
         #print file
-        published.append(file['SourceLFN'])
+        published.append(file_['SourceLFN'])
     # Print a message with the number of files to publish.
     msg = "Found %d files not already present in DBS which will be published." % (len(dbsFiles))
     logger.info(wfnamemsg+msg)
@@ -837,4 +838,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    print publishInDBS3(args.taskname)
+    print(publishInDBS3(args.taskname))

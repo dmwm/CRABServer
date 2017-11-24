@@ -3,7 +3,7 @@
 """
 Configuration file for file publisher
 """
-
+from __future__ import division
 from WMCore.Configuration import Configuration
 config = Configuration()
 config.section_('General')

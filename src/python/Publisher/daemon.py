@@ -8,6 +8,8 @@ Here's the algorithm
 3. create a multiprocessing Pool of size N
 4. spawn a process per task that publish their files
 """
+from __future__ import division
+from __future__ import print_function
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import os
@@ -205,7 +207,7 @@ class Worker(object):
             except Exception as ex:
                 self.logger.error("Error during metadata retrieving: %s" %ex)
 
-            print len(res['result'])
+            print(len(res['result']))
             for obj in res['result']:
                 if isinstance(obj, dict):
                     out.append(obj)
