@@ -1,4 +1,4 @@
-#pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915
+#pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915,C0112,C0111
 
 """
 Here's the algorithm
@@ -9,6 +9,7 @@ Here's the algorithm
 4. spawn a process per task that publish their files
 """
 import logging
+from logging.handlers import TimedRotatingFileHandler
 import os
 import subprocess
 import traceback
@@ -18,13 +19,12 @@ import json
 import datetime
 import time
 from multiprocessing import Process
-from logging.handlers import TimedRotatingFileHandler
 
 from MultiProcessingLog import MultiProcessingLog
 from WMCore.Configuration import loadConfigurationFile
 from WMCore.Services.pycurl_manager import RequestHandler
 from RESTInteractions import HTTPRequests
-from AsyncStageOut import getDNFromUserName
+from utils import getDNFromUserName
 from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping
 
 
@@ -215,7 +215,7 @@ class Worker(object):
 
         return out
 
-    def algorithm(self, parameters=None):
+    def algorithm(self):
         """
         1. Get a list of users with files to publish from the couchdb instance
         2. For each user get a suitably sized input for publish

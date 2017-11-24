@@ -50,6 +50,11 @@ systems = \
         'py_modules' : ['ServerUtilities'],
         'python': ['UserFileCache']
     },
+    'Publisher':
+    {
+        'py_modules': ['ServerUtilities', 'MultiProcessingLog', 'RESTInteractions', 'utils'],
+        'python': ['Publisher']
+    },
     'All':
     {
         'py_modules': [''],
