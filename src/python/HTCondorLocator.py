@@ -9,6 +9,8 @@ import htcondor
 import HTCondorUtils
 
 CollectorCache = {}
+
+
 # From http://stackoverflow.com/questions/3679694/a-weighted-version-of-random-choice
 def weighted_choice(choices):
     values, weights = list(zip(*choices))
@@ -17,9 +19,11 @@ def weighted_choice(choices):
     for w in weights:
         total += w
         cum_weights.append(total)
+    assert total > 0, "all choices have zero weight"
     x = random.random() * total
     i = bisect.bisect(cum_weights, x)
     return values[i]
+
 
 def filterScheddsByClassAds(schedds, classAds, logger=None):
     """ Check a list of schedds for missing classAds
@@ -42,18 +46,11 @@ def filterScheddsByClassAds(schedds, classAds, logger=None):
 
     return validSchedds
 
-def capacityMetricsChoicesHybrid(schedds, goodSchedds, logger=None):
+
+def capacityMetricsChoicesHybrid(schedds, logger=None):
     """ Mix of Jadir's way and Marco's way.
         Return a list of scheddobj and the weight to be used in the weighted choice.
-        If all of the schedds are full, pick randomly from the ones in the REST config.
     """
-
-    classAdsRequired = ['DetectedMemory', 'TotalFreeMemoryMB', 'MaxJobsRunning', 'TotalRunningJobs', 'TransferQueueMaxUploading', 'TransferQueueNumUploading', 'Name']
-    schedds = filterScheddsByClassAds(schedds, classAdsRequired, logger)
-
-    # Get only those schedds that are in our external rest configuration and their status is ok
-    schedds = [schedd for schedd in schedds if schedd['Name'] in goodSchedds and classad.ExprTree.eval(schedd['IsOk'])]
-
     totalMemory = totalJobs = totalUploads = 0
     for schedd in schedds:
         totalMemory += schedd['DetectedMemory']
@@ -63,75 +60,96 @@ def capacityMetricsChoicesHybrid(schedds, goodSchedds, logger=None):
     logger.debug("Total Mem: %d, Total Jobs: %d, Total Uploads: %d" % (totalMemory, totalJobs, totalUploads))
     weights = {}
     for schedd in schedds:
-        memPerc = schedd['TotalFreeMemoryMB']/totalMemory
-        jobPerc = (schedd['MaxJobsRunning']-schedd['TotalRunningJobs'])/totalJobs
-        uplPerc = (schedd['TransferQueueMaxUploading']-schedd['TransferQueueNumUploading'])/totalUploads
+        memPerc = schedd['TotalFreeMemoryMB'] / totalMemory
+        jobPerc = (schedd['MaxJobsRunning'] - schedd['TotalRunningJobs']) / totalJobs
+        uplPerc = (schedd['TransferQueueMaxUploading'] - schedd['TransferQueueNumUploading']) / totalUploads
         weight = min(memPerc, uplPerc, jobPerc)
         weights[schedd['Name']] = weight
         logger.debug("%s: Mem %d, MemPrct %0.2f, Run %d, RunPrct %0.2f, Trf %d, TrfPrct %0.2f, weight: %f" %
-                    (schedd['Name'], schedd['TotalFreeMemoryMB'], memPerc,
-                     schedd['JobsRunning'], jobPerc,
-                     schedd['TransferQueueNumUploading'], uplPerc, weight))
-
-    if schedds:
-        choices = [(schedd['Name'], weights[schedd['Name']]) for schedd in schedds]
-    else:
-        # In case the query to the collector doesn't return any schedds,
-        # for example when all of them are full of tasks.
-        # Pick from the schedds in the good schedulers list with equal weights.
-        choices = [(schedd, 1) for schedd in goodSchedds]
+                     (schedd['Name'], schedd['TotalFreeMemoryMB'], memPerc,
+                      schedd['JobsRunning'], jobPerc,
+                      schedd['TransferQueueNumUploading'], uplPerc, weight))
+    choices = [(schedd['Name'], weights[schedd['Name']]) for schedd in schedds]
     return choices
 
-def memoryBasedChoices(schedds, goodSchedds, logger=None):
+def memoryBasedChoices(schedds, logger=None):
     """ Choose the schedd based on the DetectedMemory classad present in the schedds object
         Return a list of scheddobj and the weight to be used in the weighted choice
     """
-    schedds_dict = {}
+    weights = {}
     for schedd in schedds:
         if 'DetectedMemory' in schedd and 'Name' in schedd:
-            schedds_dict[schedd['Name']] = schedd['DetectedMemory']
-    choices = [(i, schedds_dict.get(i, 24 * 1024)) for i in goodSchedds]
+            weight = schedd['DetectedMemory']
+        else:
+            weight = 24*1024
+        weights[schedd['Name']] = weight
+    choices = [(schedd['Name'], weights[schedd['Name']]) for schedd in schedds]
     return choices
 
 
 class HTCondorLocator(object):
-
     def __init__(self, config, logger=None):
         self.config = config
         self.logger = logger
 
-
     def adjustWeights(self, choices):
         """ The method iterates over the htcondorSchedds dict from the REST and ajust schedds
-            weights based on the weightfactor key.
-
-            param choices: a list containing schedds and their weight, such as
+            weights based on the weightfactor key. Negative weightfactors are illegal.
+            param choices: a list containing schedds and their weight as ntuples, such as
                         [(u'crab3-5@vocms05.cern.ch', 24576), (u'crab3-5@vocms059.cern.ch', 23460L)]
         """
-
         i = 0
         for schedd, weight in choices:
+            weightfactor = self.config['htcondorSchedds'].get(schedd, {}).get("weightfactor", 1)
+            assert weightfactor >= 0 , "Illegal, negative, weightfactor %d found in config"
+            #if weightfactor < 0:  # protect against negative values which confuse weighted_choices
+            #    msg = "ERROR: Illegal, negative weightfactor %d found. Override with zero" % weightfactor
+            #    self.logger.error("HTLocator.adjustWeights " + msg)
+            #    wightfactor = 0
+
             newweight = weight * self.config['htcondorSchedds'].get(schedd, {}).get("weightfactor", 1)
             choices[i] = (schedd, newweight)
             i += 1
 
-
     def getSchedd(self, chooserFunction=memoryBasedChoices):
         """
         Determine a schedd to use for this task.
+        param chooserFunction: name of a function which takes a list of schedds (a n-tuple of classAds each) and
+                                returns a list containing schedd names and their weight as n-tuples, such as
+                                [(u'crab3-5@vocms05.cern.ch', 24576), (u'crab3-5@vocms059.cern.ch', 23460L)]
         """
         collector = self.getCollector()
+        schedd = None
 
-        htcondor.param['COLLECTOR_HOST'] = collector.encode('ascii', 'ignore')
-        coll = htcondor.Collector()
-        schedds = coll.query(htcondor.AdTypes.Schedd, 'StartSchedulerUniverse =?= true && CMSGWMS_Type=?="crabschedd"',
-                             ['Name', 'DetectedMemory','TotalFreeMemoryMB','TransferQueueNumUploading', 'TransferQueueMaxUploading',
-                             'TotalRunningJobs', 'JobsRunning','MaxJobsRunning', 'IsOK'])
-        if self.config and "htcondorSchedds" in self.config:
-            choices = chooserFunction(schedds, self.config['htcondorSchedds'], self.logger)
+        try:
+            htcondor.param['COLLECTOR_HOST'] = collector.encode('ascii', 'ignore')
+            coll = htcondor.Collector()
+            # select from collector crabschedds which can start more jobs in SchedulerUniverse
+            schedds = coll.query(htcondor.AdTypes.Schedd, 'StartSchedulerUniverse =?= true && CMSGWMS_Type=?="crabschedd"',
+                                 ['Name', 'DetectedMemory', 'TotalFreeMemoryMB', 'TransferQueueNumUploading',
+                                  'TransferQueueMaxUploading','TotalRunningJobs', 'JobsRunning', 'MaxJobsRunning', 'IsOK'])
+            # make sure they have the classAds which we will use to further select and weight
+            classAdsRequired = ['DetectedMemory', 'TotalFreeMemoryMB', 'MaxJobsRunning', 'TotalRunningJobs',
+                                'TransferQueueMaxUploading', 'TransferQueueNumUploading', 'Name', 'IsOK']
+            schedds = filterScheddsByClassAds(schedds, classAdsRequired, self.logger)
+
+            # Get only those schedds that are in our external rest configuration
+            if self.config and "htcondorSchedds" in self.config:
+                schedds = [ schedd for schedd in schedds if schedd['Name'] in self.config['htcondorSchedds']]
+
+            # Get only those schedds that are in our external rest configuration and their status is ok
+            schedds = [schedd for schedd in schedds if classad.ExprTree.eval(schedd['IsOk'])]
+
+            choices = chooserFunction(schedds, self.logger)
+            if not choices:
+                raise Exception("List of possible schedds from %s is empty" % chooserFunction)
             self.adjustWeights(choices)
-        schedd = weighted_choice(choices)
+            schedd = weighted_choice(choices)
+        except Exception as ex:
+            raise Exception("Could not find any schedd to submit to. Exception was raised:%s\n" % str(ex))
+
         return schedd
+
 
     def getScheddObjNew(self, schedd):
         """
@@ -141,7 +159,8 @@ class HTCondorLocator(object):
         htcondor.param['COLLECTOR_HOST'] = self.getCollector().encode('ascii', 'ignore')
         coll = htcondor.Collector()
         schedds = coll.query(htcondor.AdTypes.Schedd, 'Name=?=%s' % HTCondorUtils.quote(schedd.encode('ascii', 'ignore')),
-                             ["AddressV1", "CondorPlatform", "CondorVersion", "Machine", "MyAddress", "Name", "MyType", "ScheddIpAddr", "RemoteCondorSetup"])
+                             ["AddressV1", "CondorPlatform", "CondorVersion", "Machine", "MyAddress", "Name", "MyType",
+                              "ScheddIpAddr", "RemoteCondorSetup"])
         self.scheddAd = ""
         if not schedds:
             self.scheddAd = self.getCachedCollectorOutput(schedd)
@@ -151,6 +170,7 @@ class HTCondorLocator(object):
         address = self.scheddAd['MyAddress']
         scheddObj = htcondor.Schedd(self.scheddAd)
         return scheddObj, address
+
 
     def cacheCollectorOutput(self, cacheName, output):
         """
@@ -163,6 +183,7 @@ class HTCondorLocator(object):
             CollectorCache[cacheName] = {}
             CollectorCache[cacheName]['ScheddAds'] = output
         CollectorCache[cacheName]['updated'] = int(time.time())
+
 
     def getCachedCollectorOutput(self, cacheName):
         """
@@ -178,6 +199,7 @@ class HTCondorLocator(object):
         else:
             raise Exception("Unable to contact the collector and cached results does not exist for %s" % cacheName)
 
+
     def getCollector(self, name="localhost"):
         """
         Return an object representing the collector given the pool name.
@@ -185,4 +207,3 @@ class HTCondorLocator(object):
         if self.config and "htcondorPool" in self.config:
             return self.config["htcondorPool"]
         return name
-
