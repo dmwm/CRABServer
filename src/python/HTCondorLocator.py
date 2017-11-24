@@ -10,7 +10,6 @@ import HTCondorUtils
 
 CollectorCache = {}
 
-
 # From http://stackoverflow.com/questions/3679694/a-weighted-version-of-random-choice
 def weighted_choice(choices):
     values, weights = list(zip(*choices))
@@ -23,7 +22,6 @@ def weighted_choice(choices):
     x = random.random() * total
     i = bisect.bisect(cum_weights, x)
     return values[i]
-
 
 def filterScheddsByClassAds(schedds, classAds, logger=None):
     """ Check a list of schedds for missing classAds
@@ -45,7 +43,6 @@ def filterScheddsByClassAds(schedds, classAds, logger=None):
             validSchedds.append(schedd)
 
     return validSchedds
-
 
 def capacityMetricsChoicesHybrid(schedds, logger=None):
     """ Mix of Jadir's way and Marco's way.
@@ -88,6 +85,7 @@ def memoryBasedChoices(schedds, logger=None):
 
 
 class HTCondorLocator(object):
+
     def __init__(self, config, logger=None):
         self.config = config
         self.logger = logger
@@ -102,11 +100,6 @@ class HTCondorLocator(object):
         for schedd, weight in choices:
             weightfactor = self.config['htcondorSchedds'].get(schedd, {}).get("weightfactor", 1)
             assert weightfactor >= 0 , "Illegal, negative, weightfactor %d found in config"
-            #if weightfactor < 0:  # protect against negative values which confuse weighted_choices
-            #    msg = "ERROR: Illegal, negative weightfactor %d found. Override with zero" % weightfactor
-            #    self.logger.error("HTLocator.adjustWeights " + msg)
-            #    wightfactor = 0
-
             newweight = weight * self.config['htcondorSchedds'].get(schedd, {}).get("weightfactor", 1)
             choices[i] = (schedd, newweight)
             i += 1
@@ -171,7 +164,6 @@ class HTCondorLocator(object):
         scheddObj = htcondor.Schedd(self.scheddAd)
         return scheddObj, address
 
-
     def cacheCollectorOutput(self, cacheName, output):
         """
         Saves Collector output in a memory cache
@@ -183,7 +175,6 @@ class HTCondorLocator(object):
             CollectorCache[cacheName] = {}
             CollectorCache[cacheName]['ScheddAds'] = output
         CollectorCache[cacheName]['updated'] = int(time.time())
-
 
     def getCachedCollectorOutput(self, cacheName):
         """
@@ -198,7 +189,6 @@ class HTCondorLocator(object):
                 raise Exception("Unable to contact the collector and cached results are too old for using.")
         else:
             raise Exception("Unable to contact the collector and cached results does not exist for %s" % cacheName)
-
 
     def getCollector(self, name="localhost"):
         """
