@@ -51,7 +51,7 @@ def capacityMetricsChoicesHybrid(schedds, logger=None):
     # make sure schedds have the classAds which we will use to further select and weight
     classAdsRequired = ['DetectedMemory', 'TotalFreeMemoryMB', 'MaxJobsRunning', 'TotalRunningJobs',
                         'TransferQueueMaxUploading', 'TransferQueueNumUploading', 'Name', 'IsOK']
-    schedds = filterScheddsByClassAds(schedds, classAdsRequired, self.logger)
+    schedds = filterScheddsByClassAds(schedds, classAdsRequired, logger)
 
     totalMemory = totalJobs = totalUploads = 0
     for schedd in schedds:
@@ -108,6 +108,7 @@ class HTCondorLocator(object):
             newweight = weight * self.config['htcondorSchedds'].get(schedd, {}).get("weightfactor", 1)
             choices[i] = (schedd, newweight)
             i += 1
+        return
 
     def getSchedd(self, chooserFunction=memoryBasedChoices):
         """
@@ -140,7 +141,7 @@ class HTCondorLocator(object):
             self.adjustWeights(choices)
             schedd = weighted_choice(choices)
         except Exception as ex:
-            raise Exception("Could not find any schedd to submit to. Exception was raised:%s\n" % str(ex))
+            raise Exception("Could not find any schedd to submit to. Exception was raised: %s\n" % str(ex))
 
         return schedd
 
