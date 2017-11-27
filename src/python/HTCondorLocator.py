@@ -48,6 +48,11 @@ def capacityMetricsChoicesHybrid(schedds, logger=None):
     """ Mix of Jadir's way and Marco's way.
         Return a list of scheddobj and the weight to be used in the weighted choice.
     """
+    # make sure schedds have the classAds which we will use to further select and weight
+    classAdsRequired = ['DetectedMemory', 'TotalFreeMemoryMB', 'MaxJobsRunning', 'TotalRunningJobs',
+                        'TransferQueueMaxUploading', 'TransferQueueNumUploading', 'Name', 'IsOK']
+    schedds = filterScheddsByClassAds(schedds, classAdsRequired, self.logger)
+
     totalMemory = totalJobs = totalUploads = 0
     for schedd in schedds:
         totalMemory += schedd['DetectedMemory']
@@ -121,16 +126,12 @@ class HTCondorLocator(object):
             schedds = coll.query(htcondor.AdTypes.Schedd, 'StartSchedulerUniverse =?= true && CMSGWMS_Type=?="crabschedd"',
                                  ['Name', 'DetectedMemory', 'TotalFreeMemoryMB', 'TransferQueueNumUploading',
                                   'TransferQueueMaxUploading','TotalRunningJobs', 'JobsRunning', 'MaxJobsRunning', 'IsOK'])
-            # make sure they have the classAds which we will use to further select and weight
-            classAdsRequired = ['DetectedMemory', 'TotalFreeMemoryMB', 'MaxJobsRunning', 'TotalRunningJobs',
-                                'TransferQueueMaxUploading', 'TransferQueueNumUploading', 'Name', 'IsOK']
-            schedds = filterScheddsByClassAds(schedds, classAdsRequired, self.logger)
 
             # Get only those schedds that are in our external rest configuration
             if self.config and "htcondorSchedds" in self.config:
                 schedds = [ schedd for schedd in schedds if schedd['Name'] in self.config['htcondorSchedds']]
 
-            # Get only those schedds that are in our external rest configuration and their status is ok
+            # Get only those schedds that their status is ok
             schedds = [schedd for schedd in schedds if classad.ExprTree.eval(schedd['IsOk'])]
 
             choices = chooserFunction(schedds, self.logger)
@@ -142,7 +143,6 @@ class HTCondorLocator(object):
             raise Exception("Could not find any schedd to submit to. Exception was raised:%s\n" % str(ex))
 
         return schedd
-
 
     def getScheddObjNew(self, schedd):
         """
