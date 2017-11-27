@@ -1,4 +1,6 @@
 #!/usr/bin/env python2.7
+#pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915,W0201,W0621
+
 """
     NOTE: This is intended to run automagically. Keep the deps minimal
 """
@@ -50,10 +52,15 @@ systems = \
         'py_modules' : ['ServerUtilities'],
         'python': ['UserFileCache']
     },
+    'Publisher':
+    {
+        'py_modules': ['ServerUtilities', 'MultiProcessingLog', 'RESTInteractions', 'utils'],
+        'python': ['Publisher']
+    },
     'All':
     {
         'py_modules': [''],
-        'python': ['TaskWorker', 'CRABInterface', 'UserFileCache', 'CRABClient']
+        'python': ['TaskWorker', 'CRABInterface', 'UserFileCache', 'CRABClient', 'Publisher']
     }
 }
 
