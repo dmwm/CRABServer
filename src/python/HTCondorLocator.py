@@ -128,11 +128,11 @@ class HTCondorLocator(object):
                                  ['Name', 'DetectedMemory', 'TotalFreeMemoryMB', 'TransferQueueNumUploading',
                                   'TransferQueueMaxUploading','TotalRunningJobs', 'JobsRunning', 'MaxJobsRunning', 'IsOK'])
 
-            # Get only those schedds that are in our external rest configuration
+            # Get only those schedds that are listed in our external REST configuration
             if self.config and "htcondorSchedds" in self.config:
                 schedds = [ schedd for schedd in schedds if schedd['Name'] in self.config['htcondorSchedds']]
 
-            # Get only those schedds that their status is ok
+            # Get only those schedds for which the status is OK
             schedds = [schedd for schedd in schedds if classad.ExprTree.eval(schedd['IsOk'])]
 
             choices = chooserFunction(schedds, self.logger)
