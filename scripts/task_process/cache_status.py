@@ -193,23 +193,34 @@ def parseErrorReport(data, nodes):
             # (even if there's only a single value) it has to be indexed to zero.
             statedict['Error'] = data[jobid].values()[0] #data[jobid] contains all retries. take the last one
 
-def parseNodeStateV2(fp, nodes):
+def parseNodeStateV2(fp, nodes, level):
     """
     HTCondor 8.1.6 updated the node state file to be classad-based.
     This is a more flexible format that allows future extensions but, unfortunately,
     also requires a separate parser.
     """
-    taskStatus = nodes.setdefault("DagStatus", {})
+    dagStatus = nodes.setdefault("DagStatus", {})
+    dagStatus.setdefault("SubDagStatus", {})
+    subDagStatus = dagStatus.setdefault("SubDags", {})
     for ad in classad.parseAds(fp):
         if ad['Type'] == "DagStatus":
-            taskStatus['Timestamp'] = ad.get('Timestamp', -1)
-            taskStatus['NodesTotal'] = ad.get('NodesTotal', -1)
-            taskStatus['DagStatus'] = ad.get('DagStatus', -1)
+            if level:
+                statusDict = subDagStatus.setdefault(int(level), {})
+                statusDict['Timestamp'] = ad.get('Timestamp', -1)
+                statusDict['NodesTotal'] = ad.get('NodesTotal', -1)
+                statusDict['DagStatus'] = ad.get('DagStatus', -1)
+            else:
+                dagStatus['Timestamp'] = ad.get('Timestamp', -1)
+                dagStatus['NodesTotal'] = ad.get('NodesTotal', -1)
+                dagStatus['DagStatus'] = ad.get('DagStatus', -1)
             continue
         if ad['Type'] != "NodeStatus":
             continue
         node = ad.get("Node", "")
-        if not node.startswith("Job") or node.endswith("SubJobs"):
+        if node.endswith("SubJobs"):
+            dagStatus["SubDagStatus"][node] = ad.get('NodeStatus', -1)
+            continue
+        if not node.startswith("Job"):
             continue
         nodeid = node[3:]
         status = ad.get('NodeStatus', -1)
@@ -275,8 +286,9 @@ def storeNodesInfoInFile():
     jobsLog.close()
 
     for fn in glob.glob("node_state*"):
+        level = re.match(r'(\w+)(?:.(\w+))?', fn).group(2)
         with open(fn, 'r') as nodeState:
-            parseNodeStateV2(nodeState, nodes)
+            parseNodeStateV2(nodeState, nodes, level)
 
     try:
         errorSummary, newFjrParseResCheckpoint = summarizeFjrParseResults(fjrParseResCheckpoint)
