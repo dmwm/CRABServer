@@ -1,6 +1,11 @@
 #!/bin/bash
 
+function log {
+    echo "[$(date +"%F %R")]" $*
+}
+
 function cache_status {
+    log "Running cache_status.py"
     python task_process/cache_status.py
 }
 
@@ -23,7 +28,7 @@ function check_exit {
     # running or are in the current state for less than 24 hours.
     NOT_DONE=0
     while read CLUSTER_ID DAG_STATUS ENTERED_CUR_STATUS; do
-        if [[ "$DAG_STATUS" == "1" || "$DAG_STATUS" == "2" || $(( ($(date +"%s") - $ENTERED_CUR_STATUS) < 24 * 3600 )) ]]; then
+        if [[ "$DAG_STATUS" == "1" || "$DAG_STATUS" == "2" || $(( ($(date +"%s") - $ENTERED_CUR_STATUS) )) < $(( 24 * 3600 )) ]]; then
             NOT_DONE=$(( $NOT_DONE + 1 ))
         fi
     done <<< $DAG_INFO
@@ -32,31 +37,31 @@ function check_exit {
 
 function dag_status {
     [[ "$DAG_INFO" == "init" || ! "$DAG_INFO" ]] && return
-    echo "$DAG_INFO"|while read CLUSTER_ID DAG_STATUS ENTERED_CUR_STATUS; do
-        echo "Dag status code for $CLUSTER_ID: $DAG_STATUS Entered current status date: $(date -d @$ENTERED_CUR_STATUS '+%Y/%m/%d %H:%M:%S %Z')"
-    done
+    while read CLUSTER_ID DAG_STATUS ENTERED_CUR_STATUS; do
+        log "Dag status code for $CLUSTER_ID: $DAG_STATUS Entered current status date: $(date -d @$ENTERED_CUR_STATUS '+%Y/%m/%d %H:%M:%S %Z')"
+    done <<< $DAG_INFO
 }
 
 function perform_condorq {
     DAG_INFO=$(condor_q -constr 'CRAB_ReqName =?= "'$REQUEST_NAME'" && TaskType =!= "Job"' -af ClusterId JobStatus EnteredCurrentStatus)
     TIME_OF_LAST_QUERY=$(date +"%s")
-    echo "Query done on $(date '+%Y/%m/%d %H:%M:%S %Z')"
+    log "HTCondor query of DAG status done on $(date '+%Y/%m/%d %H:%M:%S %Z')"
 }
 
 if [ ! -f /etc/enable_task_daemon ]; then
-    echo "/etc/enable_task_daemon file not found, not starting the task daemon and exiting"
+    log "/etc/enable_task_daemon file not found, not starting the task daemon and exiting"
     exit 1
 fi
 
 touch task_process/task_process_running
-echo "Starting a new task_process, creating task_process_running file"
+log "Starting a new task_process, creating task_process_running file"
 
 
 HOURS_BETWEEN_QUERIES=24
 
 # The request name is passed from the dagman_bootstrap_startup.sh and points to the main dag
 REQUEST_NAME=$1
-echo "REQUEST_NAME: $REQUEST_NAME"
+log "REQUEST_NAME: $REQUEST_NAME"
 
 # Sleeping until files in the spool dir are created. TODO - make this smarter
 sleep 60s
@@ -68,7 +73,7 @@ TIME_OF_LAST_QUERY=$(date +"%s")
 # submission is most likely pointless and relatively expensive, the script will run normally and perform the query later.
 DAG_INFO="init"
 
-echo "Starting task daemon wrapper"
+log "Starting task daemon wrapper"
 while true
 do
     # This is part of the logic for handling empty condor_q results. Because condor_q can sometimes return empty,
@@ -78,7 +83,7 @@ do
     # is removed almost immediately by htcondor after the dag disappears from the queue. Otherwise, this wrapper script
     # which is loaded in memory, would keep trying to execute the non-existent file.
     if [[ ! -f task_process/cache_status.py  ]]; then
-        echo "task_process/cache_status.py file not found, exiting."
+        log "task_process/cache_status.py file not found, exiting."
         exit 1
     fi
 
@@ -89,44 +94,32 @@ do
     # Calculate how much time has passed since the last condor_q and perform it again if it has been long enough.
     if [ $(($(date +"%s") - $TIME_OF_LAST_QUERY)) -gt $(($HOURS_BETWEEN_QUERIES * 3600)) ]; then
         perform_condorq
-    fi
+        dag_status
 
-    # Once the dags' status changes from 1 (idle) or 2 (running) to something else,
-    # (normally) no further updates are expected to the log files and the task_process can exit.
-    # However, in the case that a crab kill command is issued, Task Worker performs two operations:
-    # 1) Hold the DAG with condor_hold,
-    # 2) Remove all of the jobs with condor_rm.
-    # If a task is large, it will take some time for all of the jobs to be removed. If during this time
-    # we run condor_q, see that the DAGs are held and decide to exit immediately, some jobs may still be
-    # in the process of getting removed and their status may not be updated before the wrapper exits. To get around this,
-    # we won't exit until every dag has spent at least 24 hours in it's latest state (EnteredCurrentStatus classad).
-    # This should give enough time for any changes to be propagated to the log files that we parse in the caching script.
-    # This method is better than a simple sleep because of the possibility of resubmission.
-    #
-    # Note that here we also ignore an empty DAG_INFO result because it could be a temporary problem with condor_q
-    # simply returning empty. If the dag isn't actually in the queue anymore, the check for an existing caching script
-    # at the start of the loop should catch that and exit.
-    dag_status
+        # Once the dags' status changes from 1 (idle) or 2 (running) to something else,
+        # (normally) no further updates are expected to the log files and the task_process can exit.
+        # However, in the case that a crab kill command is issued, Task Worker performs two operations:
+        # 1) Hold the DAG with condor_hold,
+        # 2) Remove all of the jobs with condor_rm.
+        # If a task is large, it will take some time for all of the jobs to be removed. If during this time
+        # we run condor_q, see that the DAGs are held and decide to exit immediately, some jobs may still be
+        # in the process of getting removed and their status may not be updated before the wrapper exits. To get around this,
+        # we won't exit until every dag has spent at least 24 hours in it's latest state (EnteredCurrentStatus classad).
+        # This should give enough time for any changes to be propagated to the log files that we parse in the caching script.
+        # This method is better than a simple sleep because of the possibility of resubmission.
+        #
+        # Note that here we also ignore an empty DAG_INFO result because it could be a temporary problem with condor_q
+        # simply returning empty. If the dag isn't actually in the queue anymore, the check for an existing caching script
+        # at the start of the loop should catch that and exit.
 
-    if [ "$(check_exit)" == "1" ]; then
-        # Before we really decide to exit, we should run condor_q once more
-        # to get the latest info about the DAGs. Even though check_exit may pass successfully,
-        # because we do condor_q only every 24h (and also wait for 24 hours after ENTERED_CUR_STATUS),
-        # the information used in check_exit could be out of date - the task may have been resubmitted
-        # after our last condor_q, for example.
-        echo "Running an extra condor_q check before exitting"
-        perform_condorq
         if [ "$(check_exit)" == "1" ]; then
-
-            echo "Dag has been in one of the final states for over 24 hours."
-            echo "Caching the status one last time, removing the task_process/task_process_running file and exiting."
+            log "Dag(s) has been in one of the final states for over 24 hours."
+            log "Caching the status one last time, removing the task_process/task_process_running file and exiting."
 
             cache_status
             rm task_process/task_process_running
 
             exit 0
         fi
-        echo "Cannot exit yet!"
-        dag_status
     fi
 done
