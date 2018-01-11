@@ -51,7 +51,7 @@ class PreDAG(object):
         self.prefix = None
         self.statusCacheInfo = None
         self.processedJobs = None
-        self.failedJobs = None
+        self.failedJobs = []
         self.logger = logging.getLogger()
         handler = logging.StreamHandler(sys.stdout)
         formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", \
@@ -85,11 +85,10 @@ class PreDAG(object):
         with open("automatic_splitting/processed", "wb") as fd:
             pickle.dump(self.processedJobs.union(jobs), fd)
 
-    def completedJobs(self, stage):
+    def completedJobs(self, stage, processFailed=True):
         """Yield job IDs of completed (finished or failed) jobs.  All
         failed jobs are saved in self.failedJobs, too.
         """
-        self.failedJobs = []
         stagere = {}
         stagere['processing'] = re.compile(r"^0-\d+$")
         stagere['tail'] = re.compile(r"^[1-9]\d*$")
@@ -97,7 +96,7 @@ class PreDAG(object):
         for jobnr, jobdict in self.statusCacheInfo.iteritems():
             state = jobdict.get('State')
             if stagere[stage].match(jobnr) and state in ('finished', 'failed'):
-                if state == 'failed':
+                if state == 'failed' and processFailed:
                     self.failedJobs.append(jobnr)
                 completedCount += 1
                 yield jobnr
@@ -157,7 +156,7 @@ class PreDAG(object):
         estimates = copy.copy(unprocessed)
         self.logger.info("jobs remaining to process: {0}".format(", ".join(sorted(unprocessed))))
         if self.stage == 'tail' and len(estimates-set(self.failedJobs)) == 0:
-            estimates = set(self.completedJobs(stage='processing'))
+            estimates = set(self.completedJobs(stage='processing', processFailed=False))
         self.logger.info("jobs remaining to process: %s", ", ".join(sorted(unprocessed)))
 
         # The TaskWorker saves some files that now we are gonna read
