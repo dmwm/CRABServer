@@ -26,6 +26,13 @@ class PreDAGTest(unittest.TestCase):
     """
 
     def createStatusCache(self, probe_status='finished', job_status='finished', overrides=None):
+        """ Create a fake status cache.
+
+        Use global status settings for all probe and processing jobs, with
+        the option to override single job status settings by passing a
+        dictionary as `overrides` parameter with job ids as keys and states
+        as values.
+        """
         if overrides is None:
             overrides = {}
         if not os.path.exists("task_process"):

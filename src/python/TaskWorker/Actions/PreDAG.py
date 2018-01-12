@@ -154,7 +154,7 @@ class PreDAG(object):
         self.readProcessedJobs()
         unprocessed = completed - self.processedJobs
         estimates = copy.copy(unprocessed)
-        self.logger.info("jobs remaining to process: {0}".format(", ".join(sorted(unprocessed))))
+        self.logger.info("jobs remaining to process: %s", ", ".join(sorted(unprocessed)))
         if self.stage == 'tail' and len(estimates-set(self.failedJobs)) == 0:
             estimates = set(self.completedJobs(stage='processing', processFailed=False))
         self.logger.info("jobs remaining to process: %s", ", ".join(sorted(unprocessed)))
