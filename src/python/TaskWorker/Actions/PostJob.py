@@ -2385,9 +2385,6 @@ class PostJob():
         else:
             ## If CRAB_ASOTimeout was not defined in the job ad, use a default of 6 hours.
             self.retry_timeout = 6 * 3600
-        if self.stage == 'probe':
-            self.transfer_outputs = 0
-            self.transfer_logs = 0
         return 0
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

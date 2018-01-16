@@ -77,11 +77,9 @@ JOB_SUBMIT = \
 +CRAB_Publish = %(publication)s
 +CRAB_PublishDBSURL = %(publishdbsurl)s
 +CRAB_ISB = %(cacheurl)s
-+CRAB_SaveLogsFlag = %(savelogsflag)s
 +CRAB_AdditionalOutputFiles = %(addoutputfiles)s
 +CRAB_EDMOutputFiles = %(edmoutfiles)s
 +CRAB_TFileOutputFiles = %(tfileoutfiles)s
-+CRAB_TransferOutputs = %(saveoutput)s
 +CRAB_UserDN = %(userdn)s
 +CRAB_UserHN = %(userhn)s
 +CRAB_AsyncDest = %(asyncdest)s
@@ -583,15 +581,14 @@ class DagmanCreator(TaskAction.TaskAction):
             siteinfo[count] = groupid
             remoteOutputFiles = []
             localOutputFiles = []
-            if stage != 'probe':
-                for origFile in outfiles:
-                    info = origFile.rsplit(".", 1)
-                    if len(info) == 2:
-                        fileName = "%s_%s.%s" % (info[0], count, info[1])
-                    else:
-                        fileName = "%s_%s" % (origFile, count)
-                    remoteOutputFiles.append("%s" % fileName)
-                    localOutputFiles.append("%s=%s" % (origFile, fileName))
+            for origFile in outfiles:
+                info = origFile.rsplit(".", 1)
+                if len(info) == 2:
+                    fileName = "%s_%s.%s" % (info[0], count, info[1])
+                else:
+                    fileName = "%s_%s" % (origFile, count)
+                remoteOutputFiles.append("%s" % fileName)
+                localOutputFiles.append("%s=%s" % (origFile, fileName))
             remoteOutputFilesStr = " ".join(remoteOutputFiles)
             localOutputFiles = ", ".join(localOutputFiles)
             counter = "%04d" % (i / 1000)
