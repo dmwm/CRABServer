@@ -28,10 +28,10 @@ function check_exit {
     # running or are in the current state for less than 24 hours.
     NOT_DONE=0
     while read CLUSTER_ID DAG_STATUS ENTERED_CUR_STATUS; do
-        if [[ "$DAG_STATUS" == "1" || "$DAG_STATUS" == "2" || $(( ($(date +"%s") - $ENTERED_CUR_STATUS) )) < $(( 24 * 3600 )) ]]; then
+        if [[ "$DAG_STATUS" == "1" || "$DAG_STATUS" == "2" || $(( ($(date +"%s") - $ENTERED_CUR_STATUS) )) -lt $(( 24 * 3600 )) ]]; then
             NOT_DONE=$(( $NOT_DONE + 1 ))
         fi
-    done <<< $DAG_INFO
+    done <<< "$DAG_INFO"
     echo $(( $NOT_DONE == 0 ))
 }
 
@@ -39,11 +39,11 @@ function dag_status {
     [[ "$DAG_INFO" == "init" || ! "$DAG_INFO" ]] && return
     while read CLUSTER_ID DAG_STATUS ENTERED_CUR_STATUS; do
         log "Dag status code for $CLUSTER_ID: $DAG_STATUS Entered current status date: $(date -d @$ENTERED_CUR_STATUS '+%Y/%m/%d %H:%M:%S %Z')"
-    done <<< $DAG_INFO
+    done <<< "$DAG_INFO"
 }
 
 function perform_condorq {
-    DAG_INFO=$(condor_q -constr 'CRAB_ReqName =?= "'$REQUEST_NAME'" && TaskType =!= "Job"' -af ClusterId JobStatus EnteredCurrentStatus)
+    DAG_INFO=$(condor_q -constr 'CRAB_ReqName =?= "'$REQUEST_NAME'" && TaskType stringListMember(TaskType, "ROOT PROCESSING TAIL", " ")' -af ClusterId JobStatus EnteredCurrentStatus)
     TIME_OF_LAST_QUERY=$(date +"%s")
     log "HTCondor query of DAG status done on $(date '+%Y/%m/%d %H:%M:%S %Z')"
 }
