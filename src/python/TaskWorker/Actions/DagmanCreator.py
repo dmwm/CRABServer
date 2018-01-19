@@ -600,6 +600,7 @@ class DagmanCreator(TaskAction.TaskAction):
             pfns = ["log/cmsRun_{0}.log.tar.gz".format(count)] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
             prescriptDeferString = self.getPreScriptDefer(task, i)
+
             nodeSpec = {'count': count,
                         'prescriptDefer' : prescriptDeferString,
                         'maxretries': task['numautomjobretries'],
@@ -631,6 +632,51 @@ class DagmanCreator(TaskAction.TaskAction):
 
         return dagSpecs, i
 
+    def prepareLocal(self, dagSpecs, info, kw, inputFiles, subdags):
+        """ Prepare a file named "input_args.json" with all the input parameters of each jobs. It is a list
+            with a dictionary for each job. The dictionary key/value pairs are the arguments of gWMS-CMSRunAnalysis.sh
+            N.B.: in the JDL: "Executable = gWMS-CMSRunAnalysis.sh" and "Arguments =  $(CRAB_Archive) --sourceURL=$(CRAB_ISB) ..."
+            where each argument of each job is set in "input_args.json".
+            Also, this prepareLocal method prepare a single "InputFiles.taqr.gz" file with all the inputs files moved
+            from the TW to the schedd.
+            This is used by the client preparelocal command.
+        """
+
+        argdicts = []
+        for dagspec in dagSpecs:
+            argDict = {}
+            argDict['inputFiles'] = 'job_input_file_list_%s.txt' % dagspec['count'] #'job_input_file_list_1.txt'
+            argDict['runAndLumiMask'] = 'job_lumis_%s.json' % dagspec['count']
+            argDict['CRAB_Id'] = dagspec['count'] #'1'
+            argDict['lheInputFiles'] = dagspec['lheInputFiles'] #False
+            argDict['firstEvent'] = dagspec['firstEvent'] #'None'
+            argDict['lastEvent'] = dagspec['lastEvent'] #'None'
+            argDict['firstLumi'] = dagspec['firstLumi'] #'None'
+            argDict['firstRun'] = dagspec['firstRun'] #'None'
+            argDict['CRAB_Archive'] = info['cachefilename_flatten'] #'sandbox.tar.gz'
+            argDict['CRAB_ISB'] = info['cacheurl_flatten'] #u'https://cmsweb.cern.ch/crabcache'
+            argDict['CRAB_JobSW'] = info['jobsw_flatten'] #u'CMSSW_9_2_5'
+            argDict['CRAB_JobArch'] = info['jobarch_flatten'] #u'slc6_amd64_gcc530'
+            argDict['seeding'] = 'AutomaticSeeding'
+            argDict['scriptExe'] = kw['task']['tm_scriptexe'] #
+            argDict['eventsPerLumi'] = kw['task']['tm_events_per_lumi'] #
+            argDict['maxRuntime'] = kw['task']['max_runtime'] #-1
+            argDict['scriptArgs'] = json.dumps(kw['task']['tm_scriptargs']).replace('"', r'\"\"') #'[]'
+            argDict['CRAB_AdditionalOutputFiles'] = info['addoutputfiles_flatten']
+            #The following two are for fixing up job.submit files
+            argDict['CRAB_localOutputFiles'] = dagspec['localOutputFiles']
+            argDict['CRAB_Destination'] = dagspec['destination']
+            argdicts.append(argDict)
+
+        with open('input_args.json', 'w') as fd:
+            json.dump(argdicts, fd)
+
+        tf = tarfile.open('InputFiles.tar.gz', mode='w:gz')
+        try:
+            for ifname in inputFiles + subdags + ['input_args.json']:
+                tf.add(ifname)
+        finally:
+            tf.close()
 
     def createSubdag(self, splitterResult, **kwargs):
 
@@ -997,7 +1043,7 @@ class DagmanCreator(TaskAction.TaskAction):
             insertJobIdSid(jinfo, idx, taskid, 0)
             ml_info.append(jinfo)
 
-        return info, splitterResult, subdags
+        return info, splitterResult, subdags, dagSpecs
 
 
     def extractMonitorFiles(self, inputFiles, **kw):
@@ -1122,9 +1168,11 @@ class DagmanCreator(TaskAction.TaskAction):
         if kw['task']['tm_debug_files']:
             inputFiles.append("debug_files.tar.gz")
 
-        info, splitterResult, subdags = self.createSubdag(*args, **kw)
+        info, splitterResult, subdags, dagSpecs = self.createSubdag(*args, **kw)
 
-        return info, params, inputFiles + subdags, splitterResult
+        self.prepareLocal(dagSpecs, info, kw, inputFiles, subdags)
+
+        return info, params, ["InputFiles.tar.gz"], splitterResult
 
 
     def execute(self, *args, **kw):

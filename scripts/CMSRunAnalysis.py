@@ -542,7 +542,8 @@ def prepSandbox(opts):
                     handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: could not get jobO files from panda server')
                     sys.exit(EC_WGET)
                 time.sleep(30)
-        print(commands.getoutput('tar xfzm %s' % opts.archiveJob))
+    #The user sandbox.tar.gz has to be unpacked no matter what (even in DEBUG mode)
+    print(commands.getoutput('tar xfzm %s' % opts.archiveJob))
     print("==== Sandbox preparation FINISHING at %s ====" % time.asctime(time.gmtime()))
 
     #move the pset in the right place

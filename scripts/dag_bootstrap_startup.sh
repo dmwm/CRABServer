@@ -28,6 +28,17 @@ mkdir -p resubmit_info
 mkdir -p defer_info
 mkdir -p transfer_info
 
+
+#This is the only file transfered from the TW to the schedd. Can be downloaded for the "preparelocal" client command
+TARBALL_NAME="InputFiles.tar.gz"
+tar xvfzm $TARBALL_NAME
+if [[ $? != 0 ]]; then
+    echo "Error: Unable to unpack the Input files of the task." >&2
+    condor_qedit $CONDOR_ID DagmanHoldReason "'Unable to unpack the input files of the task.'"
+    exit 1
+fi
+
+
 # Note that the scheduler universe populate the .job.ad from 8.3.2 version.
 # Before it was written by this script using condor_q (This command is expensive to Scheduler)
 counter=0
