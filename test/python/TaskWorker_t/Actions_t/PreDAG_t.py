@@ -25,6 +25,26 @@ class PreDAGTest(unittest.TestCase):
 
     """
 
+    def createStatusCache(self, probe_status='finished', job_status='finished', overrides=None):
+        """ Create a fake status cache.
+
+        Use global status settings for all probe and processing jobs, with
+        the option to override single job status settings by passing a
+        dictionary as `overrides` parameter with job ids as keys and states
+        as values.
+        """
+        if overrides is None:
+            overrides = {}
+        if not os.path.exists("task_process"):
+            os.makedirs("task_process")
+        data = {}
+        for p in self.probes:
+            data[p] = {'State': overrides.get(p, probe_status)}
+        for j in self.done:
+            data[j] = {'State': overrides.get(j, job_status)}
+        with open("task_process/status_cache.txt", "w") as fd:
+            fd.write("\n\n" + repr(data))
+
     def setUp(self):
         """ Create the all the necessary files
         """
@@ -32,6 +52,10 @@ class PreDAGTest(unittest.TestCase):
         self.done = [str(i) for i in xrange(1, 7)]
         #we will work in a temporary directory and copy/create things there
         os.environ["TEST_DONT_REDIRECT_STDOUT"] = "True"
+        # Override the PATH to overload condor_submit_dag with a script
+        # that returns true; Otherwise, the tests will fail.
+        os.environ['PATH'] = ':'.join([os.path.join(getTestDataDirectory(), "mock_condor"), os.environ['PATH']])
+
         self.olddir = os.getcwd()
         self.tempdir = tempfile.mkdtemp()
         os.chdir(self.tempdir)
@@ -77,16 +101,40 @@ class PreDAGTest(unittest.TestCase):
         """
         predag = PreDAG()
         #Mock the createSubdagSubmission function
-        predag.createSubdagSubmission = lambda *args: True
         self.assertEqual(predag.execute("processing", 5, 0), 0)
 
     def testTailSplitting(self):
         """ Test that the PreDAG works when there are tail jobs to create
         """
         predag = PreDAG()
-        predag.createSubdagSubmission = lambda *args: True
-        predag.completedJobs = lambda *args, **kwargs: self.done
-        predag.failedJobs = []
+        self.createStatusCache()
+        self.assertEqual(predag.execute("tail", 6, 1), 0)
+        with open('RunJobs1.subdag') as fd:
+            self.assertEqual(sum(1 for _ in (line for line in fd if line.startswith('JOB'))), 1)
+
+    def testTailSplittingWithAllProcessed(self):
+        """ Test that the PreDAG works when there are no tail jobs to create
+        """
+        shutil.rmtree(self.missing_lumidir)
+        predag = PreDAG()
+        self.createStatusCache()
+        self.assertEqual(predag.execute("tail", 6, 1), 0)
+        self.assertEqual(os.path.exists('RunJobs1.subdag'), False)
+
+    def testTailSplittingWithFailedProbesAndAllProcessed(self):
+        """ Test that the PreDAG works when there are no tail jobs to create, but failed probes
+        """
+        shutil.rmtree(self.missing_lumidir)
+        predag = PreDAG()
+        self.createStatusCache(overrides=dict((p, 'failed') for p in self.probes[1:]))
+        self.assertEqual(predag.execute("tail", 6, 1), 0)
+        self.assertEqual(os.path.exists('RunJobs1.subdag'), False)
+
+    def testTailSplittingWithFailedProbes(self):
+        """ Test that the PreDAG works when there are tail jobs to create, and failed probes
+        """
+        predag = PreDAG()
+        self.createStatusCache(overrides=dict((p, 'failed') for p in self.probes[1:]))
         self.assertEqual(predag.execute("tail", 6, 1), 0)
         with open('RunJobs1.subdag') as fd:
             self.assertEqual(sum(1 for _ in (line for line in fd if line.startswith('JOB'))), 1)
@@ -106,10 +154,10 @@ class PreDAGTest(unittest.TestCase):
         """
         for p in self.done:
             os.unlink(os.path.join(self.throughputdir, p))
+        shutil.rmtree(self.missing_lumidir)
+        self.createStatusCache(job_status='failed')
         predag = PreDAG()
-        predag.createSubdagSubmission = lambda *args: True
-        predag.completedJobs = lambda *args, **kwargs: self.probes if kwargs['stage'] == 'processing' else self.done
-        predag.failedJobs = self.done
+        predag.createSubdag = lambda *args: True
         self.assertEqual(predag.execute("tail", 6, 1), 0)
         with open('RunJobs1.subdag') as fd:
             self.assertEqual(sum(1 for _ in (line for line in fd if line.startswith('JOB'))), 17)
