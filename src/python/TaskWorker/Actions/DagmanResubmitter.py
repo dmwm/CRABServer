@@ -90,7 +90,7 @@ class DagmanResubmitter(TaskAction):
             self.uploadWarning(msg, proxy, kwargs['task']['tm_taskname'])
 
         # Release the DAG
-        rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(workflow)
+        rootConst = 'stringListMember(TaskType, "ROOT PROCESSING TAIL", " ") && CRAB_ReqName =?= %s' % HTCondorUtils.quote(workflow)
 
         ## Calculate new parameters for resubmitted jobs. These parameters will
         ## be (re)written in the _CONDOR_JOB_AD when we do schedd.edit() below.

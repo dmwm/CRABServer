@@ -172,7 +172,7 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
 %(extra_jdl)s
 queue
 """
-SPLIT_ARG_MAP = {"Automatic": "seconds_per_job",
+SPLIT_ARG_MAP = {"Automatic": "minutes_per_job",
                  "LumiBased": "lumis_per_job",
                  "EventBased": "events_per_job",
                  "FileBased": "files_per_job",
@@ -620,7 +620,7 @@ class DagmanCreator(TaskAction.TaskAction):
                         'seeding': 'AutomaticSeeding',
                         'lheInputFiles': 'tm_generator' in task and task['tm_generator'] == 'lhe',
                         'eventsPerLumi': task['tm_events_per_lumi'],
-                        'maxRuntime' : task['max_runtime'],
+                        'maxRuntime': task['max_runtime'] * 60,  # the job script takes seconds, internal units are minutes
                         'sw': task['tm_job_sw'],
                         'block': block,
                         'destination': pfns,
@@ -697,20 +697,20 @@ class DagmanCreator(TaskAction.TaskAction):
         ## file and we would take it from the Task DB.
         kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
 
-        runtime = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
+        runtime = kwargs['task']['tm_split_args'].get('minutes_per_job', -1)
 
-        proberuntime = getattr(self.config.TaskWorker, 'automaticProbeRuntime', 15 * 60)
+        proberuntime = getattr(self.config.TaskWorker, 'automaticProbeRuntimeMins', 15)
         tailruntime = int(max(
-            getattr(self.config.TaskWorker, 'automaticTailRuntimeMinimum', 45 * 60),
+            getattr(self.config.TaskWorker, 'automaticTailRuntimeMinimumMins', 45),
             getattr(self.config.TaskWorker, 'automaticTailRuntimeFraction', 0.2) * runtime
         ))
 
-        overhead = getattr(self.config.TaskWorker, 'automaticProcessingOverhead', 60 * 60)
+        overhead = getattr(self.config.TaskWorker, 'automaticProcessingOverheadMins', 60)
 
         kwargs['task']['max_runtime'] = runtime
         # include a factor of 4 as a buffer
-        kwargs['task']['maxproberuntime'] = (proberuntime * 4) // 60
-        kwargs['task']['maxtailruntime'] = (tailruntime * 5) // 60
+        kwargs['task']['maxproberuntime'] = proberuntime * 4
+        kwargs['task']['maxtailruntime'] = tailruntime * 5
         if kwargs['task']['tm_split_algo'] == 'Automatic':
             if stage == 'conventional':
                 kwargs['task']['max_runtime'] = proberuntime
@@ -720,10 +720,9 @@ class DagmanCreator(TaskAction.TaskAction):
             elif stage == 'processing':
                 # include a buffer of one hour for overhead beyond the time
                 # given to CMSSW
-                kwargs['task']['tm_maxjobruntime'] = min((runtime + overhead) // 60, kwargs['task']['tm_maxjobruntime'])
+                kwargs['task']['tm_maxjobruntime'] = min(runtime + overhead, kwargs['task']['tm_maxjobruntime'])
             elif stage == 'tail':
                 kwargs['task']['max_runtime'] = -1
-
 
         info = self.makeJobSubmit(kwargs['task'])
 

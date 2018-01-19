@@ -218,7 +218,13 @@ def parseNodeStateV2(fp, nodes, level):
             continue
         node = ad.get("Node", "")
         if node.endswith("SubJobs"):
-            dagStatus["SubDagStatus"][node] = ad.get('NodeStatus', -1)
+            status = ad.get('NodeStatus', -1)
+            dagname = "RunJobs{0}.subdag".format(nodeName2Re.match(node).group(1))
+            # Add special state where we *expect* a submitted DAG for the
+            # status command on the client
+            if status == 5 and os.path.exists(dagname) and os.stat(dagname).st_size > 0:
+                status = 99
+            dagStatus["SubDagStatus"][node] = status
             continue
         if not node.startswith("Job"):
             continue

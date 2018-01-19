@@ -40,7 +40,7 @@ class DataWorkflow(object):
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
 
         self.splitArgMap = {
-                        "Automatic": "seconds_per_job",
+                        "Automatic": "minutes_per_job",
                         "LumiBased": "lumis_per_job",
                         "FileBased": "files_per_job",
                         "EventBased": "events_per_job",

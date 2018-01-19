@@ -65,10 +65,10 @@ class Splitter(TaskAction):
             raise TaskWorkerException("The splitting on your task generated %s jobs. The maximum number of jobs in each task is %s" %
                                         (numJobs, maxJobs))
 
-        minRuntime = getattr(self.config.TaskWorker, 'minAutomaticRuntime', 3 * 60 ** 2)
+        minRuntime = getattr(self.config.TaskWorker, 'minAutomaticRuntimeMins', 180)
         if kwargs['task']['tm_split_algo'] == 'Automatic' and \
-                kwargs['task']['tm_split_args']['seconds_per_job'] < minRuntime:
-            msg = "Minimum runtime requirement for automatic splitting is {0} seconds.".format(minRuntime)
+                kwargs['task']['tm_split_args']['minutes_per_job'] < minRuntime:
+            msg = "Minimum runtime requirement for automatic splitting is {0} minutes.".format(minRuntime)
             raise TaskWorkerException(msg)
 
         #printing duplicated lumis if any
