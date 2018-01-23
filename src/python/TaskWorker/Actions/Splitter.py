@@ -22,20 +22,28 @@ class Splitter(TaskAction):
 
         maxJobs = getattr(self.config.TaskWorker, 'maxJobsPerTask', 10000)
 
+        data = args[0]
         splitparam = kwargs['task']['tm_split_args']
         splitparam['algorithm'] = kwargs['task']['tm_split_algo']
         if kwargs['task']['tm_job_type'] == 'Analysis':
+            totalUnits = kwargs['task']['tm_totalunits']
             if kwargs['task']['tm_split_algo'] == 'FileBased':
-                splitparam['total_files'] = kwargs['task']['tm_totalunits']
+                if totalUnits < 1.0:
+                    totalUnits *= len(data.getFiles())
+                splitparam['total_files'] = totalUnits
             elif kwargs['task']['tm_split_algo'] == 'LumiBased':
-                splitparam['total_lumis'] = kwargs['task']['tm_totalunits']
+                if totalUnits < 1.0:
+                    totalUnits *= sum(len(run.lumis) for f in data.getFiles() for run in f['runs'])
+                splitparam['total_lumis'] = totalUnits
             elif kwargs['task']['tm_split_algo'] == 'EventAwareLumiBased':
-                splitparam['total_events'] = kwargs['task']['tm_totalunits']
+                if totalUnits < 1.0:
+                    totalUnits *= sum(f['events'] for f in data.getFiles())
+                splitparam['total_events'] = totalUnits
             elif kwargs['task']['tm_split_algo'] == 'Automatic':
                 splitparam['algorithm'] = 'FileBased'
-                splitparam['total_files'] = len(args[0].getFiles())
+                splitparam['total_files'] = len(data.getFiles())
                 numProbes = getattr(self.config.TaskWorker, 'numAutomaticProbes', 5)
-                splitparam['files_per_job'] = (len(args[0].getFiles()) + numProbes - 1) // numProbes
+                splitparam['files_per_job'] = (len(data.getFiles()) + numProbes - 1) // numProbes
         elif kwargs['task']['tm_job_type'] == 'PrivateMC':
             if 'tm_events_per_lumi' in kwargs['task'] and kwargs['task']['tm_events_per_lumi']:
                 splitparam['events_per_lumi'] = kwargs['task']['tm_events_per_lumi']
@@ -43,7 +51,7 @@ class Splitter(TaskAction):
                 splitparam['lheInputFiles'] = True
         splitparam['applyLumiCorrection'] = True
 
-        wmsubs = Subscription(fileset=args[0], workflow=wmwork,
+        wmsubs = Subscription(fileset=data, workflow=wmwork,
                                split_algo=splitparam['algorithm'],
                                type=self.jobtypeMapper[kwargs['task']['tm_job_type']])
         try:

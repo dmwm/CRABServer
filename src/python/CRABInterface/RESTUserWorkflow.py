@@ -10,7 +10,7 @@ from base64 import b64decode
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_real
 from WMCore.Services.TagCollector.TagCollector import TagCollector
 from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
 
@@ -349,7 +349,10 @@ class RESTUserWorkflow(RESTEntity):
             safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
             validate_str("splitalgo", param, safe, RX_SPLIT, optional=False)
             validate_num("algoargs", param, safe, optional=False)
-            validate_num("totalunits", param, safe, optional=True)
+            try:
+                validate_num("totalunits", param, safe, optional=True)
+            except InvalidParameter:
+                validate_real("totalunits", param, safe, optional=True)
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
             validate_str("debugfilename", param, safe, RX_CACHENAME, optional=True)
             validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
