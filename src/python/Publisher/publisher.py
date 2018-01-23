@@ -19,6 +19,7 @@ from WMCore.Configuration import loadConfigurationFile
 
 config = loadConfigurationFile(os.path.abspath('config.py'))
 
+task_path = config.General.task_path
 
 def Proxy(userDN, group, role, logger):
     """
@@ -31,7 +32,7 @@ def Proxy(userDN, group, role, logger):
         serviceKey = config.General.serviceKey
 
         defaultDelegation = {'logger': logger,
-                             'credServerPath': 'credentials',
+                             'credServerPath': '/data/certs/creds/',
                              'myProxySvr': 'myproxy.cern.ch',
                              'min_time_left': 36000,
                              'serverDN': config.General.serverDN,
@@ -51,7 +52,6 @@ def Proxy(userDN, group, role, logger):
         defaultDelegation['group'] = group
         defaultDelegation['role'] = role
 
-        print(group, role)
         valid, proxy = getProxy(defaultDelegation, logger)
     except Exception as ex:
         msg = "Error getting the user proxy"
@@ -448,6 +448,9 @@ def publishInDBS3(taskname):
 
     workflow = taskname
 
+    if len(toPublish) == 0:
+        return "EMPTY"
+
     if not workflow:
         logger.info("NO TASKNAME: %s" % toPublish[0])
     for k, v in toPublish[0].iteritems():
@@ -475,16 +478,14 @@ def publishInDBS3(taskname):
     READ_PATH = "/DBSReader"
     READ_PATH_1 = "/DBSReader/"
 
-    opsProxy = config.General.opsProxy
 
     # TODO: get user role and group
     try:
         proxy = Proxy(userDN, group, role, logger)
     except:
-        proxy = opsProxy
         logger.exception("Failed to retrieve user proxy")
+        return "FAILED"
 
-    logger.info("userProxy_"+user)
     oracelInstance = config.General.oracleDB
     oracleDB = HTTPRequests(oracelInstance,
                             proxy,
@@ -495,10 +496,11 @@ def publishInDBS3(taskname):
     fileDoc['workflow'] = workflow
 
     try:
-        results = oracleDB.get('/crabserver/dev/task',
+        results = oracleDB.get(task_path,
                                data=encodeRequest(fileDoc))
     except Exception as ex:
         logger.error("Failed to get acquired publications from oracleDB for %s: %s" % (workflow, ex))
+        return "FAILED"
 
     logger.info(results[0]['desc']['columns'])
 
@@ -725,8 +727,8 @@ def publishInDBS3(taskname):
                     if parentFile in file_['parents']:
                         file_['parents'].remove(parentFile)
             # Add this file to the list of files to be published.
-            dbsFiles.append(format_file_3(file))
-            dbsFiles_f.append(file)
+            dbsFiles.append(format_file_3(file_))
+            dbsFiles_f.append(file_)
         #print file
         published.append(file_['SourceLFN'])
     # Print a message with the number of files to publish.
