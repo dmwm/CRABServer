@@ -9,8 +9,9 @@ function cache_status {
     python task_process/cache_status.py
 }
 
-function check_exit {
+function exit_now {
     # Checks if the TP can exit without losing any possible future updates to the status of the task
+    # Returns a string "True" or "False"
     # First checks that the DAG is in a final state
     # If that passes, checks if the dag has been in a final state for long enough (currently 24h)
     # It will echo 1 if TP can exit, otherwise 0
@@ -20,19 +21,22 @@ function check_exit {
     # (DAG_INFO is not "init") and if the last perfomed condor_q was
     # successfull (DAG_INFO is not empty)
     if [[ "$DAG_INFO" == "init" || ! "$DAG_INFO" ]]; then
-        echo 0
+        EXIT_NOW=False
+        echo $EXIT_NOW
         return
     fi
 
     # Make sure that all DAGs have exited; Count the ones that are still
     # running or are in the current state for less than 24 hours.
-    NOT_DONE=0
+    EXIT_NOW=True
+    ONE_DAY=$(( 24 * 3600 ))
     while read CLUSTER_ID DAG_STATUS ENTERED_CUR_STATUS; do
-        if [[ "$DAG_STATUS" == "1" || "$DAG_STATUS" == "2" || $(( ($(date +"%s") - $ENTERED_CUR_STATUS) )) -lt $(( 24 * 3600 )) ]]; then
-            NOT_DONE=$(( $NOT_DONE + 1 ))
+        TIME_IN_THIS_STATUS=$(( ($(date +"%s") - $ENTERED_CUR_STATUS) ))
+        if [[ "$DAG_STATUS" == "1" || "$DAG_STATUS" == "2" || $TIME_IN_THIS_STATUS -lt $ONE_DAY ]]; then
+            EXIT_NOW=False
         fi
     done <<< "$DAG_INFO"
-    echo $(( $NOT_DONE == 0 ))
+    echo $EXIT_NOW
 }
 
 function dag_status {
@@ -114,16 +118,16 @@ do
     # at the start of the loop should catch that and exit.
 
     # Test if 24 hours have elapsed since the last saved condor status
-    if [ "$(check_exit)" == "1" ]; then
+    if [ "$(exit_now)" == "True" ]; then
         # Before we really decide to exit, we should run condor_q once more
-        # to get the latest info about the DAGs. Even though check_exit may pass successfully,
+        # to get the latest info about the DAGs. Even though exit_now may say yes,
         # because we do condor_q only every 24h (and also wait for 24 hours after ENTERED_CUR_STATUS),
-        # the information used in check_exit could be out of date - the task may have been resubmitted
+        # the information used in exit_now could be out of date - the task may have been resubmitted
         # after our last condor_q, for example.
         log "Running an extra condor_q check before exitting"
         perform_condorq
         dag_status
-        if [ "$(check_exit)" == "1" ]; then
+        if [ "$(exit_now)" == "True" ]; then
             log "Dag(s) has (have) been in one of the final states for over 24 hours."
             log "Caching the status one last time, removing the task_process/task_process_running file and exiting."
 
