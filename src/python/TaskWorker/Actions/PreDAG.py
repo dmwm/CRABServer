@@ -219,7 +219,7 @@ class PreDAG(object):
                 self.logger.info(msg)
         except TaskWorkerException as e:
             retmsg = "Splitting failed with:\n{0}".format(e)
-            self.logger.error(msg)
+            self.logger.error(retmsg)
 #            self.set_dashboard_state('FAILED')
             return 1
         try:

@@ -55,7 +55,7 @@ def adjustPostScriptExitStatus(resubmitJobIds, filename):
     """
     if not resubmitJobIds:
         return []
-    printLog("Looking for resubmitJobIds: {0}".format(resubmitJobIds))
+    printLog("Looking for resubmitJobIds {0} in {1}".format(resubmitJobIds, filename))
     resubmitAllFailed = (resubmitJobIds is True)
     terminator_re = re.compile(r"^\.\.\.$")
     event_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
@@ -380,13 +380,6 @@ def main():
         except TypeError:
             resubmitJobIds = True
 
-    schedd = htcondor.Schedd()
-    tailconst = "TaskType =?= \"TAIL\" && CRAB_ReqName =?= %s" % classad.quote(ad.get("CRAB_ReqName"))
-    if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
-        printLog("Killing tail DAGs")
-        schedd.edit(tailconst, "HoldKillSig", 'SIGKILL')
-        schedd.act(htcondor.JobAction.Hold, tailconst)
-
     if resubmitJobIds:
         adjustedJobIds = []
         filenames = getGlob(ad, "RunJobs.dag.nodes.log", "RunJobs[1-9]*.subdag.nodes.log")
@@ -415,10 +408,6 @@ def main():
         siteAd.update(newSiteAd)
         with open("site.ad", "w") as fd:
             fd.write(str(siteAd))
-
-    if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
-        schedd.edit(tailconst, "HoldKillSig", 'SIGUSR1')
-        schedd.act(htcondor.JobAction.Release, tailconst)
 
     printLog("Exiting AdjustSite")
 
