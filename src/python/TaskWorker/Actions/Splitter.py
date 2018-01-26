@@ -29,15 +29,15 @@ class Splitter(TaskAction):
             totalUnits = kwargs['task']['tm_totalunits']
             if kwargs['task']['tm_split_algo'] == 'FileBased':
                 if totalUnits < 1.0:
-                    totalUnits *= len(data.getFiles())
+                    totalUnits = int(totalUnits * len(data.getFiles()) + 0.5)
                 splitparam['total_files'] = totalUnits
             elif kwargs['task']['tm_split_algo'] == 'LumiBased':
                 if totalUnits < 1.0:
-                    totalUnits *= sum(len(run.lumis) for f in data.getFiles() for run in f['runs'])
+                    totalUnits = int(totalUnits * sum(len(run.lumis) for f in data.getFiles() for run in f['runs']) + 0.5)
                 splitparam['total_lumis'] = totalUnits
             elif kwargs['task']['tm_split_algo'] == 'EventAwareLumiBased':
                 if totalUnits < 1.0:
-                    totalUnits *= sum(f['events'] for f in data.getFiles())
+                    totalUnits = int(totalUnits * sum(f['events'] for f in data.getFiles()) + 0.5)
                 splitparam['total_events'] = totalUnits
             elif kwargs['task']['tm_split_algo'] == 'Automatic':
                 splitparam['algorithm'] = 'FileBased'
