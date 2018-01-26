@@ -96,7 +96,7 @@ def adjustPostScriptExitStatus(resubmitJobIds, filename):
                 ra_buffer = []
         elif len(ra_buffer) == 3:
             m = node_re.search(line)
-            printLog("Matchting the line '{0}' to groups: {1}".format(line.strip(), m.groups()))
+            printLog("Matching the line '{0}' to groups: {1}".format(line.strip(), m.groups()))
             if m and (resubmitAllFailed or (m.groups()[0] in resubmitJobIds)):
                 printLog("Successful match: {0}, adjusting status and appending to adjustedJobIds".format(m.groups()[0]))
                 adjustedJobIds.append(m.groups()[0])
@@ -390,9 +390,9 @@ def main():
                 # Note this lock method didn't exist until 8.1.6; prior to this, we simply
                 # run dangerously.
                 with htcondor.lock(open(fn, 'a'), htcondor.LockType.WriteLock):
-                    adjustedJobIds = adjustPostScriptExitStatus(resubmitJobIds, fn)
+                    adjustedJobIds.extend(adjustPostScriptExitStatus(resubmitJobIds, fn))
             else:
-                adjustedJobIds = adjustPostScriptExitStatus(resubmitJobIds, fn)
+                adjustedJobIds.extend(adjustPostScriptExitStatus(resubmitJobIds, fn))
         ## Adjust the maximum allowed number of retries only for the job ids for which
         ## the POST script exit status was adjusted. Why only for these job ids and not
         ## for all job ids in resubmitJobIds? Because if resubmitJobIds = True, which as
