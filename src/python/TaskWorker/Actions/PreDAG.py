@@ -30,6 +30,7 @@ import shutil
 import logging
 import tarfile
 import tempfile
+import functools
 import subprocess
 
 from ast import literal_eval
@@ -283,15 +284,15 @@ class PreDAG(object):
                 shutil.rmtree(tmpdir)
         missing_compact = missing.getCompactList()
         runs = missing.getRuns()
-        #Compact list is like
-        #{
-        #'1': [[1, 33], [35, 35], [37, 47], [49, 75], [77, 130], [133, 136]],
-        #'2':[[1,45],[50,80]]
-        #}
-        #Now we turn lumis it into something like:
-        #lumis=['1, 33, 35, 35, 37, 47, 49, 75, 77, 130, 133, 136','1,45,50,80']
-        #which is the format expected by buildLumiMask in the splitting algorithm
-        lumis = [",".join(str(l) for l in reduce(lambda x, y:x + y, missing_compact[run])) for run in runs]
+        # Compact list is like
+        # {
+        # '1': [[1, 33], [35, 35], [37, 47], [49, 75], [77, 130], [133, 136]],
+        # '2':[[1,45],[50,80]]
+        # }
+        # Now we turn lumis it into something like:
+        # lumis=['1, 33, 35, 35, 37, 47, 49, 75, 77, 130, 133, 136','1,45,50,80']
+        # which is the format expected by buildLumiMask in the splitting algorithm
+        lumis = [",".join(str(l) for l in functools.reduce(lambda x, y:x + y, missing_compact[run])) for run in runs]
 
         task['tm_split_args']['runs'] = runs
         task['tm_split_args']['lumis'] = lumis

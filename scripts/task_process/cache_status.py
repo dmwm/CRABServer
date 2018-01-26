@@ -5,7 +5,6 @@ import time
 import logging
 import os
 import ast
-import json
 import sys
 import classad
 import glob
@@ -42,20 +41,23 @@ FJR_PARSE_RES_FILE = "task_process/fjr_parse_results.txt"
 #
 
 cpuRe = re.compile(r"Usr \d+ (\d+):(\d+):(\d+), Sys \d+ (\d+):(\d+):(\d+)")
+
+
 def insertCpu(event, info):
     if 'TotalRemoteUsage' in event:
         m = cpuRe.match(event['TotalRemoteUsage'])
         if m:
             g = [int(i) for i in m.groups()]
-            user = g[0]*3600 + g[1]*60 + g[2]
-            sys = g[3]*3600 + g[4]*60 + g[5]
+            user = g[0] * 3600 + g[1] * 60 + g[2]
+            system = g[3] * 3600 + g[4] * 60 + g[5]
             info['TotalUserCpuTimeHistory'][-1] = user
-            info['TotalSysCpuTimeHistory'][-1] = sys
+            info['TotalSysCpuTimeHistory'][-1] = system
     else:
         if 'RemoteSysCpu' in event:
             info['TotalSysCpuTimeHistory'][-1] = float(event['RemoteSysCpu'])
         if 'RemoteUserCpu' in event:
             info['TotalUserCpuTimeHistory'][-1] = float(event['RemoteUserCpu'])
+
 
 nodeNameRe = re.compile("DAG Node: Job(\d+(?:-\d+)?)")
 nodeName2Re = re.compile("Job(\d+(?:-\d+)?)")
@@ -168,9 +170,9 @@ def parseJobLog(fp, nodes, nodeMap):
             # These events don't really affect the node status
             pass
         else:
-            logging.warning("Unknown event type: %s" % event['MyType'])
+            logging.warning("Unknown event type: %s", event['MyType'])
 
-    logging.debug("There were %d events in the job log." % count)
+    logging.debug("There were %d events in the job log.", count)
     now = time.time()
     for node, info in nodes.items():
         if node == 'DagStatus':

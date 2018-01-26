@@ -41,8 +41,8 @@ class DagmanResubmitter(TaskAction):
         else:
             resubmitWhat = "jobs"
 
-        self.logger.info("About to resubmit %s for workflow: %s." % (resubmitWhat, workflow))
-        self.logger.debug("Task info: %s" % str(task))
+        self.logger.info("About to resubmit %s for workflow: %s.", resubmitWhat, workflow)
+        self.logger.debug("Task info: %s", str(task))
 
         if task.get('resubmit_publication', False):
             asourl = task.get('tm_asourl', None)
@@ -70,7 +70,7 @@ class DagmanResubmitter(TaskAction):
             msg += " Please try again later."
             msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
             msg += " Message from the scheduler: %s" % (str(exp))
-            self.logger.exception("%s: %s" % (workflow, msg))
+            self.logger.exception("%s: %s", workflow, msg)
             raise TaskWorkerException(msg)
 
         # Check memory and walltime
@@ -145,7 +145,7 @@ class DagmanResubmitter(TaskAction):
                     for adparam, taskparam in params.iteritems():
                         if taskparam in ad:
                             if taskparam == 'jobids' and len(list(ad[taskparam])) == 0:
-                                self.logger.debug("Setting %s = True in the task ad." % (adparam))
+                                self.logger.debug("Setting %s = True in the task ad.", adparam)
                                 schedd.edit(rootConst, adparam, classad.ExprTree("true"))
                             else:
                                 schedd.edit(rootConst, adparam, ad.lookup(taskparam))
@@ -186,7 +186,7 @@ class DagmanResubmitter(TaskAction):
             configreq = {'subresource': 'state',
                          'workflow': kwargs['task']['tm_taskname'],
                          'status': 'SUBMITTED'}
-            self.logger.debug("Setting the task as successfully resubmitted with %s" % (str(configreq)))
+            self.logger.debug("Setting the task as successfully resubmitted with %s", str(configreq))
             self.server.post(self.resturi, data = urllib.urlencode(configreq))
         except HTTPException as hte:
             self.logger.error(hte.headers)

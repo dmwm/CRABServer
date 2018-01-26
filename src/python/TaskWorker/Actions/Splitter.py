@@ -82,7 +82,7 @@ class Splitter(TaskAction):
         #printing duplicated lumis if any
         lumiChecker = getattr(jobfactory, 'lumiChecker', None)
         if lumiChecker and lumiChecker.splitLumiFiles:
-            self.logger.warning("The input dataset contains the following duplicated lumis %s" % lumiChecker.splitLumiFiles.keys())
+            self.logger.warning("The input dataset contains the following duplicated lumis %s", lumiChecker.splitLumiFiles.keys())
             #TODO use self.uploadWarning
             try:
                 userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry = 2,
