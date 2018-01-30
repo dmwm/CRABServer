@@ -22,20 +22,28 @@ class Splitter(TaskAction):
 
         maxJobs = getattr(self.config.TaskWorker, 'maxJobsPerTask', 10000)
 
+        data = args[0]
         splitparam = kwargs['task']['tm_split_args']
         splitparam['algorithm'] = kwargs['task']['tm_split_algo']
         if kwargs['task']['tm_job_type'] == 'Analysis':
+            totalUnits = kwargs['task']['tm_totalunits']
             if kwargs['task']['tm_split_algo'] == 'FileBased':
-                splitparam['total_files'] = kwargs['task']['tm_totalunits']
+                if totalUnits < 1.0:
+                    totalUnits = int(totalUnits * len(data.getFiles()) + 0.5)
+                splitparam['total_files'] = totalUnits
             elif kwargs['task']['tm_split_algo'] == 'LumiBased':
-                splitparam['total_lumis'] = kwargs['task']['tm_totalunits']
+                if totalUnits < 1.0:
+                    totalUnits = int(totalUnits * sum(len(run.lumis) for f in data.getFiles() for run in f['runs']) + 0.5)
+                splitparam['total_lumis'] = totalUnits
             elif kwargs['task']['tm_split_algo'] == 'EventAwareLumiBased':
-                splitparam['total_events'] = kwargs['task']['tm_totalunits']
+                if totalUnits < 1.0:
+                    totalUnits = int(totalUnits * sum(f['events'] for f in data.getFiles()) + 0.5)
+                splitparam['total_events'] = totalUnits
             elif kwargs['task']['tm_split_algo'] == 'Automatic':
                 splitparam['algorithm'] = 'FileBased'
-                splitparam['total_files'] = len(args[0].getFiles())
+                splitparam['total_files'] = len(data.getFiles())
                 numProbes = getattr(self.config.TaskWorker, 'numAutomaticProbes', 5)
-                splitparam['files_per_job'] = (len(args[0].getFiles()) + numProbes - 1) // numProbes
+                splitparam['files_per_job'] = (len(data.getFiles()) + numProbes - 1) // numProbes
         elif kwargs['task']['tm_job_type'] == 'PrivateMC':
             if 'tm_events_per_lumi' in kwargs['task'] and kwargs['task']['tm_events_per_lumi']:
                 splitparam['events_per_lumi'] = kwargs['task']['tm_events_per_lumi']
@@ -43,7 +51,7 @@ class Splitter(TaskAction):
                 splitparam['lheInputFiles'] = True
         splitparam['applyLumiCorrection'] = True
 
-        wmsubs = Subscription(fileset=args[0], workflow=wmwork,
+        wmsubs = Subscription(fileset=data, workflow=wmwork,
                                split_algo=splitparam['algorithm'],
                                type=self.jobtypeMapper[kwargs['task']['tm_job_type']])
         try:
@@ -65,16 +73,16 @@ class Splitter(TaskAction):
             raise TaskWorkerException("The splitting on your task generated %s jobs. The maximum number of jobs in each task is %s" %
                                         (numJobs, maxJobs))
 
-        minRuntime = getattr(self.config.TaskWorker, 'minAutomaticRuntime', 3 * 60 ** 2)
+        minRuntime = getattr(self.config.TaskWorker, 'minAutomaticRuntimeMins', 180)
         if kwargs['task']['tm_split_algo'] == 'Automatic' and \
-                kwargs['task']['tm_split_args']['seconds_per_job'] < minRuntime:
-            msg = "Minimum runtime requirement for automatic splitting is {0} seconds.".format(minRuntime)
+                kwargs['task']['tm_split_args']['minutes_per_job'] < minRuntime:
+            msg = "Minimum runtime requirement for automatic splitting is {0} minutes.".format(minRuntime)
             raise TaskWorkerException(msg)
 
         #printing duplicated lumis if any
         lumiChecker = getattr(jobfactory, 'lumiChecker', None)
         if lumiChecker and lumiChecker.splitLumiFiles:
-            self.logger.warning("The input dataset contains the following duplicated lumis %s" % lumiChecker.splitLumiFiles.keys())
+            self.logger.warning("The input dataset contains the following duplicated lumis %s", lumiChecker.splitLumiFiles.keys())
             #TODO use self.uploadWarning
             try:
                 userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry = 2,

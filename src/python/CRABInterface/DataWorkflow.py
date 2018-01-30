@@ -9,7 +9,6 @@ from WMCore.REST.Error import ExecutionError
 from WMCore.Database.CMSCouch import CouchServer
 
 ## CRAB dependencies
-from ServerUtilities import TASKLIFETIME
 from ServerUtilities import checkTaskLifetime
 from ServerUtilities import PUBLICATIONDB_STATUSES
 from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
@@ -40,7 +39,7 @@ class DataWorkflow(object):
         self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
 
         self.splitArgMap = {
-                        "Automatic": "seconds_per_job",
+                        "Automatic": "minutes_per_job",
                         "LumiBased": "lumis_per_job",
                         "FileBased": "files_per_job",
                         "EventBased": "events_per_job",
@@ -275,7 +274,7 @@ class DataWorkflow(object):
            This needs to create a new workflow in the same campaign
         """
         retmsg = "ok"
-        self.logger.info("Getting task ID tuple from DB for task %s" % workflow)
+        self.logger.info("Getting task ID tuple from DB for task %s", workflow)
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         try:
             #just one row is picked up by the previous query
@@ -293,7 +292,7 @@ class DataWorkflow(object):
         task_status = row.task_status
 
         resubmitWhat = "publications" if publication else "jobs"
-        self.logger.info("About to resubmit %s for workflow: %s." % (resubmitWhat, workflow))
+        self.logger.info("About to resubmit %s for workflow: %s.", resubmitWhat, workflow)
 
         ## Ignore the following options if this is a publication resubmission or if the
         ## task was never submitted.
@@ -342,7 +341,7 @@ class DataWorkflow(object):
                 self.resubmitPublication(asourl, asodb, userproxy, workflow)
                 return [{'result': retmsg}]
             else:
-                self.logger.info("Jobs to resubmit: %s" % (jobids))
+                self.logger.info("Jobs to resubmit: %s", jobids)
 
             ## If these parameters are not set, give them the same values they had in the
             ## original task submission.
@@ -398,7 +397,7 @@ class DataWorkflow(object):
         retmsg = "ok"
         resubmitWhat = "publications" if publication else "jobs"
 
-        self.logger.info("About to resubmit %s for workflow: %s. Getting status first." % (resubmitWhat, workflow))
+        self.logger.info("About to resubmit %s for workflow: %s. Getting status first.", resubmitWhat, workflow)
 
         ## Get the status of the task/jobs.
         statusRes = self.status(workflow, userdn, userproxy)[0]
@@ -488,9 +487,9 @@ class DataWorkflow(object):
                     msg += " but only if the jobid is specified and the force option is set."
                     raise ExecutionError(msg) #return [{'result': msg}]
             if publication:
-                self.logger.info("Publications to resubmit if failed: %s" % (resubmitjobids))
+                self.logger.info("Publications to resubmit if failed: %s", resubmitjobids)
             else:
-                self.logger.info("Jobs to resubmit: %s" % (resubmitjobids))
+                self.logger.info("Jobs to resubmit: %s", resubmitjobids)
 
             ## If these parameters are not set, give them the same values they had in the
             ## original task submission.
@@ -552,7 +551,7 @@ class DataWorkflow(object):
            :arg str workflow: a workflow name"""
 
         retmsg = "ok"
-        self.logger.info("About to kill workflow: %s. Getting status first." % workflow)
+        self.logger.info("About to kill workflow: %s. Getting status first.", workflow)
         row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
         try:
             #just one row is picked up by the previous query
@@ -631,10 +630,9 @@ class DataWorkflow(object):
                    }
             try:
                 database.updateDocument(docid, 'DBSPublisher', 'updateFile', data)
-                self.logger.info("updating document %s " % docid)
+                self.logger.info("updating document %s ", docid)
             except Exception as ex:
-                msg = "Error updating document %s in CouchDB: %s" % (docid, str(ex))
-                self.logger.error(msg)
+                self.logger.error("Error updating document %s in CouchDB: %s", docid, str(ex))
         return
 
     def resubmitOraclePublication(self, taskname):

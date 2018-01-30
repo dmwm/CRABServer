@@ -55,7 +55,8 @@ def adjustPostScriptExitStatus(resubmitJobIds, filename):
     """
     if not resubmitJobIds:
         return []
-    resubmitAllFailed = (resubmitJobIds == True)
+    printLog("Looking for resubmitJobIds {0} in {1}".format(resubmitJobIds, filename))
+    resubmitAllFailed = (resubmitJobIds is True)
     terminator_re = re.compile(r"^\.\.\.$")
     event_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
     if resubmitAllFailed:
@@ -95,9 +96,9 @@ def adjustPostScriptExitStatus(resubmitJobIds, filename):
                 ra_buffer = []
         elif len(ra_buffer) == 3:
             m = node_re.search(line)
-            printLog("%s %s %s %s" % (line, m, m.groups(), resubmitJobIds))
+            printLog("Matching the line '{0}' to groups: {1}".format(line.strip(), m.groups()))
             if m and (resubmitAllFailed or (m.groups()[0] in resubmitJobIds)):
-                printLog("%s %s" % (m.groups()[0], resubmitJobIds))
+                printLog("Successful match: {0}, adjusting status and appending to adjustedJobIds".format(m.groups()[0]))
                 adjustedJobIds.append(m.groups()[0])
                 for l in ra_buffer:
                     output += l
@@ -171,7 +172,7 @@ def adjustMaxRetries(adjustJobIds, ad):
     ## count + CRAB_NumAutomJobRetries.
     retry_re = re.compile(r'RETRY Job(\d+(?:-\d+)?) (\d+) ')
     output = ""
-    adjustAll = (adjustJobIds == True)
+    adjustAll = (adjustJobIds is True)
     numAutomJobRetries = int(ad.get('CRAB_NumAutomJobRetries', 2))
     filenames = getGlob(ad, "RunJobs.dag", "RunJobs[1-9]*.subdag")
     for fn in filenames:
@@ -191,6 +192,7 @@ def adjustMaxRetries(adjustJobIds, ad):
                                 maxRetries = int(match_retry_re.groups()[1]) + (1 + numAutomJobRetries)
                             except ValueError:
                                 maxRetries = numAutomJobRetries
+                        printLog("Adjusted maxRetries for {0} to {1}".format(jobId, maxRetries))
                         line = retry_re.sub(r'RETRY Job%s %d ' % (jobId, maxRetries), line)
                 output += line
         with open(fn, 'w') as fd:
@@ -256,7 +258,7 @@ def updateWebDir(ad):
     """
     Need a doc string here.
     """
-    data = {'subresource' : 'addwebdir'}
+    data = {'subresource': 'addwebdir'}
     host = ad['CRAB_RestHost']
     uri = ad['CRAB_RestURInoAPI'] + '/task'
     data['workflow'] = ad['CRAB_ReqName']
@@ -378,13 +380,6 @@ def main():
         except TypeError:
             resubmitJobIds = True
 
-    schedd = htcondor.Schedd()
-    tailconst = "TaskType =?= \"TAIL\" && CRAB_ReqName =?= %s" % classad.quote(ad.get("CRAB_ReqName"))
-    if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
-        printLog("Killing tail DAGs")
-        schedd.edit(tailconst, "HoldKillSig", 'SIGKILL')
-        schedd.act(htcondor.JobAction.Hold, tailconst)
-
     if resubmitJobIds:
         adjustedJobIds = []
         filenames = getGlob(ad, "RunJobs.dag.nodes.log", "RunJobs[1-9]*.subdag.nodes.log")
@@ -395,9 +390,9 @@ def main():
                 # Note this lock method didn't exist until 8.1.6; prior to this, we simply
                 # run dangerously.
                 with htcondor.lock(open(fn, 'a'), htcondor.LockType.WriteLock):
-                    adjustedJobIds = adjustPostScriptExitStatus(resubmitJobIds, fn)
+                    adjustedJobIds.extend(adjustPostScriptExitStatus(resubmitJobIds, fn))
             else:
-                adjustedJobIds = adjustPostScriptExitStatus(resubmitJobIds, fn)
+                adjustedJobIds.extend(adjustPostScriptExitStatus(resubmitJobIds, fn))
         ## Adjust the maximum allowed number of retries only for the job ids for which
         ## the POST script exit status was adjusted. Why only for these job ids and not
         ## for all job ids in resubmitJobIds? Because if resubmitJobIds = True, which as
@@ -413,10 +408,6 @@ def main():
         siteAd.update(newSiteAd)
         with open("site.ad", "w") as fd:
             fd.write(str(siteAd))
-
-    if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
-        schedd.edit(tailconst, "HoldKillSig", 'SIGUSR1')
-        schedd.act(htcondor.JobAction.Release, tailconst)
 
     printLog("Exiting AdjustSite")
 

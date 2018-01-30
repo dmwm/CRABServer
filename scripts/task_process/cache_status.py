@@ -5,7 +5,6 @@ import time
 import logging
 import os
 import ast
-import json
 import sys
 import classad
 import glob
@@ -42,20 +41,23 @@ FJR_PARSE_RES_FILE = "task_process/fjr_parse_results.txt"
 #
 
 cpuRe = re.compile(r"Usr \d+ (\d+):(\d+):(\d+), Sys \d+ (\d+):(\d+):(\d+)")
+
+
 def insertCpu(event, info):
     if 'TotalRemoteUsage' in event:
         m = cpuRe.match(event['TotalRemoteUsage'])
         if m:
             g = [int(i) for i in m.groups()]
-            user = g[0]*3600 + g[1]*60 + g[2]
-            sys = g[3]*3600 + g[4]*60 + g[5]
+            user = g[0] * 3600 + g[1] * 60 + g[2]
+            system = g[3] * 3600 + g[4] * 60 + g[5]
             info['TotalUserCpuTimeHistory'][-1] = user
-            info['TotalSysCpuTimeHistory'][-1] = sys
+            info['TotalSysCpuTimeHistory'][-1] = system
     else:
         if 'RemoteSysCpu' in event:
             info['TotalSysCpuTimeHistory'][-1] = float(event['RemoteSysCpu'])
         if 'RemoteUserCpu' in event:
             info['TotalUserCpuTimeHistory'][-1] = float(event['RemoteUserCpu'])
+
 
 nodeNameRe = re.compile("DAG Node: Job(\d+(?:-\d+)?)")
 nodeName2Re = re.compile("Job(\d+(?:-\d+)?)")
@@ -168,9 +170,9 @@ def parseJobLog(fp, nodes, nodeMap):
             # These events don't really affect the node status
             pass
         else:
-            logging.warning("Unknown event type: %s" % event['MyType'])
+            logging.warning("Unknown event type: %s", event['MyType'])
 
-    logging.debug("There were %d events in the job log." % count)
+    logging.debug("There were %d events in the job log.", count)
     now = time.time()
     for node, info in nodes.items():
         if node == 'DagStatus':
@@ -193,23 +195,40 @@ def parseErrorReport(data, nodes):
             # (even if there's only a single value) it has to be indexed to zero.
             statedict['Error'] = data[jobid].values()[0] #data[jobid] contains all retries. take the last one
 
-def parseNodeStateV2(fp, nodes):
+def parseNodeStateV2(fp, nodes, level):
     """
     HTCondor 8.1.6 updated the node state file to be classad-based.
     This is a more flexible format that allows future extensions but, unfortunately,
     also requires a separate parser.
     """
-    taskStatus = nodes.setdefault("DagStatus", {})
+    dagStatus = nodes.setdefault("DagStatus", {})
+    dagStatus.setdefault("SubDagStatus", {})
+    subDagStatus = dagStatus.setdefault("SubDags", {})
     for ad in classad.parseAds(fp):
         if ad['Type'] == "DagStatus":
-            taskStatus['Timestamp'] = ad.get('Timestamp', -1)
-            taskStatus['NodesTotal'] = ad.get('NodesTotal', -1)
-            taskStatus['DagStatus'] = ad.get('DagStatus', -1)
+            if level:
+                statusDict = subDagStatus.setdefault(int(level), {})
+                statusDict['Timestamp'] = ad.get('Timestamp', -1)
+                statusDict['NodesTotal'] = ad.get('NodesTotal', -1)
+                statusDict['DagStatus'] = ad.get('DagStatus', -1)
+            else:
+                dagStatus['Timestamp'] = ad.get('Timestamp', -1)
+                dagStatus['NodesTotal'] = ad.get('NodesTotal', -1)
+                dagStatus['DagStatus'] = ad.get('DagStatus', -1)
             continue
         if ad['Type'] != "NodeStatus":
             continue
         node = ad.get("Node", "")
-        if not node.startswith("Job") or node.endswith("SubJobs"):
+        if node.endswith("SubJobs"):
+            status = ad.get('NodeStatus', -1)
+            dagname = "RunJobs{0}.subdag".format(nodeName2Re.match(node).group(1))
+            # Add special state where we *expect* a submitted DAG for the
+            # status command on the client
+            if status == 5 and os.path.exists(dagname) and os.stat(dagname).st_size > 0:
+                status = 99
+            dagStatus["SubDagStatus"][node] = status
+            continue
+        if not node.startswith("Job"):
             continue
         nodeid = node[3:]
         status = ad.get('NodeStatus', -1)
@@ -275,8 +294,9 @@ def storeNodesInfoInFile():
     jobsLog.close()
 
     for fn in glob.glob("node_state*"):
+        level = re.match(r'(\w+)(?:.(\w+))?', fn).group(2)
         with open(fn, 'r') as nodeState:
-            parseNodeStateV2(nodeState, nodes)
+            parseNodeStateV2(nodeState, nodes, level)
 
     try:
         errorSummary, newFjrParseResCheckpoint = summarizeFjrParseResults(fjrParseResCheckpoint)

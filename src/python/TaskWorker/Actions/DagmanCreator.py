@@ -172,7 +172,7 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
 %(extra_jdl)s
 queue
 """
-SPLIT_ARG_MAP = {"Automatic": "seconds_per_job",
+SPLIT_ARG_MAP = {"Automatic": "minutes_per_job",
                  "LumiBased": "lumis_per_job",
                  "EventBased": "events_per_job",
                  "FileBased": "files_per_job",
@@ -199,9 +199,9 @@ def makeLFNPrefixes(task):
     if 'tm_user_role' in task and task['tm_user_role']:
         hash_input += "," + task['tm_user_role']
     lfn = task['tm_output_lfn']
-    hash = hashlib.sha1(hash_input).hexdigest()
+    pset_hash = hashlib.sha1(hash_input).hexdigest()
     user = task['tm_username']
-    tmp_user = "%s.%s" % (user, hash)
+    tmp_user = "%s.%s" % (user, pset_hash)
     publish_info = task['tm_publish_name'].rsplit('-', 1) #publish_info[0] is the publishname or the taskname
     timestamp = getCreateTimestamp(task['tm_taskname'])
     splitlfn = lfn.split('/')
@@ -236,9 +236,9 @@ def validateLFNs(path, outputFiles):
         Lexicon.lfn(testLfn)  # will raise if testLfn is not a valid lfn
     return
 
-def transform_strings(input):
+def transform_strings(data):
     """
-    Converts the arguments in the input dictionary to the arguments necessary
+    Converts the arguments in the data dictionary to the arguments necessary
     for the job submit file string.
     """
     info = {}
@@ -249,43 +249,43 @@ def transform_strings(input):
                'stageoutpolicy', 'taskType', 'worker_name', \
                'desired_arch', 'resthost', 'resturinoapi', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
-        val = input.get(var, None)
+        val = data.get(var, None)
         if val == None:
             info[var] = 'undefined'
         else:
             info[var] = json.dumps(val)
 
     for var in 'accounting_group', 'accounting_group_user':
-        info[var] = input[var]
+        info[var] = data[var]
 
     for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'publishgroupname':
-        info[var] = int(input[var])
+        info[var] = int(data[var])
 
     for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', 'tfileoutfiles', 'edmoutfiles':
-        val = input[var]
+        val = data[var]
         if val == None:
             info[var] = "{}"
         else:
             info[var] = "{" + json.dumps(val)[1:-1] + "}"
 
-    info['lumimask'] = '"' + json.dumps(WMCore.WMSpec.WMTask.buildLumiMask(input['runs'], input['lumis'])).replace(r'"', r'\"') + '"'
+    info['lumimask'] = '"' + json.dumps(WMCore.WMSpec.WMTask.buildLumiMask(data['runs'], data['lumis'])).replace(r'"', r'\"') + '"'
 
-    splitArgName = SPLIT_ARG_MAP[input['splitalgo']]
-    info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : input['algoargs']}).replace('"', r'\"') + '"'
+    splitArgName = SPLIT_ARG_MAP[data['splitalgo']]
+    info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : data['algoargs']}).replace('"', r'\"') + '"'
     info['attempt'] = 0
 
     for var in ["cacheurl", "jobsw", "jobarch", "cachefilename", "asyncdest", "requestname"]:
-        info[var+"_flatten"] = input[var]
+        info[var+"_flatten"] = data[var]
 
     # TODO: PanDA wrapper wants some sort of dictionary.
     info["addoutputfiles_flatten"] = '{}'
 
-    temp_dest, dest = makeLFNPrefixes(input)
+    temp_dest, dest = makeLFNPrefixes(data)
     info["temp_dest"] = temp_dest
     info["output_dest"] = dest
-    info['x509up_file'] = os.path.split(input['user_proxy'])[-1]
-    info['user_proxy'] = input['user_proxy']
-    info['scratch'] = input['scratch']
+    info['x509up_file'] = os.path.split(data['user_proxy'])[-1]
+    info['user_proxy'] = data['user_proxy']
+    info['scratch'] = data['scratch']
 
     return info
 
@@ -352,7 +352,7 @@ class DagmanCreator(TaskAction.TaskAction):
         params = self.buildDashboardInfo(task)
         params_copy = dict(params)
         params_copy['jobId'] = 'TaskMeta'
-        self.logger.debug("Dashboard task info: %s" % str(params_copy))
+        self.logger.debug("Dashboard task info: %s", str(params_copy))
         apmon.sendToML(params_copy)
         apmon.free()
         return params
@@ -390,7 +390,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['desired_arch'] = "X86_64"
         m = re.match("([a-z]+)(\d+)_(\w+)_(\w+)", scram_arch)
         if m:
-            os, ver, arch, _ = m.groups()
+            _, _, arch, _ = m.groups()
             if arch == "amd64":
                 info['desired_arch'] = "X86_64"
 
@@ -620,7 +620,7 @@ class DagmanCreator(TaskAction.TaskAction):
                         'seeding': 'AutomaticSeeding',
                         'lheInputFiles': 'tm_generator' in task and task['tm_generator'] == 'lhe',
                         'eventsPerLumi': task['tm_events_per_lumi'],
-                        'maxRuntime' : task['max_runtime'],
+                        'maxRuntime': task['max_runtime'] * 60,  # the job script takes seconds, internal units are minutes
                         'sw': task['tm_job_sw'],
                         'block': block,
                         'destination': pfns,
@@ -697,20 +697,20 @@ class DagmanCreator(TaskAction.TaskAction):
         ## file and we would take it from the Task DB.
         kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
 
-        runtime = kwargs['task']['tm_split_args'].get('seconds_per_job', -1)
+        runtime = kwargs['task']['tm_split_args'].get('minutes_per_job', -1)
 
-        proberuntime = getattr(self.config.TaskWorker, 'automaticProbeRuntime', 15 * 60)
+        proberuntime = getattr(self.config.TaskWorker, 'automaticProbeRuntimeMins', 15)
         tailruntime = int(max(
-            getattr(self.config.TaskWorker, 'automaticTailRuntimeMinimum', 45 * 60),
+            getattr(self.config.TaskWorker, 'automaticTailRuntimeMinimumMins', 45),
             getattr(self.config.TaskWorker, 'automaticTailRuntimeFraction', 0.2) * runtime
         ))
 
-        overhead = getattr(self.config.TaskWorker, 'automaticProcessingOverhead', 60 * 60)
+        overhead = getattr(self.config.TaskWorker, 'automaticProcessingOverheadMins', 60)
 
         kwargs['task']['max_runtime'] = runtime
         # include a factor of 4 as a buffer
-        kwargs['task']['maxproberuntime'] = (proberuntime * 4) // 60
-        kwargs['task']['maxtailruntime'] = (tailruntime * 5) // 60
+        kwargs['task']['maxproberuntime'] = proberuntime * 4
+        kwargs['task']['maxtailruntime'] = tailruntime * 5
         if kwargs['task']['tm_split_algo'] == 'Automatic':
             if stage == 'conventional':
                 kwargs['task']['max_runtime'] = proberuntime
@@ -720,10 +720,9 @@ class DagmanCreator(TaskAction.TaskAction):
             elif stage == 'processing':
                 # include a buffer of one hour for overhead beyond the time
                 # given to CMSSW
-                kwargs['task']['tm_maxjobruntime'] = min((runtime + overhead) // 60, kwargs['task']['tm_maxjobruntime'])
+                kwargs['task']['tm_maxjobruntime'] = min(runtime + overhead, kwargs['task']['tm_maxjobruntime'])
             elif stage == 'tail':
                 kwargs['task']['max_runtime'] = -1
-
 
         info = self.makeJobSubmit(kwargs['task'])
 
@@ -733,7 +732,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         # This config setting acts as a global black list
         global_blacklist = set(self.getBlacklistedSites())
-        self.logger.debug("CRAB site blacklist: %s" % (list(global_blacklist)))
+        self.logger.debug("CRAB site blacklist: %s", list(global_blacklist))
 
         # This is needed for Site Metrics
         # It should not block any site for Site Metrics and if needed for other activities
@@ -763,8 +762,8 @@ class DagmanCreator(TaskAction.TaskAction):
 
         siteWhitelist = set(kwargs['task']['tm_site_whitelist'])
         siteBlacklist = set(kwargs['task']['tm_site_blacklist'])
-        self.logger.debug("Site whitelist: %s" % (list(siteWhitelist)))
-        self.logger.debug("Site blacklist: %s" % (list(siteBlacklist)))
+        self.logger.debug("Site whitelist: %s", list(siteWhitelist))
+        self.logger.debug("Site blacklist: %s", list(siteBlacklist))
 
         if siteWhitelist & global_blacklist:
             msg = "The following sites from the user site whitelist are blacklisted by the CRAB server: %s." % (list(siteWhitelist & global_blacklist))
@@ -779,7 +778,7 @@ class DagmanCreator(TaskAction.TaskAction):
             self.logger.warning(msg)
 
         ignoreLocality = kwargs['task']['tm_ignore_locality'] == 'T'
-        self.logger.debug("Ignore locality: %s" % (ignoreLocality))
+        self.logger.debug("Ignore locality: %s", ignoreLocality)
 
         for jobgroup in splitterResult[0]:
             jobs = jobgroup.getJobs()
@@ -791,13 +790,13 @@ class DagmanCreator(TaskAction.TaskAction):
                 for inputfile in job['input_files']:
                     jgblocks.add(inputfile['block'])
                     allblocks.add(inputfile['block'])
-            self.logger.debug("Blocks: %s" % list(jgblocks))
+            self.logger.debug("Blocks: %s", list(jgblocks))
 
             if not jobs:
                 locations = set()
             else:
                 locations = set(jobs[0]['input_files'][0]['locations'])
-            self.logger.debug("Locations: %s" % (list(locations)))
+            self.logger.debug("Locations: %s", list(locations))
 
             ## Discard the jgblocks that have no locations. This can happen when a block is
             ## still open in PhEDEx. Newly created datasets from T0 (at least) have a large
@@ -837,7 +836,7 @@ class DagmanCreator(TaskAction.TaskAction):
             else:
                 possiblesites = locations
             ## At this point 'possiblesites' should never be empty.
-            self.logger.debug("Possible sites: %s" % (list(possiblesites)))
+            self.logger.debug("Possible sites: %s", list(possiblesites))
 
             ## Apply the global site blacklist.
             availablesites = possiblesites - global_blacklist
@@ -862,7 +861,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
             availablesites = [str(i) for i in availablesites]
             datasites = jobs[0]['input_files'][0]['locations']
-            self.logger.info("Resulting available sites: %s" % (list(availablesites)))
+            self.logger.info("Resulting available sites: %s", list(availablesites))
 
             if siteWhitelist or siteBlacklist:
                 msg = "The site whitelist and blacklist will be applied by the pre-job."
@@ -1023,7 +1022,7 @@ class DagmanCreator(TaskAction.TaskAction):
         # Info for ML:
         target_se = ''
         max_len_target_se = 900
-        for site in map(str, availablesites):
+        for site in (str(s) for s in availablesites):
             if len(target_se) > max_len_target_se:
                 target_se += ',Many_More'
                 break

@@ -30,6 +30,7 @@ import shutil
 import logging
 import tarfile
 import tempfile
+import functools
 import subprocess
 
 from ast import literal_eval
@@ -179,7 +180,7 @@ class PreDAG(object):
                 count += 1
         eventsThr = sumEventsThr / count
         self.logger.info("average throughput for %s jobs: %s", count, eventsThr)
-        runtime = task['tm_split_args'].get('seconds_per_job', -1)
+        runtime = task['tm_split_args'].get('minutes_per_job', -1)
         if self.stage == "processing":
             # Build in a 33% error margin in the runtime to not create too
             # many tails. This essentially moves the peak to lower
@@ -187,10 +188,11 @@ class PreDAG(object):
             target = int(0.75 * runtime)
         elif self.stage == 'tail':
             target = int(max(
-                getattr(config.TaskWorker, 'automaticTailRuntimeMinimum', 45 * 60),
+                getattr(config.TaskWorker, 'automaticTailRuntimeMinimumMins', 45),
                 getattr(config.TaskWorker, 'automaticTailRuntimeFraction', 0.2) * runtime
             ))
-        events = int(target * eventsThr)
+        # `target` is in minutes, `eventsThr` is in events/second!
+        events = int(target * eventsThr * 60)
         splitTask = dict(task)
         splitTask['tm_split_algo'] = 'EventAwareLumiBased'
         splitTask['tm_split_args']['events_per_job'] = events
@@ -218,7 +220,7 @@ class PreDAG(object):
                 self.logger.info(msg)
         except TaskWorkerException as e:
             retmsg = "Splitting failed with:\n{0}".format(e)
-            self.logger.error(msg)
+            self.logger.error(retmsg)
 #            self.set_dashboard_state('FAILED')
             return 1
         try:
@@ -282,15 +284,15 @@ class PreDAG(object):
                 shutil.rmtree(tmpdir)
         missing_compact = missing.getCompactList()
         runs = missing.getRuns()
-        #Compact list is like
-        #{
-        #'1': [[1, 33], [35, 35], [37, 47], [49, 75], [77, 130], [133, 136]],
-        #'2':[[1,45],[50,80]]
-        #}
-        #Now we turn lumis it into something like:
-        #lumis=['1, 33, 35, 35, 37, 47, 49, 75, 77, 130, 133, 136','1,45,50,80']
-        #which is the format expected by buildLumiMask in the splitting algorithm
-        lumis = [",".join(str(l) for l in reduce(lambda x, y:x + y, missing_compact[run])) for run in runs]
+        # Compact list is like
+        # {
+        # '1': [[1, 33], [35, 35], [37, 47], [49, 75], [77, 130], [133, 136]],
+        # '2':[[1,45],[50,80]]
+        # }
+        # Now we turn lumis it into something like:
+        # lumis=['1, 33, 35, 35, 37, 47, 49, 75, 77, 130, 133, 136','1,45,50,80']
+        # which is the format expected by buildLumiMask in the splitting algorithm
+        lumis = [",".join(str(l) for l in functools.reduce(lambda x, y:x + y, missing_compact[run])) for run in runs]
 
         task['tm_split_args']['runs'] = runs
         task['tm_split_args']['lumis'] = lumis

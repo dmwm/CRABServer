@@ -7,7 +7,7 @@ echo "As user: $(whoami)"
 set -x
 
 # Touch a bunch of files to make sure job doesn't go on hold for missing files
-for FILE in $1.dagman.out RunJobs.dag RunJobs.dag.dagman.out dbs_discovery.err dbs_discovery.out job_splitting.err job_splitting.out; do
+for FILE in $1.dagman.out RunJobs.dag.dagman.out dbs_discovery.err dbs_discovery.out job_splitting.err job_splitting.out; do
     touch $FILE
 done
 
@@ -31,7 +31,7 @@ mkdir -p transfer_info
 
 #This is the only file transfered from the TW to the schedd. Can be downloaded for the "preparelocal" client command
 TARBALL_NAME="InputFiles.tar.gz"
-tar xvfzm $TARBALL_NAME
+tar --keep-newer-files -zmxvf $TARBALL_NAME
 if [[ $? != 0 ]]; then
     echo "Error: Unable to unpack the Input files of the task." >&2
     condor_qedit $CONDOR_ID DagmanHoldReason "'Unable to unpack the input files of the task.'"
