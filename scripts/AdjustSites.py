@@ -380,6 +380,15 @@ def main():
         except TypeError:
             resubmitJobIds = True
 
+    # Hold and release processing and tail DAGs here so that modifications
+    # to the submission and log files will be picked up.
+    schedd = htcondor.Schedd()
+    tailconst = "TaskType =?= \"TAIL\" && CRAB_ReqName =?= %s" % classad.quote(ad.get("CRAB_ReqName"))
+    if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
+        printLog("Holding processing and tail DAGs")
+        schedd.edit(tailconst, "HoldKillSig", 'SIGKILL')
+        schedd.act(htcondor.JobAction.Hold, tailconst)
+
     if resubmitJobIds:
         adjustedJobIds = []
         filenames = getGlob(ad, "RunJobs.dag.nodes.log", "RunJobs[1-9]*.subdag.nodes.log")
@@ -408,6 +417,11 @@ def main():
         siteAd.update(newSiteAd)
         with open("site.ad", "w") as fd:
             fd.write(str(siteAd))
+
+    if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
+        printLog("Releasing processing and tail DAGs")
+        schedd.edit(tailconst, "HoldKillSig", 'SIGUSR1')
+        schedd.act(htcondor.JobAction.Release, tailconst)
 
     printLog("Exiting AdjustSite")
 

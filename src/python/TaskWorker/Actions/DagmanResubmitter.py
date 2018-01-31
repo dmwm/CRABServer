@@ -89,8 +89,13 @@ class DagmanResubmitter(TaskAction):
             self.logger.warning(msg)
             self.uploadWarning(msg, proxy, kwargs['task']['tm_taskname'])
 
-        # Release the DAG
-        rootConst = 'stringListMember(TaskType, "ROOT PROCESSING TAIL", " ") && CRAB_ReqName =?= %s' % HTCondorUtils.quote(workflow)
+        # Find only the originally submitted DAG to hold and release: this
+        # will re-trigger the scripts and adjust retries and other
+        # resubmission parameters.
+        #
+        # Processing and tail DAGs will be restarted by these scrips on the
+        # schedd after the modifications are made.
+        rootConst = "TaskType =?= \"ROOT\" && CRAB_ReqName =?= %s" % HTCondorUtils.quote(workflow)
 
         ## Calculate new parameters for resubmitted jobs. These parameters will
         ## be (re)written in the _CONDOR_JOB_AD when we do schedd.edit() below.
