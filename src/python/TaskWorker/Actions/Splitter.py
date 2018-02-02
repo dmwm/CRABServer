@@ -40,6 +40,9 @@ class Splitter(TaskAction):
                     totalUnits = int(totalUnits * sum(f['events'] for f in data.getFiles()) + 0.5)
                 splitparam['total_events'] = totalUnits
             elif kwargs['task']['tm_split_algo'] == 'Automatic':
+                # REST backwards compatibility fix
+                if 'seconds_per_job' in kwargs['task']['tm_split_args']:
+                    kwargs['task']['tm_split_args']['minutes_per_job'] = kwargs['task']['tm_split_args'].pop('seconds_per_job')
                 splitparam['algorithm'] = 'FileBased'
                 splitparam['total_files'] = len(data.getFiles())
                 numProbes = getattr(self.config.TaskWorker, 'numAutomaticProbes', 5)
