@@ -171,11 +171,11 @@ def adjustMaxRetries(adjustJobIds, ad):
     ## resubmitJobIds argument and change the maximum retries to the current retry
     ## count + CRAB_NumAutomJobRetries.
     retry_re = re.compile(r'RETRY Job(\d+(?:-\d+)?) (\d+) ')
-    output = ""
     adjustAll = (adjustJobIds is True)
     numAutomJobRetries = int(ad.get('CRAB_NumAutomJobRetries', 2))
     filenames = getGlob(ad, "RunJobs.dag", "RunJobs[1-9]*.subdag")
     for fn in filenames:
+        output = ""
         with open(fn, 'r') as fd:
             for line in fd.readlines():
                 match_retry_re = retry_re.search(line)
