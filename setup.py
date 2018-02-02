@@ -45,7 +45,7 @@ systems = \
                        'ServerUtilities', 'MultiProcessingLog', 'CMSGroupMapper',
                        'cache_status'],
         'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
-                   'TaskWorker/Actions/Recurring', 'taskbuffer']
+                   'TaskWorker/Actions/Recurring', 'taskbuffer', 'Publisher']
     },
     'UserFileCache':
     {
