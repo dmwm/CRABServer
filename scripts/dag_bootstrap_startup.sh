@@ -189,7 +189,7 @@ EOF
         chmod 777 task_process/task_proc_wrapper.sh
         condor_submit task_process/daemon.jdl
     else
-        echo "/etc/enable_task_daemon not found or task_process/task_process_runing found, not submitting the daemon task"
+        echo "/etc/enable_task_daemon not found or task_process/task_process_running found, not submitting the daemon task"
     fi
     # --- End new status prototype ---
 
