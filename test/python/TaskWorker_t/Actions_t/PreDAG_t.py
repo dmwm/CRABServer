@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import json
 import shutil
 import tempfile
 import unittest
@@ -45,12 +46,33 @@ class PreDAGTest(unittest.TestCase):
         with open("task_process/status_cache.txt", "w") as fd:
             fd.write("\n\n" + repr(data))
 
+    def createFakePostjobData(self, jobs=None, throughput=25, eventSize=0, missingLumis=MISSING_LUMI_EXAMPLE):
+        throughputdir = "automatic_splitting/throughputs/"
+        missing_lumidir = "automatic_splitting/missing_lumis/"
+
+        for d in (throughputdir, missing_lumidir):
+            if os.path.exists(d):
+                shutil.rmtree(d)
+            os.makedirs(d)
+
+        if not jobs:
+            jobs = self.probes + self.done
+
+        if throughput is not None and eventSize is not None:
+            for p in jobs:
+                with(open(os.path.join(throughputdir, p), 'w')) as fd:
+                    json.dump((throughput, eventSize), fd)
+        if missingLumis:
+            for p in self.done[:1]:
+                with(open(os.path.join(missing_lumidir, p), 'w')) as fd:
+                    fd.write(missingLumis)
+
     def setUp(self):
         """ Create the all the necessary files
         """
         self.probes = ["0-{0}".format(i) for i in xrange(1, 6)]
         self.done = [str(i) for i in xrange(1, 7)]
-        #we will work in a temporary directory and copy/create things there
+        # we will work in a temporary directory and copy/create things there
         os.environ["TEST_DONT_REDIRECT_STDOUT"] = "True"
         # Override the PATH to overload condor_submit_dag with a script
         # that returns true; Otherwise, the tests will fail.
@@ -61,34 +83,22 @@ class PreDAGTest(unittest.TestCase):
         os.chdir(self.tempdir)
         print("Working in {0}".format(self.tempdir))
 
-        #status_cache file created by the task process
-        os.mkdir("task_process")
-        with(open("task_process/status_cache.txt", "w")) as fd:
-            fd.write("0\n0\n{{{0}}}".format(",".join("'{0}': {{'State': 'finished'}}".format(i) for i in self.probes)))
+        # status_cache file created by the task process
+        self.createStatusCache()
 
-        #Pickle file created by the TaskWorker
+        # Pickle file created by the TaskWorker
         shutil.copy(os.path.join(getTestDataDirectory(), "Actions", "datadiscovery.pkl"), self.tempdir)
         shutil.copy(os.path.join(getTestDataDirectory(), "Actions", "taskinformation.pkl"), self.tempdir)
         shutil.copy(os.path.join(getTestDataDirectory(), "Actions", "taskworkerconfig.pkl"), self.tempdir)
         shutil.copy(os.path.join(getTestDataDirectory(), "Actions", "run_and_lumis.tar.gz"), self.tempdir)
 
-        #create throughtput files
-        self.throughputdir = "automatic_splitting/throughputs/"
-        os.makedirs(self.throughputdir)
-        self.missing_lumidir = "automatic_splitting/missing_lumis/"
-        os.makedirs(self.missing_lumidir)
-        for p in self.probes + self.done:
-            with(open(os.path.join(self.throughputdir, p), 'w')) as fd:
-                fd.write("25.0")
-        for p in self.done[:1]:
-            with(open(os.path.join(self.missing_lumidir, p), 'w')) as fd:
-                fd.write(MISSING_LUMI_EXAMPLE)
+        # create throughtput files
+        self.createFakePostjobData()
 
-        #Touch the sandbox and TW code
+        # Touch the sandbox and TW code
         open("CMSRunAnalysis.tar.gz", "w").close()
         open("TaskManagerRun.tar.gz", "w").close()
         open("CMSRunAnalysis.sh", "w").close()
-
 
     def teardown(self):
         """ Back to the old dir and delete the temporary one
@@ -100,8 +110,20 @@ class PreDAGTest(unittest.TestCase):
         """ Test that the PreDAG works when probe jobs finishes
         """
         predag = PreDAG()
-        #Mock the createSubdagSubmission function
+        # Mock the createSubdagSubmission function
         self.assertEqual(predag.execute("processing", 5, 0), 0)
+        with open('RunJobs0.subdag') as fd:
+            self.assertEqual(sum(1 for _ in (line for line in fd if line.startswith('JOB'))), 50)
+
+    def testSplittingWithHighOutput(self):
+        """ Test that the PreDAG works when probe jobs finishes, with more jobs created due to large output size.
+        """
+        self.createFakePostjobData(eventSize=100000)
+        predag = PreDAG()
+        # Mock the createSubdagSubmission function
+        self.assertEqual(predag.execute("processing", 5, 0), 0)
+        with open('RunJobs0.subdag') as fd:
+            self.assertGreater(sum(1 for _ in (line for line in fd if line.startswith('JOB'))), 100)
 
     def testTailSplitting(self):
         """ Test that the PreDAG works when there are tail jobs to create
@@ -115,7 +137,7 @@ class PreDAGTest(unittest.TestCase):
     def testTailSplittingWithAllProcessed(self):
         """ Test that the PreDAG works when there are no tail jobs to create
         """
-        shutil.rmtree(self.missing_lumidir)
+        self.createFakePostjobData(missingLumis=None)
         predag = PreDAG()
         self.createStatusCache()
         self.assertEqual(predag.execute("tail", 6, 1), 0)
@@ -124,7 +146,7 @@ class PreDAGTest(unittest.TestCase):
     def testTailSplittingWithFailedProbesAndAllProcessed(self):
         """ Test that the PreDAG works when there are no tail jobs to create, but failed probes
         """
-        shutil.rmtree(self.missing_lumidir)
+        self.createFakePostjobData(missingLumis=None)
         predag = PreDAG()
         self.createStatusCache(overrides=dict((p, 'failed') for p in self.probes[1:]))
         self.assertEqual(predag.execute("tail", 6, 1), 0)
@@ -152,9 +174,7 @@ class PreDAGTest(unittest.TestCase):
     def testAllProcessingFailed(self):
         """ Check that we don't fail if all processing jobs fail
         """
-        for p in self.done:
-            os.unlink(os.path.join(self.throughputdir, p))
-        shutil.rmtree(self.missing_lumidir)
+        self.createFakePostjobData(jobs=self.probes, missingLumis=None)
         self.createStatusCache(job_status='failed')
         predag = PreDAG()
         predag.createSubdag = lambda *args: True
