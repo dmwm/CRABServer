@@ -290,6 +290,7 @@ class DataWorkflow(object):
             return [{'result': retmsg}]
 
         task_status = row.task_status
+        task_splitting = row.split_algo
 
         resubmitWhat = "publications" if publication else "jobs"
         self.logger.info("About to resubmit %s for workflow: %s.", resubmitWhat, workflow)
@@ -309,6 +310,10 @@ class DataWorkflow(object):
         ## If the task status is not an allowed one, fail the resubmission.
         if task_status not in allowedTaskStates:
             msg = "You cannot resubmit %s if the task is in status %s." % (resubmitWhat, task_status)
+            raise ExecutionError(msg)
+
+        if task_status == 'KILLED' and task_splitting == 'Automatic':
+            msg = "You cannot resubmit {0} if the task is in status {1} and uses automatic splitting.".format(resubmitWhat, task_status)
             raise ExecutionError(msg)
 
         if task_status != 'SUBMITFAILED':
