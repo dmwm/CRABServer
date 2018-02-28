@@ -2,6 +2,8 @@ import os
 import sys
 import pprint
 import logging
+import json
+import requests
 from httplib import HTTPException
 
 from WMCore.DataStructs.LumiList import LumiList
@@ -26,7 +28,7 @@ class DBSDataDiscovery(DataDiscovery):
         self.logger.info("Input dataset details: %s" % pprint.pformat(res))
         accessType = res['dataset_access_type']
         if accessType != 'VALID':
-            #as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
+            # as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
             msgForDeprecDS = "Please contact your physics group if you think the dataset should not be deprecated."
             if kwargs['task']['tm_nonvalid_input_dataset'] != 'T':
                 msg  = "CRAB refuses to proceed in getting the details of the dataset %s from DBS, because the dataset is not 'VALID' but '%s'." % (dataset, accessType)
@@ -133,7 +135,22 @@ class DBSDataDiscovery(DataDiscovery):
             msg += " Please, check DAS, https://cmsweb.cern.ch/das, and make sure the dataset is accessible on DISK"
             msg += " You might want to contact your physics group if you need a disk replica."
             if self.otherLocations:
-                msg += "\nN.B.: your dataset is stored at %s, but those are TAPE locations." % ','.join(sorted(self.otherLocations))
+                msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ','.join(sorted(self.otherLocations))
+                # submit request to DDM
+                site = "T2*" # will let Dynamo choose which T2 to stage the blocks to, TODO: allow the user to specify it
+                DDM_list = list()
+                for block in self.otherLocations:
+                    DMM_block = block.replace("#", "%23")
+                    DDM_list.append(DMM_block)
+                DMM_json = json.dumps({"item": DDM_list, "site": "T2*"})
+                productionServer = 'https://dynamo.mit.edu/'
+                testServer = 'https://t3desk007.mit.edu/'
+                #commonURL = productionServer + 'registry/request/' # TODO: to use with 'pollcopy' as well
+                commonURL = testServer + 'registry/request/'
+                DMM_request = json.load( requests.post(commonURL+'copy', data=DMM_json, headers="Content-type: application/json") )
+                # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
+                if DMM_request["result"] == "OK":
+                    msg += "\nA disk replica has been requested, please try again in two days."
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
