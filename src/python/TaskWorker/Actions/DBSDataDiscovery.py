@@ -3,7 +3,7 @@ import sys
 import pprint
 import logging
 import json
-import requests
+#import requests
 from httplib import HTTPException
 
 from WMCore.DataStructs.LumiList import LumiList
@@ -13,6 +13,8 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
+
+from RESTInteractions import HTTPRequests
 
 class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service.
@@ -134,6 +136,7 @@ class DBSDataDiscovery(DataDiscovery):
             msg = "Task could not be submitted because there is no DISK replica for dataset %s ." % (kwargs['task']['tm_input_dataset'])
             msg += " Please, check DAS, https://cmsweb.cern.ch/das, and make sure the dataset is accessible on DISK"
             msg += " You might want to contact your physics group if you need a disk replica."
+
             if self.otherLocations:
                 msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ','.join(sorted(self.otherLocations))
                 # submit request to DDM
@@ -145,9 +148,13 @@ class DBSDataDiscovery(DataDiscovery):
                 DMM_json = json.dumps({"item": DDM_list, "site": "T2*"})
                 productionServer = 'https://dynamo.mit.edu/'
                 testServer = 'https://t3desk007.mit.edu/'
-                #commonURL = productionServer + 'registry/request/' # TODO: to use with 'pollcopy' as well
+                #commonURL = productionServer + 'registry/request/' # TODO: commonURL to use with 'pollcopy' as well
                 commonURL = testServer + 'registry/request/'
-                DMM_request = json.load( requests.post(commonURL+'copy', data=DMM_json, headers="Content-type: application/json") )
+                #DMM_request = json.load( requests.post(commonURL+'copy', data=DMM_json, headers="Content-type: application/json") ) # with requests instead of HTTPRequests
+		#userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry = 2, logger = self.logger) # HTTPRequests example
+		userServer = HTTPRequests(testServer, os.environ["X509_USER_PROXY"], os.environ["X509_USER_PROXY"])
+		#DMM_request = json.load( userServer.post(commonURL+'copy', data=DMM_json, headers="Content-type: application/json") ) # no 'headers' available with HTTPRequests
+		DMM_request = json.load( userServer.post(commonURL+'copy', data=DMM_json) )
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
                 if DMM_request["result"] == "OK":
                     msg += "\nA disk replica has been requested, please try again in two days."
