@@ -45,7 +45,7 @@ class HTTPRequests(dict):
     is used more in the client.
     """
 
-    def __init__(self, url='localhost', localcert=None, localkey=None, version=None, retry=0, logger=None):
+    def __init__(self, url='localhost', localcert=None, localkey=None, version=None, retry=0, logger=None, verbose=False):
         """
         Initialise an HTTP handler
         """
@@ -62,6 +62,7 @@ class HTTPRequests(dict):
             version = __version__
         self.setdefault("version", version)
         self.setdefault("retry", retry)
+        self.setdefault("verbose", verbose)
         self.logger = logger if logger else logging.getLogger()
 
     def getUrlOpener(self):
@@ -125,7 +126,7 @@ class HTTPRequests(dict):
         for i in xrange(self['retry'] + 1):
             try:
                 response, datares = self['conn'].request(url, data, headers, verb=verb, doseq = True, ckey=self['key'], cert=self['cert'], \
-                                capath=caCertPath)#, verbose=True)# for debug
+                                capath=caCertPath, verbose=self['verbose'])
             except Exception as ex:
                 #add here other temporary errors we need to retry
                 if (not retriableError(ex)) or (i == self['retry']):
