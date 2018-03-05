@@ -106,3 +106,9 @@ ALTER TABLE filetransfersdb RENAME COLUMN tm_jobid_varchar TO tm_jobid;
 
 --Add the column to be used for the filetrasfersdb partitioning
 ALTER TABLE filetransfersdb ADD tm_creation_time TIMESTAMP;
+
+--Change number of totalUnits to allow fractions
+ALTER TABLE tasks ADD tm_totalunits_fraction NUMBER(38,6);
+UPDATE tasks SET tm_totalunits_fraction = tm_totalunits;
+ALTER TABLE tasks DROP COLUMN tm_totalunits;
+ALTER TABLE tasks RENAME COLUMN tm_totalunits_fraction TO tm_totalunits;
