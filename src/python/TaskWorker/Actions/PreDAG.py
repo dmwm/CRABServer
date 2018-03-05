@@ -168,18 +168,30 @@ class PreDAG(object):
             config = pickle.load(fd) #Task worker configuration
 
         # Read the automatic_splitting/throughputs/0-N files where the PJ
-        # saved the EventThroughput (report['steps']['cmsRun']['performance']['cpu']['EventThroughput'])
+        # saved the EventThroughput
+        # (report['steps']['cmsRun']['performance']['cpu']['EventThroughput'])
+        # and the average size of the output per event
         sumEventsThr = 0
+        sumEventsSize = 0
         count = 0
         for jid in estimates:
             if jid in self.failedJobs:
                 continue
             fn = "automatic_splitting/throughputs/{0}".format(jid)
             with open(fn) as fd:
-                sumEventsThr += float(fd.read())
+                throughput, eventsize = json.load(fd)
+                sumEventsThr += throughput
+                sumEventsSize += eventsize
                 count += 1
         eventsThr = sumEventsThr / count
+        eventsSize = sumEventsSize / count
+
         self.logger.info("average throughput for %s jobs: %s", count, eventsThr)
+        self.logger.info("average eventsize for %s jobs: %s", count, eventsSize)
+
+        maxSize = getattr(config.TaskWorker, 'automaticOutputSizeMaximum', 5 * 1000**3)
+        maxEvents = (maxSize / eventsSize) if eventsSize > 0 else 0
+
         runtime = task['tm_split_args'].get('minutes_per_job', -1)
         if self.stage == "processing":
             # Build in a 33% error margin in the runtime to not create too
@@ -193,6 +205,9 @@ class PreDAG(object):
             ))
         # `target` is in minutes, `eventsThr` is in events/second!
         events = int(target * eventsThr * 60)
+        if events > maxEvents and maxEvents > 0:
+            self.logger.info("reduced the target event count from %s to %s to obey output size", events, maxEvents)
+            events = int(maxEvents)
         splitTask = dict(task)
         splitTask['tm_split_algo'] = 'EventAwareLumiBased'
         splitTask['tm_split_args']['events_per_job'] = events

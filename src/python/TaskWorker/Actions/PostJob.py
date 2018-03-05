@@ -64,10 +64,7 @@ import sys
 import time
 import json
 import uuid
-import glob
-import fcntl
 import errno
-import pickle
 import pprint
 import shutil
 import signal
@@ -79,7 +76,6 @@ import unittest
 import datetime
 import tempfile
 import traceback
-import subprocess
 import logging.handlers
 from shutil import move
 from httplib import HTTPException
@@ -89,20 +85,13 @@ import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.WMArchive.DataMap import createArchiverDoc
 
-from ast import literal_eval
 from TaskWorker import __version__
 from ServerUtilities import getLock
 from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
-from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
-from TaskWorker.Actions.DagmanCreator import DagmanCreator
-from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, isCouchDBURL, oracleOutputMapping
-
-from WMCore.Configuration import Configuration, ConfigSection
-from functools import reduce
 
 
 ASO_JOB = None
@@ -1692,8 +1681,18 @@ class PostJob():
         if not os.path.exists(os.path.dirname(throughputFileName)):
             os.makedirs(os.path.dirname(throughputFileName))
         with open(throughputFileName, 'w') as fd:
-            report = self.job_report['steps']['cmsRun']['performance']
-            fd.write(report['cpu']['EventThroughput'])
+            report = self.job_report['steps']['cmsRun']
+            throughput = float(report['performance']['cpu'].get('EventThroughput', 0))
+
+            def valid(fi):
+                return fi['input_source_class'] == 'PoolSource' and fi.get('input_type', '') == "primaryFiles"
+
+            outsize = sum(fi['outsize'] for fi in self.output_files_info)
+            events = sum(fi.get('events', 0) for fi in report['input']['source'] if valid(fi))
+
+            eventsize = (outsize // events) if events > 0 else 0
+
+            json.dump([throughput, eventsize], fd)
 
         if self.stage == 'probe':
             return
