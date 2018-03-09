@@ -3,7 +3,7 @@ import sys
 import pprint
 import logging
 import json
-#import requests
+import urllib
 from httplib import HTTPException
 
 from WMCore.DataStructs.LumiList import LumiList
@@ -133,7 +133,7 @@ class DBSDataDiscovery(DataDiscovery):
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex))
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
-            msg = "Task could not be submitted because there is no DISK replica for dataset %s ." % (kwargs['task']['tm_input_dataset'])
+            msg = "Task could not be submitted because there is no DISK replica for dataset %s" % (kwargs['task']['tm_input_dataset'])
             msg += " Please, check DAS, https://cmsweb.cern.ch/das, and make sure the dataset is accessible on DISK"
             msg += " You might want to contact your physics group if you need a disk replica."
 
@@ -141,23 +141,23 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ','.join(sorted(self.otherLocations))
                 # submit request to DDM
                 site = "T2*" # will let Dynamo choose which T2 to stage the blocks to, TODO: allow the user to specify it
-                DDM_list = list()
-                for block in self.otherLocations:
-                    DMM_block = block.replace("#", "%23")
-                    DDM_list.append(DMM_block)
-                DMM_json = json.dumps({"item": DDM_list, "site": "T2*"})
-                productionServer = 'https://dynamo.mit.edu/'
-                testServer = 'https://t3desk007.mit.edu/'
-                #commonURL = productionServer + 'registry/request/' # TODO: commonURL to use with 'pollcopy' as well
-                commonURL = testServer + 'registry/request/'
-                #DMM_request = json.load( requests.post(commonURL+'copy', data=DMM_json, headers="Content-type: application/json") ) # with requests instead of HTTPRequests
-		#userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry = 2, logger = self.logger) # HTTPRequests example
-		userServer = HTTPRequests(testServer, os.environ["X509_USER_PROXY"], os.environ["X509_USER_PROXY"])
-		#DMM_request = json.load( userServer.post(commonURL+'copy', data=DMM_json, headers="Content-type: application/json") ) # no 'headers' available with HTTPRequests
-		DMM_request = json.load( userServer.post(commonURL+'copy', data=DMM_json) )
+                DDMList = []
+                for block in blocks:
+                    DMMBlock = urllib.quote(block)
+                    DDMList.append(DMMBlock)
+                DMMJson = json.dumps({"item": DDMList, "site": "T2*"})
+                productionServer = 'dynamo.mit.edu/'
+                testServer = 't3desk007.mit.edu/'
+                commonURL =  'registry/request/'
+                print "Will talk to DDM using %s\n" % (self.config.TaskWorker.cmscert+" "+self.config.TaskWorker.cmskey)
+                userServer = HTTPRequests(url=testServer, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
+                DMMRequest = (userServer.post(commonURL+'copy', data=DMMJson))[0]
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
-                if DMM_request["result"] == "OK":
-                    msg += "\nA disk replica has been requested, please try again in two days."
+                if DMMRequest["result"] == "OK":
+		    if DMMRequest["data"][0]["request_count"] > 1:
+                    	msg += "\nA disk replica has been already requested on %s" % DMMRequest["data"][0]["first_request"] 
+		    else:
+                    	msg += "\nA disk replica has been requested, please try again in two days."
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
@@ -224,11 +224,16 @@ if __name__ == '__main__':
     config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/%s/DBSReader/' % dbsInstance
     config.section_("TaskWorker")
     # will use X509_USER_PROXY var for this test
-    config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
-    config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
+    #config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
+    #config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
+
+    # will user service cert as defined for TW
+    config.TaskWorker.cmscert = os.environ["X509_USER_CERT"]
+    config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
+
 
     fileset = DBSDataDiscovery(config)
-    fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': os.environ["X509_USER_PROXY"],
+    fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, #'user_proxy': os.environ["X509_USER_PROXY"],
                           'tm_input_dataset': dataset, 'tm_taskname': 'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
 
 #===============================================================================
