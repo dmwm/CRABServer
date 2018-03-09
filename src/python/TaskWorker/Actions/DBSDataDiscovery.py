@@ -145,8 +145,8 @@ class DBSDataDiscovery(DataDiscovery):
                 for block in blocks:
                     DMMBlock = urllib.quote(block)
                     DDMList.append(DMMBlock)
-                DMMJson = json.dumps({"item": DDMList, "site": "T2*"})
-                productionServer = 'dynamo.mit.edu/'
+                DMMJson = json.dumps({"item": DDMList, "site": site})
+                #productionServer = 'dynamo.mit.edu/'
                 testServer = 't3desk007.mit.edu/'
                 commonURL =  'registry/request/'
                 print("Will talk to DDM using %s\n" % (self.config.TaskWorker.cmscert+" "+self.config.TaskWorker.cmskey))
@@ -154,10 +154,10 @@ class DBSDataDiscovery(DataDiscovery):
                 DMMRequest = (userServer.post(commonURL+'copy', data=DMMJson))[0]
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
                 if DMMRequest["result"] == "OK":
-		    if DMMRequest["data"][0]["request_count"] > 1:
-                    	msg += "\nA disk replica has been already requested on %s" % DMMRequest["data"][0]["first_request"] 
-		    else:
-                    	msg += "\nA disk replica has been requested, please try again in two days."
+                    if DMMRequest["data"][0]["request_count"] > 1:
+                        msg += "\nA disk replica has been already requested on %s" % DMMRequest["data"][0]["first_request"] 
+                    else:
+                        msg += "\nA disk replica has been requested, please try again in two days."
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
