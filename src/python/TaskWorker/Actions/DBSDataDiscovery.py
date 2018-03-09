@@ -149,7 +149,7 @@ class DBSDataDiscovery(DataDiscovery):
                 productionServer = 'dynamo.mit.edu/'
                 testServer = 't3desk007.mit.edu/'
                 commonURL =  'registry/request/'
-                print "Will talk to DDM using %s\n" % (self.config.TaskWorker.cmscert+" "+self.config.TaskWorker.cmskey)
+                print("Will talk to DDM using %s\n" % (self.config.TaskWorker.cmscert+" "+self.config.TaskWorker.cmskey))
                 userServer = HTTPRequests(url=testServer, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
                 DMMRequest = (userServer.post(commonURL+'copy', data=DMMJson))[0]
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
