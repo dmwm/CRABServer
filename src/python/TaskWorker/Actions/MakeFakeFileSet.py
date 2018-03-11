@@ -36,7 +36,9 @@ class MakeFakeFileSet(TaskAction):
     #even though args is not used we call "handler.actionWork(args, kwargs)" in Handler
     def execute(self, *args, **kwargs): #pylint: disable=unused-argument
 
-        totalevents = kwargs['task']['tm_totalunits']
+        # since https://github.com/dmwm/CRABServer/issues/5633 totalunits can be a float
+        # but that would confuse WMCore, therefore cast to int
+        totalevents = int(kwargs['task']['tm_totalunits'])
         firstEvent = 1
         lastEvent = totalevents
         firstLumi = 1
