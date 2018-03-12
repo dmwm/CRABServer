@@ -147,12 +147,10 @@ class DBSDataDiscovery(DataDiscovery):
                     DMMBlock = urllib.quote(block)
                     DDMList.append(DMMBlock)
                 DMMJson = json.dumps({"item": DDMList, "site": site})
-                #productionServer = 'dynamo.mit.edu/'
-                testServer = 't3desk007.mit.edu/'
                 commonURL =  'registry/request/'
-                print("Will talk to DDM using %s\n" % (self.config.TaskWorker.cmscert+" "+self.config.TaskWorker.cmskey))
-                userServer = HTTPRequests(url=testServer, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
-                DMMRequest = (userServer.post(commonURL+'copy', data=DMMJson))[0]
+                userServer = HTTPRequests(url=self.config.TaskWorker.DMMServer, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
+                DMMRequest = (userServer.post('/'+commonURL+'copy', data=DMMJson))[0]
+                self.logger.info("Contacted %s using %s and %s, got:\n%s" % (self.config.TaskWorker.DMMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, DMMRequest))
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
                 if DMMRequest["result"] == "OK":
                     msg += "\nA disk replica has been requested on %s, please try again in two days." % DMMRequest["data"][0]["first_request"] 
@@ -229,6 +227,7 @@ if __name__ == '__main__':
     config.TaskWorker.cmscert = os.environ["X509_USER_CERT"]
     config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
 
+    config.TaskWorker.DMMServer = 't3desk007.mit.edu'
 
     fileset = DBSDataDiscovery(config)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, #'user_proxy': os.environ["X509_USER_PROXY"],
