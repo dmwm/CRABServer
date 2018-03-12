@@ -1,7 +1,10 @@
+from __future__ import print_function
 import os
 import sys
 import pprint
 import logging
+import json
+import urllib
 from httplib import HTTPException
 
 from WMCore.DataStructs.LumiList import LumiList
@@ -11,6 +14,8 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
+
+from RESTInteractions import HTTPRequests
 
 class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service.
@@ -26,7 +31,7 @@ class DBSDataDiscovery(DataDiscovery):
         self.logger.info("Input dataset details: %s" % pprint.pformat(res))
         accessType = res['dataset_access_type']
         if accessType != 'VALID':
-            #as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
+            # as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
             msgForDeprecDS = "Please contact your physics group if you think the dataset should not be deprecated."
             if kwargs['task']['tm_nonvalid_input_dataset'] != 'T':
                 msg  = "CRAB refuses to proceed in getting the details of the dataset %s from DBS, because the dataset is not 'VALID' but '%s'." % (dataset, accessType)
@@ -129,11 +134,26 @@ class DBSDataDiscovery(DataDiscovery):
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex))
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
-            msg = "Task could not be submitted because there is no DISK replica for dataset %s ." % (kwargs['task']['tm_input_dataset'])
+            msg = "Task could not be submitted because there is no DISK replica for dataset %s" % (kwargs['task']['tm_input_dataset'])
             msg += " Please, check DAS, https://cmsweb.cern.ch/das, and make sure the dataset is accessible on DISK"
             msg += " You might want to contact your physics group if you need a disk replica."
+
             if self.otherLocations:
-                msg += "\nN.B.: your dataset is stored at %s, but those are TAPE locations." % ','.join(sorted(self.otherLocations))
+                msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ','.join(sorted(self.otherLocations))
+                # submit request to DDM
+                site = "T2*" # will let Dynamo choose which T2 to stage the blocks to, TODO: allow the user to specify it
+                DDMList = []
+                for block in blocks:
+                    DMMBlock = urllib.quote(block)
+                    DDMList.append(DMMBlock)
+                DMMJson = json.dumps({"item": DDMList, "site": site})
+                commonURL =  'registry/request/'
+                userServer = HTTPRequests(url=self.config.TaskWorker.DMMServer, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
+                DMMRequest = (userServer.post('/'+commonURL+'copy', data=DMMJson))[0]
+                self.logger.info("Contacted %s using %s and %s, got:\n%s" % (self.config.TaskWorker.DMMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, DMMRequest))
+                # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
+                if DMMRequest["result"] == "OK":
+                    msg += "\nA disk replica has been requested on %s, please try again in two days." % DMMRequest["data"][0]["first_request"] 
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
@@ -200,11 +220,17 @@ if __name__ == '__main__':
     config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/%s/DBSReader/' % dbsInstance
     config.section_("TaskWorker")
     # will use X509_USER_PROXY var for this test
-    config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
-    config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
+    #config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
+    #config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
+
+    # will user service cert as defined for TW
+    config.TaskWorker.cmscert = os.environ["X509_USER_CERT"]
+    config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
+
+    config.TaskWorker.DMMServer = 't3desk007.mit.edu'
 
     fileset = DBSDataDiscovery(config)
-    fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': os.environ["X509_USER_PROXY"],
+    fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, #'user_proxy': os.environ["X509_USER_PROXY"],
                           'tm_input_dataset': dataset, 'tm_taskname': 'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
 
 #===============================================================================
