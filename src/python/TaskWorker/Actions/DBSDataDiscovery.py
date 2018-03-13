@@ -4,7 +4,6 @@ import sys
 import pprint
 import logging
 import json
-import urllib
 from httplib import HTTPException
 
 from WMCore.DataStructs.LumiList import LumiList
