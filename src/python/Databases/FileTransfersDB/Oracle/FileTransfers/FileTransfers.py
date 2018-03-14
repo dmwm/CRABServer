@@ -83,13 +83,13 @@ class FileTransfers(object):
 # Move to taskDB
     GetVOMSAttr_sql = "SELECT tm_user_role, tm_user_group from tasks WHERE tm_taskname = :taskname AND ROWNUM = 1"
 
-#    GetDocsTransfer0_sql = "SELECT f.*, t.tm_user_role, t.tm_user_group \
-#			    FROM filetransfersdb f \
-#			    LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
-#                            WHERE tm_transfer_state = :state AND \
-#                                  tm_aso_worker = :asoworker AND \
-#                                  rownum < :limit \
-#                            ORDER BY rownum"
+    GetDocsTransfer0_sql = "SELECT f.*, t.tm_user_role, t.tm_user_group \
+			    FROM filetransfersdb f \
+			    LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
+                            WHERE tm_transfer_state = :state AND \
+                                  tm_aso_worker = :asoworker AND \
+                                  rownum < :limit \
+                            ORDER BY rownum"
 
     GetDocsTransfer1_sql = "SELECT f.tm_source, f.tm_destination, f.tm_username, f.tm_transfer_state, f.tm_aso_worker, f.tm_taskname, \
                                    f.tm_id, f.tm_source_lfn, f.tm_destination_lfn, t.tm_user_role, t.tm_user_group \
