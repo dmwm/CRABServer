@@ -4,7 +4,6 @@ import sys
 import pprint
 import logging
 import json
-import urllib
 from httplib import HTTPException
 
 from WMCore.DataStructs.LumiList import LumiList
@@ -142,18 +141,14 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ','.join(sorted(self.otherLocations))
                 # submit request to DDM
                 site = "T2*" # will let Dynamo choose which T2 to stage the blocks to, TODO: allow the user to specify it
-                DDMList = []
-                for block in blocks:
-                    DMMBlock = urllib.quote(block)
-                    DDMList.append(DMMBlock)
-                DMMJson = json.dumps({"item": DDMList, "site": site})
+                DDMJson = json.dumps({"item": blocks, "site": site})
                 commonURL =  'registry/request/'
-                userServer = HTTPRequests(url=self.config.TaskWorker.DMMServer, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
-                DMMRequest = (userServer.post('/'+commonURL+'copy', data=DMMJson))[0]
-                self.logger.info("Contacted %s using %s and %s, got:\n%s" % (self.config.TaskWorker.DMMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, DMMRequest))
+                userServer = HTTPRequests(url=self.config.TaskWorker.DDMServer, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
+                DDMRequest = (userServer.post('/'+commonURL+'copy', data=DDMJson))[0]
+                self.logger.info("Contacted %s using %s and %s, got:\n%s" % (self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, DDMRequest))
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
-                if DMMRequest["result"] == "OK":
-                    msg += "\nA disk replica has been requested on %s, please try again in two days." % DMMRequest["data"][0]["first_request"] 
+                if DDMRequest["result"] == "OK":
+                    msg += "\nA disk replica has been requested on %s, please try again in two days." % DDMRequest["data"][0]["first_request"] 
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
@@ -227,7 +222,7 @@ if __name__ == '__main__':
     config.TaskWorker.cmscert = os.environ["X509_USER_CERT"]
     config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
 
-    config.TaskWorker.DMMServer = 't3desk007.mit.edu'
+    config.TaskWorker.DDMServer = 'dynamo.mit.edu'
 
     fileset = DBSDataDiscovery(config)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, #'user_proxy': os.environ["X509_USER_PROXY"],
