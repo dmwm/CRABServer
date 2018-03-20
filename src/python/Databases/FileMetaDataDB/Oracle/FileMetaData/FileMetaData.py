@@ -76,7 +76,7 @@ class FileMetaData(object):
                        :publishdataname, :outlocation, :outtmplocation, :runlumi, :checksumadler32, :checksumcksum, :checksummd5, :outlfn, :outsize,\
                        :outtype, :inparentlfns, SYS_EXTRACT_UTC(SYSTIMESTAMP), :filestate, :directstageout, :outtmplfn)"
 
-    Update_sql = """UPDATE filemetadata SET fmd_tmp_location = :outtmplocation, fmd_size = :outsize, fmd_creation_time = SYS_EXTRACT_UTC(SYSTIMESTAMP), fmd_tmplfn = :outtmplfn \
+    Update_sql = """UPDATE filemetadata SET fmd_tmp_location = :outtmplocation, fmd_size = :outsize, fmd_tmplfn = :outtmplfn \
                     WHERE tm_taskname = :taskname AND fmd_lfn = :outlfn"""
 
     #the field selected here is not used, the query is only executed to check if a filemetadata for the file was already uploaded or not
