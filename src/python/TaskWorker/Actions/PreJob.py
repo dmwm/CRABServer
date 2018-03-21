@@ -341,7 +341,7 @@ class PreJob:
         new_submit_text += '+CRAB_TransferOutputs = {0}\n+CRAB_SaveLogsFlag = {0}\n'.format(saveoutputs, savelogs)
         if maxjobruntime is not None:
             new_submit_text += '+EstimatedWallTimeMins = %s\n' % str(maxjobruntime)
-            new_submit_text += '+MaxWallTimeMins = (JobStatus=?=1) ? EstimatedWallTimeMins : %s\n' % str(maxjobruntime)
+            new_submit_text += '+MaxWallTimeMins = %s\n' % str(maxjobruntime)
         if maxmemory is not None:
             new_submit_text += '+RequestMemory = %s\n' % (str(maxmemory))
         if numcores is not None:
