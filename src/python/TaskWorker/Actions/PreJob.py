@@ -338,7 +338,7 @@ class PreJob:
         ## Add the resubmission parameters to the Job.<job_id>.submit content.
         savelogs = 0 if self.stage == 'probe' else self.task_ad.lookup('CRAB_SaveLogsFlag')
         saveoutputs = 0 if self.stage == 'probe' else self.task_ad.lookup('CRAB_TransferOutputs')
-        new_submit_text += '+CRAB_TransferOutputs = {0}\n+CRAB_SaveLogsFlag = {0}\n'.format(saveoutputs, savelogs)
+        new_submit_text += '+CRAB_TransferOutputs = {0}\n+CRAB_SaveLogsFlag = {1}\n'.format(saveoutputs, savelogs)
         if maxjobruntime is not None:
             new_submit_text += '+EstimatedWallTimeMins = %s\n' % str(maxjobruntime)
             new_submit_text += '+MaxWallTimeMins = %s\n' % str(maxjobruntime)
