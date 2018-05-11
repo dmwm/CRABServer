@@ -169,7 +169,7 @@ class DBSDataDiscovery(DataDiscovery):
 
         needLumiInfo = splitAlgo != 'FileBased' or lumiMask != [] or runRange != []
         # secondary dataset access relies on run/lumi info
-        if secondary: needLumiInfo = True
+        if secondaryDataset: needLumiInfo = True
 
         if needLumiInfo:
             self.checkBlocksSize(blocks)
