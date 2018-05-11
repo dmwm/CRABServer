@@ -119,7 +119,7 @@ class DBSDataDiscovery(DataDiscovery):
             # with locations = True so we are using locations=False and looking up location later
             blocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(inputDataset, locations=False)]
             if secondaryDataset:
-                secondaryBlocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(secondaryDataset, locations=False)
+                secondaryBlocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(secondaryDataset, locations=False)]
         except DBSReaderError as dbsexc:
             #dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
