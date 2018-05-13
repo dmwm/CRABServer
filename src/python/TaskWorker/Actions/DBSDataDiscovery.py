@@ -123,7 +123,7 @@ class DBSDataDiscovery(DataDiscovery):
         except DBSReaderError as dbsexc:
             #dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
-                raise TaskWorkerException("CRAB could not find dataset %s in this DBS instance: %s" % inputDataset, dbsurl))
+                raise TaskWorkerException("CRAB could not find dataset %s in this DBS instance: %s" % inputDataset, dbsurl)
             raise
         ## Create a map for block's locations: for each block get the list of locations.
         ## Note: listFileBlockLocation() gets first the locations from PhEDEx, and if no
