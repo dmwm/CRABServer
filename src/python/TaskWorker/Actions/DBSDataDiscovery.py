@@ -77,10 +77,10 @@ class DBSDataDiscovery(DataDiscovery):
             blockInfo = self.dbs.getDBSSummaryInfo(block=block)
             if blockInfo['NumberOfLumis'] > MAX_LUMIS:
                 msg = "Block %s contains more than %s lumis.\nThis blows up CRAB server memory" % (block, MAX_LUMIS)
-                msg += "\n CRAB can only split this by ignoring lumi information. You can do this"
-                msg += "\n using FileBased split algorithm and avoiding any additional request"
-                msg += "\n wich may cause lumi information to be looked at. See CRAB FAQ for more info:"
-                msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
+                msg += "\nCRAB can only split this by ignoring lumi information. You can do this"
+                msg += "\nusing FileBased split algorithm and avoiding any additional request"
+                msg += "\nwich may cause lumi information to be looked up. See CRAB FAQ for more info:"
+                msg += "\nhttps://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
                 raise TaskWorkerException(msg)
 
 
@@ -250,8 +250,10 @@ if __name__ == '__main__':
 
     fileset = DBSDataDiscovery(config)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, #'user_proxy': os.environ["X509_USER_PROXY"],
-                          'tm_input_dataset': dataset, 'tm_taskname': 'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
-
+                          'tm_input_dataset': dataset, 'tm_taskname': 'pippo1',
+                          'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
+                          'tm_dbs_url': config.Services.DBSUrl}, tempDir='')
+    
 #===============================================================================
 #    Some interesting datasets that were hardcoded here (MM I am not using them actually, maybe we could delete them?)
 #    dataset = '/QCD_Pt-1800_Tune4C_13TeV_pythia8/Spring14dr-castor_PU_S14_POSTLS170_V6-v1/GEN-SIM-RECODEBUG'
