@@ -76,10 +76,11 @@ class DBSDataDiscovery(DataDiscovery):
         for block in blocks:
             blockInfo = self.dbs.getDBSSummaryInfo(block=block)
             if blockInfo['NumberOfLumis'] > MAX_LUMIS:
-                msg = "Block %s contains more than %s lumis. This blows up CRAB server memory" % (block, MAX_LUMIS)
-                msg += "\nCRAB can only split this by ignoring lumi information. You can do this"
-                msg += "\n using FileBased split algorithm and avoiding any runRange or lumiMask."
-                msg += "\n Also can not use secondary input nor parents"
+                msg = "Block %s contains more than %s lumis.\nThis blows up CRAB server memory" % (block, MAX_LUMIS)
+                msg += "\n CRAB can only split this by ignoring lumi information. You can do this"
+                msg += "\n using FileBased split algorithm and avoiding any additional request"
+                msg += "\n wich may cause lumi information to be looked at. See CRAB FAQ for more info:"
+                msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
                 raise TaskWorkerException(msg)
 
 
