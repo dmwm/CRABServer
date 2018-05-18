@@ -112,6 +112,8 @@ accounting_group_user = %(accounting_group_user)s
 +CRAB_SubmitterIpAddr = %(submitter_ip_addr)s
 +CRAB_TaskLifetimeDays = %(task_lifetime_days)s
 +CRAB_TaskEndTime = %(task_endtime)s
++CRAB_SplitAlgo =  %(splitalgo)s
++CRAB_AlgoArgs = %(algoargs)s
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
 +DESIRED_Archs = %(desired_arch)s
