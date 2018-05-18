@@ -49,7 +49,7 @@ class Worker(object):
     """
 
     """
-    def __init__(self, config, quiet):
+    def __init__(self, config, quiet, testMode=False):
         """
         Initialise class members
         """
@@ -75,7 +75,7 @@ class Worker(object):
                     sys.exit(1)
 
 
-        def setRootLogger(quiet, debug):
+        def setRootLogger(quiet=False, debug=True, console=False):
             """Sets the root logger with the desired verbosity level
                The root logger logs to logs/twlog.txt and every single
                logging instruction is propagated to it (not really nice
@@ -83,16 +83,21 @@ class Worker(object):
 
             :arg bool quiet: it tells if a quiet logger is needed
             :arg bool debug: it tells if needs a verbose logger
+            :arg bool console: it tells if to direct all printoput to console rather then files, useful for debug
             :return logger: a logger with the appropriate logger level."""
 
             createLogdir('logs')
             createLogdir('logs/processes')
             createLogdir('logs/tasks')
 
-            logHandler = MultiProcessingLog('logs/log.txt', when='midnight')
-            logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
-            logHandler.setFormatter(logFormatter)
-            logging.getLogger().addHandler(logHandler)
+            if console:
+                #if we are testing log to the console is easier
+                logging.getLogger().addHandler(logging.StreamHandler())
+            else:
+                logHandler = MultiProcessingLog('logs/log.txt', when='midnight')
+                logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
+                logHandler.setFormatter(logFormatter)
+                logging.getLogger().addHandler(logHandler)
             loglevel = logging.INFO
             if quiet:
                 loglevel = logging.WARNING
@@ -104,8 +109,9 @@ class Worker(object):
             logger.debug("Logging level initialized to %s.", loglevel)
             return logger
 
+        self.TestMode = testMode
         self.cache_area = self.config.cache_area
-        self.logger = setRootLogger(quiet, True)
+        self.logger = setRootLogger(quiet, True, console=self.TestMode)
 
         try:
             self.oracleDB = HTTPRequests(self.config.oracleDB,
@@ -231,9 +237,12 @@ class Worker(object):
 
         try:
             for task in tasks:
-                p = Process(target=self.startSlave, args=(task,))
-                p.start()
-                processes.append(p)
+                if self.TestMode:
+                    self.startSlave(task)   # sequentially do one task after another
+                else:                       # deal with each task in a separate process
+                    p = Process(target=self.startSlave, args=(task,))
+                    p.start()
+                    processes.append(p)
 
             for proc in processes:
                 proc.join()
