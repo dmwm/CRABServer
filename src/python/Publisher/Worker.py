@@ -74,11 +74,11 @@ class Worker(object):
                 the directory cannot be created.
             """
             try:
-                os.mkdir(dirname)
+                os.makedirs(dirname)
             except OSError as ose:
                 if ose.errno != 17: #ignore the "Directory already exists error"
                     print(str(ose))
-                    print("The task worker need to access the '%s' directory" % dirname)
+                    print("The Publisher Worker needs to access the '%s' directory" % dirname)
                     sys.exit(1)
 
 
@@ -258,8 +258,6 @@ class Worker(object):
     def startSlave(self, task):
         # TODO: lock task!
         # - process logger
-	import pdb
-	pdb.set_trace()
         logger = setProcessLogger(str(task[0][3]))
         logger.info("Process %s is starting. PID %s", task[0][3], os.getpid())
 
