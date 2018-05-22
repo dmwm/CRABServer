@@ -54,9 +54,9 @@ class MasterWorker(object):
         """Initializer
 
         :arg WMCore.Configuration config: input TaskWorker configuration
-        :arg logging logger: the logger
         :arg bool quiet: it tells if a quiet logger is needed
-        :arg bool debug: it tells if needs a verbose logger."""
+        :arg bool debug: it tells if needs a verbose logger
+        :arg bool test: it tells if to run in test (no subprocesses) mode."""
 
 
         def createLogdir(dirname):
