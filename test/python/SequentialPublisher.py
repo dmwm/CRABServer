@@ -2,7 +2,7 @@
          "python SequentialPublisher.py /path/to/config"
     and have fun!
 
-    More details: it instantiates the MasterWorker with the TEST flag True. This makes the MasterWorker
+    More details: it instantiates the Publisher Worker with the TEST flag True. This makes the Worker
     sequential (it does not instantiate new threads) and the logging is done at the console and not on
     a file.
 """
