@@ -149,6 +149,17 @@ class DBSDataDiscovery(DataDiscovery):
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
                 if DDMRequest["result"] == "OK":
                     msg += "\nA disk replica has been requested on %s, please try again in two days." % DDMRequest["data"][0]["first_request"] 
+                    # set status to TAPERECALL
+                    server = HTTPRequests(url=self.config.TaskWorker.resturl, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey)
+                    configreq = {'workflow': kwargs['task']['tm_taskname'],
+                                 'status': "TAPERECALL",
+                                 'subresource': 'success', # check if this is the correct value
+                    }
+                    server.post(?, data = urllib.urlencode(configreq))
+                    #if status setting is successful:
+                        #self.logger.info("Status set to RECALL")                        
+                        #raise TapeDatasetException(some message)
+                        #raise same exception in Worker.py and/or Actions/Handler.py
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))

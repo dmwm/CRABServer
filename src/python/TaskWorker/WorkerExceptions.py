@@ -46,3 +46,6 @@ class WorkerHandlerException(TaskWorkerException):
     """
     exitcode = 6666
 
+class TapeDatasetException(TaskWorkerException):
+    """Returned in case the input dataset is only on tape"""
+
