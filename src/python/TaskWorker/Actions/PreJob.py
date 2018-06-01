@@ -305,8 +305,8 @@ class PreJob:
                 maxjobruntime = int(str(self.task_ad.lookup('MaxWallTimeMinsProbe')))
             elif 'MaxWallTimeMinsTail' in self.task_ad and self.stage == 'tail':
                 maxjobruntime = int(str(self.task_ad.lookup('MaxWallTimeMinsTail')))
-            elif 'MaxWallTimeMins' in self.task_ad:
-                maxjobruntime = int(str(self.task_ad.lookup('MaxWallTimeMins')))
+            elif 'MaxWallTimeMinsRun' in self.task_ad:
+                maxjobruntime = int(str(self.task_ad.lookup('MaxWallTimeMinsRun')))
             if 'RequestMemory' in self.task_ad:
                 maxmemory = int(str(self.task_ad.lookup('RequestMemory')))
             if 'RequestCpus' in self.task_ad:
@@ -341,7 +341,8 @@ class PreJob:
         new_submit_text += '+CRAB_TransferOutputs = {0}\n+CRAB_SaveLogsFlag = {1}\n'.format(saveoutputs, savelogs)
         if maxjobruntime is not None:
             new_submit_text += '+EstimatedWallTimeMins = %s\n' % str(maxjobruntime)
-            new_submit_text += '+MaxWallTimeMins = %s\n' % str(maxjobruntime)
+            new_submit_text += '+MaxWallTimeMinsRun = %s\n' % str(maxjobruntime)  # how long it can run
+            new_submit_text += '+MaxWallTimeMins = %s\n' % str(maxjobruntime)     # how long a slot can it match to
         if maxmemory is not None:
             new_submit_text += '+RequestMemory = %s\n' % (str(maxmemory))
         if numcores is not None:
