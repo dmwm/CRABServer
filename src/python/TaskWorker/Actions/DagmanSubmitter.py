@@ -80,6 +80,7 @@ SUBMIT_INFO = [ \
     ('RequestMemory', 'tm_maxmemory'),
     ('RequestCpus', 'tm_numcores'),
     ('MaxWallTimeMins', 'tm_maxjobruntime'),
+    ('MaxWallTimeMinsRun', 'tm_maxjobruntime'),
     ('MaxWallTimeMinsProbe', 'maxproberuntime'),
     ('MaxWallTimeMinsTail', 'maxtailruntime'),
     ('JobPrio', 'tm_priority'),
