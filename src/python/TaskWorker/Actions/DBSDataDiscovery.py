@@ -5,12 +5,13 @@ import pprint
 import logging
 import json
 from httplib import HTTPException
+import urllib
 
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.Services.DBS.DBSReader import DBSReader
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
-from TaskWorker.WorkerExceptions import TaskWorkerException
+from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 
@@ -103,7 +104,9 @@ class DBSDataDiscovery(DataDiscovery):
                 os.environ['X509_USER_KEY'] = old_key_val
             else:
                 del os.environ['X509_USER_KEY']
-        self.logger.debug("Data discovery through %s for %s" %(self.dbs, kwargs['task']['tm_taskname']))
+
+        task = kwargs['task']['tm_taskname']
+        self.logger.debug("Data discovery through %s for %s" %(self.dbs, task))
         self.checkDatasetStatus(kwargs['task']['tm_input_dataset'], kwargs)
         try:
             # Get the list of blocks for the locations and then call dls.
@@ -134,11 +137,9 @@ class DBSDataDiscovery(DataDiscovery):
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % (kwargs['task']['tm_input_dataset'])
-            msg += " Please, check DAS, https://cmsweb.cern.ch/das, and make sure the dataset is accessible on DISK"
-            msg += " You might want to contact your physics group if you need a disk replica."
 
             if self.otherLocations:
-                msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ','.join(sorted(self.otherLocations))
+                msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ', '.join(sorted(self.otherLocations))
                 # submit request to DDM
                 site = "T2*" # will let Dynamo choose which T2 to stage the blocks to, TODO: allow the user to specify it
                 DDMJson = json.dumps({"item": blocks, "site": site})
@@ -148,18 +149,26 @@ class DBSDataDiscovery(DataDiscovery):
                 self.logger.info("Contacted %s using %s and %s, got:\n%s" % (self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, DDMRequest))
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
                 if DDMRequest["result"] == "OK":
-                    msg += "\nA disk replica has been requested on %s, please try again in two days." % DDMRequest["data"][0]["first_request"] 
+                    msg += "\nA disk replica has been requested on %s" % DDMRequest["data"][0]["first_request"]
                     # set status to TAPERECALL
-                    server = HTTPRequests(url=self.config.TaskWorker.resturl, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey)
-                    configreq = {'workflow': kwargs['task']['tm_taskname'],
-                                 'status': "TAPERECALL",
-                                 'subresource': 'success', # check if this is the correct value
+                    tapeRecallStatus = 'TAPERECALL'
+                    server = HTTPRequests(url=self.config.TaskWorker.resturl, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
+                    configreq = {'workflow': task,
+                                 'status': tapeRecallStatus,
+                                 'subresource': 'state',
+                                 # limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
                     }
-                    server.post(?, data = urllib.urlencode(configreq))
-                    #if status setting is successful:
-                        #self.logger.info("Status set to RECALL")                        
-                        #raise TapeDatasetException(some message)
-                        #raise same exception in Worker.py and/or Actions/Handler.py
+                    tapeRecallStatusSet = server.post(self.config.TaskWorker.resturi, data = urllib.urlencode(configreq))
+                    if tapeRecallStatusSet[2] == "OK":
+                        self.logger.info("Status for task %s set to '%s'" % (task, tapeRecallStatus))
+                        msg += " and the task will be submitted as soon as it is completed."
+                        self.uploadWarning(msg, kwargs['task']['user_proxy'], task)
+                        raise TapeDatasetException(msg)
+                    else:
+                        msg += ", please try again in two days."
+
+            msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
+            msg += " You might want to contact your physics group if you need a disk replica."
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
@@ -195,7 +204,7 @@ class DBSDataDiscovery(DataDiscovery):
 
         ## Format the output creating the data structures required by wmcore. Filters out invalid files,
         ## files whose block has no location, and figures out the PSN
-        result = self.formatOutput(task = kwargs['task'], requestname = kwargs['task']['tm_taskname'],
+        result = self.formatOutput(task = kwargs['task'], requestname = task,
                                    datasetfiles = filedetails, locations = locationsMap,
                                    tempDir = kwargs['tempDir'])
 
@@ -234,6 +243,8 @@ if __name__ == '__main__':
     config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
 
     config.TaskWorker.DDMServer = 'dynamo.mit.edu'
+    config.TaskWorker.resturl = 'cmsweb.cern.ch'
+    config.TaskWorker.resturi = '/crabserver/prod/workflowdb'
 
     fileset = DBSDataDiscovery(config)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, #'user_proxy': os.environ["X509_USER_PROXY"],
