@@ -175,20 +175,20 @@ class Worker(object):
         if len(self.pool) == 0:
             # Starting things up
             for x in xrange(1, self.nworkers + 1):
-                self.logger.debug("Starting process %i" % x)
+                self.logger.debug("Starting process %i", x)
                 p = multiprocessing.Process(target = processWorker, args = (self.inputs, self.results, self.resthost, self.resturi, x))
                 p.start()
                 self.pool.append(p)
-        self.logger.info("Started %d slaves"% len(self.pool))
+        self.logger.info("Started %d slaves", len(self.pool))
 
     def end(self):
         """Stopping all the slaves"""
-        self.logger.debug("Ready to close all %i started processes " % len(self.pool))
+        self.logger.debug("Ready to close all %i started processes ", len(self.pool))
         for p in self.pool:
             try:
                 ## Put len(self.pool) messages in the subprocesses queue.
                 ## Each subprocess will work on one stop message and exit
-                self.logger.debug("Putting stop message in the queue for %s " % str(p))
+                self.logger.debug("Putting stop message in the queue for %s ", str(p))
                 self.inputs.put(('-1', 'STOP', 'control', 'STOPFAILED', []))
             except Exception as ex: #pylint: disable=broad-except
                 msg =  "Hit some exception in deletion\n"
@@ -214,13 +214,13 @@ class Worker(object):
            :arg list of tuple items: list of tuple, where each element
                                      contains the type of work to be
                                      done, the task object and the args."""
-        self.logger.debug("Ready to inject %d items" % len(items))
+        self.logger.debug("Ready to inject %d items", len(items))
         workid = 0 if len(self.working.keys()) == 0 else max(self.working.keys()) + 1
         for work in items:
             worktype, task, failstatus, arguments = work
             self.inputs.put((workid, worktype, task, failstatus, arguments))
             self.working[workid] = {'workflow': task['tm_taskname'], 'injected': time.time()}
-            self.logger.info('Injecting work %d: %s' % (workid, task['tm_taskname']))
+            self.logger.info('Injecting work %d: %s', (workid, task['tm_taskname']))
             workid += 1
         self.logger.debug("Injection completed.")
 
@@ -231,7 +231,7 @@ class Worker(object):
         if len(self.working.keys()) == 0:
             return []
         allout = []
-        self.logger.info("%d work on going, checking if some has finished" % len(self.working.keys()))
+        self.logger.info("%d work on going, checking if some has finished", len(self.working.keys()))
         for _ in xrange(len(self.working.keys())):
             out = None
             try:
@@ -239,7 +239,7 @@ class Worker(object):
             except Empty:
                 pass
             if out is not None:
-                self.logger.debug('Retrieved work %s' % str(out))
+                self.logger.debug('Retrieved work %s', str(out))
                 if isinstance(out['out'], list):
                     allout.extend(out['out'])
                 else:

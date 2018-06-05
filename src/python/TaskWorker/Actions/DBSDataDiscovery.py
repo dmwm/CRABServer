@@ -147,14 +147,7 @@ class DBSDataDiscovery(DataDiscovery):
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex))
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
-<<<<<<< HEAD
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
-            msg += " Please, check DAS, https://cmsweb.cern.ch/das, and make sure the dataset is accessible on DISK"
-            msg += " You might want to contact your physics group if you need a disk replica."
-=======
-            msg = "Task could not be submitted because there is no DISK replica for dataset %s" % (kwargs['task']['tm_input_dataset'])
->>>>>>> 32b4a88c1801a1a0a39703596e339cff623d7145
-
             if self.otherLocations:
                 msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ', '.join(sorted(self.otherLocations))
                 # submit request to DDM
