@@ -762,6 +762,7 @@ def AddPsetHash(report, scram):
                 continue
             if 'pfn' not in fileInfo:
                 continue
+            print("== Adding PSet Hash for filename: %s" % fileInfo['pfn'])
             if not os.path.exists(fileInfo['pfn']):
                 print("== Output file missing!")
                 continue
