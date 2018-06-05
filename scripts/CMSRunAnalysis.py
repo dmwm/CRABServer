@@ -717,9 +717,9 @@ def AddChecksums(report):
             if 'pfn' not in fileInfo:
                 if 'fileName' in fileInfo:
                     fileInfo['pfn'] = fileInfo['fileName']
-                    fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
                 else:
-                    continue
+                    continue           
+            fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
             print("==== Checksum computation STARTING at %s for file: %s ====" % (time.asctime(time.gmtime()),fileInfo['pfn']))
             (adler32, cksum) = calculateChecksums(fileInfo['pfn'])
             print("== Adler32: %s  - size: %.3f MBytes" % (adler32, float(fileInfo['size'])/(1024*1024)) ) 
