@@ -718,13 +718,13 @@ def AddChecksums(report):
                 if 'fileName' in fileInfo:
                     fileInfo['pfn'] = fileInfo['fileName']
                 else:
-                    continue
-            print("==== Checksum STARTING at %s ====" % time.asctime(time.gmtime()))
-            print("== Filename: %s" % fileInfo['pfn'])
+                    continue           
+            fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
+            print("==== Checksum computation STARTING at %s for file: %s ====" % (time.asctime(time.gmtime()),fileInfo['pfn']))
             (adler32, cksum) = calculateChecksums(fileInfo['pfn'])
+            print("== Adler32: %s  - size: %.3f MBytes" % (adler32, float(fileInfo['size'])/(1024*1024)) ) 
             print("==== Checksum FINISHING at %s ====" % time.asctime(time.gmtime()))
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
-            fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
 
 
 def AddPsetHash(report, scram):
