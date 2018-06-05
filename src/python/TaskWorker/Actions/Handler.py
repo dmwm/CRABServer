@@ -76,7 +76,6 @@ class TaskHandler(object):
         try:
             output = work.execute(nextinput, task=self._task, tempDir=self.tempDir)
         except TapeDatasetException as tde:
-            self.logger.info("Inside Handler TapeDatasetException!")
             raise TapeDatasetException(str(tde))
         except TaskWorkerException as twe:
             self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
