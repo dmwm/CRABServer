@@ -403,11 +403,11 @@ class RetryJob(object):
         if used_job_ad:
             #We can determine walltime and max memory from job ad.
             self.ad = job_ad
-            if 'MaxWallTimeMins' in self.ad:
+            if 'MaxWallTimeMinsRun' in self.ad:
                 try:
-                    MAX_WALLTIME = int(self.ad['MaxWallTimeMins']) * 60
+                    MAX_WALLTIME = int(self.ad['MaxWallTimeMinsRun']) * 60
                 except:
-                    msg = "Unable to get MaxWallTimeMins from job classads. Using the default."
+                    msg = "Unable to get MaxWallTimeMinsRun from job classads. Using the default MAX_WALLTIME."
                     self.logger.debug(msg)
             if 'RequestMemory' in self.ad:
                 try:

@@ -67,7 +67,6 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger):
             msg = None
             outputs = work(resthost, resturi, WORKER_CONFIG, task, procnum, inputargs)
         except TapeDatasetException as tde:
-            logger.info("Inside Worker TapeDatasetException!")
             outputs = Result(task=task, err=str(tde))
         except WorkerHandlerException as we:
             outputs = Result(task=task, err=str(we))

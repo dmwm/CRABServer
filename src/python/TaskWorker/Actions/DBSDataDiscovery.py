@@ -77,8 +77,11 @@ class DBSDataDiscovery(DataDiscovery):
         for block in blocks:
             blockInfo = self.dbs.getDBSSummaryInfo(block=block)
             if blockInfo['NumberOfLumis'] > MAX_LUMIS:
-                msg = "Block %s contains more than %s lumis and cannot be processed for splitting. " % (block, MAX_LUMIS)
-                msg += "For memory/time contraint big blocks are not allowed. Use another dataset as input."
+                msg = "Block %s contains more than %s lumis.\nThis blows up CRAB server memory" % (block, MAX_LUMIS)
+                msg += "\nCRAB can only split this by ignoring lumi information. You can do this"
+                msg += "\nusing FileBased split algorithm and avoiding any additional request"
+                msg += "\nwich may cause lumi information to be looked up. See CRAB FAQ for more info:"
+                msg += "\nhttps://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
                 raise TaskWorkerException(msg)
 
 
@@ -105,20 +108,28 @@ class DBSDataDiscovery(DataDiscovery):
             else:
                 del os.environ['X509_USER_KEY']
 
-        task = kwargs['task']['tm_taskname']
-        self.logger.debug("Data discovery through %s for %s" %(self.dbs, task))
-        self.checkDatasetStatus(kwargs['task']['tm_input_dataset'], kwargs)
+        taskName = kwargs['task']['tm_taskname']
+        self.logger.debug("Data discovery through %s for %s" %(self.dbs, taskName))
+
+        inputDataset = kwargs['task']['tm_input_dataset']
+        secondaryDataset = kwargs['task'].get('tm_secondary_input_dataset', None)
+        
+        self.checkDatasetStatus(inputDataset, kwargs)
+        if secondaryDataset:
+            self.checkDatasetStatus(secondaryDataset, kwargs)
+
         try:
             # Get the list of blocks for the locations and then call dls.
             # The WMCore DBS3 implementation makes one call to dls for each block
             # with locations = True so we are using locations=False and looking up location later
-            blocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(kwargs['task']['tm_input_dataset'], locations=False)]
+            blocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(inputDataset, locations=False)]
+            if secondaryDataset:
+                secondaryBlocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(secondaryDataset, locations=False)]
         except DBSReaderError as dbsexc:
             #dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
-                raise TaskWorkerException("The CRAB3 server backend could not find dataset %s in this DBS instance: %s" % (kwargs['task']['tm_input_dataset'], dbsurl))
+                raise TaskWorkerException("CRAB could not find dataset %s in this DBS instance: %s" % inputDataset, dbsurl)
             raise
-        self.checkBlocksSize(blocks)
         ## Create a map for block's locations: for each block get the list of locations.
         ## Note: listFileBlockLocation() gets first the locations from PhEDEx, and if no
         ## locations are found it gets the original locations from DBS. So it should
@@ -136,7 +147,13 @@ class DBSDataDiscovery(DataDiscovery):
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex))
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
+<<<<<<< HEAD
+            msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
+            msg += " Please, check DAS, https://cmsweb.cern.ch/das, and make sure the dataset is accessible on DISK"
+            msg += " You might want to contact your physics group if you need a disk replica."
+=======
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % (kwargs['task']['tm_input_dataset'])
+>>>>>>> 32b4a88c1801a1a0a39703596e339cff623d7145
 
             if self.otherLocations:
                 msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ', '.join(sorted(self.otherLocations))
@@ -153,16 +170,16 @@ class DBSDataDiscovery(DataDiscovery):
                     # set status to TAPERECALL
                     tapeRecallStatus = 'TAPERECALL'
                     server = HTTPRequests(url=self.config.TaskWorker.resturl, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
-                    configreq = {'workflow': task,
+                    configreq = {'workflow': taskName,
                                  'status': tapeRecallStatus,
                                  'subresource': 'state',
                                  # limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
                     }
                     tapeRecallStatusSet = server.post(self.config.TaskWorker.resturi, data = urllib.urlencode(configreq))
                     if tapeRecallStatusSet[2] == "OK":
-                        self.logger.info("Status for task %s set to '%s'" % (task, tapeRecallStatus))
+                        self.logger.info("Status for task %s set to '%s'" % (taskName, tapeRecallStatus))
                         msg += " and the task will be submitted as soon as it is completed."
-                        self.uploadWarning(msg, kwargs['task']['user_proxy'], task)
+                        self.uploadWarning(msg, kwargs['task']['user_proxy'], taskName)
                         raise TapeDatasetException(msg)
                     else:
                         msg += ", please try again in two days."
@@ -172,12 +189,24 @@ class DBSDataDiscovery(DataDiscovery):
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
-        try:
-            filedetails = self.dbs.listDatasetFileDetails(kwargs['task']['tm_input_dataset'], getParents=True, validFileOnly=0)
+        
+        # will not need lumi info if user has asked for split by file with no run/lumi mask
+        splitAlgo = kwargs['task']['tm_split_algo']
+        lumiMask  = kwargs['task']['tm_split_args']['lumis']
+        runRange  = kwargs['task']['tm_split_args']['runs']
 
-            secondary = kwargs['task'].get('tm_secondary_input_dataset', None)
-            if secondary:
-                moredetails = self.dbs.listDatasetFileDetails(secondary, getParents=False, validFileOnly=0)
+        needLumiInfo = splitAlgo != 'FileBased' or lumiMask != [] or runRange != []
+        # secondary dataset access relies on run/lumi info
+        if secondaryDataset: needLumiInfo = True
+
+        if needLumiInfo:
+            self.checkBlocksSize(blocks)
+            if secondaryDataset:
+                self.checkBlocksSize(secondaryBlocks)
+        try:
+            filedetails = self.dbs.listDatasetFileDetails(inputDataset, getParents=True, getLumis=needLumiInfo, validFileOnly=0)
+            if secondaryDataset:
+                moredetails = self.dbs.listDatasetFileDetails(secondaryDataset, getParents=False, getLumis=needLumiInfo, validFileOnly=0)
 
                 for secfilename, secinfos in moredetails.items():
                     secinfos['lumiobj'] = LumiList(runsAndLumis=secinfos['Lumis'])
@@ -200,11 +229,11 @@ class DBSDataDiscovery(DataDiscovery):
             raise TaskWorkerException(("Cannot find any file inside the dataset. Please, check your dataset in DAS, %s.\n"
                                       "Aborting submission. Resubmitting your task will not help.") %
                                       ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
-                                      (self.dbsInstance, kwargs['task']['tm_input_dataset']))
+                                      (self.dbsInstance, inputDataset))
 
         ## Format the output creating the data structures required by wmcore. Filters out invalid files,
         ## files whose block has no location, and figures out the PSN
-        result = self.formatOutput(task = kwargs['task'], requestname = task,
+        result = self.formatOutput(task = kwargs['task'], requestname = taskName,
                                    datasetfiles = filedetails, locations = locationsMap,
                                    tempDir = kwargs['tempDir'])
 
@@ -212,7 +241,7 @@ class DBSDataDiscovery(DataDiscovery):
             raise TaskWorkerException(("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, %s.\n"
                                       "Aborting submission. Resubmitting your task will not help.") %
                                       ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
-                                      (self.dbsInstance, kwargs['task']['tm_input_dataset']))
+                                      (self.dbsInstance, inputDataset))
 
         self.logger.debug("Got %s files" % len(result.result.getFiles()))
         return result
@@ -248,8 +277,10 @@ if __name__ == '__main__':
 
     fileset = DBSDataDiscovery(config)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, #'user_proxy': os.environ["X509_USER_PROXY"],
-                          'tm_input_dataset': dataset, 'tm_taskname': 'pippo1', 'tm_dbs_url': config.Services.DBSUrl})
-
+                          'tm_input_dataset': dataset, 'tm_taskname': 'pippo1',
+                          'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
+                          'tm_dbs_url': config.Services.DBSUrl}, tempDir='')
+    
 #===============================================================================
 #    Some interesting datasets that were hardcoded here (MM I am not using them actually, maybe we could delete them?)
 #    dataset = '/QCD_Pt-1800_Tune4C_13TeV_pythia8/Spring14dr-castor_PU_S14_POSTLS170_V6-v1/GEN-SIM-RECODEBUG'

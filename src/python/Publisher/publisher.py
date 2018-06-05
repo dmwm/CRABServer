@@ -355,7 +355,7 @@ def mark_good(workflow, files, oracleDB, logger):
         msg = "Marking file %s as published." % lfn
         msg += " Document id: %s (source LFN: %s)." % (docId, source_lfn)
         logger.info(wfnamemsg+msg)
-        data['asoworker'] = 'asodciangot1'
+        data['asoworker'] = 'asoprod1'
         data['subresource'] = 'updatePublication'
         data['list_of_ids'] = docId
         data['list_of_publication_state'] = 'DONE'
@@ -443,7 +443,7 @@ def publishInDBS3(taskname):
 
     toPublish = []
     # TODO move from new to done when processed
-    with open("/tmp/"+taskname+".json") as f:
+    with open("/tmp/publisher_files/"+taskname+".json") as f:
         toPublish = json.load(f)
 
     workflow = taskname

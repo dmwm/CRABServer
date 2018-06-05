@@ -8,7 +8,7 @@ from WMCore.Configuration import Configuration
 config = Configuration()
 config.section_('General')
 
-config.General.asoworker = 'asodciangot1'
+config.General.asoworker = 'asoprod1'
 config.General.isOracle = True
 config.General.oracleDB = 'cmsweb-testbed.cern.ch'
 config.General.oracleFileTrans = '/crabserver/preprod/filetransfers'

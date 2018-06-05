@@ -112,6 +112,8 @@ accounting_group_user = %(accounting_group_user)s
 +CRAB_SubmitterIpAddr = %(submitter_ip_addr)s
 +CRAB_TaskLifetimeDays = %(task_lifetime_days)s
 +CRAB_TaskEndTime = %(task_endtime)s
++CRAB_SplitAlgo =  %(splitalgo)s
++CRAB_AlgoArgs = %(algoargs)s
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
 +DESIRED_Archs = %(desired_arch)s
@@ -158,14 +160,14 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
                   ((JobStatus =?= 1) && (time() - EnteredCurrentStatus > 7*24*60*60)) || \
                   ((JobStatus =?= 2) && ( \
                      (MemoryUsage > RequestMemory) || \
-                     (MaxWallTimeMins*60 < time() - EnteredCurrentStatus) || \
+                     (MaxWallTimeMinsRun*60 < time() - EnteredCurrentStatus) || \
                      (DiskUsage > %(max_disk_space)s))) || \
                      (time() > CRAB_TaskEndTime) || \
                   ((JobStatus =?= 1) && (time() > (x509UserProxyExpiration + 86400)))
 +PeriodicRemoveReason = ifThenElse(time() - EnteredCurrentStatus > 7*24*60*60 && isUndefined(MemoryUsage), "Removed due to idle time limit", \
                           ifThenElse(time() > x509UserProxyExpiration, "Removed job due to proxy expiration", \
                             ifThenElse(MemoryUsage > RequestMemory, "Removed due to memory use", \
-                              ifThenElse(MaxWallTimeMins*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
+                              ifThenElse(MaxWallTimeMinsRun*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
                                 ifThenElse(DiskUsage >  %(max_disk_space)s, "Removed due to disk usage", \
                                   ifThenElse(time() > CRAB_TaskEndTime, "Removed due to reached CRAB_TaskEndTime", \
                                   "Removed due to job being held"))))))

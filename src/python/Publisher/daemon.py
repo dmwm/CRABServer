@@ -10,13 +10,13 @@ Here's the algorithm
 """
 from __future__ import division
 from __future__ import print_function
+import argparse
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import os
 import subprocess
 import traceback
 import sys
-import cStringIO
 import json
 import datetime
 import time
@@ -30,7 +30,6 @@ from utils import getDNFromUserName
 from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping
 
 
-configuration = loadConfigurationFile(os.path.abspath('config.py'))
 
 
 def setProcessLogger(name):
@@ -56,7 +55,8 @@ class Worker(object):
         """
         self.config = config.General
         self.max_files_per_block = self.config.max_files_per_block
-        self.userProxy = self.config.opsProxy
+        #self.userCert = self.config.opsCert
+        #self.userKey = self.config.opsKey
         self.block_publication_timeout = self.config.block_closure_timeout
         self.lfn_map = {}
         self.force_publication = False
@@ -109,8 +109,8 @@ class Worker(object):
 
         try:
             self.oracleDB = HTTPRequests(self.config.oracleDB,
-                                         self.config.opsProxy,
-                                         self.config.opsProxy)
+                                         self.config.opsCert,
+                                         self.config.opsKey)
             self.logger.debug('Contacting OracleDB:' + self.config.oracleDB)
         except:
             self.logger.exception('Failed when contacting Oracle')
@@ -201,11 +201,12 @@ class Worker(object):
             data['lfn'] = lfn_
 
             try:
-                res = self.oracleDB.get('/crabserver/dev/filemetadata',
+                res = self.oracleDB.get('/crabserver/preprod/filemetadata',
                                         data=encodeRequest(data, listParams=["lfn"]))
                 res = res[0]
             except Exception as ex:
                 self.logger.error("Error during metadata retrieving: %s" %ex)
+                continue
 
             print(len(res['result']))
             for obj in res['result']:
@@ -250,6 +251,7 @@ class Worker(object):
         workflow = str(task[0][3])
         wfnamemsg = "%s: " % (workflow)
 
+
         if len(task[1]) > self.max_files_per_block:
             self.force_publication = True
             msg = "All datasets have more than %s ready files." % (self.max_files_per_block)
@@ -261,31 +263,25 @@ class Worker(object):
             # Retrieve the workflow status. If the status can not be retrieved, continue
             # with the next workflow.
             workflow_status = ''
-            url = '/'.join(self.cache_area.split('/')[:-1]) + '/workflow'
+            url = '/'.join(self.cache_area.split('/')[:-1]) #+ '/workflow'
             msg = "Retrieving status from %s" % (url)
             logger.info(wfnamemsg+msg)
-            buf = cStringIO.StringIO()
             header = {"Content-Type":"application/json"}
-            data = {'workflow': workflow}#, 'subresource': 'taskads'}
+            data = {'workflow': workflow, 'subresource': 'taskads'}
+            url = 'cmsweb-testbed.cern.ch'
+            connection = HTTPRequests(url,
+                                     self.config.opsCert,
+                                     self.config.opsKey)
+            
             try:
-                _, res_ = self.connection.request(url,
-                                                  data,
-                                                  header,
-                                                  doseq=True,
-                                                  ckey=self.userProxy,
-                                                  cert=self.userProxy
-                                                 )# , verbose=True) #  for debug
+                res = connection.get('/crabserver/preprod/workflow', data=encodeRequest(data))
             except Exception as ex:
-                if self.config.isOracle:
-                    logger.exception('Error retrieving status from cache.')
-                    return 0
+	        #logger.info(wfnamemsg+encodeRequest(data))
+	        logger.warn('Error retrieving status from cache for %s.' % workflow)
+	        return 0
 
-            msg = "Status retrieved from cache. Loading task status."
-            logger.info(wfnamemsg+msg)
             try:
-                buf.close()
-                res = json.loads(res_)
-                workflow_status = res['result'][0]['status']
+                workflow_status = res[0]['result'][0]['status']
                 msg = "Task status is %s." % workflow_status
                 logger.info(wfnamemsg+msg)
             except ValueError:
@@ -430,10 +426,11 @@ class Worker(object):
                             doc["Destination"] = file_["value"][0]
                             doc["SourceLFN"] = file_["value"][1]
                             toPublish.append(doc)
-                with open("/tmp/"+workflow+'.json', 'w') as outfile:
+                with open("/tmp/publisher_files/"+workflow+'.json', 'w') as outfile:
                     json.dump(toPublish, outfile)
-                logger.info(". publisher.sh %s" % (workflow))
-                subprocess.call(["/bin/bash", "/data/user/MicroASO/microPublisher/python/publisher.sh", workflow])
+                logger.info(". publisher.py %s" % (workflow))
+                command = "publisher.py"
+                subprocess.call(["python", command, workflow])
 
         except:
             logger.exception("Exception!")
@@ -443,6 +440,12 @@ class Worker(object):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--config', help='Publisher config file', default='config.py')
+
+    args = parser.parse_args()
+    configuration = loadConfigurationFile(os.path.abspath(args.config))
 
     master = Worker(configuration, False)
     while(True):
