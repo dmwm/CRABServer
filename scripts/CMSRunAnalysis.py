@@ -761,7 +761,7 @@ def AddPsetHash(report, scram):
                 continue
             if 'pfn' not in fileInfo:
                 continue
-            print("== Filename: %s" % fileInfo['pfn'])
+            print("== Adding PSet Hash for filename: %s" % fileInfo['pfn'])
             if not os.path.exists(fileInfo['pfn']):
                 print("== Output file missing!")
                 continue
@@ -769,7 +769,7 @@ def AddPsetHash(report, scram):
             if not m:
                 print("== EDM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % fileInfo['pfn'])
                 continue
-            print("==== PSet Hash lookup STARTING at %s ====" % time.asctime(time.gmtime()))
+            print("==== PSet Hash computation STARTING at %s ====" % time.asctime(time.gmtime()))
             lines = getProv(fileInfo['pfn'], scram)
             found_history = False
             matches = {}
@@ -786,7 +786,7 @@ def AddPsetHash(report, scram):
                      matches[depth] = pset_hash
                  else:
                      break
-            print("==== PSet Hash lookup FINISHED at %s ====" % time.asctime(time.gmtime()))
+            print("==== PSet Hash computation FINISHED at %s ====" % time.asctime(time.gmtime()))
             if matches:
                 max_depth = max(matches.keys())
                 pset_hash = matches[max_depth]
