@@ -28,7 +28,7 @@ class DBSDataDiscovery(DataDiscovery):
         if len(res) == 0:
             raise TaskWorkerException("Cannot find dataset %s in %s DBS instance" % (dataset, self.dbsInstance))
         res = res[0]
-        self.logger.info("Input dataset details: %s" % pprint.pformat(res))
+        self.logger.info("Input dataset details: %s", pprint.pformat(res))
         accessType = res['dataset_access_type']
         if accessType != 'VALID':
             # as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
@@ -109,7 +109,7 @@ class DBSDataDiscovery(DataDiscovery):
                 del os.environ['X509_USER_KEY']
 
         taskName = kwargs['task']['tm_taskname']
-        self.logger.debug("Data discovery through %s for %s" %(self.dbs, taskName))
+        self.logger.debug("Data discovery through %s for %s", self.dbs, taskName)
 
         inputDataset = kwargs['task']['tm_input_dataset']
         secondaryDataset = kwargs['task'].get('tm_secondary_input_dataset', None)
@@ -156,7 +156,7 @@ class DBSDataDiscovery(DataDiscovery):
                 commonURL =  'registry/request/'
                 userServer = HTTPRequests(url=self.config.TaskWorker.DDMServer, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
                 DDMRequest = (userServer.post('/'+commonURL+'copy', data=DDMJson))[0]
-                self.logger.info("Contacted %s using %s and %s, got:\n%s" % (self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, DDMRequest))
+                self.logger.info("Contacted %s using %s and %s, got:\n%s", self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, DDMRequest)
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
                 if DDMRequest["result"] == "OK":
                     msg += "\nA disk replica has been requested on %s" % DDMRequest["data"][0]["first_request"]
@@ -165,12 +165,11 @@ class DBSDataDiscovery(DataDiscovery):
                     server = HTTPRequests(url=self.config.TaskWorker.resturl, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
                     configreq = {'workflow': taskName,
                                  'status': tapeRecallStatus,
-                                 'subresource': 'state',
-                                 # limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
+                                 'subresource': 'state'
                     }
                     tapeRecallStatusSet = server.post(self.config.TaskWorker.resturi, data = urllib.urlencode(configreq))
                     if tapeRecallStatusSet[2] == "OK":
-                        self.logger.info("Status for task %s set to '%s'" % (taskName, tapeRecallStatus))
+                        self.logger.info("Status for task %s set to '%s'", taskName, tapeRecallStatus)
                         msg += " and the task will be submitted as soon as it is completed."
                         self.uploadWarning(msg, kwargs['task']['user_proxy'], taskName)
                         raise TapeDatasetException(msg)
@@ -181,7 +180,7 @@ class DBSDataDiscovery(DataDiscovery):
             msg += " You might want to contact your physics group if you need a disk replica."
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
-            self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
+            self.logger.warning("The locations of some blocks have not been found: %s", set(blocks) - set(locationsMap))
         
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
@@ -236,11 +235,11 @@ class DBSDataDiscovery(DataDiscovery):
                                       ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
                                       (self.dbsInstance, inputDataset))
 
-        self.logger.debug("Got %s files" % len(result.result.getFiles()))
+        self.logger.debug("Got %s files", len(result.result.getFiles()))
         return result
 
 if __name__ == '__main__':
-    """ Usage: python DBSDataDiscovery.py dbs_instance dataset
+    """ Usage: python DBSDataDiscovery.py dbs_instance inputDataset
         where dbs_instance should be either prod or phys03
 
         Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/phys03 /MinBias/jmsilva-crab_scale_70633-3d12352c28d6995a3700097dc8082c04/USER
@@ -248,7 +247,7 @@ if __name__ == '__main__':
         Note: self.uploadWarning is failing, I usually comment it when I run this script standalone
     """
     dbsInstance = sys.argv[1]
-    dataset = sys.argv[2]
+    inputDataset = sys.argv[2]
 
     logging.basicConfig(level = logging.DEBUG)
     from WMCore.Configuration import Configuration
@@ -270,7 +269,7 @@ if __name__ == '__main__':
 
     fileset = DBSDataDiscovery(config)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, #'user_proxy': os.environ["X509_USER_PROXY"],
-                          'tm_input_dataset': dataset, 'tm_taskname': 'pippo1',
+                          'tm_input_dataset': inputDataset, 'tm_taskname': 'pippo1',
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
                           'tm_dbs_url': config.Services.DBSUrl}, tempDir='')
     

@@ -220,7 +220,7 @@ class Worker(object):
             worktype, task, failstatus, arguments = work
             self.inputs.put((workid, worktype, task, failstatus, arguments))
             self.working[workid] = {'workflow': task['tm_taskname'], 'injected': time.time()}
-            self.logger.info('Injecting work %d: %s', (workid, task['tm_taskname']))
+            self.logger.info('Injecting work %d: %s', workid, task['tm_taskname'])
             workid += 1
         self.logger.debug("Injection completed.")
 
