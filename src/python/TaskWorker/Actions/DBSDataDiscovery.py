@@ -239,7 +239,7 @@ class DBSDataDiscovery(DataDiscovery):
         return result
 
 if __name__ == '__main__':
-    """ Usage: python DBSDataDiscovery.py dbs_instance inputDataset
+    """ Usage: python DBSDataDiscovery.py dbs_instance dbsDataset
         where dbs_instance should be either prod or phys03
 
         Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/phys03 /MinBias/jmsilva-crab_scale_70633-3d12352c28d6995a3700097dc8082c04/USER
@@ -247,7 +247,7 @@ if __name__ == '__main__':
         Note: self.uploadWarning is failing, I usually comment it when I run this script standalone
     """
     dbsInstance = sys.argv[1]
-    inputDataset = sys.argv[2]
+    dbsDataset = sys.argv[2]
 
     logging.basicConfig(level = logging.DEBUG)
     from WMCore.Configuration import Configuration
@@ -269,7 +269,7 @@ if __name__ == '__main__':
 
     fileset = DBSDataDiscovery(config)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, #'user_proxy': os.environ["X509_USER_PROXY"],
-                          'tm_input_dataset': inputDataset, 'tm_taskname': 'pippo1',
+                          'tm_input_dataset': dbsDataset, 'tm_taskname': 'pippo1',
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
                           'tm_dbs_url': config.Services.DBSUrl}, tempDir='')
     
