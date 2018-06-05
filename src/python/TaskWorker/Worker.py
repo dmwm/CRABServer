@@ -14,7 +14,7 @@ from logging.handlers import TimedRotatingFileHandler
 from RESTInteractions import HTTPRequests
 from TaskWorker.DataObjects.Result import Result
 from ServerUtilities import truncateError, executeCommand
-from TaskWorker.WorkerExceptions import WorkerHandlerException
+from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException
 
 ## Creating configuration globals to avoid passing these around at every request
 global WORKER_CONFIG
@@ -66,6 +66,9 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger):
         try:
             msg = None
             outputs = work(resthost, resturi, WORKER_CONFIG, task, procnum, inputargs)
+        except TapeDatasetException as tde:
+            logger.info("Inside Worker TapeDatasetException!")
+            outputs = Result(task=task, err=str(tde))
         except WorkerHandlerException as we:
             outputs = Result(task=task, err=str(we))
             msg = str(we)
