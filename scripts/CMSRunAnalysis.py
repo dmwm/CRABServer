@@ -55,7 +55,7 @@ def mintime():
         sys.stdout.flush()
         sys.stderr.flush()
         time.sleep(remaining)
-        print("==== Failure sleep FINISHING at %s ====" % time.asctime(time.gmtime()))
+        print("==== Failure sleep FINISHED at %s ====" % time.asctime(time.gmtime()))
 
 
 class PassThroughOptionParser(OptionParser):
@@ -544,7 +544,7 @@ def prepSandbox(opts):
                 time.sleep(30)
     #The user sandbox.tar.gz has to be unpacked no matter what (even in DEBUG mode)
     print(commands.getoutput('tar xfzm %s' % opts.archiveJob))
-    print("==== Sandbox preparation FINISHING at %s ====" % time.asctime(time.gmtime()))
+    print("==== Sandbox preparation FINISHED at %s ====" % time.asctime(time.gmtime()))
 
     #move the pset in the right place
     print("==== WMCore filesystem preparation STARTING at %s ====" % time.asctime(time.gmtime()))
@@ -559,7 +559,7 @@ def prepSandbox(opts):
     if opts.userFiles:
         for myfile in opts.userFiles.split(','):
             os.rename(myfile, destDir + '/' + myfile)
-    print("==== WMCore filesystem preparation FINISHING at %s ====" % time.asctime(time.gmtime()))
+    print("==== WMCore filesystem preparation FINISHED at %s ====" % time.asctime(time.gmtime()))
 
 
 def extractUserSandbox(archiveJob, cmsswVersion):
@@ -718,13 +718,14 @@ def AddChecksums(report):
                 if 'fileName' in fileInfo:
                     fileInfo['pfn'] = fileInfo['fileName']
                 else:
-                    continue
-            print("==== Checksum STARTING at %s ====" % time.asctime(time.gmtime()))
-            print("== Filename: %s" % fileInfo['pfn'])
-            (adler32, cksum) = calculateChecksums(fileInfo['pfn'])
-            print("==== Checksum FINISHING at %s ====" % time.asctime(time.gmtime()))
-            fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
+                    continue           
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
+            print("==== Checksum computation STARTING at %s ====" % time.asctime(time.gmtime()))
+            (adler32, cksum) = calculateChecksums(fileInfo['pfn'])
+            print("==== Checksum FINISHED at %s ====" % time.asctime(time.gmtime()))
+            print("== Filename: %s  -  Adler32: %s  - size: %.3f MBytes" % \
+                 (fileInfo['pfn'], adler32, float(fileInfo['size'])/(1024*1024)) ) 
+            fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
 
 
 def AddPsetHash(report, scram):
@@ -761,7 +762,6 @@ def AddPsetHash(report, scram):
                 continue
             if 'pfn' not in fileInfo:
                 continue
-            print("== Filename: %s" % fileInfo['pfn'])
             if not os.path.exists(fileInfo['pfn']):
                 print("== Output file missing!")
                 continue
@@ -910,7 +910,7 @@ if __name__ == "__main__":
             logCMSSW()
             raise
         print("Job exit code: %s" % str(jobExitCode))
-        print("==== CMSSW Stack Execution FINISHING at %s ====" % time.asctime(time.gmtime()))
+        print("==== CMSSW Stack Execution FINISHED at %s ====" % time.asctime(time.gmtime()))
         logCMSSW()
     except WMExecutionFailure as WMex:
         print("ERROR: Caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail))
@@ -993,7 +993,7 @@ if __name__ == "__main__":
             pickle.dump(report, of)
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             stopDashboardMonitoring(ad)
-        print("==== Report file creation FINISHING at %s ====" % time.asctime(time.gmtime()))
+        print("==== Report file creation FINISHED at %s ====" % time.asctime(time.gmtime()))
     except FwkJobReportException as FJRex:
         msg = "BadFWJRXML"
         handleException("FAILED", EC_ReportHandlingErr, msg)
@@ -1019,6 +1019,6 @@ if __name__ == "__main__":
     else:
         mintime()
 
-    print("==== CMSRunAnalysis.py FINISHING at %s ====" % time.asctime(time.gmtime()))
+    print("==== CMSRunAnalysis.py FINISHED at %s ====" % time.asctime(time.gmtime()))
     print("Local time : %s" % time.ctime())
     sys.exit(jobExitCode)
