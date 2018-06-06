@@ -723,7 +723,7 @@ def AddChecksums(report):
             print("==== Checksum computation STARTING at %s ====" % time.asctime(time.gmtime()))
             (adler32, cksum) = calculateChecksums(fileInfo['pfn'])
             print("==== Checksum FINISHED at %s ====" % time.asctime(time.gmtime()))
-            print("== Filename: %s  -  Adler32: %s  - size: %.3f MBytes" % \
+            print("== FileName: %s  -  FileAdler32: %s  - FileSize: %.3f MBytes" % \
                  (fileInfo['pfn'], adler32, float(fileInfo['size'])/(1024*1024)) ) 
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
 
