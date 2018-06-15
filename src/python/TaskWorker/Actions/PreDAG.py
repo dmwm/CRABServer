@@ -170,7 +170,7 @@ class PreDAG(object):
         # need the global black list
         config.TaskWorker.scratchDir = './scratchdir'
         if not os.path.exists(config.TaskWorker.scratchDir):
-	  os.makedirs(config.TaskWorker.scratchDir)
+	    os.makedirs(config.TaskWorker.scratchDir)
         from TaskWorker.Actions.Recurring.BanDestinationSites import CRAB3BanDestinationSites
         banSites = CRAB3BanDestinationSites(config, 'dummy', 'dummy', self.logger)
         banSites.execute()
