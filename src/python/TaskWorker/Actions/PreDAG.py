@@ -167,6 +167,14 @@ class PreDAG(object):
         with open('taskworkerconfig.pkl', 'rb') as fd:
             config = pickle.load(fd) #Task worker configuration
 
+        # need the global black list
+        config.TaskWorker.scratchDir = './scratchdir'
+        if not os.path.exists(config.TaskWorker.scratchDir):
+	  os.makedirs(config.TaskWorker.scratchDir)
+        from TaskWorker.Actions.Recurring.BanDestinationSites import CRAB3BanDestinationSites
+        banSites = CRAB3BanDestinationSites(config, 'dummy', 'dummy', self.logger)
+        banSites.execute()
+
         # Read the automatic_splitting/throughputs/0-N files where the PJ
         # saved the EventThroughput
         # (report['steps']['cmsRun']['performance']['cpu']['EventThroughput'])
@@ -226,7 +234,6 @@ class PreDAG(object):
             config.TaskWorker.numAutomJobRetries = 0
 
         try:
-            config.TaskWorker.scratchDir = './scratchdir' # XXX
             splitter = Splitter(config, server=None, resturi='')
             split_result = splitter.execute(dataset, task=splitTask)
             self.logger.info("Splitting results:")
