@@ -47,8 +47,8 @@ class TaskAction(object):
                          'workflow': taskname,
                          'warning': b64encode(truncWarning)}
             userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
-        except HTTPException as hte:
-            self.logger.error(hte.headers)
+        except Exception as ex:
+            self.logger.error("Error uploading warning: %s" %str(ex))
             self.logger.warning("Cannot add a warning to REST interface. Warning message: %s" % warning)
 
     def getBlacklistedSites(self):
