@@ -34,13 +34,12 @@ class FileTransfers(object):
 
     UpdateTransfers_sql = "UPDATE filetransfersdb SET tm_transfer_state = :transfer_state, \
                                                       tm_last_update = :last_update, \
-						      tm_transfer_failure_reason = :fail_reason, \
-						      tm_transfer_retry_count = tm_transfer_retry_count + :retry_value, \
-					              tm_fts_id = CASE WHEN :fts_id is NULL THEN tm_fts_id ELSE :fts_id END, \
-						      tm_fts_instance = CASE WHEN :fts_instance is NULL THEN tm_fts_instance ELSE :fts_instance END\
-                           WHERE tm_id = :id AND \
-                                 tm_aso_worker = :asoworker"
-
+                                                      tm_aso_worker = :asoworker, \
+                                                      tm_transfer_failure_reason = :fail_reason, \
+                                                      tm_transfer_retry_count = tm_transfer_retry_count + :retry_value, \
+                                                      tm_fts_id = CASE WHEN :fts_id is NULL THEN tm_fts_id ELSE :fts_id END,\
+                                                      tm_fts_instance = CASE WHEN :fts_instance is NULL THEN tm_fts_instance ELSE :fts_instance END\
+                                                  WHERE tm_id = :id"
 
     UpdateTransfers1_sql = "UPDATE filetransfersdb SET tm_transfer_state = :transfer_state, \
                                                        tm_last_update = :last_update, \
