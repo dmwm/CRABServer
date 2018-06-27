@@ -165,6 +165,7 @@ class DBSDataDiscovery(DataDiscovery):
                     server = HTTPRequests(url=self.config.TaskWorker.resturl, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
                     configreq = {'workflow': taskName,
                                  'status': tapeRecallStatus,
+                                 'DDM_reqid': DDMRequest["data"][0]["request_id"],
                                  'subresource': 'state'
                     }
                     tapeRecallStatusSet = server.post(self.config.TaskWorker.resturi, data = urllib.urlencode(configreq))
@@ -265,11 +266,13 @@ if __name__ == '__main__':
 
     config.TaskWorker.DDMServer = 'dynamo.mit.edu'
     config.TaskWorker.resturl = 'cmsweb.cern.ch'
+    # The middle word identify the DB instance defined in CRABServerAuth.py on the REST
     config.TaskWorker.resturi = '/crabserver/prod/workflowdb'
+
 
     fileset = DBSDataDiscovery(config)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, #'user_proxy': os.environ["X509_USER_PROXY"],
-                          'tm_input_dataset': dbsDataset, 'tm_taskname': 'pippo1',
+                          'tm_input_dataset': dbsDataset,  'tm_taskname': 'pippo1',
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
                           'tm_dbs_url': config.Services.DBSUrl}, tempDir='')
     

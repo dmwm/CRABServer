@@ -41,6 +41,7 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("subresource", param, safe, RX_SUBPOSTWORKER, optional=True)
             validate_num("limit", param, safe, optional=True)
             validate_num("clusterid", param, safe, optional=True) #clusterid of the dag
+            validate_num("DDM_reqid", param, safe, optional=True)
             # possible combinations to check
             # 1) taskname + status
             # 2) taskname + status + failure
@@ -59,7 +60,7 @@ class RESTWorkerWorkflow(RESTEntity):
 
 
     @restcall
-    def post(self, workflow, status, command, subresource, failure, resubmittedjobs, getstatus, workername, limit, clusterid):
+    def post(self, workflow, status, command, subresource, failure, resubmittedjobs, getstatus, workername, limit, clusterid, DDM_reqid):
         """ Updates task information """
         if failure is not None:
             try:
@@ -67,7 +68,7 @@ class RESTWorkerWorkflow(RESTEntity):
             except TypeError:
                 raise InvalidParameter("Failure message is not in the accepted format")
         methodmap = {"state": {"args": (self.Task.SetStatusTask_sql,), "method": self.api.modify, "kwargs": {"status": [status],
-                     "command": [command], "taskname": [workflow]}},
+                     "command": [command], "taskname": [workflow], "DDM_reqid": [DDM_reqid]}},
                      #TODO MM - I don't see where this start API is used
                      "start": {"args": (self.Task.SetReadyTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
                                "tm_taskname": [workflow]}},

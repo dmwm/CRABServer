@@ -138,6 +138,7 @@ class Task(object):
     #SetStatusTask -- Used by DataWorkflow.resubmit (crab resubmit), and DataWorkflow.proceed (crab proceed)
     #              -- Also used by RESTWorkerWorkflow
     SetStatusTask_sql = "UPDATE tasks SET tm_task_status = upper(:status), tm_task_command = upper(:command) WHERE tm_taskname = :taskname"
+    SetStatusTask_sql = "UPDATE tasks SET tm_task_status = upper(:status), tm_task_command = upper(:command), tm_DDM_reqid = :DDM_reqid WHERE tm_taskname = :taskname"
     #SetStatusTask -- Used by DataWorkflow.kill (crab kill). Really similar to SetStatusTask_sql but also set a warning.
     SetStatusWarningTask_sql = "UPDATE tasks SET tm_task_status = upper(:status), tm_task_command = upper(:command), tm_task_warnings = :warnings WHERE tm_taskname = :taskname"
 
