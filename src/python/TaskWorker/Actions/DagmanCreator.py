@@ -18,6 +18,7 @@ from httplib import HTTPException
 
 from ServerUtilities import getLock
 from ServerUtilities import TASKLIFETIME
+from ServerUtilities import saveAndClearX509, restoreX509
 
 import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
