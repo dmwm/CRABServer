@@ -13,6 +13,7 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
+from ServerUtilities import saveAndClearX509, restoreX509
 
 from RESTInteractions import HTTPRequests
 
@@ -86,26 +87,19 @@ class DBSDataDiscovery(DataDiscovery):
 
     def execute(self, *args, **kwargs):
         self.logger.info("Data discovery with DBS") ## to be changed into debug
-        old_cert_val = os.getenv("X509_USER_CERT")
-        old_key_val = os.getenv("X509_USER_KEY")
-        try:
-            os.environ['X509_USER_CERT'] = self.config.TaskWorker.cmscert
-            os.environ['X509_USER_KEY'] = self.config.TaskWorker.cmskey
-            # DBS3 requires X509_USER_CERT to be set - but we don't want to leak that to other modules
-            dbsurl = self.config.Services.DBSUrl
-            if kwargs['task']['tm_dbs_url']:
-                dbsurl = kwargs['task']['tm_dbs_url']
-            self.dbs = DBSReader(dbsurl)
-            self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
-        finally:
-            if old_cert_val != None:
-                os.environ['X509_USER_CERT'] = old_cert_val
-            else:
-                del os.environ['X509_USER_CERT']
-            if old_key_val != None:
-                os.environ['X509_USER_KEY'] = old_key_val
-            else:
-                del os.environ['X509_USER_KEY']
+
+        # DBS3 requires X509_USER_CERT to be set - but we don't want to leak that to other modules
+        oldX509env = saveAndClearX509()
+
+
+        os.environ['X509_USER_CERT'] = self.config.TaskWorker.cmscert
+        os.environ['X509_USER_KEY'] = self.config.TaskWorker.cmskey
+
+        dbsurl = self.config.Services.DBSUrl
+        if kwargs['task']['tm_dbs_url']:
+            dbsurl = kwargs['task']['tm_dbs_url']
+        self.dbs = DBSReader(dbsurl)
+        self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
 
         taskName = kwargs['task']['tm_taskname']
         self.logger.debug("Data discovery through %s for %s" %(self.dbs, taskName))
@@ -219,6 +213,9 @@ class DBSDataDiscovery(DataDiscovery):
                                       (self.dbsInstance, inputDataset))
 
         self.logger.debug("Got %s files" % len(result.result.getFiles()))
+
+        restoreX509(oldX509env)
+
         return result
 
 if __name__ == '__main__':

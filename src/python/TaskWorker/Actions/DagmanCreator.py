@@ -366,13 +366,18 @@ class DagmanCreator(TaskAction.TaskAction):
         """
         lfns = [dest_dir]
         dest_sites_ = [dest_site]
+        oldX509env = saveAndClearX509()
         try:
+            phedex = PhEDEx.PhEDEx({{"cert": self.config.TaskWorker.cmscert, \
+                                     "key" : self.config.TaskWorker.cmskey,  \
+                                     'pycurl': True})
             pfn_info = self.phedex.getPFN(nodes=dest_sites_, lfns=lfns)
         except HTTPException as ex:
             self.logger.error(ex.headers)
             raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not contact phedex to do the site+lfn=>pfn translation.\n"+\
                                 "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex))
+        restoreX509(oldX509env)
         results = []
         for lfn in lfns:
             found_lfn = False
