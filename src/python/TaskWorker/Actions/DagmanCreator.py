@@ -368,9 +368,9 @@ class DagmanCreator(TaskAction.TaskAction):
         dest_sites_ = [dest_site]
         oldX509env = saveAndClearX509()
         try:
-            phedex = PhEDEx.PhEDEx({{"cert": self.config.TaskWorker.cmscert, \
-                                     "key" : self.config.TaskWorker.cmskey,  \
-                                     'pycurl': True})
+            phedex = PhEDEx.PhEDEx({'cert': self.config.TaskWorker.cmscert, \
+                                    'key' : self.config.TaskWorker.cmskey,  \
+                                    'pycurl': True})
             pfn_info = self.phedex.getPFN(nodes=dest_sites_, lfns=lfns)
         except HTTPException as ex:
             self.logger.error(ex.headers)
