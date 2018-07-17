@@ -18,6 +18,7 @@ from httplib import HTTPException
 
 from ServerUtilities import getLock
 from ServerUtilities import TASKLIFETIME
+from ServerUtilities import saveAndClearX509, restoreX509
 
 import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
@@ -325,8 +326,6 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def __init__(self, *args, **kwargs):
         TaskAction.TaskAction.__init__(self, *args, **kwargs)
-        self.phedex = PhEDEx.PhEDEx({'pycurl': True}) #TODO use config certs!
-
 
     def buildDashboardInfo(self, task):
         taskType = self.getDashboardTaskType(task)
@@ -366,13 +365,19 @@ class DagmanCreator(TaskAction.TaskAction):
         """
         lfns = [dest_dir]
         dest_sites_ = [dest_site]
+
+        oldX509env = saveAndClearX509()
+        cert = self.config.TaskWorker.cmscert
+        key  = self.config.TaskWorker.cmskey
         try:
-            pfn_info = self.phedex.getPFN(nodes=dest_sites_, lfns=lfns)
+            phedex = PhEDEx.PhEDEx({'cert': cert, 'key': key, 'pycurl': True})
+            pfn_info = phedex.getPFN(nodes=dest_sites_, lfns=lfns)
         except HTTPException as ex:
             self.logger.error(ex.headers)
             raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not contact phedex to do the site+lfn=>pfn translation.\n"+\
                                 "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex))
+        restoreX509(oldX509env)
         results = []
         for lfn in lfns:
             found_lfn = False

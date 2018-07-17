@@ -466,3 +466,38 @@ def getColumn(dictresult, columnName):
     else:
         return value
 
+def saveAndClearX509():
+    """
+       returns a tuple with the current value of X509 env. var. and clears them
+       usage:           savedValues = saveAndClear(X509)
+            and later:  restoreX509(savedValues)
+    """
+    proxy = os.getenv('X509_USER_PROXY')
+    cert  = os.getenv('X509_USER_CERT')
+    key   = os.getenv('X509_USER_KEY')
+    if proxy: del os.environ['X509_USER_PROXY']
+    if cert:  del os.environ['X509_USER_CERT']
+    if key:   del os.environ['X509_USER_KEY']
+
+    return(proxy, cert, key)
+
+def restoreX509(values):
+    """
+      restores X509 env. var. from tuple, see saveAndClearX509 for usage
+    """
+    proxy = values[0]
+    cert  = values[1]
+    key   = values[2]
+    if proxy:
+        os.environ['X509_USER_PROXY'] = proxy
+    else:
+        if os.getenv('X509_USER_PROXY'): del os.environ['X509_USER_PROXY']
+    if cert:
+        os.environ['X509_USER_CERT'] = cert
+    else:
+        if os.getenv('X509_USER_CERT'): del os.environ['X509_USER_CERT']
+    if key:
+        os.environ['X509_USER_KEY']  = key
+    else:
+        if os.getenv('X509_USER_KEY'): del os.environ['X509_USER_KEY']
+
