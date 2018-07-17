@@ -326,7 +326,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def __init__(self, *args, **kwargs):
         TaskAction.TaskAction.__init__(self, *args, **kwargs)
-        self.phedex = PhEDEx.PhEDEx({'pycurl': True}) #TODO use config certs!
+        #self.phedex = PhEDEx.PhEDEx({'pycurl': True}) #TODO use config certs!
 
 
     def buildDashboardInfo(self, task):
@@ -373,7 +373,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         try:
             phedex = PhEDEx.PhEDEx({'pycurl': True})
-            pfn_info = self.phedex.getPFN(nodes=dest_sites_, lfns=lfns)
+            pfn_info = phedex.getPFN(nodes=dest_sites_, lfns=lfns)
         except HTTPException as ex:
             self.logger.error(ex.headers)
             raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not contact phedex to do the site+lfn=>pfn translation.\n"+\
