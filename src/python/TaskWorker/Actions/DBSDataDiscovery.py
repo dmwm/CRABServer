@@ -89,9 +89,8 @@ class DBSDataDiscovery(DataDiscovery):
         self.logger.info("Data discovery with DBS") ## to be changed into debug
 
         # DBS3 requires X509_USER_CERT to be set - but we don't want to leak that to other modules
+        # so will save current env (which should have nothing in production setup anyhow) and restore before returning
         oldX509env = saveAndClearX509()
-
-
         os.environ['X509_USER_CERT'] = self.config.TaskWorker.cmscert
         os.environ['X509_USER_KEY'] = self.config.TaskWorker.cmskey
 

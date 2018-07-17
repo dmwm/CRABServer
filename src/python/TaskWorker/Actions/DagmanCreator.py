@@ -365,7 +365,7 @@ class DagmanCreator(TaskAction.TaskAction):
         """
         lfns = [dest_dir]
         dest_sites_ = [dest_site]
-        
+
         oldX509env = saveAndClearX509()
         cert = self.config.TaskWorker.cmscert
         key  = self.config.TaskWorker.cmskey
