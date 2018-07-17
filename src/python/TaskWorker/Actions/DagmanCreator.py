@@ -326,8 +326,6 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def __init__(self, *args, **kwargs):
         TaskAction.TaskAction.__init__(self, *args, **kwargs)
-        #self.phedex = PhEDEx.PhEDEx({'pycurl': True}) #TODO use config certs!
-
 
     def buildDashboardInfo(self, task):
         taskType = self.getDashboardTaskType(task)
@@ -368,11 +366,11 @@ class DagmanCreator(TaskAction.TaskAction):
         lfns = [dest_dir]
         dest_sites_ = [dest_site]
         oldX509env = saveAndClearX509()
-        os.environ['X509_USER_CERT'] = self.config.TaskWorker.cmscert
-        os.environ['X509_USER_KEY'] = self.config.TaskWorker.cmskey
+        cert = self.config.TaskWorker.cmscert
+        key = self.config.TaskWorker.cmskey
 
         try:
-            phedex = PhEDEx.PhEDEx({'pycurl': True})
+            phedex = PhEDEx.PhEDEx({'cert': cert, 'key': key, '''pycurl': True})
             pfn_info = phedex.getPFN(nodes=dest_sites_, lfns=lfns)
         except HTTPException as ex:
             self.logger.error(ex.headers)
