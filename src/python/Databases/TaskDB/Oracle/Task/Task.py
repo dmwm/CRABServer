@@ -58,7 +58,7 @@ class Task(object):
 
     GetReadyTasks_tuple = namedtuple("GetReadyTasks", ["tm_taskname", "panda_jobset_id", "tm_task_status", "tm_task_command", \
                        "tm_start_time", "tm_start_injection", "tm_end_injection", \
-                       "tm_task_failure", "tm_job_sw", "tm_job_arch", "tm_input_dataset", \
+                       "tm_task_failure", "tm_job_sw", "tm_job_arch", "tm_input_dataset", "tm_DDM_reqid", \
                        "tm_site_whitelist", "tm_site_blacklist", "tm_split_algo", "tm_split_args", \
                        "tm_totalunits", "tm_user_sandbox", "tm_debug_files", "tm_cache_url", "tm_username", "tm_user_dn", "tm_user_vo", \
                        "tm_user_role", "tm_user_group", "tm_publish_name", "tm_asyncdest", "tm_dbs_url", \
@@ -72,7 +72,7 @@ class Task(object):
     #GetReadyTasks
     GetReadyTasks_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, tm_task_command, \
                        tm_start_time, tm_start_injection, tm_end_injection, \
-                       tm_task_failure, tm_job_sw, tm_job_arch, tm_input_dataset, \
+                       tm_task_failure, tm_job_sw, tm_job_arch, tm_input_dataset, tm_DDM_reqid, \
                        tm_site_whitelist, tm_site_blacklist, tm_split_algo, tm_split_args, \
                        tm_totalunits, tm_user_sandbox, tm_debug_files, tm_cache_url, tm_username, tm_user_dn, tm_user_vo, \
                        tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \

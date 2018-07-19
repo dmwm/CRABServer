@@ -241,9 +241,28 @@ class MasterWorker(object):
 
         self.logger.debug("Failing QUEUED tasks before startup.")
         self.failQueuedTasks()
-        self.logger.debug("Starting main loop.")
+        self.logger.debug("Master Worker Starting Main Cycle.")
         while(not self.STOP):
             limit = self.slaves.queueableTasks()
+
+            tapeRecallStatus = 'TAPERECALL'
+            self.logger.info("Retrieving %s tasks", tapeRecallStatus)
+            recallingTasks = self._getWork(limit=limit, getstatus=tapeRecallStatus)
+            if len(recallingTasks) > 0:
+                self.logger.info("Retrieved a total of %d %s tasks", len(recallingTasks), tapeRecallStatus)
+                self.logger.debug("Retrieved the following %s tasks: \n%s", tapeRecallStatus, str(recallingTasks))
+                userServer = HTTPRequests(url=self.config.TaskWorker.DDMServer, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=True)
+                for recallingTask in recallingTasks:
+                    if not recallingTask['tm_DDM_reqid']:
+                        self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", recallingTask['tm_taskname'])
+                        continue
+                    DDMRequest = (userServer.get('/registry/request/pollcopy', data={'request_id': recallingTask['tm_DDM_reqid']}))[0]
+                    self.logger.info("Contacted %s using %s and %s, got:\n%s", self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, DDMRequest)
+                    # The query above returns a JSON with a format {"result": "OK", "message": "Request found", "data": [{"request_id": 14, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:25:41", "last_request": "2018-02-26 23:25:41", "request_count": 1}]}
+                    if DDMRequest["data"][0]["status"] == "completed": # possible values: new, activated, updated, completed, rejected, cancelled
+                        self.updateWork(recallingTask['tm_taskname'], recallingTask['tm_task_command'], 'NEW')
+                        #self.uploadWarning("The disk replica for the input dataset is completed, the task is going to be submitted", user_proxy, recallingTask['tm_taskname']) # need to fetch the user_proxy
+
             if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
                 time.sleep(self.config.TaskWorker.polling)
                 continue
@@ -260,7 +279,7 @@ class MasterWorker(object):
                     worktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
                     toInject.append((worktype, task, failstatus, None))
                 else:
-                    #The task stays in HOLDING and will be acquired again later
+                    #The task stays in HOLDING and will be acquired agkin later
                     self.logger.info("Skipping %s since it could not be updated to QUEUED. Will be retried in the next iteration", task['tm_taskname'])
 
             self.slaves.injectWorks(toInject)
@@ -280,7 +299,7 @@ class MasterWorker(object):
 
             dummyFinished = self.slaves.checkFinished()
 
-        self.logger.debug("Master Worker Exiting Main Cycle")
+        self.logger.debug("Master Worker Exiting Main Cycle.")
 
 
 if __name__ == '__main__':

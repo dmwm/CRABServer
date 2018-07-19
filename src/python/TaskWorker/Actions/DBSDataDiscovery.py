@@ -153,9 +153,8 @@ class DBSDataDiscovery(DataDiscovery):
                 # submit request to DDM
                 site = "T2*" # will let Dynamo choose which T2 to stage the blocks to, TODO: allow the user to specify it
                 DDMJson = json.dumps({"item": blocks, "site": site})
-                commonURL =  'registry/request/'
                 userServer = HTTPRequests(url=self.config.TaskWorker.DDMServer, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
-                DDMRequest = (userServer.post('/'+commonURL+'copy', data=DDMJson))[0]
+                DDMRequest = (userServer.post('/registry/request/copy', data=DDMJson))[0]
                 self.logger.info("Contacted %s using %s and %s, got:\n%s", self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, DDMRequest)
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
                 if DDMRequest["result"] == "OK":
