@@ -3,7 +3,6 @@ import os
 import sys
 import pprint
 import logging
-import json
 from httplib import HTTPException
 import urllib
 
@@ -15,6 +14,7 @@ from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetExceptio
 
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 
+from TaskWorker.Actions.DDMRequests import blocksRequest
 from RESTInteractions import HTTPRequests
 
 class DBSDataDiscovery(DataDiscovery):
@@ -143,31 +143,35 @@ class DBSDataDiscovery(DataDiscovery):
         except Exception as ex: #TODO should we catch HttpException instead?
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
-                                "This is could be a temporary phedex/dbs glitch, please try to submit a new task (resubmit will not work)"+\
-                                " and contact the experts if the error persists.\nError reason: %s" % str(ex))
+                                      "This is could be a temporary phedex/dbs glitch, please try to submit a new task (resubmit will not work)"+\
+                                      " and contact the experts if the error persists.\nError reason: %s" % str(ex))
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
             if self.otherLocations:
                 msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ', '.join(sorted(self.otherLocations))
                 # submit request to DDM
-                site = "T2*" # will let Dynamo choose which T2 to stage the blocks to, TODO: allow the user to specify it
-                DDMJson = json.dumps({"item": blocks, "site": site})
-                userServer = HTTPRequests(url=self.config.TaskWorker.DDMServer, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
-                DDMRequest = (userServer.post('/registry/request/copy', data=DDMJson))[0]
-                self.logger.info("Contacted %s using %s and %s, got:\n%s", self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, DDMRequest)
+                ddmRequest = blocksRequest(blocks, self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, verbose=False)
+                self.logger.info("Contacted %s using %s and %s, got:\n%s", self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, ddmRequest)
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
-                if DDMRequest["result"] == "OK":
-                    msg += "\nA disk replica has been requested on %s" % DDMRequest["data"][0]["first_request"]
+                if ddmRequest["result"] == "OK":
+                    msg += "\nA disk replica has been requested on %s" % ddmRequest["data"][0]["first_request"]
                     # set status to TAPERECALL
                     tapeRecallStatus = 'TAPERECALL'
                     server = HTTPRequests(url=self.config.TaskWorker.resturl, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
                     configreq = {'workflow': taskName,
                                  'status': tapeRecallStatus,
-                                 'DDM_reqid': DDMRequest["data"][0]["request_id"],
+                                 'DDM_reqid': ddmRequest["data"][0]["request_id"],
                                  'subresource': 'state'
                     }
-                    tapeRecallStatusSet = server.post(self.config.TaskWorker.resturi, data = urllib.urlencode(configreq))
+                    try:
+                        tapeRecallStatusSet = server.post(self.config.TaskWorker.resturi, data = urllib.urlencode(configreq))
+                    except HTTPException as hte:
+                        msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (self.config.TaskWorker.resturl, str(hte))
+                        msg += "\nSetting %s status failed for task %s" % (tapeRecallStatus, taskName)
+                        msg += "\nHTTP Headers are: %s" % hte.headers
+                        raise TaskWorkerException(msg, retry=True)
+
                     if tapeRecallStatusSet[2] == "OK":
                         self.logger.info("Status for task %s set to '%s'", taskName, tapeRecallStatus)
                         msg += " and the task will be submitted as soon as it is completed."

@@ -23,6 +23,8 @@ from TaskWorker.WorkerExceptions import ConfigException
 from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
 from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
 
+from TaskWorker.Actions.DDMRequests import statusRequest
+
 ## NOW placing this here, then to be verified if going into Action.Handler, or TSM
 ## The meaning of the elements in the 3-tuples are as follows:
 ## 1st) the command to be executed on the task;
@@ -251,17 +253,15 @@ class MasterWorker(object):
             if len(recallingTasks) > 0:
                 self.logger.info("Retrieved a total of %d %s tasks", len(recallingTasks), tapeRecallStatus)
                 self.logger.debug("Retrieved the following %s tasks: \n%s", tapeRecallStatus, str(recallingTasks))
-                userServer = HTTPRequests(url=self.config.TaskWorker.DDMServer, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=True)
                 for recallingTask in recallingTasks:
                     if not recallingTask['tm_DDM_reqid']:
                         self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", recallingTask['tm_taskname'])
                         continue
-                    DDMRequest = (userServer.get('/registry/request/pollcopy', data={'request_id': recallingTask['tm_DDM_reqid']}))[0]
-                    self.logger.info("Contacted %s using %s and %s, got:\n%s", self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, DDMRequest)
+                    ddmRequest = statusRequest(recallingTask['tm_DDM_reqid'], self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, verbose=False)
+                    self.logger.info("Contacted %s using %s and %s, got:\n%s", self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, ddmRequest)
                     # The query above returns a JSON with a format {"result": "OK", "message": "Request found", "data": [{"request_id": 14, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:25:41", "last_request": "2018-02-26 23:25:41", "request_count": 1}]}
-                    if DDMRequest["data"][0]["status"] == "completed": # possible values: new, activated, updated, completed, rejected, cancelled
+                    if ddmRequest["data"][0]["status"] == "completed": # possible values: new, activated, updated, completed, rejected, cancelled
                         self.updateWork(recallingTask['tm_taskname'], recallingTask['tm_task_command'], 'NEW')
-                        #self.uploadWarning("The disk replica for the input dataset is completed, the task is going to be submitted", user_proxy, recallingTask['tm_taskname']) # need to fetch the user_proxy
 
             if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
                 time.sleep(self.config.TaskWorker.polling)
