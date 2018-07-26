@@ -1,3 +1,5 @@
+from __future__ import division
+
 import json
 from RESTInteractions import HTTPRequests
 from httplib import HTTPException

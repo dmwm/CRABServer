@@ -1,5 +1,6 @@
+from __future__ import division
+
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
-from RESTInteractions import HTTPRequests
 from TaskWorker.MasterWorker import MasterWorker
 from TaskWorker.Actions.DDMRequests import statusRequest
 
@@ -11,7 +12,7 @@ class TapeRecallStatus(BaseRecurringAction):
 
         tapeRecallStatus = 'TAPERECALL'
         self.logger.info("Retrieving %s tasks", tapeRecallStatus)
-        recallingTasks = mw._getWork(limit=999999, getstatus=tapeRecallStatus)
+        recallingTasks = mw.getWork(limit=999999, getstatus=tapeRecallStatus)
         if len(recallingTasks) > 0:
             self.logger.info("Retrieved a total of %d %s tasks", len(recallingTasks), tapeRecallStatus)
             self.logger.debug("Retrieved the following %s tasks: \n%s", tapeRecallStatus, str(recallingTasks))

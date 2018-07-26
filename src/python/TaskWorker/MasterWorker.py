@@ -172,17 +172,17 @@ class MasterWorker(object):
         return True
 
 
-    def _getWork(self, limit, getstatus):
+    def getWork(self, limit, getstatus):
         configreq = {'limit': limit, 'workername': self.config.TaskWorker.name, 'getstatus': getstatus}
         pendingwork = []
         try:
             pendingwork = self.server.get(self.restURInoAPI + '/workflowdb', data = configreq)[0]['result']
         except HTTPException as hte:
-            msg = "HTTP Error during _getWork: %s\n" % str(hte)
+            msg = "HTTP Error during getWork: %s\n" % str(hte)
             msg += "HTTP Headers are %s: " % hte.headers
             self.logger.error(msg)
         except Exception: #pylint: disable=broad-except
-            self.logger.exception("Server could not process the _getWork request (prameters are %s)", configreq)
+            self.logger.exception("Server could not process the getWork request (prameters are %s)", configreq)
         return pendingwork
 
 
@@ -219,7 +219,7 @@ class MasterWorker(object):
         limit = self.slaves.nworkers * 2
         total = 0
         while True:
-            pendingwork = self._getWork(limit=limit, getstatus='QUEUED')
+            pendingwork = self.getWork(limit=limit, getstatus='QUEUED')
             for task in pendingwork:
                 self.logger.debug("Failing QUEUED task %s", task['tm_taskname'])
                 if task['tm_task_command']:
@@ -248,7 +248,7 @@ class MasterWorker(object):
                 time.sleep(self.config.TaskWorker.polling)
                 continue
 
-            pendingwork = self._getWork(limit=limit, getstatus='HOLDING')
+            pendingwork = self.getWork(limit=limit, getstatus='HOLDING')
 
             if len(pendingwork) > 0:
                 self.logger.info("Retrieved a total of %d works", len(pendingwork))
@@ -260,7 +260,7 @@ class MasterWorker(object):
                     worktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
                     toInject.append((worktype, task, failstatus, None))
                 else:
-                    #The task stays in HOLDING and will be acquired agkin later
+                    #The task stays in HOLDING and will be acquired again later
                     self.logger.info("Skipping %s since it could not be updated to QUEUED. Will be retried in the next iteration", task['tm_taskname'])
 
             self.slaves.injectWorks(toInject)
