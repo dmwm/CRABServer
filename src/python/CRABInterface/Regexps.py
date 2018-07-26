@@ -78,7 +78,7 @@ RX_SUBRESTAT = re.compile(r"^errors|report|logs|data|logs2|data2|resubmit|resubm
 
 #subresources of the ServerInfo (/info) and Task (/task) resources
 RX_SUBRES_SI = re.compile(r"^delegatedn|backendurls|version|bannedoutdest|scheddaddress|ignlocalityblacklist|$")
-RX_SUBRES_TASK = re.compile(r"^allinfo|allusers|summary|search|taskbystatus|getpublishurl|addwarning|addwebdir|addoutputdatasets|webdir|counttasksbystatus|lastfailures|updateschedd|updatepublicationtime$")
+RX_SUBRES_TASK = re.compile(r"^allinfo|allusers|summary|search|taskbystatus|getpublishurl|addwarning|addwebdir|addoutputdatasets|addddmreqid|webdir|counttasksbystatus|lastfailures|updateschedd|updatepublicationtime$")
 
 #worker workflow
 RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._%]{1,100}$")

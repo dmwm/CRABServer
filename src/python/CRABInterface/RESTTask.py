@@ -39,6 +39,8 @@ class RESTTask(RESTEntity):
             validate_str("webdirurl", param, safe, RX_URL, optional=True)
             validate_str("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
             validate_strlist("outputdatasets", param, safe, RX_OUT_DATASET)
+            validate_str("taskstatus", param, safe, RX_STATUS, optional=True)
+            validate_num("ddmreqid", param, safe, optional=True)
         elif method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
             validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
@@ -312,4 +314,22 @@ class RESTTask(RESTEntity):
 
         return []
 
+
+    def addddmreqid(self, **kwargs):
+        """ Add DDM request ID to DDM_reqid column in the database. Can be tested with:
+            curl -X POST https://balcas-crab.cern.ch/crabserver/dev/task -k --key $X509_USER_PROXY --cert $X509_USER_PROXY \
+                    -d 'subresource=addddmreqid&workflow=?&taskstatus=TAPERECALL&ddmreqid=12345' -v
+        """
+        #check if the parameters are there
+        if 'ddmreqid' not in kwargs or not kwargs['ddmreqid']:
+            raise InvalidParameter("DDM request ID not found in the input parameters")
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+
+        workflow = kwargs['workflow']
+        authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
+
+        self.api.modify(self.Task.UpdateDDMReqId_sql, taskstatus=[str(kwargs['taskstatus'])], ddmreqid=[str(kwargs['ddmreqid'])], workflow=[workflow])
+
+        return []
 

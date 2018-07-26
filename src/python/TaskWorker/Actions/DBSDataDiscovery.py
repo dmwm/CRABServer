@@ -151,17 +151,18 @@ class DBSDataDiscovery(DataDiscovery):
                     msg += "\nA disk replica has been requested on %s" % ddmRequest["data"][0]["first_request"]
                     # set status to TAPERECALL
                     tapeRecallStatus = 'TAPERECALL'
-                    server = HTTPRequests(url=self.config.TaskWorker.resturl, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
+                    ddmReqId = ddmRequest["data"][0]["request_id"]
+                    server = HTTPRequests(url=self.config.TaskWorker.resturl, localcert=kwargs['task']['user_proxy'], localkey=kwargs['task']['user_proxy'], verbose=False)
                     configreq = {'workflow': taskName,
-                                 'status': tapeRecallStatus,
-                                 'DDM_reqid': ddmRequest["data"][0]["request_id"],
-                                 'subresource': 'state'
+                                 'taskstatus': tapeRecallStatus,
+                                 'ddmreqid': ddmReqId,
+                                 'subresource': 'addddmreqid'
                     }
                     try:
-                        tapeRecallStatusSet = server.post(self.config.TaskWorker.resturi, data = urllib.urlencode(configreq))
+                        tapeRecallStatusSet = server.post(self.config.TaskWorker.restURInoAPI+'task', data = urllib.urlencode(configreq))
                     except HTTPException as hte:
                         msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (self.config.TaskWorker.resturl, str(hte))
-                        msg += "\nSetting %s status failed for task %s" % (tapeRecallStatus, taskName)
+                        msg += "\nSetting %s status and DDM request ID (%d) failed for task %s" % (tapeRecallStatus, ddmReqId, taskName)
                         msg += "\nHTTP Headers are: %s" % hte.headers
                         raise TaskWorkerException(msg, retry=True)
 
@@ -169,6 +170,7 @@ class DBSDataDiscovery(DataDiscovery):
                         self.logger.info("Status for task %s set to '%s'", taskName, tapeRecallStatus)
                         msg += " and the task will be submitted as soon as it is completed."
                         self.uploadWarning(msg, kwargs['task']['user_proxy'], taskName)
+
                         raise TapeDatasetException(msg)
                     else:
                         msg += ", please try again in two days."
@@ -265,8 +267,8 @@ if __name__ == '__main__':
 
     config.TaskWorker.DDMServer = 'dynamo.mit.edu'
     config.TaskWorker.resturl = 'cmsweb.cern.ch'
-    # The middle word identify the DB instance defined in CRABServerAuth.py on the REST
-    config.TaskWorker.resturi = '/crabserver/prod/workflowdb'
+    # The second word identify the DB instance defined in CRABServerAuth.py on the REST
+    config.TaskWorker.restURInoAPI = '/crabserver/prod/'
 
 
     fileset = DBSDataDiscovery(config)
