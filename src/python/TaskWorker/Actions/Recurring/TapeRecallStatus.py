@@ -4,6 +4,9 @@ from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 from TaskWorker.MasterWorker import MasterWorker
 from TaskWorker.Actions.DDMRequests import statusRequest
 
+import logging
+import sys
+
 class TapeRecallStatus(BaseRecurringAction):
     pollingTime = 60*4 # minutes
 
@@ -24,5 +27,26 @@ class TapeRecallStatus(BaseRecurringAction):
                 self.logger.info("Contacted %s using %s and %s, got:\n%s", config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, ddmRequest)
                 # The query above returns a JSON with a format {"result": "OK", "message": "Request found", "data": [{"request_id": 14, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:25:41", "last_request": "2018-02-26 23:25:41", "request_count": 1}]}
                 if ddmRequest["data"][0]["status"] == "completed": # possible values: new, activated, updated, completed, rejected, cancelled
+                    self.logger.info("Request %d is completed, setting status of task %s to NEW", recallingTask['tm_DDM_reqid'], recallingTask['tm_taskname'])
                     mw.updateWork(recallingTask['tm_taskname'], recallingTask['tm_task_command'], 'NEW')
+
+
+if __name__ == '__main__':
+    """ Simple main to execute the action standalone. You just need to set the task worker environment. """
+
+    twconfig = '/data/srv/TaskManager/current/TaskWorkerConfig.py'
+
+    logger = logging.getLogger()
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
+    from WMCore.Configuration import loadConfigurationFile
+    cfg = loadConfigurationFile(twconfig)
+
+    trs = TapeRecallStatus()
+    trs.logger = logger
+    trs._execute(None, None, cfg, None)
 
