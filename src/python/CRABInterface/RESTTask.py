@@ -1,17 +1,16 @@
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 from WMCore.REST.Error import InvalidParameter, ExecutionError
 
 from CRABInterface.Utils import conn_handler
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
-from CRABInterface.Regexps import RX_SUBRES_TASK, RX_TASKNAME, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_OUT_DATASET, RX_URL, RX_OUT_DATASET, RX_SCHEDD_NAME
+from CRABInterface.Regexps import RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL, RX_RUNS, RX_OUT_DATASET, RX_URL, RX_OUT_DATASET, RX_SCHEDD_NAME
 
 # external dependecies here
 import re
 import logging
-import cherrypy
 from ast import literal_eval
 from base64 import b64decode
 
@@ -29,7 +28,7 @@ class RESTTask(RESTEntity):
         self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
         self.logger = logging.getLogger("CRABLogger.RESTTask")
 
-    def validate(self, apiobj, method, api, param, safe):
+    def validate(self, method, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid()
         if method in ['POST']:
@@ -55,7 +54,7 @@ class RESTTask(RESTEntity):
         """
         return getattr(RESTTask, subresource)(self, **kwargs)
 
-    def allusers(self, **kwargs):
+    def allusers(self):
         rows = self.api.query(None, None, self.Task.ALLUSER_sql)
         return rows
 
@@ -66,7 +65,7 @@ class RESTTask(RESTEntity):
 
 
 	#INSERTED BY ERIC SUMMER STUDENT
-    def summary(self, **kwargs):
+    def summary(self):
         """ Retrieves the data for list all users"""
         rows = self.api.query(None, None, self.Task.TASKSUMMARY_sql)
         return rows
@@ -136,7 +135,7 @@ class RESTTask(RESTEntity):
         if 'workflow' not in kwargs or not kwargs['workflow']:
             raise InvalidParameter("Task name not found in the input parameters")
         workflow = kwargs['workflow']
-        self.logger.info("Getting proxied url for %s" % workflow)
+        self.logger.info("Getting proxied url for %s", workflow)
 
         try:
             row = self.Task.ID_tuple(*next(self.api.query(None, None, self.Task.ID_sql, taskname=workflow)))
@@ -161,16 +160,16 @@ class RESTTask(RESTEntity):
         # behind a firewall.
         #=============================================================================
         scheddsObj = self.centralcfg.centralconfig['backend-urls'].get('htcondorSchedds', {})
-        self.logger.info("ScheddObj for task %s is: %s\nSchedd used for submission %s" % (workflow, scheddsObj, row.schedd))
+        self.logger.info("ScheddObj for task %s is: %s\nSchedd used for submission %s", workflow, scheddsObj, row.schedd)
         #be careful that htcondorSchedds could be a list (backward compatibility). We might want to remove this in the future
         if row.schedd in list(scheddsObj) and isinstance(scheddsObj, dict):
-            self.logger.debug("Found schedd %s" % row.schedd)
+            self.logger.debug("Found schedd %s", row.schedd)
             proxiedurlbase = scheddsObj[row.schedd].get('proxiedurl')
-            self.logger.debug("Proxied url base is %s" % proxiedurlbase)
+            self.logger.debug("Proxied url base is %s", proxiedurlbase)
             if proxiedurlbase:
                 yield proxiedurlbase + suffix
         else:
-            self.logger.info("Could not determine proxied url for task %s" % workflow)
+            self.logger.info("Could not determine proxied url for task %s", workflow)
 
 
     def counttasksbystatus(self, **kwargs):

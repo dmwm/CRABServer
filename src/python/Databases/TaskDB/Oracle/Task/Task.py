@@ -127,10 +127,6 @@ class Task(object):
     SetReadyTasks_sql = "UPDATE tasks SET tm_start_injection = SYS_EXTRACT_UTC(SYSTIMESTAMP), \
                         tm_task_status = upper(:tm_task_status)  WHERE tm_taskname = :tm_taskname"
 
-    #TODO this is not needed anymore
-    #SetSplitargsTask
-    SetSplitargsTask_sql = "UPDATE tasks SET tm_split_args = :splitargs WHERE tm_taskname = :taskname"
-
     #SetStartInjection
     SetStartInjection_sql = "UPDATE tasks SET tm_start_injection = SYS_EXTRACT_UTC(SYSTIMESTAMP) \
                             WHERE tm_taskname = :tm_taskname"
