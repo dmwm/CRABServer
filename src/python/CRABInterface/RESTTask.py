@@ -28,7 +28,7 @@ class RESTTask(RESTEntity):
         self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
         self.logger = logging.getLogger("CRABLogger.RESTTask")
 
-    def validate(self, method, param, safe):
+    def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid()
         if method in ['POST']:
@@ -54,7 +54,7 @@ class RESTTask(RESTEntity):
         """
         return getattr(RESTTask, subresource)(self, **kwargs)
 
-    def allusers(self):
+    def allusers(self, **kwargs):
         rows = self.api.query(None, None, self.Task.ALLUSER_sql)
         return rows
 
@@ -65,7 +65,7 @@ class RESTTask(RESTEntity):
 
 
 	#INSERTED BY ERIC SUMMER STUDENT
-    def summary(self):
+    def summary(self, **kwargs):
         """ Retrieves the data for list all users"""
         rows = self.api.query(None, None, self.Task.TASKSUMMARY_sql)
         return rows
@@ -205,7 +205,7 @@ class RESTTask(RESTEntity):
 
 
     def addwarning(self, **kwargs):
-        """ Add a warning to the wraning column in the database. Can be tested with:
+        """ Add a warning to the warning column in the database. Can be tested with:
             curl -X POST https://mmascher-poc.cern.ch/crabserver/dev/task -k --key /tmp/x509up_u8440 --cert /tmp/x509up_u8440 \
                     -d 'subresource=addwarning&workflow=140710_233424_crab3test-5:mmascher_crab_HCprivate12&warning=blahblah' -v
         """
@@ -239,6 +239,35 @@ class RESTTask(RESTEntity):
         warnings.append(warning)
 
         self.api.modify(self.Task.SetWarnings_sql, warnings=[str(warnings)], workflow=[workflow])
+
+        return []
+
+
+    def deletewarnings(self, **kwargs):
+        """ Deleet warnings from the warning column in the database. Can be tested with:
+            curl -X POST https://mmascher-poc.cern.ch/crabserver/dev/task -k --key /tmp/x509up_u8440 --cert /tmp/x509up_u8440 \
+                    -d 'subresource=deletewarnings&workflow=140710_233424_crab3test-5:mmascher_crab_HCprivate12' -v
+        """
+        #check if the parameter is there
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+
+        #decoding and setting the parameters
+        workflow = kwargs['workflow']
+        authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
+
+#        rows = self.api.query(None, None, "SELECT tm_task_warnings FROM tasks WHERE tm_taskname = :workflow", workflow=workflow)#self.Task.TASKSUMMARY_sql)
+        rows = self.api.query(None, None, self.Task.ID_sql, taskname=workflow)#self.Task.TASKSUMMARY_sql)
+        rows = list(rows) #from generator to list
+        if len(rows)==0:
+            raise InvalidParameter("Task %s not found in the task database" % workflow)
+
+        row = self.Task.ID_tuple(*rows[0])
+        warnings = literal_eval(row.task_warnings.read() if row.task_warnings else '[]')
+        if len(warnings)<1:
+            raise ExecutionError("No warnings to remove.")
+
+        self.api.modify(self.Task.DeleteWarnings_sql, workflow=[workflow])
 
         return []
 

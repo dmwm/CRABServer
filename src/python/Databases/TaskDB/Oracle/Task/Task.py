@@ -148,7 +148,10 @@ class Task(object):
                                 WHERE tm_taskname = :tm_taskname"""
 
     #UpdateWarnings
-    SetWarnings_sql = """UPDATE tasks SET tm_task_warnings=:warnings WHERE tm_taskname=:workflow"""
+    SetWarnings_sql = """UPDATE tasks SET tm_task_warnings = :warnings WHERE tm_taskname = :workflow"""
+
+    #DeleteWarnings
+    DeleteWarnings_sql = """UPDATE tasks SET tm_task_warnings = DEFAULT WHERE tm_taskname = :workflow"""
 
     #TaskUpdateWebDir
     UpdateWebUrl_sql = """UPDATE tasks SET tm_user_webdir = :webdirurl \

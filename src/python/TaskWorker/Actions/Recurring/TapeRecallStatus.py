@@ -3,7 +3,8 @@ from __future__ import division
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 from TaskWorker.MasterWorker import MasterWorker
 from TaskWorker.Actions.DDMRequests import statusRequest
-from TaskWorker.Actions.TaskAction import TaskAction
+from RESTInteractions import HTTPRequests
+from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 
 import logging
 import sys
@@ -30,9 +31,11 @@ class TapeRecallStatus(BaseRecurringAction):
                 if ddmRequest["data"][0]["status"] == "completed": # possible values: new, activated, updated, completed, rejected, cancelled
                     self.logger.info("Request %d is completed, setting status of task %s to NEW", recallingTask['tm_DDM_reqid'], recallingTask['tm_taskname'])
                     mw.updateWork(recallingTask['tm_taskname'], recallingTask['tm_task_command'], 'NEW')
-                    # Delete all task warnings (the tapeRecallStatus adds a warning which is no longer valid now)
-                    ta = TaskAction(config, server=self.config.TaskWorker.resturl, resturi=config.TaskWorker.restURInoAPI)
-                    self.uploadWarning("", recallingTask['user_proxy'], recallingTask['tm_taskname'])
+                    # Delete all task warnings (the tapeRecallStatus added a dataset warning which is no longer valid now)
+                    server = HTTPRequests(config.TaskWorker.resturl, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=self.logger)
+                    mpl = MyProxyLogon(config=config, server=server, resturi=config.TaskWorker.restURInoAPI, myproxylen=self.pollingTime)
+                    mpl.execute(task=recallingTask) # this adds 'user_proxy' to recallingTask
+                    mpl.deleteWarnings(recallingTask['user_proxy'], recallingTask['tm_taskname'])
 
 
 if __name__ == '__main__':

@@ -17,7 +17,7 @@ class Create(DBCreator):
                       'jobgroups_id_seq'
                       ]
 
-    def __init__(self, logger=None, dbi=None):
+    def __init__(self, logger=None, dbi=None, param=None):
         if dbi == None:
             myThread = threading.currentThread()
             dbi = myThread.dbi
