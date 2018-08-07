@@ -167,6 +167,10 @@ class PreDAG(object):
         with open('taskworkerconfig.pkl', 'rb') as fd:
             config = pickle.load(fd) #Task worker configuration
 
+        # need to use user proxy as credential for talking with cmsweb
+        config.TaskWorker.cmscert = os.environ.get('X509_USER_PROXY')
+        config.TaskWorker.cmskey  = os.environ.get('X509_USER_PROXY')
+
         # need the global black list
         config.TaskWorker.scratchDir = './scratchdir'
         if not os.path.exists(config.TaskWorker.scratchDir):
