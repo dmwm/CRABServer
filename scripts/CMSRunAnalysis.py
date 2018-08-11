@@ -973,7 +973,7 @@ if __name__ == "__main__":
         # allow us to use a different LFN on job failure.
         report['jobExitCode'] = jobExitCode
         AddChecksums(report)
-        if not 'CRAB3_RUNTIME_DEBUG' in os.environ or True: 
+        if not 'CRAB3_RUNTIME_DEBUG' in os.environ:
             try:
                 AddPsetHash(report, scram)
             except Exception as ex:
