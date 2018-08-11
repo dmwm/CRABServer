@@ -570,8 +570,15 @@ def extractUserSandbox(archiveJob, cmsswVersion):
 def getProv(filename, scram):
     ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd(), logName="edmProvDumpOutput.log")
     if ret > 0:
-        msg = scram.diagnostic()
-        handleException("FAILED", EC_CMSRunWrapper, 'Error getting pset hash from file.\n\tScram Env %s\n\tCommand:edmProvDump %s' % (msg, filename))
+        scramMsg = scram.diagnostic()
+        if os.path.isfile("edmProvDumpOutput.log"):
+            with open("edmProvDumpOutput.log", "r") as fd:
+                output = fd.read()
+            scramMsg += "\n" + output
+
+        msg = "FAILED (%s)\n" % EC_CMSRunWrapper
+        msg += "Error getting pset hash from file.\n\tCommand:edmProvDump %s\n\tScram Diagnostic %s" % (filename, scramMsg)
+        print(msg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
     output = ''
