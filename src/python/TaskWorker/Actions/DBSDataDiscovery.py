@@ -84,15 +84,30 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nhttps://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
                 raise TaskWorkerException(msg)
 
-
     def execute(self, *args, **kwargs):
-        self.logger.info("Data discovery with DBS") ## to be changed into debug
+        """
+        This is a convenience wrapper around the executeInternal function
+        """
 
         # DBS3 requires X509_USER_CERT to be set - but we don't want to leak that to other modules
         # so will save current env (which should have nothing in production setup anyhow) and restore before returning
+        # even if exception is raised inside executeInternal
+
         oldX509env = saveAndClearX509()
         os.environ['X509_USER_CERT'] = self.config.TaskWorker.cmscert
         os.environ['X509_USER_KEY'] = self.config.TaskWorker.cmskey
+        try:
+            result = self.executeInternal(*args, **kw)
+        except:
+            raise
+        finally:
+            restoreX509(oldX509env)
+
+        return result
+
+    def executeInternal(self, *args, **kwargs):
+        self.logger.info("Data discovery with DBS") ## to be changed into debug
+
 
         dbsurl = self.config.Services.DBSUrl
         if kwargs['task']['tm_dbs_url']:
@@ -212,8 +227,6 @@ class DBSDataDiscovery(DataDiscovery):
                                       (self.dbsInstance, inputDataset))
 
         self.logger.debug("Got %s files" % len(result.result.getFiles()))
-
-        restoreX509(oldX509env)
 
         return result
 
