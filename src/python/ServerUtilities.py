@@ -567,9 +567,9 @@ class cleanX509env():
             self.oldProxy = os.getenv('X509_USER_PROXY')
             self.old=Cert = os.getenv('X509_USER_CERT')
             self.oldKey = os.getenv('X509_USER_KEY')
-            if X509_USER_PROXY: self.newProxy = X509_USER_PROXY
-            if X509_USER_CERT : self.newCert = X509_USER_CERT
-            if X509_USER_KEY  : self.newKey = X509_USER_KEY
+            self.newProxy = X509_USER_PROXY
+            self.newCert = X509_USER_CERT
+            self.newKey = X509_USER_KEY
 
         def __enter__(self):
             # Clean previous env. only delete env. vars if they were defined
