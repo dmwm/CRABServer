@@ -565,7 +565,7 @@ class newX509env():
     def __init__(self, X509_USER_PROXY=None, X509_USER_CERT=None, X509_USER_KEY=None):
         # save current env
         self.oldProxy = os.getenv('X509_USER_PROXY')
-        self.old=Cert = os.getenv('X509_USER_CERT')
+        self.oldCert = os.getenv('X509_USER_CERT')
         self.oldKey = os.getenv('X509_USER_KEY')
         self.newProxy = X509_USER_PROXY
         self.newCert = X509_USER_CERT
