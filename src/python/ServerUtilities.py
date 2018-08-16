@@ -466,86 +466,7 @@ def getColumn(dictresult, columnName):
     else:
         return value
 
-def saveAndClearX509():
-    """
-       returns a tuple with the current value of X509 env. var. and clears them
-       usage:           savedValues = saveAndClear(X509)
-            and later:  restoreX509(savedValues)
-    """
-    proxy = os.getenv('X509_USER_PROXY')
-    cert  = os.getenv('X509_USER_CERT')
-    key   = os.getenv('X509_USER_KEY')
-    if proxy: del os.environ['X509_USER_PROXY']
-    if cert:  del os.environ['X509_USER_CERT']
-    if key:   del os.environ['X509_USER_KEY']
-
-    return(proxy, cert, key)
-
-def restoreX509(values):
-    """
-      restores X509 env. var. from tuple, see saveAndClearX509 for usage
-    """
-    proxy = values[0]
-    cert  = values[1]
-    key   = values[2]
-    if proxy:
-        os.environ['X509_USER_PROXY'] = proxy
-    else:
-        if os.getenv('X509_USER_PROXY'): del os.environ['X509_USER_PROXY']
-    if cert:
-        os.environ['X509_USER_CERT'] = cert
-    else:
-        if os.getenv('X509_USER_CERT'): del os.environ['X509_USER_CERT']
-    if key:
-        os.environ['X509_USER_KEY']  = key
-    else:
-        if os.getenv('X509_USER_KEY'): del os.environ['X509_USER_KEY']
-
-class cleanX509env():
-    """
-    context manager to run some code with no X509 env var predefined
-    exiting env is restored when code is exited, even if exited via exception
-    see: https://docs.python.org/2.7/reference/compound_stmts.html?highlight=try#the-with-statement
-    and: http://preshing.com/20110920/the-python-with-statement-by-example/
-    usage 1:
-        with cleanX509env() :
-           set X509 variable as I like
-           do stuff
-        now environment is restored 
-    usage 2:
-        env=cleanX509env()
-        with env:
-         set variables
-         do stuff
-    """
-    def __init__(self):
-        # save current env
-        self.proxy = os.getenv('X509_USER_PROXY')
-        self.cert = os.getenv('X509_USER_CERT')
-        self.key = os.getenv('X509_USER_KEY')
-
-    def __enter__(self):
-        # only delete env. vars if they were defined
-        if self.proxy: del os.environ['X509_USER_PROXY']
-        if self.cert:  del os.environ['X509_USER_CERT']
-        if self.key:   del os.environ['X509_USER_KEY']
-
-    def __exit__(self):
-        # restore X509 environment
-        if self.proxy:
-            os.environ['X509_USER_PROXY'] = self.proxy
-        else:
-            if os.getenv('X509_USER_PROXY'): del os.environ['X509_USER_PROXY']
-        if self.cert:
-            os.environ['X509_USER_CERT'] = self.cert
-        else:
-            if os.getenv('X509_USER_CERT'): del os.environ['X509_USER_CERT']
-        if self.key:
-            os.environ['X509_USER_KEY'] = self.key
-        else:
-            if os.getenv('X509_USER_KEY'): del os.environ['X509_USER_KEY']
-
-    class newX509env():
+class newX509env():
         """
         context manager to run some code with a new x509 environment
         exiting env is restored when code is exited, even if exited via exception
@@ -565,7 +486,7 @@ class cleanX509env():
         def __init__(self, X509_USER_PROXY=None, X509_USER_CERT=None, X509_USER_KEY=None):
             # save current env
             self.oldProxy = os.getenv('X509_USER_PROXY')
-            self.old=Cert = os.getenv('X509_USER_CERT')
+            self.oldCert = os.getenv('X509_USER_CERT')
             self.oldKey = os.getenv('X509_USER_KEY')
             self.newProxy = X509_USER_PROXY
             self.newCert = X509_USER_CERT
@@ -581,7 +502,7 @@ class cleanX509env():
             if self.newCert:  os.environ['X509_USER_CERT'] = self.newCert
             if self.newKey:   os.environ['X509_USER_KEY'] = self.newKey
 
-        def __exit__(self):
+        def __exit__(self, a, b, c):
             # restore X509 environment
             if self.oldProxy:
                 os.environ['X509_USER_PROXY'] = self.oldProxy

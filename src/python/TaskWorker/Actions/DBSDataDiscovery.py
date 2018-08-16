@@ -13,7 +13,6 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
-from ServerUtilities import saveAndClearX509, restoreX509
 
 from RESTInteractions import HTTPRequests
 
@@ -90,18 +89,11 @@ class DBSDataDiscovery(DataDiscovery):
         """
 
         # DBS3 requires X509_USER_CERT to be set - but we don't want to leak that to other modules
-        # so will save current env (which should have nothing in production setup anyhow) and restore before returning
-        # even if exception is raised inside executeInternal
+        # so use a context manager to set an ad hoc env and restore as soon as
+        # executeInternal is over, even if it raises exception
 
-        oldX509env = saveAndClearX509()
-        os.environ['X509_USER_CERT'] = self.config.TaskWorker.cmscert
-        os.environ['X509_USER_KEY'] = self.config.TaskWorker.cmskey
-        try:
-            result = self.executeInternal(*args, **kw)
-        except:
-            raise
-        finally:
-            restoreX509(oldX509env)
+        with self.config.TaskWorker.envForCMSWEB:
+            result = self.executeInternal(*args, **kwargs)
 
         return result
 
