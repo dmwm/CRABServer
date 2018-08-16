@@ -502,7 +502,7 @@ class newX509env():
         if self.newCert:  os.environ['X509_USER_CERT'] = self.newCert
         if self.newKey:   os.environ['X509_USER_KEY'] = self.newKey
 
-    def __exit__(self):
+    def __exit__(self, a, b, c):
         # restore X509 environment
         if self.oldProxy:
             os.environ['X509_USER_PROXY'] = self.oldProxy
