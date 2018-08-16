@@ -97,7 +97,7 @@ class DBSDataDiscovery(DataDiscovery):
         os.environ['X509_USER_CERT'] = self.config.TaskWorker.cmscert
         os.environ['X509_USER_KEY'] = self.config.TaskWorker.cmskey
         try:
-            result = self.executeInternal(*args, **kw)
+            result = self.executeInternal(*args, **kwargs)
         except:
             raise
         finally:
