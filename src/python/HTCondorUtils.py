@@ -88,7 +88,7 @@ class AuthenticatedSubprocess(object):
         else:
             timestart = time.time()
             self.timedout = True
-            while (time.time() - timestart) < 3600:
+            while (time.time() - timestart) < 30:
                 res = os.waitpid(self.pid, os.WNOHANG)
                 if res != (0,0):
                     self.timedout = False
