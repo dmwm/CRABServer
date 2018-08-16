@@ -58,7 +58,7 @@ class Task(object):
 
     GetReadyTasks_tuple = namedtuple("GetReadyTasks", ["tm_taskname", "panda_jobset_id", "tm_task_status", "tm_task_command", \
                        "tm_start_time", "tm_start_injection", "tm_end_injection", \
-                       "tm_task_failure", "tm_job_sw", "tm_job_arch", "tm_input_dataset", \
+                       "tm_task_failure", "tm_job_sw", "tm_job_arch", "tm_input_dataset", "tm_DDM_reqid", \
                        "tm_site_whitelist", "tm_site_blacklist", "tm_split_algo", "tm_split_args", \
                        "tm_totalunits", "tm_user_sandbox", "tm_debug_files", "tm_cache_url", "tm_username", "tm_user_dn", "tm_user_vo", \
                        "tm_user_role", "tm_user_group", "tm_publish_name", "tm_asyncdest", "tm_dbs_url", \
@@ -72,7 +72,7 @@ class Task(object):
     #GetReadyTasks
     GetReadyTasks_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, tm_task_command, \
                        tm_start_time, tm_start_injection, tm_end_injection, \
-                       tm_task_failure, tm_job_sw, tm_job_arch, tm_input_dataset, \
+                       tm_task_failure, tm_job_sw, tm_job_arch, tm_input_dataset, tm_DDM_reqid, \
                        tm_site_whitelist, tm_site_blacklist, tm_split_algo, tm_split_args, \
                        tm_totalunits, tm_user_sandbox, tm_debug_files, tm_cache_url, tm_username, tm_user_dn, tm_user_vo, \
                        tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \
@@ -127,10 +127,6 @@ class Task(object):
     SetReadyTasks_sql = "UPDATE tasks SET tm_start_injection = SYS_EXTRACT_UTC(SYSTIMESTAMP), \
                         tm_task_status = upper(:tm_task_status)  WHERE tm_taskname = :tm_taskname"
 
-    #TODO this is not needed anymore
-    #SetSplitargsTask
-    SetSplitargsTask_sql = "UPDATE tasks SET tm_split_args = :splitargs WHERE tm_taskname = :taskname"
-
     #SetStartInjection
     SetStartInjection_sql = "UPDATE tasks SET tm_start_injection = SYS_EXTRACT_UTC(SYSTIMESTAMP) \
                             WHERE tm_taskname = :tm_taskname"
@@ -152,7 +148,10 @@ class Task(object):
                                 WHERE tm_taskname = :tm_taskname"""
 
     #UpdateWarnings
-    SetWarnings_sql = """UPDATE tasks SET tm_task_warnings=:warnings WHERE tm_taskname=:workflow"""
+    SetWarnings_sql = """UPDATE tasks SET tm_task_warnings = :warnings WHERE tm_taskname = :workflow"""
+
+    #DeleteWarnings
+    DeleteWarnings_sql = """UPDATE tasks SET tm_task_warnings = DEFAULT WHERE tm_taskname = :workflow"""
 
     #TaskUpdateWebDir
     UpdateWebUrl_sql = """UPDATE tasks SET tm_user_webdir = :webdirurl \
@@ -166,4 +165,8 @@ class Task(object):
 
     #UpdatePublicationTime_sql
     UpdatePublicationTime_sql = """UPDATE tasks SET tm_last_publication = SYS_EXTRACT_UTC(SYSTIMESTAMP) \
+                              WHERE tm_taskname = :workflow"""
+
+    #TaskDDMReqId
+    UpdateDDMReqId_sql = """UPDATE tasks SET tm_task_status = upper(:taskstatus), tm_DDM_reqid = :ddmreqid \
                               WHERE tm_taskname = :workflow"""

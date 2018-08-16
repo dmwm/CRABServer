@@ -1,17 +1,16 @@
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_numlist
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 from WMCore.REST.Error import InvalidParameter, ExecutionError
 
 from CRABInterface.Utils import conn_handler
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
-from CRABInterface.Regexps import RX_SUBRES_TASK, RX_TASKNAME, RX_BLOCK, RX_WORKER_NAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL, RX_DN, RX_SUBPOSTWORKER, RX_SUBGETWORKER, RX_RUNS, RX_LUMIRANGE, RX_OUT_DATASET, RX_URL, RX_OUT_DATASET, RX_SCHEDD_NAME
+from CRABInterface.Regexps import RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL, RX_RUNS, RX_OUT_DATASET, RX_URL, RX_OUT_DATASET, RX_SCHEDD_NAME
 
 # external dependecies here
 import re
 import logging
-import cherrypy
 from ast import literal_eval
 from base64 import b64decode
 
@@ -39,6 +38,8 @@ class RESTTask(RESTEntity):
             validate_str("webdirurl", param, safe, RX_URL, optional=True)
             validate_str("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
             validate_strlist("outputdatasets", param, safe, RX_OUT_DATASET)
+            validate_str("taskstatus", param, safe, RX_STATUS, optional=True)
+            validate_num("ddmreqid", param, safe, optional=True)
         elif method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
             validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
@@ -134,7 +135,7 @@ class RESTTask(RESTEntity):
         if 'workflow' not in kwargs or not kwargs['workflow']:
             raise InvalidParameter("Task name not found in the input parameters")
         workflow = kwargs['workflow']
-        self.logger.info("Getting proxied url for %s" % workflow)
+        self.logger.info("Getting proxied url for %s", workflow)
 
         try:
             row = self.Task.ID_tuple(*next(self.api.query(None, None, self.Task.ID_sql, taskname=workflow)))
@@ -159,16 +160,16 @@ class RESTTask(RESTEntity):
         # behind a firewall.
         #=============================================================================
         scheddsObj = self.centralcfg.centralconfig['backend-urls'].get('htcondorSchedds', {})
-        self.logger.info("ScheddObj for task %s is: %s\nSchedd used for submission %s" % (workflow, scheddsObj, row.schedd))
+        self.logger.info("ScheddObj for task %s is: %s\nSchedd used for submission %s", workflow, scheddsObj, row.schedd)
         #be careful that htcondorSchedds could be a list (backward compatibility). We might want to remove this in the future
         if row.schedd in list(scheddsObj) and isinstance(scheddsObj, dict):
-            self.logger.debug("Found schedd %s" % row.schedd)
+            self.logger.debug("Found schedd %s", row.schedd)
             proxiedurlbase = scheddsObj[row.schedd].get('proxiedurl')
-            self.logger.debug("Proxied url base is %s" % proxiedurlbase)
+            self.logger.debug("Proxied url base is %s", proxiedurlbase)
             if proxiedurlbase:
                 yield proxiedurlbase + suffix
         else:
-            self.logger.info("Could not determine proxied url for task %s" % workflow)
+            self.logger.info("Could not determine proxied url for task %s", workflow)
 
 
     def counttasksbystatus(self, **kwargs):
@@ -204,7 +205,7 @@ class RESTTask(RESTEntity):
 
 
     def addwarning(self, **kwargs):
-        """ Add a warning to the wraning column in the database. Can be tested with:
+        """ Add a warning to the warning column in the database. Can be tested with:
             curl -X POST https://mmascher-poc.cern.ch/crabserver/dev/task -k --key /tmp/x509up_u8440 --cert /tmp/x509up_u8440 \
                     -d 'subresource=addwarning&workflow=140710_233424_crab3test-5:mmascher_crab_HCprivate12&warning=blahblah' -v
         """
@@ -238,6 +239,35 @@ class RESTTask(RESTEntity):
         warnings.append(warning)
 
         self.api.modify(self.Task.SetWarnings_sql, warnings=[str(warnings)], workflow=[workflow])
+
+        return []
+
+
+    def deletewarnings(self, **kwargs):
+        """ Deleet warnings from the warning column in the database. Can be tested with:
+            curl -X POST https://mmascher-poc.cern.ch/crabserver/dev/task -k --key /tmp/x509up_u8440 --cert /tmp/x509up_u8440 \
+                    -d 'subresource=deletewarnings&workflow=140710_233424_crab3test-5:mmascher_crab_HCprivate12' -v
+        """
+        #check if the parameter is there
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+
+        #decoding and setting the parameters
+        workflow = kwargs['workflow']
+        authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
+
+#        rows = self.api.query(None, None, "SELECT tm_task_warnings FROM tasks WHERE tm_taskname = :workflow", workflow=workflow)#self.Task.TASKSUMMARY_sql)
+        rows = self.api.query(None, None, self.Task.ID_sql, taskname=workflow)#self.Task.TASKSUMMARY_sql)
+        rows = list(rows) #from generator to list
+        if len(rows)==0:
+            raise InvalidParameter("Task %s not found in the task database" % workflow)
+
+        row = self.Task.ID_tuple(*rows[0])
+        warnings = literal_eval(row.task_warnings.read() if row.task_warnings else '[]')
+        if len(warnings)<1:
+            raise ExecutionError("No warnings to remove.")
+
+        self.api.modify(self.Task.DeleteWarnings_sql, workflow=[workflow])
 
         return []
 
@@ -312,4 +342,22 @@ class RESTTask(RESTEntity):
 
         return []
 
+
+    def addddmreqid(self, **kwargs):
+        """ Add DDM request ID to DDM_reqid column in the database. Can be tested with:
+            curl -X POST https://balcas-crab.cern.ch/crabserver/dev/task -k --key $X509_USER_PROXY --cert $X509_USER_PROXY \
+                    -d 'subresource=addddmreqid&workflow=?&taskstatus=TAPERECALL&ddmreqid=12345' -v
+        """
+        #check if the parameters are there
+        if 'ddmreqid' not in kwargs or not kwargs['ddmreqid']:
+            raise InvalidParameter("DDM request ID not found in the input parameters")
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+
+        workflow = kwargs['workflow']
+        authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
+
+        self.api.modify(self.Task.UpdateDDMReqId_sql, taskstatus=[kwargs['taskstatus']], ddmreqid=[kwargs['ddmreqid']], workflow=[workflow])
+
+        return []
 
