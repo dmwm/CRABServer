@@ -466,38 +466,53 @@ def getColumn(dictresult, columnName):
     else:
         return value
 
-def saveAndClearX509():
+class newX509env():
     """
-       returns a tuple with the current value of X509 env. var. and clears them
-       usage:           savedValues = saveAndClear(X509)
-            and later:  restoreX509(savedValues)
+    context manager to run some code with a new x509 environment
+    exiting env is restored when code is exited, even if exited via exception
+    The new environmnet will only contain X509_USER_.. variables explicitely
+    listed as argument to the method.
+    see: https://docs.python.org/2.7/reference/compound_stmts.html?highlight=try#the-with-statement
+    and: http://preshing.com/20110920/the-python-with-statement-by-example/
+    usage 1:
+        with newX509env(X509_USER_PROXY=proxy,X509_USER_CERT=cert,X509_USER_KEY=key :
+           do stuff
+    usage 2:
+        myEnv=newX509env(X509_USER_PROXY=myProxy,X509_USER_CERT=myCert,X509_USER_KEY=myKey)
+        with myEnv:
+            do stuff
     """
-    proxy = os.getenv('X509_USER_PROXY')
-    cert  = os.getenv('X509_USER_CERT')
-    key   = os.getenv('X509_USER_KEY')
-    if proxy: del os.environ['X509_USER_PROXY']
-    if cert:  del os.environ['X509_USER_CERT']
-    if key:   del os.environ['X509_USER_KEY']
 
-    return(proxy, cert, key)
+    def __init__(self, X509_USER_PROXY=None, X509_USER_CERT=None, X509_USER_KEY=None):
+        # save current env
+        self.oldProxy = os.getenv('X509_USER_PROXY')
+        self.oldCert = os.getenv('X509_USER_CERT')
+        self.oldKey = os.getenv('X509_USER_KEY')
+        self.newProxy = X509_USER_PROXY
+        self.newCert = X509_USER_CERT
+        self.newKey = X509_USER_KEY
 
-def restoreX509(values):
-    """
-      restores X509 env. var. from tuple, see saveAndClearX509 for usage
-    """
-    proxy = values[0]
-    cert  = values[1]
-    key   = values[2]
-    if proxy:
-        os.environ['X509_USER_PROXY'] = proxy
-    else:
-        if os.getenv('X509_USER_PROXY'): del os.environ['X509_USER_PROXY']
-    if cert:
-        os.environ['X509_USER_CERT'] = cert
-    else:
-        if os.getenv('X509_USER_CERT'): del os.environ['X509_USER_CERT']
-    if key:
-        os.environ['X509_USER_KEY']  = key
-    else:
-        if os.getenv('X509_USER_KEY'): del os.environ['X509_USER_KEY']
+    def __enter__(self):
+        # Clean previous env. only delete env. vars if they were defined
+        if self.oldProxy: del os.environ['X509_USER_PROXY']
+        if self.oldCert:  del os.environ['X509_USER_CERT']
+        if self.oldKey:   del os.environ['X509_USER_KEY']
+        # set environment to whatever user wants
+        if self.newProxy: os.environ['X509_USER_PROXY'] = self.newProxy
+        if self.newCert:  os.environ['X509_USER_CERT'] = self.newCert
+        if self.newKey:   os.environ['X509_USER_KEY'] = self.newKey
 
+    def __exit__(self, a, b, c):
+        # restore X509 environment
+        if self.oldProxy:
+            os.environ['X509_USER_PROXY'] = self.oldProxy
+        else:
+            if os.getenv('X509_USER_PROXY'): del os.environ['X509_USER_PROXY']
+        if self.oldCert:
+            os.environ['X509_USER_CERT'] = self.oldCert
+        else:
+            if os.getenv('X509_USER_CERT'): del os.environ['X509_USER_CERT']
+        if self.oldKey:
+            os.environ['X509_USER_KEY'] = self.oldKey
+        else:
+            if os.getenv('X509_USER_KEY'): del os.environ['X509_USER_KEY']

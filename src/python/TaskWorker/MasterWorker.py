@@ -16,6 +16,7 @@ from WMCore.Configuration import loadConfigurationFile
 from RESTInteractions import HTTPRequests
 
 import HTCondorLocator
+from ServerUtilities import newX509env
 from TaskWorker.TestWorker import TestWorker
 from MultiProcessingLog import MultiProcessingLog
 from TaskWorker.Worker import Worker, setProcessLogger
@@ -135,6 +136,11 @@ class MasterWorker(object):
             self.config.TaskWorker.retry_interval = [retry*20*2 for retry in range(self.config.TaskWorker.max_retry)]
         if not len(self.config.TaskWorker.retry_interval) == self.config.TaskWorker.max_retry:
             raise ConfigException("No correct max_retry and retry_interval specified; len of retry_interval must be equal to max_retry.")
+        # use the config to pass some useful global stuff to all workers
+        # will use TaskWorker.cmscert/key to talk with CMSWEB
+        self.config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT = self.config.TaskWorker.cmscert,
+                                                         X509_USER_KEY  = self.config.TaskWorker.cmskey)
+
         if self.TEST:
             self.slaves = TestWorker(self.config, resthost, self.restURInoAPI + '/workflowdb')
         else:
