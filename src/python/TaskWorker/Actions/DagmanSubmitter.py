@@ -348,6 +348,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         configreq = {'workflow': workflow,
                      'status': "SUBMITTED",
                      'subresource': 'success',
+                     'clusterid': results[0]['ClusterId']
                     }
         self.logger.warning("Task %s already submitted to HTCondor; pushing information centrally: %s", workflow, str(configreq))
         data = urllib.urlencode(configreq)
