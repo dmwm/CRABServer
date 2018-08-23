@@ -6,8 +6,6 @@ import shutil
 import subprocess
 import classad
 from collections import namedtuple
-from ServerUtilities import MAX_DISK_SPACE, MAX_WALLTIME, MAX_MEMORY
-
 JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERROR')(0, 1, 2)
 
 # Without this environment variable set, HTCondor takes a write lock per logfile entry
@@ -45,6 +43,12 @@ class RetryJob(object):
         self.report              = {}
         self.validreport         = True
         self.integrated_job_time = 0
+
+        from ServerUtilities import MAX_DISK_SPACE, MAX_WALLTIME, MAX_MEMORY
+        self.MAX_DISK_SPACE = MAX_DISK_SPACE
+        self.MAX_WALLTIME   = MAX_WALLTIME
+        self.MAX_MEMORY     = MAX_MEMORY
+
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -200,10 +204,10 @@ class RetryJob(object):
             if 'RemoteWallClockTime' in ad:
                 integrated_job_time += ad['RemoteWallClockTime']
         self.integrated_job_time = integrated_job_time
-        if total_job_time > MAX_WALLTIME:
+        if total_job_time > self.MAX_WALLTIME:
             exitMsg = "Not retrying a long running job (job ran for %d hours)" % (total_job_time / 3600)
             self.create_fake_fjr(exitMsg, 50664)
-        if integrated_job_time > 1.5*MAX_WALLTIME:
+        if integrated_job_time > 1.5*self.MAX_WALLTIME:
             exitMsg = "Not retrying a job because the integrated time (across all retries) is %d hours." % (integrated_job_time / 3600)
             self.create_fake_fjr(exitMsg, 50664)
 
@@ -230,8 +234,8 @@ class RetryJob(object):
             total_job_memory = float(total_job_memory)
         except ValueError:
             return
-        if total_job_memory > MAX_MEMORY:
-            exitMsg = "Not retrying job due to excessive memory use (%d MB)" % (total_job_memory)
+        if total_job_memory > self.MAX_MEMORY:
+            exitMsg = "Not retrying job due to excessive memory use (%d MB vs %d MB requested)" % (total_job_memory, self.MAX_MEMORY)
             self.create_fake_fjr(exitMsg, 50660, 50660)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -252,8 +256,8 @@ class RetryJob(object):
         if 'DiskUsage' in self.ad:
             try:
                 diskUsage = int(self.ad['DiskUsage'])
-                if diskUsage >= MAX_DISK_SPACE:
-                    self.logger.debug("Disk Usage: %s, Maximum allowed disk usage: %s", diskUsage, MAX_DISK_SPACE)
+                if diskUsage >= self.MAX_DISK_SPACE:
+                    self.logger.debug("Disk Usage: %s, Maximum allowed disk usage: %s", diskUsage, self.MAX_DISK_SPACE)
                     exitMsg = "Not retrying job due to excessive disk usage (job automatically killed on the worker node)"
                     self.create_fake_fjr(exitMsg, 50662, 50662)
             except:
@@ -405,15 +409,15 @@ class RetryJob(object):
             self.ad = job_ad
             if 'MaxWallTimeMinsRun' in self.ad:
                 try:
-                    MAX_WALLTIME = int(self.ad['MaxWallTimeMinsRun']) * 60
+                    self.MAX_WALLTIME = int(self.ad['MaxWallTimeMinsRun']) * 60
                 except:
                     msg = "Unable to get MaxWallTimeMinsRun from job classads. Using the default MAX_WALLTIME."
                     self.logger.debug(msg)
             if 'RequestMemory' in self.ad:
                 try:
-                    MAX_MEMORY = int(self.ad['RequestMemory'])
+                    self.MAX_MEMORY = int(self.ad['RequestMemory'])
                 except:
-                    msg = "Unable to get RequestMemory from job classads. Using the default."
+                    msg = "Unable to get RequestMemory from job classads. Using the default MAX_MEMORY."
                     self.logger.debug(msg)
             msg = "Job ads already present. Will not use condor_q, but will load previous jobs ads."
             self.logger.debug(msg)
