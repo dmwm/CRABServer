@@ -586,6 +586,11 @@ class HTCondorDataWorkflow(DataWorkflow):
                         result['status'] = row.task_status
                     else:
                         result['status'] = dagman_codes.get(DAGStatus, row.task_status)
+                    # make sure taskStatusCode is defined even if not using old logic
+                    if result['status'] in ['KILLED', 'KILLFAILED']:
+                        taskStatusCode = 5
+                    else:
+                        taskStatusCode = 1
                 else:
                     self.logger.info("Node state file is too old or does not have an update time. Will use condor_q to get the workflow status.")
                     useOldLogic = True
@@ -680,7 +685,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                     taskStatus[i] = {'State': 'unsubmitted'}
 
         for job, info in taskStatus.items():
-            job = int(job)
             status = info['State']
             jobsPerStatus.setdefault(status, 0)
             jobsPerStatus[status] += 1
