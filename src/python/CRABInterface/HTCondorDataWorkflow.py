@@ -462,7 +462,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                   "taskWarningMsg"   : [], #from the db
                   "submissionTime"   : 0,  #from the db
                   "statusFailureMsg" : '', #errors of the status itself
-                  "jobsPerStatus"    : {},
                   "jobList"          : [],
                   "schedd"           : '', #from the db
                   "splitting"        : '', #from the db
@@ -692,7 +691,6 @@ class HTCondorDataWorkflow(DataWorkflow):
             jobsPerStatus.setdefault(status, 0)
             jobsPerStatus[status] += 1
             jobList.append((status, job))
-        result['jobsPerStatus'] = jobsPerStatus
         result['jobList'] = jobList
         #result['jobs'] = taskStatus
 
@@ -705,7 +703,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         ## Retrieve publication information.
         publicationInfo = {}
-        if (row.publication == 'T' and 'finished' in result['jobsPerStatus']):
+        if (row.publication == 'T' and 'finished' in jobsPerStatus):
             #let's default asodb to asynctransfer, for old task this is empty!
             asodb = row.asodb or 'asynctransfer'
             publicationInfo = self.publicationStatus(workflow, row.asourl, asodb, row.username)
@@ -713,7 +711,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         elif (row.publication == 'F'):
             publicationInfo['status'] = {'disabled': []}
         else:
-            self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.publication, result['jobsPerStatus'].get('finished', 0)))
+            self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.publication, jobsPerStatus.get('finished', 0)))
         result['publication'] = publicationInfo.get('status', {})
         result['publicationFailures'] = publicationInfo.get('failure_reasons', {})
 
