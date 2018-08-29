@@ -468,6 +468,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                   "splitting"        : '', #from the db
                   "taskWorker"       : '', #from the db
                   "collector"        : '', #from the db
+                  "webdirPath"       : '', #from the db
                   "username"         : ''} #from the db
 
         # First, verify the task has been submitted by the backend.
@@ -486,6 +487,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## Add scheduler and collector to the result dictionary.
         if row.username:
             result['username'] = row.username
+        if row.user_webdir:
+            result['webdirPath'] =  '/'.join(['/home/grid']+row.user_webdir.split('/')[-2:])
         if row.schedd:
             result['schedd'] = row.schedd
         if row.twname:
