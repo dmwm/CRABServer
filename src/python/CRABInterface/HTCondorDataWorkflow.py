@@ -467,7 +467,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                   "schedd"           : '', #from the db
                   "splitting"        : '', #from the db
                   "taskWorker"       : '', #from the db
-                  "collector"        : '', #from the db
                   "webdirPath"       : '', #from the db
                   "username"         : ''} #from the db
 
@@ -495,8 +494,6 @@ class HTCondorDataWorkflow(DataWorkflow):
             result['taskWorker'] = row.twname
         if row.split_algo:
             result['splitting'] = row.split_algo
-        if row.collector:
-            result['collector'] = row.collector
 
         self.asoDBURL = row.asourl
 
