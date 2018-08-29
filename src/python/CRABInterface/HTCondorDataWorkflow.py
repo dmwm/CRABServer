@@ -694,7 +694,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             jobList.append((status, job))
         result['jobsPerStatus'] = jobsPerStatus
         result['jobList'] = jobList
-        result['jobs'] = taskStatus
+        #result['jobs'] = taskStatus
 
         if len(taskStatus) == 0 and results and results['JobStatus'] == 2:
             result['status'] = 'Running (jobs not submitted)'
