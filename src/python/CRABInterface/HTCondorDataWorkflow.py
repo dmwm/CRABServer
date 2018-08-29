@@ -457,18 +457,17 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         #Empty results
         result = {"status"           : '', #from the db
-                  "command"           : '', #from the db
+                  "command"          : '', #from the db
                   "taskFailureMsg"   : '', #from the db
                   "taskWarningMsg"   : [], #from the db
-                  "submissionTime"   : 0, #from the db
+                  "submissionTime"   : 0,  #from the db
                   "statusFailureMsg" : '', #errors of the status itself
                   "jobsPerStatus"    : {},
-                  "failedJobdefs"    : 0,
-                  "totalJobdefs"     : 0,
-                  "jobdefErrors"     : [],
                   "jobList"          : [],
                   "schedd"           : '', #from the db
-                  "collector"        : '',  #from the db
+                  "splitting"        : '', #from the db
+                  "taskWorker"       : '', #from the db
+                  "collector"        : '', #from the db
                   "username"         : ''} #from the db
 
         # First, verify the task has been submitted by the backend.
@@ -489,6 +488,10 @@ class HTCondorDataWorkflow(DataWorkflow):
             result['username'] = row.username
         if row.schedd:
             result['schedd'] = row.schedd
+        if row.twname:
+            result['taskWorker'] = row.twname
+        if row.split_algo:
+            result['splitting'] = row.split_algo
         if row.collector:
             result['collector'] = row.collector
 
