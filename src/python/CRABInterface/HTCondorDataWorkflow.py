@@ -457,18 +457,16 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         #Empty results
         result = {"status"           : '', #from the db
-                  "command"           : '', #from the db
+                  "command"          : '', #from the db
                   "taskFailureMsg"   : '', #from the db
                   "taskWarningMsg"   : [], #from the db
-                  "submissionTime"   : 0, #from the db
+                  "submissionTime"   : 0,  #from the db
                   "statusFailureMsg" : '', #errors of the status itself
-                  "jobsPerStatus"    : {},
-                  "failedJobdefs"    : 0,
-                  "totalJobdefs"     : 0,
-                  "jobdefErrors"     : [],
                   "jobList"          : [],
                   "schedd"           : '', #from the db
-                  "collector"        : '',  #from the db
+                  "splitting"        : '', #from the db
+                  "taskWorker"       : '', #from the db
+                  "webdirPath"       : '', #from the db
                   "username"         : ''} #from the db
 
         # First, verify the task has been submitted by the backend.
@@ -487,10 +485,14 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## Add scheduler and collector to the result dictionary.
         if row.username:
             result['username'] = row.username
+        if row.user_webdir:
+            result['webdirPath'] =  '/'.join(['/home/grid']+row.user_webdir.split('/')[-2:])
         if row.schedd:
             result['schedd'] = row.schedd
-        if row.collector:
-            result['collector'] = row.collector
+        if row.twname:
+            result['taskWorker'] = row.twname
+        if row.split_algo:
+            result['splitting'] = row.split_algo
 
         self.asoDBURL = row.asourl
 
@@ -586,6 +588,11 @@ class HTCondorDataWorkflow(DataWorkflow):
                         result['status'] = row.task_status
                     else:
                         result['status'] = dagman_codes.get(DAGStatus, row.task_status)
+                    # make sure taskStatusCode is defined even if not using old logic
+                    if result['status'] in ['KILLED', 'KILLFAILED']:
+                        taskStatusCode = 5
+                    else:
+                        taskStatusCode = 1
                 else:
                     self.logger.info("Node state file is too old or does not have an update time. Will use condor_q to get the workflow status.")
                     useOldLogic = True
@@ -680,14 +687,12 @@ class HTCondorDataWorkflow(DataWorkflow):
                     taskStatus[i] = {'State': 'unsubmitted'}
 
         for job, info in taskStatus.items():
-            job = int(job)
             status = info['State']
             jobsPerStatus.setdefault(status, 0)
             jobsPerStatus[status] += 1
             jobList.append((status, job))
-        result['jobsPerStatus'] = jobsPerStatus
         result['jobList'] = jobList
-        result['jobs'] = taskStatus
+        #result['jobs'] = taskStatus
 
         if len(taskStatus) == 0 and results and results['JobStatus'] == 2:
             result['status'] = 'Running (jobs not submitted)'
@@ -698,7 +703,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         ## Retrieve publication information.
         publicationInfo = {}
-        if (row.publication == 'T' and 'finished' in result['jobsPerStatus']):
+        if (row.publication == 'T' and 'finished' in jobsPerStatus):
             #let's default asodb to asynctransfer, for old task this is empty!
             asodb = row.asodb or 'asynctransfer'
             publicationInfo = self.publicationStatus(workflow, row.asourl, asodb, row.username)
@@ -706,7 +711,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         elif (row.publication == 'F'):
             publicationInfo['status'] = {'disabled': []}
         else:
-            self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.publication, result['jobsPerStatus'].get('finished', 0)))
+            self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.publication, jobsPerStatus.get('finished', 0)))
         result['publication'] = publicationInfo.get('status', {})
         result['publicationFailures'] = publicationInfo.get('failure_reasons', {})
 

@@ -21,7 +21,7 @@ from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
 from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
-from TaskWorker.WorkerExceptions import WorkerHandlerException, TaskWorkerException
+from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException, TaskWorkerException
 
 
 class TaskHandler(object):
@@ -75,6 +75,8 @@ class TaskHandler(object):
         """
         try:
             output = work.execute(nextinput, task=self._task, tempDir=self.tempDir)
+        except TapeDatasetException as tde:
+            raise TapeDatasetException(str(tde))
         except TaskWorkerException as twe:
             self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
             raise WorkerHandlerException(str(twe), retry = twe.retry) #TaskWorker error, do not add traceback to the error propagated to the REST

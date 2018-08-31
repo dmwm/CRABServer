@@ -112,6 +112,8 @@ accounting_group_user = %(accounting_group_user)s
 +CRAB_SubmitterIpAddr = %(submitter_ip_addr)s
 +CRAB_TaskLifetimeDays = %(task_lifetime_days)s
 +CRAB_TaskEndTime = %(task_endtime)s
++CRAB_SplitAlgo =  %(splitalgo)s
++CRAB_AlgoArgs = %(algoargs)s
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
 +DESIRED_Archs = %(desired_arch)s
@@ -158,14 +160,14 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
                   ((JobStatus =?= 1) && (time() - EnteredCurrentStatus > 7*24*60*60)) || \
                   ((JobStatus =?= 2) && ( \
                      (MemoryUsage > RequestMemory) || \
-                     (MaxWallTimeMins*60 < time() - EnteredCurrentStatus) || \
+                     (MaxWallTimeMinsRun*60 < time() - EnteredCurrentStatus) || \
                      (DiskUsage > %(max_disk_space)s))) || \
                      (time() > CRAB_TaskEndTime) || \
                   ((JobStatus =?= 1) && (time() > (x509UserProxyExpiration + 86400)))
 +PeriodicRemoveReason = ifThenElse(time() - EnteredCurrentStatus > 7*24*60*60 && isUndefined(MemoryUsage), "Removed due to idle time limit", \
                           ifThenElse(time() > x509UserProxyExpiration, "Removed job due to proxy expiration", \
                             ifThenElse(MemoryUsage > RequestMemory, "Removed due to memory use", \
-                              ifThenElse(MaxWallTimeMins*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
+                              ifThenElse(MaxWallTimeMinsRun*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
                                 ifThenElse(DiskUsage >  %(max_disk_space)s, "Removed due to disk usage", \
                                   ifThenElse(time() > CRAB_TaskEndTime, "Removed due to reached CRAB_TaskEndTime", \
                                   "Removed due to job being held"))))))
@@ -323,8 +325,6 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def __init__(self, *args, **kwargs):
         TaskAction.TaskAction.__init__(self, *args, **kwargs)
-        self.phedex = PhEDEx.PhEDEx({'pycurl': True}) #TODO use config certs!
-
 
     def buildDashboardInfo(self, task):
         taskType = self.getDashboardTaskType(task)
@@ -364,11 +364,16 @@ class DagmanCreator(TaskAction.TaskAction):
         """
         lfns = [dest_dir]
         dest_sites_ = [dest_site]
-        try:
-            pfn_info = self.phedex.getPFN(nodes=dest_sites_, lfns=lfns)
-        except HTTPException as ex:
-            self.logger.error(ex.headers)
-            raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not contact phedex to do the site+lfn=>pfn translation.\n"+\
+
+        with self.config.TaskWorker.envForCMSWEB:
+            cert = self.config.TaskWorker.cmscert
+            key  = self.config.TaskWorker.cmskey
+            try:
+                phedex = PhEDEx.PhEDEx({'cert': cert, 'key': key, 'pycurl': True})
+                pfn_info = phedex.getPFN(nodes=dest_sites_, lfns=lfns)
+            except HTTPException as ex:
+                self.logger.error(ex.headers)
+                raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not contact phedex to do the site+lfn=>pfn translation.\n"+\
                                 "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex))
         results = []
