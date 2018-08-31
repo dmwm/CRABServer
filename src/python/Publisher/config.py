@@ -1,10 +1,11 @@
 #pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915
 
 """
-Configuration file for file publisher
+Configuration file for CRAB standalone Publisher
 """
 from __future__ import division
 from WMCore.Configuration import Configuration
+
 config = Configuration()
 config.section_('General')
 
