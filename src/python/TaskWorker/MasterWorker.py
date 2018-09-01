@@ -51,13 +51,14 @@ def validateConfig(config):
 class MasterWorker(object):
     """I am the master of the TaskWorker"""
 
-    def __init__(self, config, quiet, debug, test=False):
+    def __init__(self, config, quiet, debug, test=False, console=False):
         """Initializer
 
         :arg WMCore.Configuration config: input TaskWorker configuration
         :arg bool quiet: it tells if a quiet logger is needed
         :arg bool debug: it tells if needs a verbose logger
-        :arg bool test: it tells if to run in test (no subprocesses) mode."""
+        :arg bool test: it tells if to run in test (no subprocesses) mode.
+        :arg bool console: it tells if logging to console."""
 
 
         def createLogdir(dirname):
@@ -73,7 +74,7 @@ class MasterWorker(object):
                     sys.exit(1)
 
 
-        def setRootLogger(quiet, debug):
+        def setRootLogger(quiet, debug, console):
             """Sets the root logger with the desired verbosity level
                The root logger logs to logs/twlog.txt and every single
                logging instruction is propagated to it (not really nice
@@ -81,14 +82,14 @@ class MasterWorker(object):
 
             :arg bool quiet: it tells if a quiet logger is needed
             :arg bool debug: it tells if needs a verbose logger
+            :arg bool console: it tells if sending log to console
             :return logger: a logger with the appropriate logger level."""
 
             createLogdir('logs')
             createLogdir('logs/processes')
             createLogdir('logs/tasks')
 
-            if self.TEST:
-                #if we are testing log to the console is easier
+            if console:
                 logging.getLogger().addHandler(logging.StreamHandler())
             else:
                 logHandler = MultiProcessingLog('logs/twlog.txt', when='midnight')
@@ -110,7 +111,7 @@ class MasterWorker(object):
 
         self.STOP = False
         self.TEST = test
-        self.logger = setRootLogger(quiet, debug)
+        self.logger = setRootLogger(quiet, debug, console)
         self.config = config
         resthost = None
         self.restURInoAPI = None

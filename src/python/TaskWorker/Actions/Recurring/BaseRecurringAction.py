@@ -13,7 +13,8 @@ class BaseRecurringAction:
         #set the logger
         self.logger = logging.getLogger(__name__)
         if not self.logger.handlers:
-            hdlr = logging.FileHandler('logs/recurring.log')
+            logging.basicConfig(filename='logs/recurring.log')
+            hdlr = logging.getLogger().handlers[0]
             formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
             hdlr.setFormatter(formatter)
             self.logger.addHandler(hdlr)

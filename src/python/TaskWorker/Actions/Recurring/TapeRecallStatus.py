@@ -8,12 +8,13 @@ from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 
 import logging
 import sys
+import os
 
 class TapeRecallStatus(BaseRecurringAction):
     pollingTime = 60*4 # minutes
 
     def _execute(self, resthost, resturi, config, task):
-        mw = MasterWorker(config, quiet=False, debug=True, test=False)
+        mw = MasterWorker(config, quiet=False, debug=False, test=True)
 
         tapeRecallStatus = 'TAPERECALL'
         self.logger.info("Retrieving %s tasks", tapeRecallStatus)
