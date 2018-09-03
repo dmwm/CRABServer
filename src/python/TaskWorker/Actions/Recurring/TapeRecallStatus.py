@@ -8,7 +8,6 @@ from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 
 import logging
 import sys
-import os
 
 class TapeRecallStatus(BaseRecurringAction):
     pollingTime = 60*4 # minutes
