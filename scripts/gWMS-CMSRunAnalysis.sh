@@ -148,6 +148,14 @@ echo "======== CMSRunAnalsysis.sh at $(TZ=GMT date) FINISHING ========"
 mv jobReport.json jobReport.json.$CRAB_Id
 mv WMArchiveReport.json WMArchiveReport.json.$CRAB_Id
 
+if [[ $EXIT_STATUS != 0 ]]
+then
+  echo "User's application failed, will not transfer log to remote stageout disk"
+  echo "log will be available for a few weeks vai crab getlog command and/or via the dashboard link"
+  export FAIL_NO_XFER_LOG=True
+else
+  export FAIL_NO_XFER_LOG=False
+fi
 
 if [[ $EXIT_STATUS == 137 ]]
 then
@@ -215,8 +223,10 @@ else
 fi
 echo "======== python2.7 bootstrap for stageout at $(TZ=GMT date) FINISHING ========"
 
-echo "======== Attempting to notify HTCondor of file stageout ========"
-condor_chirp phase output
+# keep following two lines (commented) in case we really want to do this sometimes
+# as they stand those are uselss since condor_chirp syntax is different and this always fail
+#echo "======== Attempting to notify HTCondor of file stageout ========"
+#condor_chirp phase output
 
 echo "======== Stageout at $(TZ=GMT date) STARTING ========"
 rm -f wmcore_initialized
