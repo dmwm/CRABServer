@@ -10,7 +10,7 @@ STARTDIR=$PWD/tmp/runtime
 CRAB3_VERSION=3.3.0-pre1
 
 WMCOREDIR=$STARTDIR/WMCore
-WMCOREVER=1.0.14_crab_4
+WMCOREVER=1.1.14.crab1
 WMCOREREPO=dmwm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
@@ -33,6 +33,14 @@ else
     REPLACEMENT_ABSOLUTE=""
 fi
 pushd $STARTDIR
+
+#
+# cleanup, avoid to keep adding to existing tarballs
+#
+
+rm -f $STARTDIR/CRAB3.zip
+rm -f $STARTDIR/WMCore.zip
+rm -f $STARTDIR/nose.tar.gz
 
 #
 # This is the one dep which can't be taken from the CMS RPM install.
@@ -74,10 +82,10 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
 
 else
 
-    if [[ ! -e libcurl.so.4 ]]; then
-        curl -L http://hcc-briantest.unl.edu/libcurl.so.4 > $STARTDIR/libcurl.so.4 || exit 2
-    fi
-    chmod +x libcurl.so.4
+    #if [[ ! -e libcurl.so.4 ]]; then
+    #    curl -L http://hcc-briantest.unl.edu/libcurl.so.4 > $STARTDIR/libcurl.so.4 || exit 2
+    #fi
+    #chmod +x libcurl.so.4
 
     if [[ -d "$REPLACEMENT_ABSOLUTE/WMCore" ]]; then
         echo "Using replacement WMCore source at $REPLACEMENT_ABSOLUTE/WMCore"
@@ -98,19 +106,11 @@ else
         CRABSERVER_PATH="CRABServer-$CRABSERVERVER"
     fi
 
-    if [[ ! -e cherrypy.tar.gz ]]; then
-        curl -L http://download.cherrypy.org/cherrypy/3.1.2/CherryPy-3.1.2.tar.gz > cherrypy.tar.gz || exit 2
-    fi
     if [[ ! -e nose.tar.gz ]]; then
         curl -L https://github.com/nose-devs/nose/archive/release_1.3.0.tar.gz > nose.tar.gz || exit 2
     fi
 
-    tar xzf cherrypy.tar.gz || exit 2
     tar xzf nose.tar.gz || exit 2
-
-    pushd CherryPy-3.1.2/
-    zip -rq $STARTDIR/CRAB3.zip cherrypy  -x \*.pyc || exit 3
-    popd
 
     pushd nose-release_1.3.0/
     zip -rq $STARTDIR/CRAB3.zip nose -x \*.pyc || exit 3

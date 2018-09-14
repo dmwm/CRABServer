@@ -91,7 +91,11 @@ def parseJobLog(fp, nodes, nodeMap):
         elif event['MyType'] == 'JobTerminatedEvent':
             node = nodeMap[event['Cluster'], event['Proc']]
             nodes[node]['EndTimes'].append(eventtime)
-            nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
+            # at times HTCondor does not log the ExecuteEvent and there's no StartTime
+            if nodes[node]['StartTimes'] :
+                nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
+            else:
+                 nodes[node]['WallDurations'][-1] = 0
             insertCpu(event, nodes[node])
             if event['TerminatedNormally']:
                 if event['ReturnValue'] == 0:

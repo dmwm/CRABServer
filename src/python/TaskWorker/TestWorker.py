@@ -28,8 +28,10 @@ class TestWorker(object):
     def injectWorks(self, works):
         if works:
             func, task, _, args = works[0]
-            func(self.resthost, self.resturi, self.config, task, 0, args)
-
+            try:
+                func(self.resthost, self.resturi, self.config, task, 0, args)
+            except:
+                pass
     def checkFinished(self):
         return []
 

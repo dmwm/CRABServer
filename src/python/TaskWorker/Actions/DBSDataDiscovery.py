@@ -3,17 +3,18 @@ import os
 import sys
 import pprint
 import logging
-import json
 from httplib import HTTPException
+import urllib
 
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.Services.DBS.DBSReader import DBSReader
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
-from TaskWorker.WorkerExceptions import TaskWorkerException
+from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 
+from TaskWorker.Actions.DDMRequests import blocksRequest
 from RESTInteractions import HTTPRequests
 
 class DBSDataDiscovery(DataDiscovery):
@@ -27,7 +28,7 @@ class DBSDataDiscovery(DataDiscovery):
         if len(res) == 0:
             raise TaskWorkerException("Cannot find dataset %s in %s DBS instance" % (dataset, self.dbsInstance))
         res = res[0]
-        self.logger.info("Input dataset details: %s" % pprint.pformat(res))
+        self.logger.info("Input dataset details: %s", pprint.pformat(res))
         accessType = res['dataset_access_type']
         if accessType != 'VALID':
             # as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
@@ -83,32 +84,32 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nhttps://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
                 raise TaskWorkerException(msg)
 
-
     def execute(self, *args, **kwargs):
+        """
+        This is a convenience wrapper around the executeInternal function
+        """
+
+        # DBS3 requires X509_USER_CERT to be set - but we don't want to leak that to other modules
+        # so use a context manager to set an ad hoc env and restore as soon as
+        # executeInternal is over, even if it raises exception
+
+        with self.config.TaskWorker.envForCMSWEB:
+            result = self.executeInternal(*args, **kwargs)
+
+        return result
+
+    def executeInternal(self, *args, **kwargs):
         self.logger.info("Data discovery with DBS") ## to be changed into debug
-        old_cert_val = os.getenv("X509_USER_CERT")
-        old_key_val = os.getenv("X509_USER_KEY")
-        try:
-            os.environ['X509_USER_CERT'] = self.config.TaskWorker.cmscert
-            os.environ['X509_USER_KEY'] = self.config.TaskWorker.cmskey
-            # DBS3 requires X509_USER_CERT to be set - but we don't want to leak that to other modules
-            dbsurl = self.config.Services.DBSUrl
-            if kwargs['task']['tm_dbs_url']:
-                dbsurl = kwargs['task']['tm_dbs_url']
-            self.dbs = DBSReader(dbsurl)
-            self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
-        finally:
-            if old_cert_val != None:
-                os.environ['X509_USER_CERT'] = old_cert_val
-            else:
-                del os.environ['X509_USER_CERT']
-            if old_key_val != None:
-                os.environ['X509_USER_KEY'] = old_key_val
-            else:
-                del os.environ['X509_USER_KEY']
+
+
+        dbsurl = self.config.Services.DBSUrl
+        if kwargs['task']['tm_dbs_url']:
+            dbsurl = kwargs['task']['tm_dbs_url']
+        self.dbs = DBSReader(dbsurl)
+        self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
 
         taskName = kwargs['task']['tm_taskname']
-        self.logger.debug("Data discovery through %s for %s" %(self.dbs, taskName))
+        self.logger.debug("Data discovery through %s for %s", self.dbs, taskName)
 
         inputDataset = kwargs['task']['tm_input_dataset']
         secondaryDataset = kwargs['task'].get('tm_secondary_input_dataset', None)
@@ -116,6 +117,7 @@ class DBSDataDiscovery(DataDiscovery):
         self.checkDatasetStatus(inputDataset, kwargs)
         if secondaryDataset:
             self.checkDatasetStatus(secondaryDataset, kwargs)
+
         try:
             # Get the list of blocks for the locations and then call dls.
             # The WMCore DBS3 implementation makes one call to dls for each block
@@ -141,29 +143,50 @@ class DBSDataDiscovery(DataDiscovery):
         except Exception as ex: #TODO should we catch HttpException instead?
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
-                                "This is could be a temporary phedex/dbs glitch, please try to submit a new task (resubmit will not work)"+\
-                                " and contact the experts if the error persists.\nError reason: %s" % str(ex))
+                                      "This is could be a temporary phedex/dbs glitch, please try to submit a new task (resubmit will not work)"+\
+                                      " and contact the experts if the error persists.\nError reason: %s" % str(ex))
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
-            msg += " Please, check DAS, https://cmsweb.cern.ch/das, and make sure the dataset is accessible on DISK"
-            msg += " You might want to contact your physics group if you need a disk replica."
-
             if self.otherLocations:
-                msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ','.join(sorted(self.otherLocations))
+                msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ', '.join(sorted(self.otherLocations))
                 # submit request to DDM
-                site = "T2*" # will let Dynamo choose which T2 to stage the blocks to, TODO: allow the user to specify it
-                DDMJson = json.dumps({"item": blocks, "site": site})
-                commonURL =  'registry/request/'
-                userServer = HTTPRequests(url=self.config.TaskWorker.DDMServer, localcert=self.config.TaskWorker.cmscert, localkey=self.config.TaskWorker.cmskey, verbose=False)
-                DDMRequest = (userServer.post('/'+commonURL+'copy', data=DDMJson))[0]
-                self.logger.info("Contacted %s using %s and %s, got:\n%s" % (self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, DDMRequest))
+                ddmRequest = blocksRequest(blocks, self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, verbose=False)
+                self.logger.info("Contacted %s using %s and %s, got:\n%s", self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, ddmRequest)
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
-                if DDMRequest["result"] == "OK":
-                    msg += "\nA disk replica has been requested on %s, please try again in two days." % DDMRequest["data"][0]["first_request"] 
+                if ddmRequest["result"] == "OK":
+                    msg += "\nA disk replica has been requested on %s" % ddmRequest["data"][0]["first_request"]
+                    # set status to TAPERECALL
+                    tapeRecallStatus = 'TAPERECALL'
+                    ddmReqId = ddmRequest["data"][0]["request_id"]
+                    server = HTTPRequests(url=self.config.TaskWorker.resturl, localcert=kwargs['task']['user_proxy'], localkey=kwargs['task']['user_proxy'], verbose=False)
+                    configreq = {'workflow': taskName,
+                                 'taskstatus': tapeRecallStatus,
+                                 'ddmreqid': ddmReqId,
+                                 'subresource': 'addddmreqid'
+                    }
+                    try:
+                        tapeRecallStatusSet = server.post(self.config.TaskWorker.restURInoAPI+'task', data = urllib.urlencode(configreq))
+                    except HTTPException as hte:
+                        msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (self.config.TaskWorker.resturl, str(hte))
+                        msg += "\nSetting %s status and DDM request ID (%d) failed for task %s" % (tapeRecallStatus, ddmReqId, taskName)
+                        msg += "\nHTTP Headers are: %s" % hte.headers
+                        raise TaskWorkerException(msg, retry=True)
+
+                    if tapeRecallStatusSet[2] == "OK":
+                        self.logger.info("Status for task %s set to '%s'", taskName, tapeRecallStatus)
+                        msg += " and the task will be submitted as soon as it is completed."
+                        self.uploadWarning(msg, kwargs['task']['user_proxy'], taskName)
+
+                        raise TapeDatasetException(msg)
+                    else:
+                        msg += ", please try again in two days."
+
+            msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
+            msg += " You might want to contact your physics group if you need a disk replica."
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
-            self.logger.warning("The locations of some blocks have not been found: %s" % (set(blocks) - set(locationsMap)))
+            self.logger.warning("The locations of some blocks have not been found: %s", set(blocks) - set(locationsMap))
         
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
@@ -218,11 +241,12 @@ class DBSDataDiscovery(DataDiscovery):
                                       ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
                                       (self.dbsInstance, inputDataset))
 
-        self.logger.debug("Got %s files" % len(result.result.getFiles()))
+        self.logger.debug("Got %s files", len(result.result.getFiles()))
+
         return result
 
 if __name__ == '__main__':
-    """ Usage: python DBSDataDiscovery.py dbs_instance dataset
+    """ Usage: python DBSDataDiscovery.py dbs_instance dbsDataset
         where dbs_instance should be either prod or phys03
 
         Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/phys03 /MinBias/jmsilva-crab_scale_70633-3d12352c28d6995a3700097dc8082c04/USER
@@ -230,7 +254,7 @@ if __name__ == '__main__':
         Note: self.uploadWarning is failing, I usually comment it when I run this script standalone
     """
     dbsInstance = sys.argv[1]
-    dataset = sys.argv[2]
+    dbsDataset = sys.argv[2]
 
     logging.basicConfig(level = logging.DEBUG)
     from WMCore.Configuration import Configuration
@@ -247,10 +271,14 @@ if __name__ == '__main__':
     config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
 
     config.TaskWorker.DDMServer = 'dynamo.mit.edu'
+    config.TaskWorker.resturl = 'cmsweb.cern.ch'
+    # The second word identify the DB instance defined in CRABServerAuth.py on the REST
+    config.TaskWorker.restURInoAPI = '/crabserver/prod/'
+
 
     fileset = DBSDataDiscovery(config)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, #'user_proxy': os.environ["X509_USER_PROXY"],
-                          'tm_input_dataset': dataset, 'tm_taskname': 'pippo1',
+                          'tm_input_dataset': dbsDataset,  'tm_taskname': 'pippo1',
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
                           'tm_dbs_url': config.Services.DBSUrl}, tempDir='')
     

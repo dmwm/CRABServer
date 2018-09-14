@@ -449,7 +449,7 @@ $(document).ready(function() {
                         if (duration) content.push(duration.toFixed(0))
                         content.push(duration)
 
-                        transtable.row.add( content ).draw()
+                        transtable.row.add( content )//.draw()
 
                     }
 

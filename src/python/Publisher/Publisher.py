@@ -486,6 +486,7 @@ def publishInDBS3(taskname):
         logger.exception("Failed to retrieve user proxy")
         return "FAILED"
 
+    #TODO can we use a CRAB Server API here ?
     oracelInstance = config.General.oracleDB
     oracleDB = HTTPRequests(oracelInstance,
                             proxy,

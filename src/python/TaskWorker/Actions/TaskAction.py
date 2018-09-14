@@ -40,16 +40,29 @@ class TaskAction(object):
 
     def uploadWarning(self, warning, userProxy, taskname):
         truncWarning = truncateError(warning)
-        try:
-            userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2,
-                                      logger = self.logger)
-            configreq = {'subresource': 'addwarning',
-                         'workflow': taskname,
+        userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2,
+                                  logger = self.logger)
+        configreq = {'subresource': 'addwarning',
+                        'workflow': taskname,
                          'warning': b64encode(truncWarning)}
+        try:
             userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
         except HTTPException as hte:
-            self.logger.error(hte.headers)
+            self.logger.error("Error uploading warning: %s" %str(hte))
             self.logger.warning("Cannot add a warning to REST interface. Warning message: %s" % warning)
+
+
+    def deleteWarnings(self, userProxy, taskname):
+        userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2,
+                                  logger = self.logger)
+        configreq = {'subresource': 'deletewarnings',
+                        'workflow': taskname}
+        try:
+            userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
+        except HTTPException as hte:
+            self.logger.error("Error deleting warnings: %s" %str(hte))
+            self.logger.warning("Can not delete warnings from REST interface.")
+
 
     def getBlacklistedSites(self):
         bannedSites = []
