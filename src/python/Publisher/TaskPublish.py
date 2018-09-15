@@ -434,8 +434,8 @@ def publishInDBS3(taskname):
                 print(str(ose))
                 print("The task worker need to access the '%s' directory" % dirname)
                 sys.exit(1)
-    createLogdir('taskLogs')
 
+    createLogdir('taskLogs')
     logger = logging.getLogger(taskname)
     logging.basicConfig(filename='taskLogs/'+taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
 
@@ -635,6 +635,7 @@ def publishInDBS3(taskname):
     for fileTo in toPublish:
         if fileTo['lfn'] not in existingFilesValid:
             workToDo = True
+            break
 
     if not workToDo:
         msg = "Nothing uploaded, %s has these files already or not enough files." % (dataset)
@@ -805,6 +806,10 @@ def publishInDBS3(taskname):
             msg += str(traceback.format_exc())
             logger.error(wfnamemsg+msg)
             failure_reason = str(ex)
+            file='/tmp/failed-block-at-%s.txt' % time.time()
+            with open(file,'write') as fd:
+               fd.write(blockDump)
+            logger.error("FAILING BLOCK SAVED AS %s" % file)
         count += max_files_per_block
         files_to_publish_next = dbsFiles_f[count:count+max_files_per_block]
         if len(files_to_publish_next) < max_files_per_block:
