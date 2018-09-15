@@ -45,13 +45,18 @@ def setProcessLogger(name):
     return logger
 
 
-class Worker(object):
-    """
+class Master(object):
+    """I am the main daemon kicking off all Publisher work via slave Publishers"""
 
-    """
-    def __init__(self, config, quiet):
+    
+    def __init__(self, config, quiet=False, debug=True, testMode=False):
         """
         Initialise class members
+
+        :arg WMCore.Configuration config: input Publisher configuration
+        :arg bool quiet: it tells if a quiet logger is needed
+        :arg bool debug: it tells if needs a verbose logger
+        :arg bool testMode: it tells if to run in test (no subprocesses) mode.
         """
         self.config = config.General
         self.max_files_per_block = self.config.max_files_per_block
@@ -61,21 +66,23 @@ class Worker(object):
         self.lfn_map = {}
         self.force_publication = False
         self.force_failure = False
-        #TODO: logger!
+        self.TestMode = testMode
+        self.cache_area = self.config.cache_area
+
         def createLogdir(dirname):
             """ Create the directory dirname ignoring erors in case it exists. Exit if
                 the directory cannot be created.
             """
             try:
-                os.mkdir(dirname)
+                os.makedirs(dirname)
             except OSError as ose:
                 if ose.errno != 17: #ignore the "Directory already exists error"
                     print(str(ose))
-                    print("The task worker need to access the '%s' directory" % dirname)
+                    print("The Publisher Worker needs to access the '%s' directory" % dirname)
                     sys.exit(1)
 
 
-        def setRootLogger(quiet, debug):
+        def setRootLogger(quiet=False, debug=True, console=False):
             """Sets the root logger with the desired verbosity level
                The root logger logs to logs/twlog.txt and every single
                logging instruction is propagated to it (not really nice
@@ -83,16 +90,21 @@ class Worker(object):
 
             :arg bool quiet: it tells if a quiet logger is needed
             :arg bool debug: it tells if needs a verbose logger
+            :arg bool console: it tells if to direct all printoput to console rather then files, useful for debug
             :return logger: a logger with the appropriate logger level."""
 
-            createLogdir('logs')
-            createLogdir('logs/processes')
-            createLogdir('logs/tasks')
+            createLogdir('Publisher/logs')
+            createLogdir('Publisher/logs/processes')
+            createLogdir('Publisher/logs/tasks')
 
-            logHandler = MultiProcessingLog('logs/log.txt', when='midnight')
-            logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
-            logHandler.setFormatter(logFormatter)
-            logging.getLogger().addHandler(logHandler)
+            if console:
+                #if we are testing log to the console is easier
+                logging.getLogger().addHandler(logging.StreamHandler())
+            else:
+                logHandler = MultiProcessingLog('logs/log.txt', when='midnight')
+                logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
+                logHandler.setFormatter(logFormatter)
+                logging.getLogger().addHandler(logHandler)
             loglevel = logging.INFO
             if quiet:
                 loglevel = logging.WARNING
@@ -104,8 +116,7 @@ class Worker(object):
             logger.debug("Logging level initialized to %s.", loglevel)
             return logger
 
-        self.cache_area = self.config.cache_area
-        self.logger = setRootLogger(quiet, True)
+        self.logger = setRootLogger(quiet, True, console=self.TestMode)
 
         try:
             self.oracleDB = HTTPRequests(self.config.oracleDB,
@@ -116,13 +127,13 @@ class Worker(object):
             self.logger.exception('Failed when contacting Oracle')
             raise
 
-        try:
-            self.connection = RequestHandler(config={'timeout': 900, 'connecttimeout' : 900})
-        except Exception as ex:
-            msg = "Error initializing the connection"
-            msg += str(ex)
-            msg += str(traceback.format_exc())
-            self.logger.debug(msg)
+        #try:
+        #    self.connection = RequestHandler(config={'timeout': 900, 'connecttimeout' : 900})
+        #except Exception as ex:
+        #    msg = "Error initializing the connection handler"
+        #    msg += str(ex)
+        #    msg += str(traceback.format_exc())
+        #    self.logger.debug(msg)
 
 
     def active_tasks(self, db):
@@ -148,7 +159,7 @@ class Worker(object):
         fileDoc['grouping'] = 0
         fileDoc['limit'] = 100000
 
-        self.logger.debug("Retrieving max.100000 acquired puclications from oracleDB")
+        self.logger.debug("Retrieving max.100000 acquired publications from oracleDB")
 
         result = []
 
@@ -163,7 +174,7 @@ class Worker(object):
 
         self.logger.debug("publen: %s" % len(result))
 
-        self.logger.debug("%s acquired puclications retrieved" % len(result))
+        self.logger.debug("%s acquired publications retrieved" % len(result))
         #TODO: join query for publisher (same of submitter)
         unique_tasks = [list(i) for i in set(tuple([x['username'],
                                                     x['user_group'],
@@ -226,14 +237,25 @@ class Worker(object):
         """
         tasks = self.active_tasks(self.oracleDB)
 
+        # example code, uncomment to pick only one task
+        #myTask='180912_142016:arizzi_crab_NanoDnRMXDYJetsToLL_M-105To160_TuneCUETP8M1_13TeV-amcaRunIISummer16MiniAODv2-PUMorio__heIV_v6-v22201'
+        #tasksToDo=[]
+        #for t in tasks:
+        #  if t[0][3]==myTask:
+        #  tasksToDo.append(t)
+        #tasks = tasksToDo
+
         self.logger.debug('kicking off pool %s' % [x[0][3] for x in tasks])
         processes = []
 
         try:
             for task in tasks:
-                p = Process(target=self.startSlave, args=(task,))
-                p.start()
-                processes.append(p)
+                if self.TestMode:
+                    self.startSlave(task)   # sequentially do one task after another
+                else:                       # deal with each task in a separate process
+                    p = Process(target=self.startSlave, args=(task,))
+                    p.start()
+                    processes.append(p)
 
             for proc in processes:
                 proc.join()
@@ -251,6 +273,10 @@ class Worker(object):
         workflow = str(task[0][3])
         wfnamemsg = "%s: " % (workflow)
 
+        if int(workflow[0:2]) < 18:
+            msg = "Skipped. Ignore tasks created before 2018."
+            logger.info(wfnamemsg+msg)
+            return 0
 
         if len(task[1]) > self.max_files_per_block:
             self.force_publication = True
@@ -276,9 +302,9 @@ class Worker(object):
             try:
                 res = connection.get('/crabserver/preprod/workflow', data=encodeRequest(data))
             except Exception as ex:
-	        #logger.info(wfnamemsg+encodeRequest(data))
-	        logger.warn('Error retrieving status from cache for %s.' % workflow)
-	        return 0
+                #logger.info(wfnamemsg+encodeRequest(data))
+                logger.warn('Error retrieving status from cache for %s.' % workflow)
+                return 0
 
             try:
                 workflow_status = res[0]['result'][0]['status']
@@ -429,8 +455,11 @@ class Worker(object):
                 with open("/tmp/publisher_files/"+workflow+'.json', 'w') as outfile:
                     json.dump(toPublish, outfile)
                 logger.info(". publisher.py %s" % (workflow))
-                command = "publisher.py"
-                subprocess.call(["python", command, workflow])
+
+                # find the location in the current environment of the script we want to run
+                import Publisher.TaskPublish as tp
+                taskPublishScript = tp.__file__
+                subprocess.call(["python", taskPublishScript, workflow])
 
         except:
             logger.exception("Exception!")
@@ -442,12 +471,13 @@ class Worker(object):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--config', help='Publisher config file', default='config.py')
+    parser.add_argument('--config', help='Publisher config file', default='PublisherConfig.py')
 
     args = parser.parse_args()
     configuration = loadConfigurationFile(os.path.abspath(args.config))
 
-    master = Worker(configuration, False)
+    master = Master(configuration)
     while(True):
         master.algorithm()
         time.sleep(configuration.General.pollInterval)
+
