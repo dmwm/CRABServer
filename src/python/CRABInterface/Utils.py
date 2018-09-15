@@ -12,7 +12,7 @@ import threading
 
 from WMCore.WMFactory import WMFactory
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.Services.CRIC import CRIC
+from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.Credential.SimpleMyProxy import SimpleMyProxy, MyProxyException
 from WMCore.Credential.Proxy import Proxy
