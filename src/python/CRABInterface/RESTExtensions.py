@@ -23,7 +23,7 @@ def authz_operator(username = None, group='crab3', role='operator'):
     """
     if cherrypy.request.user['login'] != username and\
        group not in cherrypy.request.user.get('roles', {}).get(role, {}).get('group', set()):
-        raise cherrypy.HTTPError(403, "You are not allowed to access this resource. You need to be a CRAB3 operator in sitedb to perform this action")
+        raise cherrypy.HTTPError(403, "You are not allowed to access this resource. You need to be a CRAB3 operator in CRIC to perform this action")
 
 def authz_operator_without_raise(group, role):
     try:
@@ -72,4 +72,4 @@ def authz_owner_match(dbapi, workflows, Task):
 
 def authz_login_valid():
     if not cherrypy.request.user['login']:
-        raise cherrypy.HTTPError(403, "You are not allowed to access this resource. Please check: https://twiki.cern.ch/twiki/bin/viewauth/CMS/SiteDBForCRAB")
+        raise cherrypy.HTTPError(403, "You are not allowed to access this resource. Please run: crab checkusername")
