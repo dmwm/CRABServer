@@ -10,7 +10,7 @@
 """
 
 from WMCore.Configuration import Configuration
-from Publisher.Worker import Worker
+from Publisher.PublishMaster import Master
 
 import logging
 import sys
@@ -30,5 +30,5 @@ if usePdb:
    import pdb
    pdb.set_trace()
 
-worker = Worker(config, quiet, debug, test)
-worker.algorithm()
+master = Master(config, quiet, debug, test)
+master.algorithm()
