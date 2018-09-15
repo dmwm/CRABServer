@@ -49,7 +49,7 @@ class RESTUserWorkflow(RESTEntity):
             if '*' in site:
                 sitere = re.compile(site.replace('*', '.*'))
                 expanded = [str(s) for s in (self.allPNNNames.sites if pnn else self.allCMSNames.sites) if sitere.match(s)]
-                self.logger.debug("Site %s expanded to using CRIC %s during validate", site, expanded)
+                self.logger.debug("Site %s expanded using CRIC to %s during validate", site, expanded)
                 if not expanded:
                     excasync = ValueError("Remote output data site not valid")
                     invalidp = InvalidParameter("Cannot expand site %s to anything" % site, errobj=excasync)
