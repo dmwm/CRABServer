@@ -45,7 +45,7 @@ def setProcessLogger(name):
     return logger
 
 
-class Worker(object):
+class Master(object):
     """I am the main daemon kicking off all Publisher work via slave Publishers"""
 
     
@@ -237,6 +237,14 @@ class Worker(object):
         """
         tasks = self.active_tasks(self.oracleDB)
 
+        # example code, uncomment to pick only one task
+        #myTask='180912_142016:arizzi_crab_NanoDnRMXDYJetsToLL_M-105To160_TuneCUETP8M1_13TeV-amcaRunIISummer16MiniAODv2-PUMorio__heIV_v6-v22201'
+        #tasksToDo=[]
+        #for t in tasks:
+        #  if t[0][3]==myTask:
+        #  tasksToDo.append(t)
+        #tasks = tasksToDo
+
         self.logger.debug('kicking off pool %s' % [x[0][3] for x in tasks])
         processes = []
 
@@ -265,8 +273,8 @@ class Worker(object):
         workflow = str(task[0][3])
         wfnamemsg = "%s: " % (workflow)
 
-	if int(workflow[0:2]) < 18:
-	    msg = "Skipped. Ignore tasks created before 2018."
+        if int(workflow[0:2]) < 18:
+            msg = "Skipped. Ignore tasks created before 2018."
             logger.info(wfnamemsg+msg)
             return 0
 
@@ -294,9 +302,9 @@ class Worker(object):
             try:
                 res = connection.get('/crabserver/preprod/workflow', data=encodeRequest(data))
             except Exception as ex:
-	        #logger.info(wfnamemsg+encodeRequest(data))
-	        logger.warn('Error retrieving status from cache for %s.' % workflow)
-	        return 0
+                #logger.info(wfnamemsg+encodeRequest(data))
+                logger.warn('Error retrieving status from cache for %s.' % workflow)
+                return 0
 
             try:
                 workflow_status = res[0]['result'][0]['status']
@@ -447,9 +455,11 @@ class Worker(object):
                 with open("/tmp/publisher_files/"+workflow+'.json', 'w') as outfile:
                     json.dump(toPublish, outfile)
                 logger.info(". publisher.py %s" % (workflow))
-                #TODO insert proper path before the command
-                command = "publisher.py"
-                subprocess.call(["python", command, workflow])
+
+                # find the location in the current environment of the script we want to run
+                import Publisher.TaskPublish as tp
+                taskPublishScript = tp.__file__
+                subprocess.call(["python", taskPublishScript, workflow])
 
         except:
             logger.exception("Exception!")
@@ -466,7 +476,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     configuration = loadConfigurationFile(os.path.abspath(args.config))
 
-    master = Worker(configuration)
+    master = Master(configuration)
     while(True):
         master.algorithm()
         time.sleep(configuration.General.pollInterval)
