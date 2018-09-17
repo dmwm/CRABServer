@@ -36,8 +36,8 @@ class DataDiscovery(TaskAction):
         ## Loop over the sorted list of files.
         # can't affort one message from CRIC per file, unless critical !
         previousLogLevel=self.logger.getEffectiveLevel()
+        resourceCatalog = CRIC(logger=self.logger)
         self.logger.setLevel(logging.ERROR)
-        resourceCatalog = CRIC()
         for lfn, infos in datasetfiles.iteritems():
             ## Skip the file if the block has not been found or has no locations.
             if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
