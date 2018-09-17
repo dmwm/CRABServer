@@ -151,7 +151,7 @@ mv WMArchiveReport.json WMArchiveReport.json.$CRAB_Id
 if [[ $EXIT_STATUS != 0 ]]
 then
   echo "User's application failed, will not transfer log to remote stageout disk"
-  echo "log will be available for a few weeks vai crab getlog command and/or via the dashboard link"
+  echo "log will be available for a few weeks via crab getlog command and/or via the dashboard link"
   export FAIL_NO_XFER_LOG=True
 else
   export FAIL_NO_XFER_LOG=False
