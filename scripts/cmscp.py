@@ -837,6 +837,9 @@ def main():
         msg  = "The user has not specified to transfer the log files."
         msg += " No log files stageout (nor log files metadata upload) will be performed."
         print(msg)
+    ## if main application failed, we do not transfer the logs
+    if os.getenv('FAIL_NO_XFER_LOG',False):
+        transfer_logs = False
     ## If we couldn't read CRAB_TransferOutputs from the job ad, we assume True.
     if 'CRAB_TransferOutputs' not in G_JOB_AD:
         msg  = "WARNING: Job's HTCondor ClassAd is missing attribute CRAB_TransferOutputs."
