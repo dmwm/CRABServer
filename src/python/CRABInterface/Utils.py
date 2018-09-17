@@ -12,7 +12,7 @@ import threading
 
 from WMCore.WMFactory import WMFactory
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
+from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.Credential.SimpleMyProxy import SimpleMyProxy, MyProxyException
 from WMCore.Credential.Proxy import Proxy
@@ -121,7 +121,7 @@ def getCentralConfig(extconfigurl, mode):
 def conn_handler(services):
     """
     Decorator to be used among REST resources to optimize connections to other services
-    as CouchDB and SiteDB, PhEDEx, WMStats monitoring
+    as CouchDB and CRIC, PhEDEx, WMStats monitoring
 
     arg str list services: list of string telling which service connections
                            should be started; currently availables are
@@ -129,9 +129,9 @@ def conn_handler(services):
     """
     def wrap(func):
         def wrapped_func(*args, **kwargs):
-            if 'sitedb' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
-                args[0].allCMSNames = CMSSitesCache(sites=SiteDBJSON(config={'cert': serverCert, 'key': serverKey}).getAllCMSNames(), cachetime=mktime(gmtime()))
-                args[0].allPNNNames = CMSSitesCache(sites=SiteDBJSON(config={'cert': serverCert, 'key': serverKey}).getAllPhEDExNodeNames(), cachetime=mktime(gmtime()))
+            if 'cric' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
+                args[0].allCMSNames = CMSSitesCache(sites=CRIC().getAllPSNs(), cachetime=mktime(gmtime()))
+                args[0].allPNNNames = CMSSitesCache(sites=CRIC().getAllPhEDExNodeNames(), cachetime=mktime(gmtime()))
             if 'phedex' in services and not args[0].phedex:
                 phdict = args[0].phedexargs
                 phdict.update({'cert': serverCert, 'key': serverKey})

@@ -64,7 +64,7 @@ class RESTUserWorkflow(RESTEntity):
     @staticmethod
     def _checkOutLFN(kwargs, username):
         """Check the lfn parameter: it must start with '/store/user/<username>/', '/store/group/groupname/' or '/store/local/something/',
-           where username is the one registered in SiteDB (i.e. the one used in the CERN primary account).
+           where username is the one registered in CMS global list (i.e. the one used in the CERN primary account).
            If lfn is not there, default to '/store/user/<username>/'.
         """
         if not kwargs['lfn']:
@@ -75,7 +75,7 @@ class RESTUserWorkflow(RESTEntity):
                 msg = "The parameter Data.outLFNDirBase in the CRAB configuration file must start with either"
                 msg += " '/store/user/<username>/' or '/store/group/<groupname>/'"
                 msg += " (or '/store/local/<something>/' if publication is off),"
-                msg += " where username is your username as registered in SiteDB"
+                msg += " where username is your username as registered in CMS services"
                 msg += " (i.e. the username of your CERN primary account)."
                 raise InvalidParameter(msg)
 
@@ -283,7 +283,7 @@ class RESTUserWorkflow(RESTEntity):
         return asourl, asodb
 
     def _checkSite(self, site, pnn=False):
-        """ Check a single site like T2_IT_Something against sites in sitedb or phedex
+        """ Check a single site like T2_IT_Something against known CMS site names
         """
         sites = self.allPNNNames.sites if pnn else self.allCMSNames.sites
         if site not in sites:
@@ -321,12 +321,12 @@ class RESTUserWorkflow(RESTEntity):
             #Need to log the message in the db for the users
             self.logger.warning(msg)
 
-    @conn_handler(services=['sitedb', 'centralconfig'])
+    @conn_handler(services=['cric', 'centralconfig'])
     def validate(self, apiobj, method, api, param, safe): #pylint: disable=unused-argument
         """Validating all the input parameter as enforced by the WMCore.REST module"""
 
         if method in ['PUT']:
-            username = cherrypy.request.user['login'] # username registered in SiteDB
+            username = cherrypy.request.user['login'] # username registered in CMS WEB frontend
             requestname = param.kwargs['workflow']
             param.kwargs['workflow'] = generateTaskName(username, requestname)
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
