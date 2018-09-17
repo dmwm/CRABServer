@@ -28,17 +28,16 @@ class DataDiscovery(TaskAction):
         """
         self.logger.debug(" Formatting data discovery output ")
 
-        resourceCatalog = CRIC()
-
         wmfiles = []
         event_counter = 0
         lumi_counter = 0
         uniquelumis = set()
         datasetLumis = {}
         ## Loop over the sorted list of files.
-        # can't affort one message per file, unless critical !
+        # can't affort one message from CRIC per file, unless critical !
         previousLogLevel=self.logger.getEffectiveLevel()
         self.logger.setLevel(logging.ERROR)
+        resourceCatalog = CRIC()
         for lfn, infos in datasetfiles.iteritems():
             ## Skip the file if the block has not been found or has no locations.
             if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
