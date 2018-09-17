@@ -257,8 +257,10 @@ if __name__ == '__main__':
     dbsDataset = sys.argv[2]
 
     logging.basicConfig(level = logging.DEBUG)
-    from WMCore.Configuration import Configuration
-    config = Configuration()
+    from WMCore.Configuration import ConfigurationEx
+    from ServerUtilities import newX509env
+
+    config = ConfigurationEx()
     config.section_("Services")
     config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/%s/DBSReader/' % dbsInstance
     config.section_("TaskWorker")
@@ -269,6 +271,9 @@ if __name__ == '__main__':
     # will user service cert as defined for TW
     config.TaskWorker.cmscert = os.environ["X509_USER_CERT"]
     config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
+    config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT= config.TaskWorker.cmscert,
+                                                X509_USER_KEY = config.TaskWorker.cmskey)
+
 
     config.TaskWorker.DDMServer = 'dynamo.mit.edu'
     config.TaskWorker.resturl = 'cmsweb.cern.ch'
