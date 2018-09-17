@@ -829,7 +829,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 else:
                     resourceCatalog = CRIC(logger=self.logger)
                 try:
-                    possiblesites = set(resourceCatalog.getAllCMSNames())
+                    possiblesites = set(resourceCatalog.getAllPSNs())
                 except Exception as ex:
                     msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
                     msg += " This could be a temporary Resource Catalog glitch."
