@@ -1,7 +1,7 @@
 from WMCore.DataStructs.Run import Run
 from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
-from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
+from WMCore.Services.CRIC.CRIC import CRIC
 
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
@@ -29,9 +29,9 @@ class UserDataDiscovery(DataDiscovery):
         if hasattr(self.config.Sites, 'available'):
             locations = self.config.Sites.available
         else:
-            sbj = SiteDBJSON({"key":self.config.TaskWorker.cmskey,
-                              "cert":self.config.TaskWorker.cmscert})
-            locations = sbj.getAllCMSNames()
+            with self.config.envForCMSWEB :
+                resourceCatalog = CRIC(loger=self.logger)
+                locations = resourceCatalog.getAllPSNs()
 
         userFileset = Fileset(name = kwargs['task']['tm_taskname'])
         self.logger.info("There are %d files specified by the user." % len(userfiles))

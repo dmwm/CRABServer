@@ -5,8 +5,7 @@ from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
 from WMCore.DataStructs.Run import Run
 
-from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
-
+from WMCore.Services.CRIC.CRIC import CRIC
 
 class MakeFakeFileSet(TaskAction):
     """This is needed to make WMCore.JobSplitting lib working...
@@ -17,9 +16,8 @@ class MakeFakeFileSet(TaskAction):
 
     def __init__(self, *args, **kwargs):
         TaskAction.__init__(self, *args, **kwargs)
-        self.sbj = SiteDBJSON({"key":self.config.TaskWorker.cmskey,
-                          "cert":self.config.TaskWorker.cmscert})
-
+        with self.config.envForCMSWEB:
+            self.resourceCatalog = CRIC(logger=self.logger)
 
     def getListOfSites(self):
         """ Get the list of sites to use for PrivateMC workflows.
@@ -27,7 +25,8 @@ class MakeFakeFileSet(TaskAction):
             and don't want to overtake production (WMAgent) jobs there. In the
             future we would like to take this list from the SSB.
         """
-        sites = self.sbj.getAllCMSNames()
+
+        sites = self.resourceCatalog.getAllPSNs()
         filteredSites = [site for site in sites if not site.startswith("T1_")]
 
         return filteredSites

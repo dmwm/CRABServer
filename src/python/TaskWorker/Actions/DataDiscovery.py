@@ -1,20 +1,17 @@
 from __future__ import print_function
 import os
 import json
+import logging
 
 from WMCore.DataStructs.Run import Run
 from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
 from WMCore.DataStructs.LumiList import LumiList
-from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
+from WMCore.Services.CRIC.CRIC import CRIC
 
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.WorkerExceptions import TaskWorkerException
-
-# TEMPORARY
-from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
-import httplib
 
 class DataDiscovery(TaskAction):
     """
@@ -30,9 +27,6 @@ class DataDiscovery(TaskAction):
         discovery operations and fill up the WMCore objects.
         """
         self.logger.debug(" Formatting data discovery output ")
-        # TEMPORARY
-        pnn_psn_map = {}
-        sbj = SiteDBJSON({"key": self.config.TaskWorker.cmskey, "cert": self.config.TaskWorker.cmscert})
 
         wmfiles = []
         event_counter = 0
@@ -40,6 +34,10 @@ class DataDiscovery(TaskAction):
         uniquelumis = set()
         datasetLumis = {}
         ## Loop over the sorted list of files.
+        # can't affort one message from CRIC per file, unless critical !
+        previousLogLevel=self.logger.getEffectiveLevel()
+        resourceCatalog = CRIC(logger=self.logger)
+        self.logger.setLevel(logging.ERROR)
         for lfn, infos in datasetfiles.iteritems():
             ## Skip the file if the block has not been found or has no locations.
             if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
@@ -67,25 +65,12 @@ class DataDiscovery(TaskAction):
                 checksums = infos['Checksums']
             wmfile = File(lfn = lfn, events = infos['NumberOfEvents'], size = size, checksums = checksums, parents = infos['Parents'])
             wmfile['block'] = infos['BlockName']
-            wmfile['locations'] = []
-            for pnn in locations[infos['BlockName']]:
-                if pnn and pnn not in pnn_psn_map:
-                    self.logger.debug("Translating PNN %s" %pnn)
-                    try:
-                        pnn_psn_map[pnn] = sbj.PNNtoPSN(pnn)
-                    except KeyError:
-                        self.logger.error("Impossible translating %s to a CMS name through SiteDB" %pnn)
-                        pnn_psn_map[pnn] = ''
-                    except httplib.HTTPException as ex:
-                        self.logger.error("Couldn't map SE to site: %s" % pnn)
-                        print("Couldn't map SE to site: %s" % pnn)
-                        print("got problem: %s" % ex)
-                        print("got another problem: %s" % ex.__dict__)
-                if pnn and pnn in pnn_psn_map:
-                    if isinstance(pnn_psn_map[pnn], list):
-                        wmfile['locations'].extend(pnn_psn_map[pnn])
-                    else:
-                        wmfile['locations'].append(pnn_psn_map[pnn])
+            try:
+                wmfile['locations'] = resourceCatalog.PNNstoPSNs(locations[wmfile['block']])
+            except exception as ex:
+                self.logger.error("Impossible translating %s to a CMS name through CMS Resource Catalog" % locations[wmfile['block']] )
+                self.logger.error("got this exception:\n %s" % ex)
+                raise
             wmfile['workflow'] = requestname
             event_counter += infos['NumberOfEvents']
             for run, lumis in infos['Lumis'].iteritems():
@@ -96,6 +81,7 @@ class DataDiscovery(TaskAction):
                 lumi_counter += len(lumis)
             wmfiles.append(wmfile)
 
+        self.logger.setLevel(previousLogLevel)
         uniquelumis = len(uniquelumis)
         self.logger.debug('Tot events found: %d' % event_counter)
         self.logger.debug('Tot lumis found: %d' % uniquelumis)
