@@ -41,7 +41,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
         row = self.Task.ID_tuple(*row)
 
-        backend_urls = copy.deepcopy(self.centralcfg.centralconfig["backend-urls"])
+        backend_urls = copy.deepcopy(self.centralcfg.centralconfig["backend-urls"])-con
         if row.schedd and row.collector:
             # Override the collector because it may be different from what's in the external configuration
             # (if the task was submitted by specifying a different collector in the config, for example)

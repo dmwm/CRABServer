@@ -28,7 +28,7 @@ from CMSGroupMapper import get_egroup_users
 
 import WMCore.WMSpec.WMTask
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
-import WMCore.Services.SiteDB.SiteDB as SiteDB
+from WMCore.Services.CRIC.CRIC import CRIC
 
 import classad
 
@@ -824,19 +824,18 @@ class DagmanCreator(TaskAction.TaskAction):
                 # See if we're running on the backend, otherwise use user
                 # cert on the scheduler (automatic splitting)
                 if os.path.isfile(self.config.TaskWorker.cmskey):
-                    sbj = SiteDB.SiteDBJSON({"key": self.config.TaskWorker.cmskey,
-                                             "cert": self.config.TaskWorker.cmscert,
-                                             "pycurl": True})
+                    with self.config.envForCMSWEB:
+                        resourceCatalog = CRIC(logger=self.logger)
                 else:
-                    sbj = SiteDB.SiteDBJSON({"pycurl": True})
+                    resourceCatalog = CRIC(logger=self.logger)
                 try:
-                    possiblesites = set(sbj.getAllCMSNames())
+                    possiblesites = set(resourceCatalog.getAllCMSNames())
                 except Exception as ex:
-                    msg = "The CRAB3 server backend could not contact SiteDB to get the list of all CMS sites."
-                    msg += " This could be a temporary SiteDB glitch."
+                    msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
+                    msg += " This could be a temporary Resource Catalog glitch."
                     msg += " Please try to submit a new task (resubmit will not work)"
                     msg += " and contact the experts if the error persists."
-                    msg += "\nError reason: %s" % (str(ex)) #TODO add the sitedb url so the user can check themselves!
+                    msg += "\nError reason: %s" % (str(ex))
                     raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
             else:
                 possiblesites = locations
