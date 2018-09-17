@@ -35,6 +35,9 @@ class DataDiscovery(TaskAction):
         uniquelumis = set()
         datasetLumis = {}
         ## Loop over the sorted list of files.
+        # can't affort one message per file, unless critical !
+        previousLogLevel=self.logger.getEffectiveLevel()
+        self.logger.setLevel(logging.ERROR)
         for lfn, infos in datasetfiles.iteritems():
             ## Skip the file if the block has not been found or has no locations.
             if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
@@ -78,6 +81,7 @@ class DataDiscovery(TaskAction):
                 lumi_counter += len(lumis)
             wmfiles.append(wmfile)
 
+        self.logger.setLevel(previousLogLevel)
         uniquelumis = len(uniquelumis)
         self.logger.debug('Tot events found: %d' % event_counter)
         self.logger.debug('Tot lumis found: %d' % uniquelumis)
