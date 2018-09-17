@@ -825,9 +825,9 @@ class DagmanCreator(TaskAction.TaskAction):
                 # cert on the scheduler (automatic splitting)
                 if os.path.isfile(self.config.TaskWorker.cmskey):
                     with self.config.envForCMSWEB:
-                        resourceCatalog = CRIC(logger=self.logger)
+                        resourceCatalog = CRIC()
                 else:
-                    resourceCatalog = CRIC(logger=self.logger)
+                    resourceCatalog = CRIC()
                 try:
                     possiblesites = set(resourceCatalog.getAllPSNs())
                 except Exception as ex:

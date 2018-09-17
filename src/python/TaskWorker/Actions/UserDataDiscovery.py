@@ -1,7 +1,7 @@
 from WMCore.DataStructs.Run import Run
 from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
-from WMCore.Services.CRIC.CRIC import import CRIC
+from WMCore.Services.CRIC.CRIC import CRIC
 
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
@@ -30,9 +30,8 @@ class UserDataDiscovery(DataDiscovery):
             locations = self.config.Sites.available
         else:
             with self.config.envForCMSWEB :
-                resourceCatalog = CRIC(logger=self.logger)
+                resourceCatalog = CRIC()
                 locations = resourceCatalog.getAllPSNs()
-
 
         userFileset = Fileset(name = kwargs['task']['tm_taskname'])
         self.logger.info("There are %d files specified by the user." % len(userfiles))

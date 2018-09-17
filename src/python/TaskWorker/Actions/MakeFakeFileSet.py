@@ -17,7 +17,7 @@ class MakeFakeFileSet(TaskAction):
     def __init__(self, *args, **kwargs):
         TaskAction.__init__(self, *args, **kwargs)
         with self.config.envForCMSWEB:
-            self.resourceCatalog = CRIC(logger=self.logger)
+            self.resourceCatalog = CRIC()
 
     def getListOfSites(self):
         """ Get the list of sites to use for PrivateMC workflows.

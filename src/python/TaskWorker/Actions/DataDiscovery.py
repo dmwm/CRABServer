@@ -27,7 +27,7 @@ class DataDiscovery(TaskAction):
         """
         self.logger.debug(" Formatting data discovery output ")
 
-        resourceCatalog = CRIC(logger=self.logger)
+        resourceCatalog = CRIC()
 
         wmfiles = []
         event_counter = 0
