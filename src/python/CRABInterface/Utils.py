@@ -131,7 +131,7 @@ def conn_handler(services):
         def wrapped_func(*args, **kwargs):
             if 'cric' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
                 args[0].allCMSNames = CMSSitesCache(sites=CRIC().getAllPSNs(), cachetime=mktime(gmtime()))
-                args[0].allPNNNames = CMSSitesCache(sites=CRIC().getAllPhEDExNodeNames, cachetime=mktime(gmtime()))
+                args[0].allPNNNames = CMSSitesCache(sites=CRIC().getAllPhEDExNodeNames(), cachetime=mktime(gmtime()))
             if 'phedex' in services and not args[0].phedex:
                 phdict = args[0].phedexargs
                 phdict.update({'cert': serverCert, 'key': serverKey})
