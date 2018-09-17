@@ -1,6 +1,7 @@
 from __future__ import print_function
 import os
 import json
+import logging
 
 from WMCore.DataStructs.Run import Run
 from WMCore.DataStructs.File import File
