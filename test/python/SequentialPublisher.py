@@ -8,6 +8,7 @@
     sequential (it does not instantiate new threads) and the logging is done at the console and not on
     a file.
 """
+from __future__ import division
 
 from WMCore.Configuration import Configuration
 from Publisher.PublishMaster import Master
