@@ -159,7 +159,7 @@ periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReas
 periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) || \
                   ((JobStatus =?= 1) && (time() - EnteredCurrentStatus > 7*24*60*60)) || \
                   ((JobStatus =?= 2) && ( \
-                     (MemoryUsage > RequestMemory) || \
+                     (MemoryUsage =!= UNDEFINED && MemoryUsage > RequestMemory) || \
                      (MaxWallTimeMinsRun*60 < time() - EnteredCurrentStatus) || \
                      (DiskUsage > %(max_disk_space)s))) || \
                      (time() > CRAB_TaskEndTime) || \
