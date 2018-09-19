@@ -51,14 +51,14 @@ def validateConfig(config):
 class MasterWorker(object):
     """I am the master of the TaskWorker"""
 
-    def __init__(self, config, quiet, debug, test=False, console=False):
+    def __init__(self, config, logWarning, logDebug, sequential=False, console=False):
         """Initializer
 
         :arg WMCore.Configuration config: input TaskWorker configuration
-        :arg bool quiet: it tells if a quiet logger is needed
-        :arg bool debug: it tells if needs a verbose logger
-        :arg bool test: it tells if to run in test (no subprocesses) mode.
-        :arg bool console: it tells if logging to console."""
+        :arg bool logWarning: it tells if a quiet logger is needed
+        :arg bool logDebug: it tells if needs a verbose logger
+        :arg bool sequential: it tells if to run in sequential (no subprocesses) mode.
+        :arg bool console: it tells if to log to console."""
 
 
         def createLogdir(dirname):
@@ -74,15 +74,15 @@ class MasterWorker(object):
                     sys.exit(1)
 
 
-        def setRootLogger(quiet, debug, console):
+        def setRootLogger(logWarning, logDebug, console):
             """Sets the root logger with the desired verbosity level
                The root logger logs to logs/twlog.txt and every single
                logging instruction is propagated to it (not really nice
                to read)
 
-            :arg bool quiet: it tells if a quiet logger is needed
-            :arg bool debug: it tells if needs a verbose logger
-            :arg bool console: it tells if sending log to console
+            :arg bool logWarning: it tells if a quiet logger is needed
+            :arg bool logDebug: it tells if needs a verbose logger
+            :arg bool console: it tells if to log to console
             :return logger: a logger with the appropriate logger level."""
 
             createLogdir('logs')
@@ -98,9 +98,9 @@ class MasterWorker(object):
                 logHandler.setFormatter(logFormatter)
                 logging.getLogger().addHandler(logHandler)
             loglevel = logging.INFO
-            if quiet:
+            if logWarning:
                 loglevel = logging.WARNING
-            if debug:
+            if logDebug:
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
             logger = setProcessLogger("master")
@@ -110,8 +110,8 @@ class MasterWorker(object):
 
 
         self.STOP = False
-        self.TEST = test
-        self.logger = setRootLogger(quiet, debug, console)
+        self.TEST = sequential
+        self.logger = setRootLogger(logWarning, logDebug, console)
         self.config = config
         resthost = None
         self.restURInoAPI = None
@@ -296,14 +296,14 @@ if __name__ == '__main__':
     usage  = "usage: %prog [options] [args]"
     parser = OptionParser(usage=usage)
 
-    parser.add_option( "-d", "--debug",
+    parser.add_option( "-d", "--logDebug",
                        action = "store_true",
-                       dest = "debug",
+                       dest = "logDebug",
                        default = False,
                        help = "print extra messages to stdout" )
-    parser.add_option( "-q", "--quiet",
+    parser.add_option( "-q", "--logWarning",
                        action = "store_true",
-                       dest = "quiet",
+                       dest = "logWarning",
                        default = False,
                        help = "don't print any messages to stdout" )
 
@@ -325,7 +325,7 @@ if __name__ == '__main__':
 
     mw = None
     try:
-        mw = MasterWorker(configuration, quiet=options.quiet, debug=options.debug)
+        mw = MasterWorker(configuration, logWarning=options.logWarning, logDebug=options.logDebug)
         signal.signal(signal.SIGINT, mw.quit_)
         signal.signal(signal.SIGTERM, mw.quit_)
         mw.algorithm()

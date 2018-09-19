@@ -13,7 +13,7 @@ class TapeRecallStatus(BaseRecurringAction):
     pollingTime = 60*4 # minutes
 
     def _execute(self, resthost, resturi, config, task):
-        mw = MasterWorker(config, quiet=False, debug=False, test=True)
+        mw = MasterWorker(config, logWarning=False, logDebug=False, sequential=True, console=False)
 
         tapeRecallStatus = 'TAPERECALL'
         self.logger.info("Retrieving %s tasks", tapeRecallStatus)

@@ -28,5 +28,5 @@ if usePdb:
    import pdb
    pdb.set_trace()
 
-mc = MasterWorker(config, False, True, True)
+mc = MasterWorker(config=config, logWarning=False, logDebug=True, sequential=True, console=True)
 mc.algorithm()
