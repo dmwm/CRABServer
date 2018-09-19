@@ -182,6 +182,9 @@ class DBSDataDiscovery(DataDiscovery):
                     else:
                         msg += ", please try again in two days."
 
+                else:
+                    msg += "\nThe disk replica request failed with this error:\n %s" % ddmRequest["message"]
+
             msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
             msg += " You might want to contact your physics group if you need a disk replica."
             raise TaskWorkerException(msg)
