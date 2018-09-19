@@ -52,13 +52,13 @@ def getDNFromUserName(username, log, ckey = None, cert = None):
     """
     Parse site string to know the fts server to use
     """
+    dn = ''
     with newX509env(X509_USER_CERT=cert,X509_USER_KEY=ckey):
         resourceCatalog = CRIC(logger=log)
-    dn = ''
-    try:
-        dn = resourceCatalog.userNameDn(username)
-    except :
-        log.error("CRIC URL cannot be accessed")
+        try:
+            dn = resourceCatalog.userNameDn(username)
+        except :
+            log.error("CRIC URL cannot be accessed")
     if not dn:
         log.error("user does not exist")
     return dn
