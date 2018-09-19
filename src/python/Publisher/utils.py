@@ -52,7 +52,7 @@ def getDNFromUserName(username, log, ckey = None, cert = None):
     """
     Parse site string to know the fts server to use
     """
-    with newX509env(X509_USER_CERT=cert,X509_USER_KEY=ckey)
+    with newX509env(X509_USER_CERT=cert,X509_USER_KEY=ckey):
         resourceCatalog = CRIC(logger=log)
     dn = ''
     try:
