@@ -5,8 +5,10 @@ import logging
 import hashlib
 import subprocess
 
-from WMCore.Services.SiteDB.SiteDB import SiteDBJSON
+from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.Credential.Proxy import Proxy
+from ServerUtilities import newX509env
+
 
 __version__ = '1.0.3'
 
@@ -50,16 +52,15 @@ def getDNFromUserName(username, log, ckey = None, cert = None):
     """
     Parse site string to know the fts server to use
     """
+    with newX509env(X509_USER_CERT=cert,X509_USER_KEY=ckey)
+        resourceCatalog = CRIC(logger=log)
     dn = ''
-    site_db = SiteDBJSON(config={'key': ckey, 'cert': cert})
     try:
-        dn = site_db.userNameDn(username)
-    except IndexError:
+        dn = resourceCatalog.userNameDn(username)
+    except :
+        log.error("CRIC URL cannot be accessed")
+    if not dn:
         log.error("user does not exist")
-        return dn
-    except RuntimeError:
-        log.error("SiteDB URL cannot be accessed")
-        return dn
     return dn
 
 def getProxy(defaultDelegation, log):
