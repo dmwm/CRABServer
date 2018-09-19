@@ -12,7 +12,7 @@ import argparse
 import re
 
 import dbs.apis.dbsClient as dbsClient
-from utils import getProxy
+from Publisher.utils import getProxy
 from ServerUtilities import getHashLfn, encodeRequest, oracleOutputMapping
 from RESTInteractions import HTTPRequests
 from WMCore.Configuration import loadConfigurationFile
