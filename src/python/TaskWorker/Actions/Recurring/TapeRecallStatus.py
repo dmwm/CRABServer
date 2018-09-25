@@ -32,7 +32,7 @@ class TapeRecallStatus(BaseRecurringAction):
                 ufc = UserFileCache({'endpoint': recallingTask['tm_cache_url'], "pycurl": True})
                 sandbox = recallingTask['tm_user_sandbox'].replace(".tar.gz","")
                 try:
-                    ufc.download(sandbox, recallingTask['tm_username'], sandbox)
+                    ufc.download(sandbox, sandbox, recallingTask['tm_username'])
                     os.remove(sandbox)
                 except Exception as ex:
                     self.logger.exception(ex)
