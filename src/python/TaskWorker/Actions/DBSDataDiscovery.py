@@ -152,8 +152,9 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ', '.join(sorted(self.otherLocations))
                 # submit request to DDM
                 ddmRequest = None
+                ddmServer = self.config.TaskWorker.DDMServer
                 try:
-                    ddmRequest = blocksRequest(blocks, self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, verbose=False)
+                    ddmRequest = blocksRequest(blocks, ddmServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, verbose=False)
                 except HTTPException as hte:
                     self.logger.exception(hte)
                     msg += "\nThe automatic stage-out failed, please try again later. If the error persists contact the experts and provide this error message:"
