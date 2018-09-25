@@ -21,18 +21,18 @@ class TapeRecallStatus(BaseRecurringAction):
         recallingTasks = mw.getWork(limit=999999, getstatus=tapeRecallStatus)
         if len(recallingTasks) > 0:
             self.logger.info("Retrieved a total of %d %s tasks", len(recallingTasks), tapeRecallStatus)
-            self.logger.info("Retrieved the following %s tasks: \n%s", tapeRecallStatus, str(recallingTasks))
+            self.logger.debug("Retrieved the following %s tasks: \n%s", tapeRecallStatus, str(recallingTasks))
             for recallingTask in recallingTasks:
                 if not recallingTask['tm_DDM_reqid']:
                     self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", recallingTask['tm_taskname'])
                     continue
 
-                # Make sure the sandbox is not deleted until the tape recall is completed
+                # Make sure the task sandbox in the crabcache is not deleted until the tape recall is completed
                 from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
                 ufc = UserFileCache({'endpoint': recallingTask['tm_cache_url'], "pycurl": True})
                 sandbox = recallingTask['tm_user_sandbox'].replace(".tar.gz","")
                 try:
-                    result = ufc.download(sandbox, recallingTask['tm_username'], sandbox)
+                    ufc.download(sandbox, recallingTask['tm_username'], sandbox)
                     os.remove(sandbox)
                 except Exception as ex:
                     self.logger.exception(ex)
