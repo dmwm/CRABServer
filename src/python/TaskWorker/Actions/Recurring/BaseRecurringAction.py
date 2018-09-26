@@ -13,10 +13,11 @@ class BaseRecurringAction:
         #set the logger
         self.logger = logging.getLogger(__name__)
         if not self.logger.handlers:
-            hdlr = logging.FileHandler('logs/recurring.log')
+            logging.basicConfig(filename='logs/recurring.log') # this creates the 'logs' dir if needed
+            handler = logging.getLogger().handlers[0]
             formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
-            hdlr.setFormatter(formatter)
-            self.logger.addHandler(hdlr)
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
         self.logger.setLevel(logging.DEBUG)
 
     def isTimeToGo(self):

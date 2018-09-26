@@ -9,7 +9,7 @@
     a file.
 """
 
-from WMCore.Configuration import Configuration
+from WMCore.Configuration import loadConfigurationFile
 from TaskWorker.MasterWorker import MasterWorker, validateConfig
 
 import logging
@@ -17,16 +17,15 @@ import sys
 
 logging.getLogger().setLevel(logging.DEBUG)
 
-from WMCore.Configuration import loadConfigurationFile, Configuration
-config = loadConfigurationFile( sys.argv[1] )
+config = loadConfigurationFile(sys.argv[1])
 config.TaskWorker.nslaves = 1
 
 validateConfig(config)
 
-usePdb = ( len(sys.argv) == 3 )
+usePdb = (len(sys.argv) == 3)
 if usePdb:
-   import pdb
-   pdb.set_trace()
+    import pdb
+    pdb.set_trace()
 
-mc = MasterWorker(config, False, True, True)
+mc = MasterWorker(config=config, logWarning=False, logDebug=True, sequential=True, console=True)
 mc.algorithm()

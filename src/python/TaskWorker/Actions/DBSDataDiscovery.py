@@ -151,7 +151,18 @@ class DBSDataDiscovery(DataDiscovery):
             if self.otherLocations:
                 msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ', '.join(sorted(self.otherLocations))
                 # submit request to DDM
-                ddmRequest = blocksRequest(blocks, self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, verbose=False)
+                ddmRequest = None
+                ddmServer = self.config.TaskWorker.DDMServer
+                try:
+                    ddmRequest = blocksRequest(blocks, ddmServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, verbose=False)
+                except HTTPException as hte:
+                    self.logger.exception(hte)
+                    msg += "\nThe automatic stage-out failed, please try again later. If the error persists contact the experts and provide this error message:"
+                    msg += "\nHTTP Error while contacting the DDM server %s:\n%s" % (ddmServer, str(hte))
+                    msg += "\nHTTP Headers are: %s" % hte.headers
+                    msg += "\nYou might want to contact your physics group if you need a disk replica."
+                    raise TaskWorkerException(msg, retry=True)
+
                 self.logger.info("Contacted %s using %s and %s, got:\n%s", self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, ddmRequest)
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
                 if ddmRequest["result"] == "OK":
@@ -168,6 +179,7 @@ class DBSDataDiscovery(DataDiscovery):
                     try:
                         tapeRecallStatusSet = server.post(self.config.TaskWorker.restURInoAPI+'task', data = urllib.urlencode(configreq))
                     except HTTPException as hte:
+                        self.logger.exception(hte)
                         msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (self.config.TaskWorker.resturl, str(hte))
                         msg += "\nSetting %s status and DDM request ID (%d) failed for task %s" % (tapeRecallStatus, ddmReqId, taskName)
                         msg += "\nHTTP Headers are: %s" % hte.headers
@@ -182,8 +194,10 @@ class DBSDataDiscovery(DataDiscovery):
                     else:
                         msg += ", please try again in two days."
 
+                else:
+                    msg += "\nThe disk replica request failed with this error:\n %s" % ddmRequest["message"]
+
             msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
-            msg += " You might want to contact your physics group if you need a disk replica."
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
             self.logger.warning("The locations of some blocks have not been found: %s", set(blocks) - set(locationsMap))

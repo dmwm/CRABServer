@@ -29,7 +29,7 @@ from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
 ## 1st) the command to be executed on the task;
 ## 2nd) the work that should be do;
 ## 3nd) the new status that the task should get in case of failure.
-STATE_ACTIONS_MAP = { 'SUBMIT' : (handleNewTask, 'SUBMITFAILED'), 'KILL' : (handleKill, 'KILLFAILED'), 'RESUBMIT' : (handleResubmit, 'RESUBMITFAILED')}
+STATE_ACTIONS_MAP = {'SUBMIT' : (handleNewTask, 'SUBMITFAILED'), 'KILL' : (handleKill, 'KILLFAILED'), 'RESUBMIT' : (handleResubmit, 'RESUBMITFAILED')}
 
 MODEURL = {'cmsweb-dev': {'host': 'cmsweb-dev.cern.ch', 'instance':  'dev'},
            'cmsweb-preprod': {'host': 'cmsweb-testbed.cern.ch', 'instance': 'preprod'},
@@ -51,13 +51,14 @@ def validateConfig(config):
 class MasterWorker(object):
     """I am the master of the TaskWorker"""
 
-    def __init__(self, config, quiet, debug, test=False):
+    def __init__(self, config, logWarning, logDebug, sequential=False, console=False):
         """Initializer
 
         :arg WMCore.Configuration config: input TaskWorker configuration
-        :arg bool quiet: it tells if a quiet logger is needed
-        :arg bool debug: it tells if needs a verbose logger
-        :arg bool test: it tells if to run in test (no subprocesses) mode."""
+        :arg bool logWarning: it tells if a quiet logger is needed
+        :arg bool logDebug: it tells if needs a verbose logger
+        :arg bool sequential: it tells if to run in sequential (no subprocesses) mode.
+        :arg bool console: it tells if to log to console."""
 
 
         def createLogdir(dirname):
@@ -73,22 +74,22 @@ class MasterWorker(object):
                     sys.exit(1)
 
 
-        def setRootLogger(quiet, debug):
+        def setRootLogger(logWarning, logDebug, console):
             """Sets the root logger with the desired verbosity level
                The root logger logs to logs/twlog.txt and every single
                logging instruction is propagated to it (not really nice
                to read)
 
-            :arg bool quiet: it tells if a quiet logger is needed
-            :arg bool debug: it tells if needs a verbose logger
+            :arg bool logWarning: it tells if a quiet logger is needed
+            :arg bool logDebug: it tells if needs a verbose logger
+            :arg bool console: it tells if to log to console
             :return logger: a logger with the appropriate logger level."""
 
             createLogdir('logs')
             createLogdir('logs/processes')
             createLogdir('logs/tasks')
 
-            if self.TEST:
-                #if we are testing log to the console is easier
+            if console:
                 logging.getLogger().addHandler(logging.StreamHandler())
             else:
                 logHandler = MultiProcessingLog('logs/twlog.txt', when='midnight')
@@ -97,9 +98,9 @@ class MasterWorker(object):
                 logHandler.setFormatter(logFormatter)
                 logging.getLogger().addHandler(logHandler)
             loglevel = logging.INFO
-            if quiet:
+            if logWarning:
                 loglevel = logging.WARNING
-            if debug:
+            if logDebug:
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
             logger = setProcessLogger("master")
@@ -109,8 +110,8 @@ class MasterWorker(object):
 
 
         self.STOP = False
-        self.TEST = test
-        self.logger = setRootLogger(quiet, debug)
+        self.TEST = sequential
+        self.logger = setRootLogger(logWarning, logDebug, console)
         self.config = config
         resthost = None
         self.restURInoAPI = None
@@ -126,8 +127,8 @@ class MasterWorker(object):
             raise ConfigException("No correct mode provided: need to specify config.TaskWorker.mode in the configuration")
         #Let's increase the server's retries for recoverable errors in the MasterWorker
         #60 means we'll keep retrying for 1 hour basically (we retry at 20*NUMRETRY seconds, so at: 20s, 60s, 120s, 200s, 300s ...)
-        self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry = 20,
-                                   logger = self.logger)
+        self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry=20,
+                                   logger=self.logger)
         self.logger.debug("Hostcert: %s, hostkey: %s", str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey))
         # Retries for any failures
         if not hasattr(self.config.TaskWorker, 'max_retry'):
@@ -138,8 +139,8 @@ class MasterWorker(object):
             raise ConfigException("No correct max_retry and retry_interval specified; len of retry_interval must be equal to max_retry.")
         # use the config to pass some useful global stuff to all workers
         # will use TaskWorker.cmscert/key to talk with CMSWEB
-        self.config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT = self.config.TaskWorker.cmscert,
-                                                         X509_USER_KEY  = self.config.TaskWorker.cmskey)
+        self.config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=self.config.TaskWorker.cmscert,
+                                                         X509_USER_KEY=self.config.TaskWorker.cmskey)
 
         if self.TEST:
             self.slaves = TestWorker(self.config, resthost, self.restURInoAPI + '/workflowdb')
@@ -165,7 +166,7 @@ class MasterWorker(object):
 
         configreq = {'subresource': 'process', 'workername': self.config.TaskWorker.name, 'getstatus': getstatus, 'limit': limit, 'status': setstatus}
         try:
-            self.server.post(self.restURInoAPI + '/workflowdb', data = urllib.urlencode(configreq))
+            self.server.post(self.restURInoAPI + '/workflowdb', data=urllib.urlencode(configreq))
         except HTTPException as hte:
             msg = "HTTP Error during _lockWork: %s\n" % str(hte)
             msg += "HTTP Headers are %s: " % hte.headers
@@ -182,7 +183,7 @@ class MasterWorker(object):
         configreq = {'limit': limit, 'workername': self.config.TaskWorker.name, 'getstatus': getstatus}
         pendingwork = []
         try:
-            pendingwork = self.server.get(self.restURInoAPI + '/workflowdb', data = configreq)[0]['result']
+            pendingwork = self.server.get(self.restURInoAPI + '/workflowdb', data=configreq)[0]['result']
         except HTTPException as hte:
             msg = "HTTP Error during getWork: %s\n" % str(hte)
             msg += "HTTP Headers are %s: " % hte.headers
@@ -204,7 +205,7 @@ class MasterWorker(object):
 
         configreq = {'workflow': taskname, 'command': command, 'status': status, 'subresource': 'state'}
         try:
-            self.server.post(self.restURInoAPI + '/workflowdb', data = urllib.urlencode(configreq))
+            self.server.post(self.restURInoAPI + '/workflowdb', data=urllib.urlencode(configreq))
         except HTTPException as hte:
             msg = "HTTP Error during updateWork: %s\n" % str(hte)
             msg += "HTTP Headers are %s: " % hte.headers
@@ -248,7 +249,7 @@ class MasterWorker(object):
         self.logger.debug("Failing QUEUED tasks before startup.")
         self.failQueuedTasks()
         self.logger.debug("Master Worker Starting Main Cycle.")
-        while(not self.STOP):
+        while not self.STOP:
             limit = self.slaves.queueableTasks()
             if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
                 time.sleep(self.config.TaskWorker.polling)
@@ -292,39 +293,49 @@ class MasterWorker(object):
 if __name__ == '__main__':
     from optparse import OptionParser
 
-    usage  = "usage: %prog [options] [args]"
+    usage = "usage: %prog [options] [args]"
     parser = OptionParser(usage=usage)
 
-    parser.add_option( "-d", "--debug",
-                       action = "store_true",
-                       dest = "debug",
-                       default = False,
-                       help = "print extra messages to stdout" )
-    parser.add_option( "-q", "--quiet",
-                       action = "store_true",
-                       dest = "quiet",
-                       default = False,
-                       help = "don't print any messages to stdout" )
+    parser.add_option("-d", "--logDebug",
+                      action="store_true",
+                      dest="logDebug",
+                      default=False,
+                      help="print extra messages to stdout")
+    parser.add_option("-w", "--logWarning",
+                      action="store_true",
+                      dest="logWarning",
+                      default=False,
+                      help="don't print any messages to stdout")
+    parser.add_option("-s", "--sequential",
+                      action="store_true",
+                      dest="sequential",
+                      default=False,
+                      help="run in sequential (no subprocesses) mode")
+    parser.add_option("-c", "--console",
+                      action="store_true",
+                      dest="console",
+                      default=False,
+                      help="log to console")
 
-    parser.add_option( "--config",
-                       dest = "config",
-                       default = None,
-                       metavar = "FILE",
-                       help = "configuration file path" )
+    parser.add_option("--config",
+                      dest="config",
+                      default=None,
+                      metavar="FILE",
+                      help="configuration file path")
 
     (options, args) = parser.parse_args()
 
     if not options.config:
         raise ConfigException("Configuration not found")
 
-    configuration = loadConfigurationFile( os.path.abspath(options.config) )
+    configuration = loadConfigurationFile(os.path.abspath(options.config))
     status_, msg_ = validateConfig(configuration)
     if not status_:
         raise ConfigException(msg_)
 
     mw = None
     try:
-        mw = MasterWorker(configuration, quiet=options.quiet, debug=options.debug)
+        mw = MasterWorker(configuration, logWarning=options.logWarning, logDebug=options.logDebug, sequential=options.sequential, console=options.console)
         signal.signal(signal.SIGINT, mw.quit_)
         signal.signal(signal.SIGTERM, mw.quit_)
         mw.algorithm()

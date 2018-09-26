@@ -8,12 +8,13 @@ from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 
 import logging
 import sys
+import os
 
 class TapeRecallStatus(BaseRecurringAction):
     pollingTime = 60*4 # minutes
 
     def _execute(self, resthost, resturi, config, task):
-        mw = MasterWorker(config, quiet=False, debug=True, test=False)
+        mw = MasterWorker(config, logWarning=False, logDebug=False, sequential=True, console=False)
 
         tapeRecallStatus = 'TAPERECALL'
         self.logger.info("Retrieving %s tasks", tapeRecallStatus)
@@ -25,6 +26,20 @@ class TapeRecallStatus(BaseRecurringAction):
                 if not recallingTask['tm_DDM_reqid']:
                     self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", recallingTask['tm_taskname'])
                     continue
+
+                # Make sure the task sandbox in the crabcache is not deleted until the tape recall is completed
+                from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
+                ufc = UserFileCache({'endpoint': recallingTask['tm_cache_url'], "pycurl": True})
+                sandbox = recallingTask['tm_user_sandbox'].replace(".tar.gz","")
+                try:
+                    ufc.download(sandbox, sandbox, recallingTask['tm_username'])
+                    os.remove(sandbox)
+                except Exception as ex:
+                    self.logger.exception(ex)
+                    self.logger.info("The CRAB3 server backend could not download the input sandbox (%s) from the frontend (%s) using the '%s' username."+\
+                                     " This could be a temporary glitch, will try again in next occurrence of the recurring action."+\
+                                     " Error reason:\n%s", sandbox, recallingTask['tm_cache_url'], recallingTask['tm_username'], str(ex))
+
                 ddmRequest = statusRequest(recallingTask['tm_DDM_reqid'], config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, verbose=False)
                 self.logger.info("Contacted %s using %s and %s, got:\n%s", config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, ddmRequest)
                 # The query above returns a JSON with a format {"result": "OK", "message": "Request found", "data": [{"request_id": 14, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:25:41", "last_request": "2018-02-26 23:25:41", "request_count": 1}]}
@@ -37,6 +52,8 @@ class TapeRecallStatus(BaseRecurringAction):
                     mpl.execute(task=recallingTask) # this adds 'user_proxy' to recallingTask
                     mpl.deleteWarnings(recallingTask['user_proxy'], recallingTask['tm_taskname'])
 
+        else:
+            self.logger.info("No %s task retrieved.", tapeRecallStatus)
 
 if __name__ == '__main__':
     """ Simple main to execute the action standalone. You just need to set the task worker environment. """
