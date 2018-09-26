@@ -17,12 +17,12 @@ import sys
 
 logging.getLogger().setLevel(logging.DEBUG)
 
-config = loadConfigurationFile( sys.argv[1] )
+config = loadConfigurationFile(sys.argv[1])
 config.TaskWorker.nslaves = 1
 
 validateConfig(config)
 
-usePdb = ( len(sys.argv) == 3 )
+usePdb = (len(sys.argv) == 3)
 if usePdb:
     import pdb
     pdb.set_trace()
