@@ -26,7 +26,7 @@ from MultiProcessingLog import MultiProcessingLog
 from WMCore.Configuration import loadConfigurationFile
 from WMCore.Services.pycurl_manager import RequestHandler
 from RESTInteractions import HTTPRequests
-from utils import getDNFromUserName
+from Publisher.utils import getDNFromUserName
 from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping
 
 
