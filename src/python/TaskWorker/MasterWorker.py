@@ -301,11 +301,21 @@ if __name__ == '__main__':
                        dest = "logDebug",
                        default = False,
                        help = "print extra messages to stdout" )
-    parser.add_option( "-q", "--logWarning",
+    parser.add_option( "-w", "--logWarning",
                        action = "store_true",
                        dest = "logWarning",
                        default = False,
                        help = "don't print any messages to stdout" )
+    parser.add_option( "-s", "--sequential",
+                       action = "store_true",
+                       dest = "sequential",
+                       default = False,
+                       help = "run in sequential (no subprocesses) mode" )
+    parser.add_option( "-c", "--console",
+                       action = "store_true",
+                       dest = "console",
+                       default = False,
+                       help = "log to console" )
 
     parser.add_option( "--config",
                        dest = "config",
@@ -325,7 +335,7 @@ if __name__ == '__main__':
 
     mw = None
     try:
-        mw = MasterWorker(configuration, logWarning=options.logWarning, logDebug=options.logDebug)
+        mw = MasterWorker(configuration, logWarning=options.logWarning, logDebug=options.logDebug, sequential=options.sequential, console=options.console)
         signal.signal(signal.SIGINT, mw.quit_)
         signal.signal(signal.SIGTERM, mw.quit_)
         mw.algorithm()
