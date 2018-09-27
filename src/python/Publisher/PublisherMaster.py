@@ -1,4 +1,4 @@
-#pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915,C0112,C0111
+# pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915,C0112,C0111
 
 """
 Here's the algorithm
@@ -30,8 +30,6 @@ from Publisher.utils import getDNFromUserName
 from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping
 
 
-
-
 def setProcessLogger(name):
     """ Set the logger for a single process. The file used for it is logs/processes/proc.name.txt and it
         can be retrieved with logging.getLogger(name) in other parts of the code
@@ -48,7 +46,6 @@ def setProcessLogger(name):
 class Master(object):
     """I am the main daemon kicking off all Publisher work via slave Publishers"""
 
-    
     def __init__(self, config, quiet=False, debug=True, testMode=False):
         """
         Initialise class members
@@ -59,6 +56,10 @@ class Master(object):
         :arg bool testMode: it tells if to run in test (no subprocesses) mode.
         """
         self.config = config.General
+        self.rest = self.config.oracleDB
+        self.filetransfers = self.config.oracleFileTrans
+        self.usertransfers = self.config.oracleUserTrans
+        
         self.max_files_per_block = self.config.max_files_per_block
         #self.userCert = self.config.opsCert
         #self.userKey = self.config.opsKey
@@ -81,7 +82,6 @@ class Master(object):
                     print("The Publisher Worker needs to access the '%s' directory" % dirname)
                     sys.exit(1)
 
-
         def setRootLogger(quiet=False, debug=True, console=False):
             """Sets the root logger with the desired verbosity level
                The root logger logs to logs/twlog.txt and every single
@@ -93,12 +93,12 @@ class Master(object):
             :arg bool console: it tells if to direct all printoput to console rather then files, useful for debug
             :return logger: a logger with the appropriate logger level."""
 
-            createLogdir('Publisher/logs')
-            createLogdir('Publisher/logs/processes')
-            createLogdir('Publisher/logs/tasks')
+            createLogdir('logs')
+            createLogdir('logs/processes')
+            createLogdir('logs/tasks')
 
             if console:
-                #if we are testing log to the console is easier
+                # if we are testing log to the console is easier
                 logging.getLogger().addHandler(logging.StreamHandler())
             else:
                 logHandler = MultiProcessingLog('logs/log.txt', when='midnight')
@@ -135,7 +135,6 @@ class Master(object):
         #    msg += str(traceback.format_exc())
         #    self.logger.debug(msg)
 
-
     def active_tasks(self, db):
 
         fileDoc = {}
@@ -150,7 +149,7 @@ class Master(object):
                               data=encodeRequest(fileDoc))
         except Exception as ex:
             self.logger.error("Failed to acquire publications \
-                                from oracleDB: %s" %ex)
+                                from oracleDB: %s" % ex)
             return []
 
         fileDoc = dict()
@@ -175,12 +174,13 @@ class Master(object):
         self.logger.debug("publen: %s" % len(result))
 
         self.logger.debug("%s acquired publications retrieved" % len(result))
-        #TODO: join query for publisher (same of submitter)
+
+        # TODO: join query for publisher (same of submitter)
         unique_tasks = [list(i) for i in set(tuple([x['username'],
                                                     x['user_group'],
                                                     x['user_role'],
                                                     x['taskname']]
-                                                  ) for x in result if x['transfer_state'] == 3)]
+                                                   ) for x in result if x['transfer_state'] == 3)]
 
         info = []
         for task in unique_tasks:
@@ -197,6 +197,7 @@ class Master(object):
         data['filetype'] = 'EDM'
 
         out = []
+
         # divide lfn per chunks, avoiding URI-too long exception
         def chunks(l, n):
             """
@@ -208,15 +209,15 @@ class Master(object):
             for i in range(0, len(l), n):
                 yield l[i:i + n]
 
-        for  lfn_ in chunks(lfn_ready, 50):
+        for lfn_ in chunks(lfn_ready, 50):
             data['lfn'] = lfn_
 
             try:
-                res = self.oracleDB.get('/crabserver/preprod/filemetadata',
+                res = self.oracleDB.get(self.filetransfers.replace('filetransfers', 'filemetadata'),
                                         data=encodeRequest(data, listParams=["lfn"]))
                 res = res[0]
             except Exception as ex:
-                self.logger.error("Error during metadata retrieving: %s" %ex)
+                self.logger.error("Error during metadata retrieving: %s" % ex)
                 continue
 
             print(len(res['result']))
@@ -224,7 +225,7 @@ class Master(object):
                 if isinstance(obj, dict):
                     out.append(obj)
                 else:
-                    #print type(obj)
+                    # print type(obj)
                     out.append(json.loads(str(obj)))
 
         return out
@@ -238,12 +239,12 @@ class Master(object):
         tasks = self.active_tasks(self.oracleDB)
 
         # example code, uncomment to pick only one task
-        #myTask='180912_142016:arizzi_crab_NanoDnRMXDYJetsToLL_M-105To160_TuneCUETP8M1_13TeV-amcaRunIISummer16MiniAODv2-PUMorio__heIV_v6-v22201'
-        #tasksToDo=[]
-        #for t in tasks:
+        # myTask='180912_142016:arizzi_crab_NanoDnRMXDYJetsToLL_M-105To160_TuneCUETP8M1_13TeV-amcaRunIISummer16MiniAODv2-PUMorio__heIV_v6-v22201'
+        # tasksToDo=[]
+        # for t in tasks:
         #  if t[0][3]==myTask:
         #  tasksToDo.append(t)
-        #tasks = tasksToDo
+        # tasks = tasksToDo
 
         self.logger.debug('kicking off pool %s' % [x[0][3] for x in tasks])
         processes = []
@@ -261,7 +262,6 @@ class Master(object):
                 proc.join()
         except:
             self.logger.exception("Error during process mapping")
-
 
     def startSlave(self, task):
         # TODO: lock task!
@@ -292,17 +292,16 @@ class Master(object):
             url = '/'.join(self.cache_area.split('/')[:-1]) #+ '/workflow'
             msg = "Retrieving status from %s" % (url)
             logger.info(wfnamemsg+msg)
-            header = {"Content-Type":"application/json"}
-            data = {'workflow': workflow, 'subresource': 'taskads'}
-            url = 'cmsweb-testbed.cern.ch'
+            data = {'workflow': workflow}
+            url = self.rest
             connection = HTTPRequests(url,
                                      self.config.opsCert,
                                      self.config.opsKey)
             
             try:
-                res = connection.get('/crabserver/preprod/workflow', data=encodeRequest(data))
+                res = connection.get(self.filetransfers.replace('filetransfers', 'workflow'), data=encodeRequest(data))
             except Exception as ex:
-                #logger.info(wfnamemsg+encodeRequest(data))
+                # logger.info(wfnamemsg+encodeRequest(data))
                 logger.warn('Error retrieving status from cache for %s.' % workflow)
                 return 0
 
@@ -383,7 +382,7 @@ class Master(object):
                         msg += " Not enough to force publication."
                     logger.info(wfnamemsg+msg)
 
-        #logger.info(task[1])
+        # logger.info(task[1])
         try:
             if self.force_publication:
                 # - get info
@@ -442,8 +441,8 @@ class Master(object):
                 publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready)
                 for file_ in active_:
                     for _, doc in enumerate(publDescFiles_list):
-                        #logger.info(type(doc))
-                        #logger.info(doc)
+                        # logger.info(type(doc))
+                        # logger.info(doc)
                         if doc["lfn"] == file_["value"][2]:
                             doc["User"] = username
                             doc["Group"] = file_["key"][1]
@@ -480,4 +479,3 @@ if __name__ == '__main__':
     while(True):
         master.algorithm()
         time.sleep(configuration.General.pollInterval)
-

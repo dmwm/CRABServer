@@ -1,4 +1,5 @@
-#pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915
+# pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915
+
 from __future__ import division
 from __future__ import print_function
 import os
@@ -68,6 +69,7 @@ def Proxy(userDN, group, role, logger):
 
     return userProxy
 
+
 def format_file_3(file_):
     """
     format file for DBS
@@ -88,6 +90,7 @@ def format_file_3(file_):
     if file_.get("md5") != "asda" and file_.get("md5") != "NOTSET": # asda is the silly value that MD5 defaults to
         nf['md5'] = file_['md5']
     return nf
+
 
 def createBulkBlock(output_config, processing_era_config, primds_config, \
                     dataset_config, acquisition_era_config, block_config, files):
@@ -118,6 +121,7 @@ def createBulkBlock(output_config, processing_era_config, primds_config, \
     blockDump['block']['file_count'] = len(files)
     blockDump['block']['block_size'] = sum([int(file_[u'file_size']) for file_ in files])
     return blockDump
+
 
 def migrateByBlockDBS3(workflow, migrateApi, destReadApi, sourceApi, dataset, blocks=None):
     """
@@ -294,6 +298,7 @@ def migrateByBlockDBS3(workflow, migrateApi, destReadApi, sourceApi, dataset, bl
         return 4, "Migration check failed. %s" % ex
     return 0, ""
 
+
 def requestBlockMigration(workflow, migrateApi, sourceApi, block):
     """
     Submit migration request for one block, checking the request output.
@@ -355,7 +360,7 @@ def mark_good(workflow, files, oracleDB, logger):
         msg = "Marking file %s as published." % lfn
         msg += " Document id: %s (source LFN: %s)." % (docId, source_lfn)
         logger.info(wfnamemsg+msg)
-        data['asoworker'] = 'asoprod1'
+        data['asoworker'] = config.General.asoworker 
         data['subresource'] = 'updatePublication'
         data['list_of_ids'] = docId
         data['list_of_publication_state'] = 'DONE'
@@ -392,7 +397,7 @@ def mark_failed(files, oracleDB, logger, failure_reason=""):
 
         try:
             fileDoc = dict()
-            fileDoc['asoworker'] = 'asodciangot1'
+            fileDoc['asoworker'] = config.General.asoworker
             fileDoc['subresource'] = 'updatePublication'
             fileDoc['list_of_ids'] = docId
 
@@ -478,7 +483,6 @@ def publishInDBS3(taskname):
     READ_PATH = "/DBSReader"
     READ_PATH_1 = "/DBSReader/"
 
-
     # TODO: get user role and group
     try:
         proxy = Proxy(userDN, group, role, logger)
@@ -486,7 +490,6 @@ def publishInDBS3(taskname):
         logger.exception("Failed to retrieve user proxy")
         return "FAILED"
 
-    #TODO can we use a CRAB Server API here ?
     oracelInstance = config.General.oracleDB
     oracleDB = HTTPRequests(oracelInstance,
                             proxy,
@@ -516,11 +519,9 @@ def publishInDBS3(taskname):
         #sourceURL = "https://cmsweb.cern.ch/dbs/prod/global/DBSReader"
         if not sourceURL.endswith(READ_PATH) and not sourceURL.endswith(READ_PATH_1):
             sourceURL += READ_PATH
-
-
     except Exception:
         logger.exception("ERROR")
-    ## When looking up parents may need to look in global DBS as well.
+    # When looking up parents may need to look in global DBS as well.
     globalURL = sourceURL
     globalURL = globalURL.replace('phys01', 'global')
     globalURL = globalURL.replace('phys02', 'global')
@@ -633,6 +634,7 @@ def publishInDBS3(taskname):
     workToDo = False
 
     for fileTo in toPublish:
+        #print(existingFilesValid)
         if fileTo['lfn'] not in existingFilesValid:
             workToDo = True
             break
@@ -733,6 +735,8 @@ def publishInDBS3(taskname):
             dbsFiles_f.append(file_)
         #print file
         published.append(file_['SourceLFN'])
+        #published.append(file_['lfn'].replace("/store","/store/temp"))
+
     # Print a message with the number of files to publish.
     msg = "Found %d files not already present in DBS which will be published." % (len(dbsFiles))
     logger.info(wfnamemsg+msg)
@@ -760,6 +764,7 @@ def publishInDBS3(taskname):
             failureMsg += " Not publishing any files."
             logger.info(wfnamemsg+failureMsg)
             failed.extend([f['SourceLFN'] for f in dbsFiles_f])
+            #failed.extend([f['lfn'].replace("/store","/store/temp") for f in dbsFiles_f])
             failure_reason = failureMsg
             published = [x for x in published[dataset] if x not in failed[dataset]]
             return "NOTHING TO DO"
@@ -772,6 +777,7 @@ def publishInDBS3(taskname):
             failureMsg += " Not publishing any files."
             logger.info(wfnamemsg+failureMsg)
             failed.extend([f['SourceLFN'] for f in dbsFiles_f])
+            #failed.extend([f['lfn'].replace("/store","/store/temp") for f in dbsFiles_f])
             failure_reason = failureMsg
             published = [x for x in published[dataset] if x not in failed[dataset]]
             return "NOTHING TO DO"
@@ -799,8 +805,10 @@ def publishInDBS3(taskname):
             destApi.insertBulkBlock(blockDump)
             block_count += 1
         except Exception as ex:
-            logger.error("Error for files: %s" % [f['SourceLFN'] for f in toPublish])
+            #logger.error("Error for files: %s" % [f['SourceLFN'] for f in toPublish])
+            logger.error("Error for files: %s" % [f['lfn'] for f in toPublish])
             failed.extend([f['SourceLFN'] for f in toPublish])
+            #failed.extend([f['lfn'].replace("/store","/store/temp") for f in toPublish])
             msg = "Error when publishing (%s) " % ", ".join(failed)
             msg += str(ex)
             msg += str(traceback.format_exc())
@@ -814,6 +822,7 @@ def publishInDBS3(taskname):
         files_to_publish_next = dbsFiles_f[count:count+max_files_per_block]
         if len(files_to_publish_next) < max_files_per_block:
             publish_in_next_iteration.extend([f["SourceLFN"] for f in files_to_publish_next])
+            #publish_in_next_iteration.extend([f["lfn"].replace("/store","/store/temp") for f in files_to_publish_next])
             break
     published = [x for x in published if x not in failed + publish_in_next_iteration]
     # Fill number of files/blocks published for this dataset.
