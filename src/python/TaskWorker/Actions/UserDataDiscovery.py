@@ -30,7 +30,7 @@ class UserDataDiscovery(DataDiscovery):
             locations = self.config.Sites.available
         else:
             with self.config.TaskWorker.envForCMSWEB :
-                resourceCatalog = CRIC(loger=self.logger)
+                resourceCatalog = CRIC(logger=self.logger)
                 locations = resourceCatalog.getAllPSNs()
 
         userFileset = Fileset(name = kwargs['task']['tm_taskname'])
