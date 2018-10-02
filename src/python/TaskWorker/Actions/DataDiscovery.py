@@ -67,7 +67,7 @@ class DataDiscovery(TaskAction):
             wmfile['block'] = infos['BlockName']
             try:
                 wmfile['locations'] = resourceCatalog.PNNstoPSNs(locations[wmfile['block']])
-            except exception as ex:
+            except Exception as ex:
                 self.logger.error("Impossible translating %s to a CMS name through CMS Resource Catalog" % locations[wmfile['block']] )
                 self.logger.error("got this exception:\n %s" % ex)
                 raise

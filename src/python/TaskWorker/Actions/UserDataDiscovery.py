@@ -29,7 +29,7 @@ class UserDataDiscovery(DataDiscovery):
         if hasattr(self.config.Sites, 'available'):
             locations = self.config.Sites.available
         else:
-            with self.config.envForCMSWEB :
+            with self.config.TaskWorker.envForCMSWEB :
                 resourceCatalog = CRIC(loger=self.logger)
                 locations = resourceCatalog.getAllPSNs()
 
