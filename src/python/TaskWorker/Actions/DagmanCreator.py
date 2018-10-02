@@ -821,7 +821,7 @@ class DagmanCreator(TaskAction.TaskAction):
                 continue
 
             if ignoreLocality:
-                with self.config.envForCMSWEB:
+                with self.config.TaskWorker.envForCMSWEB:
                     resourceCatalog = CRIC(logger=self.logger)
                 try:
                     possiblesites = set(resourceCatalog.getAllPSNs())

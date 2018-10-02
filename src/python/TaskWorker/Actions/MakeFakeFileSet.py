@@ -16,7 +16,7 @@ class MakeFakeFileSet(TaskAction):
 
     def __init__(self, *args, **kwargs):
         TaskAction.__init__(self, *args, **kwargs)
-        with self.config.envForCMSWEB:
+        with self.config.TaskWorker.envForCMSWEB:
             self.resourceCatalog = CRIC(logger=self.logger)
 
     def getListOfSites(self):
