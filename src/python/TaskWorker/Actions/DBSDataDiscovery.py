@@ -109,6 +109,7 @@ class DBSDataDiscovery(DataDiscovery):
         self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
 
         taskName = kwargs['task']['tm_taskname']
+        userProxy = kwargs['task']['user_proxy']
         self.logger.debug("Data discovery through %s for %s", self.dbs, taskName)
 
         inputDataset = kwargs['task']['tm_input_dataset']
@@ -170,7 +171,7 @@ class DBSDataDiscovery(DataDiscovery):
                     # set status to TAPERECALL
                     tapeRecallStatus = 'TAPERECALL'
                     ddmReqId = ddmRequest["data"][0]["request_id"]
-                    server = HTTPRequests(url=self.config.TaskWorker.resturl, localcert=kwargs['task']['user_proxy'], localkey=kwargs['task']['user_proxy'], verbose=False)
+                    server = HTTPRequests(url=self.config.TaskWorker.resturl, localcert=userProxy, localkey=userProxy, verbose=False)
                     configreq = {'workflow': taskName,
                                  'taskstatus': tapeRecallStatus,
                                  'ddmreqid': ddmReqId,
@@ -188,7 +189,7 @@ class DBSDataDiscovery(DataDiscovery):
                     if tapeRecallStatusSet[2] == "OK":
                         self.logger.info("Status for task %s set to '%s'", taskName, tapeRecallStatus)
                         msg += " and the task will be submitted as soon as it is completed."
-                        self.uploadWarning(msg, kwargs['task']['user_proxy'], taskName)
+                        self.uploadWarning(msg, userProxy, taskName)
 
                         raise TapeDatasetException(msg)
                     else:
@@ -200,8 +201,10 @@ class DBSDataDiscovery(DataDiscovery):
             msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
             raise TaskWorkerException(msg)
         if len(blocks) != len(locationsMap):
-            self.logger.warning("The locations of some blocks have not been found: %s", set(blocks) - set(locationsMap))
-        
+            msg = "The locations of some blocks have not been found: %s" % list(set(blocks) - set(locationsMap))
+            self.logger.warning(msg)
+            self.uploadWarning(msg, userProxy, taskName)
+
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
         lumiMask  = kwargs['task']['tm_split_args']['lumis']
@@ -212,7 +215,7 @@ class DBSDataDiscovery(DataDiscovery):
         if secondaryDataset: needLumiInfo = True
 
         if needLumiInfo:
-            self.checkBlocksSize(blocks)
+            self.checkBlocksSize(locationsMap.keys())
             if secondaryDataset:
                 self.checkBlocksSize(secondaryBlocks)
         try:
@@ -296,7 +299,7 @@ if __name__ == '__main__':
 
 
     fileset = DBSDataDiscovery(config)
-    fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, #'user_proxy': os.environ["X509_USER_PROXY"],
+    fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': os.environ["X509_USER_PROXY"],
                           'tm_input_dataset': dbsDataset,  'tm_taskname': 'pippo1',
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
                           'tm_dbs_url': config.Services.DBSUrl}, tempDir='')
