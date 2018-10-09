@@ -215,7 +215,7 @@ class DBSDataDiscovery(DataDiscovery):
         if secondaryDataset: needLumiInfo = True
 
         if needLumiInfo:
-            self.checkBlocksSize(locationsMap.keys())
+            self.checkBlocksSize(locationsMap.keys()) # Interested only in blocks with locations, 'blocks' may contain invalid ones and trigger an Exception
             if secondaryDataset:
                 self.checkBlocksSize(secondaryBlocks)
         try:
@@ -267,8 +267,6 @@ if __name__ == '__main__':
         where dbs_instance should be either prod or phys03
 
         Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/phys03 /MinBias/jmsilva-crab_scale_70633-3d12352c28d6995a3700097dc8082c04/USER
-
-        Note: self.uploadWarning is failing, I usually comment it when I run this script standalone
     """
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
@@ -290,7 +288,6 @@ if __name__ == '__main__':
     config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
     config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT= config.TaskWorker.cmscert,
                                                 X509_USER_KEY = config.TaskWorker.cmskey)
-
 
     config.TaskWorker.DDMServer = 'dynamo.mit.edu'
     config.TaskWorker.resturl = 'cmsweb.cern.ch'
