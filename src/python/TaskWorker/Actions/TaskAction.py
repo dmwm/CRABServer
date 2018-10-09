@@ -39,6 +39,10 @@ class TaskAction(object):
 
 
     def uploadWarning(self, warning, userProxy, taskname):
+        if not self.server: # When testing, the server can be None
+            self.logger.warning(warning)
+            return
+
         truncWarning = truncateError(warning)
         userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2,
                                   logger = self.logger)
