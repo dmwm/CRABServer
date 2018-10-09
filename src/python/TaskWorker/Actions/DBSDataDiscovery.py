@@ -51,7 +51,7 @@ class DBSDataDiscovery(DataDiscovery):
 
     def keepOnlyDisks(self, locationsMap):
         self.otherLocations = set()
-        phedex = PhEDEx() #TODO use certs from the config!
+        phedex = PhEDEx() # TODO use certs from the config!
         #get all the PNN that are of kind disk
         try:
             diskLocations = set([pnn['name'] for pnn in phedex.getNodeMap()['phedex']['node'] if pnn['kind']=='Disk'])
@@ -59,12 +59,12 @@ class DBSDataDiscovery(DataDiscovery):
             self.logger.error(ex.headers)
             raise TaskWorkerException("The CRAB3 server backend could not contact phedex to get the list of site storages.\n"+\
                                 "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
-                                " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
+                                " and contact the experts if the error persists.\nError reason: %s" % str(ex)) # TODO addo the nodes phedex so the user can check themselves
         for block, locations in locationsMap.iteritems():
             locationsMap[block] = set(locations) & diskLocations
             self.otherLocations = self.otherLocations.union(set(locations) - diskLocations)
-        #remove any key with value that has set([])
-        for key, value in locationsMap.items(): #wont work in python3!
+        # remove any key with value that has set([])
+        for key, value in locationsMap.items(): # wont work in python3!
             if value == set([]):
                 locationsMap.pop(key)
 
@@ -122,12 +122,12 @@ class DBSDataDiscovery(DataDiscovery):
         try:
             # Get the list of blocks for the locations and then call dls.
             # The WMCore DBS3 implementation makes one call to dls for each block
-            # with locations = True so we are using locations=False and looking up location later
+            # with locations=True so we are using locations=False and looking up location later
             blocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(inputDataset, locations=False)]
             if secondaryDataset:
                 secondaryBlocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(secondaryDataset, locations=False)]
         except DBSReaderError as dbsexc:
-            #dataset not found in DBS is a known use case
+            # dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
                 raise TaskWorkerException("CRAB could not find dataset %s in this DBS instance: %s" % inputDataset, dbsurl)
             raise
@@ -141,7 +141,7 @@ class DBSDataDiscovery(DataDiscovery):
         try:
             dbsOnly = self.dbsInstance.split('/')[1] != 'global'
             locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly)
-        except Exception as ex: #TODO should we catch HttpException instead?
+        except Exception as ex: # TODO should we catch HttpException instead?
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
                                       "This is could be a temporary phedex/dbs glitch, please try to submit a new task (resubmit will not work)"+\
@@ -215,7 +215,7 @@ class DBSDataDiscovery(DataDiscovery):
         if secondaryDataset: needLumiInfo = True
 
         if needLumiInfo:
-            self.checkBlocksSize(locationsMap.keys())
+            self.checkBlocksSize(locationsMap.keys()) # Interested only in blocks with locations, 'blocks' may contain invalid ones and trigger an Exception
             if secondaryDataset:
                 self.checkBlocksSize(secondaryBlocks)
         try:
@@ -263,12 +263,10 @@ class DBSDataDiscovery(DataDiscovery):
         return result
 
 if __name__ == '__main__':
-    """ Usage: python DBSDataDiscovery.py dbs_instance dbsDataset
-        where dbs_instance should be either prod or phys03
+    """Usage: python DBSDataDiscovery.py dbs_instance dbsDataset
+    where dbs_instance should be either prod or phys03
 
-        Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/phys03 /MinBias/jmsilva-crab_scale_70633-3d12352c28d6995a3700097dc8082c04/USER
-
-        Note: self.uploadWarning is failing, I usually comment it when I run this script standalone
+    Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/phys03 /MinBias/jmsilva-crab_scale_70633-3d12352c28d6995a3700097dc8082c04/USER
     """
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
@@ -290,7 +288,6 @@ if __name__ == '__main__':
     config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
     config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT= config.TaskWorker.cmscert,
                                                 X509_USER_KEY = config.TaskWorker.cmskey)
-
 
     config.TaskWorker.DDMServer = 'dynamo.mit.edu'
     config.TaskWorker.resturl = 'cmsweb.cern.ch'

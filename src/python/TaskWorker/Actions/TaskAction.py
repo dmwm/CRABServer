@@ -20,7 +20,12 @@ class TaskAction(object):
                              }
         self.server = server
         self.procnum = procnum
-#        self.resturl = resturi #backward compatibility
+        # Initialised in DBSDataDiscovery:
+        self.dbs = None
+        self.dbsInstance = None
+        self.otherLocations = None
+
+        #self.resturl = resturi # backward compatibility
         ## Trying to give the right naming to the variables.
         ## In the resturl arg we have the REST URI (e.g. '/crabserver/prod/workflowdb').
         ## The first field in the REST URI (e.g. 'crabserver') I will call it the server
@@ -39,6 +44,10 @@ class TaskAction(object):
 
 
     def uploadWarning(self, warning, userProxy, taskname):
+        if not self.server: # When testing, the server can be None
+            self.logger.warning(warning)
+            return
+
         truncWarning = truncateError(warning)
         userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2,
                                   logger = self.logger)
