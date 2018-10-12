@@ -36,7 +36,8 @@ class DataDiscovery(TaskAction):
         ## Loop over the sorted list of files.
         # can't affort one message from CRIC per file, unless critical !
         previousLogLevel=self.logger.getEffectiveLevel()
-        resourceCatalog = CRIC(logger=self.logger)
+        configDict = {"cacheduration": 1, "pycurl": True} # cache duration is in hours
+        resourceCatalog = CRIC(logger=self.logger, configDict=configDict)
         self.logger.setLevel(logging.ERROR)
         for lfn, infos in datasetfiles.iteritems():
             ## Skip the file if the block has not been found or has no locations.
