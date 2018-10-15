@@ -50,9 +50,8 @@ class DBSDataDiscovery(DataDiscovery):
 
 
     def keepOnlyDisks(self, locationsMap):
-        self.otherLocations = set()
         phedex = PhEDEx() # TODO use certs from the config!
-        #get all the PNN that are of kind disk
+        # get all the PNNs that are of kind 'Disk'
         try:
             diskLocations = set([pnn['name'] for pnn in phedex.getNodeMap()['phedex']['node'] if pnn['kind']=='Disk'])
         except HTTPException as ex:
@@ -137,7 +136,7 @@ class DBSDataDiscovery(DataDiscovery):
         ## never be the case at this point that some blocks have no locations.
         ## locationsMap is a dictionary, key=blockName, value=list of PhedexNodes, example:
         ## {'/JetHT/Run2016B-PromptReco-v2/AOD#b10179dc-3723-11e6-9aa5-001e67abf228': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL'],
-        ## '/JetHT/Run2016B-PromptReco-v2/AOD#89b03ca6-1dc9-11e6-b567-001e67ac06a0': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL'}
+        ## '/JetHT/Run2016B-PromptReco-v2/AOD#89b03ca6-1dc9-11e6-b567-001e67ac06a0': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL']}
         try:
             dbsOnly = self.dbsInstance.split('/')[1] != 'global'
             locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly)
@@ -246,7 +245,7 @@ class DBSDataDiscovery(DataDiscovery):
                                       ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
                                       (self.dbsInstance, inputDataset))
 
-        ## Format the output creating the data structures required by wmcore. Filters out invalid files,
+        ## Format the output creating the data structures required by WMCore. Filters out invalid files,
         ## files whose block has no location, and figures out the PSN
         result = self.formatOutput(task = kwargs['task'], requestname = taskName,
                                    datasetfiles = filedetails, locations = locationsMap,
