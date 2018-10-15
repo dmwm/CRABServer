@@ -49,10 +49,6 @@ class DBSDataDiscovery(DataDiscovery):
         return
 
 
-    def removeEmpty(self, dictionary):
-        return {key: value for key, value in dictionary.iteritems() if value}
-
-
     def keepOnlyDisks(self, locationsMap):
         phedex = PhEDEx() # TODO use certs from the config!
         # get all the PNNs that are of kind 'Disk'
@@ -145,7 +141,7 @@ class DBSDataDiscovery(DataDiscovery):
             raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
                                       "This is could be a temporary phedex/dbs glitch, please try to submit a new task (resubmit will not work)"+\
                                       " and contact the experts if the error persists.\nError reason: %s" % str(ex))
-        locationsMap = self.removeEmpty(locationsMap)
+        locationsMap = {key: value for key, value in locationsMap.iteritems() if value}
         blocksWithLocation = locationsMap.keys()
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
