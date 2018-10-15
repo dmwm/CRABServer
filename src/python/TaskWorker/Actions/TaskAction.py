@@ -57,8 +57,8 @@ class TaskAction(object):
         try:
             userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
         except HTTPException as hte:
-            self.logger.error("Error uploading warning: %s" %str(hte))
-            self.logger.warning("Cannot add a warning to REST interface. Warning message: %s" % warning)
+            self.logger.error("Error uploading warning: %s", str(hte))
+            self.logger.warning("Cannot add a warning to REST interface. Warning message: %s", warning)
 
 
     def deleteWarnings(self, userProxy, taskname):
@@ -69,7 +69,7 @@ class TaskAction(object):
         try:
             userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
         except HTTPException as hte:
-            self.logger.error("Error deleting warnings: %s" %str(hte))
+            self.logger.error("Error deleting warnings: %s", str(hte))
             self.logger.warning("Can not delete warnings from REST interface.")
 
 
@@ -81,6 +81,6 @@ class TaskAction(object):
                 try:
                     bannedSites = json.load(fd)
                 except ValueError as e:
-                    self.logger.error("Failed to load json from file %s. Error message: %s" % (fileLocation, e))
+                    self.logger.error("Failed to load json from file %s. Error message: %s", (fileLocation, e))
                     return []
         return bannedSites
