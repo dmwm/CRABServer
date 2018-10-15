@@ -81,6 +81,6 @@ class TaskAction(object):
                 try:
                     bannedSites = json.load(fd)
                 except ValueError as e:
-                    self.logger.error("Failed to load json from file %s. Error message: %s", (fileLocation, e))
+                    self.logger.error("Failed to load json from file %s. Error message: %s", fileLocation, e)
                     return []
         return bannedSites
