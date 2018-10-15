@@ -49,6 +49,10 @@ class DBSDataDiscovery(DataDiscovery):
         return
 
 
+    def removeEmpty(self, dictionary):
+        return {key: value for key, value in dictionary.iteritems() if value}
+
+
     def keepOnlyDisks(self, locationsMap):
         phedex = PhEDEx() # TODO use certs from the config!
         # get all the PNNs that are of kind 'Disk'
@@ -62,10 +66,6 @@ class DBSDataDiscovery(DataDiscovery):
         for block, locations in locationsMap.iteritems():
             locationsMap[block] = set(locations) & diskLocations
             self.otherLocations = self.otherLocations.union(set(locations) - diskLocations)
-        # remove any key with value that has set([])
-        for key, value in locationsMap.items(): # wont work in python3!
-            if value == set([]):
-                locationsMap.pop(key)
 
 
     def checkBlocksSize(self, blocks):
@@ -145,6 +145,8 @@ class DBSDataDiscovery(DataDiscovery):
             raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
                                       "This is could be a temporary phedex/dbs glitch, please try to submit a new task (resubmit will not work)"+\
                                       " and contact the experts if the error persists.\nError reason: %s" % str(ex))
+        locationsMap = self.removeEmpty(locationsMap)
+        blocksWithLocation = locationsMap.keys()
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
@@ -154,7 +156,7 @@ class DBSDataDiscovery(DataDiscovery):
                 ddmRequest = None
                 ddmServer = self.config.TaskWorker.DDMServer
                 try:
-                    ddmRequest = blocksRequest(blocks, ddmServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, verbose=False)
+                    ddmRequest = blocksRequest(blocksWithLocation, ddmServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, verbose=False)
                 except HTTPException as hte:
                     self.logger.exception(hte)
                     msg += "\nThe automatic stage-out failed, please try again later. If the error persists contact the experts and provide this error message:"
@@ -199,8 +201,8 @@ class DBSDataDiscovery(DataDiscovery):
 
             msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
             raise TaskWorkerException(msg)
-        if len(blocks) != len(locationsMap):
-            msg = "The locations of some blocks have not been found: %s" % list(set(blocks) - set(locationsMap))
+        if len(blocks) != len(blocksWithLocation):
+            msg = "The locations of some blocks have not been found: %s" % list(set(blocks) - set(blocksWithLocation))
             self.logger.warning(msg)
             self.uploadWarning(msg, userProxy, taskName)
 
@@ -214,7 +216,7 @@ class DBSDataDiscovery(DataDiscovery):
         if secondaryDataset: needLumiInfo = True
 
         if needLumiInfo:
-            self.checkBlocksSize(locationsMap.keys()) # Interested only in blocks with locations, 'blocks' may contain invalid ones and trigger an Exception
+            self.checkBlocksSize(blocksWithLocation) # Interested only in blocks with locations, 'blocks' may contain invalid ones and trigger an Exception
             if secondaryDataset:
                 self.checkBlocksSize(secondaryBlocks)
         try:
