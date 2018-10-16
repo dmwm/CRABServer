@@ -212,6 +212,7 @@ class FileTransfers(object):
                                                               tm_source = :source, \
                                                               tm_source_lfn = :source_lfn, \
                                                               tm_filesize = :filesize, \
+                                                              tm_publish = :publish, \
                                                               tm_publication_state = :publication_state, \
                                                               tm_transfer_retry_count = CASE WHEN :transfer_retry_count = NULL THEN tm_transfer_retry_count ELSE :transfer_retry_count END, \
                                                               tm_jobid = :job_id, \
