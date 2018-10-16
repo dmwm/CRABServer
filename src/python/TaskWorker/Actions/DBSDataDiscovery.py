@@ -50,23 +50,18 @@ class DBSDataDiscovery(DataDiscovery):
 
 
     def keepOnlyDisks(self, locationsMap):
-        self.otherLocations = set()
-        phedex = PhEDEx() #TODO use certs from the config!
-        #get all the PNN that are of kind disk
+        phedex = PhEDEx() # TODO use certs from the config!
+        # get all the PNNs that are of kind 'Disk'
         try:
             diskLocations = set([pnn['name'] for pnn in phedex.getNodeMap()['phedex']['node'] if pnn['kind']=='Disk'])
         except HTTPException as ex:
             self.logger.error(ex.headers)
             raise TaskWorkerException("The CRAB3 server backend could not contact phedex to get the list of site storages.\n"+\
                                 "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
-                                " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
+                                " and contact the experts if the error persists.\nError reason: %s" % str(ex)) # TODO addo the nodes phedex so the user can check themselves
         for block, locations in locationsMap.iteritems():
             locationsMap[block] = set(locations) & diskLocations
             self.otherLocations = self.otherLocations.union(set(locations) - diskLocations)
-        #remove any key with value that has set([])
-        for key, value in locationsMap.items(): #wont work in python3!
-            if value == set([]):
-                locationsMap.pop(key)
 
 
     def checkBlocksSize(self, blocks):
@@ -122,12 +117,12 @@ class DBSDataDiscovery(DataDiscovery):
         try:
             # Get the list of blocks for the locations and then call dls.
             # The WMCore DBS3 implementation makes one call to dls for each block
-            # with locations = True so we are using locations=False and looking up location later
+            # with locations=True so we are using locations=False and looking up location later
             blocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(inputDataset, locations=False)]
             if secondaryDataset:
                 secondaryBlocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(secondaryDataset, locations=False)]
         except DBSReaderError as dbsexc:
-            #dataset not found in DBS is a known use case
+            # dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
                 raise TaskWorkerException("CRAB could not find dataset %s in this DBS instance: %s" % inputDataset, dbsurl)
             raise
@@ -137,15 +132,17 @@ class DBSDataDiscovery(DataDiscovery):
         ## never be the case at this point that some blocks have no locations.
         ## locationsMap is a dictionary, key=blockName, value=list of PhedexNodes, example:
         ## {'/JetHT/Run2016B-PromptReco-v2/AOD#b10179dc-3723-11e6-9aa5-001e67abf228': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL'],
-        ## '/JetHT/Run2016B-PromptReco-v2/AOD#89b03ca6-1dc9-11e6-b567-001e67ac06a0': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL'}
+        ## '/JetHT/Run2016B-PromptReco-v2/AOD#89b03ca6-1dc9-11e6-b567-001e67ac06a0': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL']}
         try:
             dbsOnly = self.dbsInstance.split('/')[1] != 'global'
             locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly)
-        except Exception as ex: #TODO should we catch HttpException instead?
+        except Exception as ex: # TODO should we catch HttpException instead?
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
                                       "This is could be a temporary phedex/dbs glitch, please try to submit a new task (resubmit will not work)"+\
                                       " and contact the experts if the error persists.\nError reason: %s" % str(ex))
+        locationsMap = {key: value for key, value in locationsMap.iteritems() if value}
+        blocksWithLocation = locationsMap.keys()
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
@@ -155,7 +152,7 @@ class DBSDataDiscovery(DataDiscovery):
                 ddmRequest = None
                 ddmServer = self.config.TaskWorker.DDMServer
                 try:
-                    ddmRequest = blocksRequest(blocks, ddmServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, verbose=False)
+                    ddmRequest = blocksRequest(blocksWithLocation, ddmServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, verbose=False)
                 except HTTPException as hte:
                     self.logger.exception(hte)
                     msg += "\nThe automatic stage-out failed, please try again later. If the error persists contact the experts and provide this error message:"
@@ -200,8 +197,8 @@ class DBSDataDiscovery(DataDiscovery):
 
             msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
             raise TaskWorkerException(msg)
-        if len(blocks) != len(locationsMap):
-            msg = "The locations of some blocks have not been found: %s" % list(set(blocks) - set(locationsMap))
+        if len(blocks) != len(blocksWithLocation):
+            msg = "The locations of some blocks have not been found: %s" % list(set(blocks) - set(blocksWithLocation))
             self.logger.warning(msg)
             self.uploadWarning(msg, userProxy, taskName)
 
@@ -215,7 +212,7 @@ class DBSDataDiscovery(DataDiscovery):
         if secondaryDataset: needLumiInfo = True
 
         if needLumiInfo:
-            self.checkBlocksSize(locationsMap.keys())
+            self.checkBlocksSize(blocksWithLocation) # Interested only in blocks with locations, 'blocks' may contain invalid ones and trigger an Exception
             if secondaryDataset:
                 self.checkBlocksSize(secondaryBlocks)
         try:
@@ -246,7 +243,7 @@ class DBSDataDiscovery(DataDiscovery):
                                       ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
                                       (self.dbsInstance, inputDataset))
 
-        ## Format the output creating the data structures required by wmcore. Filters out invalid files,
+        ## Format the output creating the data structures required by WMCore. Filters out invalid files,
         ## files whose block has no location, and figures out the PSN
         result = self.formatOutput(task = kwargs['task'], requestname = taskName,
                                    datasetfiles = filedetails, locations = locationsMap,
@@ -263,12 +260,10 @@ class DBSDataDiscovery(DataDiscovery):
         return result
 
 if __name__ == '__main__':
-    """ Usage: python DBSDataDiscovery.py dbs_instance dbsDataset
-        where dbs_instance should be either prod or phys03
+    """Usage: python DBSDataDiscovery.py dbs_instance dbsDataset
+    where dbs_instance should be either prod or phys03
 
-        Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/phys03 /MinBias/jmsilva-crab_scale_70633-3d12352c28d6995a3700097dc8082c04/USER
-
-        Note: self.uploadWarning is failing, I usually comment it when I run this script standalone
+    Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/phys03 /MinBias/jmsilva-crab_scale_70633-3d12352c28d6995a3700097dc8082c04/USER
     """
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
@@ -290,7 +285,6 @@ if __name__ == '__main__':
     config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
     config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT= config.TaskWorker.cmscert,
                                                 X509_USER_KEY = config.TaskWorker.cmskey)
-
 
     config.TaskWorker.DDMServer = 'dynamo.mit.edu'
     config.TaskWorker.resturl = 'cmsweb.cern.ch'

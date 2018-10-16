@@ -20,7 +20,12 @@ class TaskAction(object):
                              }
         self.server = server
         self.procnum = procnum
-#        self.resturl = resturi #backward compatibility
+        # Initialised in DBSDataDiscovery:
+        self.dbs = None
+        self.dbsInstance = None
+        self.otherLocations = set()
+
+        #self.resturl = resturi # backward compatibility
         ## Trying to give the right naming to the variables.
         ## In the resturl arg we have the REST URI (e.g. '/crabserver/prod/workflowdb').
         ## The first field in the REST URI (e.g. 'crabserver') I will call it the server
@@ -39,6 +44,10 @@ class TaskAction(object):
 
 
     def uploadWarning(self, warning, userProxy, taskname):
+        if not self.server: # When testing, the server can be None
+            self.logger.warning(warning)
+            return
+
         truncWarning = truncateError(warning)
         userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2,
                                   logger = self.logger)
@@ -48,8 +57,8 @@ class TaskAction(object):
         try:
             userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
         except HTTPException as hte:
-            self.logger.error("Error uploading warning: %s" %str(hte))
-            self.logger.warning("Cannot add a warning to REST interface. Warning message: %s" % warning)
+            self.logger.error("Error uploading warning: %s", str(hte))
+            self.logger.warning("Cannot add a warning to REST interface. Warning message: %s", warning)
 
 
     def deleteWarnings(self, userProxy, taskname):
@@ -60,7 +69,7 @@ class TaskAction(object):
         try:
             userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
         except HTTPException as hte:
-            self.logger.error("Error deleting warnings: %s" %str(hte))
+            self.logger.error("Error deleting warnings: %s", str(hte))
             self.logger.warning("Can not delete warnings from REST interface.")
 
 
@@ -72,6 +81,6 @@ class TaskAction(object):
                 try:
                     bannedSites = json.load(fd)
                 except ValueError as e:
-                    self.logger.error("Failed to load json from file %s. Error message: %s" % (fileLocation, e))
+                    self.logger.error("Failed to load json from file %s. Error message: %s", fileLocation, e)
                     return []
         return bannedSites
