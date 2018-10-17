@@ -10,11 +10,11 @@ STARTDIR=$PWD/tmp/runtime
 CRAB3_VERSION=3.3.0-pre1
 
 WMCOREDIR=$STARTDIR/WMCore
-WMCOREVER=1.1.17.pre1
+WMCOREVER=1.1.14.crab1
 WMCOREREPO=dmwm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
-CRABSERVERVER=3.3.1809.rc8
+CRABSERVERVER=3.3.1706.rc2
 CRABSERVERREPO=dmwm
 
 [[ -d $STARTDIR ]] || mkdir -p $STARTDIR
@@ -115,11 +115,6 @@ else
     pushd nose-release_1.3.0/
     zip -rq $STARTDIR/CRAB3.zip nose -x \*.pyc || exit 3
     popd
-
-    cp -r /tmp/fts3 .
-
-    zip -rq $STARTDIR/CRAB3.zip fts3 -x \*.pyc || exit 3
-
 
     # up until this point, evertying in CRAB3.zip is an external
     cp $STARTDIR/CRAB3.zip $ORIGDIR/CRAB3-externals.zip
