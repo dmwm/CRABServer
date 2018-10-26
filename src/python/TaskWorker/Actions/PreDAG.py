@@ -202,8 +202,8 @@ class PreDAG(object):
         eventsThr = sumEventsThr / count
         eventsSize = sumEventsSize / count
 
-        self.logger.info("average throughput for %s jobs: %s", count, eventsThr)
-        self.logger.info("average eventsize for %s jobs: %s", count, eventsSize)
+        self.logger.info("average throughput for %s jobs: %s evt/s", count, eventsThr)
+        self.logger.info("average eventsize for %s jobs: %s bytes", count, eventsSize)
 
         maxSize = getattr(config.TaskWorker, 'automaticOutputSizeMaximum', 5 * 1000**3)
         maxEvents = (maxSize / eventsSize) if eventsSize > 0 else 0
