@@ -54,7 +54,8 @@ def getDNFromUserName(username, log, ckey = None, cert = None):
     """
     dn = ''
     with newX509env(X509_USER_CERT=cert,X509_USER_KEY=ckey):
-        resourceCatalog = CRIC(logger=log)
+        configDict = {"cacheduration": 1, "pycurl": True} # cache duration is in hours
+        resourceCatalog = CRIC(logger=self.logger, configDict=configDict)
         try:
             dn = resourceCatalog.userNameDn(username)
         except :

@@ -822,7 +822,8 @@ class DagmanCreator(TaskAction.TaskAction):
 
             if ignoreLocality:
                 with self.config.TaskWorker.envForCMSWEB:
-                    resourceCatalog = CRIC(logger=self.logger)
+                    configDict = {"cacheduration": 1, "pycurl": True} # cache duration is in hours
+                    resourceCatalog = CRIC(logger=self.logger, configDict=configDict)
                     try:
                         possiblesites = set(resourceCatalog.getAllPSNs())
                     except Exception as ex:

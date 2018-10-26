@@ -37,6 +37,7 @@ from ast import literal_eval
 from WMCore.DataStructs.LumiList import LumiList
 
 from ServerUtilities import getLock
+from ServerUtilities import newX509env
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.WorkerExceptions import TaskWorkerException
@@ -170,6 +171,8 @@ class PreDAG(object):
         # need to use user proxy as credential for talking with cmsweb
         config.TaskWorker.cmscert = os.environ.get('X509_USER_PROXY')
         config.TaskWorker.cmskey  = os.environ.get('X509_USER_PROXY')
+        config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
+                                                         X509_USER_KEY=config.TaskWorker.cmskey)
 
         # need the global black list
         config.TaskWorker.scratchDir = './scratchdir'
@@ -177,7 +180,8 @@ class PreDAG(object):
             os.makedirs(config.TaskWorker.scratchDir)
         from TaskWorker.Actions.Recurring.BanDestinationSites import CRAB3BanDestinationSites
         banSites = CRAB3BanDestinationSites(config, 'dummy', 'dummy', self.logger)
-        banSites.execute()
+        with config.TaskWorker.envForCMSWEB:
+            banSites.execute()
 
         # Read the automatic_splitting/throughputs/0-N files where the PJ
         # saved the EventThroughput
@@ -252,7 +256,8 @@ class PreDAG(object):
         try:
             parent = self.prefix if self.stage == 'tail' else None
             creator = DagmanCreator(config, server=None, resturi='')
-            creator.createSubdag(split_result.result, task=task, parent=parent, stage=self.stage)
+            with config.TaskWorker.envForCMSWEB:
+                creator.createSubdag(split_result.result, task=task, parent=parent, stage=self.stage)
             self.submitSubdag('RunJobs{0}.subdag'.format(self.prefix), getattr(config.TaskWorker, 'maxPost', 20), self.stage)
         except TaskWorkerException as e:
             retmsg = "DAG creation failed with:\n{0}".format(e)
