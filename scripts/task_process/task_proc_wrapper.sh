@@ -9,6 +9,11 @@ function cache_status {
     python task_process/cache_status.py
 }
 
+function manage_transfers {
+    log "Running transfers.py"
+    python task_process/transfers.py 
+}
+
 function exit_now {
     # Checks if the TP can exit without losing any possible future updates to the status of the task
     # Returns a string "True" or "False"
@@ -77,6 +82,8 @@ TIME_OF_LAST_QUERY=$(date +"%s")
 # submission is most likely pointless and relatively expensive, the script will run normally and perform the query later.
 DAG_INFO="init"
 
+export PYTHONPATH=`pwd`/CRAB3.zip:`pwd`/WMCore.zip:$PYTHONPATH
+
 log "Starting task daemon wrapper"
 while true
 do
@@ -93,6 +100,7 @@ do
 
     # Run the parsing script
     cache_status
+    manage_transfers
     sleep 300s
 
     # Calculate how much time has passed since the last condor_q and perform it again if it has been long enough.

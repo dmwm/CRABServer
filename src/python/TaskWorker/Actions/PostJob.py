@@ -287,6 +287,7 @@ class ASOServerJob(object):
         self.aso_start_time = aso_start_time
         self.aso_start_timestamp = aso_start_timestamp
         proxy = os.environ.get('X509_USER_PROXY', None)
+        self.proxy = proxy
         self.aso_db_url = self.job_ad['CRAB_ASOURL']
         self.rest_host = rest_host
         self.rest_uri_no_api = rest_uri_no_api
@@ -737,7 +738,7 @@ class ASOServerJob(object):
                     doc['publish'] = publish
                     msg = "ASO job description: %s" % (pprint.pformat(doc))
                     self.logger.info(msg)
-                    commit_result_msg = self.updateOrInsertDoc(doc)
+                    commit_result_msg = self.updateOrInsertDoc(doc, needs_transfer)
                     if 'error' in commit_result_msg:
                         msg = "Error injecting document to ASO database:\n%s" % (commit_result_msg)
                         self.logger.info(msg)
@@ -782,7 +783,7 @@ class ASOServerJob(object):
         else:
             return self.couch_database.document(doc_id)
 
-    def updateOrInsertDoc(self, doc):
+    def updateOrInsertDoc(self, doc, toTransfer):
         """"""
         returnMsg = {}
         if not isCouchDBURL(self.aso_db_url):
@@ -835,6 +836,18 @@ class ASOServerJob(object):
                     msg += " Transfer submission failed."
                     msg += "\n%s" % (str(hte.headers))
                     returnMsg['error'] = msg
+            if toTransfer:
+                if not 'destination_lfn' in newDoc:
+                    newDoc['destination_lfn'] = doc['destination_lfn']
+                if not 'destination' in newDoc:
+                    newDoc['destination'] = doc['destination']
+                with open('task_process/transfers.txt', 'a') as transfers_file:
+                    transfer_dump = json.dumps(newDoc)
+                    transfers_file.write(transfer_dump+"\n")
+                if not os.path.exists('task_process/rest_filetransfers.txt'):
+                    with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
+                        rest_file.write(self.rest_host + self.rest_uri_no_api + '\n')
+                        rest_file.write(self.proxy)
         else:
             returnMsg = self.couch_database.commitOne(doc)[0]
         return returnMsg
@@ -860,7 +873,7 @@ class ASOServerJob(object):
         Retrieve the status of all transfers from the cached file 'aso_status.json'
         or by querying an ASO database view if the file is more than 5 minutes old
         or if we injected a document after the file was last updated. Calls to
-+       get_transfers_statuses_fallback() have been removed to not generate load
+        get_transfers_statuses_fallback() have been removed to not generate load
         on couch.
         """
         statuses = []
