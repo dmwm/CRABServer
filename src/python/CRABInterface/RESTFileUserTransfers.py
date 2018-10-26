@@ -75,6 +75,7 @@ class RESTFileUserTransfers(RESTEntity):
             validate_num("filesize", param, safe, optional=True)
             validate_str("transfer_state", param, safe, RX_ANYTHING, optional=True)
             validate_num("transfer_retry_count", param, safe, optional=True)
+            validate_num("publish", param, safe, optional=False)
             validate_str("publication_state", param, safe, RX_ANYTHING, optional=True)
             validate_str("job_id", param, safe, RX_JOBID, optional=True)
             validate_num("job_retry_count", param, safe, optional=True)
@@ -144,7 +145,7 @@ class RESTFileUserTransfers(RESTEntity):
 
     @restcall
     def post(self, subresource, id, username, taskname, start_time, source, source_lfn, filesize,
-             transfer_state, transfer_retry_count, publication_state, job_id, job_retry_count, listOfIds):
+             transfer_state, transfer_retry_count, publish, publication_state, job_id, job_retry_count, listOfIds):
         """This is used for user to allow kill transfers for specific task, retryPublication or retryTransfers.
             So far we do not allow retryPublications or retryTransfers for themselfs."""
         binds = {}
@@ -158,6 +159,7 @@ class RESTFileUserTransfers(RESTEntity):
             binds['source_lfn'] = [source_lfn]
             binds['filesize'] = [filesize]
             binds['transfer_state'] = [TRANSFERDB_STATUSES[transfer_state]]
+            binds['publish'] = [publish]
             binds['publication_state'] = [PUBLICATIONDB_STATUSES[publication_state]]
             binds['transfer_retry_count'] = [transfer_retry_count]
             binds['job_id'] = [job_id]
