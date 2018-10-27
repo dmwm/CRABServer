@@ -83,7 +83,7 @@ class Task(object):
                        tm_use_parent, tm_collector, tm_schedd, tm_dry_run, \
                        tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode, \
                        tm_publish_groupname, tm_nonvalid_input_dataset, tm_secondary_input_dataset, tm_primary_dataset, tm_submitter_ip_addr, tm_ignore_global_blacklist \
-                       FROM tasks WHERE tm_task_status = :get_status AND ROWNUM <= :limit AND tw_name = :tw_name
+                       FROM tasks WHERE tm_task_status = :get_status AND ROWNUM <= :limit AND tw_name LIKE :tw_name
                        ORDER BY tm_start_time ASC"""
 
     #GetUserFromID

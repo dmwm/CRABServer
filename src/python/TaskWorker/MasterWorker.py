@@ -179,8 +179,11 @@ class MasterWorker(object):
         return True
 
 
-    def getWork(self, limit, getstatus):
+    def getWork(self, limit, getstatus, ignoreTWName=False):
         configreq = {'limit': limit, 'workername': self.config.TaskWorker.name, 'getstatus': getstatus}
+        if ignoreTWName:
+            configreq['workername'] = '%'
+
         pendingwork = []
         try:
             pendingwork = self.server.get(self.restURInoAPI + '/workflowdb', data=configreq)[0]['result']
