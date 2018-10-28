@@ -43,11 +43,11 @@ class DataDiscovery(TaskAction):
         for lfn, infos in datasetfiles.iteritems():
             ## Skip the file if it is not in VALID state.
             if not infos.get('ValidFile', True):
-                self.logger.warning("Skipping invalid file %s" % lfn)
+                self.logger.warning("Skipping invalid file %s", lfn)
                 continue
             ## Skip the file if the block has not been found or has no locations.
             if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
-                self.logger.warning("Skipping %s because its block (%s) has no locations" % (lfn, infos['BlockName']))
+                self.logger.warning("Skipping %s because its block (%s) has no locations", lfn, infos['BlockName'])
                 blocksWithNoLocations.add(infos['BlockName'])
                 continue
 
@@ -71,8 +71,8 @@ class DataDiscovery(TaskAction):
             try:
                 wmfile['locations'] = resourceCatalog.PNNstoPSNs(locations[wmfile['block']])
             except Exception as ex:
-                self.logger.error("Impossible translating %s to a CMS name through CMS Resource Catalog" % locations[wmfile['block']] )
-                self.logger.error("got this exception:\n %s" % ex)
+                self.logger.error("Impossible translating %s to a CMS name through CMS Resource Catalog", locations[wmfile['block']] )
+                self.logger.error("got this exception:\n %s", ex)
                 raise
             wmfile['workflow'] = requestname
             event_counter += infos['NumberOfEvents']
@@ -91,10 +91,10 @@ class DataDiscovery(TaskAction):
 
         self.logger.setLevel(previousLogLevel)
         uniquelumis = len(uniquelumis)
-        self.logger.debug('Tot events found: %d' % event_counter)
-        self.logger.debug('Tot lumis found: %d' % uniquelumis)
-        self.logger.debug('Duplicate lumis found: %d' % (lumi_counter - uniquelumis))
-        self.logger.debug('Tot files found: %d' % len(wmfiles))
+        self.logger.debug('Tot events found: %d', event_counter)
+        self.logger.debug('Tot lumis found: %d', uniquelumis)
+        self.logger.debug('Duplicate lumis found: %d', (lumi_counter - uniquelumis))
+        self.logger.debug('Tot files found: %d', len(wmfiles))
 
         self.logger.debug("Starting to create compact lumilists for input dataset")
         datasetLumiList = LumiList(runsAndLumis=datasetLumis)

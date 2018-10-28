@@ -2,6 +2,7 @@
 """
 
 """
+from __future__ import print_function
 import json
 import logging
 import threading
@@ -27,7 +28,7 @@ if os.path.exists('task_process/rest_filetransfers.txt'):
     with open("task_process/rest_filetransfers.txt", "r") as _rest:
             rest_filetransfers = _rest.readline().split('\n')[0]
             proxy = os.getcwd() + "/" + _rest.readline()
-            print "Proxy: %s", proxy
+            print("Proxy: %s", proxy)
 
 def get_tfc_rules(phedex, site):
     """
