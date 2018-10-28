@@ -197,10 +197,6 @@ class DBSDataDiscovery(DataDiscovery):
 
             msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
             raise TaskWorkerException(msg)
-        if len(blocks) != len(blocksWithLocation):
-            msg = "The locations of some blocks have not been found: %s" % list(set(blocks) - set(blocksWithLocation))
-            self.logger.warning(msg)
-            self.uploadWarning(msg, userProxy, taskName)
 
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']

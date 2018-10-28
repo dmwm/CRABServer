@@ -33,19 +33,21 @@ class DataDiscovery(TaskAction):
         lumi_counter = 0
         uniquelumis = set()
         datasetLumis = {}
+        blocksWithNoLocations = set()
         ## Loop over the sorted list of files.
         # can't affort one message from CRIC per file, unless critical !
         previousLogLevel=self.logger.getEffectiveLevel()
         resourceCatalog = CRIC(logger=self.logger)
         self.logger.setLevel(logging.ERROR)
         for lfn, infos in datasetfiles.iteritems():
-            ## Skip the file if the block has not been found or has no locations.
-            if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
-                self.logger.warning("Skipping %s because its block (%s) has no locations" % (lfn, infos['BlockName']))
-                continue
             ## Skip the file if it is not in VALID state.
             if not infos.get('ValidFile', True):
                 self.logger.warning("Skipping invalid file %s" % lfn)
+                continue
+            ## Skip the file if the block has not been found or has no locations.
+            if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
+                self.logger.warning("Skipping %s because its block (%s) has no locations" % (lfn, infos['BlockName']))
+                blocksWithNoLocations.add(infos['BlockName'])
                 continue
 
             if task['tm_use_parent'] == 1 and len(infos['Parents']) == 0:
@@ -80,6 +82,11 @@ class DataDiscovery(TaskAction):
                     uniquelumis.add((run, lumi))
                 lumi_counter += len(lumis)
             wmfiles.append(wmfile)
+
+        if blocksWithNoLocations:
+            msg = "The locations of some blocks (%d) have not been found: %s" % (len(blocksWithNoLocations), list(blocksWithNoLocations))
+            self.logger.warning(msg)
+            self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
 
         self.logger.setLevel(previousLogLevel)
         uniquelumis = len(uniquelumis)
