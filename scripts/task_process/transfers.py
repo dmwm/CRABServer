@@ -2,7 +2,7 @@
 """
 
 """
-from __future__ import print_function
+from __future__ import division, print_function
 import json
 import logging
 import threading
@@ -432,7 +432,7 @@ def state_manager(fts):
 
     with open("task_process/transfers/fts_jobids_new.txt", "w+") as _jobids:
         for line in jobs_ongoing:
-            logging.info("Writing: %s" %line)
+            logging.info("Writing: %s", line)
             _jobids.write(line+"\n")
 
     os.rename("task_process/transfers/fts_jobids_new.txt", "task_process/transfers/fts_jobids.txt")
