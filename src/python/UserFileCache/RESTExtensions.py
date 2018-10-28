@@ -11,12 +11,13 @@ from ServerUtilities import FILE_SIZE_LIMIT, FILE_MEMORY_LIMIT
 from WMCore.REST.Validation import _validate_one
 from WMCore.REST.Error import RESTError, InvalidParameter
 from WMCore.Services.UserFileCache.UserFileCache import calculateChecksum
+from WMCore.REST.Auth import get_user_info
 
 # external dependecies here
 import tarfile
 import hashlib
 import cStringIO
-import cherrypy
+import urllib2
 from os import fstat, walk, path, listdir
 
 # 600MB is the default user quota limit - overwritten in RESTBaseAPI if quota_user_limit is set in the config
@@ -24,20 +25,34 @@ QUOTA_USER_LIMIT = 1024*1024*600
 #these users have 10* basic user quota - overwritten in RESTBaseAPI if powerusers is set in the config
 POWER_USERS_LIST = []
 
+def http_error(msg, code=403):
+    try:
+        import requests
+        err = requests.HTTPError(msg)
+        err.response.status_code = code
+        return err
+    except ImportError:
+        url = '' # required for urllib2 HTTPError but we should acquire it from elsewhere
+        return urllib2.HTTPError(url, code, err, None, None)
+
 ###### authz_login_valid is currently duplicatint CRABInterface.RESTExtension . A better solution
 ###### should be found for authz_*
 def authz_login_valid():
-    if not cherrypy.request.user['login']:
-        raise cherrypy.HTTPError(403, "You are not allowed to access this resource.")
+    user = get_user_info()
+    if not user['login']:
+        err = "You are not allowed to access this resources"
+        raise http_error(err)
 
 def authz_operator(username):
-    """ Check if the the user who is trying to access this resource (i.e.: cherrypy.request.user['login'], the cert username) is the
-        same as username. If not check if the user is a CRAB3 operator. {... 'operator': {'group': set(['crab3']) ... in the cherrypy roles}
+    """ Check if the the user who is trying to access this resource (i.e.: user['login'], the cert username) is the
+        same as username. If not check if the user is a CRAB3 operator. {... 'operator': {'group': set(['crab3']) ... in request roles}
         If the user is not an operator and is trying to access a file owned by another user than raise
     """
-    if cherrypy.request.user['login'] != username and\
-       'crab3' not in cherrypy.request.user.get('roles', {}).get('operator', {}).get('group', set()):
-        raise cherrypy.HTTPError(403, "You are not allowed to access this resource. You need to be a CRAB3 operator in sitedb to access other user's files")
+    user = get_user_info()
+    if user['login'] != username and\
+       'crab3' not in user.get('roles', {}).get('operator', {}).get('group', set()):
+        err = "You are not allowed to access this resource. You need to be a CRAB3 operator in sitedb to access other user's files"
+        raise http_error(err)
 
 def file_size(argfile):
     """Return the file or cStringIO.StringIO size
@@ -84,10 +99,11 @@ def quota_user_free(quotadir, infile):
     :return: Nothing"""
     filesize, _ = file_size(infile.file)
     quota = get_size(quotadir)
-    quotaLimit = QUOTA_USER_LIMIT*10 if cherrypy.request.user['login'] in POWER_USERS_LIST else QUOTA_USER_LIMIT
+    user = get_user_info()
+    quotaLimit = QUOTA_USER_LIMIT*10 if user['login'] in POWER_USERS_LIST else QUOTA_USER_LIMIT
     if filesize + quota > quotaLimit:
          excquota = ValueError("User %s has reached quota of %dB: additional file of %dB cannot be uploaded." \
-                               % (cherrypy.request.user['login'], quota, filesize))
+                               % (user['login'], quota, filesize))
          raise InvalidParameter("User quota limit reached; cannot upload the file", errobj=excquota, trace='')
 
 def _check_file(argname, val):

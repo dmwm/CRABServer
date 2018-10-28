@@ -822,16 +822,17 @@ class DagmanCreator(TaskAction.TaskAction):
 
             if ignoreLocality:
                 with self.config.TaskWorker.envForCMSWEB:
-                    resourceCatalog = CRIC(logger=self.logger)
-                try:
-                    possiblesites = set(resourceCatalog.getAllPSNs())
-                except Exception as ex:
-                    msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
-                    msg += " This could be a temporary Resource Catalog glitch."
-                    msg += " Please try to submit a new task (resubmit will not work)"
-                    msg += " and contact the experts if the error persists."
-                    msg += "\nError reason: %s" % (str(ex))
-                    raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+                    configDict = {"cacheduration": 1, "pycurl": True} # cache duration is in hours
+                    resourceCatalog = CRIC(logger=self.logger, configDict=configDict)
+                    try:
+                        possiblesites = set(resourceCatalog.getAllPSNs())
+                    except Exception as ex:
+                        msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
+                        msg += " This could be a temporary Resource Catalog glitch."
+                        msg += " Please try to submit a new task (resubmit will not work)"
+                        msg += " and contact the experts if the error persists."
+                        msg += "\nError reason: %s" % (str(ex))
+                        raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
             else:
                 possiblesites = locations
             ## At this point 'possiblesites' should never be empty.

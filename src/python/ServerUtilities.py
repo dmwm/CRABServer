@@ -484,15 +484,16 @@ class newX509env():
     """
 
     def __init__(self, X509_USER_PROXY=None, X509_USER_CERT=None, X509_USER_KEY=None):
-        # save current env
-        self.oldProxy = os.getenv('X509_USER_PROXY')
-        self.oldCert = os.getenv('X509_USER_CERT')
-        self.oldKey = os.getenv('X509_USER_KEY')
+        # define the new environment
         self.newProxy = X509_USER_PROXY
         self.newCert = X509_USER_CERT
         self.newKey = X509_USER_KEY
 
     def __enter__(self):
+        # save current env
+        self.oldProxy = os.getenv('X509_USER_PROXY')
+        self.oldCert = os.getenv('X509_USER_CERT')
+        self.oldKey = os.getenv('X509_USER_KEY')
         # Clean previous env. only delete env. vars if they were defined
         if self.oldProxy: del os.environ['X509_USER_PROXY']
         if self.oldCert:  del os.environ['X509_USER_CERT']
