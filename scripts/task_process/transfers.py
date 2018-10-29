@@ -2,6 +2,7 @@
 """
 
 """
+from __future__ import division, print_function
 import json
 import logging
 import threading
@@ -25,9 +26,9 @@ logging.basicConfig(
 
 if os.path.exists('task_process/rest_filetransfers.txt'): 
     with open("task_process/rest_filetransfers.txt", "r") as _rest:
-            rest_filetransfers = _rest.readline().split('\n')[0]
-            proxy = os.getcwd() + "/" + _rest.readline()
-            print "Proxy: %s", proxy
+        rest_filetransfers = _rest.readline().split('\n')[0]
+        proxy = os.getcwd() + "/" + _rest.readline()
+        print("Proxy: %s", proxy)
 
 def get_tfc_rules(phedex, site):
     """
@@ -37,12 +38,12 @@ def get_tfc_rules(phedex, site):
     try:
         phedex.getNodeTFC(site)
     except Exception as e:
-        logging.exception('PhEDEx exception: %s' % e)
+        logging.exception('PhEDEx exception: %s', e)
     try:
         tfc_file = phedex.cacheFileName('tfc',
                                         inputdata={'node': site})
     except Exception as e:
-        logging.exception('PhEDEx cache exception: %s' % e)
+        logging.exception('PhEDEx cache exception: %s', e)
     return readTFC(tfc_file)
 
 
@@ -67,7 +68,7 @@ def mark_transferred(ids):
         oracleDB = HTTPRequests(rest_filetransfers,
                                 proxy,
                                 proxy)
-        logging.debug("Marking done %s" % ids)
+        logging.debug("Marking done %s", ids)
 
         data = dict()
         data['asoworker'] = 'asoless'
@@ -77,7 +78,7 @@ def mark_transferred(ids):
 
         oracleDB.post('/filetransfers',
                       data=encodeRequest(data))
-        logging.debug("Marked good %s" % ids)
+        logging.debug("Marked good %s", ids)
     except Exception:
         logging.exception("Error updating documents")
         return 1
@@ -105,7 +106,7 @@ def mark_failed(ids, failures_reasons):
 
         oracleDB.post('/filetransfers',
                       data=encodeRequest(data))
-        logging.debug("Marked failed %s" % ids)
+        logging.debug("Marked failed %s", ids)
     except Exception:
         logging.exception("Error updating documents")
         return 1
@@ -332,7 +333,7 @@ def submit(phedex, context, toTrans):
     for fileDoc in to_update:
         _ = oracleDB.post('/filetransfers',
                           data=encodeRequest(fileDoc))
-        logging.info("Marked submitted %s files" % (fileDoc['list_of_ids']))
+        logging.info("Marked submitted %s files", fileDoc['list_of_ids'])
 
     return jobids
 
@@ -348,7 +349,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, context, phedex):
     #threadLock = threading.Lock()
     #threads = []
     transfers = []
-    logging.info("starting from line: %s" % lastLine)
+    logging.info("starting from line: %s", lastLine)
 
     with open(inputFile) as _list:
         for _data in _list.readlines()[lastLine:]:
@@ -408,7 +409,7 @@ def state_manager(fts):
 
         try:
             for jobID, _ in done_id.iteritems():
-                logging.info('Marking job %s files done and %s files failed for job %s' % (len(done_id[jobID]), len(failed_id[jobID]), jobID))
+                logging.info('Marking job %s files done and %s files failed for job %s', len(done_id[jobID]), len(failed_id[jobID]), jobID)
 
                 if len(done_id[jobID]) > 0:
                     doneReady = mark_transferred(done_id[jobID])
@@ -431,7 +432,7 @@ def state_manager(fts):
 
     with open("task_process/transfers/fts_jobids_new.txt", "w+") as _jobids:
         for line in jobs_ongoing:
-            logging.info("Writing: %s" %line)
+            logging.info("Writing: %s", line)
             _jobids.write(line+"\n")
 
     os.rename("task_process/transfers/fts_jobids_new.txt", "task_process/transfers/fts_jobids.txt")
@@ -448,7 +449,7 @@ def submission_manager(phedex, context):
         with open("task_process/transfers/last_transfer.txt", "r") as _last:
             read = _last.readline()
             last_line = int(read)
-            logging.info("last line is: %s" % last_line)
+            logging.info("last line is: %s", last_line)
             _last.close()
 
     # TODO: if the following fails check not to leave a corrupted file
@@ -492,13 +493,13 @@ def algorithm():
                         httpDict={'key': proxy,
                                   'cert': proxy})
     except Exception as e:
-        logging.exception('PhEDEx exception: %s' % e)
+        logging.exception('PhEDEx exception: %s', e)
         return
 
     jobs_ongoing = state_manager(fts)
     new_jobs = submission_manager(phedex, context)
 
-    logging.debug("Transfer jobs ongoing: %s, %s " % (jobs_ongoing,new_jobs))
+    logging.debug("Transfer jobs ongoing: %s, %s ", jobs_ongoing, new_jobs)
 
     return
 
