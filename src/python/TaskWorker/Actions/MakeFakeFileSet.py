@@ -27,7 +27,7 @@ class MakeFakeFileSet(TaskAction):
             future we would like to take this list from the SSB.
         """
         with self.config.TaskWorker.envForCMSWEB:
-            sites = self.resourceCatalog.getAllPSNs()770
+            sites = self.resourceCatalog.getAllPSNs()
         filteredSites = [site for site in sites if not site.startswith("T1_")]
 
         return filteredSites
