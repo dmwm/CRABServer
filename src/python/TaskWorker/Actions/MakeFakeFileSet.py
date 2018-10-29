@@ -26,8 +26,8 @@ class MakeFakeFileSet(TaskAction):
             and don't want to overtake production (WMAgent) jobs there. In the
             future we would like to take this list from the SSB.
         """
-
-        sites = self.resourceCatalog.getAllPSNs()
+        with self.config.TaskWorker.envForCMSWEB:
+            sites = self.resourceCatalog.getAllPSNs()770
         filteredSites = [site for site in sites if not site.startswith("T1_")]
 
         return filteredSites
