@@ -229,6 +229,7 @@ def makeWebDir(ad):
         os.symlink(os.path.abspath(os.path.join(".", "site.ad")), os.path.join(path, "site_ad.txt"))
         os.symlink(os.path.abspath(os.path.join(".", ".job.ad")), os.path.join(path, "job_ad.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "task_process/status_cache.txt")), os.path.join(path, "status_cache"))
+        os.symlink(os.path.abspath(os.path.join(".", "AutomaticSplitting_Log0.txt")), os.path.join(path, "prejob_logs/predag.0.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "InputFiles.tar.gz")), os.path.join(path, "InputFiles.tar.gz"))
         ## Symlinks to ease operator navigation across spool/web directories
         os.symlink(os.path.abspath("."), os.path.join(path, "SPOOL_DIR"))
