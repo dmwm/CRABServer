@@ -215,8 +215,9 @@ else
 fi
 echo "======== python2.7 bootstrap for stageout at $(TZ=GMT date) FINISHING ========"
 
-echo "======== Attempting to notify HTCondor of file stageout ========"
-condor_chirp phase output
+#echo "======== Attempting to notify HTCondor of file stageout ========"
+# wrong syntax for chirping, also needs a proper classAd name. Keep commented line for a future fix
+#condor_chirp phase output
 
 echo "======== Stageout at $(TZ=GMT date) STARTING ========"
 rm -f wmcore_initialized
