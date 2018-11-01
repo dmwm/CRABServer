@@ -490,8 +490,7 @@ def algorithm():
 
     try:
         phedex = PhEDEx(responseType='xml',
-                        httpDict={'key': proxy,
-                                  'cert': proxy})
+                        httpDict={'key': proxy, 'cert': proxy, 'pycurl':True})
     except Exception as e:
         logging.exception('PhEDEx exception: %s', e)
         return
