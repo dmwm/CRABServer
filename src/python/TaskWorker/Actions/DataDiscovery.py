@@ -35,6 +35,7 @@ class DataDiscovery(TaskAction):
         uniquelumis = set()
         datasetLumis = {}
         ## Loop over the sorted list of files.
+        resourceCatalog = CRIC(logger=self.logger)
         # can't affort one message from CRIC per file, unless critical !
         with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
             for lfn, infos in datasetfiles.iteritems():
