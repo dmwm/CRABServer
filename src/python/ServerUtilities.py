@@ -517,3 +517,49 @@ class newX509env():
             os.environ['X509_USER_KEY'] = self.oldKey
         else:
             if os.getenv('X509_USER_KEY'): del os.environ['X509_USER_KEY']
+
+
+class tempSetLogLevel():
+    """
+        a simple context manager to temporarely change logging level
+        making sure it is restored even if exception is raised
+        USAGE:
+            with tempSetLogLevel(logger=myLogger,level=logging.ERROR):
+               do stuff
+        both arguments are mandatory
+
+        EXAMPLE:
+        import logging
+        logger=logging.getLogger()
+        logger.addHandler(logging.StreamHandler())
+        logger=logging.getLogger()
+        logger.setLevel(logging.DEBUG)
+        logger.debug("debug msg")
+        with tempSetLogLevel(logger,logging.ERROR):
+          try:
+            i=1
+            while True:
+              logger.debug("msg inside loop at %d", i)
+              if i==3: logger.error("got one error at %d", i)
+              if i==5: raise
+              i+=1
+          except Exception as e:
+            logger.error("got exception at %d", i)
+            pass
+        logger.debug("after the loop")
+
+        RESULTS IN THIS PRINTOUT:
+        debug msg
+        got one error at 3
+        got exception at 5
+        after the loop
+    """
+    import logging
+    def __init__(self,logger=None,level=None):
+        self.newLogLevel=level
+        self.logger=logger
+    def __enter__(self):
+        self.previousLogLevel=self.logger.getEffectiveLevel()
+        self.logger.setLevel(self.newLogLevel)
+    def __exit__(self,a,b,c):
+        self.logger.setLevel(self.previousLogLevel)
