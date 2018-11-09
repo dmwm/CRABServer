@@ -93,7 +93,6 @@ class DagmanKiller(TaskAction):
     def killAll(self, jobConst):
 
         # We need to keep ROOT, PROCESSING, and TAIL DAGs in hold until periodic remove kicks in.
-        # See DagmanSubmitter.py#L390 (dagAd["PeriodicRemove"])
         # This is needed in case user wants to resubmit.
         rootConst = 'stringListMember(TaskType, "ROOT PROCESSING TAIL", " ") && CRAB_ReqName =?= %s' % HTCondorUtils.quote(self.workflow)
 
