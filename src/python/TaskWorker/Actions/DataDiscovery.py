@@ -87,7 +87,7 @@ class DataDiscovery(TaskAction):
         if blocksWithNoLocations:
             msg = "The locations of some blocks (%d) have not been found: %s" % (len(blocksWithNoLocations), list(blocksWithNoLocations))
             self.logger.warning(msg)
-        self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
+            self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
 
         uniquelumis = len(uniquelumis)
         self.logger.debug('Tot events found: %d', event_counter)
