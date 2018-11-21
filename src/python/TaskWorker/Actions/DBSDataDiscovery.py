@@ -75,7 +75,7 @@ class DBSDataDiscovery(DataDiscovery):
         MAX_LUMIS = 100000
         for block in blocks:
             blockInfo = self.dbs.getDBSSummaryInfo(block=block)
-            if blockInfo['NumberOfLumis'] > MAX_LUMIS:
+            if blockInfo.get('NumberOfLumis',0) > MAX_LUMIS:
                 msg = "Block %s contains more than %s lumis.\nThis blows up CRAB server memory" % (block, MAX_LUMIS)
                 msg += "\nCRAB can only split this by ignoring lumi information. You can do this"
                 msg += "\nusing FileBased split algorithm and avoiding any additional request"
