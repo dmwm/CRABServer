@@ -1,5 +1,7 @@
 import time
 import logging
+import os
+
 from TaskWorker.DataObjects.Result import Result
 
 def handleRecurring(resthost, resturi, config, task, procnum, action):
@@ -10,11 +12,12 @@ def handleRecurring(resthost, resturi, config, task, procnum, action):
 class BaseRecurringAction:
     def __init__(self):
         self.lastExecution = 0
-        #set the logger
+        # set the logger
         self.logger = logging.getLogger(__name__)
         if not self.logger.handlers:
-            logging.basicConfig(filename='logs/recurring.log') # this creates the 'logs' dir if needed
-            handler = logging.getLogger().handlers[0]
+            if not os.path.exists('logs'):
+                os.makedirs('logs')
+            handler = logging.FileHandler('logs/recurring.log')
             formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)

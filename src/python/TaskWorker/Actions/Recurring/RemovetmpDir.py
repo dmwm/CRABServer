@@ -46,5 +46,4 @@ if __name__ == '__main__':
     cfg = loadConfigurationFile(twconfig)
 
     rd = RemovetmpDir()
-    rd.logger = logger
     rd._execute(None, None, cfg, None)

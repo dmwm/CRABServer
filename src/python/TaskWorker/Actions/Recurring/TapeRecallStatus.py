@@ -85,6 +85,5 @@ if __name__ == '__main__':
     cfg = loadConfigurationFile(twconfig)
 
     trs = TapeRecallStatus()
-    trs.logger = logger
     trs._execute(None, None, cfg, None)
 
