@@ -3,6 +3,8 @@ from WMCore.Credential.Proxy import Proxy
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
+from ServerUtilities import tempSetLogLevel
+import logging
 
 # We won't do anything if the proxy is shorted then 1 hour
 # NB: in the PoC we had 24 hours, but does that make sense
@@ -35,16 +37,19 @@ class MyProxyLogon(TaskAction):
                     'myproxyAccount' : self.server['host'],
                     'cleanEnvironment' : getattr(self.config.MyProxy, 'cleanEnvironment', False)
                    }
-        proxy = Proxy(proxycfg)
-        userproxy = proxy.getProxyFilename(serverRenewer=True)
-        proxy.logonRenewMyProxy()
-        timeleft = proxy.getTimeLeft(userproxy)
-        usergroups = set(proxy.getAllUserGroups(userproxy))
+        # WMCore proxy methods are awfully verbode, reduce logging level when using them
+        with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
+            proxy = Proxy(proxycfg)
+            userproxy = proxy.getProxyFilename(serverRenewer=True)
+            proxy.logonRenewMyProxy()
+            timeleft = proxy.getTimeLeft(userproxy)
+            usergroups = set(proxy.getAllUserGroups(userproxy))
         if timeleft is None or timeleft <= 0:
             msg = "Impossible to retrieve proxy from %s for %s." % (proxycfg['myProxySvr'], proxycfg['userDN'])
             raise TaskWorkerException(msg)
         else:
             kwargs['task']['user_proxy'] = userproxy
             kwargs['task']['user_groups'] = usergroups
+            self.logger.debug("Valid proxy for %s now in %s", proxycfg['userDN'], userproxy)
             result = Result(task=kwargs['task'], result='OK')
         return result
