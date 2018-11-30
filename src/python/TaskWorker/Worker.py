@@ -20,10 +20,10 @@ from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetExcep
 global WORKER_CONFIG
 
 
-def addTaskLogHandler(logger, username, taskname):
+def addTaskLogHandler(logger, username, taskname, logsDir):
     #set the logger to save the tasklog
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
-    taskdirname = "logs/tasks/%s/" % username
+    taskdirname = logsDir+"/tasks/%s/" % username
     try:
         os.mkdir(taskdirname)
     except OSError as ose:
@@ -44,7 +44,7 @@ def removeTaskLogHandler(logger, taskhandler):
     logger.removeHandler(taskhandler)
 
 
-def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger):
+def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsDir):
     procName = "Process-%s" % procnum
     while True:
         try:
@@ -53,7 +53,7 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger):
             workid, work, task, failstatus, inputargs = inputs.get()
             if work == 'STOP':
                 break
-            taskhandler = addTaskLogHandler(logger, task['tm_username'], task['tm_taskname'])
+            taskhandler = addTaskLogHandler(logger, task['tm_username'], task['tm_taskname'], logsDir)
         except (EOFError, IOError):
             crashMessage = "Hit EOF/IO in getting new work\n"
             crashMessage += "Assuming this is a graceful break attempt.\n"
@@ -115,17 +115,17 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger):
                     })
 
 
-def processWorker(inputs, results, resthost, resturi, procnum):
+def processWorker(inputs, results, resthost, resturi, logsDir, procnum):
     """Wait for an reference to appear in the input queue, call the referenced object
        and write the output in the output queue.
 
        :arg Queue inputs: the queue where the inputs are shared by the master
        :arg Queue results: the queue where this method writes the output
        :return: default returning zero, but not really needed."""
-    logger = setProcessLogger(str(procnum))
+    logger = setProcessLogger(str(procnum), logsDir)
     logger.info("Process %s is starting. PID %s", procnum, os.getpid())
     try:
-        processWorkerLoop(inputs, results, resthost, resturi, procnum, logger)
+        processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsDir)
     except: #pylint: disable=bare-except
         #if enything happen put the log inside process logfiles instead of nohup.log
         logger.exception("Unexpected error in process worker!")
@@ -133,12 +133,12 @@ def processWorker(inputs, results, resthost, resturi, procnum):
     return 0
 
 
-def setProcessLogger(name):
-    """ Set the logger for a single process. The file used for it is logs/processes/proc.name.txt and it
+def setProcessLogger(name, logsDir):
+    """ Set the logger for a single process. The file used for it is logsiDir/processes/proc.name.txt and it
         can be retrieved with logging.getLogger(name) in other parts of the code
     """
     logger = logging.getLogger(name)
-    handler = TimedRotatingFileHandler('logs/processes/proc.c3id_%s.pid_%s.txt' % (name, os.getpid()), 'midnight', backupCount=30)
+    handler = TimedRotatingFileHandler(logsDir+'/processes/proc.c3id_%s.pid_%s.txt' % (name, os.getpid()), 'midnight', backupCount=30)
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
@@ -176,7 +176,7 @@ class Worker(object):
             # Starting things up
             for x in xrange(1, self.nworkers + 1):
                 self.logger.debug("Starting process %i", x)
-                p = multiprocessing.Process(target = processWorker, args = (self.inputs, self.results, self.resthost, self.resturi, x))
+                p = multiprocessing.Process(target = processWorker, args = (self.inputs, self.results, self.resthost, self.resturi, WORKER_CONFIG.TaskWorker.logsDir, x))
                 p.start()
                 self.pool.append(p)
         self.logger.info("Started %d slaves", len(self.pool))

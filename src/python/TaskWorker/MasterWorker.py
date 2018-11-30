@@ -76,7 +76,7 @@ class MasterWorker(object):
 
         def setRootLogger(logWarning, logDebug, console):
             """Sets the root logger with the desired verbosity level
-               The root logger logs to logs/twlog.txt and every single
+               The root logger logs to logsDir/twlog.txt and every single
                logging instruction is propagated to it (not really nice
                to read)
 
@@ -85,14 +85,15 @@ class MasterWorker(object):
             :arg bool console: it tells if to log to console
             :return logger: a logger with the appropriate logger level."""
 
-            createLogdir('logs')
-            createLogdir('logs/processes')
-            createLogdir('logs/tasks')
+            logsDir = config.TaskWorker.logsDir
+            createLogdir(logsDir)
+            createLogdir(logsDir+'/processes')
+            createLogdir(logsDir+'/tasks')
 
             if console:
                 logging.getLogger().addHandler(logging.StreamHandler())
             else:
-                logHandler = MultiProcessingLog('logs/twlog.txt', when='midnight')
+                logHandler = MultiProcessingLog(logsDir+'/twlog.txt', when='midnight')
                 logFormatter = \
                     logging.Formatter("%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
                 logHandler.setFormatter(logFormatter)
@@ -103,7 +104,7 @@ class MasterWorker(object):
             if logDebug:
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
-            logger = setProcessLogger("master")
+            logger = setProcessLogger("master", logsDir)
             logger.debug("PID %s.", os.getpid())
             logger.debug("Logging level initialized to %s.", loglevel)
             return logger
@@ -153,7 +154,7 @@ class MasterWorker(object):
 
     def getRecurringActionInst(self, actionName):
         mod = __import__('TaskWorker.Actions.Recurring.%s' % actionName, fromlist=actionName)
-        return getattr(mod, actionName)()
+        return getattr(mod, actionName)(self.config.TaskWorker.logsDir)
 
 
     def _lockWork(self, limit, getstatus, setstatus):

@@ -47,5 +47,5 @@ if __name__ == '__main__':
 
     resthost = 'mmascher-dev6.cern.ch'
     resturi = '/crabserver/dev/filemetadata'
-    fmdc = FMDCleaner()
+    fmdc = FMDCleaner(cfg.TaskWorker.logsDir)
     fmdc._execute(resthost, resturi, cfg, None)

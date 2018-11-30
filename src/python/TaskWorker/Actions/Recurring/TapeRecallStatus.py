@@ -5,6 +5,7 @@ from TaskWorker.MasterWorker import MasterWorker
 from TaskWorker.Actions.DDMRequests import statusRequest
 from RESTInteractions import HTTPRequests
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
+from TaskWorker.WorkerExceptions import TaskWorkerException
 
 import logging
 import sys
@@ -47,7 +48,12 @@ class TapeRecallStatus(BaseRecurringAction):
 
                 server = HTTPRequests(config.TaskWorker.resturl, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=self.logger)
                 mpl = MyProxyLogon(config=config, server=server, resturi=config.TaskWorker.restURInoAPI, myproxylen=self.pollingTime)
-                mpl.execute(task=recallingTask) # this adds 'user_proxy' to recallingTask
+                user_proxy = True
+                try:
+                    mpl.execute(task=recallingTask) # this adds 'user_proxy' to recallingTask
+                except TaskWorkerException as twe:
+                    user_proxy = False
+                    self.logger.exception(twe)
 
                 if ddmRequest["message"] == "Request found":
                     status = ddmRequest["data"][0]["status"]
@@ -55,16 +61,16 @@ class TapeRecallStatus(BaseRecurringAction):
                         self.logger.info("Request %d is completed, setting status of task %s to NEW", reqId, taskName)
                         mw.updateWork(taskName, recallingTask['tm_task_command'], 'NEW')
                         # Delete all task warnings (the tapeRecallStatus added a dataset warning which is no longer valid now)
-                        mpl.deleteWarnings(recallingTask['user_proxy'], taskName)
+                        if user_proxy: mpl.deleteWarnings(recallingTask['user_proxy'], taskName)
                     elif status == "rejected":
                         msg = "DDM request_id %d has been rejected with this reason: %s" % (reqId, ddmRequest["data"][0]["reason"])
-                        mpl.uploadWarning(msg, recallingTask['user_proxy'], taskName)
+                        if user_proxy: mpl.uploadWarning(msg, recallingTask['user_proxy'], taskName)
                         self.logger.info(msg + "\nSetting status of task %s to FAILED", taskName)
                         mw.updateWork(taskName, recallingTask['tm_task_command'], 'FAILED')
                 else:
                     msg = "DDM request_id %d not found. Please report to experts" % reqId
                     self.logger.info(msg)
-                    mpl.uploadWarning(msg, recallingTask['user_proxy'], taskName)
+                    if user_proxy: mpl.uploadWarning(msg, recallingTask['user_proxy'], taskName)
 
         else:
             self.logger.info("No %s task retrieved.", tapeRecallStatus)
@@ -84,7 +90,6 @@ if __name__ == '__main__':
     from WMCore.Configuration import loadConfigurationFile
     cfg = loadConfigurationFile(twconfig)
 
-    trs = TapeRecallStatus()
-    trs.logger = logger
+    trs = TapeRecallStatus(cfg.TaskWorker.logsDir)
     trs._execute(None, None, cfg, None)
 
