@@ -543,7 +543,7 @@ def prepSandbox(opts):
                     sys.exit(EC_WGET)
                 time.sleep(30)
     #The user sandbox.tar.gz has to be unpacked no matter what (even in DEBUG mode)
-    print(commands.getoutput('tar xfzm %s' % opts.archiveJob))
+    print(commands.getoutput('tar xfm %s' % opts.archiveJob))
     print("==== Sandbox preparation FINISHED at %s ====" % time.asctime(time.gmtime()))
 
     #move the pset in the right place
@@ -564,7 +564,7 @@ def prepSandbox(opts):
 
 def extractUserSandbox(archiveJob, cmsswVersion):
     os.chdir(cmsswVersion)
-    print(commands.getoutput('tar xfzm %s ' % os.path.join('..', archiveJob)))
+    print(commands.getoutput('tar xfm %s ' % os.path.join('..', archiveJob)))
     os.chdir('..')
 
 def getProv(filename, scram):
