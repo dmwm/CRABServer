@@ -44,7 +44,7 @@ then
 		echo "Using tarball shipped within condor"
 	fi
     	
-	tar xvfzm TaskManagerRun.tar.gz
+	tar xvfm TaskManagerRun.tar.gz
 	if [[ $? != 0 ]]
 	then
 		echo "Error: Unable to unpack the task manager runtime environment." >&2
