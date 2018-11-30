@@ -75,7 +75,7 @@ class DBSDataDiscovery(DataDiscovery):
         MAX_LUMIS = 100000
         for block in blocks:
             blockInfo = self.dbs.getDBSSummaryInfo(block=block)
-            if blockInfo['NumberOfLumis'] > MAX_LUMIS:
+            if blockInfo.get('NumberOfLumis',0) > MAX_LUMIS:
                 msg = "Block %s contains more than %s lumis.\nThis blows up CRAB server memory" % (block, MAX_LUMIS)
                 msg += "\nCRAB can only split this by ignoring lumi information. You can do this"
                 msg += "\nusing FileBased split algorithm and avoiding any additional request"
@@ -119,8 +119,8 @@ class DBSDataDiscovery(DataDiscovery):
             self.checkDatasetStatus(secondaryDataset, kwargs)
 
         try:
-            # Get the list of blocks for the locations and then call dls.
-            # The WMCore DBS3 implementation makes one call to dls for each block
+            # Get the list of blocks for the locations and then call DBS.
+            # The WMCore DBS3 implementation makes one call to DBS for each block
             # with locations=True so we are using locations=False and looking up location later
             blocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(inputDataset, locations=False)]
             if secondaryDataset:
@@ -140,6 +140,8 @@ class DBSDataDiscovery(DataDiscovery):
         try:
             dbsOnly = self.dbsInstance.split('/')[1] != 'global'
             locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly)
+            if secondaryDataset:
+                secondaryLocationsMap = self.dbs.listFileBlockLocation(list(secondaryBlocks), dbsOnly=dbsOnly)
         except Exception as ex: # TODO should we catch HttpException instead?
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
@@ -147,6 +149,10 @@ class DBSDataDiscovery(DataDiscovery):
                                       " and contact the experts if the error persists.\nError reason: %s" % str(ex))
         locationsMap = {key: value for key, value in locationsMap.iteritems() if value}
         blocksWithLocation = locationsMap.keys()
+        if secondaryDataset:
+            secondaryLocationsMap = {key: value for key, value in secondaryLocationsMap.iteritems() if value}
+            secondaryBlocksWithLocation = secondaryLocationsMap.keys()
+
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
@@ -214,7 +220,7 @@ class DBSDataDiscovery(DataDiscovery):
         if needLumiInfo:
             self.checkBlocksSize(blocksWithLocation) # Interested only in blocks with locations, 'blocks' may contain invalid ones and trigger an Exception
             if secondaryDataset:
-                self.checkBlocksSize(secondaryBlocks)
+                self.checkBlocksSize(secondaryBlocksWithLocation)
         try:
             filedetails = self.dbs.listDatasetFileDetails(inputDataset, getParents=True, getLumis=needLumiInfo, validFileOnly=0)
             if secondaryDataset:
@@ -267,6 +273,7 @@ if __name__ == '__main__':
     """
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
+    dbsSecondaryDataset = sys.argv[3] if len(sys.argv) == 4 else None
 
     logging.basicConfig(level = logging.DEBUG)
     from WMCore.Configuration import ConfigurationEx
@@ -294,7 +301,7 @@ if __name__ == '__main__':
 
     fileset = DBSDataDiscovery(config)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': os.environ["X509_USER_PROXY"],
-                          'tm_input_dataset': dbsDataset,  'tm_taskname': 'pippo1',
+                          'tm_input_dataset': dbsDataset,  'tm_secondary_input_dataset': dbsSecondaryDataset, 'tm_taskname': 'pippo1',
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
                           'tm_dbs_url': config.Services.DBSUrl}, tempDir='')
     
