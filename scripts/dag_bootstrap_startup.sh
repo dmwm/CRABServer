@@ -31,7 +31,7 @@ mkdir -p transfer_info
 
 #This is the only file transfered from the TW to the schedd. Can be downloaded for the "preparelocal" client command
 TARBALL_NAME="InputFiles.tar.gz"
-tar --keep-newer-files -zmxvf $TARBALL_NAME
+tar --keep-newer-files -mxvf $TARBALL_NAME
 if [[ $? != 0 ]]; then
     echo "Error: Unable to unpack the Input files of the task." >&2
     condor_qedit $CONDOR_ID DagmanHoldReason "'Unable to unpack the input files of the task.'"
@@ -106,7 +106,7 @@ if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]; then
     fi
 
     TARBALL_NAME=TaskManagerRun.tar.gz
-    tar xfzm $TARBALL_NAME
+    tar xfm $TARBALL_NAME
     if [[ $? != 0 ]]; then
         echo "Error: Unable to unpack the task manager runtime environment." >&2
         condor_qedit $CONDOR_ID DagmanHoldReason "'Unable to unpack the task manager runtime environment.'"
