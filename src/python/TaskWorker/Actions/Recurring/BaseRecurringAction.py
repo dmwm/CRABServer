@@ -10,14 +10,14 @@ def handleRecurring(resthost, resturi, config, task, procnum, action):
     getattr(mod, actionClass)().execute(resthost, resturi, config, task, procnum)
 
 class BaseRecurringAction:
-    def __init__(self):
+    def __init__(self, logsDir):
         self.lastExecution = 0
         # set the logger
         self.logger = logging.getLogger(__name__)
         if not self.logger.handlers:
-            if not os.path.exists('logs'):
-                os.makedirs('logs')
-            handler = logging.FileHandler('logs/recurring.log')
+            if not os.path.exists(logsDir):
+                os.makedirs(logsDir)
+            handler = logging.FileHandler(logsDir+'/recurring.log')
             formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)

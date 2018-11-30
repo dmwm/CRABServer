@@ -84,6 +84,6 @@ if __name__ == '__main__':
     from WMCore.Configuration import loadConfigurationFile
     cfg = loadConfigurationFile(twconfig)
 
-    trs = TapeRecallStatus()
+    trs = TapeRecallStatus(cfg.TaskWorker.logsDir)
     trs._execute(None, None, cfg, None)
 

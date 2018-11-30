@@ -45,5 +45,5 @@ if __name__ == '__main__':
     from WMCore.Configuration import loadConfigurationFile
     cfg = loadConfigurationFile(twconfig)
 
-    rd = RemovetmpDir()
+    rd = RemovetmpDir(cfg.TaskWorker.logsDir)
     rd._execute(None, None, cfg, None)
