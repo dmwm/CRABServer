@@ -7,7 +7,7 @@ from TaskWorker.DataObjects.Result import Result
 def handleRecurring(resthost, resturi, config, task, procnum, action):
     actionClass = action.split('.')[-1]
     mod = __import__(action, fromlist=actionClass)
-    getattr(mod, actionClass)().execute(resthost, resturi, config, task, procnum)
+    getattr(mod, actionClass)(config.TaskWorker.logsDir).execute(resthost, resturi, config, task, procnum)
 
 class BaseRecurringAction:
     def __init__(self, logsDir):
