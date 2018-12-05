@@ -344,9 +344,9 @@ class PreJob:
             new_submit_text += '+MaxWallTimeMinsRun = %s\n' % str(maxjobruntime)  # how long it can run
             new_submit_text += '+MaxWallTimeMins = %s\n' % str(maxjobruntime)     # how long a slot can it match to
         if maxmemory is not None:
-            new_submit_text += '+RequestMemory = %s\n' % (str(maxmemory))
+            new_submit_text += 'RequestMemory = %s\n' % (str(maxmemory))
         if numcores is not None:
-            new_submit_text += '+RequestCpus = %s\n' % (str(numcores))
+            new_submit_text += 'RequestCpus = %s\n' % (str(numcores))
         if priority is not None:
             new_submit_text += '+JobPrio = %s\n' % (str(priority))
 
@@ -449,9 +449,9 @@ class PreJob:
         siteblacklist.update(automatic_siteblacklist)
         available -= (siteblacklist - sitewhitelist)
         if not available:
-          self.logger.error("Can not submit since DESIRED_Sites list is empty")
-          self.prejob_exit_code = 1
-          sys.exit(self.prejob_exit_code)
+            self.logger.error("Can not submit since DESIRED_Sites list is empty")
+            self.prejob_exit_code = 1
+            sys.exit(self.prejob_exit_code)
         ## Add DESIRED_SITES to the Job.<job_id>.submit content.
         new_submit_text = '+DESIRED_SITES="%s"\n%s' % (",".join(available), new_submit_text)
         new_submit_text = '+DESIRED_CMSDataLocations="%s"\n%s' % (",".join(datasites), new_submit_text)
