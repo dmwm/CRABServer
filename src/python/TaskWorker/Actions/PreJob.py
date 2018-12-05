@@ -343,12 +343,13 @@ class PreJob:
             new_submit_text += '+EstimatedWallTimeMins = %s\n' % str(maxjobruntime)
             new_submit_text += '+MaxWallTimeMinsRun = %s\n' % str(maxjobruntime)  # how long it can run
             new_submit_text += '+MaxWallTimeMins = %s\n' % str(maxjobruntime)     # how long a slot can it match to
+        # no plus sign for next 3 attributes, since those are Condor standard ones
         if maxmemory is not None:
             new_submit_text += 'RequestMemory = %s\n' % (str(maxmemory))
         if numcores is not None:
             new_submit_text += 'RequestCpus = %s\n' % (str(numcores))
         if priority is not None:
-            new_submit_text += '+JobPrio = %s\n' % (str(priority))
+            new_submit_text += 'JobPrio = %s\n' % (str(priority))
 
         ## Within the schedd, order the first few jobs in the task before all other tasks of the same priority.
         pre_job_prio = 1
