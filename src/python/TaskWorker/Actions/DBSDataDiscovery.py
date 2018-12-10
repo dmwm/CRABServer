@@ -61,6 +61,7 @@ class DBSDataDiscovery(DataDiscovery):
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex)) # TODO addo the nodes phedex so the user can check themselves
         diskLocationsMap = {}
         for block, locations in locationsMap.iteritems():
+            locations[:] = [x for x in locations if x != 'T3_CH_CERN_OpenData']
             if (set(locations) & diskLocations):
                 diskLocationsMap[block] = locationsMap[block]
             else:
