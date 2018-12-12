@@ -63,8 +63,10 @@ class DBSDataDiscovery(DataDiscovery):
         for block, locations in locationsMap.iteritems():
             locations[:] = [x for x in locations if x != 'T3_CH_CERN_OpenData'] # ignore OpenData until it is accessible by CRAB
             if (set(locations) & diskLocations):
+                # at least some locations are disk
                 diskLocationsMap[block] = locationsMap[block]
             else:
+                # no locations are in the disk list, assume that they are tape
                 self.tapeLocations = self.tapeLocations.union(set(locations) - diskLocations)
         locationsMap.clear() # remove all blocks
         locationsMap.update(diskLocationsMap) # add only blocks with disk locations
