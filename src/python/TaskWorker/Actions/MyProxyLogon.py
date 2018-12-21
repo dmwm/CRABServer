@@ -46,6 +46,15 @@ class MyProxyLogon(TaskAction):
             usergroups = set(proxy.getAllUserGroups(userproxy))
         if timeleft is None or timeleft <= 0:
             msg = "Impossible to retrieve proxy from %s for %s." % (proxycfg['myProxySvr'], proxycfg['userDN'])
+            self.logger.error(msg)
+            self.logger.error("\n Will try again in verbose mode")
+            self.logger.error("===========PROXY ERROR START ==========================")
+            with tempSetLogLevel(logger=self.logger, level=logging.DEBUG):
+                userproxy = proxy.getProxyFilename(serverRenewer=True)
+                proxy.logonRenewMyProxy()
+                timeleft = proxy.getTimeLeft(userproxy)
+                usergroups = set(proxy.getAllUserGroups(userproxy))
+            self.logger.error("===========PROXY ERROR END   ==========================")
             raise TaskWorkerException(msg)
         else:
             kwargs['task']['user_proxy'] = userproxy
