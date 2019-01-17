@@ -138,8 +138,8 @@ class Task(object):
     SetStatusWarningTask_sql = "UPDATE tasks SET tm_task_status = upper(:status), tm_task_command = upper(:command), tm_task_warnings = :warnings WHERE tm_taskname = :taskname"
 
 
-    #UpdateWorker simple version without orderind to ensure no race in case of multiple TW's
-    UpdateWorker_sql = "UPDATE  tasks SET tw_name = :tw_name, tm_task_status = :set_status \
+    # UpdateWorker simple version without ordering to ensure no race in case of multiple TWs
+    UpdateWorker_sql = "UPDATE tasks SET tw_name = :tw_name, tm_task_status = :set_status \
                         WHERE tm_task_status = :get_status AND rownum <= :limit"
 
     #UpdateOutDataset
