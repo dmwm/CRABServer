@@ -526,7 +526,7 @@ class ASOServerJob(object):
                     elif file_info['pfn'] in task['tm_tfile_outfiles']:
                         file_info['filetype'] = 'TFILE'
                     elif file_info['pfn'] in task['tm_outfiles']:
-                         file_info['filetype'] = 'FAKE'
+                        file_info['filetype'] = 'FAKE'
                     else:
                         file_info['filetype'] = 'UNKNOWN'
                     output_files.append(file_info)
@@ -1037,12 +1037,12 @@ class ASOServerJob(object):
         except HTTPException as hte:
             msg = "Error retrieving document from ASO database for ID %s: %s" % (doc_id, str(hte.headers))
             self.logger.error(msg)
+        except NotFound:
+            msg = "Document is not found in ASO RDBMS database for ID %s" % (doc_id)
+            self.logger.warning(msg)
         except Exception:
             msg = "Error retrieving document from ASO database for ID %s" % (doc_id)
             self.logger.exception(msg)
-        except NotFound as er:
-            msg = "Document is not found in ASO RDBMS database for ID %s" % (doc_id)
-            self.logger.warning(msg)
         return doc
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -1061,7 +1061,7 @@ class ASOServerJob(object):
             if isCouchDBURL(self.aso_db_url):
                 status = doc['state'] if doc else 'unknown'
             else:
-               status = doc['transfer_state'] if doc else 'unknown'
+                status = doc['transfer_state'] if doc else 'unknown'
             statuses.append(status)
         return statuses
 
@@ -1179,7 +1179,7 @@ class ASOServerJob(object):
                     self.logger.warning(msg)
                     not_cancelled.append(docIdKill)
                     cancelled.append(docIdKill)
-                except NotFound as er:
+                except NotFound:
                     # This is strange that document is not found in database.
                     # Just add it as canceled and move on.
                     cancelled.append(docIdKill)
@@ -1784,7 +1784,6 @@ class PostJob():
                         self.logger.info("       -----> Succeeded to copy job ad file.")
                     except:
                         self.logger.info("       -----> Failed to copy job ad file. Continuing")
-                        pass
                 self.logger.info("====== Finished to parse job ad.")
                 break
             counter += 1
