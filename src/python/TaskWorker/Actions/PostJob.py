@@ -1947,6 +1947,17 @@ class PostJob():
                 return self.check_retry_count(mostCommon(self.stageout_exit_codes, 60324)), retmsg
             self.logger.info("====== Finished to check for ASO transfers.")
 
+        ## Upload the input files metadata.
+        self.logger.info("====== Starting upload of input files metadata.")
+        try:
+            self.upload_input_files_metadata()
+        except Exception as ex:
+            retmsg = "Fatal error uploading input files metadata: %s" % (str(ex))
+            self.logger.exception(retmsg)
+            self.logger.info("====== Finished upload of input files metadata.")
+            return self.check_retry_count(80001), retmsg
+        self.logger.info("====== Finished upload of input files metadata.")
+
         ## Upload the output files metadata.
         if self.transfer_outputs:
             self.logger.info("====== Starting upload of output files metadata.")
@@ -1980,17 +1991,6 @@ class PostJob():
                             self.logger.info("====== Finished to update publication flags of transfered files.")
                             return self.check_retry_count(80001), retmsg
                 self.logger.info("====== Finished to update publication flags of transfered files.")
-
-        ## Upload the input files metadata.
-        self.logger.info("====== Starting upload of input files metadata.")
-        try:
-            self.upload_input_files_metadata()
-        except Exception as ex:
-            retmsg = "Fatal error uploading input files metadata: %s" % (str(ex))
-            self.logger.exception(retmsg)
-            self.logger.info("====== Finished upload of input files metadata.")
-            return self.check_retry_count(80001), retmsg
-        self.logger.info("====== Finished upload of input files metadata.")
 
         self.set_dashboard_state('FINISHED')
 
