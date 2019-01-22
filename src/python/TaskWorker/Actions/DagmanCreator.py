@@ -416,14 +416,14 @@ class DagmanCreator(TaskAction.TaskAction):
             return False
 
     def setCMS_WMTool(self, task):
-        if  isHammerCloud(self, task):
+        if self.isHammerCloud(task):
             WMTool = 'HammerCloud'
         else:
             WMTool = 'USER'
         return WMTool
 
     def setCMS_TaskType(self, task):
-        if isHammerCloud(self, task):
+        if self.isHammerCloud(task):
             taskType = task['tm_activity']
         else:
             if task['scriptexe']:
