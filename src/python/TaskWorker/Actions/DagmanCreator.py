@@ -68,7 +68,7 @@ JOB_SUBMIT = \
 """
 +CRAB_ReqName = %(requestname)s
 +CRAB_Workflow = %(workflow)s
-+CRAB_JobType = %(jobtype)s
++CMS_JobType = %(jobtype)s
 +CRAB_JobSW = %(jobsw)s
 +CRAB_JobArch = %(jobarch)s
 +CRAB_DBSURL = %(dbsurl)s

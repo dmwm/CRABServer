@@ -42,7 +42,7 @@ except ImportError:
 SUBMIT_INFO = [ \
     ('CRAB_ReqName', 'requestname'),
     ('CRAB_Workflow', 'workflow'),
-    ('CRAB_JobType', 'jobtype'),
+    ('CMS_JobType', 'jobtype'),
     ('CRAB_JobSW', 'jobsw'),
     ('CRAB_JobArch', 'jobarch'),
     ('DESIRED_CMSDataset', 'inputdata'),
