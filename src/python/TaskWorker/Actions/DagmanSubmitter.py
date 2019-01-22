@@ -528,9 +528,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
         for job in info:
             job.update(params)
             apmon.sendToML(job)
-        try:
+        if len(info)>0 :
             self.logger.debug("Dashboard job info submitted. Last job for example is: %s", job)
-        except NameError:
+        else:
             self.logger.debug("No dashboard job info submitted")
         apmon.free()
 
