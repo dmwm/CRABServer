@@ -410,7 +410,7 @@ class DagmanCreator(TaskAction.TaskAction):
         return task['tm_activity']
 
     def isHammerCloud(self, task):
-        if task['tm_activity'] and 'HC' in task['tm_activity]:
+        if task['tm_activity'] and 'HC' in task['tm_activity']:
             return True
         else:
             return False
