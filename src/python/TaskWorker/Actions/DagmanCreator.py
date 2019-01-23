@@ -116,6 +116,9 @@ accounting_group_user = %(accounting_group_user)s
 +CRAB_AlgoArgs = %(algoargs)s
 +CMS_WMTool = %(cms_wmtool)s
 +CMS_TaskType = %(cms_tasktype)s
++CMS_SubmissionTool = CRAB
++CMS_Type = %(cms_type)s
+
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
 +DESIRED_Archs = %(desired_arch)s
@@ -250,7 +253,7 @@ def transform_strings(data):
                'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
-               'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', \
+               'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', 'cms_type', \
                'desired_arch', 'resthost', 'resturinoapi', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
         val = data.get(var, None)
@@ -432,6 +435,13 @@ class DagmanCreator(TaskAction.TaskAction):
                 taskType = 'cmsRun'
             return taskType
 
+    def setCMS_Type(self, task):
+        if self.isHammerCloud(task):
+            type = 'Test'
+        else:
+            type = 'Analysis'
+        return type
+
     def isGlobalBlacklistIgnored(self, kwargs):
         """ Determine wether the user wants to ignore the globalblacklist
         """
@@ -497,6 +507,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['submitter_ip_addr'] = task['tm_submitter_ip_addr']
         info['cms_wmtool'] = self.setCMS_WMTool(task)
         info['cms_tasktype'] = self.setCMS_TaskType(task)
+        info['cms_type'] = self.setCMS_Type(task)
 
         #Classads for task lifetime management, see https://github.com/dmwm/CRABServer/issues/5505
         info['task_lifetime_days'] = TASKLIFETIME // 24 // 60 // 60
