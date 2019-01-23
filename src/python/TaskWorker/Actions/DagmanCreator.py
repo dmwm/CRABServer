@@ -250,7 +250,7 @@ def transform_strings(data):
                'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
-               'stageoutpolicy', 'taskType', 'worker_name', \
+               'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype'\
                'desired_arch', 'resthost', 'resturinoapi', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
         val = data.get(var, None)
