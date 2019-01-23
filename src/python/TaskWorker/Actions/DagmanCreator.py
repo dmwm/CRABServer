@@ -465,7 +465,7 @@ class DagmanCreator(TaskAction.TaskAction):
         # From here on out, we convert from tm_* names to the DataWorkflow names
         info = dict(task)
         info['workflow'] = task['tm_taskname']
-        info['jobtype'] = 'analysis'
+        info['jobtype'] = 'Analysis'
         info['jobsw'] = info['tm_job_sw']
         info['jobarch'] = info['tm_job_arch']
         info['inputdata'] = info['tm_input_dataset']
