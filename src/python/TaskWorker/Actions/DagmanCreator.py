@@ -426,7 +426,7 @@ class DagmanCreator(TaskAction.TaskAction):
         if self.isHammerCloud(task):
             taskType = task['tm_activity']
         else:
-            if task['scriptexe']:
+            if task['tm_scriptexe']:
                 taskType = 'script'
             else:
                 taskType = 'cmsRun'
