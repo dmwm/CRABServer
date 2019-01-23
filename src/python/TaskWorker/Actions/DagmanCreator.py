@@ -437,10 +437,10 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def setCMS_Type(self, task):
         if self.isHammerCloud(task):
-            type = 'Test'
+            cms_type = 'Test'
         else:
-            type = 'Analysis'
-        return type
+            cms_type = 'Analysis'
+        return cms_type
 
     def isGlobalBlacklistIgnored(self, kwargs):
         """ Determine wether the user wants to ignore the globalblacklist
