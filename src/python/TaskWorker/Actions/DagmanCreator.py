@@ -116,7 +116,7 @@ accounting_group_user = %(accounting_group_user)s
 +CRAB_AlgoArgs = %(algoargs)s
 +CMS_WMTool = %(cms_wmtool)s
 +CMS_TaskType = %(cms_tasktype)s
-+CMS_SubmissionTool = CRAB
++CMS_SubmissionTool = "CRAB"
 +CMS_Type = %(cms_type)s
 
 
