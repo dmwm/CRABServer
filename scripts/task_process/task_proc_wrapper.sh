@@ -57,11 +57,6 @@ function perform_condorq {
     log "HTCondor query of DAG status done on $(date '+%Y/%m/%d %H:%M:%S %Z')"
 }
 
-if [ ! -f /etc/enable_task_daemon ]; then
-    log "/etc/enable_task_daemon file not found, not starting the task daemon and exiting"
-    exit 1
-fi
-
 touch task_process/task_process_running
 log "Starting a new task_process, creating task_process_running file"
 
