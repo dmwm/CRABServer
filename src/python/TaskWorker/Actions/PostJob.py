@@ -222,7 +222,7 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
             error_summary_changed = True
 
     # Write the fjr report summary of this postjob to a file which task_process reads incrementally
-    if error_summary_changed and os.path.isfile("/etc/enable_task_daemon"):
+    if error_summary_changed :
         with getLock(G_FJR_PARSE_RESULTS_FILE_NAME):
             with open(G_FJR_PARSE_RESULTS_FILE_NAME, "a+") as fjr_parse_results:
                 fjr_parse_results.write(json.dumps({job_id : {crab_retry : error_summary}}) + "\n")
