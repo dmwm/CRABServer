@@ -137,11 +137,10 @@ class Task(object):
     #SetStatusTask -- Used by DataWorkflow.kill (crab kill). Really similar to SetStatusTask_sql but also set a warning.
     SetStatusWarningTask_sql = "UPDATE tasks SET tm_task_status = upper(:status), tm_task_command = upper(:command), tm_task_warnings = :warnings WHERE tm_taskname = :taskname"
 
-    #UpdateWorker
-    UpdateWorker_sql = """UPDATE tasks SET tw_name = :tw_name, tm_task_status = :set_status \
-                         WHERE tm_taskname IN (SELECT tm_taskname FROM (SELECT tm_taskname, rownum as counter \
-                         FROM tasks WHERE tm_task_status = :get_status ORDER BY tm_start_time) \
-                         WHERE counter <= :limit)"""
+
+    # UpdateWorker simple version without ordering to ensure no race in case of multiple TWs
+    UpdateWorker_sql = "UPDATE tasks SET tw_name = :tw_name, tm_task_status = :set_status \
+                        WHERE tm_task_status = :get_status AND rownum <= :limit"
 
     #UpdateOutDataset
     SetUpdateOutDataset_sql = """UPDATE tasks SET tm_output_dataset = :tm_output_dataset \

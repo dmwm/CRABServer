@@ -68,7 +68,7 @@ JOB_SUBMIT = \
 """
 +CRAB_ReqName = %(requestname)s
 +CRAB_Workflow = %(workflow)s
-+CRAB_JobType = %(jobtype)s
++CMS_JobType = %(jobtype)s
 +CRAB_JobSW = %(jobsw)s
 +CRAB_JobArch = %(jobarch)s
 +CRAB_DBSURL = %(dbsurl)s
@@ -114,6 +114,11 @@ accounting_group_user = %(accounting_group_user)s
 +CRAB_TaskEndTime = %(task_endtime)s
 +CRAB_SplitAlgo =  %(splitalgo)s
 +CRAB_AlgoArgs = %(algoargs)s
++CMS_WMTool = %(cms_wmtool)s
++CMS_TaskType = %(cms_tasktype)s
++CMS_SubmissionTool = "CRAB"
++CMS_Type = %(cms_type)s
+
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
 +DESIRED_Archs = %(desired_arch)s
@@ -248,7 +253,7 @@ def transform_strings(data):
                'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
-               'stageoutpolicy', 'taskType', 'worker_name', \
+               'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', 'cms_type', \
                'desired_arch', 'resthost', 'resturinoapi', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
         val = data.get(var, None)
@@ -407,6 +412,35 @@ class DagmanCreator(TaskAction.TaskAction):
             return getattr(self.config.TaskWorker, 'dashboardTaskType', 'analysistest')
         return task['tm_activity']
 
+    def isHammerCloud(self, task):
+        if task['tm_activity'] and 'HC' in task['tm_activity']:
+            return True
+        else:
+            return False
+
+    def setCMS_WMTool(self, task):
+        if self.isHammerCloud(task):
+            WMTool = 'HammerCloud'
+        else:
+            WMTool = 'USER'
+        return WMTool
+
+    def setCMS_TaskType(self, task):
+        if self.isHammerCloud(task):
+            taskType = task['tm_activity']
+        else:
+            if task['tm_scriptexe']:
+                taskType = 'script'
+            else:
+                taskType = 'cmsRun'
+            return taskType
+
+    def setCMS_Type(self, task):
+        if self.isHammerCloud(task):
+            cms_type = 'Test'
+        else:
+            cms_type = 'Analysis'
+        return cms_type
 
     def isGlobalBlacklistIgnored(self, kwargs):
         """ Determine wether the user wants to ignore the globalblacklist
@@ -431,7 +465,7 @@ class DagmanCreator(TaskAction.TaskAction):
         # From here on out, we convert from tm_* names to the DataWorkflow names
         info = dict(task)
         info['workflow'] = task['tm_taskname']
-        info['jobtype'] = 'analysis'
+        info['jobtype'] = 'Analysis'
         info['jobsw'] = info['tm_job_sw']
         info['jobarch'] = info['tm_job_arch']
         info['inputdata'] = info['tm_input_dataset']
@@ -471,6 +505,9 @@ class DagmanCreator(TaskAction.TaskAction):
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
         info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
         info['submitter_ip_addr'] = task['tm_submitter_ip_addr']
+        info['cms_wmtool'] = self.setCMS_WMTool(task)
+        info['cms_tasktype'] = self.setCMS_TaskType(task)
+        info['cms_type'] = self.setCMS_Type(task)
 
         #Classads for task lifetime management, see https://github.com/dmwm/CRABServer/issues/5505
         info['task_lifetime_days'] = TASKLIFETIME // 24 // 60 // 60

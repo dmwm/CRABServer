@@ -61,12 +61,15 @@ class DBSDataDiscovery(DataDiscovery):
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex)) # TODO addo the nodes phedex so the user can check themselves
         diskLocationsMap = {}
         for block, locations in locationsMap.iteritems():
+            locations[:] = [x for x in locations if x != 'T3_CH_CERN_OpenData'] # ignore OpenData until it is accessible by CRAB
             if (set(locations) & diskLocations):
+                # at least some locations are disk
                 diskLocationsMap[block] = locationsMap[block]
             else:
-                self.otherLocations = self.otherLocations.union(set(locations) - diskLocations)
-        locationsMap.clear()
-        locationsMap.update(diskLocationsMap)
+                # no locations are in the disk list, assume that they are tape
+                self.tapeLocations = self.tapeLocations.union(set(locations) - diskLocations)
+        locationsMap.clear() # remove all blocks
+        locationsMap.update(diskLocationsMap) # add only blocks with disk locations
 
     def checkBlocksSize(self, blocks):
         """ Make sure no single blocks has more than 100k lumis. See
@@ -156,8 +159,8 @@ class DBSDataDiscovery(DataDiscovery):
         self.keepOnlyDisks(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
-            if self.otherLocations:
-                msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ', '.join(sorted(self.otherLocations))
+            if self.tapeLocations:
+                msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ', '.join(sorted(self.tapeLocations))
                 # submit request to DDM
                 ddmRequest = None
                 ddmServer = self.config.TaskWorker.DDMServer

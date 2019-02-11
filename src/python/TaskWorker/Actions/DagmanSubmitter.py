@@ -42,7 +42,7 @@ except ImportError:
 SUBMIT_INFO = [ \
     ('CRAB_ReqName', 'requestname'),
     ('CRAB_Workflow', 'workflow'),
-    ('CRAB_JobType', 'jobtype'),
+    ('CMS_JobType', 'jobtype'),
     ('CRAB_JobSW', 'jobsw'),
     ('CRAB_JobArch', 'jobarch'),
     ('DESIRED_CMSDataset', 'inputdata'),
@@ -528,7 +528,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
         for job in info:
             job.update(params)
             apmon.sendToML(job)
-        self.logger.debug("Dashboard job info submitted. Last job for example is: %s", job)
+        if info :
+            self.logger.debug("Dashboard job info submitted. Last job for example is: %s", info[-1])
+        else:
+            self.logger.debug("No dashboard job info submitted")
         apmon.free()
 
 

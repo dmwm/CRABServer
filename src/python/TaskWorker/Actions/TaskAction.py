@@ -23,7 +23,7 @@ class TaskAction(object):
         # Initialised in DBSDataDiscovery:
         self.dbs = None
         self.dbsInstance = None
-        self.otherLocations = set()
+        self.tapeLocations = set()
 
         #self.resturl = resturi # backward compatibility
         ## Trying to give the right naming to the variables.
