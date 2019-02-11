@@ -29,22 +29,6 @@ class TapeRecallStatus(BaseRecurringAction):
                 if not reqId:
                     self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", taskName)
                     continue
-                # Make sure the task sandbox in the crabcache is not deleted until the tape recall is completed
-                from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
-                ufc = UserFileCache({'endpoint': recallingTask['tm_cache_url'], "pycurl": True})
-                sandbox = recallingTask['tm_user_sandbox'].replace(".tar.gz","")
-                try:
-                    ufc.download(sandbox, sandbox, recallingTask['tm_username'])
-                    os.remove(sandbox)
-                except Exception as ex:
-                    self.logger.exception(ex)
-                    self.logger.info("The CRAB3 server backend could not download the input sandbox (%s) from the frontend (%s) using the '%s' username (request_id = %d)."+\
-                                     " This could be a temporary glitch, will try again in next occurrence of the recurring action."+\
-                                     " Error reason:\n%s", sandbox, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId, str(ex))
-
-                ddmRequest = statusRequest(reqId, config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, verbose=False)
-                # The query above returns a JSON with a format {"result": "OK", "message": "Request found", "data": [{"request_id": 14, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:25:41", "last_request": "2018-02-26 23:25:41", "request_count": 1}]}                
-                self.logger.info("Contacted %s using %s and %s for request_id = %d, got:\n%s", config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, reqId, ddmRequest)
 
                 server = HTTPRequests(config.TaskWorker.resturl, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=self.logger)
                 mpl = MyProxyLogon(config=config, server=server, resturi=config.TaskWorker.restURInoAPI, myproxylen=self.pollingTime)
@@ -54,6 +38,25 @@ class TapeRecallStatus(BaseRecurringAction):
                 except TaskWorkerException as twe:
                     user_proxy = False
                     self.logger.exception(twe)
+
+                # Make sure the task sandbox in the crabcache is not deleted until the tape recall is completed
+                if user_proxy:
+                    from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
+                    ufc = UserFileCache({'cert': recallingTask['user_proxy'], 'key': recallingTask['user_proxy'], 'endpoint': recallingTask['tm_cache_url'], "pycurl": True})
+                    sandbox = recallingTask['tm_user_sandbox'].replace(".tar.gz","")
+                    try:
+                        ufc.download(sandbox, sandbox, recallingTask['tm_username'])
+                        os.remove(sandbox)
+                        self.logger.info("Successfully touched input sandbox (%s) of task %s (frontend: %s) using the '%s' username (request_id = %d).",
+                                         sandbox, taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId)
+                    except Exception as ex:
+                        self.logger.info("The CRAB3 server backend could not download the input sandbox (%s) of task %s from the frontend (%s) using the '%s' username (request_id = %d)."+\
+                                         " This could be a temporary glitch, will try again in next occurrence of the recurring action."+\
+                                         " Error reason:\n%s", sandbox, taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId, str(ex))
+
+                ddmRequest = statusRequest(reqId, config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, verbose=False)
+                # The query above returns a JSON with a format {"result": "OK", "message": "Request found", "data": [{"request_id": 14, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:25:41", "last_request": "2018-02-26 23:25:41", "request_count": 1}]}                
+                self.logger.info("Contacted %s using %s and %s for request_id = %d, got:\n%s", config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, reqId, ddmRequest)
 
                 if ddmRequest["message"] == "Request found":
                     status = ddmRequest["data"][0]["status"]
