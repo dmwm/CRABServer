@@ -22,9 +22,10 @@ class TapeRecallStatus(BaseRecurringAction):
         recallingTasks = mw.getWork(limit=999999, getstatus=tapeRecallStatus, ignoreTWName=True)
         if len(recallingTasks) > 0:
             self.logger.info("Retrieved a total of %d %s tasks", len(recallingTasks), tapeRecallStatus)
-            self.logger.debug("Retrieved the following %s tasks: \n%s", tapeRecallStatus, str(recallingTasks))
             for recallingTask in recallingTasks:
                 taskName = recallingTask['tm_taskname']
+                self.logger.info("Working on task %s", taskName)
+
                 reqId = recallingTask['tm_DDM_reqid']
                 if not reqId:
                     self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", taskName)
