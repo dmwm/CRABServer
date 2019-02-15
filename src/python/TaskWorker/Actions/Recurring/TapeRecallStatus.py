@@ -32,11 +32,6 @@ class TapeRecallStatus(BaseRecurringAction):
                     self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", taskName)
                     continue
 
-                if (time.time() - getTimeFromTaskname(str(taskName)) > MAX_DAYS_FOR_TAPERECALL*24*60*60):
-                    self.logger.info("Task %s is older than %d days, setting its status to FAILED", taskName, MAX_DAYS_FOR_TAPERECALL)
-                    mw.updateWork(taskName, recallingTask['tm_task_command'], 'FAILED')
-                    continue
-
                 server = HTTPRequests(config.TaskWorker.resturl, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=self.logger)
                 mpl = MyProxyLogon(config=config, server=server, resturi=config.TaskWorker.restURInoAPI, myproxylen=self.pollingTime)
                 user_proxy = True
@@ -45,6 +40,13 @@ class TapeRecallStatus(BaseRecurringAction):
                 except TaskWorkerException as twe:
                     user_proxy = False
                     self.logger.exception(twe)
+
+                if (time.time() - getTimeFromTaskname(str(taskName)) > MAX_DAYS_FOR_TAPERECALL*24*60*60):
+                    self.logger.info("Task %s is older than %d days, setting its status to FAILED", taskName, MAX_DAYS_FOR_TAPERECALL)
+                    mw.updateWork(taskName, recallingTask['tm_task_command'], 'FAILED')
+                    msg = "Task has been failed because the disk replica request (id: %d) for the input dataset did not complete in %d days." % (reqId, MAX_DAYS_FOR_TAPERECALL)
+                    if user_proxy: mpl.uploadWarning(msg, recallingTask['user_proxy'], taskName)
+                    continue
 
                 # Make sure the task sandbox in the crabcache is not deleted until the tape recall is completed
                 if user_proxy:
