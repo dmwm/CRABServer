@@ -6,7 +6,7 @@ from TaskWorker.Actions.DDMRequests import statusRequest
 from RESTInteractions import HTTPRequests
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.WorkerExceptions import TaskWorkerException
-from ServerUtilities import getTimeFromTaskname
+from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, getTimeFromTaskname
 
 import logging
 import sys
@@ -14,7 +14,6 @@ import os, time
 
 class TapeRecallStatus(BaseRecurringAction):
     pollingTime = 60*4 # minutes
-    maxLifeDays = 30
 
     def _execute(self, resthost, resturi, config, task):
         mw = MasterWorker(config, logWarning=False, logDebug=False, sequential=True, console=False)
@@ -33,8 +32,8 @@ class TapeRecallStatus(BaseRecurringAction):
                     self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", taskName)
                     continue
 
-                if (time.time() - getTimeFromTaskname(str(taskName)) > self.maxLifeDays*24*60*60):
-                    self.logger.info("Task %s is older than %d days, setting it to FAILED", taskName, self.maxLifeDays,)
+                if (time.time() - getTimeFromTaskname(str(taskName)) > MAX_DAYS_FOR_TAPERECALL*24*60*60):
+                    self.logger.info("Task %s is older than %d days, setting its status to FAILED", taskName, MAX_DAYS_FOR_TAPERECALL)
                     mw.updateWork(taskName, recallingTask['tm_task_command'], 'FAILED')
                     continue
 
