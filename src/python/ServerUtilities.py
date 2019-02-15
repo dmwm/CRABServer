@@ -487,6 +487,9 @@ class newX509env():
 
     def __init__(self, X509_USER_PROXY=None, X509_USER_CERT=None, X509_USER_KEY=None):
         # define the new environment
+        self.oldProxy = None
+        self.oldCert = None
+        self.oldKey = None
         self.newProxy = X509_USER_PROXY
         self.newCert = X509_USER_CERT
         self.newKey = X509_USER_KEY
@@ -557,11 +560,12 @@ class tempSetLogLevel():
         after the loop
     """
     import logging
-    def __init__(self,logger=None,level=None):
-        self.newLogLevel=level
-        self.logger=logger
+    def __init__(self, logger=None, level=None):
+        self.previousLogLevel = None
+        self.newLogLevel = level
+        self.logger = logger
     def __enter__(self):
-        self.previousLogLevel=self.logger.getEffectiveLevel()
+        self.previousLogLevel = self.logger.getEffectiveLevel()
         self.logger.setLevel(self.newLogLevel)
     def __exit__(self,a,b,c):
         self.logger.setLevel(self.previousLogLevel)
