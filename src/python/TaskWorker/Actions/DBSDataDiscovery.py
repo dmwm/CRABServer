@@ -177,7 +177,6 @@ class DBSDataDiscovery(DataDiscovery):
                 self.logger.info("Contacted %s using %s and %s, got:\n%s", self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, ddmRequest)
                 # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
                 if ddmRequest["result"] == "OK":
-                    msg += "\nA disk replica has been requested on %s" % ddmRequest["data"][0]["first_request"]
                     # set status to TAPERECALL
                     tapeRecallStatus = 'TAPERECALL'
                     ddmReqId = ddmRequest["data"][0]["request_id"]
@@ -196,9 +195,10 @@ class DBSDataDiscovery(DataDiscovery):
                         msg += "\nHTTP Headers are: %s" % hte.headers
                         raise TaskWorkerException(msg, retry=True)
 
+                    msg += "\nA disk replica has been requested on %s to CMS DDM (request ID: %d)" % (ddmRequest["data"][0]["first_request"], ddmReqId)
                     if tapeRecallStatusSet[2] == "OK":
                         self.logger.info("Status for task %s set to '%s'", taskName, tapeRecallStatus)
-                        msg += " and the task will be submitted as soon as it is completed."
+                        msg += "\nThis task will be automatically submitted as soon as the stage-out is completed."
                         self.uploadWarning(msg, userProxy, taskName)
 
                         raise TapeDatasetException(msg)
