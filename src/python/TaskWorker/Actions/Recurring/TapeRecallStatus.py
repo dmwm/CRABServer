@@ -1,5 +1,12 @@
 from __future__ import division
 
+import logging
+import sys
+import os, time
+import urllib
+from base64 import b64encode
+from httplib import HTTPException
+
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 from TaskWorker.MasterWorker import MasterWorker
 from TaskWorker.Actions.DDMRequests import statusRequest
@@ -7,10 +14,6 @@ from RESTInteractions import HTTPRequests
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, getTimeFromTaskname
-
-import logging
-import sys
-import os, time
 
 class TapeRecallStatus(BaseRecurringAction):
     pollingTime = 60*4 # minutes
@@ -33,6 +36,12 @@ class TapeRecallStatus(BaseRecurringAction):
                     continue
 
                 server = HTTPRequests(config.TaskWorker.resturl, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=self.logger)
+                if (time.time() - getTimeFromTaskname(str(taskName)) > MAX_DAYS_FOR_TAPERECALL*24*60*60):
+                    self.logger.info("Task %s is older than %d days, setting its status to FAILED", taskName, MAX_DAYS_FOR_TAPERECALL)
+                    msg = "The disk replica request (ID: %d) for the input dataset did not complete in %d days." % (reqId, MAX_DAYS_FOR_TAPERECALL)
+                    failTask(taskName, server, config.TaskWorker.restURInoAPI, msg, self.logger)
+                    continue
+
                 mpl = MyProxyLogon(config=config, server=server, resturi=config.TaskWorker.restURInoAPI, myproxylen=self.pollingTime)
                 user_proxy = True
                 try:
@@ -40,13 +49,6 @@ class TapeRecallStatus(BaseRecurringAction):
                 except TaskWorkerException as twe:
                     user_proxy = False
                     self.logger.exception(twe)
-
-                if (time.time() - getTimeFromTaskname(str(taskName)) > MAX_DAYS_FOR_TAPERECALL*24*60*60):
-                    self.logger.info("Task %s is older than %d days, setting its status to FAILED", taskName, MAX_DAYS_FOR_TAPERECALL)
-                    mw.updateWork(taskName, recallingTask['tm_task_command'], 'FAILED')
-                    msg = "Task has been failed because the disk replica request (id: %d) for the input dataset did not complete in %d days." % (reqId, MAX_DAYS_FOR_TAPERECALL)
-                    if user_proxy: mpl.uploadWarning(msg, recallingTask['user_proxy'], taskName)
-                    continue
 
                 # Make sure the task sandbox in the crabcache is not deleted until the tape recall is completed
                 if user_proxy:
@@ -75,10 +77,10 @@ class TapeRecallStatus(BaseRecurringAction):
                         # Delete all task warnings (the tapeRecallStatus added a dataset warning which is no longer valid now)
                         if user_proxy: mpl.deleteWarnings(recallingTask['user_proxy'], taskName)
                     elif status == "rejected":
-                        msg = "DDM request_id %d has been rejected with this reason: %s" % (reqId, ddmRequest["data"][0]["reason"])
-                        if user_proxy: mpl.uploadWarning(msg, recallingTask['user_proxy'], taskName)
+                        msg = "The DDM request (ID: %d) has been rejected with this reason: %s" % (reqId, ddmRequest["data"][0]["reason"])
                         self.logger.info(msg + "\nSetting status of task %s to FAILED", taskName)
-                        mw.updateWork(taskName, recallingTask['tm_task_command'], 'FAILED')
+                        failTask(taskName, server, config.TaskWorker.restURInoAPI, msg, self.logger)
+
                 else:
                     msg = "DDM request_id %d not found. Please report to experts" % reqId
                     self.logger.info(msg)
@@ -86,6 +88,24 @@ class TapeRecallStatus(BaseRecurringAction):
 
         else:
             self.logger.info("No %s task retrieved.", tapeRecallStatus)
+
+
+def failTask(taskName, HTTPServer, restURInoAPI, msg, logger):
+    try:
+        logger.info("Uploading failure message to the REST:\n%s", msg)
+        configreq = {'workflow': taskName,
+                     'status': 'FAILED',
+                     'subresource': 'failure',
+                     'failure': b64encode(msg)}
+        HTTPServer.post(restURInoAPI+'workflowdb', data = urllib.urlencode(configreq))
+        logger.info("Failure message successfully uploaded to the REST")
+    except HTTPException as hte:
+        logger.warning("Cannot upload failure message to the REST for task %s. HTTP headers follows:", taskName)
+        logger.error(hte.headers)
+    except Exception as exc: #pylint: disable=broad-except
+        logger.warning("Cannot upload failure message to the REST for workflow %s.\nReason: %s", taskName, exc)
+        logger.exception('Traceback follows:')
+
 
 if __name__ == '__main__':
     """ Simple main to execute the action standalone. You just need to set the task worker environment and desired twconfig. """
