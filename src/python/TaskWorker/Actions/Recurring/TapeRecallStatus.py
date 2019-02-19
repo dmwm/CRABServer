@@ -90,21 +90,21 @@ class TapeRecallStatus(BaseRecurringAction):
             self.logger.info("No %s task retrieved.", tapeRecallStatus)
 
 
-def failTask(taskName, HTTPServer, restURInoAPI, msg, logger):
+def failTask(taskName, HTTPServer, restURInoAPI, msg, log):
     try:
-        logger.info("Uploading failure message to the REST:\n%s", msg)
+        log.info("Uploading failure message to the REST:\n%s", msg)
         configreq = {'workflow': taskName,
                      'status': 'FAILED',
                      'subresource': 'failure',
                      'failure': b64encode(msg)}
         HTTPServer.post(restURInoAPI+'workflowdb', data = urllib.urlencode(configreq))
-        logger.info("Failure message successfully uploaded to the REST")
+        log.info("Failure message successfully uploaded to the REST")
     except HTTPException as hte:
-        logger.warning("Cannot upload failure message to the REST for task %s. HTTP headers follows:", taskName)
-        logger.error(hte.headers)
+        log.warning("Cannot upload failure message to the REST for task %s. HTTP headers follows:", taskName)
+        log.error(hte.headers)
     except Exception as exc: #pylint: disable=broad-except
-        logger.warning("Cannot upload failure message to the REST for workflow %s.\nReason: %s", taskName, exc)
-        logger.exception('Traceback follows:')
+        log.warning("Cannot upload failure message to the REST for workflow %s.\nReason: %s", taskName, exc)
+        log.exception('Traceback follows:')
 
 
 if __name__ == '__main__':
