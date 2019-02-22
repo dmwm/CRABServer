@@ -3,9 +3,6 @@ from __future__ import division
 import logging
 import sys
 import os, time
-import urllib
-from base64 import b64encode
-from httplib import HTTPException
 
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 from TaskWorker.MasterWorker import MasterWorker
@@ -14,6 +11,7 @@ from RESTInteractions import HTTPRequests
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, getTimeFromTaskname
+from TaskWorker.Worker import failTask
 
 class TapeRecallStatus(BaseRecurringAction):
     pollingTime = 60*4 # minutes
@@ -22,12 +20,14 @@ class TapeRecallStatus(BaseRecurringAction):
         mw = MasterWorker(config, logWarning=False, logDebug=False, sequential=True, console=False)
 
         tapeRecallStatus = 'TAPERECALL'
+        #tapeRecallStatus = 'FAILED'
         self.logger.info("Retrieving %s tasks", tapeRecallStatus)
         recallingTasks = mw.getWork(limit=999999, getstatus=tapeRecallStatus, ignoreTWName=True)
         if len(recallingTasks) > 0:
             self.logger.info("Retrieved a total of %d %s tasks", len(recallingTasks), tapeRecallStatus)
             for recallingTask in recallingTasks:
                 taskName = recallingTask['tm_taskname']
+                #if not 'twelvuplicate' in taskName: continue
                 self.logger.info("Working on task %s", taskName)
 
                 reqId = recallingTask['tm_DDM_reqid']
@@ -39,7 +39,7 @@ class TapeRecallStatus(BaseRecurringAction):
                 if (time.time() - getTimeFromTaskname(str(taskName)) > MAX_DAYS_FOR_TAPERECALL*24*60*60):
                     self.logger.info("Task %s is older than %d days, setting its status to FAILED", taskName, MAX_DAYS_FOR_TAPERECALL)
                     msg = "The disk replica request (ID: %d) for the input dataset did not complete in %d days." % (reqId, MAX_DAYS_FOR_TAPERECALL)
-                    failTask(taskName, server, config.TaskWorker.restURInoAPI, msg, self.logger)
+                    failTask(taskName, server, config.TaskWorker.restURInoAPI+'workflowdb', msg, self.logger, 'FAILED')
                     continue
 
                 mpl = MyProxyLogon(config=config, server=server, resturi=config.TaskWorker.restURInoAPI, myproxylen=self.pollingTime)
@@ -79,7 +79,7 @@ class TapeRecallStatus(BaseRecurringAction):
                     elif status == "rejected":
                         msg = "The DDM request (ID: %d) has been rejected with this reason: %s" % (reqId, ddmRequest["data"][0]["reason"])
                         self.logger.info(msg + "\nSetting status of task %s to FAILED", taskName)
-                        failTask(taskName, server, config.TaskWorker.restURInoAPI, msg, self.logger)
+                        failTask(taskName, server, config.TaskWorker.restURInoAPI+'workflowdb', msg, self.logger, 'FAILED')
 
                 else:
                     msg = "DDM request_id %d not found. Please report to experts" % reqId
@@ -88,23 +88,6 @@ class TapeRecallStatus(BaseRecurringAction):
 
         else:
             self.logger.info("No %s task retrieved.", tapeRecallStatus)
-
-
-def failTask(taskName, HTTPServer, restURInoAPI, msg, log):
-    try:
-        log.info("Uploading failure message to the REST:\n%s", msg)
-        configreq = {'workflow': taskName,
-                     'status': 'FAILED',
-                     'subresource': 'failure',
-                     'failure': b64encode(msg)}
-        HTTPServer.post(restURInoAPI+'workflowdb', data = urllib.urlencode(configreq))
-        log.info("Failure message successfully uploaded to the REST")
-    except HTTPException as hte:
-        log.warning("Cannot upload failure message to the REST for task %s. HTTP exception headers follows:", taskName)
-        log.error(hte.headers)
-    except Exception as exc: #pylint: disable=broad-except
-        log.warning("Cannot upload failure message to the REST for workflow %s.\nReason: %s", taskName, exc)
-        log.exception('Traceback follows:')
 
 
 if __name__ == '__main__':
