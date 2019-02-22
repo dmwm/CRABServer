@@ -99,7 +99,7 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsD
         finally:
             if msg:
                 server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey, retry = 20, logger = logger)
-                failTask(task['tm_taskname'], server, resturi, msg, log, failstatus)
+                failTask(task['tm_taskname'], server, resturi, msg, logger, failstatus)
         t1 = time.time()
         logger.debug("%s: ...work on %s completed in %d seconds: %s", procName, task['tm_taskname'], t1-t0, outputs)
 
