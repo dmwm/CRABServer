@@ -20,14 +20,12 @@ class TapeRecallStatus(BaseRecurringAction):
         mw = MasterWorker(config, logWarning=False, logDebug=False, sequential=True, console=False)
 
         tapeRecallStatus = 'TAPERECALL'
-        #tapeRecallStatus = 'FAILED'
         self.logger.info("Retrieving %s tasks", tapeRecallStatus)
         recallingTasks = mw.getWork(limit=999999, getstatus=tapeRecallStatus, ignoreTWName=True)
         if len(recallingTasks) > 0:
             self.logger.info("Retrieved a total of %d %s tasks", len(recallingTasks), tapeRecallStatus)
             for recallingTask in recallingTasks:
                 taskName = recallingTask['tm_taskname']
-                #if not 'twelvuplicate' in taskName: continue
                 self.logger.info("Working on task %s", taskName)
 
                 reqId = recallingTask['tm_DDM_reqid']
