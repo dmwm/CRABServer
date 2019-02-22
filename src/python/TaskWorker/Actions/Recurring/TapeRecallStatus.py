@@ -100,7 +100,7 @@ def failTask(taskName, HTTPServer, restURInoAPI, msg, log):
         HTTPServer.post(restURInoAPI+'workflowdb', data = urllib.urlencode(configreq))
         log.info("Failure message successfully uploaded to the REST")
     except HTTPException as hte:
-        log.warning("Cannot upload failure message to the REST for task %s. HTTP headers follows:", taskName)
+        log.warning("Cannot upload failure message to the REST for task %s. HTTP exception headers follows:", taskName)
         log.error(hte.headers)
     except Exception as exc: #pylint: disable=broad-except
         log.warning("Cannot upload failure message to the REST for workflow %s.\nReason: %s", taskName, exc)
