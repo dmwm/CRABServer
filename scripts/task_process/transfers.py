@@ -234,7 +234,9 @@ class submit_thread(threading.Thread):
                            overwrite=True,
                            verify_checksum=True,
                            # TODO: add user DN to metadata
-                           metadata={"issuer": "ASO"},
+                           metadata={"issuer": "ASO",
+                                     "userDN": self.files[0][4],
+                                     "taskname": self.files[0][5]},
                            copy_pin_lifetime=-1,
                            bring_online=None,
                            source_spacetoken=None,
@@ -290,6 +292,8 @@ def submit(phedex, context, toTrans):
     for source in sources:
 
         ids = [x[2] for x in toTrans if x[3] == source]
+        username = toTrans[0][5]
+        taskname = toTrans[0][6]
         src_lfns = [x[0] for x in toTrans if x[3] == source]
         dst_lfns = [x[1] for x in toTrans if x[3] == source]
 
@@ -319,7 +323,7 @@ def submit(phedex, context, toTrans):
         source_pfns = sorted_source_pfns
         dest_pfns = sorted_dest_pfns
 
-        tx_from_source = [[x[0], x[1], x[2], source] for x in zip(source_pfns, dest_pfns, ids)] 
+        tx_from_source = [[x[0], x[1], x[2], source, username, taskname] for x in zip(source_pfns, dest_pfns, ids)] 
 
         for files in chunks(tx_from_source, 200):
             thread = submit_thread(threadLock, logging, context, files, source, jobids, to_update)
@@ -361,7 +365,9 @@ def perform_transfers(inputFile, lastLine, _lastFile, context, phedex):
                               doc["destination_lfn"],
                               doc["id"],
                               doc["source"],
-                              doc["destination"]])
+                              doc["destination"],
+                              doc["username"],
+                              doc["taskname"]])
 
         jobids = []
         if len(transfers) > 0:
