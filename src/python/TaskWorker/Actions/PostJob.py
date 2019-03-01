@@ -1139,9 +1139,10 @@ class ASOServerJob(object):
             # Now this means that we have a list of ids which needs to be killed
             # First try to kill ALL in one API call
             newDoc = {'listOfIds': transfersToKill,
+                      'publish': 0,
                       'subresource': 'killTransfersById'}
             try:
-                killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds']))
+                killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds', 'publish']))
                 not_cancelled = killedFiles[0]['result'][0]['failedKill']
                 cancelled = killedFiles[0]['result'][0]['killed']
             except HTTPException as hte:
@@ -1159,11 +1160,12 @@ class ASOServerJob(object):
             # and also kill if status is not in KILL or KILLED
             for docIdKill in transfersToKill:
                 newDoc = {'listOfIds': [docIdKill],
+                          'publish': 0,
                           'subresource': 'killTransfersById'}
                 try:
                     doc_out = self.getDocByID(docIdKill)
                     if doc_out['transfer_state'] not in ['kill', 'killed']:
-                        killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds']))
+                        killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds', 'publish']))
                         failedFiles = killedFiles[0]['result'][0]['failedKill']
                         notfailedFiles = killedFiles[0]['result'][0]['killed']
                         if failedFiles:
