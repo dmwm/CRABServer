@@ -16,7 +16,7 @@ class FileTransfers(object):
                        :rest_host, :rest_uri, :transfer_state, :publication_state, :last_update, \
                        :transfer_max_retry_count, :publication_max_retry_count, :start_time, SYS_EXTRACT_UTC(SYSTIMESTAMP))"
 
-    AcquireTransfers_sql = "UPDATE filetransfersdb SET tm_aso_worker = :asoworker, \
+    AcquireTransfers_sql = "UPDATE filetransfersdb SET tm_aso_worker = 'asoprod1', \
                                tm_last_update = :last_update, \
                                tm_transfer_state = :new_transfer_state \
                             WHERE tm_aso_worker IS NULL AND \
@@ -26,15 +26,15 @@ class FileTransfers(object):
 
     AcquirePublication_sql = "UPDATE filetransfersdb SET tm_last_update = :last_update, \
                                                          tm_publication_state = :new_publication_state, \
-                                                         tm_aso_worker = :asoworker \
-                              WHERE (tm_aso_worker = :asoworker or tm_aso_worker is NULL) AND \
+                                                         tm_aso_worker = 'asoprod1' \
+                              WHERE (tm_aso_worker = 'asoprod1' or tm_aso_worker is NULL) AND \
                                     tm_transfer_state = :transfer_state AND \
                                     tm_publish = :publish_flag AND \
                                     tm_publication_state = :publication_state"
 
     UpdateTransfers_sql = "UPDATE filetransfersdb SET tm_transfer_state = :transfer_state, \
                                                       tm_last_update = :last_update, \
-                                                      tm_aso_worker = :asoworker, \
+                                                      tm_aso_worker = 'asoprod1', \
                                                       tm_transfer_failure_reason = :fail_reason, \
                                                       tm_transfer_retry_count = tm_transfer_retry_count + :retry_value, \
                                                       tm_fts_id = CASE WHEN :fts_id is NULL THEN tm_fts_id ELSE :fts_id END,\
@@ -46,7 +46,7 @@ class FileTransfers(object):
                                                        tm_fts_instance = :fts_instance, \
                                                        tm_fts_id = :fts_id \
                             WHERE tm_id = :id AND \
-                                  tm_aso_worker = :asoworker"
+                                  tm_aso_worker = 'asoprod1'"
 
     UpdatePublication_sql = "UPDATE filetransfersdb SET tm_publication_state = :publication_state, \
                                                         tm_last_update = :last_update, \
@@ -54,14 +54,14 @@ class FileTransfers(object):
                                                         tm_publication_retry_count = tm_publication_retry_count + :retry_value, \
                                                         tm_publish = CASE WHEN :publish = -1 THEN tm_publish ELSE :publish END \
                              WHERE tm_id = :id AND \
-                                   (tm_aso_worker LIKE :asoworker OR tm_aso_worker is NULL)"
+                                   (tm_aso_worker LIKE 'asoprod1' OR tm_aso_worker is NULL)"
 
     RetryPublication_sql = "UPDATE filetransfersdb SET tm_publication_state = :new_publication_state, \
                                                        tm_last_update = :last_update, \
                                                        tm_aso_worker = NULL, \
                                                        tm_publication_retry_count = tm_publication_retry_count + 1 \
                             WHERE tm_id = :id AND \
-                                  tm_aso_worker = :asoworker AND \
+                                  tm_aso_worker = 'asoprod1' AND \
                                   tm_publication_state = :publication_state AND \
                                   tm_publication_max_retry_count <= tm_publication_retry_count"
 
@@ -70,7 +70,7 @@ class FileTransfers(object):
                                                      tm_aso_worker = NULL, \
                                                      tm_transfer_retry_count = tm_transfer_retry_count + 1 \
                           WHERE tm_transfer_state = :transfer_state AND \
-                                tm_aso_worker = :asoworker AND \
+                                tm_aso_worker = 'asoprod1' AND \
                                 (:last_update - tm_last_update) > :time_to AND \
                                 tm_transfer_max_retry_count >= tm_transfer_retry_count"
 
@@ -86,7 +86,7 @@ class FileTransfers(object):
 			    FROM filetransfersdb f \
 			    LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
                             WHERE tm_transfer_state = :state AND \
-                                  tm_aso_worker = :asoworker AND \
+                                  tm_aso_worker = 'asoprod1' AND \
                                   rownum < :limit \
                             ORDER BY rownum"
 
@@ -98,7 +98,7 @@ class FileTransfers(object):
                                   f.tm_username = :username AND \
                                   NVL(t.tm_user_role, 'None') = :vorole AND \
                                   NVL(t.tm_user_group, 'None') = :vogroup AND \
-                                  f.tm_aso_worker = :asoworker AND \
+                                  f.tm_aso_worker = 'asoprod1' AND \
                                   rownum < :limit \
                             ORDER BY rownum"
 
@@ -112,7 +112,7 @@ class FileTransfers(object):
 			       LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
                                WHERE f.tm_publication_state = :state AND \
                                      f.tm_transfer_state = :transfer_state AND \
-                                     f.tm_aso_worker = :asoworker AND \
+                                     f.tm_aso_worker = 'asoprod1' AND \
                                      rownum < :limit \
                                ORDER BY rownum"
 
@@ -127,7 +127,7 @@ class FileTransfers(object):
                                WHERE f.tm_username = :username AND \
                                      f.tm_publication_state = :state AND \
                                      f.tm_transfer_state = :transfer_state AND \
-                                     f.tm_aso_worker = :asoworker AND \
+                                     f.tm_aso_worker = 'asoprod1' AND \
                                      rownum < :limit \
                                ORDER BY rownum"
 
@@ -135,7 +135,7 @@ class FileTransfers(object):
                                          GROUP BY tm_aso_worker, tm_transfer_state"
 
     GetGroupedTransferStatistics1_sql = "SELECT count(*) as count, tm_aso_worker, tm_username, tm_transfer_state, tm_source, tm_destination FROM filetransfersdb \
-                                         WHERE tm_username = :username AND tm_aso_worker = :asoworker \
+                                         WHERE tm_username = :username AND tm_aso_worker = 'asoprod1' \
                                          GROUP BY tm_aso_worker, tm_username, tm_transfer_state, tm_source, tm_destination"
 
 
@@ -144,7 +144,7 @@ class FileTransfers(object):
                                           GROUP BY tm_username, tm_transfer_state"
 
     GetGroupedTransferStatistics2_sql = "SELECT count(*) as count, tm_aso_worker, tm_username, tm_taskname, tm_transfer_state FROM filetransfersdb \
-                                         WHERE tm_username = :username AND tm_aso_worker = :asoworker AND tm_taskname = :taskname \
+                                         WHERE tm_username = :username AND tm_aso_worker = 'asoprod1' AND tm_taskname = :taskname \
                                          GROUP BY tm_aso_worker, tm_username, tm_taskname, tm_transfer_state"
 
     GetGroupedTransferStatistics2a_sql = "SELECT count(*) as count, tm_username, tm_taskname, tm_transfer_state FROM filetransfersdb \
@@ -152,7 +152,7 @@ class FileTransfers(object):
                                           GROUP BY tm_username, tm_taskname, tm_transfer_state"
 
     GetGroupedTransferStatistics3_sql = "SELECT count(*) as count, tm_aso_worker, tm_username, tm_source, tm_transfer_state FROM filetransfersdb \
-                                         WHERE tm_username = :username AND tm_aso_worker = :asoworker AND tm_source = :source \
+                                         WHERE tm_username = :username AND tm_aso_worker = 'asoprod1' AND tm_source = :source \
                                          GROUP BY tm_aso_worker, tm_username, tm_source, tm_transfer_state"
 
     GetGroupedTransferStatistics3a_sql = "SELECT count(*) as count, tm_username, tm_source, tm_transfer_state FROM filetransfersdb \
@@ -160,7 +160,7 @@ class FileTransfers(object):
                                          GROUP BY tm_username, tm_source, tm_transfer_state"
 
     GetGroupedTransferStatistics4_sql = "SELECT count(*) as count, tm_aso_worker, tm_username, tm_source, tm_destination, tm_transfer_state FROM filetransfersdb \
-                                         WHERE tm_username = :username AND tm_aso_worker = :asoworker AND tm_source = :source AND tm_destination = :destination \
+                                         WHERE tm_username = :username AND tm_aso_worker = 'asoprod1' AND tm_source = :source AND tm_destination = :destination \
                                          GROUP BY tm_aso_worker, tm_username, tm_source, tm_destination, tm_transfer_state"
 
     GetGroupedTransferStatistics4a_sql = "SELECT count(*) as count, tm_username, tm_source, tm_destination, tm_transfer_state FROM filetransfersdb \
@@ -168,7 +168,7 @@ class FileTransfers(object):
                                          GROUP BY tm_username, tm_source, tm_destination, tm_transfer_state"
 
     GetGroupedTransferStatistics5_sql = "SELECT count(*) as count, tm_aso_worker, tm_username, tm_taskname, tm_source, tm_destination, tm_transfer_state FROM filetransfersdb \
-                                         WHERE tm_username = :username AND tm_aso_worker = :asoworker AND tm_source = :source AND tm_destination = :destination AND tm_taskname = :taskname \
+                                         WHERE tm_username = :username AND tm_aso_worker = 'asoprod1' AND tm_source = :source AND tm_destination = :destination AND tm_taskname = :taskname \
                                          GROUP BY tm_aso_worker, tm_username, tm_taskname, tm_source, tm_destination, tm_transfer_state"
 
     GetGroupedTransferStatistics5a_sql = "SELECT count(*) as count, tm_username, tm_taskname, tm_source, tm_destination, tm_transfer_state FROM filetransfersdb \
@@ -180,7 +180,7 @@ class FileTransfers(object):
                                             GROUP BY tm_aso_worker, tm_publication_state"
 
     GetGroupedPublicationStatistics1_sql = "SELECT count(*) as count, tm_aso_worker, tm_username, tm_publication_state FROM filetransfersdb \
-                                            WHERE tm_username = :username AND tm_aso_worker = :asoworker \
+                                            WHERE tm_username = :username AND tm_aso_worker = 'asoprod1' \
                                             GROUP BY tm_aso_worker, tm_username, tm_publication_state"
 
     GetGroupedPublicationStatistics1a_sql = "SELECT count(*) as count, tm_username, tm_publication_state FROM filetransfersdb \
@@ -188,7 +188,7 @@ class FileTransfers(object):
                                              GROUP BY tm_username, tm_publication_state"
 
     GetGroupedPublicationStatistics2_sql = "SELECT count(*) as count, tm_aso_worker, tm_username, tm_taskname, tm_publication_state FROM filetransfersdb \
-                                            WHERE tm_username = :username AND tm_aso_worker = :asoworker AND tm_taskname = :taskname \
+                                            WHERE tm_username = :username AND tm_aso_worker = 'asoprod1' AND tm_taskname = :taskname \
                                             GROUP BY tm_aso_worker, tm_username, tm_taskname, tm_publication_state"
 
     GetGroupedPublicationStatistics2a_sql = "SELECT count(*) as count, tm_username, tm_taskname, tm_publication_state FROM filetransfersdb \
@@ -247,8 +247,8 @@ class FileTransfers(object):
                                        WHERE tm_username = :username AND tm_taskname = :taskname"  # ORDER BY tm_job_retry_count"
 
     GetActiveUsers_sql = "SELECT t.tm_username, t.tm_user_role, t.tm_user_group, count(*) FROM filetransfersdb f LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
-                                       WHERE (tm_transfer_state=0 AND tm_aso_worker IS NULL) OR (tm_transfer_state=1 AND tm_aso_worker=:asoworker) GROUP BY t.tm_username,t.tm_user_role,t.tm_user_group"
+                                       WHERE (tm_transfer_state=0 AND tm_aso_worker IS NULL) OR (tm_transfer_state=1 AND tm_aso_worker='asoprod1') GROUP BY t.tm_username,t.tm_user_role,t.tm_user_group"
 
     GetActiveUserPublications_sql = "SELECT t.tm_username, t.tm_user_role, t.tm_user_group, count(*) FROM filetransfersdb f LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
-                                       WHERE (tm_publication_state=0 OR tm_publication_state = 1) AND tm_aso_worker=:asoworker AND tm_publish = 1 GROUP BY t.tm_username,t.tm_user_role,t.tm_user_group"
+                                       WHERE (tm_publication_state=0 OR tm_publication_state = 1) AND tm_aso_worker='asoprod1' AND tm_publish = 1 GROUP BY t.tm_username,t.tm_user_role,t.tm_user_group"
 
