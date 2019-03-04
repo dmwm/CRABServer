@@ -7,6 +7,8 @@ import json
 import logging
 import threading
 import os
+import time
+import subprocess
 
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.Storage.TrivialFileCatalog import readTFC
@@ -29,6 +31,42 @@ if os.path.exists('task_process/rest_filetransfers.txt'):
         rest_filetransfers = _rest.readline().split('\n')[0]
         proxy = os.getcwd() + "/" + _rest.readline()
         print("Proxy: %s", proxy)
+
+
+def execute_command(command, logger, timeout):
+    """
+    _execute_command_
+    Funtion to manage commands.
+    """
+
+    stdout, stderr, rc = None, None, 99999
+    proc = subprocess.Popen(
+            command, shell=True, cwd=os.environ['PWD'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+    )
+
+    t_beginning = time.time()
+    seconds_passed = 0
+    while True:
+        if proc.poll() is not None:
+            break
+        seconds_passed = time.time() - t_beginning
+        if timeout and seconds_passed > timeout:
+            proc.terminate()
+            logger.error('Timeout in %s execution.' % command )
+            return stdout, rc
+
+        time.sleep(0.1)
+
+    stdout, stderr = proc.communicate()
+    rc = proc.returncode
+
+    logger.debug('Executing : \n command : %s\n output : %s\n error: %s\n retcode : %s' % (command, stdout, stderr, rc))
+
+    return stdout, rc
+
 
 def get_tfc_rules(phedex, site):
     """
@@ -113,6 +151,19 @@ def mark_failed(ids, failures_reasons):
     return 0
 
 
+def remove_files(pfn):
+
+    command = 'env -i X509_USER_PROXY=%s gfal-rm -v -t 180 %s'  % \
+              (proxy, pfn)
+    logging.debug("Running remove command %s" % command)
+    stdout, rc = execute_command(command, logging, 3600)
+    if rc:
+        logging.info("Deletion command failed with output %s" % (stdout))
+    else:
+        logging.info("File Deleted.")
+    return
+
+
 class check_states_thread(threading.Thread):
     """
     get transfers state per jobid
@@ -183,6 +234,11 @@ class check_states_thread(threading.Thread):
                     else:
                         self.log.exception('Failure reason not found')
                         self.failed_reasons[self.jobid].append('unable to get failure reason')
+                # TODO: wait for gfal installed on schedds
+                # try:
+                #     remove_files(file_status['source_surl'])
+                # except:
+                #     self.log.exception('Failed to remove temp files')
 
         self.threadLock.release()
 
