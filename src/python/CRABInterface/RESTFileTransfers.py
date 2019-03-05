@@ -77,7 +77,7 @@ class RESTFileTransfers(RESTEntity):
         binds = {}
         timeNow = int(time.time())
         binds['last_update'] = [timeNow]
-        binds['asoworker'] = [kwargs['asoworker']]
+        #binds['asoworker'] = [kwargs['asoworker']]
 
         if subresource == 'acquireTransfers':
             ###############################################
@@ -308,7 +308,7 @@ class RESTFileTransfers(RESTEntity):
             if not limit:
                 limit = 1000
             binds['limit'] = limit
-            binds['asoworker'] = asoworker
+            #binds['asoworker'] = asoworker
             sqlQuery = ""
             if subresource == 'acquiredTransfers':
                 if grouping > 3:
@@ -386,7 +386,7 @@ class RESTFileTransfers(RESTEntity):
                 if not limit:
                     limit = 5000
                 binds['limit'] = limit if limit < 5000 else 5000
-                binds['asoworker'] = asoworker
+                #binds['asoworker'] = asoworker
                 binds['state'] = TRANSFERDB_STATUSES['KILL']
                 sqlQuery = self.transferDB.GetDocsTransfer0_sql
                 rows = self.api.query(None, None, sqlQuery, **binds)
