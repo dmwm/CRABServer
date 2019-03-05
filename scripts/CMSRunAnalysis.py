@@ -851,11 +851,7 @@ if __name__ == "__main__":
         from WMCore.FwkJobReport.Report import Report
         from WMCore.FwkJobReport.Report import FwkJobReportException
         from WMCore.WMSpec.Steps.WMExecutionFailure import WMExecutionFailure
-        # temporarely be compatible with old and new WMCore 
-        try:
-            from WMCore.Algorithms.BasicAlgos import calculateChecksums
-        except:
-            from Utils.FileTools import calculateChecksums
+        from Utils.FileTools import calculateChecksums
         from WMCore.WMSpec.Steps.Executors.CMSSW import CMSSW
         from WMCore.Configuration import Configuration
         from WMCore.WMSpec.WMStep import WMStep

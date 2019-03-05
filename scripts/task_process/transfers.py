@@ -239,9 +239,9 @@ class submit_thread(threading.Thread):
                            bring_online=None,
                            source_spacetoken=None,
                            spacetoken=None,
-                           max_time_in_queue=6,
+                           max_time_in_queue=600,
                            retry=3,
-                           retry_delay=3,
+                           retry_delay=600,
                            reuse=True
                            )
         # TODO: fts retries?? check delay
