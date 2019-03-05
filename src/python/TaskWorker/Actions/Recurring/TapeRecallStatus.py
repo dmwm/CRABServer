@@ -53,7 +53,7 @@ class TapeRecallStatus(BaseRecurringAction):
                     from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
                     ufc = UserFileCache({'cert': recallingTask['user_proxy'], 'key': recallingTask['user_proxy'], 'endpoint': recallingTask['tm_cache_url'], "pycurl": True})
                     sandbox = recallingTask['tm_user_sandbox'].replace(".tar.gz","")
-                    sandboxPath = os.path.join(config.TaskWorker.logsDir, sandbox)
+                    sandboxPath = os.path.join("/tmp", sandbox)
                     try:
                         ufc.download(sandbox, sandboxPath, recallingTask['tm_username'])
                         self.logger.info("Successfully touched input sandbox (%s) of task %s (frontend: %s) using the '%s' username (request_id = %d).",
