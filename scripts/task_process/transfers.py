@@ -301,6 +301,7 @@ class submit_thread(threading.Thread):
                            retry=3,
                            retry_delay=600
                            )
+        # reuse=True
         # TODO: fts retries?? check delay
 
         jobid = fts3.submit(self.context, job)
