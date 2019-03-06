@@ -14,8 +14,10 @@ function manage_transfers {
     timeout 15m python task_process/transfers.py
     err=$?
     if [ $err -eq 137 ] || [ $err -eq 124 ]; then
-        log "transfers.py exited with process timeout"
-    else log "transfers.py exited with $err";
+        log "ERROR: transfers.py exited with process timeout";
+    elif [ $err -eq 0 ]; then
+        log "transfers.py exited.";
+    else log "ERROR: transfers.py exited with $err";
     fi
 }
 
