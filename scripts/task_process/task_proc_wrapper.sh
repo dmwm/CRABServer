@@ -11,7 +11,8 @@ function cache_status {
 
 function manage_transfers {
     log "Running transfers.py"
-    timeout 600s python task_process/transfers.py
+    timeout 900s python task_process/transfers.py
+    log "transfers.py exited with $?"
 }
 
 function exit_now {
