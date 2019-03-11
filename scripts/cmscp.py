@@ -9,19 +9,15 @@ import sys
 import re
 import json
 import time
-import urllib
-import pprint
 import signal
 import logging
 import tarfile
-import hashlib
-import datetime
 import traceback
 
 if os.path.exists("WMCore.zip") and "WMCore.zip" not in sys.path:
     sys.path.append("WMCore.zip")
 
-from ServerUtilities import cmd_exist, parseJobAd, TRANSFERDB_STATES, isCouchDBURL
+from ServerUtilities import cmd_exist, parseJobAd
 
 if 'http_proxy' in os.environ and not os.environ['http_proxy'].startswith("http://"):
     os.environ['http_proxy'] = "http://%s" % (os.environ['http_proxy'])
@@ -32,7 +28,6 @@ from WMCore.Storage.Registry import retrieveStageOutImpl
 from WMCore.Algorithms.Alarm import Alarm, alarmHandler
 import WMCore.WMException as WMException
 import DashboardAPI
-from httplib import HTTPException
 
 ## See the explanation of this sentry file in CMSRunAnalysis.py.
 with open('wmcore_initialized', 'w') as fd_wmcore:
@@ -1400,7 +1395,7 @@ def main():
                                                       output_dest_lfn, \
                                                       dest_site, source_site, \
                                                       is_log = False, inject = transfer_outputs)
-                    except Exception as ex:
+                    except Exception:
                         msg  = "ERROR: Unhandled exception when performing stageout."
                         msg += "\n%s" % (traceback.format_exc())
                         print(msg)
