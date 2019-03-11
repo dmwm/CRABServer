@@ -146,6 +146,30 @@ class ScheddStats(dict):
 scheddStats = ScheddStats()
 
 
+def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
+    """ Check memory and walltime and if user requires too much:
+        - upload warning back to crabserver
+        - change walltime to max 47h Issue: #4742
+    """
+
+    stdmaxjobruntime = 2750
+    stdmaxmemory = 2500
+    runtime = task[cmd+'_maxjobruntime']
+    memory = task[cmd+'_maxmemory']
+    if runtime is not None and runtime > stdmaxjobruntime:
+        msg = "Task requests %s minutes of runtime, but only %s minutes are guaranteed to be available." % (runtime, stdmaxjobruntime)
+        msg += " Jobs may not find a site where to run."
+        msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
+        logger.warning(msg)
+        if info is not None: info['tm_maxjobruntime'] = str(stdmaxjobruntime)
+            warningUploader(msg, task['user_proxy'], task['tm_taskname'])
+    if memory is not None and memory > stdmaxmemory:
+        if task[cmd+'_numcores'] is not None and task[cmd+'_numcores'] < 2:
+            msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (memory, stdmaxmemory)
+            msg += " Jobs may not find a site where to run and stay idle forever."
+            logger.warning(msg)
+                                                                                                                                                                                                                                                                        132,9         27%
+
 class DagmanSubmitter(TaskAction.TaskAction):
 
     """
@@ -174,31 +198,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.logger.warning(msg)
             time.sleep(20)
             raise TaskWorkerException(msg) #we already tried 20 times, give up
-
-
-    def checkMemoryWalltime(self, info, task, cmd):
-        """ Check memory and walltime and if user requires too much:
-            - upload warning back to crabserver
-            - change walltime to max 47h Issue: #4742
-        """
-
-        stdmaxjobruntime = 2750
-        stdmaxmemory = 2500
-        runtime = task[cmd+'_maxjobruntime']
-        memory = task[cmd+'_maxmemory']
-        if runtime is not None and runtime > stdmaxjobruntime:
-            msg = "Task requests %s minutes of runtime, but only %s minutes are guaranteed to be available." % (runtime, stdmaxjobruntime)
-            msg += " Jobs may not find a site where to run."
-            msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
-            self.logger.warning(msg)
-            if info is not None: info['tm_maxjobruntime'] = str(stdmaxjobruntime)
-            self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
-        if memory is not None and memory > stdmaxmemory:
-            if task[cmd+'_numcores'] is not None and task[cmd+'_numcores'] < 2:
-                msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (memory, stdmaxmemory)
-                msg += " Jobs may not find a site where to run and stay idle forever."
-                self.logger.warning(msg)
-                self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
 
 
     def pickAndSetSchedd(self, task):
@@ -242,7 +241,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dashboardParams = args[0][1]
         inputFiles = args[0][2]
 
-        self.checkMemoryWalltime(info, task, 'tm')
+        checkMemoryWalltime(info, task, 'tm', self.logger, self.uploadWarning)
 
         if not schedd:
             schedd = self.pickAndSetSchedd(task)
