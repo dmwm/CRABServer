@@ -176,7 +176,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             raise TaskWorkerException(msg) #we already tried 20 times, give up
 
 
-    def checkMemoryWalltime(self, info, task):
+    def checkMemoryWalltime(self, info, task, cmd):
         """ Check memory and walltime and if user requires too much:
             - upload warning back to crabserver
             - change walltime to max 47h Issue: #4742
@@ -184,18 +184,21 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         stdmaxjobruntime = 2750
         stdmaxmemory = 2500
-        if task['tm_maxjobruntime'] > stdmaxjobruntime:
-            msg = "Task requests %s minutes of runtime, but only %s minutes are guaranteed to be available." % (task['tm_maxjobruntime'], stdmaxjobruntime)
+        runtime = task[cmd+'_maxjobruntime']
+        memory = task[cmd+'_maxmemory']
+        if runtime is not None and runtime > stdmaxjobruntime:
+            msg = "Task requests %s minutes of runtime, but only %s minutes are guaranteed to be available." % (runtime, stdmaxjobruntime)
             msg += " Jobs may not find a site where to run."
             msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
             self.logger.warning(msg)
-            info['tm_maxjobruntime'] = str(stdmaxjobruntime)
+            if info is not None: info['tm_maxjobruntime'] = str(stdmaxjobruntime)
             self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
-        if task['tm_maxmemory'] > stdmaxmemory:
-            msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (task['tm_maxmemory'], stdmaxmemory)
-            msg += " Jobs may not find a site where to run and stay idle forever."
-            self.logger.warning(msg)
-            self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
+        if memory is not None and memory > stdmaxmemory:
+            if task[cmd+'_numcores'] is not None and task[cmd+'_numcores'] < 2:
+                msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (memory, stdmaxmemory)
+                msg += " Jobs may not find a site where to run and stay idle forever."
+                self.logger.warning(msg)
+                self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
 
 
     def pickAndSetSchedd(self, task):
@@ -239,7 +242,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dashboardParams = args[0][1]
         inputFiles = args[0][2]
 
-        self.checkMemoryWalltime(info, task)
+        self.checkMemoryWalltime(info, task, 'tm')
 
         if not schedd:
             schedd = self.pickAndSetSchedd(task)

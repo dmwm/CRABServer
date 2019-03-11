@@ -12,6 +12,7 @@ from WMCore.Database.CMSCouch import CouchServer
 
 from ServerUtilities import FEEDBACKMAIL
 from TaskWorker.Actions.TaskAction import TaskAction
+from TaskWorker.Actions.DagmanSubmitter import checkMemoryWalltime
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from httplib import HTTPException
@@ -74,20 +75,8 @@ class DagmanResubmitter(TaskAction):
             raise TaskWorkerException(msg)
 
         # Check memory and walltime
-        stdmaxjobruntime = 2800
-        stdmaxmemory = 2500
-        if task['resubmit_maxjobruntime'] is not None and task['resubmit_maxjobruntime'] > stdmaxjobruntime:
-            msg  = "Task requests %s minutes of walltime, but only %s are guaranteed to be available." % (task['resubmit_maxjobruntime'], stdmaxjobruntime)
-            msg += " Jobs may not find a site where to run."
-            msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
-            self.logger.warning(msg)
-            task['resubmit_maxjobruntime'] = str(stdmaxjobruntime)
-            self.uploadWarning(msg, proxy, kwargs['task']['tm_taskname'])
-        if task['resubmit_maxmemory'] is not None and task['resubmit_maxmemory'] > stdmaxmemory:
-            msg  = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (task['resubmit_maxmemory'], stdmaxmemory)
-            msg += " Jobs may not find a site where to run and stay idle forever."
-            self.logger.warning(msg)
-            self.uploadWarning(msg, proxy, kwargs['task']['tm_taskname'])
+        checkMemoryWalltime(self, None, task, 'resubmit')
+
 
         # Find only the originally submitted DAG to hold and release: this
         # will re-trigger the scripts and adjust retries and other
