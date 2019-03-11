@@ -1013,10 +1013,10 @@ def main():
 
     ## Modify the stageout temporary and final directory by:
     ## a) adding a four-digit counter;
-    jid = G_JOB_AD['CRAB_Id']
-    if isinstance(jid, basestring):
-        jid = int(jid.split('-')[0])
-    counter = "%04d" % (jid / 1000)
+    logs_arch_dest_pfn_path = os.path.dirname(dest_files[0])
+    if logs_arch_dest_pfn_path.endswith('/log'):
+        logs_arch_dest_pfn_path = re.sub(r'/log$', '', logs_arch_dest_pfn_path)
+    counter = os.path.basename(logs_arch_dest_pfn_path)
     dest_temp_dir = os.path.join(dest_temp_dir, counter)
     dest_final_dir = os.path.join(dest_final_dir, counter)
     ## b) adding a 'failed' subdirectory in case cmsRun failed.
@@ -1028,10 +1028,7 @@ def main():
     logs_arch_file_name = 'cmsRun.log.tar.gz'
     logs_arch_dest_file_name = os.path.basename(dest_files[0])
     logs_arch_dest_pfn = dest_files[0]
-    logs_arch_dest_pfn_path = os.path.dirname(dest_files[0])
     if G_JOB_WRAPPER_EXIT_CODE != 0:
-        if logs_arch_dest_pfn_path.endswith('/log'):
-            logs_arch_dest_pfn_path = re.sub(r'/log$', '', logs_arch_dest_pfn_path)
         logs_arch_dest_pfn_path = os.path.join(logs_arch_dest_pfn_path, 'failed', 'log')
         logs_arch_dest_pfn = os.path.join(logs_arch_dest_pfn_path, logs_arch_dest_file_name)
     logs_arch_dest_temp_lfn = os.path.join(dest_temp_dir, 'log', logs_arch_dest_file_name)
