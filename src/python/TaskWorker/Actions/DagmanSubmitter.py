@@ -162,13 +162,13 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
         msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
         logger.warning(msg)
         if info is not None: info['tm_maxjobruntime'] = str(stdmaxjobruntime)
-            warningUploader(msg, task['user_proxy'], task['tm_taskname'])
+        warningUploader(msg, task['user_proxy'], task['tm_taskname'])
     if memory is not None and memory > stdmaxmemory:
         if task[cmd+'_numcores'] is not None and task[cmd+'_numcores'] < 2:
             msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (memory, stdmaxmemory)
             msg += " Jobs may not find a site where to run and stay idle forever."
             logger.warning(msg)
-                                                                                                                                                                                                                                                                        132,9         27%
+
 
 class DagmanSubmitter(TaskAction.TaskAction):
 
