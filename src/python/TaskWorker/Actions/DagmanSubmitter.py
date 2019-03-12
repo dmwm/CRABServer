@@ -168,6 +168,7 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
             msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (memory, stdmaxmemory)
             msg += " Jobs may not find a site where to run and stay idle forever."
             logger.warning(msg)
+            warningUploader(msg, task['user_proxy'], task['tm_taskname'])
 
 
 class DagmanSubmitter(TaskAction.TaskAction):
