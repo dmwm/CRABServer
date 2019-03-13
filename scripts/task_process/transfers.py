@@ -234,11 +234,10 @@ class check_states_thread(threading.Thread):
                     else:
                         self.log.exception('Failure reason not found')
                         self.failed_reasons[self.jobid].append('unable to get failure reason')
-                # TODO: wait for gfal installed on schedds
-                # try:
-                #     remove_files(file_status['source_surl'])
-                # except:
-                #     self.log.exception('Failed to remove temp files')
+                try:
+                    remove_files(file_status['source_surl'])
+                except:
+                    self.log.exception('Failed to remove temp files')
 
         self.threadLock.release()
 
@@ -289,7 +288,6 @@ class submit_thread(threading.Thread):
         job = fts3.new_job(transfers,
                            overwrite=True,
                            verify_checksum=True,
-                           # TODO: add user DN to metadata
                            metadata={"issuer": "ASO",
                                      "userDN": self.files[0][4],
                                      "taskname": self.files[0][5]},
@@ -297,12 +295,17 @@ class submit_thread(threading.Thread):
                            bring_online=None,
                            source_spacetoken=None,
                            spacetoken=None,
+                           # max time for job in the fts queue in seconds.
+                           # Usually, it should take O(s) for healthy situations
                            max_time_in_queue=600,
                            retry=3,
+                           # seconds after which the transfer is retried
+                           # reduced under FTS suggestion w.r.t. the 3hrs of asov1
                            retry_delay=600
+                           # timeout on the single transfer process
+                           # TODO: not clear if we may need it
+                           # timeout = 1300
                            )
-        # reuse=True
-        # TODO: fts retries?? check delay
 
         jobid = fts3.submit(self.context, job)
 
