@@ -667,7 +667,7 @@ class ASOServerJob(object):
                         msg += " but does not correspond to the current job retry."
                         msg  = msg % (source_lfn, doc_id, transfer_status)
                         if transfer_status in ['acquired', 'new', 'retry']:
-                            msg += "\nFile transfer status is not terminal ('done', 'failed' or 'killed')."
+                            msg += "\nFile transfer status is %s, which is not terminal ('done', 'failed' or 'killed')." % transfer_status
                             msg += " Will not inject a new document for the current job retry."
                             self.logger.info(msg)
                             needs_commit = False
