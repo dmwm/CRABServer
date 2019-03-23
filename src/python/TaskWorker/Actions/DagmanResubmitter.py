@@ -100,7 +100,7 @@ class DagmanResubmitter(TaskAction):
         overwrite = False
         for taskparam in params.values():
             if ('resubmit_'+taskparam in task) and task['resubmit_'+taskparam] != None:
-                # In case resubmission parameters contain a list of unicode strings, 
+                # In case resubmission parameters contain a list of unicode strings,
                 # convert it to a list of ascii strings because of HTCondor unicode
                 # incompatibility.
                 # Note that unicode strings that are not in a list are not handled,
@@ -181,7 +181,7 @@ class DagmanResubmitter(TaskAction):
                          'workflow': kwargs['task']['tm_taskname'],
                          'status': 'SUBMITTED'}
             self.logger.debug("Setting the task as successfully resubmitted with %s", str(configreq))
-            self.server.post(self.resturi, data = urllib.urlencode(configreq))
+            self.server.post(self.resturi, data=urllib.urlencode(configreq))
         except HTTPException as hte:
             self.logger.error(hte.headers)
             msg  = "The CRAB server successfully resubmitted the task to the Grid scheduler,"
@@ -202,7 +202,8 @@ class DagmanResubmitter(TaskAction):
             msg = "Error while trying to connect to CouchDB: %s" % (str(ex))
             raise TaskWorkerException(msg)
         try:
-            failedPublications = database.loadView('DBSPublisher', 'PublicationFailedByWorkflow', {'reduce': False, 'startkey': [taskname], 'endkey': [taskname, {}]})['rows']
+            failedPublications = database.loadView('DBSPublisher', 'PublicationFailedByWorkflow',\
+                    {'reduce': False, 'startkey': [taskname], 'endkey': [taskname, {}]})['rows']
         except Exception as ex:
             msg = "Error while trying to load view 'DBSPublisher.PublicationFailedByWorkflow' from CouchDB: %s" % (str(ex))
             raise TaskWorkerException(msg)
@@ -232,7 +233,7 @@ if __name__ == "__main__":
     from RESTInteractions import HTTPRequests
     from WMCore.Configuration import Configuration
 
-    logging.basicConfig(level = logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
     config = Configuration()
 
     config.section_("TaskWorker")
