@@ -743,8 +743,6 @@ class ASOServerJob(object):
                         msg = "Error injecting document to ASO database:\n%s" % (commit_result_msg)
                         self.logger.info(msg)
                         return False
-                    ## If the upload succeds then record the timestamp in the fwjr (if not already present)
-                    self.recordASOStartTime()
                 ## Record all files for which we want the post-job to monitor their transfer.
                 if needs_transfer:
                     doc_info = {'doc_id'     : doc_id,
@@ -752,6 +750,9 @@ class ASOServerJob(object):
                                 'delayed_publicationflag_update' : delayed_publicationflag_update
                                }
                     docs_in_transfer.append(doc_info)
+                    # Make sure that the fjr has the record of the ASO start transfer time stamp
+                    self.recordASOStartTime()
+
 
         self.logger.info("====== Finished to check uploads to ASO database.")
 
