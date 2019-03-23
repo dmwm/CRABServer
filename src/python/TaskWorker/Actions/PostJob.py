@@ -2087,7 +2087,7 @@ class PostJob():
             msg += "\nAttempts were made to cancel the ongoing transfers,"
             msg += " but cancellation failed for some transfers."
             msg += "\nConsidering cancellation failures as a permament stageout error."
-            self.stageout_exit_codes.append(60321)
+            self.stageout_exit_codes.append(60317)
             raise PermanentStageoutError(msg)
 
         ## Retrieve the stageout failures (a dictionary where the keys are the IDs of
