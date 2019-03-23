@@ -92,7 +92,7 @@ class DagmanResubmitter(TaskAction):
         params = {'CRAB_ResubmitList'  : 'jobids',
                   'CRAB_SiteBlacklist' : 'site_blacklist',
                   'CRAB_SiteWhitelist' : 'site_whitelist',
-                  'MaxWallTimeMins'    : 'maxjobruntime',
+                  'MaxWallTimeMinsRun' : 'maxjobruntime',
                   'RequestMemory'      : 'maxmemory',
                   'RequestCpus'        : 'numcores',
                   'JobPrio'            : 'priority'
