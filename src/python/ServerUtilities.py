@@ -373,6 +373,7 @@ def generateTaskName(username, requestname, timestamp=None):
 def encodeRequest(configreq, listParams=None):
     """ Used to encode the request from a dict to a string. Include the code needed for transforming lists in the format required by
         cmsweb, e.g.:   adduserfiles = ['file1','file2']  ===>  [...]adduserfiles=file1&adduserfiles=file2[...]
+        The list of dictionary keys like adduserfiles above, which have a list as value, needs to be passed in the listParams argument  
     """
     listParams = listParams or []
     encodedLists = ''
