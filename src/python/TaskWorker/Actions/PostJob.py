@@ -1147,6 +1147,7 @@ class ASOServerJob(object):
                     killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds']))
                     not_cancelled = killedFiles[0]['result'][0]['failedKill']
                     cancelled = killedFiles[0]['result'][0]['killed']
+                    break  # no need to retry
                 except HTTPException as hte:
                     msg  = "Error setting KILL status in database."
                     msg += " Transfer KILL failed."
@@ -1161,6 +1162,7 @@ class ASOServerJob(object):
                     self.logger.error(msg)
                     not_cancelled = transfersToKill
                     cancelled = []
+
 
             # Ok Now lets do a double check on doc_ids which failed to update one by one.
             # It is just to make proof concept to cover KILL to RDBMS
