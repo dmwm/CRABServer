@@ -1140,6 +1140,7 @@ class ASOServerJob(object):
                 # Now this means that we have a list of ids which needs to be killed
                 # First try to kill ALL in one API call
                 newDoc = {'listOfIds': transfersToKill,
+                          'publish' : 0,
                           'username': self.job_ad['CRAB_UserHN'],
                           'subresource': 'killTransfersById'}
                 try:
@@ -1169,6 +1170,7 @@ class ASOServerJob(object):
             # and also kill if status is not in KILL or KILLED
             for docIdKill in transfersToKill:
                 newDoc = {'listOfIds': [docIdKill],
+                          'publish': 0,
                           'username': self.job_ad['CRAB_UserHN'],
                           'subresource': 'killTransfersById'}
                 try:
