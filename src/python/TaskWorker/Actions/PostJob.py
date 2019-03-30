@@ -1111,6 +1111,7 @@ class ASOServerJob(object):
                     continue
                 doc['state'] = 'killed'
                 doc['end_time'] = now
+                username = doc['username']
                 if isCouchDBURL(self.aso_db_url):
                     # In case it is still CouchDB leave this in this loop and for RDBMS add
                     # everything to a list and update this with one call for multiple files.
@@ -1136,23 +1137,34 @@ class ASOServerJob(object):
                 else:
                     transfersToKill.append(doc_id)
 
-        if not isCouchDBURL(self.aso_db_url):
-            # Now this means that we have a list of ids which needs to be killed
-            # First try to kill ALL in one API call
-            newDoc = {'listOfIds': transfersToKill,
-                      'publish': 0,
-                      'subresource': 'killTransfersById'}
-            try:
-                killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds', 'publish']))
-                not_cancelled = killedFiles[0]['result'][0]['failedKill']
-                cancelled = killedFiles[0]['result'][0]['killed']
-            except HTTPException as hte:
-                msg  = "Error setting KILL status in database."
-                msg += " Transfer KILL failed."
-                msg += "\n%s" % (str(hte.headers))
-                self.logger.warning(msg)
-                not_cancelled = transfersToKill
-                cancelled = []
+            if not isCouchDBURL(self.aso_db_url):
+                # Now this means that we have a list of ids which needs to be killed
+                # First try to kill ALL in one API call
+                newDoc = {'listOfIds': transfersToKill,
+                          'publish' : 0,
+                          'username': username,
+                          'subresource': 'killTransfersById'}
+                try:
+                    killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds']))
+                    not_cancelled = killedFiles[0]['result'][0]['failedKill']
+                    cancelled = killedFiles[0]['result'][0]['killed']
+                    break  # no need to retry
+                except HTTPException as hte:
+                    msg  = "Error setting KILL status in database."
+                    msg += " Transfer KILL failed."
+                    msg += "\n%s" % (str(hte.headers))
+                    self.logger.warning(msg)
+                    not_cancelled = transfersToKill
+                    cancelled = []
+                except Exception as ex:
+                    msg  = "Unknown error setting KILL status in database."
+                    msg += " Transfer KILL failed."
+                    msg += "\n%s" % (str(ex))
+                    self.logger.error(msg)
+                    not_cancelled = transfersToKill
+                    cancelled = []
+
+
             # Ok Now lets do a double check on doc_ids which failed to update one by one.
             # It is just to make proof concept to cover KILL to RDBMS
             self.logger.info("Failed to kill %s and succeeded to kill %s", not_cancelled, cancelled)
@@ -1162,11 +1174,12 @@ class ASOServerJob(object):
             for docIdKill in transfersToKill:
                 newDoc = {'listOfIds': [docIdKill],
                           'publish': 0,
+                          'username': self.job_ad['CRAB_UserHN'],
                           'subresource': 'killTransfersById'}
                 try:
                     doc_out = self.getDocByID(docIdKill)
                     if doc_out['transfer_state'] not in ['kill', 'killed']:
-                        killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds', 'publish']))
+                        killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds']))
                         failedFiles = killedFiles[0]['result'][0]['failedKill']
                         notfailedFiles = killedFiles[0]['result'][0]['killed']
                         if failedFiles:
