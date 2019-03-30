@@ -307,7 +307,7 @@ def isFailurePermanent(reason, gridJob=False):
         refuseToSubmit = ""
     for exitCode in STAGEOUT_ERRORS:
         for error in STAGEOUT_ERRORS[exitCode]:
-            if re.match(error['regex'], reason.lower()):
+            if re.match(error['regex'].lower(), reason.lower()):
                 reason = error['error-msg'] + refuseToSubmit + checkQuota
                 return error['isPermanent'], reason, exitCode
     return False, "", None
