@@ -1111,6 +1111,7 @@ class ASOServerJob(object):
                     continue
                 doc['state'] = 'killed'
                 doc['end_time'] = now
+                username = doc['username']
                 if isCouchDBURL(self.aso_db_url):
                     # In case it is still CouchDB leave this in this loop and for RDBMS add
                     # everything to a list and update this with one call for multiple files.
@@ -1141,7 +1142,7 @@ class ASOServerJob(object):
                 # First try to kill ALL in one API call
                 newDoc = {'listOfIds': transfersToKill,
                           'publish' : 0,
-                          'username': self.job_ad['CRAB_UserHN'],
+                          'username': username,
                           'subresource': 'killTransfersById'}
                 try:
                     killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds']))
