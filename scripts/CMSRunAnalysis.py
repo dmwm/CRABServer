@@ -568,7 +568,7 @@ def extractUserSandbox(archiveJob, cmsswVersion):
     os.chdir('..')
 
 def getProv(filename, scram):
-    ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd(), logName="edmProvDumpOutput.log")
+    ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd())
     if ret > 0:
         scramMsg = scram.diagnostic()
         if os.path.isfile("edmProvDumpOutput.log"):
@@ -616,7 +616,7 @@ def executeScriptExe(opts, scram):
                                                            opts.oneEventMode,
                                                            opts.eventsPerLumi,
                                                            opts.maxRuntime)
-    ret = scram(command_, runtimeDir = os.getcwd(), logName='scramOutput.log')
+    ret = scram(command_, runtimeDir = os.getcwd())
     if ret > 0:
         msg = scram.diagnostic()
         handleException("FAILED", EC_CMSRunWrapper, 'Error executing TweakPSet.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
@@ -625,7 +625,7 @@ def executeScriptExe(opts, scram):
 
     command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
 
-    ret = scram(command_, runtimeDir = os.getcwd(), logName = 'cmsRun-stdout.log', cleanEnv = False)#logName=subprocess.PIPE) for printing to the stdout
+    ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
     if ret > 0:
         msg = scram.diagnostic()
         handleException("FAILED", EC_CMSRunWrapper, 'Error executing scriptExe.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
@@ -641,7 +641,7 @@ def executeCMSSWStack(opts, scram):
                        "config = __import__(\"WMTaskSpace.cmsRun.PSet\", globals(), locals(), [\"process\"], -1);"+\
                        "tweakJson = makeTweak(config.process).jsondictionary();"+\
                        "print tweakJson[\"process\"][\"outputModules_\"]"
-        ret = scram("python -c '%s'" % pythonScript, logName=subprocess.PIPE, runtimeDir=os.getcwd())
+        ret = scram("python -c '%s'" % pythonScript, runtimeDir=os.getcwd())
         if ret > 0:
             msg = scram.diagnostic()
             handleException("FAILED", EC_CMSRunWrapper, 'Error getting output modules from the pset.\n\tScram Env %s\n\tCommand:%s' % (msg, pythonScript))
