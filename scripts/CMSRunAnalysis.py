@@ -18,7 +18,6 @@ import os.path
 import logging
 import commands
 import traceback
-import subprocess
 from ast import literal_eval
 from optparse import OptionParser, BadOptionError, AmbiguousOptionError
 
@@ -190,7 +189,7 @@ def reportPopularity(monitorId, monitorJobId, myad, fjr):
     if 'CRAB_DataBlock' not in myad:
         print("Not sending data to popularity service because 'CRAB_DataBlock' is not in job ad.")
     sources = fjr.get('steps', {}).get('cmsRun', {}).get('input', {}).get('source', [])
-    skippedFiles = fjr.get('skippedFiles', [])
+    #skippedFiles = fjr.get('skippedFiles', [])
     fallbackFiles = fjr.get('fallbackFiles', [])
     if not sources:
         print("Not sending data to popularity service because no input sources found.")
@@ -365,18 +364,18 @@ def handleException(exitAcronym, exitCode, exitMsg):
 
     if report.get('steps', {}).get('cmsRun', {}).get('errors'):
         exitMsg += '\nCMSSW error message follows.\n'
-        for error in report['steps']['cmsRun']['errors']:
-            if 'exitCode' in error:
+        for err in report['steps']['cmsRun']['errors']:
+            if 'exitCode' in err:
                 try:
                     exitCode = int(exitCode)
-                    fjrExitCode = int(error['exitCode'])
+                    fjrExitCode = int(err['exitCode'])
                     if (fjrExitCode % 256 == exitCode) and (fjrExitCode != exitCode):
                         print("NOTE: FJR has exit code %d and WMCore reports %d; preferring the FJR one." % (fjrExitCode, exitCode))
                         exitCode = fjrExitCode
                 except ValueError:
                     pass
-            exitMsg += error['type'] + '\n'
-            exitMsg += error['details'] + '\n'
+            exitMsg += err['type'] + '\n'
+            exitMsg += err['details'] + '\n'
 
     report['exitAcronym'] = exitAcronym
     report['exitCode'] = exitCode
@@ -386,15 +385,15 @@ def handleException(exitAcronym, exitCode, exitMsg):
         print("ERROR: Traceback follows:\n", formatted_tb)
 
     try:
-        slc = SiteLocalConfig.loadSiteLocalConfig()
-        report['executed_site'] = slc.siteName
-        print("== Execution site for failed job from site-local-config.xml: %s" % slc.siteName)
+        slcfg = SiteLocalConfig.loadSiteLocalConfig()
+        report['executed_site'] = slcfg.siteName
+        print("== Execution site for failed job from site-local-config.xml: %s" % slcfg.siteName)
     except:
         print("ERROR: Failed to record execution site name in the FJR from the site-local-config.xml")
         print(traceback.format_exc())
 
-    with open('jobReport.json', 'w') as of:
-        json.dump(report, of)
+    with open('jobReport.json', 'w') as rf:
+        json.dump(report, rf)
     if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         stopDashboardMonitoring(ad)
 
@@ -501,9 +500,9 @@ def parseArgs():
         print("maxRuntime:    ", opts.maxRuntime)
         print("===================")
     except:
-        type, value, traceBack = sys.exc_info()
-        print('ERROR: missing parameters : %s - %s' % (type, value))
-        handleException("FAILED", EC_MissingArg, 'CMSRunAnalysisERROR: missing parameters : %s - %s' % (type, value))
+        name, value, traceBack = sys.exc_info()
+        print('ERROR: missing parameters: %s - %s' % (name, value))
+        handleException("FAILED", EC_MissingArg, 'CMSRunAnalysisERROR: missing parameters: %s - %s' % (name, value))
         mintime()
         sys.exit(EC_MissingArg)
 
@@ -782,18 +781,18 @@ def AddPsetHash(report, scram):
             found_history = False
             matches = {}
             for line in lines.splitlines():
-                 if not found_history:
-                     if processing_history_re.match(line):
-                         found_history = True
-                     continue
-                 m = pset_re.match(line)
-                 if m:
-                     # Note we want the deepest entry in the hierarchy
-                     depth, pset_hash = m.groups()
-                     depth = len(depth)
-                     matches[depth] = pset_hash
-                 else:
-                     break
+                if not found_history:
+                    if processing_history_re.match(line):
+                        found_history = True
+                    continue
+                m = pset_re.match(line)
+                if m:
+                    # Note we want the deepest entry in the hierarchy
+                    depth, pset_hash = m.groups()
+                    depth = len(depth)
+                    matches[depth] = pset_hash
+                else:
+                    break
             print("==== PSet Hash computation FINISHED at %s ====" % time.asctime(time.gmtime()))
             if matches:
                 max_depth = max(matches.keys())
@@ -845,15 +844,14 @@ if __name__ == "__main__":
     #WMCore import here
     # Note that we may fail in the imports - hence we try to report to Dashboard first
     try:
-        opts = parseArgs()
-        prepSandbox(opts)
+        options = parseArgs()
+        prepSandbox(options)
         from WMCore.WMRuntime.Bootstrap import setupLogging
         from WMCore.FwkJobReport.Report import Report
         from WMCore.FwkJobReport.Report import FwkJobReportException
         from WMCore.WMSpec.Steps.WMExecutionFailure import WMExecutionFailure
         from Utils.FileTools import calculateChecksums
         from WMCore.WMSpec.Steps.Executors.CMSSW import CMSSW
-        from WMCore.Configuration import Configuration
         from WMCore.WMSpec.WMStep import WMStep
         from WMCore.WMSpec.WMTask import makeWMTask
         from WMCore.WMSpec.WMWorkload import newWorkload
@@ -873,8 +871,8 @@ if __name__ == "__main__":
     # unlikely python will see a segfault.  Drop a marker file in the working
     # directory; if we encounter a python segfault, the wrapper will look to see if
     # this file exists and report to Dashboard accordingly.
-    with open("wmcore_initialized", "w") as fd:
-        fd.write("wmcore initialized.\n")
+    with open("wmcore_initialized", "w") as mf:
+        mf.write("wmcore initialized.\n")
 
     try:
         setupLogging('.')
@@ -889,30 +887,30 @@ if __name__ == "__main__":
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             startDashboardMonitoring(ad)
         print("==== CMSSW Stack Execution STARTING at %s ====" % time.asctime(time.gmtime()))
-        scram = Scram(
-            version = opts.cmsswVersion,
+        scr = Scram(
+            version = options.cmsswVersion,
             directory = os.getcwd(),
-            architecture = opts.scramArch,
+            architecture = options.scramArch,
             )
 
         print("==== SCRAM Obj CREATED at %s ====" % time.asctime(time.gmtime()))
-        if scram.project() or scram.runtime(): #if any of the two commands fail...
-            msg = scram.diagnostic()
-            handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % msg)
+        if scr.project() or scr.runtime(): #if any of the two commands fail...
+            dgn = scr.diagnostic()
+            handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % dgn)
             mintime()
             sys.exit(EC_CMSMissingSoftware)
 
-        extractUserSandbox(opts.archiveJob, opts.cmsswVersion)
+        extractUserSandbox(options.archiveJob, options.cmsswVersion)
 
         try:
             jobExitCode = None
-            if opts.scriptExe=='None':
+            if options.scriptExe=='None':
                 print("==== CMSSW JOB Execution started at %s ====" % time.asctime(time.gmtime()))
-                cmssw = executeCMSSWStack(opts, scram)
-                jobExitCode = cmssw.step.execution.exitStatus
+                cmsswSt = executeCMSSWStack(options, scr)
+                jobExitCode = cmsswSt.step.execution.exitStatus
             else:
                 print("==== ScriptEXE Execution started at %s ====" % time.asctime(time.gmtime()))
-                jobExitCode = executeScriptExe(opts, scram)
+                jobExitCode = executeScriptExe(options, scr)
         except:
             print("==== CMSSW Stack Execution FAILED at %s ====" % time.asctime(time.gmtime()))
             logCMSSW()
@@ -927,20 +925,20 @@ if __name__ == "__main__":
         # Try to recover what we can from the FJR.  handleException will use this if possible.
         if os.path.exists('FrameworkJobReport.xml'):
             try:
-                report = Report("cmsRun")
-                report.parse('FrameworkJobReport.xml', "cmsRun")
+                rep = Report("cmsRun")
+                rep.parse('FrameworkJobReport.xml', "cmsRun")
                 try:
-                    jobExitCode = report.getExitCode()
+                    jobExitCode = rep.getExitCode()
                 except:
                     jobExitCode = WMex.code
-                report = report.__to_json__(None)
+                rep = rep.__to_json__(None)
                 #save the virgin WMArchive report
                 with open('WMArchiveReport.json', 'w') as of:
-                    json.dump(report, of)
-                StripReport(report)
-                report['jobExitCode'] = jobExitCode
+                    json.dump(rep, of)
+                StripReport(rep)
+                rep['jobExitCode'] = jobExitCode
                 with open('jobReport.json', 'w') as of:
-                    json.dump(report, of)
+                    json.dump(rep, of)
             except:
                 print("WARNING: Failure when trying to parse FJR XML after job failure.  Traceback follows.")
                 print(traceback.format_exc())
@@ -957,59 +955,59 @@ if __name__ == "__main__":
     #Create the report file
     try:
         print("==== Report file creation STARTING at %s ====" % time.asctime(time.gmtime()))
-        report = Report("cmsRun")
-        report.parse('FrameworkJobReport.xml', "cmsRun")
-        jobExitCode = report.getExitCode()
-        report = report.__to_json__(None)
+        rep = Report("cmsRun")
+        rep.parse('FrameworkJobReport.xml', "cmsRun")
+        jobExitCode = rep.getExitCode()
+        rep = rep.__to_json__(None)
         with open('WMArchiveReport.json', 'w') as of:
-            json.dump(report, of)
-        StripReport(report)
+            json.dump(rep, of)
+        StripReport(rep)
         # Record the payload process's exit code separately; that way, we can distinguish
         # cmsRun failures from stageout failures.  The initial use case of this is to
         # allow us to use a different LFN on job failure.
-        report['jobExitCode'] = jobExitCode
-        AddChecksums(report)
+        rep['jobExitCode'] = jobExitCode
+        AddChecksums(rep)
         if not 'CRAB3_RUNTIME_DEBUG' in os.environ:
             try:
-                AddPsetHash(report, scram)
+                AddPsetHash(rep, scr)
             except Exception as ex:
-                msg = "Unable to compute pset hash for job output. Got exception:"
-                msg += "\n" + str(ex) + "\n"
-                handleException("FAILED", EC_PsetHash, msg)
+                exmsg = "Unable to compute pset hash for job output. Got exception:"
+                exmsg += "\n" + str(ex) + "\n"
+                handleException("FAILED", EC_PsetHash, exmsg)
                 mintime()
                 sys.exit(EC_PsetHash)
         if jobExitCode: #TODO check exitcode from fwjr
-            report['exitAcronym'] = "FAILED"
-            report['exitCode'] = jobExitCode
-            report['exitMsg'] = "Error while running CMSSW:\n"
-            for error in report['steps']['cmsRun']['errors']:
-                report['exitMsg'] += error['type'] + '\n'
-                report['exitMsg'] += error['details'] + '\n'
+            rep['exitAcronym'] = "FAILED"
+            rep['exitCode'] = jobExitCode
+            rep['exitMsg'] = "Error while running CMSSW:\n"
+            for error in rep['steps']['cmsRun']['errors']:
+                rep['exitMsg'] += error['type'] + '\n'
+                rep['exitMsg'] += error['details'] + '\n'
         else:
-            report['exitAcronym'] = "OK"
-            report['exitCode'] = 0
-            report['exitMsg'] = "OK"
+            rep['exitAcronym'] = "OK"
+            rep['exitCode'] = 0
+            rep['exitMsg'] = "OK"
 
         slc = SiteLocalConfig.loadSiteLocalConfig()
-        report['executed_site'] = slc.siteName
+        rep['executed_site'] = slc.siteName
         if 'phedex-node' in slc.localStageOut:
-            report['phedex_node'] = slc.localStageOut['phedex-node']
+            rep['phedex_node'] = slc.localStageOut['phedex-node']
         print("== Execution site from site-local-config.xml: %s" % slc.siteName)
         with open('jobReport.json', 'w') as of:
-            json.dump(report, of)
+            json.dump(rep, of)
         with open('jobReportExtract.pickle', 'w') as of:
-            pickle.dump(report, of)
+            pickle.dump(rep, of)
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             stopDashboardMonitoring(ad)
         print("==== Report file creation FINISHED at %s ====" % time.asctime(time.gmtime()))
     except FwkJobReportException as FJRex:
-        msg = "BadFWJRXML"
-        handleException("FAILED", EC_ReportHandlingErr, msg)
+        extype = "BadFWJRXML"
+        handleException("FAILED", EC_ReportHandlingErr, extype)
         mintime()
         sys.exit(EC_ReportHandlingErr)
     except Exception as ex:
-        msg = "Exception while handling the job report."
-        handleException("FAILED", EC_ReportHandlingErr, msg)
+        extype = "Exception while handling the job report."
+        handleException("FAILED", EC_ReportHandlingErr, extype)
         mintime()
         sys.exit(EC_ReportHandlingErr)
 
@@ -1018,7 +1016,7 @@ if __name__ == "__main__":
         try:
             oldName = 'UNKNOWN'
             newName = 'UNKNOWN'
-            for oldName, newName in literal_eval(opts.outFiles).iteritems():
+            for oldName, newName in literal_eval(options.outFiles).iteritems():
                 os.rename(oldName, newName)
         except Exception as ex:
             handleException("FAILED", EC_MoveOutErr, "Exception while moving file %s to %s." %(oldName, newName))
