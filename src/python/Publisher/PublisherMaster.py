@@ -136,6 +136,19 @@ class Master(object):
         #    self.logger.debug(msg)
 
     def active_tasks(self, db):
+        """
+        :param db: HTTPRequest object to access proper REST as createdin __init__ method
+        TODO  detail here the strucutre it returns
+        :return: a list tuples [(task,info)]. One element for each task which has jobs to be published
+                 each list element has the format (task, info) where task and info are lists
+                 task=[] a set fo 4 attributes formatted as a list of strings:
+                    [username, usergroup, userrole, taskname]
+                    this is a subset of the information present in each element of thee next list !
+                 info=[filedic1, filedic2, filedic3...] a list of dictionaries,one per file with keys:
+                   u'username', u'cache_url', u'source_lfn', u'publication_state', u'destination',
+                   u'user_role', u'last_update', u'input_dataset', u'dbs_url', u'aso_worker',
+                   u'user_group', u'taskname', u'transfer_state', u'destination_lfn'
+        """
 
         fileDoc = {}
         fileDoc['asoworker'] = self.config.asoworker
