@@ -244,7 +244,7 @@ class check_states_thread(threading.Thread):
                 list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
                 for file in files_to_remove:
                     list_of_surls += str(file) + ' '  # convert JSON u'srm://....' to plain srm://...
-                remove_files(files_to_remove)
+                remove_files(list_of_surls)
             except:
                 self.log.exception('Failed to remove temp files')
 
