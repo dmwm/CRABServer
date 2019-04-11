@@ -216,7 +216,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         currentBackendurls = copy.deepcopy(self.backendurls)
         currentBackendurls['htcondorSchedds'] = dict([(s,restSchedulers[s]) for s in restSchedulers if s not in alreadyTriedSchedds])
-        self.logger.debug("Will choose among: %s", currentBackendurls['htcondorSchedds'].keys())
         if len(currentBackendurls['htcondorSchedds']) == 0:
             return None
         loc = HTCondorLocator.HTCondorLocator(currentBackendurls, self.logger)
@@ -224,7 +223,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             schedd = loc.getSchedd(chooserFunction=self.config.TaskWorker.scheddPickerFunction)
         else:
             schedd = loc.getSchedd() #uses the default memory stuff
-        self.logger.debug("Finished picking up scheduler. Sending schedd (%s) to rest", schedd)
+        self.logger.debug("Finished picking up scheduler. Sending schedd name (%s) to REST", schedd)
         self.sendScheddToREST(task, schedd)
 
         return schedd
