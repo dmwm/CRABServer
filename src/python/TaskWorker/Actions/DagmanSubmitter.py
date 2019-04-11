@@ -223,7 +223,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             schedd = loc.getSchedd(chooserFunction=self.config.TaskWorker.scheddPickerFunction)
         else:
             schedd = loc.getSchedd() #uses the default memory stuff
-        self.logger.debug("Finished picking up scheduler. Sending schedd (%s) to rest", schedd)
+        self.logger.debug("Finished picking up scheduler. Sending schedd name (%s) to REST", schedd)
         self.sendScheddToREST(task, schedd)
 
         return schedd
