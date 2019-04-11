@@ -123,8 +123,9 @@ class HTCondorLocator(object):
         try:
             htcondor.param['COLLECTOR_HOST'] = collector.encode('ascii', 'ignore')
             coll = htcondor.Collector()
-            # select from collector crabschedds which can start more jobs in SchedulerUniverse
-            schedds = coll.query(htcondor.AdTypes.Schedd, 'StartSchedulerUniverse =?= true && CMSGWMS_Type=?="crabschedd"',
+            # select from collector crabschedds and pull some add values
+            # this call returns a list of schedd objects.
+            schedds = coll.query(htcondor.AdTypes.Schedd, 'CMSGWMS_Type=?="crabschedd"',
                                  ['Name', 'DetectedMemory', 'TotalFreeMemoryMB', 'TransferQueueNumUploading',
                                   'TransferQueueMaxUploading','TotalRunningJobs', 'JobsRunning', 'MaxJobsRunning', 'IsOK'])
 
@@ -133,7 +134,24 @@ class HTCondorLocator(object):
                 schedds = [ schedd for schedd in schedds if schedd['Name'] in self.config['htcondorSchedds']]
 
             # Get only those schedds for which the status is OK
-            schedds = [schedd for schedd in schedds if classad.ExprTree.eval(schedd['IsOk'])]
+            notOkSchedNames = [schedd['Name'] for schedd in schedds if not classad.ExprTree.eval(schedd['IsOk'])]
+            if notOkSchedNames:
+                self.logger.debug("Skip these schedds because isOK is False: %s" % notOkSchedNames)
+                schedds = [schedd for schedd in schedds if schedd['Name'] not in notOkSchedNames]
+
+            # Get only schedds which can start more jobs in SchedulerUniverse
+            saturatedScheds = coll.query(htcondor.AdTypes.Schedd,
+                                             'StartSchedulerUniverse =?= false && CMSGWMS_Type=?="crabschedd"',
+                                             ['Name'])
+            saturatedSchedNames = [sched['Name'] for sched in saturatedScheds]
+            if saturatedSchedNames:
+                self.logger.debug("Skip these schedds because are at the MaxTask limit: %s" % saturatedSchedNames)
+                schedds = [schedd for schedd in schedds if schedd['Name'] not in saturatedSchedNames]
+
+            if schedds :
+                self.logger.debug("Will pick best schedd among %s" % [sched['Name'] for sched in schedds])
+            else:
+                raise Exception("All possible CRAB schedd's are saturated. Try later")
 
             choices = chooserFunction(schedds, self.logger)
             if not choices:
