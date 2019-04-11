@@ -38,6 +38,25 @@ def addTaskLogHandler(logger, username, taskname, logsDir):
     return taskhandler
 
 
+def failTask(taskName, HTTPServer, resturi, msg, log, failstatus='FAILED'):
+    try:
+        log.info("Uploading failure message to the REST:\n%s", msg)
+        truncMsg = truncateError(msg)
+        configreq = {'workflow': taskName,
+                     'status': failstatus,
+                     'subresource': 'failure',
+                     # Limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
+                     'failure': b64encode(truncMsg)}
+        HTTPServer.post(resturi, data = urllib.urlencode(configreq))
+        log.info("Failure message successfully uploaded to the REST")
+    except HTTPException as hte:
+        log.warning("Cannot upload failure message to the REST for task %s. HTTP exception headers follows:", taskName)
+        log.error(hte.headers)
+    except Exception as exc: #pylint: disable=broad-except
+        log.warning("Cannot upload failure message to the REST for workflow %s.\nReason: %s", taskName, exc)
+        log.exception('Traceback follows:')
+
+
 def removeTaskLogHandler(logger, taskhandler):
     taskhandler.flush()
     taskhandler.close()
@@ -79,24 +98,8 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsD
             msg += "\n" + str(traceback.format_exc())
         finally:
             if msg:
-                try:
-                    logger.info("Uploading error message to REST: %s", msg)
-                    server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey, retry = 20,
-                                          logger = logger)
-                    truncMsg = truncateError(msg)
-                    configreq = {'workflow': task['tm_taskname'],
-                                 'status': failstatus,
-                                 'subresource': 'failure',
-                                 #limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
-                                 'failure': b64encode(truncMsg)}
-                    server.post(resturi, data = urllib.urlencode(configreq))
-                    logger.info("Error message successfully uploaded to the REST")
-                except HTTPException as hte:
-                    logger.warning("Cannot upload failure message to the REST for workflow %s. HTTP headers follows:", task['tm_taskname'])
-                    logger.error(hte.headers)
-                except Exception as exc: #pylint: disable=broad-except
-                    logger.warning("Cannot upload failure message to the REST for workflow %s.\nReason: %s", task['tm_taskname'], exc)
-                    logger.exception('Traceback follows:')
+                server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey, retry = 20, logger = logger)
+                failTask(task['tm_taskname'], server, resturi, msg, logger, failstatus)
         t1 = time.time()
         logger.debug("%s: ...work on %s completed in %d seconds: %s", procName, task['tm_taskname'], t1-t0, outputs)
 

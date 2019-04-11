@@ -7,6 +7,8 @@ import json
 import logging
 import threading
 import os
+import time
+import subprocess
 
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.Storage.TrivialFileCatalog import readTFC
@@ -29,6 +31,42 @@ if os.path.exists('task_process/rest_filetransfers.txt'):
         rest_filetransfers = _rest.readline().split('\n')[0]
         proxy = os.getcwd() + "/" + _rest.readline()
         print("Proxy: %s", proxy)
+
+
+def execute_command(command, logger, timeout):
+    """
+    _execute_command_
+    Funtion to manage commands.
+    """
+
+    stdout, stderr, rc = None, None, 99999
+    proc = subprocess.Popen(
+            command, shell=True, cwd=os.environ['PWD'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+    )
+
+    t_beginning = time.time()
+    seconds_passed = 0
+    while True:
+        if proc.poll() is not None:
+            break
+        seconds_passed = time.time() - t_beginning
+        if timeout and seconds_passed > timeout:
+            proc.terminate()
+            logger.error('Timeout in %s execution.' % command )
+            return stdout, rc
+
+        time.sleep(0.1)
+
+    stdout, stderr = proc.communicate()
+    rc = proc.returncode
+
+    logger.debug('Executing : \n command : %s\n output : %s\n error: %s\n retcode : %s' % (command, stdout, stderr, rc))
+
+    return stdout, rc
+
 
 def get_tfc_rules(phedex, site):
     """
@@ -113,6 +151,19 @@ def mark_failed(ids, failures_reasons):
     return 0
 
 
+def remove_files(pfn):
+
+    command = 'env -i X509_USER_PROXY=%s gfal-rm -v -t 180 %s'  % \
+              (proxy, pfn)
+    logging.debug("Running remove command %s" % command)
+    stdout, rc = execute_command(command, logging, 3600)
+    if rc:
+        logging.info("Deletion command failed with output %s" % (stdout))
+    else:
+        logging.info("File Deleted.")
+    return
+
+
 class check_states_thread(threading.Thread):
     """
     get transfers state per jobid
@@ -183,6 +234,10 @@ class check_states_thread(threading.Thread):
                     else:
                         self.log.exception('Failure reason not found')
                         self.failed_reasons[self.jobid].append('unable to get failure reason')
+                try:
+                    remove_files(file_status['source_surl'])
+                except:
+                    self.log.exception('Failed to remove temp files')
 
         self.threadLock.release()
 
@@ -233,18 +288,24 @@ class submit_thread(threading.Thread):
         job = fts3.new_job(transfers,
                            overwrite=True,
                            verify_checksum=True,
-                           # TODO: add user DN to metadata
-                           metadata={"issuer": "ASO"},
+                           metadata={"issuer": "ASO",
+                                     "userDN": self.files[0][4],
+                                     "taskname": self.files[0][5]},
                            copy_pin_lifetime=-1,
                            bring_online=None,
                            source_spacetoken=None,
                            spacetoken=None,
-                           max_time_in_queue=6,
+                           # max time for job in the fts queue in seconds.
+                           # Usually, it should take O(s) for healthy situations
+                           max_time_in_queue=600,
                            retry=3,
-                           retry_delay=3,
-                           reuse=True
+                           # seconds after which the transfer is retried
+                           # reduced under FTS suggestion w.r.t. the 3hrs of asov1
+                           retry_delay=600
+                           # timeout on the single transfer process
+                           # TODO: not clear if we may need it
+                           # timeout = 1300
                            )
-        # TODO: fts retries?? check delay
 
         jobid = fts3.submit(self.context, job)
 
@@ -291,6 +352,8 @@ def submit(phedex, context, toTrans):
     for source in sources:
 
         ids = [x[2] for x in toTrans if x[3] == source]
+        username = toTrans[0][5]
+        taskname = toTrans[0][6]
         src_lfns = [x[0] for x in toTrans if x[3] == source]
         dst_lfns = [x[1] for x in toTrans if x[3] == source]
 
@@ -320,7 +383,7 @@ def submit(phedex, context, toTrans):
         source_pfns = sorted_source_pfns
         dest_pfns = sorted_dest_pfns
 
-        tx_from_source = [[x[0], x[1], x[2], source] for x in zip(source_pfns, dest_pfns, ids)] 
+        tx_from_source = [[x[0], x[1], x[2], source, username, taskname] for x in zip(source_pfns, dest_pfns, ids)] 
 
         for files in chunks(tx_from_source, 200):
             thread = submit_thread(threadLock, logging, context, files, source, jobids, to_update)
@@ -362,7 +425,9 @@ def perform_transfers(inputFile, lastLine, _lastFile, context, phedex):
                               doc["destination_lfn"],
                               doc["id"],
                               doc["source"],
-                              doc["destination"]])
+                              doc["destination"],
+                              doc["username"],
+                              doc["taskname"]])
 
         jobids = []
         if len(transfers) > 0:

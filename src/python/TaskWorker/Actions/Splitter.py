@@ -1,12 +1,6 @@
-import urllib
-from base64 import b64encode
-from httplib import HTTPException
-
 from WMCore.DataStructs.Workflow import Workflow
 from WMCore.DataStructs.Subscription import Subscription
 from WMCore.JobSplitting.SplitterFactory import SplitterFactory
-
-from RESTInteractions import HTTPRequests
 
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
@@ -67,10 +61,11 @@ class Splitter(TaskAction):
             raise TaskWorkerException(msg)
         if numJobs == 0:
             msg  = "The CRAB3 server backend could not submit any job to the Grid scheduler:"
-            msg += " Splitting task %s" % (kwargs['task']['tm_taskname'])
+            msg += " splitting task %s" % (kwargs['task']['tm_taskname'])
             if kwargs['task']['tm_input_dataset']:
                 msg += " on dataset %s" % (kwargs['task']['tm_input_dataset'])
-            msg += " with %s method does not generate any job" % (kwargs['task']['tm_split_algo'])
+            msg += " with %s method does not generate any job. See\n" % (kwargs['task']['tm_split_algo'])
+            msg += "https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Splitting"
             raise TaskWorkerException(msg)
         elif numJobs > maxJobs:
             raise TaskWorkerException("The splitting on your task generated %s jobs. The maximum number of jobs in each task is %s" %
@@ -86,18 +81,9 @@ class Splitter(TaskAction):
         lumiChecker = getattr(jobfactory, 'lumiChecker', None)
         if lumiChecker and lumiChecker.splitLumiFiles:
             self.logger.warning("The input dataset contains the following duplicated lumis %s", lumiChecker.splitLumiFiles.keys())
-            #TODO use self.uploadWarning
-            try:
-                userServer = HTTPRequests(self.server['host'], kwargs['task']['user_proxy'], kwargs['task']['user_proxy'], retry = 2,
-                                          logger = self.logger)
-                configreq = {'subresource': 'addwarning',
-                             'workflow': kwargs['task']['tm_taskname'],
-                             'warning': b64encode('The CRAB3 server backend detected lumis split across files in the input dataset.'
-                                        ' Will apply the necessary corrections in the splitting algorithms. You can ignore this message.')}
-                userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
-            except HTTPException as hte:
-                self.logger.error(hte.headers)
-                self.logger.warning("Cannot add warning to REST after finding duplicates")
+            msg = "The CRAB3 server backend detected lumis split across files in the input dataset."
+            msg += " Will apply the necessary corrections in the splitting algorithm. You can ignore this message."
+            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
         return Result(task = kwargs['task'], result = (factory, args[0]))
 

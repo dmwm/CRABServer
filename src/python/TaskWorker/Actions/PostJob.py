@@ -667,7 +667,7 @@ class ASOServerJob(object):
                         msg += " but does not correspond to the current job retry."
                         msg  = msg % (source_lfn, doc_id, transfer_status)
                         if transfer_status in ['acquired', 'new', 'retry']:
-                            msg += "\nFile transfer status is not terminal ('done', 'failed' or 'killed')."
+                            msg += "\nFile transfer status is %s, which is not terminal ('done', 'failed' or 'killed')." % transfer_status
                             msg += " Will not inject a new document for the current job retry."
                             self.logger.info(msg)
                             needs_commit = False
@@ -743,8 +743,6 @@ class ASOServerJob(object):
                         msg = "Error injecting document to ASO database:\n%s" % (commit_result_msg)
                         self.logger.info(msg)
                         return False
-                    ## If the upload succeds then record the timestamp in the fwjr (if not already present)
-                    self.recordASOStartTime()
                 ## Record all files for which we want the post-job to monitor their transfer.
                 if needs_transfer:
                     doc_info = {'doc_id'     : doc_id,
@@ -752,6 +750,9 @@ class ASOServerJob(object):
                                 'delayed_publicationflag_update' : delayed_publicationflag_update
                                }
                     docs_in_transfer.append(doc_info)
+                    # Make sure that the fjr has the record of the ASO start transfer time stamp
+                    self.recordASOStartTime()
+
 
         self.logger.info("====== Finished to check uploads to ASO database.")
 
@@ -1110,6 +1111,7 @@ class ASOServerJob(object):
                     continue
                 doc['state'] = 'killed'
                 doc['end_time'] = now
+                username = doc['username']
                 if isCouchDBURL(self.aso_db_url):
                     # In case it is still CouchDB leave this in this loop and for RDBMS add
                     # everything to a list and update this with one call for multiple files.
@@ -1135,22 +1137,34 @@ class ASOServerJob(object):
                 else:
                     transfersToKill.append(doc_id)
 
-        if not isCouchDBURL(self.aso_db_url):
-            # Now this means that we have a list of ids which needs to be killed
-            # First try to kill ALL in one API call
-            newDoc = {'listOfIds': transfersToKill,
-                      'subresource': 'killTransfersById'}
-            try:
-                killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds']))
-                not_cancelled = killedFiles[0]['result'][0]['failedKill']
-                cancelled = killedFiles[0]['result'][0]['killed']
-            except HTTPException as hte:
-                msg  = "Error setting KILL status in database."
-                msg += " Transfer KILL failed."
-                msg += "\n%s" % (str(hte.headers))
-                self.logger.warning(msg)
-                not_cancelled = transfersToKill
-                cancelled = []
+            if not isCouchDBURL(self.aso_db_url):
+                # Now this means that we have a list of ids which needs to be killed
+                # First try to kill ALL in one API call
+                newDoc = {'listOfIds': transfersToKill,
+                          'publish' : 0,
+                          'username': username,
+                          'subresource': 'killTransfersById'}
+                try:
+                    killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds']))
+                    not_cancelled = killedFiles[0]['result'][0]['failedKill']
+                    cancelled = killedFiles[0]['result'][0]['killed']
+                    break  # no need to retry
+                except HTTPException as hte:
+                    msg  = "Error setting KILL status in database."
+                    msg += " Transfer KILL failed."
+                    msg += "\n%s" % (str(hte.headers))
+                    self.logger.warning(msg)
+                    not_cancelled = transfersToKill
+                    cancelled = []
+                except Exception as ex:
+                    msg  = "Unknown error setting KILL status in database."
+                    msg += " Transfer KILL failed."
+                    msg += "\n%s" % (str(ex))
+                    self.logger.error(msg)
+                    not_cancelled = transfersToKill
+                    cancelled = []
+
+
             # Ok Now lets do a double check on doc_ids which failed to update one by one.
             # It is just to make proof concept to cover KILL to RDBMS
             self.logger.info("Failed to kill %s and succeeded to kill %s", not_cancelled, cancelled)
@@ -1159,6 +1173,8 @@ class ASOServerJob(object):
             # and also kill if status is not in KILL or KILLED
             for docIdKill in transfersToKill:
                 newDoc = {'listOfIds': [docIdKill],
+                          'publish': 0,
+                          'username': self.job_ad['CRAB_UserHN'],
                           'subresource': 'killTransfersById'}
                 try:
                     doc_out = self.getDocByID(docIdKill)
@@ -2084,7 +2100,7 @@ class PostJob():
             msg += "\nAttempts were made to cancel the ongoing transfers,"
             msg += " but cancellation failed for some transfers."
             msg += "\nConsidering cancellation failures as a permament stageout error."
-            self.stageout_exit_codes.append(60321)
+            self.stageout_exit_codes.append(60317)
             raise PermanentStageoutError(msg)
 
         ## Retrieve the stageout failures (a dictionary where the keys are the IDs of
