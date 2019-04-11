@@ -215,9 +215,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         alreadyTriedSchedds = scheddStats.taskErrors.keys() #keys in the taskerrors are schedd
 
         currentBackendurls = copy.deepcopy(self.backendurls)
-        self.logger.debug("Known schedds: %s", currentBackendurls['htcondorSchedds'].keys())
         currentBackendurls['htcondorSchedds'] = dict([(s,restSchedulers[s]) for s in restSchedulers if s not in alreadyTriedSchedds])
-        self.logger.debug("Schedds not tried&failed already: %s", currentBackendurls['htcondorSchedds'].keys())
+        self.logger.debug("Will choose among: %s", currentBackendurls['htcondorSchedds'].keys())
         if len(currentBackendurls['htcondorSchedds']) == 0:
             return None
         loc = HTCondorLocator.HTCondorLocator(currentBackendurls, self.logger)
