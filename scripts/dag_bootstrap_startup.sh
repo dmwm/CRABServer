@@ -11,11 +11,22 @@ for FILE in $1.dagman.out RunJobs.dag.dagman.out dbs_discovery.err dbs_discovery
     touch $FILE
 done
 
+rhrel_str=`cat /etc/redhat-release`
+rhrel_str=${rhrel_str##*release }
+os_ver=${rhrel_str%%.*}
+curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"
+libcurl_path="${curl_path}/lib"
+source ${curl_path}/etc/profile.d/init.sh
+
 export PATH="/opt/glidecondor/bin:/opt/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export PATH="/data/srv/glidecondor/bin:/data/srv/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export PYTHONPATH=/opt/glidecondor/lib/python:$PYTHONPATH
 export LD_LIBRARY_PATH=/opt/glidecondor/lib:/opt/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/data/srv/glidecondor/lib:/data/srv/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$libcurl_path:$LD_LIBRARY_PATH
+
+srcname=$0
+env > ${srcname%.sh}.env
 
 #Sourcing Remote Condor setup
 source_script=`grep '^RemoteCondorSetup =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
