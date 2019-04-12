@@ -160,7 +160,7 @@ def remove_files(pfn):
     if rc:
         logging.info("Deletion command failed with output %s" % (stdout))
     else:
-        logging.info("File Deleted.")
+        logging.info("File(s) Deleted.")
     return
 
 
@@ -219,6 +219,7 @@ class check_states_thread(threading.Thread):
             self.done_id[self.jobid] = []
             self.failed_id[self.jobid] = []
             self.failed_reasons[self.jobid] = []
+            files_to_remove = []
 
             for file_status in file_statuses:
                 _id = file_status['file_metadata']['oracleId']
@@ -234,10 +235,19 @@ class check_states_thread(threading.Thread):
                     else:
                         self.log.exception('Failure reason not found')
                         self.failed_reasons[self.jobid].append('unable to get failure reason')
-                try:
-                    remove_files(file_status['source_surl'])
-                except:
-                    self.log.exception('Failed to remove temp files')
+                #try:
+                #    remove_files(file_status['source_surl'])
+                #except:
+                #    self.log.exception('Failed to remove temp files')
+                files_to_remove.append(file_status['source_surl'])
+            try:
+                list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
+                for file in files_to_remove:
+                    list_of_surls += str(file) + ' '  # convert JSON u'srm://....' to plain srm://...
+                remove_files(list_of_surls)
+            except:
+                self.log.exception('Failed to remove temp files')
+
 
         self.threadLock.release()
 
@@ -246,12 +256,12 @@ class submit_thread(threading.Thread):
     """
 
     """
-    def __init__(self, threadLock, log, context, files, source, jobids, toUpdate):
+    def __init__(self, threadLock, log, ftsContext, files, source, jobids, toUpdate):
         """
 
         :param threadLock:
         :param log:
-        :param context:
+        :param ftsContext:
         :param files:
         :param source:
         :param jobids:
@@ -263,7 +273,7 @@ class submit_thread(threading.Thread):
         self.files = files
         self.source = source
         self.jobids = jobids
-        self.context = context
+        self.ftsContext = ftsContext
         self.toUpdate = toUpdate
 
     def run(self):
@@ -307,7 +317,7 @@ class submit_thread(threading.Thread):
                            # timeout = 1300
                            )
 
-        jobid = fts3.submit(self.context, job)
+        jobid = fts3.submit(self.ftsContext, job)
 
         self.jobids.append(jobid)
 
@@ -326,7 +336,7 @@ class submit_thread(threading.Thread):
         self.threadLock.release()
 
 
-def submit(phedex, context, toTrans):
+def submit(phedex, ftsContext, toTrans):
     """
     submit tranfer jobs
 
@@ -334,7 +344,7 @@ def submit(phedex, context, toTrans):
     - prepare jobs chunks of max 200 transfers
     - submit fts job
 
-    :param context: fts client context
+    :param ftsContext: fts client ftsContext
     :param toTrans: [source pfn, destination pfn, oracle file id, source site]
     :return: list of jobids submitted
     """
@@ -386,7 +396,7 @@ def submit(phedex, context, toTrans):
         tx_from_source = [[x[0], x[1], x[2], source, username, taskname] for x in zip(source_pfns, dest_pfns, ids)] 
 
         for files in chunks(tx_from_source, 200):
-            thread = submit_thread(threadLock, logging, context, files, source, jobids, to_update)
+            thread = submit_thread(threadLock, logging, ftsContext, files, source, jobids, to_update)
             thread.start()
             threads.append(thread)
 
@@ -401,7 +411,7 @@ def submit(phedex, context, toTrans):
     return jobids
 
 
-def perform_transfers(inputFile, lastLine, _lastFile, context, phedex):
+def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
     """
     get transfers and update last read line number
     :param inputFile:
@@ -431,7 +441,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, context, phedex):
 
         jobids = []
         if len(transfers) > 0:
-            jobids = submit(phedex, context, transfers)
+            jobids = submit(phedex, ftsContext, transfers)
 
             for jobid in jobids:
                 logging.info("Monitor link: https://fts3.cern.ch:8449/fts3/ftsmon/#/job/"+jobid)
@@ -505,7 +515,7 @@ def state_manager(fts):
     return jobs_ongoing
 
 
-def submission_manager(phedex, context):
+def submission_manager(phedex, ftsContext):
     """
 
     """
@@ -519,7 +529,7 @@ def submission_manager(phedex, context):
 
     # TODO: if the following fails check not to leave a corrupted file
     with open("task_process/transfers/last_transfer_new.txt", "w+") as _last:
-        _, jobids = perform_transfers("task_process/transfers.txt", last_line, _last, context, phedex)
+        _, jobids = perform_transfers("task_process/transfers.txt", last_line, _last, ftsContext, phedex)
         _last.close()
         os.rename("task_process/transfers/last_transfer_new.txt", "task_process/transfers/last_transfer.txt")
 
@@ -550,8 +560,8 @@ def algorithm():
                        proxy,
                        proxy)
 
-    context = fts3.Context('https://fts3.cern.ch:8446', proxy, proxy, verify=True)
-    logging.debug("Delegating proxy: "+fts3.delegate(context, lifetime=timedelta(hours=48), force=False))
+    ftsContext = fts3.Context('https://fts3.cern.ch:8446', proxy, proxy, verify=True)
+    logging.debug("Delegating proxy to FTS: "+fts3.delegate(ftsContext, lifetime=timedelta(hours=48), force=False))
 
     try:
         phedex = PhEDEx(responseType='xml',
@@ -561,9 +571,9 @@ def algorithm():
         return
 
     jobs_ongoing = state_manager(fts)
-    new_jobs = submission_manager(phedex, context)
+    new_jobs = submission_manager(phedex, ftsContext)
 
-    logging.debug("Transfer jobs ongoing: %s, %s ", jobs_ongoing, new_jobs)
+    logging.debug("Transfer jobs ongoing: %s, new: %s ", jobs_ongoing, new_jobs)
 
     return
 
