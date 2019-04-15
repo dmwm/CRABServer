@@ -41,6 +41,8 @@ MAX_DISK_SPACE = 20000000 # Disk usage is not used from .job.ad as CRAB3 is not 
 TASKLIFETIME = 30*24*60*60
 ## Number of days where the resubmission is not possible if the task is expiring
 NUM_DAYS_FOR_RESUBMITDRAIN = 7
+## Maximum number of days a task can stay in TAPERECALL status for
+MAX_DAYS_FOR_TAPERECALL = 30
 
 ## These are all possible statuses of a task in the TaskDB.
 TASKDBSTATUSES_TMP = ['NEW', 'HOLDING', 'QUEUED']
@@ -305,7 +307,7 @@ def isFailurePermanent(reason, gridJob=False):
         refuseToSubmit = ""
     for exitCode in STAGEOUT_ERRORS:
         for error in STAGEOUT_ERRORS[exitCode]:
-            if re.match(error['regex'], reason.lower()):
+            if re.match(error['regex'].lower(), reason.lower()):
                 reason = error['error-msg'] + refuseToSubmit + checkQuota
                 return error['isPermanent'], reason, exitCode
     return False, "", None
@@ -371,6 +373,7 @@ def generateTaskName(username, requestname, timestamp=None):
 def encodeRequest(configreq, listParams=None):
     """ Used to encode the request from a dict to a string. Include the code needed for transforming lists in the format required by
         cmsweb, e.g.:   adduserfiles = ['file1','file2']  ===>  [...]adduserfiles=file1&adduserfiles=file2[...]
+        The list of dictionary keys like adduserfiles above, which have a list as value, needs to be passed in the listParams argument  
     """
     listParams = listParams or []
     encodedLists = ''
@@ -485,6 +488,9 @@ class newX509env():
 
     def __init__(self, X509_USER_PROXY=None, X509_USER_CERT=None, X509_USER_KEY=None):
         # define the new environment
+        self.oldProxy = None
+        self.oldCert = None
+        self.oldKey = None
         self.newProxy = X509_USER_PROXY
         self.newCert = X509_USER_CERT
         self.newKey = X509_USER_KEY
@@ -555,11 +561,12 @@ class tempSetLogLevel():
         after the loop
     """
     import logging
-    def __init__(self,logger=None,level=None):
-        self.newLogLevel=level
-        self.logger=logger
+    def __init__(self, logger=None, level=None):
+        self.previousLogLevel = None
+        self.newLogLevel = level
+        self.logger = logger
     def __enter__(self):
-        self.previousLogLevel=self.logger.getEffectiveLevel()
+        self.previousLogLevel = self.logger.getEffectiveLevel()
         self.logger.setLevel(self.newLogLevel)
     def __exit__(self,a,b,c):
         self.logger.setLevel(self.previousLogLevel)

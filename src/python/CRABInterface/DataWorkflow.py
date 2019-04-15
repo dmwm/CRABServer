@@ -570,7 +570,7 @@ class DataWorkflow(object):
 
         args = {'ASOURL' : getattr(row, 'asourl', '')}
 
-        if row.task_status in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'KILLED']:
+        if row.task_status in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'KILLED', 'TAPERECALL']:
             args.update({"killList": jobids})
             #Set arguments first so in case of failure we don't do any "damage"
             self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow], arguments = [str(args)])
@@ -579,7 +579,7 @@ class DataWorkflow(object):
             #if the task has just been submitted and not acquired by the TW
             self.api.modify(self.Task.SetStatusWarningTask_sql, status = ["KILLED"], command = ["KILL"], taskname = [workflow], warnings = [str(warnings)])
         else:
-            raise ExecutionError("You cannot kill a task if it is in the %s state" % row.task_status)
+            raise ExecutionError("You cannot kill a task if it is in the %s status" % row.task_status)
 
         return [{"result":retmsg}]
 
@@ -591,7 +591,7 @@ class DataWorkflow(object):
         """
         row = self.Task.ID_tuple(*next(self.api.query(None, None, self.Task.ID_sql, taskname=workflow)))
         if row.task_status != 'UPLOADED':
-            msg = 'Can only proceed if task is in the UPLOADED state, but it is in the %s state.' % row.task_status
+            msg = 'Can only proceed if task is in the UPLOADED status, but it is in the %s status.' % row.task_status
             raise ExecutionError(msg)
         else:
             self.api.modify(self.Task.SetDryRun_sql, taskname=[workflow], dry_run=['F'])

@@ -11,7 +11,14 @@ function cache_status {
 
 function manage_transfers {
     log "Running transfers.py"
-    python task_process/transfers.py 
+    timeout 15m python task_process/transfers.py
+    err=$?
+    if [ $err -eq 137 ] || [ $err -eq 124 ]; then
+        log "ERROR: transfers.py exited with process timeout";
+    elif [ $err -eq 0 ]; then
+        log "transfers.py exited.";
+    else log "ERROR: transfers.py exited with $err";
+    fi
 }
 
 function exit_now {

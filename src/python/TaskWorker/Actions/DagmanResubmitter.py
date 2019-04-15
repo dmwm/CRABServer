@@ -12,6 +12,7 @@ from WMCore.Database.CMSCouch import CouchServer
 
 from ServerUtilities import FEEDBACKMAIL
 from TaskWorker.Actions.TaskAction import TaskAction
+from TaskWorker.Actions.DagmanSubmitter import checkMemoryWalltime
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from httplib import HTTPException
@@ -74,20 +75,8 @@ class DagmanResubmitter(TaskAction):
             raise TaskWorkerException(msg)
 
         # Check memory and walltime
-        stdmaxjobruntime = 2800
-        stdmaxmemory = 2500
-        if task['resubmit_maxjobruntime'] is not None and task['resubmit_maxjobruntime'] > stdmaxjobruntime:
-            msg  = "Task requests %s minutes of walltime, but only %s are guaranteed to be available." % (task['resubmit_maxjobruntime'], stdmaxjobruntime)
-            msg += " Jobs may not find a site where to run."
-            msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
-            self.logger.warning(msg)
-            task['resubmit_maxjobruntime'] = str(stdmaxjobruntime)
-            self.uploadWarning(msg, proxy, kwargs['task']['tm_taskname'])
-        if task['resubmit_maxmemory'] is not None and task['resubmit_maxmemory'] > stdmaxmemory:
-            msg  = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (task['resubmit_maxmemory'], stdmaxmemory)
-            msg += " Jobs may not find a site where to run and stay idle forever."
-            self.logger.warning(msg)
-            self.uploadWarning(msg, proxy, kwargs['task']['tm_taskname'])
+        checkMemoryWalltime(None, task, 'resubmit', self.logger, self.uploadWarning)
+
 
         # Find only the originally submitted DAG to hold and release: this
         # will re-trigger the scripts and adjust retries and other
@@ -103,7 +92,7 @@ class DagmanResubmitter(TaskAction):
         params = {'CRAB_ResubmitList'  : 'jobids',
                   'CRAB_SiteBlacklist' : 'site_blacklist',
                   'CRAB_SiteWhitelist' : 'site_whitelist',
-                  'MaxWallTimeMins'    : 'maxjobruntime',
+                  'MaxWallTimeMinsRun' : 'maxjobruntime',
                   'RequestMemory'      : 'maxmemory',
                   'RequestCpus'        : 'numcores',
                   'JobPrio'            : 'priority'
@@ -111,7 +100,7 @@ class DagmanResubmitter(TaskAction):
         overwrite = False
         for taskparam in params.values():
             if ('resubmit_'+taskparam in task) and task['resubmit_'+taskparam] != None:
-                # In case resubmission parameters contain a list of unicode strings, 
+                # In case resubmission parameters contain a list of unicode strings,
                 # convert it to a list of ascii strings because of HTCondor unicode
                 # incompatibility.
                 # Note that unicode strings that are not in a list are not handled,
@@ -192,7 +181,7 @@ class DagmanResubmitter(TaskAction):
                          'workflow': kwargs['task']['tm_taskname'],
                          'status': 'SUBMITTED'}
             self.logger.debug("Setting the task as successfully resubmitted with %s", str(configreq))
-            self.server.post(self.resturi, data = urllib.urlencode(configreq))
+            self.server.post(self.resturi, data=urllib.urlencode(configreq))
         except HTTPException as hte:
             self.logger.error(hte.headers)
             msg  = "The CRAB server successfully resubmitted the task to the Grid scheduler,"
@@ -213,7 +202,8 @@ class DagmanResubmitter(TaskAction):
             msg = "Error while trying to connect to CouchDB: %s" % (str(ex))
             raise TaskWorkerException(msg)
         try:
-            failedPublications = database.loadView('DBSPublisher', 'PublicationFailedByWorkflow', {'reduce': False, 'startkey': [taskname], 'endkey': [taskname, {}]})['rows']
+            failedPublications = database.loadView('DBSPublisher', 'PublicationFailedByWorkflow',\
+                    {'reduce': False, 'startkey': [taskname], 'endkey': [taskname, {}]})['rows']
         except Exception as ex:
             msg = "Error while trying to load view 'DBSPublisher.PublicationFailedByWorkflow' from CouchDB: %s" % (str(ex))
             raise TaskWorkerException(msg)
@@ -243,7 +233,7 @@ if __name__ == "__main__":
     from RESTInteractions import HTTPRequests
     from WMCore.Configuration import Configuration
 
-    logging.basicConfig(level = logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
     config = Configuration()
 
     config.section_("TaskWorker")
