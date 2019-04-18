@@ -546,6 +546,9 @@ $(document).ready(function() {
             var dashboardUrl = "http://dashb-cms-job.cern.ch/dashboard/templates/" +
                 "task-analysis/#user=" + username + "&table=Mains&pattern=" + inputTaskName;
 
+            var monitDashboardUrl = "https://monit-grafana.cern.ch/d/cmsTMDetail/cms-task-monitoring-task-view?orgId=11" +
+                "&var-user=" + username + "&var-task" + inputTaskName;
+
             var dasInputUrl = "https://cmsweb.cern.ch/das/request?view=list&limit=50&instance=" + dbsInstance + "&input=" + inputDataset;
 
             if (outputDataset !== "") {
@@ -556,6 +559,7 @@ $(document).ready(function() {
             }
 
             $("#main-dashboard-link").attr("href", dashboardUrl);
+            $("#main-monit-dashboard-link").attr("href", monitDashboardUrl);
 
             webDirUrlToDisplay = "";
             if (proxiedWebDirUrl === "") {
