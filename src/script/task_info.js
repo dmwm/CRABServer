@@ -876,6 +876,7 @@ $(document).ready(function() {
 
     function clearPreviousContent() {
         $("#main-dashboard-link").attr("href", "#");
+        $("#main-monit-dashboard-link").attr("href", "#");
         $("#main-webdir-link").attr("href", "#");
         $("#main-das-link-input").attr("href", "#");
 
