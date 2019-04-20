@@ -11,7 +11,7 @@
 from __future__ import division
 
 from WMCore.Configuration import Configuration
-from Publisher.PublishMaster import Master
+from Publisher.PublisherMaster import Master
 
 import logging
 import sys

@@ -26,7 +26,7 @@ from MultiProcessingLog import MultiProcessingLog
 from WMCore.Configuration import loadConfigurationFile
 from WMCore.Services.pycurl_manager import RequestHandler
 from RESTInteractions import HTTPRequests
-from Publisher.utils import getDNFromUserName
+#from Publisher.utils import getDNFromUserName
 from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping
 
 
@@ -61,6 +61,9 @@ class Master(object):
         self.usertransfers = self.config.oracleUserTrans
         
         self.max_files_per_block = self.config.max_files_per_block
+        # these are used for talking to DBS
+        os.putenv('X509_USER_CERT', self.config.opsCert)
+        os.putenv('X509_USER_KEY', self.config.opsKey)
         #self.userCert = self.config.opsCert
         #self.userKey = self.config.opsKey
         self.block_publication_timeout = self.config.block_closure_timeout
@@ -118,11 +121,17 @@ class Master(object):
 
         self.logger = setRootLogger(quiet, True, console=self.TestMode)
 
+        from WMCore.Credential.Proxy import Proxy
+        proxy = Proxy({'logger':self.logger})
+        from ServerUtilities import tempSetLogLevel
+        with tempSetLogLevel(self.logger,logging.ERROR):
+            self.myDN = proxy.getSubjectFromCert(certFile=self.config.opsCert)
+
         try:
             self.oracleDB = HTTPRequests(self.config.oracleDB,
                                          self.config.opsCert,
                                          self.config.opsKey)
-            self.logger.debug('Contacting OracleDB:' + self.config.oracleDB)
+            self.logger.debug('Contacting Oracle via CRABREST:' + self.config.oracleDB)
         except:
             self.logger.exception('Failed when contacting Oracle')
             raise
@@ -430,7 +439,7 @@ class Master(object):
                         input_dbs_url = str(active_file['value'][4])
                     lfn_ready.append(dest_lfn)
 
-                userDN = ''
+                #userDN = ''
                 username = task[0][0]
                 user_group = ""
                 if task[0][1]:
@@ -438,16 +447,6 @@ class Master(object):
                 user_role = ""
                 if task[0][2]:
                     user_role = task[0][2]
-                logger.debug("Trying to get DN %s %s %s" % (username, user_group, user_role))
-
-                try:
-                    userDN = getDNFromUserName(username, logger)
-                except Exception as ex:
-                    msg = "Error retrieving the user DN"
-                    msg += str(ex)
-                    msg += str(traceback.format_exc())
-                    logger.error(msg)
-                    return 1
 
                 # Get metadata
                 toPublish = []
@@ -460,7 +459,7 @@ class Master(object):
                             doc["User"] = username
                             doc["Group"] = file_["key"][1]
                             doc["Role"] = file_["key"][2]
-                            doc["UserDN"] = userDN
+                            doc["UserDN"] = self.myDN
                             doc["Destination"] = file_["value"][0]
                             doc["SourceLFN"] = file_["value"][1]
                             toPublish.append(doc)
