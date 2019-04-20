@@ -46,7 +46,7 @@ def setProcessLogger(name):
 class Master(object):
     """I am the main daemon kicking off all Publisher work via slave Publishers"""
 
-    def __init__(self, config, quiet=False, debug=True, testMode=False):
+    def __init__(self, configurationFile, quiet=False, debug=True, testMode=False):
         """
         Initialise class members
 
@@ -55,6 +55,10 @@ class Master(object):
         :arg bool debug: it tells if needs a verbose logger
         :arg bool testMode: it tells if to run in test (no subprocesses) mode.
         """
+
+        self.configurationFile = configurationFile
+        configuration = loadConfigurationFile(configurationFile)
+
         self.config = config.General
         self.rest = self.config.oracleDB
         self.filetransfers = self.config.oracleFileTrans
@@ -72,6 +76,14 @@ class Master(object):
         self.force_failure = False
         self.TestMode = testMode
         self.cache_area = self.config.cache_area
+        self.taskFilesDir = self.config.taskFilesDir
+        try:
+            os.makedirs(self.taskFilesDir)
+        except OSError as ose:
+            if ose.errno != 17: #ignore the "Directory already exists error"
+                print(str(ose))
+                print("The Publisher needs to access the '%s' directory" % dirname)
+                sys.exit(1)
 
         def createLogdir(dirname):
             """ Create the directory dirname ignoring erors in case it exists. Exit if
@@ -463,14 +475,14 @@ class Master(object):
                             doc["Destination"] = file_["value"][0]
                             doc["SourceLFN"] = file_["value"][1]
                             toPublish.append(doc)
-                with open("/tmp/publisher_files/"+workflow+'.json', 'w') as outfile:
+                with open(self.taskFilesDir + workflow + '.json', 'w') as outfile:
                     json.dump(toPublish, outfile)
                 logger.info(". publisher.py %s" % (workflow))
 
                 # find the location in the current environment of the script we want to run
                 import Publisher.TaskPublish as tp
                 taskPublishScript = tp.__file__
-                subprocess.call(["python", taskPublishScript, workflow])
+                subprocess.call(["python", taskPublishScript, "configurationFile=%s"%configurationFile, "taskname=%"%workflow])
 
         except:
             logger.exception("Exception!")
@@ -485,9 +497,10 @@ if __name__ == '__main__':
     parser.add_argument('--config', help='Publisher config file', default='PublisherConfig.py')
 
     args = parser.parse_args()
-    configuration = loadConfigurationFile(os.path.abspath(args.config))
+    #need to pass the configuration file abs patch to the slaves
+    configurationFile = os.path.abspath(args.config)
 
-    master = Master(configuration)
+    master = Master(configurationFile)
     while(True):
         master.algorithm()
         time.sleep(configuration.General.pollInterval)
