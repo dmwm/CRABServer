@@ -442,8 +442,8 @@ def publishInDBS3(configFile, taskname):
 
     oracelInstance = config.General.oracleDB
     oracleDB = HTTPRequests(oracelInstance,
-                            proxy,
-                            proxy)
+                            config.General.serviceCert,
+                            config.General.serviceKey)
 
     fileDoc = dict()
     fileDoc['subresource'] = 'search'
@@ -478,11 +478,14 @@ def publishInDBS3(configFile, taskname):
     globalURL = globalURL.replace('phys03', 'global')
     globalURL = globalURL.replace('caf', 'global')
 
-    pr = os.environ.get("SOCKS5_PROXY")
+    # DBS client relies on X509 env. vars
+    os.putenv('X509_USER_CERT', config.Global.serviceCert)
+    os.putenv('X509_USER_KEY', self.Global.serviceKey)
+
     logger.info(wfnamemsg+"Source API URL: %s" % sourceURL)
-    sourceApi = dbsClient.DbsApi(url=sourceURL, proxy=pr)
+    sourceApi = dbsClient.DbsApi(url=sourceURL)
     logger.info(wfnamemsg+"Global API URL: %s" % globalURL)
-    globalApi = dbsClient.DbsApi(url=globalURL, proxy=pr)
+    globalApi = dbsClient.DbsApi(url=globalURL)
 
     if publish_dbs_url.endswith('/DBSWriter'):
         publish_read_url = publish_dbs_url[:-len('/DBSWriter')] + '/DBSReader'
