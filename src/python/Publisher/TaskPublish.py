@@ -433,9 +433,6 @@ def publishInDBS3(configFile, taskname):
     pnn = toPublish[0]["Destination"]
     logger.info(wfnamemsg+" "+user)
 
-    READ_PATH = "/DBSReader"
-    READ_PATH_1 = "/DBSReader/"
-
     # TODO: get user role and group
     try:
         proxy = Proxy(userDN, group, role, logger)
@@ -470,8 +467,8 @@ def publishInDBS3(configFile, taskname):
         publish_dbs_url = results[0]['result'][publish_dbs_urlIndex]
 
         #sourceURL = "https://cmsweb.cern.ch/dbs/prod/global/DBSReader"
-        if not sourceURL.endswith(READ_PATH) and not sourceURL.endswith(READ_PATH_1):
-            sourceURL += READ_PATH
+        if not sourceURL.endswith("/DBSReader") and not sourceURL.endswith("/DBSReader/"):
+            sourceURL += "/DBSReader"
     except Exception:
         logger.exception("ERROR")
     # When looking up parents may need to look in global DBS as well.
@@ -487,17 +484,13 @@ def publishInDBS3(configFile, taskname):
     logger.info(wfnamemsg+"Global API URL: %s" % globalURL)
     globalApi = dbsClient.DbsApi(url=globalURL, proxy=pr)
 
-    WRITE_PATH = "/DBSWriter"
-    MIGRATE_PATH = "/DBSMigrate"
-    READ_PATH = "/DBSReader"
-
-    if publish_dbs_url.endswith(WRITE_PATH):
-        publish_read_url = publish_dbs_url[:-len(WRITE_PATH)] + READ_PATH
-        publish_migrate_url = publish_dbs_url[:-len(WRITE_PATH)] + MIGRATE_PATH
+    if publish_dbs_url.endswith('/DBSWriter'):
+        publish_read_url = publish_dbs_url[:-len('/DBSWriter')] + '/DBSReader'
+        publish_migrate_url = publish_dbs_url[:-len('/DBSWriter')] + 'DBSMigrate'
     else:
-        publish_migrate_url = publish_dbs_url + MIGRATE_PATH
-        publish_read_url = publish_dbs_url + READ_PATH
-        publish_dbs_url += WRITE_PATH
+        publish_migrate_url = publish_dbs_url + '/DBSMigrate'
+        publish_read_url = publish_dbs_url + '/DBSReader'
+        publish_dbs_url += '/DBSWriter'
 
     try:
         logger.debug(wfnamemsg+"Destination API URL: %s" % publish_dbs_url)
