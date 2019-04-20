@@ -66,10 +66,8 @@ class Master(object):
         
         self.max_files_per_block = self.config.max_files_per_block
         # these are used for talking to DBS
-        os.putenv('X509_USER_CERT', self.config.opsCert)
-        os.putenv('X509_USER_KEY', self.config.opsKey)
-        #self.userCert = self.config.opsCert
-        #self.userKey = self.config.opsKey
+        os.putenv('X509_USER_CERT', self.config.serviceCert)
+        os.putenv('X509_USER_KEY', self.config.serviceKey)
         self.block_publication_timeout = self.config.block_closure_timeout
         self.lfn_map = {}
         self.force_publication = False
@@ -137,12 +135,12 @@ class Master(object):
         proxy = Proxy({'logger':self.logger})
         from ServerUtilities import tempSetLogLevel
         with tempSetLogLevel(self.logger,logging.ERROR):
-            self.myDN = proxy.getSubjectFromCert(certFile=self.config.opsCert)
+            self.myDN = proxy.getSubjectFromCert(certFile=self.config.serviceCert)
 
         try:
             self.oracleDB = HTTPRequests(self.config.oracleDB,
-                                         self.config.opsCert,
-                                         self.config.opsKey)
+                                         self.config.serviceCert,
+                                         self.config.serviceKey)
             self.logger.debug('Contacting Oracle via CRABREST:' + self.config.oracleDB)
         except:
             self.logger.exception('Failed when contacting Oracle')
@@ -329,8 +327,8 @@ class Master(object):
             data = {'workflow': workflow}
             url = self.rest
             connection = HTTPRequests(url,
-                                     self.config.opsCert,
-                                     self.config.opsKey)
+                                     self.config.serviceCert,
+                                     self.config.serviceKey)
             
             try:
                 res = connection.get(self.filetransfers.replace('filetransfers', 'workflow'), data=encodeRequest(data))
