@@ -9,7 +9,7 @@ from WMCore.Configuration import Configuration
 config = Configuration()
 config.section_('General')
 
-config.General.asoworker = 'asoprod1'
+config.General.asoworker = 'asoless'
 config.General.isOracle = True
 config.General.oracleDB = 'cmsweb-testbed.cern.ch'
 config.General.oracleFileTrans = '/crabserver/preprod/filetransfers'
@@ -30,6 +30,7 @@ config.General.opsCert = '/data/certs/servicecert.pem'
 config.General.opsKey = '/data/certs/servicekey.pem'
 config.General.cache_path = '/crabserver/preprod/filemetadata'
 config.General.task_path = '/crabserver/preprod/task'
+config.General.taskFilesDir = '/data/srv/Publisher_files/'
 
-config.section_('Publisher')
-config.Publisher.logMsgFormat = '%(asctime)s:%(levelname)s: %(message)s'
+config.section_('TaskPublisher')
+config.TaskPublisher.logMsgFormat = '%(asctime)s:%(levelname)s: %(message)s'
