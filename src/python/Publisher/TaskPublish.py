@@ -13,61 +13,10 @@ import argparse
 import re
 
 import dbs.apis.dbsClient as dbsClient
-from Publisher.utils import getProxy
 from ServerUtilities import getHashLfn, encodeRequest, oracleOutputMapping
 from RESTInteractions import HTTPRequests
 from WMCore.Configuration import loadConfigurationFile
 
-config = loadConfigurationFile(os.path.abspath('config.py'))
-
-task_path = config.General.task_path
-
-def Proxy(userDN, group, role, logger):
-    """
-
-    """
-    userProxy = ''
-
-    try:
-        serviceCert = config.General.serviceCert
-        serviceKey = config.General.serviceKey
-
-        defaultDelegation = {'logger': logger,
-                             'credServerPath': '/data/certs/creds/',
-                             'myProxySvr': 'myproxy.cern.ch',
-                             'min_time_left': 36000,
-                             'serverDN': config.General.serverDN,
-                             'uisource': "/dev/null"
-                            }
-
-        cache_area = config.General.cache_area
-        getCache = re.compile('https?://([^/]*)/.*')
-        myproxyAccount = getCache.findall(cache_area)[0]
-        defaultDelegation['myproxyAccount'] = myproxyAccount
-
-        defaultDelegation['server_cert'] = serviceCert
-        defaultDelegation['server_key'] = serviceKey
-
-        valid = False
-        defaultDelegation['userDN'] = userDN
-        defaultDelegation['group'] = group
-        defaultDelegation['role'] = role
-
-        valid, proxy = getProxy(defaultDelegation, logger)
-    except Exception as ex:
-        msg = "Error getting the user proxy"
-        print(msg)
-        msg += str(ex)
-        msg += str(traceback.format_exc())
-        logger.error(msg)
-    if valid:
-        userProxy = proxy
-    else:
-        logger.error('Did not get valid proxy.')
-
-    logger.info("userProxy: %s" % userProxy)
-
-    return userProxy
 
 
 def format_file_3(file_):
@@ -423,10 +372,14 @@ def mark_failed(files, oracleDB, logger, failure_reason=""):
             continue
 
 
-def publishInDBS3(taskname):
+def publishInDBS3(configFile, taskname):
     """
 
     """
+    config = loadConfigurationFile(configFile)
+    task_path = config.General.task_path
+    taskFilesDir = config.General.taskFilesDir
+
     def createLogdir(dirname):
         """
         Create the directory dirname ignoring erors in case it exists. Exit if
@@ -442,13 +395,13 @@ def publishInDBS3(taskname):
 
     createLogdir('taskLogs')
     logger = logging.getLogger(taskname)
-    logging.basicConfig(filename='taskLogs/'+taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
+    logging.basicConfig(filename='taskLogs/'+taskname+'.log', level=logging.INFO, format=config.TaskPublisher.logMsgFormat)
 
     logger.info("Getting files to publish")
 
     toPublish = []
     # TODO move from new to done when processed
-    with open("/tmp/publisher_files/"+taskname+".json") as f:
+    with open(taskFilesDir + taskname + ".json") as f:
         toPublish = json.load(f)
 
     workflow = taskname
@@ -850,9 +803,11 @@ def publishInDBS3(taskname):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='Publish datasets.')
-    parser.add_argument('taskname', metavar='taskname', type=str, help='taskname')
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--configFile', help='Publisher configuration file', default='PublisherConfig.py')
+    parser.add_argument('--taskname', help='taskname', required=True)
 
     args = parser.parse_args()
 
-    print(publishInDBS3(args.taskname))
+    print(publishInDBS3(args.configFile, args.taskname))
