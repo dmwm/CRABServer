@@ -18,15 +18,39 @@ import os.path
 import logging
 import commands
 import traceback
+import subprocess
 from ast import literal_eval
 from optparse import OptionParser, BadOptionError, AmbiguousOptionError
 
 import DashboardAPI
 import WMCore.Storage.SiteLocalConfig as SiteLocalConfig
 
+class LoggingContext(object):
+    def __init__(self, logger, level=None, handler=None, close=True):
+        self.logger = logger
+        self.level = level
+        self.handler = handler
+        self.close = close
+        self.old_level = None
+
+    def __enter__(self):
+        if self.level is not None:
+            self.old_level = self.logger.level
+            self.logger.setLevel(self.level)
+        if self.handler:
+            self.logger.addHandler(self.handler)
+
+    def __exit__(self, et, ev, tb):
+        if self.level is not None:
+            self.logger.setLevel(self.old_level)
+        if self.handler:
+            self.logger.removeHandler(self.handler)
+        if self.handler and self.close:
+            self.handler.close()
+
 logCMSSWSaved = False
 
-def sighandler(signum, stack):
+def sighandler(signum):
     print('Job was killed with signal: %s' % signum)
     if not logCMSSWSaved:
         logCMSSW()
@@ -567,15 +591,24 @@ def extractUserSandbox(archiveJob, cmsswVersion):
     os.chdir('..')
 
 def getProv(filename, scram):
-    ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd())
+    fh = logging.FileHandler('edmProvDumpOutput.log')
+    with LoggingContext(logging.getLogger(), level=logging.DEBUG, handler=fh, close=True):
+        ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd())
     if ret > 0:
         scramMsg = scram.diagnostic()
+        if os.path.isfile("edmProvDumpOutput.log"):
+            with open("edmProvDumpOutput.log", "r") as fd:
+                output = fd.read()
+            scramMsg += "\n" + output
+
         msg = "FAILED (%s)\n" % EC_CMSRunWrapper
         msg += "Error getting pset hash from file.\n\tCommand:edmProvDump %s\n\tScram Diagnostic %s" % (filename, scramMsg)
         print(msg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
     output = ''
+    with open("edmProvDumpOutput.log", "r") as fd:
+        output = fd.read()
     return output
 
 
@@ -608,7 +641,9 @@ def executeScriptExe(opts, scram):
                                                            opts.oneEventMode,
                                                            opts.eventsPerLumi,
                                                            opts.maxRuntime)
-    ret = scram(command_, runtimeDir = os.getcwd())
+    fh = logging.FileHandler('scramOutput.log')
+    with LoggingContext(logging.getLogger(), level=logging.DEBUG, handler=fh, close=True):
+        ret = scram(command_, runtimeDir = os.getcwd())
     if ret > 0:
         msg = scram.diagnostic()
         handleException("FAILED", EC_CMSRunWrapper, 'Error executing TweakPSet.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
@@ -617,7 +652,9 @@ def executeScriptExe(opts, scram):
 
     command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
 
-    ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
+    fh = logging.StreamHandler('cmsRun-stdout.log')
+    with LoggingContext(logging.getLogger(), level=logging.DEBUG, handler=fh, close=True):
+        ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
     if ret > 0:
         msg = scram.diagnostic()
         handleException("FAILED", EC_CMSRunWrapper, 'Error executing scriptExe.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
@@ -633,7 +670,9 @@ def executeCMSSWStack(opts, scram):
                        "config = __import__(\"WMTaskSpace.cmsRun.PSet\", globals(), locals(), [\"process\"], -1);"+\
                        "tweakJson = makeTweak(config.process).jsondictionary();"+\
                        "print tweakJson[\"process\"][\"outputModules_\"]"
-        ret = scram("python -c '%s'" % pythonScript, runtimeDir=os.getcwd())
+        fh = logging.StreamHandler(subprocess.PIPE)
+        with LoggingContext(logging.getLogger(), level=logging.DEBUG, handler=fh, close=True):
+            ret = scram("python -c '%s'" % pythonScript, runtimeDir=os.getcwd())
         if ret > 0:
             msg = scram.diagnostic()
             handleException("FAILED", EC_CMSRunWrapper, 'Error getting output modules from the pset.\n\tScram Env %s\n\tCommand:%s' % (msg, pythonScript))
