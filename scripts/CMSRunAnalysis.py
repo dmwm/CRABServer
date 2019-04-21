@@ -49,7 +49,7 @@ class LoggingContext(object):
 
 logCMSSWSaved = False
 
-def sighandler(signum, stack):
+def sighandler(signum):
     print('Job was killed with signal: %s' % signum)
     if not logCMSSWSaved:
         logCMSSW()
