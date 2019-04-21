@@ -18,7 +18,6 @@ import os.path
 import logging
 import commands
 import traceback
-import subprocess
 from ast import literal_eval
 from optparse import OptionParser, BadOptionError, AmbiguousOptionError
 
@@ -670,9 +669,7 @@ def executeCMSSWStack(opts, scram):
                        "config = __import__(\"WMTaskSpace.cmsRun.PSet\", globals(), locals(), [\"process\"], -1);"+\
                        "tweakJson = makeTweak(config.process).jsondictionary();"+\
                        "print tweakJson[\"process\"][\"outputModules_\"]"
-        fh = logging.StreamHandler(subprocess.PIPE)
-        with LoggingContext(logging.getLogger(), level=logging.DEBUG, handler=fh, close=True):
-            ret = scram("python -c '%s'" % pythonScript, runtimeDir=os.getcwd())
+        ret = scram("python -c '%s'" % pythonScript, runtimeDir=os.getcwd())
         if ret > 0:
             msg = scram.diagnostic()
             handleException("FAILED", EC_CMSRunWrapper, 'Error getting output modules from the pset.\n\tScram Env %s\n\tCommand:%s' % (msg, pythonScript))
