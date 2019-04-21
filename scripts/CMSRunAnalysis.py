@@ -18,6 +18,7 @@ import os.path
 import logging
 import commands
 import traceback
+import subprocess
 from ast import literal_eval
 from optparse import OptionParser, BadOptionError, AmbiguousOptionError
 
