@@ -570,12 +570,19 @@ def getProv(filename, scram):
     ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd())
     if ret > 0:
         scramMsg = scram.diagnostic()
+        if os.path.isfile("edmProvDumpOutput.log"):
+            with open("edmProvDumpOutput.log", "r") as fd:
+                output = fd.read()
+            scramMsg += "\n" + output
+
         msg = "FAILED (%s)\n" % EC_CMSRunWrapper
         msg += "Error getting pset hash from file.\n\tCommand:edmProvDump %s\n\tScram Diagnostic %s" % (filename, scramMsg)
         print(msg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
     output = ''
+    with open("edmProvDumpOutput.log", "r") as fd:
+        output = fd.read()
     return output
 
 
