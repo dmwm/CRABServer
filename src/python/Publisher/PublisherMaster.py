@@ -57,7 +57,7 @@ class Master(object):
         """
 
         self.configurationFile = configurationFile
-        configuration = loadConfigurationFile(configurationFile)
+        config = loadConfigurationFile(configurationFile)
 
         self.config = config.General
         self.rest = self.config.oracleDB
