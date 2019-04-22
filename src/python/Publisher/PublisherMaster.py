@@ -495,7 +495,7 @@ if __name__ == '__main__':
     parser.add_argument('--config', help='Publisher config file', default='PublisherConfig.py')
 
     args = parser.parse_args()
-    #need to pass the configuration file abs patch to the slaves
+    #need to pass the configuration file path to the slaves
     configurationFile = os.path.abspath(args.config)
 
     master = Master(configurationFile)
