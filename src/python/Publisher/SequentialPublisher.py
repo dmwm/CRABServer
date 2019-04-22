@@ -11,7 +11,7 @@
 from __future__ import division
 
 import logging
-import sys
+import os
 import argparse
 
 from Publisher.PublisherMaster import Master
@@ -20,16 +20,18 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', help='Publisher config file', default='PublisherConfig.py')
+parser.add_argument('--debug', help='start with pbd', action='store_true')
 args = parser.parse_args()
 # need to pass the configuration file path to the slaves
 configurationFile = os.path.abspath(args.config)
+usePdb = args.debug
 
 # ask for verbose logging in test mode
 quiet = False
 debug = True
 testMode  = True
 
-usePdb = ( len(sys.argv) == 3 )
+#usePdb = ( len(sys.argv) == 3 )
 if usePdb:
    import pdb
    pdb.set_trace()
