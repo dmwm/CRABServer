@@ -10,26 +10,30 @@
 """
 from __future__ import division
 
-from WMCore.Configuration import Configuration
-from Publisher.PublisherMaster import Master
-
 import logging
 import sys
+import argparse
+
+from Publisher.PublisherMaster import Master
 
 logging.getLogger().setLevel(logging.DEBUG)
 
-from WMCore.Configuration import loadConfigurationFile, Configuration
-config = loadConfigurationFile( sys.argv[1] )
+parser = argparse.ArgumentParser()
+parser.add_argument('--config', help='Publisher config file', default='PublisherConfig.py')
+args = parser.parse_args()
+# need to pass the configuration file path to the slaves
+configurationFile = os.path.abspath(args.config)
 
 # ask for verbose logging in test mode
 quiet = False
 debug = True
-test  = True
+testMode  = True
 
 usePdb = ( len(sys.argv) == 3 )
 if usePdb:
    import pdb
    pdb.set_trace()
 
-master = Master(config, quiet, debug, test)
+master = Master(configurationFile, quiet, debug, testMode)
 master.algorithm()
+
