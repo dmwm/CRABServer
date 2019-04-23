@@ -9,19 +9,15 @@ import sys
 import re
 import json
 import time
-import urllib
-import pprint
 import signal
 import logging
 import tarfile
-import hashlib
-import datetime
 import traceback
 
 if os.path.exists("WMCore.zip") and "WMCore.zip" not in sys.path:
     sys.path.append("WMCore.zip")
 
-from ServerUtilities import cmd_exist, parseJobAd, TRANSFERDB_STATES, isCouchDBURL
+from ServerUtilities import cmd_exist, parseJobAd
 
 if 'http_proxy' in os.environ and not os.environ['http_proxy'].startswith("http://"):
     os.environ['http_proxy'] = "http://%s" % (os.environ['http_proxy'])
@@ -32,7 +28,6 @@ from WMCore.Storage.Registry import retrieveStageOutImpl
 from WMCore.Algorithms.Alarm import Alarm, alarmHandler
 import WMCore.WMException as WMException
 import DashboardAPI
-from httplib import HTTPException
 
 ## See the explanation of this sentry file in CMSRunAnalysis.py.
 with open('wmcore_initialized', 'w') as fd_wmcore:
@@ -1013,10 +1008,10 @@ def main():
 
     ## Modify the stageout temporary and final directory by:
     ## a) adding a four-digit counter;
-    jid = G_JOB_AD['CRAB_Id']
-    if isinstance(jid, basestring):
-        jid = int(jid.split('-')[0])
-    counter = "%04d" % (jid / 1000)
+    logs_arch_dest_pfn_path = os.path.dirname(dest_files[0])
+    if logs_arch_dest_pfn_path.endswith('/log'):
+        logs_arch_dest_pfn_path = re.sub(r'/log$', '', logs_arch_dest_pfn_path)
+    counter = os.path.basename(logs_arch_dest_pfn_path)
     dest_temp_dir = os.path.join(dest_temp_dir, counter)
     dest_final_dir = os.path.join(dest_final_dir, counter)
     ## b) adding a 'failed' subdirectory in case cmsRun failed.
@@ -1028,10 +1023,7 @@ def main():
     logs_arch_file_name = 'cmsRun.log.tar.gz'
     logs_arch_dest_file_name = os.path.basename(dest_files[0])
     logs_arch_dest_pfn = dest_files[0]
-    logs_arch_dest_pfn_path = os.path.dirname(dest_files[0])
     if G_JOB_WRAPPER_EXIT_CODE != 0:
-        if logs_arch_dest_pfn_path.endswith('/log'):
-            logs_arch_dest_pfn_path = re.sub(r'/log$', '', logs_arch_dest_pfn_path)
         logs_arch_dest_pfn_path = os.path.join(logs_arch_dest_pfn_path, 'failed', 'log')
         logs_arch_dest_pfn = os.path.join(logs_arch_dest_pfn_path, logs_arch_dest_file_name)
     logs_arch_dest_temp_lfn = os.path.join(dest_temp_dir, 'log', logs_arch_dest_file_name)
@@ -1403,7 +1395,7 @@ def main():
                                                       output_dest_lfn, \
                                                       dest_site, source_site, \
                                                       is_log = False, inject = transfer_outputs)
-                    except Exception as ex:
+                    except Exception:
                         msg  = "ERROR: Unhandled exception when performing stageout."
                         msg += "\n%s" % (traceback.format_exc())
                         print(msg)

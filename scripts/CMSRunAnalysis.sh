@@ -31,6 +31,7 @@ sigterm() {
 echo "======== CMSRunAnalysis.sh STARTING at $(TZ=GMT date) ========"
 echo "Local time : $(date)"
 echo "Current system : $(uname -a)"
+echo "Current processor: $(cat /proc/cpuinfo |grep name|sort|uniq)"
 ### source the CMSSW stuff using either OSG or LCG style entry env. variables
 ###    (incantations per oli's instructions)
 #   LCG style --

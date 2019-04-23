@@ -7,6 +7,8 @@ import json
 import logging
 import threading
 import os
+import time
+import subprocess
 
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.Storage.TrivialFileCatalog import readTFC
@@ -29,6 +31,42 @@ if os.path.exists('task_process/rest_filetransfers.txt'):
         rest_filetransfers = _rest.readline().split('\n')[0]
         proxy = os.getcwd() + "/" + _rest.readline()
         print("Proxy: %s", proxy)
+
+
+def execute_command(command, logger, timeout):
+    """
+    _execute_command_
+    Funtion to manage commands.
+    """
+
+    stdout, stderr, rc = None, None, 99999
+    proc = subprocess.Popen(
+            command, shell=True, cwd=os.environ['PWD'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+    )
+
+    t_beginning = time.time()
+    seconds_passed = 0
+    while True:
+        if proc.poll() is not None:
+            break
+        seconds_passed = time.time() - t_beginning
+        if timeout and seconds_passed > timeout:
+            proc.terminate()
+            logger.error('Timeout in %s execution.' % command )
+            return stdout, rc
+
+        time.sleep(0.1)
+
+    stdout, stderr = proc.communicate()
+    rc = proc.returncode
+
+    logger.debug('Executing : \n command : %s\n output : %s\n error: %s\n retcode : %s' % (command, stdout, stderr, rc))
+
+    return stdout, rc
+
 
 def get_tfc_rules(phedex, site):
     """
@@ -113,6 +151,19 @@ def mark_failed(ids, failures_reasons):
     return 0
 
 
+def remove_files(pfn):
+
+    command = 'env -i X509_USER_PROXY=%s gfal-rm -v -t 180 %s'  % \
+              (proxy, pfn)
+    logging.debug("Running remove command %s" % command)
+    stdout, rc = execute_command(command, logging, 3600)
+    if rc:
+        logging.info("Deletion command failed with output %s" % (stdout))
+    else:
+        logging.info("File(s) Deleted.")
+    return
+
+
 class check_states_thread(threading.Thread):
     """
     get transfers state per jobid
@@ -168,6 +219,7 @@ class check_states_thread(threading.Thread):
             self.done_id[self.jobid] = []
             self.failed_id[self.jobid] = []
             self.failed_reasons[self.jobid] = []
+            files_to_remove = []
 
             for file_status in file_statuses:
                 _id = file_status['file_metadata']['oracleId']
@@ -183,6 +235,19 @@ class check_states_thread(threading.Thread):
                     else:
                         self.log.exception('Failure reason not found')
                         self.failed_reasons[self.jobid].append('unable to get failure reason')
+                #try:
+                #    remove_files(file_status['source_surl'])
+                #except:
+                #    self.log.exception('Failed to remove temp files')
+                files_to_remove.append(file_status['source_surl'])
+            try:
+                list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
+                for file in files_to_remove:
+                    list_of_surls += str(file) + ' '  # convert JSON u'srm://....' to plain srm://...
+                remove_files(list_of_surls)
+            except:
+                self.log.exception('Failed to remove temp files')
+
 
         self.threadLock.release()
 
@@ -191,12 +256,12 @@ class submit_thread(threading.Thread):
     """
 
     """
-    def __init__(self, threadLock, log, context, files, source, jobids, toUpdate):
+    def __init__(self, threadLock, log, ftsContext, files, source, jobids, toUpdate):
         """
 
         :param threadLock:
         :param log:
-        :param context:
+        :param ftsContext:
         :param files:
         :param source:
         :param jobids:
@@ -208,7 +273,7 @@ class submit_thread(threading.Thread):
         self.files = files
         self.source = source
         self.jobids = jobids
-        self.context = context
+        self.ftsContext = ftsContext
         self.toUpdate = toUpdate
 
     def run(self):
@@ -233,20 +298,26 @@ class submit_thread(threading.Thread):
         job = fts3.new_job(transfers,
                            overwrite=True,
                            verify_checksum=True,
-                           # TODO: add user DN to metadata
-                           metadata={"issuer": "ASO"},
+                           metadata={"issuer": "ASO",
+                                     "userDN": self.files[0][4],
+                                     "taskname": self.files[0][5]},
                            copy_pin_lifetime=-1,
                            bring_online=None,
                            source_spacetoken=None,
                            spacetoken=None,
+                           # max time for job in the fts queue in seconds.
+                           # Usually, it should take O(s) for healthy situations
                            max_time_in_queue=600,
                            retry=3,
-                           retry_delay=600,
-                           reuse=True
+                           # seconds after which the transfer is retried
+                           # reduced under FTS suggestion w.r.t. the 3hrs of asov1
+                           retry_delay=600
+                           # timeout on the single transfer process
+                           # TODO: not clear if we may need it
+                           # timeout = 1300
                            )
-        # TODO: fts retries?? check delay
 
-        jobid = fts3.submit(self.context, job)
+        jobid = fts3.submit(self.ftsContext, job)
 
         self.jobids.append(jobid)
 
@@ -265,7 +336,7 @@ class submit_thread(threading.Thread):
         self.threadLock.release()
 
 
-def submit(phedex, context, toTrans):
+def submit(phedex, ftsContext, toTrans):
     """
     submit tranfer jobs
 
@@ -273,7 +344,7 @@ def submit(phedex, context, toTrans):
     - prepare jobs chunks of max 200 transfers
     - submit fts job
 
-    :param context: fts client context
+    :param ftsContext: fts client ftsContext
     :param toTrans: [source pfn, destination pfn, oracle file id, source site]
     :return: list of jobids submitted
     """
@@ -291,6 +362,8 @@ def submit(phedex, context, toTrans):
     for source in sources:
 
         ids = [x[2] for x in toTrans if x[3] == source]
+        username = toTrans[0][5]
+        taskname = toTrans[0][6]
         src_lfns = [x[0] for x in toTrans if x[3] == source]
         dst_lfns = [x[1] for x in toTrans if x[3] == source]
 
@@ -320,10 +393,10 @@ def submit(phedex, context, toTrans):
         source_pfns = sorted_source_pfns
         dest_pfns = sorted_dest_pfns
 
-        tx_from_source = [[x[0], x[1], x[2], source] for x in zip(source_pfns, dest_pfns, ids)] 
+        tx_from_source = [[x[0], x[1], x[2], source, username, taskname] for x in zip(source_pfns, dest_pfns, ids)] 
 
         for files in chunks(tx_from_source, 200):
-            thread = submit_thread(threadLock, logging, context, files, source, jobids, to_update)
+            thread = submit_thread(threadLock, logging, ftsContext, files, source, jobids, to_update)
             thread.start()
             threads.append(thread)
 
@@ -338,7 +411,7 @@ def submit(phedex, context, toTrans):
     return jobids
 
 
-def perform_transfers(inputFile, lastLine, _lastFile, context, phedex):
+def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
     """
     get transfers and update last read line number
     :param inputFile:
@@ -362,11 +435,13 @@ def perform_transfers(inputFile, lastLine, _lastFile, context, phedex):
                               doc["destination_lfn"],
                               doc["id"],
                               doc["source"],
-                              doc["destination"]])
+                              doc["destination"],
+                              doc["username"],
+                              doc["taskname"]])
 
         jobids = []
         if len(transfers) > 0:
-            jobids = submit(phedex, context, transfers)
+            jobids = submit(phedex, ftsContext, transfers)
 
             for jobid in jobids:
                 logging.info("Monitor link: https://fts3.cern.ch:8449/fts3/ftsmon/#/job/"+jobid)
@@ -440,7 +515,7 @@ def state_manager(fts):
     return jobs_ongoing
 
 
-def submission_manager(phedex, context):
+def submission_manager(phedex, ftsContext):
     """
 
     """
@@ -454,7 +529,7 @@ def submission_manager(phedex, context):
 
     # TODO: if the following fails check not to leave a corrupted file
     with open("task_process/transfers/last_transfer_new.txt", "w+") as _last:
-        _, jobids = perform_transfers("task_process/transfers.txt", last_line, _last, context, phedex)
+        _, jobids = perform_transfers("task_process/transfers.txt", last_line, _last, ftsContext, phedex)
         _last.close()
         os.rename("task_process/transfers/last_transfer_new.txt", "task_process/transfers/last_transfer.txt")
 
@@ -485,8 +560,8 @@ def algorithm():
                        proxy,
                        proxy)
 
-    context = fts3.Context('https://fts3.cern.ch:8446', proxy, proxy, verify=True)
-    logging.debug("Delegating proxy: "+fts3.delegate(context, lifetime=timedelta(hours=48), force=False))
+    ftsContext = fts3.Context('https://fts3.cern.ch:8446', proxy, proxy, verify=True)
+    logging.debug("Delegating proxy to FTS: "+fts3.delegate(ftsContext, lifetime=timedelta(hours=48), force=False))
 
     try:
         phedex = PhEDEx(responseType='xml',
@@ -496,9 +571,9 @@ def algorithm():
         return
 
     jobs_ongoing = state_manager(fts)
-    new_jobs = submission_manager(phedex, context)
+    new_jobs = submission_manager(phedex, ftsContext)
 
-    logging.debug("Transfer jobs ongoing: %s, %s ", jobs_ongoing, new_jobs)
+    logging.debug("Transfer jobs ongoing: %s, new: %s ", jobs_ongoing, new_jobs)
 
     return
 
