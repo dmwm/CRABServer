@@ -51,7 +51,7 @@ then
 #   OSG style --
 elif [ -f "$OSG_APP"/cmssoft/cms/cmsset_default.sh ]
 then
-    echo 'OSG style'  
+    echo 'OSG style'
     set +x
     . $OSG_APP/cmssoft/cms/cmsset_default.sh
     rc=$?
@@ -175,7 +175,7 @@ echo "======== CMSRunAnalysis.py FINISHING at $(TZ=GMT date) ========"
 
 if [[ $jobrc == 68 ]]
 then
-  echo "WARNING: CMSSW encountered a malloc failure.  Logging ulimits:"
+  echo "WARNING: CMSSW encountered a malloc failure. Logging ulimits:"
   sigterm
 fi
 
@@ -190,7 +190,7 @@ if [ -e scramOutput.log ]; then
   cat scramOutput.log
   echo "==== SCRAM interaction log contents dump FINISHING ===="
 else
-  echo "ERROR: scramOutput.log does not exist."
+  echo "WARNING: scramOutput.log does not exist (perhaps scriptExe was set?)."
 fi
 
 if [ ! -e wmcore_initialized ];
