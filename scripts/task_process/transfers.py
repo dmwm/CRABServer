@@ -35,7 +35,7 @@ if os.path.exists('task_process/rest_filetransfers.txt'):
 
 def execute_command(command, logger, timeout):
     """
-    _execute_command_
+    _execute_command_ with a timeout (in seconds)
     Funtion to manage commands.
     """
 
@@ -63,7 +63,7 @@ def execute_command(command, logger, timeout):
     stdout, stderr = proc.communicate()
     rc = proc.returncode
 
-    logger.debug('Executing : \n command : %s\n output : %s\n error: %s\n retcode : %s' % (command, stdout, stderr, rc))
+    logger.debug('Executed : \n command : %s\n output : %s\n error: %s\n retcode : %s' % (command, stdout, stderr, rc))
 
     return stdout, rc
 
@@ -153,10 +153,10 @@ def mark_failed(ids, failures_reasons):
 
 def remove_files(pfn):
 
-    command = 'env -i X509_USER_PROXY=%s gfal-rm -v -t 180 %s'  % \
+    command = 'env -i X509_USER_PROXY=%s timeout 60m gfal-rm -v -t 180 %s &'  % \
               (proxy, pfn)
     logging.debug("Running remove command %s" % command)
-    stdout, rc = execute_command(command, logging, 3600)
+    stdout, rc = execute_command(command, logging, 60)
     if rc:
         logging.info("Deletion command failed with output %s" % (stdout))
     else:
