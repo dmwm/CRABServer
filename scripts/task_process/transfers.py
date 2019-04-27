@@ -7,7 +7,6 @@ import json
 import logging
 import threading
 import os
-import time
 import subprocess
 
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
@@ -31,41 +30,6 @@ if os.path.exists('task_process/rest_filetransfers.txt'):
         rest_filetransfers = _rest.readline().split('\n')[0]
         proxy = os.getcwd() + "/" + _rest.readline()
         print("Proxy: %s", proxy)
-
-
-def execute_command(command, logger, timeout):
-    """
-    _execute_command_
-    Funtion to manage commands.
-    """
-
-    stdout, stderr, rc = None, None, 99999
-    proc = subprocess.Popen(
-            command, shell=True, cwd=os.environ['PWD'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            stdin=subprocess.PIPE,
-    )
-
-    t_beginning = time.time()
-    seconds_passed = 0
-    while True:
-        if proc.poll() is not None:
-            break
-        seconds_passed = time.time() - t_beginning
-        if timeout and seconds_passed > timeout:
-            proc.terminate()
-            logger.error('Timeout in %s execution.' % command )
-            return stdout, rc
-
-        time.sleep(0.1)
-
-    stdout, stderr = proc.communicate()
-    rc = proc.returncode
-
-    logger.debug('Executing : \n command : %s\n output : %s\n error: %s\n retcode : %s' % (command, stdout, stderr, rc))
-
-    return stdout, rc
 
 
 def get_tfc_rules(phedex, site):
@@ -151,16 +115,26 @@ def mark_failed(ids, failures_reasons):
     return 0
 
 
-def remove_files(pfn):
+def remove_files_in_bkg(pfns, logFile, timeout=None) :
+    """
+    fork a process to remove the indicated PFN's without
+    wainting for it to complete and w/o any error checking
+    gfal-rm output is added to logFile
+    A timeout is applied on the gfal-rm command anyhow as a sanity measure
+        against runaway processes, we accept that some file may not be deleted.
+    :param pfns: list of SURL's
+    :param logFile: name of the logFile
+    :param timeout: timeout as a string valid as arg. for linux timeout command, default is 4 hours
+    :return: none
+    """
 
-    command = 'env -i X509_USER_PROXY=%s gfal-rm -v -t 180 %s'  % \
-              (proxy, pfn)
-    logging.debug("Running remove command %s" % command)
-    stdout, rc = execute_command(command, logging, 3600)
-    if rc:
-        logging.info("Deletion command failed with output %s" % (stdout))
-    else:
-        logging.info("File(s) Deleted.")
+    if not timeout:
+        timeout = '%dm' % (len(pfns) * 3)    # default is 3minutes per file to be removed
+    command = 'env -i X509_USER_PROXY=%s timeout %s gfal-rm -v -t 180 %s >> %s 2>&1 &'  % \
+              (proxy, timeout, pfns, logFile)
+    logging.debug("Running remove command %s", command)
+    subprocess.call(command, shell=True)
+
     return
 
 
@@ -204,7 +178,7 @@ class check_states_thread(threading.Thread):
 
         try:
             status = self.fts.get("jobs/"+self.jobid)[0]
-        except Exception as ex:
+        except Exception:
             self.log.exception("failed to retrieve status for %s " % self.jobid)
             self.jobs_ongoing.append(self.jobid)
             self.threadLock.release()
@@ -235,17 +209,14 @@ class check_states_thread(threading.Thread):
                     else:
                         self.log.exception('Failure reason not found')
                         self.failed_reasons[self.jobid].append('unable to get failure reason')
-                #try:
-                #    remove_files(file_status['source_surl'])
-                #except:
-                #    self.log.exception('Failed to remove temp files')
                 files_to_remove.append(file_status['source_surl'])
             try:
                 list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
-                for file in files_to_remove:
-                    list_of_surls += str(file) + ' '  # convert JSON u'srm://....' to plain srm://...
-                remove_files(list_of_surls)
-            except:
+                for f in files_to_remove:
+                    list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
+                removeLogFile = './remove_files.log'
+                remove_files_in_bkg(list_of_surls, removeLogFile)
+            except Exception:
                 self.log.exception('Failed to remove temp files')
 
 
@@ -429,7 +400,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
             try:
                 lastLine += 1
                 doc = json.loads(_data)
-            except:
+            except Exception:
                 continue
             transfers.append([doc["source_lfn"],
                               doc["destination_lfn"],
