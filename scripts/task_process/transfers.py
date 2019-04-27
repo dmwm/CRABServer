@@ -178,7 +178,7 @@ class check_states_thread(threading.Thread):
 
         try:
             status = self.fts.get("jobs/"+self.jobid)[0]
-        except Exception as ex:
+        except Exception:
             self.log.exception("failed to retrieve status for %s " % self.jobid)
             self.jobs_ongoing.append(self.jobid)
             self.threadLock.release()
@@ -400,7 +400,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
             try:
                 lastLine += 1
                 doc = json.loads(_data)
-            except:
+            except Exception:
                 continue
             transfers.append([doc["source_lfn"],
                               doc["destination_lfn"],
