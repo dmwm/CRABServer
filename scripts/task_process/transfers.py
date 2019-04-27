@@ -7,7 +7,6 @@ import json
 import logging
 import threading
 import os
-import time
 import subprocess
 
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
@@ -133,7 +132,7 @@ def remove_files_in_bkg(pfns, logFile, timeout=None) :
         timeout = '%dm' % (len(pfns) * 3)    # default is 3minutes per file to be removed
     command = 'env -i X509_USER_PROXY=%s timeout %s gfal-rm -v -t 180 %s >> %s 2>&1 &'  % \
               (proxy, timeout, pfns, logFile)
-    logging.debug("Running remove command %s" % command)
+    logging.debug("Running remove command %s", command)
     subprocess.call(command, shell=True)
 
     return
@@ -213,11 +212,11 @@ class check_states_thread(threading.Thread):
                 files_to_remove.append(file_status['source_surl'])
             try:
                 list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
-                for file in files_to_remove:
-                    list_of_surls += str(file) + ' '  # convert JSON u'srm://....' to plain srm://...
+                for f in files_to_remove:
+                    list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
                 removeLogFile = './remove_files.log'
                 remove_files_in_bkg(list_of_surls, removeLogFile)
-            except:
+            except Exception:
                 self.log.exception('Failed to remove temp files')
 
 
