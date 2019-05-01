@@ -590,7 +590,7 @@ def extractUserSandbox(archiveJob, cmsswVersion):
 def getProv(filename, scram):
     #fh = logging.FileHandler('edmProvDumpOutput.log')
     #with LoggingContext(logging.getLogger(), level=logging.DEBUG, handler=fh, close=True):
-    with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR)
+    with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
         ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd())
     if ret > 0:
         scramMsg = scram.diagnostic()
@@ -636,7 +636,7 @@ def executeScriptExe(opts, scram):
                                                            opts.maxRuntime)
     fh = logging.FileHandler('scramOutput.log')
     #with LoggingContext(logging.getLogger(), level=logging.DEBUG, handler=fh, close=True):
-    with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR)
+    with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
         ret = scram(command_, runtimeDir = os.getcwd())
     if ret > 0:
         msg = scram.diagnostic()
@@ -667,7 +667,7 @@ def executeCMSSWStack(opts, scram):
                        "config = __import__(\"WMTaskSpace.cmsRun.PSet\", globals(), locals(), [\"process\"], -1);"+\
                        "tweakJson = makeTweak(config.process).jsondictionary();"+\
                        "print tweakJson[\"process\"][\"outputModules_\"]"
-        with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR)
+        with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
             ret = scram("python -c '%s'" % pythonScript, runtimeDir=os.getcwd())
         if ret > 0:
             msg = scram.diagnostic()
