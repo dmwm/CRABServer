@@ -648,7 +648,7 @@ def executeScriptExe(opts, scram):
 
     #fh = logging.FileHandler('cmsRun-stdout.log')
     #with LoggingContext(logging.getLogger(), level=logging.DEBUG, handler=fh, close=True):
-    with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG)
+    with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
         ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
     if ret > 0:
         msg = scram.diagnostic()
