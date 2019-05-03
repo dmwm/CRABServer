@@ -588,8 +588,6 @@ def extractUserSandbox(archiveJob, cmsswVersion):
     os.chdir('..')
 
 def getProv(filename, scram):
-    #fh = logging.FileHandler('edmProvDumpOutput.log')
-    #with LoggingContext(logging.getLogger(), level=logging.DEBUG, handler=fh, close=True):
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
         ret = scram("edmProvDump %s" % filename, runtimeDir=os.getcwd())
     if ret > 0:
@@ -634,8 +632,7 @@ def executeScriptExe(opts, scram):
                                                            opts.oneEventMode,
                                                            opts.eventsPerLumi,
                                                            opts.maxRuntime)
-    fh = logging.FileHandler('scramOutput.log')
-    #with LoggingContext(logging.getLogger(), level=logging.DEBUG, handler=fh, close=True):
+
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
         ret = scram(command_, runtimeDir = os.getcwd())
     if ret > 0:
@@ -646,8 +643,6 @@ def executeScriptExe(opts, scram):
 
     command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
 
-    #fh = logging.FileHandler('cmsRun-stdout.log')
-    #with LoggingContext(logging.getLogger(), level=logging.DEBUG, handler=fh, close=True):
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
         ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
     if ret > 0:
