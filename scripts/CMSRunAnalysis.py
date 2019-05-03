@@ -1010,11 +1010,11 @@ if __name__ == "__main__":
             rep['exitCode'] = 0
             rep['exitMsg'] = "OK"
 
-        slc = SiteLocalConfig.loadSiteLocalConfig()
-        rep['executed_site'] = slc.siteName
-        if 'phedex-node' in slc.localStageOut:
-            rep['phedex_node'] = slc.localStageOut['phedex-node']
-        print("== Execution site from site-local-config.xml: %s" % slc.siteName)
+        slCfg = SiteLocalConfig.loadSiteLocalConfig()
+        rep['executed_site'] = slCfg.siteName
+        if 'phedex-node' in slCfg.localStageOut:
+            rep['phedex_node'] = slCfg.localStageOut['phedex-node']
+        print("== Execution site from site-local-config.xml: %s" % slCfg.siteName)
         with open('jobReport.json', 'w') as of:
             json.dump(rep, of)
         with open('jobReportExtract.pickle', 'w') as of:
