@@ -969,8 +969,7 @@ if __name__ == "__main__":
                 with open('jobReport.json', 'w') as of:
                     json.dump(rep, of)
             except:
-                print("WARNING: Failure when trying to parse FJR XML after job failure.  Traceback follows.")
-                print(traceback.format_exc())
+                print("WARNING: Failure when trying to parse FJR XML after job failure.")
 
         handleException("FAILED", WMex.code, exmsg)
         mintime()
