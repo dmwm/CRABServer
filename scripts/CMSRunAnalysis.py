@@ -33,7 +33,7 @@ class tempSetLogLevel():
             with tempSetLogLevel(logger=myLogger,level=logging.ERROR):
                do stuff
     """
-    import logging
+    #import logging  # already imported globally in this file
     def __init__(self, logger=None, level=None):
         self.previousLogLevel = None
         self.newLogLevel = level
