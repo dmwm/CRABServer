@@ -185,13 +185,6 @@ then
   sigterm
 fi
 
-if [ -e scramOutput.log ]; then
-  echo "==== SCRAM interaction log contents dump STARTING ===="
-  cat scramOutput.log
-  echo "==== SCRAM interaction log contents dump FINISHING ===="
-else
-  echo "WARNING: scramOutput.log does not exist (perhaps scriptExe was set?)."
-fi
 
 if [ ! -e wmcore_initialized ];
 then
