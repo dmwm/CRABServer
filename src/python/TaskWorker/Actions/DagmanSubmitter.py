@@ -223,7 +223,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             schedd = loc.getSchedd(chooserFunction=self.config.TaskWorker.scheddPickerFunction)
         else:
             schedd = loc.getSchedd() #uses the default memory stuff
-        self.logger.debug("Finished picking up scheduler. Sending schedd (%s) to rest", schedd)
+        self.logger.debug("Finished picking up scheduler. Sending schedd name (%s) to REST", schedd)
         self.sendScheddToREST(task, schedd)
 
         return schedd
@@ -451,6 +451,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
         dagAd["CRAB_Attempt"] = 0
+        dagAd["CMS_Type"] = info['cms_type']
+        dagAd["CMS_WMTool"] = info ['cms_wmtool']
+        dagAd["CMS_TaskType"] = info['cms_tasktype']
+        dagAd["CMS_SubmissionTool"] = "CRAB"
         # We switched from local to scheduler universe.  Why?  It seems there's no way in the
         # local universe to change the hold signal at runtime.  That's fairly important for our
         # resubmit implementation.

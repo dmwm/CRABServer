@@ -22,8 +22,8 @@ BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
 
 # Parameters for User File Cache
-# 100MB is the maximum allowed size of a single file
-FILE_SIZE_LIMIT = 104857600
+# 120 MB is the maximum allowed size of a single file
+FILE_SIZE_LIMIT = 120*1048576
 # 0.5MB is the maximum limit for file completely loaded into memory
 FILE_MEMORY_LIMIT = 512*1024
 
@@ -307,7 +307,7 @@ def isFailurePermanent(reason, gridJob=False):
         refuseToSubmit = ""
     for exitCode in STAGEOUT_ERRORS:
         for error in STAGEOUT_ERRORS[exitCode]:
-            if re.match(error['regex'], reason.lower()):
+            if re.match(error['regex'].lower(), reason.lower()):
                 reason = error['error-msg'] + refuseToSubmit + checkQuota
                 return error['isPermanent'], reason, exitCode
     return False, "", None
@@ -373,6 +373,7 @@ def generateTaskName(username, requestname, timestamp=None):
 def encodeRequest(configreq, listParams=None):
     """ Used to encode the request from a dict to a string. Include the code needed for transforming lists in the format required by
         cmsweb, e.g.:   adduserfiles = ['file1','file2']  ===>  [...]adduserfiles=file1&adduserfiles=file2[...]
+        The list of dictionary keys like adduserfiles above, which have a list as value, needs to be passed in the listParams argument  
     """
     listParams = listParams or []
     encodedLists = ''

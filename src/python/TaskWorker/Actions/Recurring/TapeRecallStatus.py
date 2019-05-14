@@ -53,15 +53,21 @@ class TapeRecallStatus(BaseRecurringAction):
                     from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
                     ufc = UserFileCache({'cert': recallingTask['user_proxy'], 'key': recallingTask['user_proxy'], 'endpoint': recallingTask['tm_cache_url'], "pycurl": True})
                     sandbox = recallingTask['tm_user_sandbox'].replace(".tar.gz","")
+                    debugFiles = recallingTask['tm_debug_files'].replace(".tar.gz","")
+                    sandboxPath = os.path.join("/tmp", sandbox)
+                    debugFilesPath = os.path.join("/tmp", debugFiles)
                     try:
-                        ufc.download(sandbox, sandbox, recallingTask['tm_username'])
-                        os.remove(sandbox)
-                        self.logger.info("Successfully touched input sandbox (%s) of task %s (frontend: %s) using the '%s' username (request_id = %d).",
-                                         sandbox, taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId)
+                        ufc.download(sandbox, sandboxPath, recallingTask['tm_username'])
+                        ufc.download(debugFiles, debugFilesPath, recallingTask['tm_username'])
+                        self.logger.info("Successfully touched input and debug sandboxes (%s and %s) of task %s (frontend: %s) using the '%s' username (request_id = %d).",
+                                         sandbox, debugFiles, taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId)
                     except Exception as ex:
-                        self.logger.info("The CRAB3 server backend could not download the input sandbox (%s) of task %s from the frontend (%s) using the '%s' username (request_id = %d)."+\
+                        self.logger.info("The CRAB3 server backend could not download the input and/or debug sandbox (%s and/or %s) of task %s from the frontend (%s) using the '%s' username (request_id = %d)."+\
                                          " This could be a temporary glitch, will try again in next occurrence of the recurring action."+\
-                                         " Error reason:\n%s", sandbox, taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId, str(ex))
+                                         " Error reason:\n%s", sandbox, debugFiles, taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId, str(ex))
+                    finally:
+                        if os.path.exists(sandboxPath): os.remove(sandboxPath)
+                        if os.path.exists(debugFilesPath): os.remove(debugFilesPath)
 
                 ddmRequest = statusRequest(reqId, config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, verbose=False)
                 # The query above returns a JSON with a format {"result": "OK", "message": "Request found", "data": [{"request_id": 14, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:25:41", "last_request": "2018-02-26 23:25:41", "request_count": 1}]}                
