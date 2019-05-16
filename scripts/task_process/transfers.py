@@ -260,6 +260,7 @@ class submit_thread(threading.Thread):
         for lfn in self.files:
             transfers.append(fts3.new_transfer(lfn[0],
                                                lfn[1],
+                                               filesize=lfn[6],
                                                metadata={'oracleId': lfn[2]}
                                                )
                              )
@@ -333,6 +334,7 @@ def submit(phedex, ftsContext, toTrans):
     for source in sources:
 
         ids = [x[2] for x in toTrans if x[3] == source]
+        sizes = [x[7] for x in toTrans if x[3] == source]
         username = toTrans[0][5]
         taskname = toTrans[0][6]
         src_lfns = [x[0] for x in toTrans if x[3] == source]
@@ -364,7 +366,7 @@ def submit(phedex, ftsContext, toTrans):
         source_pfns = sorted_source_pfns
         dest_pfns = sorted_dest_pfns
 
-        tx_from_source = [[x[0], x[1], x[2], source, username, taskname] for x in zip(source_pfns, dest_pfns, ids)] 
+        tx_from_source = [[x[0], x[1], x[2], source, username, taskname, x[3]] for x in zip(source_pfns, dest_pfns, ids, sizes)]
 
         for files in chunks(tx_from_source, 200):
             thread = submit_thread(threadLock, logging, ftsContext, files, source, jobids, to_update)
@@ -408,7 +410,8 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
                               doc["source"],
                               doc["destination"],
                               doc["username"],
-                              doc["taskname"]])
+                              doc["taskname"],
+                              doc["filesize"]])
 
         jobids = []
         if len(transfers) > 0:
