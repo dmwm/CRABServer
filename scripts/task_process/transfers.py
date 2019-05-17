@@ -171,21 +171,24 @@ class check_states_thread(threading.Thread):
         - update states on oracle
         """
 
-        self.threadLock.acquire()
         self.log.info("Getting state of job %s" % self.jobid)
 
+        self.threadLock.acquire()
         self.jobs_ongoing.append(self.jobid)
+        self.threadLock.release()
 
         try:
             status = self.fts.get("jobs/"+self.jobid)[0]
         except Exception:
             self.log.exception("failed to retrieve status for %s " % self.jobid)
+            self.threadLock.acquire()
             self.jobs_ongoing.append(self.jobid)
             self.threadLock.release()
             return
 
         self.log.info("State of job %s: %s" % (self.jobid, status["job_state"]))
 
+        self.threadLock.acquire()
         # TODO: if in final state get with list_files=True and the update_states
         if status["job_state"] in ['FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
             file_statuses = self.fts.get("jobs/%s/files" % self.jobid)[0]
@@ -218,7 +221,7 @@ class check_states_thread(threading.Thread):
                 remove_files_in_bkg(list_of_surls, removeLogFile)
             except Exception:
                 self.log.exception('Failed to remove temp files')
-
+                self.threadLock.release()
 
         self.threadLock.release()
 
@@ -252,7 +255,6 @@ class submit_thread(threading.Thread):
 
         """
 
-        self.threadLock.acquire()
         self.log.info("Processing transfers from: %s" % self.source)
 
         # create destination and source pfns for job
@@ -288,9 +290,22 @@ class submit_thread(threading.Thread):
                            # timeout = 1300
                            )
 
-        jobid = fts3.submit(self.ftsContext, job)
+        try:
+            jobid = fts3.submit(self.ftsContext, job)
+        except:
+            self.log.exception('FTS job submission exception')
+            ids = [x[2] for x in self.files]
+            failures_reasons = ['FTS job submission failed' for x in self.files]
+            try:
+                mark_failed(ids, failures_reasons)
+            except:
+                self.log.exception('Cannot mark as failed --> Zombie transfer')
+                return
+            return
 
+        self.threadLock.acquire()
         self.jobids.append(jobid)
+        self.threadLock.release()
 
         # TODO: manage exception here, what we should do?
         fileDoc = dict()
@@ -303,6 +318,7 @@ class submit_thread(threading.Thread):
 
         self.log.info("Marking submitted %s files" % (len(fileDoc['list_of_ids'])))
 
+        self.threadLock.acquire()
         self.toUpdate.append(fileDoc)
         self.threadLock.release()
 
