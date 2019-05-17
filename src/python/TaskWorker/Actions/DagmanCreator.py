@@ -133,10 +133,6 @@ job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, Rem
 WhenToTransferOutput = ON_EXIT_OR_EVICT
 +SpoolOnEvict = false
 
-# Keep job in the queue upon completion long enough for the postJob to run, allowing the monitoring script to fetch the postJob status and job exit-code updated by the postJob
-LeaveJobInQueue = true
-PostJobStatus = "not run"
-
 universe = vanilla
 Executable = gWMS-CMSRunAnalysis.sh
 Output = job_out.$(CRAB_Id)

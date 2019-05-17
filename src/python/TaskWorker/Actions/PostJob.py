@@ -77,13 +77,10 @@ import datetime
 import tempfile
 import traceback
 import logging.handlers
-import classad
 from shutil import move
 from httplib import HTTPException
 
 import DashboardAPI
-import HTCondorLocator
-import HTCondorUtils
 import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.WMArchive.DataMap import createArchiverDoc
@@ -1516,7 +1513,6 @@ class PostJob():
             self.logger.error(msg)
             if self.crab_retry is not None:
                 self.set_dashboard_state('FAILED')
-                self.set_postJob_ClassAds('FAILED')
             retval = JOB_RETURN_CODES.FATAL_ERROR
             self.log_finish_msg(retval)
             return retval
@@ -1662,7 +1658,6 @@ class PostJob():
                 msg = "The retry handler indicated this was a fatal error."
                 self.logger.info(msg)
                 self.set_dashboard_state('FAILED')
-                self.set_postJob_ClassAds('FAILED')
                 self.logger.info("====== Finished to analyze job exit status.")
                 res = JOB_RETURN_CODES.FATAL_ERROR, ""
             elif self.retryjob_retval == JOB_RETURN_CODES.RECOVERABLE_ERROR:
@@ -1672,7 +1667,6 @@ class PostJob():
                     msg += " DAGMan will not retry."
                     self.logger.info(msg)
                     self.set_dashboard_state('FAILED')
-                    self.set_postJob_ClassAds('FAILED')
                     self.logger.info("====== Finished to analyze job exit status.")
                     res = JOB_RETURN_CODES.FATAL_ERROR, ""
                 else:
@@ -1680,7 +1674,6 @@ class PostJob():
                     msg += " DAGMan will retry."
                     self.logger.info(msg)
                     self.set_dashboard_state('COOLOFF')
-                    self.set_postJob_ClassAds('COOLOFF')
                     self.logger.info("====== Finished to analyze job exit status.")
                     res = JOB_RETURN_CODES.RECOVERABLE_ERROR, ""
             else:
@@ -1688,7 +1681,6 @@ class PostJob():
                 msg += " Will consider this as a fatal error. DAGMan will not retry."
                 self.logger.info(msg)
                 self.set_dashboard_state('FAILED')
-                self.set_postJob_ClassAds('FAILED')
                 self.logger.info("====== Finished to analyze job exit status.")
                 res = JOB_RETURN_CODES.FATAL_ERROR, "" #MarcoM: this should never happen
         ## This is for the case in which we don't run the retry-job.
@@ -1698,7 +1690,6 @@ class PostJob():
                 msg += " Setting this node (job) to permanent failure."
                 self.logger.info(msg)
                 self.set_dashboard_state('FAILED')
-                self.set_postJob_ClassAds('FAILED')
                 self.logger.info("====== Finished to analyze job exit status.")
                 res = JOB_RETURN_CODES.FATAL_ERROR, ""
         else:
@@ -1828,7 +1819,6 @@ class PostJob():
             self.logger.info("====== Starting to parse ROOT job ad file %s." % (job_ad_file_name))
             if self.parse_job_ad(job_ad_file_name):
                 self.set_dashboard_state('FAILED', exitCode=89999)
-                self.set_postJob_ClassAds('FAILED', exitCode=89999)
                 self.logger.info("====== Finished to parse ROOT job ad.")
                 retmsg = "Failure parsing the ROOT job ad."
                 return JOB_RETURN_CODES.FATAL_ERROR, retmsg
@@ -1854,7 +1844,6 @@ class PostJob():
         self.logger.info("====== Starting to parse job report file %s." % (G_JOB_REPORT_NAME))
         if self.parse_job_report():
             self.set_dashboard_state('FAILED', exitCode=89999)
-            self.set_postJob_ClassAds('FAILED', exitCode=89999)
             self.logger.info("====== Finished to parse job report.")
             retmsg = "Failure parsing the job report."
             return JOB_RETURN_CODES.FATAL_ERROR, retmsg
@@ -1879,7 +1868,6 @@ class PostJob():
             msg += " Finishing post-job execution with exit code 0."
             self.logger.info(msg)
             self.set_dashboard_state('FINISHED')
-            self.set_postJob_ClassAds('FINISHED')
             return 0, ""
 
         ## Give a message about the transfer flags.
@@ -1958,7 +1946,6 @@ class PostJob():
                 msg = "There was at least one permanent stageout error; user will need to resubmit."
                 self.logger.error(msg)
                 self.set_dashboard_state('FAILED', exitCode=mostCommon(self.stageout_exit_codes, 60324))
-                self.set_postJob_ClassAds('FAILED', exitCode=mostCommon(self.stageout_exit_codes, 60324))
                 self.logger.info("====== Finished to check for ASO transfers.")
                 return JOB_RETURN_CODES.FATAL_ERROR, retmsg
             except RecoverableStageoutError as rse:
@@ -2021,7 +2008,6 @@ class PostJob():
                 self.logger.info("====== Finished to update publication flags of transfered files.")
 
         self.set_dashboard_state('FINISHED')
-        self.set_postJob_ClassAds('FINISHED')
 
         return 0, ""
 
@@ -2621,58 +2607,8 @@ class PostJob():
                  }
         if reason:
             params['StatusValueReason'] = reason
-        monitoringExitCode(params, exitCode)
-        ## Unfortunately, Dashboard only has 1-second resolution; we must separate all
-        ## updates by at least 1s in order for it to get the correct ordering.
-        time.sleep(1)
-        msg += " Dashboard parameters: %s" % (str(params))
-        self.logger.info(msg)
-        DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
-        self.logger.info("====== Finished to prepare/send report to dashboard.")
-
-    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-    def set_postJob_ClassAds(self, state, exitCode = None):
-        """
-        Update PostJobStatus and job exit-code among the job ClassAds for the monitoring script to update the Grafana dashboard.
-        """
-        if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
-            return
-        msg = "postJob status: %s." % (state)
-        params = {'PostJobStatus': state}
-        monitoringExitCode(params, exitCode)
-        msg += " ClassAds values to set are: %s" % (str(params))
-        self.logger.info(msg)
-        backendurls = self.server.get(self.rest_uri_no_api + '/info', data = {'subresource': 'backendurls'})[0]['result'][0]
-        loc = HTCondorLocator.HTCondorLocator(backendurls)
-        address = None
-        schedd = None
-        try:
-            self.logger.debug("Getting schedd object")
-            schedd, address = loc.getScheddObjNew(task['tm_schedd'])
-            self.logger.debug("Got schedd object")
-        except Exception as exp:
-            msg = "The CRAB server backend was not able to contact the Grid scheduler."
-            msg += " Please try again later."
-            msg += " Message from the scheduler: %s" % (str(exp))
-            self.logger.exception(msg)
-            self.logger.info("ClassAds will not be updated")
-            return
-
-        with HTCondorUtils.AuthenticatedSubprocess(os.environ['X509_USER_PROXY'], logger=self.logger) as (parent, rpipe):
-            if not parent:
-                for param in params:
-                    schedd.edit([self.dag_jobid], param, "'"+params[param]+"'")
-                # Allow Condor to remove the job from the queue before ten days upon completion
-                schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
-        self.logger.info("====== Finished to update classAds.")
-
-    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-    def monitoringExitCode(self, params, exitCode):
-        """
-        Take exit code from job_fjr.<job_id>.<retry_id>.json only if RetryJob thinks it is FATAL_ERROR.
-        """
+        ## Take exit code from job_fjr.<job_id>.<retry_id>.json and report final exit code to Dashboard.
+        ## Only taken if RetryJob think it is FATAL_ERROR.
         if self.retryjob_retval and self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR and not exitCode:
             try:
                 with open(G_JOB_REPORT_NAME_NEW, 'r') as fd:
@@ -2699,6 +2635,13 @@ class PostJob():
             params['JobExitCode'] = exitCode
         else:
             self.logger.debug("Dashboard exit code already set on the worker node. Continuing normally.")
+        ## Unfortunately, Dashboard only has 1-second resolution; we must separate all
+        ## updates by at least 1s in order for it to get the correct ordering.
+        time.sleep(1)
+        msg += " Dashboard parameters: %s" % (str(params))
+        self.logger.info(msg)
+        DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+        self.logger.info("====== Finished to prepare/send report to dashboard.")
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -2767,13 +2710,11 @@ class PostJob():
             msg += " Setting this node (job) to permanent failure. DAGMan will NOT retry."
             self.logger.info(msg)
             self.set_dashboard_state('FAILED', exitCode=exitCode)
-            self.set_postJob_ClassAds('FAILED', exitCode=exitCode)
             return JOB_RETURN_CODES.FATAL_ERROR
         else:
             msg = "Job will be retried by DAGMan."
             self.logger.info(msg)
             self.set_dashboard_state('COOLOFF', exitCode=exitCode)
-            self.set_postJob_ClassAds('COOLOFF', exitCode=exitCode)
             return JOB_RETURN_CODES.RECOVERABLE_ERROR
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
