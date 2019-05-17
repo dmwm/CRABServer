@@ -224,19 +224,27 @@ class check_states_thread(threading.Thread):
 
 
 class submit_thread(threading.Thread):
-    """
+    """Thread for actual FTS job submission
 
     """
+
     def __init__(self, threadLock, log, ftsContext, files, source, jobids, toUpdate):
         """
-
-        :param threadLock:
-        :param log:
-        :param ftsContext:
-        :param files:
-        :param source:
-        :param jobids:
-        :param toUpdate:
+        :param threadLock: lock for the thread
+        :param log: log object
+        :param ftsContext: FTS context
+        :param files: [
+               [source_pfn,
+                dest_pfn,
+                file oracle id,
+                source site,
+                username,
+                taskname,
+                file size],
+               ...]
+        :param source: source site name
+        :param jobids: collect the list of job ids when submitted
+        :param toUpdate: list of oracle ids to update
         """
         threading.Thread.__init__(self)
         self.log = log
@@ -317,7 +325,14 @@ def submit(phedex, ftsContext, toTrans):
     - submit fts job
 
     :param ftsContext: fts client ftsContext
-    :param toTrans: [source pfn, destination pfn, oracle file id, source site]
+    :param toTrans: [[source pfn,
+                      destination pfn,
+                      oracle file id,
+                      source site,
+                      destination,
+                      username,
+                      taskname,
+                      filesize],....]
     :return: list of jobids submitted
     """
     threadLock = threading.Lock()
@@ -387,13 +402,15 @@ def submit(phedex, ftsContext, toTrans):
 def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
     """
     get transfers and update last read line number
-    :param inputFile:
-    :param lastLine:
+
+    :param inputFile: path to the file with list of files to be transferred
+    :param lastLine: number of the last line processed
+    :param _last: path to the file keeping track of the last read line
+    :param ftsContext: FTS context
+    :param phedex: phedex client object
     :return:
     """
 
-    #threadLock = threading.Lock()
-    #threads = []
     transfers = []
     logging.info("starting from line: %s", lastLine)
 
@@ -538,6 +555,7 @@ def algorithm():
     logging.debug("Delegating proxy to FTS: "+fts3.delegate(ftsContext, lifetime=timedelta(hours=48), force=False))
 
     try:
+        
         phedex = PhEDEx(responseType='xml',
                         httpDict={'key': proxy, 'cert': proxy, 'pycurl':True})
     except Exception as e:
@@ -558,4 +576,3 @@ if __name__ == "__main__":
     except Exception:
         logging.exception("error during main loop")
     logging.debug("transfer_inject.py exiting")
-
