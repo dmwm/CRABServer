@@ -77,6 +77,7 @@ import datetime
 import tempfile
 import traceback
 import logging.handlers
+import htcondor
 import classad
 from shutil import move
 from httplib import HTTPException
@@ -2621,7 +2622,7 @@ class PostJob():
                  }
         if reason:
             params['StatusValueReason'] = reason
-        monitoringExitCode(params, exitCode)
+        self.monitoringExitCode(params, exitCode)
         ## Unfortunately, Dashboard only has 1-second resolution; we must separate all
         ## updates by at least 1s in order for it to get the correct ordering.
         time.sleep(1)
@@ -2640,25 +2641,10 @@ class PostJob():
             return
         msg = "postJob status: %s." % (state)
         params = {'PostJobStatus': state}
-        monitoringExitCode(params, exitCode)
+        self.monitoringExitCode(params, exitCode)
         msg += " ClassAds values to set are: %s" % (str(params))
         self.logger.info(msg)
-        backendurls = self.server.get(self.rest_uri_no_api + '/info', data = {'subresource': 'backendurls'})[0]['result'][0]
-        loc = HTCondorLocator.HTCondorLocator(backendurls)
-        address = None
-        schedd = None
-        try:
-            self.logger.debug("Getting schedd object")
-            schedd, address = loc.getScheddObjNew(task['tm_schedd'])
-            self.logger.debug("Got schedd object")
-        except Exception as exp:
-            msg = "Postjob is not able to contact the Grid scheduler %s." % (task['tm_schedd'])
-            msg += " Please try again later."
-            msg += " Message from the scheduler: %s" % (str(exp))
-            self.logger.exception(msg)
-            self.logger.info("ClassAds will not be updated")
-            return
-
+        schedd = htcondor.Schedd()
         with HTCondorUtils.AuthenticatedSubprocess(os.environ['X509_USER_PROXY'], logger=self.logger) as (parent, rpipe):
             if not parent:
                 for param in params:
