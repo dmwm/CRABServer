@@ -2649,9 +2649,9 @@ class PostJob():
             if not parent:
                 for param in params:
                     self.schedd.edit([self.dag_jobid], param, "'"+params[param]+"'")
-                # Allow Condor to remove the job from the queue before ten days upon completion
-                self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
-        self.logger.info("====== Finished to update classAds.")
+                self.logger.info("====== Finished to update classAds. Removing job from the HTCondor queue.")
+                # Once classAds have been updated, no need to keep the job in the queue any longer
+                self.schedd.act(htcondor.JobAction.Remove, [self.dag_jobid])
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
