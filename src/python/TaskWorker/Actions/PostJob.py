@@ -2639,7 +2639,8 @@ class PostJob():
         """
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
-        msg = "postJob status: %s." % (state)
+        self.logger.info("====== Starting to update classAds.")
+        msg = "status: %s." % (state)
         params = {'CRAB_PostJobStatus': state}
         self.monitoringExitCode(params, exitCode)
         msg += " ClassAds values to set are: %s" % (str(params))
