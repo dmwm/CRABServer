@@ -72,6 +72,7 @@ JOB_SUBMIT = \
 +CRAB_JobSW = %(jobsw)s
 +CRAB_JobArch = %(jobarch)s
 +CRAB_DBSURL = %(dbsurl)s
++CRAB_PostJobStatus = "not run"
 +CRAB_PublishName = %(publishname)s
 +CRAB_PublishGroupName = %(publishgroupname)s
 +CRAB_Publish = %(publication)s
@@ -135,7 +136,6 @@ WhenToTransferOutput = ON_EXIT_OR_EVICT
 
 # Keep job in the queue upon completion long enough for the postJob to run, allowing the monitoring script to fetch the postJob status and job exit-code updated by the postJob
 LeaveJobInQueue = true
-CRAB_PostJobStatus = "not run"
 
 universe = vanilla
 Executable = gWMS-CMSRunAnalysis.sh
