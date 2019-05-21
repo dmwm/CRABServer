@@ -83,7 +83,6 @@ from shutil import move
 from httplib import HTTPException
 
 import DashboardAPI
-import HTCondorLocator
 import HTCondorUtils
 import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.DataStructs.LumiList import LumiList
@@ -1282,6 +1281,7 @@ class PostJob():
         ## ID is -1 (and the $RETURN argument macro is -1004). This is just the first
         ## number in self.dag_jobid.
         self.dag_clusterid       = None
+        self.schedd = htcondor.Schedd()
 
         ## Set a logger for the post-job. Use a memory handler by default. Once we know
         ## the name of the log file where all the logging should go, we will flush the
@@ -2644,13 +2644,12 @@ class PostJob():
         self.monitoringExitCode(params, exitCode)
         msg += " ClassAds values to set are: %s" % (str(params))
         self.logger.info(msg)
-        schedd = htcondor.Schedd()
         with HTCondorUtils.AuthenticatedSubprocess(os.environ['X509_USER_PROXY'], logger=self.logger) as (parent, rpipe):
             if not parent:
                 for param in params:
-                    schedd.edit([self.dag_jobid], param, "'"+params[param]+"'")
+                    self.schedd.edit([self.dag_jobid], param, "'"+params[param]+"'")
                 # Allow Condor to remove the job from the queue before ten days upon completion
-                schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+                self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
         self.logger.info("====== Finished to update classAds.")
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
