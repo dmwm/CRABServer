@@ -307,7 +307,7 @@ class submit_thread(threading.Thread):
         fileDoc['subresource'] = 'updateTransfers'
         fileDoc['list_of_ids'] = [x[2] for x in self.files]
         fileDoc['list_of_transfer_state'] = ["SUBMITTED" for _ in self.files]
-        fileDoc['list_of_fts_instance'] = ['https://fts3.cern.ch:8446/' for _ in self.files]
+        fileDoc['list_of_fts_instance'] = [self.ftsContext.endpoint for _ in self.files]
         fileDoc['list_of_fts_id'] = [jobid for _ in self.files]
 
         self.log.info("Marking submitted %s files" % (len(fileDoc['list_of_ids'])))
@@ -434,8 +434,9 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
         if len(transfers) > 0:
             jobids = submit(phedex, ftsContext, transfers)
 
+            ftsMon = ftsContext.endpoint.replace('8446','8449') + '/fts3/ftsmon/#/job/'
             for jobid in jobids:
-                logging.info("Monitor link: https://fts3.cern.ch:8449/fts3/ftsmon/#/job/"+jobid)
+                logging.info("Monitor link: " + ftsMon + jobid)
 
             # TODO: send to dashboard
 
@@ -546,14 +547,16 @@ def algorithm():
     - append new fts job ids to fts_jobids.txt
     """
 
-    # TODO: pass by configuration
-    fts = HTTPRequests('fts3.cern.ch:8446/',
-                       proxy,
-                       proxy)
+    # TODO: pass by configuration the fts server host name
+    ftsHost   = 'fts3.cern.ch'
 
-    ftsContext = fts3.Context('https://fts3.cern.ch:8446', proxy, proxy, verify=True)
+    ftsREST = '%s:8446/' % ftsHost
+    ftsEndpoint = 'https://%s:8446' % ftsHost
+    #TODO: use Python Easy Binding API for status enquiry and stop using HTTPRequest here, only ftsContext
+    fts = HTTPRequests(ftsREST, proxy, proxy)
+    ftsContext = fts3.Context(ftsEndpoint, proxy, proxy, verify=True)
+
     logging.debug("Delegating proxy to FTS: "+fts3.delegate(ftsContext, lifetime=timedelta(hours=48), force=False))
-
     log_phedex = logging.getLogger('phedex')
 
     # Uncomment the 2 lines below if you want to enable phedex logging 
