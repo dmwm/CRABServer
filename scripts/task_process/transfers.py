@@ -556,7 +556,7 @@ def algorithm():
     fts = HTTPRequests(ftsREST, proxy, proxy)
     ftsContext = fts3.Context(ftsEndpoint, proxy, proxy, verify=True)
 
-    logging.debug("Delegating proxy to FTS: "+fts3.delegate(ftsContext, lifetime=timedelta(hours=48), force=False))
+    logging.debug("Delegating proxy to FTS: %s", fts3.delegate(ftsContext, lifetime=timedelta(hours=48), force=False) )
     log_phedex = logging.getLogger('phedex')
 
     # Uncomment the 2 lines below if you want to enable phedex logging 
