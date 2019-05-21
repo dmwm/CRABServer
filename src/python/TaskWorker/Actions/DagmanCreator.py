@@ -135,7 +135,7 @@ WhenToTransferOutput = ON_EXIT_OR_EVICT
 
 # Keep job in the queue upon completion long enough for the postJob to run, allowing the monitoring script to fetch the postJob status and job exit-code updated by the postJob
 LeaveJobInQueue = true
-PostJobStatus = "not run"
+CRAB_PostJobStatus = "not run"
 
 universe = vanilla
 Executable = gWMS-CMSRunAnalysis.sh
