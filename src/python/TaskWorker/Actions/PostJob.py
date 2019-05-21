@@ -2638,6 +2638,7 @@ class PostJob():
         Update PostJobStatus and job exit-code among the job ClassAds for the monitoring script to update the Grafana dashboard.
         """
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
+            self.schedd.act(htcondor.JobAction.Remove, [self.dag_jobid])
             return
         self.logger.info("====== Starting to update classAds.")
         msg = "status: %s." % (state)
