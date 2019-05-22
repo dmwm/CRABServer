@@ -1241,6 +1241,7 @@ class PostJob():
         self.source_dir          = None
         self.dest_dir            = None
         self.logs_arch_file_name = None
+        self.stage               = None
         self.output_files_names  = None
         ## The crab_retry is the number of times the post-job was ran (not necessarilly
         ## completing) for this job id.
@@ -1317,13 +1318,13 @@ class PostJob():
                         #if the line is empty we are sure it's the first try. See comment 10 lines below
                         defer_num = 0
             except IOError as e:
-                self.logger.error("I/O error({0}): {1}".format(e.errno, e.strerror))
+                self.logger.error("I/O error(%d): %s", e.errno, e.strerror)
                 raise
             except ValueError:
                 self.logger.error("Could not convert data to an integer.")
                 raise
             except:
-                self.logger.exception("Unexpected error: %s" % sys.exc_info()[0])
+                self.logger.exception("Unexpected error: %s", sys.exc_info()[0])
                 raise
         else:
             #create the file if it does not exist
@@ -1339,10 +1340,10 @@ class PostJob():
                 #put some spaces to overwrite possibly longer numbers (should never happen, but..)
                 fd.write(str(defer_num + 1) + ' '*10)
         except IOError as e:
-            self.logger.error("I/O error({0}): {1}".format(e.errno, e.strerror))
+            self.logger.error("I/O error(%d): %s", e.errno, e.strerror)
             raise
         except:
-            self.logger.exception("Unexpected error: %s" % sys.exc_info()[0])
+            self.logger.exception("Unexpected error: %s", sys.exc_info()[0])
             raise
 
         return defer_num
@@ -1491,7 +1492,7 @@ class PostJob():
         DEFER_NUM = self.get_defer_num()
 
         if first_pj_execution():
-            self.logger.info("======== Starting execution on %s. Task Worker Version %s" % (os.uname()[1], __version__))
+            self.logger.info("======== Starting execution on %s. Task Worker Version %s", os.uname()[1], __version__)
 
         ## Create the task web directory in the schedd. Ignore if it exists already.
         self.create_taskwebdir()
@@ -1634,7 +1635,7 @@ class PostJob():
         """
         Logs a message with the post-job return code.
         """
-        self.logger.info("======== Finished post-job execution with status code %s." % (retval))
+        self.logger.info("======== Finished post-job execution with status code %s.", retval)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1754,9 +1755,9 @@ class PostJob():
             outlumis += LumiList(runsAndLumis=input_['runs'])
 
         missing = inlumis - outlumis
-        self.logger.info("Lumis expected to be processed: {0}".format(len(inlumis.getLumis())))
-        self.logger.info("Lumis actually processed:       {0}".format(len(outlumis.getLumis())))
-        self.logger.info("Difference in lumis:            {0}".format(len(missing.getLumis())))
+        self.logger.info("Lumis expected to be processed: %d", len(inlumis.getLumis()))
+        self.logger.info("Lumis actually processed:       %d", len(outlumis.getLumis()))
+        self.logger.info("Difference in lumis:            %d", len(missing.getLumis()))
         if len(missing.getLumis()) == 0:
             # we don't want to create the subjobs if the job processed everything
             return
@@ -1794,9 +1795,9 @@ class PostJob():
             condor_history_dir = os.environ.get("_CONDOR_PER_JOB_HISTORY_DIR", "")
             job_ad_file_name = os.path.join(condor_history_dir, str("history." + str(self.dag_jobid)))
         counter = 0
-        self.logger.info("====== Starting to parse job ad file %s." % (job_ad_file_name))
+        self.logger.info("====== Starting to parse job ad file %s.", job_ad_file_name)
         while counter < 5:
-            self.logger.info("       -----> Started %s time out of %s -----" % (str(counter), "5"))
+            self.logger.info("       -----> Started %s time out of %s -----", str(counter), "5")
             parse_job_ad_exit = self.parse_job_ad(job_ad_file_name)
             if not parse_job_ad_exit:
                 used_job_ad = True
@@ -1826,7 +1827,7 @@ class PostJob():
             ## only (actually almost only) global parameters that are available in the main
             ## ROOT job ad, so we can fallback to read this main ROOT job ad here.
             job_ad_file_name = os.environ.get("_CONDOR_JOB_AD", ".job.ad")
-            self.logger.info("====== Starting to parse ROOT job ad file %s." % (job_ad_file_name))
+            self.logger.info("====== Starting to parse ROOT job ad file %s.", job_ad_file_name)
             if self.parse_job_ad(job_ad_file_name):
                 self.set_dashboard_state('FAILED', exitCode=89999)
                 self.set_state_ClassAds('FAILED', exitCode=89999)
@@ -1852,7 +1853,7 @@ class PostJob():
         if not first_pj_execution():
             self.logger.setLevel(logging.ERROR)
         ## Parse the job report.
-        self.logger.info("====== Starting to parse job report file %s." % (G_JOB_REPORT_NAME))
+        self.logger.info("====== Starting to parse job report file %s.", G_JOB_REPORT_NAME)
         if self.parse_job_report():
             self.set_dashboard_state('FAILED', exitCode=89999)
             self.set_state_ClassAds('FAILED', exitCode=89999)
@@ -2003,7 +2004,7 @@ class PostJob():
                 self.logger.info("====== About to update publication flags of transfered files.")
                 for doc in getattr(ASO_JOB, 'docs_in_transfer', []):
                     doc_id = doc.get('doc_id')
-                    self.logger.debug("Found doc %s" % doc_id)
+                    self.logger.debug("Found doc %s", doc_id)
                     if doc.get('delayed_publicationflag_update'):
                         newDoc = {
                             'subresource' : 'updatePublication',
@@ -2037,7 +2038,7 @@ class PostJob():
         """
         env_file = "postjob_env.txt"
         if not os.path.exists(env_file) or not os.stat(env_file).st_size:
-            self.logger.info("Will write env variables to %s file." % env_file)
+            self.logger.info("Will write env variables to %s file.", env_file)
             try:
                 with open(env_file, "w") as fd:
                     fd.write("------ Environment variables:\n")
@@ -2045,9 +2046,8 @@ class PostJob():
                         fd.write("%30s    %s\n" % (key, os.environ[key]))
             except:
                 self.logger.info("Not able to write ENV variables to a file. Continuing")
-                pass
         else:
-            self.logger.info("Will not write %s file. Continue." % env_file)
+            self.logger.info("Will not write %s file. Continue.", env_file)
         # if job_ad is available, write it output to PostJob log file
         if self.job_ad:
             self.logger.debug("------ Job classad values for debug purposes:")
@@ -2671,15 +2671,13 @@ class PostJob():
                             params['ExeExitCode'] = report['jobExitCode']
                     except ValueError as e:
                         self.logger.debug("Not able to load the fwjr because of a ValueError %s. \
-                                           Not setting exit code for dashboard. Continuing normally" % (e))
+                                           Not setting exit code for dashboard. Continuing normally", e)
                         ## Means that file exists, but failed to load json
                         ## Don`t fail and go ahead with reporting to dashboard
-                        pass
             except IOError as e:
                 ## File does not exist. Don`t fail and go ahead with reporting to dashboard
                 self.logger.debug("Not able to load the fwjr because of a IOError %s. \
-                                   Not setting exitcode for dashboard. Continuing normally." % (e))
-                pass
+                                   Not setting exitcode for dashboard. Continuing normally.", e)
         ## If Exit Code is defined we report only it. It is the final exit Code of the job
         elif exitCode:
             self.logger.debug("Dashboard exit code is defined by Postjob execution.")
@@ -2884,7 +2882,7 @@ class PostJob():
         if not os.path.isdir(WMARCHIVE_BASE_LOCATION):
             os.makedirs(os.path.join(WMARCHIVE_BASE_LOCATION))
         #not using shutil.move because I want to move the file in the same disk
-        self.logger.info("%s , %s" % (G_WMARCHIVE_REPORT_NAME_NEW, os.path.join(WMARCHIVE_BASE_LOCATION, "%s_%s" % (self.reqname, G_WMARCHIVE_REPORT_NAME_NEW))))
+        self.logger.info("%s , %s", G_WMARCHIVE_REPORT_NAME_NEW, os.path.join(WMARCHIVE_BASE_LOCATION, "%s_%s" % (self.reqname, G_WMARCHIVE_REPORT_NAME_NEW)))
         os.rename(G_WMARCHIVE_REPORT_NAME_NEW, os.path.join(WMARCHIVE_BASE_LOCATION, "%s_%s" % (self.reqname, G_WMARCHIVE_REPORT_NAME_NEW)))
 
 ##==============================================================================
