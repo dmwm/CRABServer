@@ -2638,21 +2638,21 @@ class PostJob():
         Update PostJobStatus and job exit-code among the job ClassAds for the monitoring script to update the Grafana dashboard.
         """
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
-            self.schedd.act(htcondor.JobAction.Remove, [self.dag_jobid])
+            self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
             return
         self.logger.info("====== Starting to update classAds.")
         msg = "status: %s." % (state)
-        params = {'CRAB_PostJobStatus': state}
+        params = {'CRAB_PostJobStatus': '"{0}"'.format(state)}
         self.monitoringExitCode(params, exitCode)
         msg += " ClassAds values to set are: %s" % (str(params))
         self.logger.info(msg)
         with HTCondorUtils.AuthenticatedSubprocess(os.environ['X509_USER_PROXY'], logger=self.logger) as (parent, rpipe):
             if not parent:
                 for param in params:
-                    self.schedd.edit([self.dag_jobid], param, "'"+params[param]+"'")
-                self.logger.info("====== Finished to update classAds. Removing job from the HTCondor queue.")
-                # Once classAds have been updated, no need to keep the job in the queue any longer
-                self.schedd.act(htcondor.JobAction.Remove, [self.dag_jobid])
+                    self.schedd.edit([self.dag_jobid], param, params[param])
+                # Once state classAds have been updated, let HTCondor remove the job from the queue
+                self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+                self.logger.info("====== Finished to update classAds.")
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
