@@ -73,6 +73,7 @@ JOB_SUBMIT = \
 +CRAB_JobArch = %(jobarch)s
 +CRAB_DBSURL = %(dbsurl)s
 +CRAB_PostJobStatus = "not run"
++CRAB_PostJobLastUpdate = 0
 +CRAB_PublishName = %(publishname)s
 +CRAB_PublishGroupName = %(publishgroupname)s
 +CRAB_Publish = %(publication)s

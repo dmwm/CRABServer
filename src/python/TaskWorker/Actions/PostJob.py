@@ -2650,6 +2650,7 @@ class PostJob():
             if not parent:
                 for param in params:
                     self.schedd.edit([self.dag_jobid], param, params[param])
+                self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', time.time())
                 # Once state classAds have been updated, let HTCondor remove the job from the queue
                 self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
                 self.logger.info("====== Finished to update classAds.")
