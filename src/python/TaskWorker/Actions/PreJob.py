@@ -15,7 +15,6 @@ from ServerUtilities import getWebdirForDb, insertJobIdSid, setDashboardLogs
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import CMSGroupMapper
-import HTCondorUtils
 
 
 class PreJob:
@@ -30,7 +29,6 @@ class PreJob:
         self.job_id        = None
         self.taskname      = None
         self.backend       = None
-        self.schedd        = htcondor.Schedd()
         self.task_ad       = classad.ClassAd()
         self.userWebDirPrx = ""
         self.resubmit_info = {}
@@ -266,6 +264,10 @@ class PreJob:
         new_submit_text = '+CRAB_Retry = %d\n' % (crab_retry)
         msg = "Setting CRAB_Retry = %s" % (crab_retry)
         self.logger.info(msg)
+        ## Add job and postjob log URLs
+        job_retry = "%s.%s" % (self.job_id, crab_retry)
+        new_submit_text += '+CRAB_JobLogURL = %s\n' % os.path.join(self.userWebDirPrx, "job_out."+job_retry+".txt")
+        new_submit_text += '+CRAB_PostJobLogURL = %s\n' % os.path.join(self.userWebDirPrx, "postjob_out."+job_retry+".txt")
         ## For the parameters that can be overwritten at each manual job resubmission,
         ## read them from the task ad, unless there is resubmission information there
         ## and this job is not one that has to be resubmitted, in which case we should
@@ -471,24 +473,16 @@ class PreJob:
                     return
             job_retry = "%s.%s" % (self.job_id, crab_retry)
             fname = os.path.join(logpath, "job_out.%s.txt" % job_retry)
-            logURLs = {}
             with open(fname, 'w') as fd:
                 fd.write("Job output has not been processed by post-job.\n")
-                logURLs['CRAB_JobLogURL'] = os.path.join(self.userWebDirPrx, "job_out."+job_retry+".txt")
             fname = "postjob.%s.txt" % job_retry
             with open(fname, 'w') as fd:
                 fd.write("Post-job is currently queued.\n")
-                logURLs['CRAB_PostJobLogURL'] = os.path.join(self.userWebDirPrx, "postjob_out."+job_retry+".txt")
             try:
                 os.symlink(os.path.abspath(os.path.join(".", fname)), \
                            os.path.join(logpath, fname))
             except:
                 pass
-            with HTCondorUtils.AuthenticatedSubprocess(os.environ['X509_USER_PROXY'], logger=self.logger) as (parent, rpipe):
-                if not parent:
-                    self.logger.info("Adding job and postjob log URLs to job ClassAds")
-                    for url in logURLs:
-                        self.schedd.edit('CRAB_ReqName == "%s" && CRAB_Id == "%s" && CRAB_Retry == %d' %(taskname, self.job_id, int(crab_retry)), url, '"{0}"'.format(logURLs[url]))
             if crab_retry:
                 return time.time() - os.stat(os.path.join(".", "postjob.%s.%s.txt" % (self.job_id, int(crab_retry)-1))).st_mtime
         except:
@@ -563,6 +557,14 @@ class PreJob:
         self.get_task_ad()
 
         try:
+            with open('proxied_webdir') as fd:
+                proxied_webdir = fd.read()
+            self.userWebDirPrx = proxied_webdir
+        except IOError as e:
+            self.logger.error(("'I/O error(%s): %s', when looking for the proxied_webdir file. Might be normal"
+                               " if the schedd does not have a proxiedurl in the REST external config." % (e.errno, e.strerror)))
+
+        try:
             self.get_resubmit_info()
             self.alter_submit(crab_retry)
             self.save_resubmit_info()
@@ -570,14 +572,6 @@ class PreJob:
             msg = "Exception executing the pre-job."
             self.logger.exception(msg)
             raise
-
-        try:
-            with open('proxied_webdir') as fd:
-                proxied_webdir = fd.read()
-            self.userWebDirPrx = proxied_webdir
-        except IOError as e:
-            self.logger.error(("'I/O error(%s): %s', when looking for the proxied_webdir file. Might be normal"
-                               " if the schedd does not have a proxiedurl in the REST external config." % (e.errno, e.strerror)))
 
         old_time = self.touch_logs(crab_retry)
         ## Note the cooloff time is based on the DAGMan retry number (i.e. the number of
