@@ -29,6 +29,7 @@ class PreJob:
         self.job_id        = None
         self.taskname      = None
         self.backend       = None
+        self.stage         = None
         self.task_ad       = classad.ClassAd()
         self.userWebDirPrx = ""
         self.resubmit_info = {}
@@ -158,9 +159,9 @@ class PreJob:
 
         storage_rules = htcondor.param['CRAB_StorageRules']
 
-        self.logger.info("User web dir proxy: " + self.userWebDirPrx)
+        self.logger.info("User web dir proxy: %s", self.userWebDirPrx)
         userWebDir = getWebdirForDb(str(self.task_ad.get('CRAB_ReqName')), storage_rules)
-        self.logger.info("web dir: " + userWebDir)
+        self.logger.info("web dir: %s", userWebDir)
 
         if self.userWebDirPrx:
             setDashboardLogs(params, self.userWebDirPrx, self.job_id, crab_retry)
@@ -171,7 +172,7 @@ class PreJob:
 
         insertJobIdSid(params, self.job_id, self.task_ad['CRAB_ReqName'], crab_retry)
         apmon = ApmonIf()
-        self.logger.debug("Dashboard task info: %s" % str(params))
+        self.logger.debug("Dashboard task info: %s", str(params))
         apmon.sendToML(params)
         apmon.free()
 
@@ -182,7 +183,7 @@ class PreJob:
         """
         self.task_ad = {}
         try:
-            self.logger.info("Loading classads from: %s" % os.environ['_CONDOR_JOB_AD'])
+            self.logger.info("Loading classads from: %s", os.environ['_CONDOR_JOB_AD'])
             self.task_ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
             self.logger.info(str(self.task_ad))
         except:
@@ -219,8 +220,7 @@ class PreJob:
             for state in JOB_RETURN_CODES._fields:
                 count = 0
                 with open("task_statistics.%s" % (state)) as fd:
-                    for line in fd:
-                        count += 1
+                    count = len(fd.read().split(b'\n')) - 1
                 results[state] = count
         except:
             return {}
@@ -236,8 +236,7 @@ class PreJob:
             for state in JOB_RETURN_CODES._fields:
                 count = 0
                 with open("task_statistics.%s.%s" % (site, state)) as fd:
-                    for line in fd:
-                        count += 1
+                    count = len(fd.read().split(b'\n')) - 1
                 results[state] = count
         except:
             return {}
@@ -488,7 +487,6 @@ class PreJob:
         except:
             msg = "Exception executing touch_logs()."
             self.logger.exception(msg)
-            pass
 
 
     def needsDefer(self):
@@ -504,7 +502,7 @@ class PreJob:
             submitTime = int(self.task_ad.get("CRAB_TaskSubmitTime"))
             currentTime = time.time()
             if currentTime < (submitTime + totalDefer):
-                self.logger.info('  Defer time of this job (%s seconds since initial task submission) not elapsed yet, deferring for %s seconds' % (totalDefer, totalDefer))
+                self.logger.info('  Defer time of this job (%s seconds since initial task submission) not elapsed yet, deferring for %s seconds', totalDefer, totalDefer)
                 return True
             else:
                 self.logger.info('  Continuing normally since current time is greater than requested starttime of the job')
@@ -561,8 +559,8 @@ class PreJob:
                 proxied_webdir = fd.read()
             self.userWebDirPrx = proxied_webdir
         except IOError as e:
-            self.logger.error(("'I/O error(%s): %s', when looking for the proxied_webdir file. Might be normal"
-                               " if the schedd does not have a proxiedurl in the REST external config." % (e.errno, e.strerror)))
+            self.logger.error("'I/O error(%s): %s', when looking for the proxied_webdir file. Might be normal"
+                              " if the schedd does not have a proxiedurl in the REST external config.", e.errno, e.strerror)
 
         try:
             self.get_resubmit_info()
