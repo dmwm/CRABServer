@@ -250,7 +250,7 @@ def makeWebDir(ad):
     #See https://github.com/dmwm/CRABServer/blob/3.3.1507.rc8/src/python/CRABInterface/HTCondorDataWorkflow.py#L398
     dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
     try:
-        htcondor.Schedd().edit([dagJobId], 'CRAB_UserWebDir', ad.lookup('CRAB_UserWebDir'))
+        htcondor.Schedd().edit([dagJobId], 'CRAB_UserWebDir', '{0}'.format(ad.lookup('CRAB_UserWebDir')))
     except RuntimeError as reerror:
         printLog(str(reerror))
 
