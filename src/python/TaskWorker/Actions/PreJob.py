@@ -266,7 +266,7 @@ class PreJob:
         ## Add job and postjob log URLs
         job_retry = "%s.%s" % (self.job_id, crab_retry)
         new_submit_text += '+CRAB_JobLogURL = %s\n' % classad.quote(os.path.join(self.userWebDirPrx, "job_out."+job_retry+".txt"))
-        new_submit_text += '+CRAB_PostJobLogURL = %s\n' % classad.quote(os.path.join(self.userWebDirPrx, "postjob_out."+job_retry+".txt"))
+        new_submit_text += '+CRAB_PostJobLogURL = %s\n' % classad.quote(os.path.join(self.userWebDirPrx, "postjob."+job_retry+".txt"))
         ## For the parameters that can be overwritten at each manual job resubmission,
         ## read them from the task ad, unless there is resubmission information there
         ## and this job is not one that has to be resubmitted, in which case we should
