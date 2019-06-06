@@ -292,21 +292,14 @@ def saveProxiedWebdir(ad):
     if proxied_webDir: # Prefer the proxied webDir to the non-proxied one
         ad[webDir_adName] = str(proxied_webDir)
 
-    #This condor_edit is required because in the REST interface we look for the webdir if the DB upload failed (or in general if we use the "old logic")
-    #See https://github.com/dmwm/CRABServer/blob/3.3.1507.rc8/src/python/CRABInterface/HTCondorDataWorkflow.py#L398
-    dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
-    try:
-        htcondor.Schedd().edit([dagJobId], webDir_adName, '{0}'.format(ad.lookup(webDir_adName)))
-    except RuntimeError as reerror:
-        printLog(str(reerror))
-
-    # We need to use a file to communicate this to the prejob. I tried things like:
-    #    htcondor.Schedd().edit([dagJobId], 'CRAB_UserWebDirPrx', ad.lookup('CRAB_UserWebDir'))
-    # but the prejob read the classads from the file, not querying the schedd.and we can't update
-    # the classad file since it's owned by user condor
     if ad[webDir_adName]:
-        with open("proxied_webdir", "w") as fd:
-            fd.write(ad[webDir_adName])
+        # This condor_edit is required because in the REST interface we look for the webdir if the DB upload failed (or in general if we use the "old logic")
+        # See https://github.com/dmwm/CRABServer/blob/3.3.1507.rc8/src/python/CRABInterface/HTCondorDataWorkflow.py#L398
+        dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
+        try:
+            htcondor.Schedd().edit([dagJobId], webDir_adName, '{0}'.format(ad.lookup(webDir_adName)))
+        except RuntimeError as reerror:
+            printLog(str(reerror))
     else:
         printLog("Cannot get proxied webdir from the server. Maybe the schedd does not have one in the REST configuration?")
         return 1
