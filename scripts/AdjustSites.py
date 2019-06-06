@@ -244,15 +244,7 @@ def makeWebDir(ad):
         storage_rules = "^/home/remoteGlidein,http://submit-5.t2.ucsd.edu/CSstoragePath"
     sinfo = storage_rules.split(",")
     storage_re = re.compile(sinfo[0])
-    val = storage_re.sub(sinfo[1], path)
-    ad['CRAB_UserWebDir'] = val
-    #This condor_edit is required because in the REST interface we look for the webdir if the DB upload failed (or in general if we use the "old logic")
-    #See https://github.com/dmwm/CRABServer/blob/3.3.1507.rc8/src/python/CRABInterface/HTCondorDataWorkflow.py#L398
-    dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
-    try:
-        htcondor.Schedd().edit([dagJobId], 'CRAB_UserWebDir', '{0}'.format(ad.lookup('CRAB_UserWebDir')))
-    except RuntimeError as reerror:
-        printLog(str(reerror))
+    ad['CRAB_localWebDirURL'] = storage_re.sub(sinfo[1], path)
 
 
 def updateWebDir(ad):
@@ -263,10 +255,11 @@ def updateWebDir(ad):
     host = ad['CRAB_RestHost']
     uri = ad['CRAB_RestURInoAPI'] + '/task'
     data['workflow'] = ad['CRAB_ReqName']
-    data['webdirurl'] = ad['CRAB_UserWebDir']
+    data['webdirurl'] = ad['CRAB_localWebDirURL']
     cert = ad['X509UserProxy']
+
     try:
-        printLog("Uploading webdir %s to %s" % (ad['CRAB_UserWebDir'], host))
+        printLog("Uploading webdir %s to %s" % (data['webdirurl'], host))
         server = HTTPRequests(host, cert, cert)
         server.post(uri, data=urllib.urlencode(data))
         return 0
@@ -293,15 +286,27 @@ def saveProxiedWebdir(ad):
     host = ad['CRAB_RestHost']
     uri = ad['CRAB_RestURInoAPI'] + '/task'
     cert = ad['X509UserProxy']
-    res = getProxiedWebDir(task, host, uri, cert, logFunction=printLog)
+    webDir_adName = 'CRAB_WebDirURL'
+    ad[webDir_adName] = ad['CRAB_localWebDirURL']
+    proxied_webDir = getProxiedWebDir(task, host, uri, cert, logFunction=printLog)
+    if proxied_webDir: # Prefer the proxied webDir to the non-proxied one
+        ad[webDir_adName] = str(proxied_webDir)
+
+    #This condor_edit is required because in the REST interface we look for the webdir if the DB upload failed (or in general if we use the "old logic")
+    #See https://github.com/dmwm/CRABServer/blob/3.3.1507.rc8/src/python/CRABInterface/HTCondorDataWorkflow.py#L398
+    dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
+    try:
+        htcondor.Schedd().edit([dagJobId], webDir_adName, '{0}'.format(ad.lookup(webDir_adName)))
+    except RuntimeError as reerror:
+        printLog(str(reerror))
 
     # We need to use a file to communicate this to the prejob. I tried things like:
     #    htcondor.Schedd().edit([dagJobId], 'CRAB_UserWebDirPrx', ad.lookup('CRAB_UserWebDir'))
     # but the prejob read the classads from the file, not querying the schedd.and we can't update
     # the classad file since it's owned by user condor
-    if res:
+    if ad[webDir_adName]:
         with open("proxied_webdir", "w") as fd:
-            fd.write(res)
+            fd.write(ad[webDir_adName])
     else:
         printLog("Cannot get proxied webdir from the server. Maybe the schedd does not have one in the REST configuration?")
         return 1
@@ -354,14 +359,15 @@ def main():
 
     retries = 0
     exitCode = 1
-    while retries < 3 and exitCode != 0:
+    maxRetries = 3
+    while retries < maxRetries and exitCode != 0:
         exitCode = updateWebDir(ad)
         if exitCode != 0:
             time.sleep(retries * 20)
         retries += 1
 
     if exitCode != 0:
-        printLog("Exiting AdjustSites because the webdir upload failed three times.")
+        printLog("Exiting AdjustSites because the webdir upload failed %d times." % maxRetries)
         sys.exit(1)
 
     printLog("Webdir URL has been uploaded, exit code is %s. Setting the classad for the proxied webdir" % exitCode)
