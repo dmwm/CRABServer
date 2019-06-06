@@ -102,7 +102,7 @@ do
 
     # Run the parsing script
     cache_status
-    [ -f USE_ASO_V2 ] && manage_transfers
+    manage_transfers
     sleep 300s
 
     # Calculate how much time has passed since the last condor_q and perform it again if it has been long enough.
