@@ -551,9 +551,9 @@ class PreJob:
         ## Load the task ad.
         self.get_task_ad()
 
-        webDir_ClassAd = 'CRAB_WebDirURL'
+        webDir_ClassAd = 'CRAB_WebDirURL' # this ClassAd is not present in the os.environ['_CONDOR_JOB_AD'] file parsed in the get_task_ad() above, being created afterwards by AdjustSites.py, so we need to query the DAG job now:
         try:
-            self.userWebDirPrx = htcondor.Schedd().xquery(requirements="ClusterId == %d && ProcId == %d" % (self.task_ad['ClusterId'], self.task_ad['ProcId']), projection=[webDir_ClassAd]).next().get(webDir_ClassAd)
+            self.userWebDirPrx = htcondor.Schedd().xquery(requirements="ClusterId == %d && ProcId == %d" % (self.task_ad['ClusterId'], self.task_ad['ProcId']), projection=[webDir_ClassAd]).next().get(webDir_ClassAd) # Given we are querying the DAG job, we may extend this query and remove the file parsing above. 
         except:
             msg = "Exception executing the pre-job:"
             msg += "\n'%s' ClassAd not found in job %d.%d" % (webDir_ClassAd, self.task_ad['ClusterId'], self.task_ad['ProcId'])
