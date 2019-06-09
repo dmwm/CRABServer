@@ -1079,9 +1079,10 @@ class ASOServerJob(object):
         Killing actual FTS transfers (if possible) is left to ASO.
         """
         if doc_ids_reasons is None:
+            doc_ids_reasons = {}
             for doc_info in self.docs_in_transfer:
                 doc_id = doc_info['doc_id']
-                doc_ids_reasons = dict(doc_id = None)
+                doc_ids_reasons[doc_id] = None
         if not doc_ids_reasons:
             msg = "There are no ASO transfers to cancel."
             self.logger.info(msg)
