@@ -2649,11 +2649,12 @@ class PostJob():
         self.logger.info(msg)
         with HTCondorUtils.AuthenticatedSubprocess(os.environ['X509_USER_PROXY'], logger=self.logger) as (parent, rpipe):
             if not parent:
-                for param in params:
-                    self.schedd.edit([self.dag_jobid], param, str(params[param]))
-                self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
-                # Once state classAds have been updated, let HTCondor remove the job from the queue
-                self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+                with self.schedd.transaction():
+                    for param in params:
+                        self.schedd.edit([self.dag_jobid], param, str(params[param]))
+                    self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
+                    # Once state classAds have been updated, let HTCondor remove the job from the queue
+                    self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
                 self.logger.info("====== Finished to update classAds.")
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
