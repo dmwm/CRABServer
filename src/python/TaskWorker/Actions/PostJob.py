@@ -83,7 +83,6 @@ from shutil import move
 from httplib import HTTPException
 
 import DashboardAPI
-import HTCondorUtils
 import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.WMArchive.DataMap import createArchiverDoc
@@ -2647,15 +2646,13 @@ class PostJob():
         self.monitoringExitCode(params, exitCode)
         msg += " ClassAds values to set are: %s" % (str(params))
         self.logger.info(msg)
-        with HTCondorUtils.AuthenticatedSubprocess(os.environ['X509_USER_PROXY'], logger=self.logger) as (parent, rpipe):
-            if not parent:
-                with self.schedd.transaction():
-                    for param in params:
-                        self.schedd.edit([self.dag_jobid], param, str(params[param]))
-                    self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
-                    # Once state classAds have been updated, let HTCondor remove the job from the queue
-                    self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
-                self.logger.info("====== Finished to update classAds.")
+        with self.schedd.transaction():
+            for param in params:
+                self.schedd.edit([self.dag_jobid], param, str(params[param]))
+            self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
+            # Once state classAds have been updated, let HTCondor remove the job from the queue
+            self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+        self.logger.info("====== Finished to update classAds.")
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
