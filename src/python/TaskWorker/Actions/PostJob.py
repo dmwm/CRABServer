@@ -2840,7 +2840,7 @@ class PostJob():
             archiveDoc = createArchiverDoc(job)
             archiveDoc['task'] = self.reqname
             archiveDoc["meta_data"]['crab_id'] = self.job_id
-            archiveDoc["meta_data"]['crab_exit_code'] = self.job_report['exitCode']
+            archiveDoc["meta_data"]['crab_exit_code'] = self.job_report.get('exitCode', -1)
             archiveDoc["steps"].append(
                 {
                     "errors": [
