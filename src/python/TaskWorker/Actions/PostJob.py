@@ -79,6 +79,7 @@ import traceback
 import logging.handlers
 import htcondor
 import classad
+import random
 from shutil import move
 from httplib import HTTPException
 
@@ -2646,13 +2647,27 @@ class PostJob():
         self.monitoringExitCode(params, exitCode)
         msg += " ClassAds values to set are: %s" % (str(params))
         self.logger.info(msg)
-        with self.schedd.transaction():
-            for param in params:
-                self.schedd.edit([self.dag_jobid], param, str(params[param]))
-            self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
-            # Once state classAds have been updated, let HTCondor remove the job from the queue
-            self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
-        self.logger.info("====== Finished to update classAds.")
+
+        limit = 5
+        counter = 0
+        while counter < limit:
+            counter += 1
+            self.logger.info("       -----> Started attempt %d out of %d -----", counter, limit)
+            with self.schedd.transaction():
+                for param in params:
+                    self.schedd.edit([self.dag_jobid], param, str(params[param]))
+                self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
+                # Once state classAds have been updated, let HTCondor remove the job from the queue
+                self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+                self.logger.info("====== Finished to update classAds.")
+                break
+            if counter != limit:
+                self.logger.warning("       -----> Failed to set ClassAds -----")
+                maxSleep = 2*counter -1
+                self.logger.warning("Sleeping for %d minute at most...", maxSleep)
+                time.sleep(60 * random.randint(2*(counter/3), maxSleep+1))
+            else:
+                self.logger.error("Failed to set ClassAds for %d times, will not retry. Dashboard may report stale job status/exit-code.", limit)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
