@@ -2653,17 +2653,19 @@ class PostJob():
         while counter < limit:
             try:
                 counter += 1
-                self.logger.info("       -----> Started attempt %d out of %d -----", counter, limit)
+                msg = "attempt %d out of %d" % (counter, limit)
+                self.logger.info("       -----> Started %s -----", msg)
                 with self.schedd.transaction():
                     for param in params:
                         self.schedd.edit([self.dag_jobid], param, str(params[param]))
                     self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
                     # Once state ClassAds have been updated, let HTCondor remove the job from the queue
                     self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+                    self.logger.info("       -----> Finished %s -----", msg)
                     self.logger.info("====== Finished to update ClassAds.")
                     break
             except Exception:
-                self.logger.exception()
+                self.logger.exception("Exception in setting ClassAds:")
 
             if counter != limit:
                 self.logger.warning("       -----> Failed to set ClassAds -----")
@@ -2828,7 +2830,12 @@ class PostJob():
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def processWMArchive(self, retval):
-        WMARCHIVE_BASE_LOCATION = json.load(open("/etc/wmarchive.json")).get("BASE_DIR", "/data/wmarchive")
+        try:
+            with open("/etc/wmarchive.json") as wma:
+                WMARCHIVE_BASE_LOCATION = json.load(wma).get("BASE_DIR", "/data/wmarchive")
+        except:
+            self.logger.exception("Can not load the WM archive json. Exception follows:")
+            return
         WMARCHIVE_BASE_LOCATION = os.path.join(WMARCHIVE_BASE_LOCATION, 'new')
 
         now = int(time.time())
