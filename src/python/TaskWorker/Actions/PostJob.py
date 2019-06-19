@@ -2641,7 +2641,7 @@ class PostJob():
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
             return
-        self.logger.info("====== Starting to update classAds.")
+        self.logger.info("====== Starting to update ClassAds.")
         msg = "status: %s." % (state)
         params = {'CRAB_PostJobStatus': '"{0}"'.format(state)}
         self.monitoringExitCode(params, exitCode)
@@ -2651,16 +2651,20 @@ class PostJob():
         limit = 5
         counter = 0
         while counter < limit:
-            counter += 1
-            self.logger.info("       -----> Started attempt %d out of %d -----", counter, limit)
-            with self.schedd.transaction():
-                for param in params:
-                    self.schedd.edit([self.dag_jobid], param, str(params[param]))
-                self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
-                # Once state classAds have been updated, let HTCondor remove the job from the queue
-                self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
-                self.logger.info("====== Finished to update classAds.")
-                break
+            try:
+                counter += 1
+                self.logger.info("       -----> Started attempt %d out of %d -----", counter, limit)
+                with self.schedd.transaction():
+                    for param in params:
+                        self.schedd.edit([self.dag_jobid], param, str(params[param]))
+                    self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
+                    # Once state ClassAds have been updated, let HTCondor remove the job from the queue
+                    self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+                    self.logger.info("====== Finished to update ClassAds.")
+                    break
+            except Exception:
+                self.logger.exception()
+
             if counter != limit:
                 self.logger.warning("       -----> Failed to set ClassAds -----")
                 maxSleep = 2*counter -1
