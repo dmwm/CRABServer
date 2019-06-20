@@ -136,7 +136,7 @@ WhenToTransferOutput = ON_EXIT_OR_EVICT
 +SpoolOnEvict = false
 
 # Keep job in the queue upon completion long enough for the postJob to run, allowing the monitoring script to fetch the postJob status and job exit-code updated by the postJob
-LeaveJobInQueue = true
+LeaveJobInQueue = ifThenElse((JobStatus=?=4 || JobStatus=?=3) && (time() - EnteredCurrentStatus < 30 * 60*60), true, false)
 
 universe = vanilla
 Executable = gWMS-CMSRunAnalysis.sh
