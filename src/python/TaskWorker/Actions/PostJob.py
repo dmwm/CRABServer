@@ -2653,14 +2653,14 @@ class PostJob():
         while counter < limit:
             try:
                 counter += 1
-                msg = "attempt %d out of %d" % (counter, limit)
+                msg = "attempt %d out of %d without Schedd.edits" % (counter, limit)
                 self.logger.info("       -----> Started %s -----", msg)
                 with self.schedd.transaction():
-                    for param in params:
-                        self.schedd.edit([self.dag_jobid], param, str(params[param]))
-                    self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
-                    # Once state ClassAds have been updated, let HTCondor remove the job from the queue
-                    self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+                    #for param in params:
+                    #    self.schedd.edit([self.dag_jobid], param, str(params[param]))
+                    #self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
+                    ## Once state ClassAds have been updated, let HTCondor remove the job from the queue
+                    #self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
                     self.logger.info("       -----> Finished %s -----", msg)
                     self.logger.info("====== Finished to update ClassAds.")
                     break
