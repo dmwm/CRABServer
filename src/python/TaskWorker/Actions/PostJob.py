@@ -2655,7 +2655,7 @@ class PostJob():
                 counter += 1
                 msg = "attempt %d out of %d without Schedd.edits" % (counter, limit)
                 self.logger.info("       -----> Started %s -----", msg)
-                with self.schedd.transaction():
+                with self.schedd.transaction(htcondor.TransactionFlags.NonDurable):
                     #for param in params:
                     #    self.schedd.edit([self.dag_jobid], param, str(params[param]))
                     #self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
