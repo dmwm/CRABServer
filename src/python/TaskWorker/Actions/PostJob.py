@@ -2638,6 +2638,10 @@ class PostJob():
         """
         Update PostJobStatus and job exit-code among the job ClassAds for the monitoring script to update the Grafana dashboard.
         """
+        if not os.path.exists('/etc/editClassAds'):
+            self.logger.info("====== Will not edit the job ClassAds.")
+            return
+
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
             return
