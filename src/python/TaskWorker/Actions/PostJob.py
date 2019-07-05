@@ -79,11 +79,11 @@ import traceback
 import logging.handlers
 import htcondor
 import classad
+import random
 from shutil import move
 from httplib import HTTPException
 
 import DashboardAPI
-import HTCondorUtils
 import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.WMArchive.DataMap import createArchiverDoc
@@ -1079,6 +1079,7 @@ class ASOServerJob(object):
         Killing actual FTS transfers (if possible) is left to ASO.
         """
         if doc_ids_reasons is None:
+            doc_ids_reasons = {}
             for doc_info in self.docs_in_transfer:
                 doc_id = doc_info['doc_id']
                 doc_ids_reasons[doc_id] = None
@@ -2637,23 +2638,46 @@ class PostJob():
         """
         Update PostJobStatus and job exit-code among the job ClassAds for the monitoring script to update the Grafana dashboard.
         """
+        if not os.path.exists('/etc/editClassAds'):
+            self.logger.info("====== Will not edit the job ClassAds.")
+            return
+
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
             return
-        self.logger.info("====== Starting to update classAds.")
+        self.logger.info("====== Starting to update ClassAds.")
         msg = "status: %s." % (state)
         params = {'CRAB_PostJobStatus': '"{0}"'.format(state)}
         self.monitoringExitCode(params, exitCode)
         msg += " ClassAds values to set are: %s" % (str(params))
         self.logger.info(msg)
-        with HTCondorUtils.AuthenticatedSubprocess(os.environ['X509_USER_PROXY'], logger=self.logger) as (parent, rpipe):
-            if not parent:
-                for param in params:
-                    self.schedd.edit([self.dag_jobid], param, str(params[param]))
-                self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
-                # Once state classAds have been updated, let HTCondor remove the job from the queue
-                self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
-                self.logger.info("====== Finished to update classAds.")
+
+        limit = 5
+        counter = 0
+        while counter < limit:
+            try:
+                counter += 1
+                msg = "attempt %d out of %d with only one Schedd.edit" % (counter, limit)
+                self.logger.info("       -----> Started %s -----", msg)
+                with self.schedd.transaction(htcondor.TransactionFlags.NonDurable):
+                    #for param in params:
+                    #    self.schedd.edit([self.dag_jobid], param, str(params[param]))
+                    #self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
+                    # Once state ClassAds have been updated, let HTCondor remove the job from the queue
+                    self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+                    self.logger.info("       -----> Finished %s -----", msg)
+                    self.logger.info("====== Finished to update ClassAds.")
+                    break
+            except Exception:
+                self.logger.exception("Exception in setting ClassAds:")
+
+            if counter != limit:
+                self.logger.warning("       -----> Failed to set ClassAds -----")
+                maxSleep = 2*counter -1
+                self.logger.warning("Sleeping for %d minute at most...", maxSleep)
+                time.sleep(60 * random.randint(2*(counter/3), maxSleep+1))
+            else:
+                self.logger.error("Failed to set ClassAds for %d times, will not retry. Dashboard may report stale job status/exit-code.", limit)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -2810,7 +2834,12 @@ class PostJob():
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def processWMArchive(self, retval):
-        WMARCHIVE_BASE_LOCATION = json.load(open("/etc/wmarchive.json")).get("BASE_DIR", "/data/wmarchive")
+        try:
+            with open("/etc/wmarchive.json") as wma:
+                WMARCHIVE_BASE_LOCATION = json.load(wma).get("BASE_DIR", "/data/wmarchive")
+        except:
+            self.logger.exception("Can not load the WM archive json. Exception follows:")
+            return
         WMARCHIVE_BASE_LOCATION = os.path.join(WMARCHIVE_BASE_LOCATION, 'new')
 
         now = int(time.time())
@@ -2826,7 +2855,7 @@ class PostJob():
             archiveDoc = createArchiverDoc(job)
             archiveDoc['task'] = self.reqname
             archiveDoc["meta_data"]['crab_id'] = self.job_id
-            archiveDoc["meta_data"]['crab_exit_code'] = self.job_report['exitCode']
+            archiveDoc["meta_data"]['crab_exit_code'] = self.job_report.get('exitCode', -1)
             archiveDoc["steps"].append(
                 {
                     "errors": [
