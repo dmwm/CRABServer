@@ -551,6 +551,7 @@ class PreJob:
         ## Load the task ad.
         self.get_task_ad()
 
+        webDir_ClassAd = 'CRAB_WebDirURL' # this ClassAd is not present in the os.environ['_CONDOR_JOB_AD'] file parsed in the get_task_ad() above, being created afterwards by AdjustSites.py, so we need to query the DAG job now:
         try:
             with open('webdir') as fd:
                 self.userWebDirPrx = fd.read()
