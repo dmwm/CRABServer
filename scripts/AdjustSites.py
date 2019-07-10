@@ -300,6 +300,12 @@ def saveProxiedWebdir(ad):
             htcondor.Schedd().edit([dagJobId], webDir_adName, '{0}'.format(ad.lookup(webDir_adName)))
         except RuntimeError as reerror:
             printLog(str(reerror))
+
+        # We need to use a file to communicate this to the prejob. I tried to read the corresponding ClassAd from the preJob like:
+        # htcondor.Schedd().xquery(requirements="ClusterId == %d && ProcId == %d" % (self.task_ad['ClusterId'], self.task_ad['ProcId']), projection=[webDir_adName]).next().get(webDir_adName)
+        # but it is too heavy of an operation.
+        with open("webdir", "w") as fd:
+            fd.write(ad[webDir_adName])
     else:
         printLog("Cannot get proxied webdir from the server. Maybe the schedd does not have one in the REST configuration?")
         return 1
