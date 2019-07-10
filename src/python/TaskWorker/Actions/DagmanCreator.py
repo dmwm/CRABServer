@@ -23,7 +23,7 @@ import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
 import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
-from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE
+from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS
 from CMSGroupMapper import get_egroup_users
 
 import WMCore.WMSpec.WMTask
@@ -1045,11 +1045,19 @@ class DagmanCreator(TaskAction.TaskAction):
             fd.write(dag)
 
         info["jobcount"] = len(dagSpecs)
-        maxpost = getattr(self.config.TaskWorker, 'maxPost', 20)
+
+        maxidle = getattr(self.config.TaskWorker, 'maxIdle', MAX_IDLE_JOBS)
+        if maxidle == -1:
+            maxidle = info['jobcount']
+        elif maxidle == 0:
+            maxidle = int(max(MAX_IDLE_JOBS, info['jobcount']*.1))
+        info['maxidle'] = maxidle
+
+        maxpost = getattr(self.config.TaskWorker, 'maxPost', MAX_POST_JOBS)
         if maxpost == -1:
             maxpost = info['jobcount']
         elif maxpost == 0:
-            maxpost = int(max(20, info['jobcount']*.1))
+            maxpost = int(max(MAX_POST_JOBS, info['jobcount']*.1))
         info['maxpost'] = maxpost
 
         if info.get('faillimit') == None:

@@ -88,6 +88,7 @@ SUBMIT_INFO = [ \
     ('CRAB_ASODB', 'tm_asodb'),
     ('CRAB_FailedNodeLimit', 'faillimit'),
     ('CRAB_DashboardTaskType', 'taskType'),
+    ('CRAB_MaxIdle', 'maxidle'),
     ('CRAB_MaxPost', 'maxpost')]
 
 

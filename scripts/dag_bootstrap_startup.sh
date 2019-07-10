@@ -70,7 +70,13 @@ if [ $(cat $_CONDOR_JOB_AD | wc -l) -lt 3 ]; then
     fi
 fi
 
-#MAX_POST is set in TaskWorker configuration.
+# MAX_IDLE and MAX_POST are set in TaskWorker configuration and ServerUtilities.py.
+MAX_IDLE=1000
+MAX_IDLE_TMP=`grep '^CRAB_MaxIdle =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
+if [ "X$MAX_IDLE_TMP" != "X" ]; then
+    MAX_IDLE=$MAX_IDLE_TMP
+fi
+
 MAX_POST=20
 MAX_POST_TMP=`grep '^CRAB_MaxPost =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
 if [ "X$MAX_POST_TMP" != "X" ]; then
@@ -226,7 +232,7 @@ EOF
     # This is also done in the PostJob to submit subdags for tail-catching
     # and automated splitting.  Values below will also have to be changed
     # there in (createSubdagSubmission)!
-    exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -DoRecov -AutoRescue 0 -MaxPre 20 -MaxIdle 1000 -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
+    exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -DoRecov -AutoRescue 0 -MaxPre 20 -MaxIdle $MAX_IDLE -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
     EXIT_STATUS=$?
     echo "condor_dagman terminated with EXIT_STATUS=${EXIT_STATUS} at `date`"
 fi
