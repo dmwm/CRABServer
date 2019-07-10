@@ -483,7 +483,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 if k == 'X509UserProxy':
                     v = os.path.basename(v)
                 if isinstance(v, basestring):
-                    value = classad.quote(v)
+                    value = classad.quote(v.strip('"')) # beware double quoting
                 elif isinstance(v, classad.ExprTree):
                     value = repr(v)
                 elif isinstance(v, list):
