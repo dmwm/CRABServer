@@ -88,12 +88,12 @@ SUBMIT_INFO = [ \
     ('CRAB_ASODB', 'tm_asodb'),
     ('CRAB_FailedNodeLimit', 'faillimit'),
     ('CRAB_DashboardTaskType', 'taskType'),
+    ('CRAB_MaxIdle', 'maxidle'),
     ('CRAB_MaxPost', 'maxpost'),
     ('CMS_Type', 'cms_type'),
     ('CMS_WMTool', 'cms_wmtool'),
     ('CMS_TaskType', 'cms_tasktype'),
 ]
-
 
 def addCRABInfoToClassAd(ad, info):
     """

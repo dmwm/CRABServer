@@ -272,12 +272,11 @@ def updateWebDir(ad):
 
 def saveProxiedWebdir(ad):
     """ The function queries the REST interface to get the proxied webdir and sets
-        a classad so that we report this to the dashboard instead of the regular URL
+        a classad so that we report this to the dashboard instead of the regular URL.
 
-        The proxied_url (if exist) is written to a file named proxied_webdir so that
-        prejobs can read it and report to dashboard. If the url does not exist
-        (i.e.: schedd not at CERN), the file is not written and we report the usual
-        webdir
+        The webdir (if exists) is written to a file named 'webdir' so that
+        prejobs can read it and report to dashboard. If the proxied URL does not exist
+        (i.e.: schedd not at CERN), we report the usual webdir.
 
         See https://github.com/dmwm/CRABServer/issues/4883
     """
@@ -300,6 +299,12 @@ def saveProxiedWebdir(ad):
             htcondor.Schedd().edit([dagJobId], webDir_adName, '{0}'.format(ad.lookup(webDir_adName)))
         except RuntimeError as reerror:
             printLog(str(reerror))
+
+        # We need to use a file to communicate this to the prejob. I tried to read the corresponding ClassAd from the preJob like:
+        # htcondor.Schedd().xquery(requirements="ClusterId == %d && ProcId == %d" % (self.task_ad['ClusterId'], self.task_ad['ProcId']), projection=[webDir_adName]).next().get(webDir_adName)
+        # but it is too heavy of an operation.
+        with open("webdir", "w") as fd:
+            fd.write(ad[webDir_adName])
     else:
         printLog("Cannot get proxied webdir from the server. Maybe the schedd does not have one in the REST configuration?")
         return 1
@@ -343,7 +348,7 @@ def main():
     printLog("Starting AdjustSites with _CONDOR_JOB_AD=%s" % os.environ['_CONDOR_JOB_AD'])
 
     with open(os.environ['_CONDOR_JOB_AD']) as fd:
-        ad = classad.parseOld(fd)
+        ad = classad.parseOne(fd)
     printLog("Parsed ad: %s" % ad)
 
     makeWebDir(ad)
@@ -413,7 +418,7 @@ def main():
     if 'CRAB_SiteAdUpdate' in ad:
         newSiteAd = ad['CRAB_SiteAdUpdate']
         with open("site.ad") as fd:
-            siteAd = classad.parse(fd)
+            siteAd = classad.parseOne(fd)
         siteAd.update(newSiteAd)
         with open("site.ad", "w") as fd:
             fd.write(str(siteAd))

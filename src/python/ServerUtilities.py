@@ -34,6 +34,9 @@ MAX_WALLTIME = 21*60*60 + 30*60
 MAX_MEMORY = 2*1024
 MAX_DISK_SPACE = 20000000 # Disk usage is not used from .job.ad as CRAB3 is not seeting it. 20GB is max.
 
+MAX_IDLE_JOBS = 1000
+MAX_POST_JOBS = 20
+
 ## Parameter used to set the LeaveJobInQueue and the PeriodicRemoveclassads.
 ## It's also used during resubmissions since we don't allow a resubmission during the last week
 ## Before changing this value keep in mind that old running DAGs have the old value in the CRAB_TaskSubmitTime
