@@ -88,7 +88,11 @@ SUBMIT_INFO = [ \
     ('CRAB_ASODB', 'tm_asodb'),
     ('CRAB_FailedNodeLimit', 'faillimit'),
     ('CRAB_DashboardTaskType', 'taskType'),
-    ('CRAB_MaxPost', 'maxpost')]
+    ('CRAB_MaxPost', 'maxpost'),
+    ('CMS_Type', 'cms_type'),
+    ('CMS_WMTool', 'cms_wmtool'),
+    ('CMS_TaskType', 'cms_tasktype'),
+]
 
 
 def addCRABInfoToClassAd(ad, info):
@@ -483,7 +487,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 if k == 'X509UserProxy':
                     v = os.path.basename(v)
                 if isinstance(v, basestring):
-                    value = classad.quote(v.strip('"')) # beware double quoting
+                    value = classad.quote(v)
                 elif isinstance(v, classad.ExprTree):
                     value = repr(v)
                 elif isinstance(v, list):
