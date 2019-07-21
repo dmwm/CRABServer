@@ -684,7 +684,7 @@ class DagmanCreator(TaskAction.TaskAction):
             with a dictionary for each job. The dictionary key/value pairs are the arguments of gWMS-CMSRunAnalysis.sh
             N.B.: in the JDL: "Executable = gWMS-CMSRunAnalysis.sh" and "Arguments =  $(CRAB_Archive) --sourceURL=$(CRAB_ISB) ..."
             where each argument of each job is set in "input_args.json".
-            Also, this prepareLocal method prepare a single "InputFiles.taqr.gz" file with all the inputs files moved
+            Also, this prepareLocal method prepare a single "InputFiles.tar.gz" file with all the inputs files moved
             from the TW to the schedd.
             This is used by the client preparelocal command.
         """
