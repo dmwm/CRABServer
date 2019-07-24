@@ -36,8 +36,7 @@ import subprocess
 from ast import literal_eval
 from WMCore.DataStructs.LumiList import LumiList
 
-from ServerUtilities import getLock
-from ServerUtilities import newX509env
+from ServerUtilities import getLock, newX509env, MAX_IDLE_JOBS, MAX_POST_JOBS
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.WorkerExceptions import TaskWorkerException
@@ -258,7 +257,7 @@ class PreDAG(object):
             creator = DagmanCreator(config, server=None, resturi='')
             with config.TaskWorker.envForCMSWEB:
                 creator.createSubdag(split_result.result, task=task, parent=parent, stage=self.stage)
-            self.submitSubdag('RunJobs{0}.subdag'.format(self.prefix), getattr(config.TaskWorker, 'maxPost', 20), self.stage)
+            self.submitSubdag('RunJobs{0}.subdag'.format(self.prefix), getattr(config.TaskWorker, 'maxIdle', MAX_IDLE_JOBS), getattr(config.TaskWorker, 'maxPost', MAX_POST_JOBS), self.stage)
         except TaskWorkerException as e:
             retmsg = "DAG creation failed with:\n{0}".format(e)
             self.logger.error(retmsg)
@@ -268,10 +267,10 @@ class PreDAG(object):
         return 0
 
     @staticmethod
-    def submitSubdag(subdag, maxpost, stage):
+    def submitSubdag(subdag, maxidle, maxpost, stage):
         """ Submit a subdag
         """
-        subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', '1000',
+        subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', str(maxidle),
                                '-MaxPost', str(maxpost), '-insert_sub_file', 'subdag.ad',
                                '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), subdag),
                                '-append', '+TaskType = "{0}"'.format(stage.upper()), subdag])

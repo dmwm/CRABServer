@@ -558,13 +558,12 @@ class PreJob:
         ## Load the task ad.
         self.get_task_ad()
 
-        webDir_ClassAd = 'CRAB_WebDirURL'
         try:
-            self.userWebDirPrx = htcondor.Schedd().xquery(requirements="ClusterId == %d && ProcId == %d" % (self.task_ad['ClusterId'], self.task_ad['ProcId']), projection=[webDir_ClassAd]).next().get(webDir_ClassAd)
-        except:
-            msg = "Exception executing the pre-job:"
-            msg += "\n'%s' ClassAd not found in job %d.%d" % (webDir_ClassAd, self.task_ad['ClusterId'], self.task_ad['ProcId'])
-            self.logger.exception(msg)
+            with open('webdir') as fd:
+                self.userWebDirPrx = fd.read()
+        except IOError as e:
+            self.logger.error("'I/O error(%s): %s', when looking for the 'webdir' file. Might be normal"
+                              " if the schedd does not have a proxiedurl in the REST external config.", e.errno, e.strerror)
 
         try:
             self.get_resubmit_info()
