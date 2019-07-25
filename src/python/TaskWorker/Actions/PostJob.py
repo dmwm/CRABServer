@@ -2639,17 +2639,17 @@ class PostJob():
         Update PostJobStatus and job exit-code among the job ClassAds for the monitoring script to update the Grafana dashboard.
         """
         if not os.path.exists('/etc/editClassAds'):
-            self.logger.info("====== Will not edit the job ClassAds.")
+            self.logger.info("====== Will not edit the job ClassAd.")
             return
 
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
             return
-        self.logger.info("====== Starting to update ClassAds.")
+        self.logger.info("====== Starting to update job ClassAd.")
         msg = "status: %s." % (state)
         params = {'CRAB_PostJobStatus': '"{0}"'.format(state)}
         self.monitoringExitCode(params, exitCode)
-        msg += " ClassAds values to set are: %s" % (str(params))
+        msg += " ClassAd attributes to set are: %s" % (str(params))
         self.logger.info(msg)
 
         limit = 5
@@ -2657,27 +2657,28 @@ class PostJob():
         while counter < limit:
             try:
                 counter += 1
-                msg = "attempt %d out of %d with only one Schedd.edit" % (counter, limit)
+                msg = "attempt %d out of %d" % (counter, limit)
                 self.logger.info("       -----> Started %s -----", msg)
                 with self.schedd.transaction(htcondor.TransactionFlags.NonDurable):
-                    #for param in params:
-                    #    self.schedd.edit([self.dag_jobid], param, str(params[param]))
-                    #self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
-                    # Once state ClassAds have been updated, let HTCondor remove the job from the queue
+                    if os.path.exists('/etc/editPostJobClassAdAttributes'):
+                        for param in params:
+                            self.schedd.edit([self.dag_jobid], param, str(params[param]))
+                        self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
+                    # Once ClassAd state attributes have been updated, let HTCondor remove the job from the queue
                     self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
                     self.logger.info("       -----> Finished %s -----", msg)
-                    self.logger.info("====== Finished to update ClassAds.")
+                    self.logger.info("====== Finished to update job ClassAd.")
                     break
             except Exception:
-                self.logger.exception("Exception in setting ClassAds:")
+                self.logger.exception("Exception in setting job ClassAd attributes:")
 
             if counter != limit:
-                self.logger.warning("       -----> Failed to set ClassAds -----")
+                self.logger.warning("       -----> Failed to set job ClassAd attributes -----")
                 maxSleep = 2*counter -1
                 self.logger.warning("Sleeping for %d minute at most...", maxSleep)
                 time.sleep(60 * random.randint(2*(counter/3), maxSleep+1))
             else:
-                self.logger.error("Failed to set ClassAds for %d times, will not retry. Dashboard may report stale job status/exit-code.", limit)
+                self.logger.error("Failed to set job ClassAd attributes for %d times, will not retry. Dashboard may report stale job status/exit-code.", limit)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
