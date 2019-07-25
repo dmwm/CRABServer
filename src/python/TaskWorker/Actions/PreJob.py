@@ -15,7 +15,6 @@ from ServerUtilities import getWebdirForDb, insertJobIdSid, setDashboardLogs
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import CMSGroupMapper
-import HTCondorUtils
 
 
 class PreJob:
@@ -475,17 +474,11 @@ class PreJob:
             fname = "postjob.%s.txt" % job_retry
             with open(fname, 'w') as fd:
                 fd.write("Post-job is currently queued.\n")
-                logURLs['CRAB_PostJobLogURL'] = os.path.join(self.userWebDirPrx, "postjob_out."+job_retry+".txt")
             try:
                 os.symlink(os.path.abspath(os.path.join(".", fname)), \
                            os.path.join(logpath, fname))
             except:
                 pass
-            with HTCondorUtils.AuthenticatedSubprocess(os.environ['X509_USER_PROXY'], logger=self.logger) as (parent, rpipe):
-                if not parent:
-                    self.logger.info("Adding job and postjob log URLs to job ClassAds")
-                    for url in logURLs:
-                        self.schedd.edit('CRAB_ReqName == "%s" && CRAB_Id == "%s" && CRAB_Retry == %d' %(taskname, self.job_id, int(crab_retry)), url, '"{0}"'.format(logURLs[url]))
             if crab_retry:
                 return time.time() - os.stat(os.path.join(".", "postjob.%s.%s.txt" % (self.job_id, int(crab_retry)-1))).st_mtime
         except:
@@ -574,14 +567,6 @@ class PreJob:
             self.logger.exception(msg)
             raise
 
-        try:
-            with open('proxied_webdir') as fd:
-                proxied_webdir = fd.read()
-            self.userWebDirPrx = proxied_webdir
-        except IOError as e:
-            self.logger.error(("'I/O error(%s): %s', when looking for the proxied_webdir file. Might be normal"
-                               " if the schedd does not have a proxiedurl in the REST external config." % (e.errno, e.strerror)))
-
         old_time = self.touch_logs(crab_retry)
         ## Note the cooloff time is based on the DAGMan retry number (i.e. the number of
         ## times the full cycle pre-job + job + post-job finished). This way, we don't
@@ -596,4 +581,3 @@ class PreJob:
         self.logger.info(msg)
         os.close(fd_prejob_log)
         os.execv("/bin/sleep", ["sleep", str(sleep_time)])
-
