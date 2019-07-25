@@ -302,7 +302,7 @@ def saveProxiedWebdir(ad):
 
         # We need to use a file to communicate this to the prejob. I tried to read the corresponding ClassAd from the preJob like:
         # htcondor.Schedd().xquery(requirements="ClusterId == %d && ProcId == %d" % (self.task_ad['ClusterId'], self.task_ad['ProcId']), projection=[webDir_adName]).next().get(webDir_adName)
-        # but it is too heavy of an operation.
+        # but it is too heavy of an operation with HTCondor v8.8.3
         with open("webdir", "w") as fd:
             fd.write(ad[webDir_adName])
     else:
