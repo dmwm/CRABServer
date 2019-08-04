@@ -56,7 +56,7 @@ SUBMIT_INFO = [ \
     ('CRAB_AdditionalOutputFiles', 'addoutputfiles'),
     ('CRAB_EDMOutputFiles', 'edmoutfiles'),
     ('CRAB_TFileOutputFiles', 'tfileoutfiles'),
-    ('CRAB_TransferOutputs', 'saveoutput'),
+    ('CRAB_TransferOutputs', 'saveoutput'), # CRAB_TransferOutputs must be always 0 for probe jobs, we set it in the PostJob.py
     ('CRAB_SaveLogsFlag', 'savelogsflag'),
     ('CRAB_UserDN', 'userdn'),
     ('CRAB_UserHN', 'userhn'),

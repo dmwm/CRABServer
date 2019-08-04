@@ -523,7 +523,7 @@ class DagmanCreator(TaskAction.TaskAction):
         # TODO: pass through these correctly.
         info['runs'] = []
         info['lumis'] = []
-        info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
+        info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0 # info['saveoutput'] must be always 0 for probe jobs, we set it in the PostJob.py
         egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
         if egroups and info['userhn'] in self.getHighPrioUsers(info['user_proxy'], info['workflow'], egroups):
             info['accounting_group'] = 'highprio'
