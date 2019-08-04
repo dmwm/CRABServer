@@ -19,7 +19,10 @@ from CRABInterface.DataWorkflow import DataWorkflow
 from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 
-from CRABInterface.Utils import conn_handler, global_user_throttle
+# WMCore Utils module
+from Utils.Throttled import global_user_throttle
+
+from CRABInterface.Utils import conn_handler
 from ServerUtilities import FEEDBACKMAIL, PUBLICATIONDB_STATES, isCouchDBURL, getEpochFromDBTime
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 

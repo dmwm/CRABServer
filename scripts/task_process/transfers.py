@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# pylint: disable=line-too-long
 """
 
 """
@@ -14,18 +15,18 @@ from WMCore.Storage.TrivialFileCatalog import readTFC
 import fts3.rest.client.easy as fts3
 from datetime import timedelta
 from RESTInteractions import HTTPRequests
-from ServerUtilities import  encodeRequest
+from ServerUtilities import encodeRequest
 
 if not os.path.exists('task_process/transfers'):
     os.makedirs('task_process/transfers')
 
 logging.basicConfig(
     filename='task_process/transfers/transfer_inject.log',
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s[%(relativeCreated)6d]%(threadName)s: %(message)s'
 )
 
-if os.path.exists('task_process/rest_filetransfers.txt'): 
+if os.path.exists('task_process/rest_filetransfers.txt'):
     with open("task_process/rest_filetransfers.txt", "r") as _rest:
         rest_filetransfers = _rest.readline().split('\n')[0]
         proxy = os.getcwd() + "/" + _rest.readline()
@@ -80,7 +81,7 @@ def mark_transferred(ids):
 
         oracleDB.post('/filetransfers',
                       data=encodeRequest(data))
-        logging.debug("Marked good %s", ids)
+        logging.info("Marked good %s", ids)
     except Exception:
         logging.exception("Error updating documents")
         return 1
@@ -108,14 +109,14 @@ def mark_failed(ids, failures_reasons):
 
         oracleDB.post('/filetransfers',
                       data=encodeRequest(data))
-        logging.debug("Marked failed %s", ids)
+        logging.info("Marked failed %s", ids)
     except Exception:
         logging.exception("Error updating documents")
         return 1
     return 0
 
 
-def remove_files_in_bkg(pfns, logFile, timeout=None) :
+def remove_files_in_bkg(pfns, logFile, timeout=None):
     """
     fork a process to remove the indicated PFN's without
     wainting for it to complete and w/o any error checking
@@ -219,24 +220,31 @@ class check_states_thread(threading.Thread):
             except Exception:
                 self.log.exception('Failed to remove temp files')
 
-
         self.threadLock.release()
 
 
 class submit_thread(threading.Thread):
-    """
+    """Thread for actual FTS job submission
 
     """
+
     def __init__(self, threadLock, log, ftsContext, files, source, jobids, toUpdate):
         """
-
-        :param threadLock:
-        :param log:
-        :param ftsContext:
-        :param files:
-        :param source:
-        :param jobids:
-        :param toUpdate:
+        :param threadLock: lock for the thread
+        :param log: log object
+        :param ftsContext: FTS context
+        :param files: [
+               [source_pfn,
+                dest_pfn,
+                file oracle id,
+                source site,
+                username,
+                taskname,
+                file size],
+               ...]
+        :param source: source site name
+        :param jobids: collect the list of job ids when submitted
+        :param toUpdate: list of oracle ids to update
         """
         threading.Thread.__init__(self)
         self.log = log
@@ -317,7 +325,14 @@ def submit(phedex, ftsContext, toTrans):
     - submit fts job
 
     :param ftsContext: fts client ftsContext
-    :param toTrans: [source pfn, destination pfn, oracle file id, source site]
+    :param toTrans: [[source pfn,
+                      destination pfn,
+                      oracle file id,
+                      source site,
+                      destination,
+                      username,
+                      taskname,
+                      filesize],....]
     :return: list of jobids submitted
     """
     threadLock = threading.Lock()
@@ -387,13 +402,15 @@ def submit(phedex, ftsContext, toTrans):
 def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
     """
     get transfers and update last read line number
-    :param inputFile:
-    :param lastLine:
+
+    :param inputFile: path to the file with list of files to be transferred
+    :param lastLine: number of the last line processed
+    :param _last: path to the file keeping track of the last read line
+    :param ftsContext: FTS context
+    :param phedex: phedex client object
     :return:
     """
 
-    #threadLock = threading.Lock()
-    #threads = []
     transfers = []
     logging.info("starting from line: %s", lastLine)
 
@@ -457,7 +474,7 @@ def state_manager(fts):
             t.join()
 
         try:
-            for jobID, _ in done_id.iteritems():
+            for jobID, _ in done_id.items():
                 logging.info('Marking job %s files done and %s files failed for job %s', len(done_id[jobID]), len(failed_id[jobID]), jobID)
 
                 if len(done_id[jobID]) > 0:
@@ -537,9 +554,15 @@ def algorithm():
     ftsContext = fts3.Context('https://fts3.cern.ch:8446', proxy, proxy, verify=True)
     logging.debug("Delegating proxy to FTS: "+fts3.delegate(ftsContext, lifetime=timedelta(hours=48), force=False))
 
+    log_phedex = logging.getLogger('phedex')
+
+    # Uncomment the 2 lines below if you want to enable phedex logging 
+    # log_phedex.addHandler(logging.FileHandler('mylogfile.log', mode='a', encoding=None, delay=False))
+    # log_phedex.setLevel(logging.INFO)
+
     try:
-        phedex = PhEDEx(responseType='xml',
-                        httpDict={'key': proxy, 'cert': proxy, 'pycurl':True})
+        phedex = PhEDEx(responseType='xml', logger=log_phedex,
+                        httpDict={'key': proxy, 'cert': proxy, 'pycurl': True})
     except Exception as e:
         logging.exception('PhEDEx exception: %s', e)
         return
@@ -547,7 +570,7 @@ def algorithm():
     jobs_ongoing = state_manager(fts)
     new_jobs = submission_manager(phedex, ftsContext)
 
-    logging.debug("Transfer jobs ongoing: %s, new: %s ", jobs_ongoing, new_jobs)
+    logging.info("Transfer jobs ongoing: %s, new: %s ", jobs_ongoing, new_jobs)
 
     return
 
@@ -557,5 +580,4 @@ if __name__ == "__main__":
         algorithm()
     except Exception:
         logging.exception("error during main loop")
-    logging.debug("transfer_inject.py exiting")
-
+    logging.info("transfer_inject.py exiting")

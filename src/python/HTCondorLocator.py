@@ -94,6 +94,7 @@ class HTCondorLocator(object):
     def __init__(self, config, logger=None):
         self.config = config
         self.logger = logger
+        self.scheddAd = ""
 
     def adjustWeights(self, choices):
         """ The method iterates over the htcondorSchedds dict from the REST and ajust schedds
@@ -133,13 +134,22 @@ class HTCondorLocator(object):
             if self.config and "htcondorSchedds" in self.config:
                 schedds = [ schedd for schedd in schedds if schedd['Name'] in self.config['htcondorSchedds']]
 
-            # Get only those schedds for which the status is OK
+            # Keep only those schedds with a non-zero weightfactor in our external REST configuration
+            zeroSchedds = []
+            for schedd in schedds:
+                weightfactor = self.config['htcondorSchedds'].get(schedd['Name'], {}).get("weightfactor", 1)
+                if not weightfactor:
+                    zeroSchedds.append(schedd['Name'])
+            self.logger.debug("Skip these schedds because have a zero weightfactor (maybe in drain) in the REST configuration: %s" % zeroSchedds)
+            schedds = [ schedd for schedd in schedds if schedd['Name'] not in zeroSchedds]
+
+            # Keep only those schedds for which the status is OK
             notOkSchedNames = [schedd['Name'] for schedd in schedds if not classad.ExprTree.eval(schedd['IsOk'])]
             if notOkSchedNames:
                 self.logger.debug("Skip these schedds because isOK is False: %s" % notOkSchedNames)
                 schedds = [schedd for schedd in schedds if schedd['Name'] not in notOkSchedNames]
 
-            # Get only schedds which can start more jobs in SchedulerUniverse
+            # Keep only schedds which can start more jobs in SchedulerUniverse
             saturatedScheds = coll.query(htcondor.AdTypes.Schedd,
                                              'StartSchedulerUniverse =?= false && CMSGWMS_Type=?="crabschedd"',
                                              ['Name'])
@@ -148,7 +158,7 @@ class HTCondorLocator(object):
                 self.logger.debug("Skip these schedds because are at the MaxTask limit: %s" % saturatedSchedNames)
                 schedds = [schedd for schedd in schedds if schedd['Name'] not in saturatedSchedNames]
 
-            if schedds :
+            if schedds:
                 self.logger.debug("Will pick best schedd among %s" % [sched['Name'] for sched in schedds])
             else:
                 raise Exception("All possible CRAB schedd's are saturated. Try later")
@@ -173,7 +183,6 @@ class HTCondorLocator(object):
         schedds = coll.query(htcondor.AdTypes.Schedd, 'Name=?=%s' % HTCondorUtils.quote(schedd.encode('ascii', 'ignore')),
                              ["AddressV1", "CondorPlatform", "CondorVersion", "Machine", "MyAddress", "Name", "MyType",
                               "ScheddIpAddr", "RemoteCondorSetup"])
-        self.scheddAd = ""
         if not schedds:
             self.scheddAd = self.getCachedCollectorOutput(schedd)
         else:
