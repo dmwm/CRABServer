@@ -347,11 +347,8 @@ def logCMSSW():
     tooBig = numLines > maxLines or numChars > maxChars
     prefix = "== CMSSW: "
     if tooBig:
-        print("WARNING: CMSSW output more then %d lines or %d characters; truncating to first %d and last %d and %d characters" % (maxLines, maxChars, keepAtStart, keepAtEnd, maxChars))
-        print("Use 'crab getlog' to retrieve full output of this job from storage.")
-        print("=======================================")
         with open(outfile) as fp:
-            fp = shorten(fp, numLines, keepAtStart, keepAtEnd, maxChars, tag=prefix)
+            fp = shorten(fp, numLines, keepAtStart, keepAtEnd, maxLines, maxChars, tag=prefix)
             for line in fp:
                 printCMSSWLine(line, maxLineLen)
     else:
@@ -363,7 +360,11 @@ def logCMSSW():
     open('logCMSSWSaved.txt', 'a').close()
     os.utime('logCMSSWSaved.txt', None)
 
-def shorten(msg, numLines, keepAtStart, keepAtEnd, maxChars, tag=""):
+def shorten(msg, numLines, keepAtStart, keepAtEnd, maxLines, maxChars, tag=""):
+    print("WARNING: output more then %d lines or %d characters; truncating to first %d and last %d lines and %d characters" % (maxLines, maxChars, keepAtStart, keepAtEnd, maxChars))
+    print("Use 'crab getlog' to retrieve full output of this job from storage.")
+    print("=======================================")
+
     shortMsg = ""
     tag = "\n" + tag
     for nl, line in enumerate(msg):
@@ -416,7 +417,21 @@ def handleException(exitAcronym, exitCode, exitMsg):
 
     report['exitAcronym'] = exitAcronym
     report['exitCode'] = exitCode
-    report['exitMsg'] = exitMsg
+
+    # check size of outfile
+    shortExitMsg = exitMsg
+    keepAtStart = 1000
+    keepAtEnd   = 3000
+    maxLines    = keepAtStart + keepAtEnd
+    maxChars    = 10000
+    numLines = sum(1 for line in str(exitMsg))
+    numChars = len( str(exitMsg) )
+
+    tooBig = numLines > maxLines or numChars > maxChars
+    if tooBig:
+        shortExitMsg = shorten(str(exitMsg), numLines, keepAtStart, keepAtEnd, maxLines, maxChars)
+
+    report['exitMsg'] = shortExitMsg
     print("ERROR: Exceptional exit at %s (%s): %s" % (time.asctime(time.gmtime()), str(exitCode), str(exitMsg)))
     if not formatted_tb.startswith("None"):
         print("ERROR: Traceback follows:\n", formatted_tb)
