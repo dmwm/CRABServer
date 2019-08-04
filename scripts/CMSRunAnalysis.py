@@ -335,36 +335,52 @@ def logCMSSW():
     # check size of outfile
     keepAtStart = 1000
     keepAtEnd   = 3000
-    maxLineLen = 3000
+    maxLineLen  = 3000
     maxLines    = keepAtStart + keepAtEnd
+    maxChars    = 10000
     numLines = sum(1 for line in open(outfile))
+    numChars = len( open(outfile).read() )
 
     print("======== CMSSW OUTPUT STARTING ========")
     print("NOTICE: lines longer than %s characters will be truncated" % maxLineLen)
 
-    tooBig = numLines > maxLines
-    if tooBig :
-        print("WARNING: CMSSW output more then %d lines; truncating to first %d and last %d" % (maxLines, keepAtStart, keepAtEnd))
+    tooBig = numLines > maxLines or numChars > maxChars
+    prefix = "== CMSSW: "
+    if tooBig:
+        print("WARNING: CMSSW output more then %d lines or %d characters; truncating to first %d and last %d and %d characters" % (maxLines, maxChars, keepAtStart, keepAtEnd, maxChars))
         print("Use 'crab getlog' to retrieve full output of this job from storage.")
         print("=======================================")
         with open(outfile) as fp:
-            for nl, line in enumerate(fp):
-                if nl < keepAtStart:
-                    printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
-                if nl == keepAtStart+1:
-                    print("== CMSSW: ")
-                    print("== CMSSW: [...BIG SNIP...]")
-                    print("== CMSSW: ")
-                if numLines-nl <= keepAtEnd:
-                    printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
+            fp = shorten(fp, numLines, keepAtStart, keepAtEnd, maxChars, tag=prefix)
+            for line in fp:
+                printCMSSWLine(line, maxLineLen)
     else:
         for line in open(outfile):
-            printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
+            printCMSSWLine(prefix + line, maxLineLen)
 
     print("======== CMSSW OUTPUT FINSHING ========")
     logCMSSWSaved = True
     open('logCMSSWSaved.txt', 'a').close()
     os.utime('logCMSSWSaved.txt', None)
+
+def shorten(msg, numLines, keepAtStart, keepAtEnd, maxChars, tag=""):
+    shortMsg = ""
+    tag = "\n" + tag
+    for nl, line in enumerate(msg):
+        if nl < keepAtStart:
+            shortMsg += tag + line
+        if nl == keepAtStart+1:
+            shortMsg += tag
+            shortMsg += tag + "[...BIG SNIP...]"
+            shortMsg += tag
+        if numLines-nl <= keepAtEnd:
+            shortMsg += tag + line
+
+    # Keep only the first maxChars chars
+    if len(shortMsg) > maxChars:
+        shortMsg = shortMsg[:maxChars]
+
+    return shortMsg
 
 def printCMSSWLine(line, lineLenLimit):
     """ Simple print auxiliary function that truncates lines"""
