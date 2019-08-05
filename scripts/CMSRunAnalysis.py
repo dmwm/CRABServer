@@ -424,12 +424,12 @@ def handleException(exitAcronym, exitCode, exitMsg):
     keepAtEnd   = 3000
     maxLines    = keepAtStart + keepAtEnd
     maxChars    = 10000
-    numLines = sum(1 for line in str(exitMsg))
-    numChars = len( str(exitMsg) )
+    numLines = len(exitMsg.splitlines())
+    numChars = len(exitMsg)
 
     tooBig = numLines > maxLines or numChars > maxChars
     if tooBig:
-        shortExitMsg = shorten(str(exitMsg), numLines, keepAtStart, keepAtEnd, maxLines, maxChars)
+        shortExitMsg = shorten(exitMsg.splitlines(), numLines, keepAtStart, keepAtEnd, maxLines, maxChars)
 
     report['exitMsg'] = shortExitMsg
     print("ERROR: Exceptional exit at %s (%s): %s" % (time.asctime(time.gmtime()), str(exitCode), str(exitMsg)))
