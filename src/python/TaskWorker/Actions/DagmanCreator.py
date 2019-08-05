@@ -494,7 +494,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['publication'] = 1 if info['tm_publication'] == 'T' else 0
         info['userdn'] = info['tm_user_dn']
         info['requestname'] = task['tm_taskname'].replace('"', '')
-        info['savelogsflag'] = 1 if info['tm_save_logs'] == 'T' else 0
+        info['savelogsflag'] = 1 if info['tm_save_logs'] == 'T' else 0 # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
         info['blacklistT1'] = 0
         info['siteblacklist'] = task['tm_site_blacklist']
         info['sitewhitelist'] = task['tm_site_whitelist']
