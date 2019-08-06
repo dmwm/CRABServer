@@ -361,7 +361,7 @@ def logCMSSW():
     os.utime('logCMSSWSaved.txt', None)
 
 def shorten(msg, numLines, keepAtStart, keepAtEnd, maxLines, maxChars, tag=""):
-    print("WARNING: output more then %d lines or %d characters; truncating to first %d and last %d lines and %d characters" % (maxLines, maxChars, keepAtStart, keepAtEnd, maxChars))
+    print("WARNING: output more than %d lines or %d characters; truncating to first %d and last %d lines and %d characters" % (maxLines, maxChars, keepAtStart, keepAtEnd, maxChars))
     print("Use 'crab getlog' to retrieve full output of this job from storage.")
     print("=======================================")
 
@@ -437,9 +437,9 @@ def handleException(exitAcronym, exitCode, exitMsg):
         print("ERROR: Traceback follows:\n", formatted_tb)
 
     try:
-        slCfg = SiteLocalConfig.loadSiteLocalConfig()
-        report['executed_site'] = slCfg.siteName
-        print("== Execution site for failed job from site-local-config.xml: %s" % slCfg.siteName)
+        sLCfg = SiteLocalConfig.loadSiteLocalConfig()
+        report['executed_site'] = sLCfg.siteName
+        print("== Execution site for failed job from site-local-config.xml: %s" % sLCfg.siteName)
     except:
         print("ERROR: Failed to record execution site name in the FJR from the site-local-config.xml")
         print(traceback.format_exc())
