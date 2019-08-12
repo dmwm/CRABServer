@@ -667,8 +667,8 @@ def executeScriptExe(opts, scram):
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
         ret = scram(command_, runtimeDir = os.getcwd())
     if ret > 0:
-        msg = scram.diagnostic()
-        handleException("FAILED", EC_CMSRunWrapper, 'Error executing TweakPSet.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
+        msg =  'Error executing TweakPSet.\n\tScram Diagnostic %s' % scram.diagnostic()
+        handleException("FAILED", EC_CMSRunWrapper, msg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
 
@@ -677,8 +677,8 @@ def executeScriptExe(opts, scram):
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
         ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
     if ret > 0:
-        msg = scram.diagnostic()
-        handleException("FAILED", EC_CMSRunWrapper, 'Error executing scriptExe.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
+        msg = 'Error executing scriptExe.\n\tScram Diagnostic %s' % scram.diagnostic()
+        handleException("FAILED", EC_CMSRunWrapper, msg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
     with open('cmsRun-stdout.log','w') as fh:
@@ -696,8 +696,8 @@ def executeCMSSWStack(opts, scram):
         with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
             ret = scram("python -c '%s'" % pythonScript, runtimeDir=os.getcwd())
         if ret > 0:
-            msg = scram.diagnostic()
-            handleException("FAILED", EC_CMSRunWrapper, 'Error getting output modules from the pset.\n\tScram Env %s\n\tCommand:%s' % (msg, pythonScript))
+            msg = 'Error getting output modules from the pset.\n\tScram Diagnostic %s' % scram.diagnostic()
+            handleException("FAILED", EC_CMSRunWrapper, msg)
             mintime()
             sys.exit(EC_CMSRunWrapper)
         output = literal_eval(scram.getStdout())
