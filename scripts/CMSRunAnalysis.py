@@ -664,6 +664,7 @@ def executeScriptExe(opts, scram):
                                                            opts.eventsPerLumi,
                                                            opts.maxRuntime)
 
+    print ('Executing %s' % command_)
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
         ret = scram(command_, runtimeDir = os.getcwd())
     if ret > 0:
@@ -673,7 +674,7 @@ def executeScriptExe(opts, scram):
         sys.exit(EC_CMSRunWrapper)
 
     command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
-
+    print ('Exdcuting user script: %s' % command_)
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
         ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
     if ret > 0:
@@ -935,11 +936,11 @@ if __name__ == "__main__":
         setupLogging('.')
 
         # Also add stdout to the logging
-        logHandler = logging.StreamHandler(sys.stdout)
-        logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
-        logging.Formatter.converter = time.gmtime
-        logHandler.setFormatter(logFormatter)
-        logging.getLogger().addHandler(logHandler)
+        #logHandler = logging.StreamHandler(sys.stdout)
+        #logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
+        #logging.Formatter.converter = time.gmtime
+        #logHandler.setFormatter(logFormatter)
+        #logging.getLogger().addHandler(logHandler)
 
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             startDashboardMonitoring(ad)
