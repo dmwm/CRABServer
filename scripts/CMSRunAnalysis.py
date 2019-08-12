@@ -677,7 +677,9 @@ def executeScriptExe(opts, scram):
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
         ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
     if ret > 0:
-        msg = 'Error executing scriptExe.\n\tScram Diagnostic %s' % scram.diagnostic()
+        with open('cmsRun-stdout.log','w') as fh:
+            fh.write(scram.diagnostic())
+        msg = 'Error executing scriptExe.\n\tSee stdout log'
         handleException("FAILED", EC_CMSRunWrapper, msg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
