@@ -337,51 +337,35 @@ def logCMSSW():
     keepAtEnd   = 3000
     maxLineLen  = 3000
     maxLines    = keepAtStart + keepAtEnd
-    maxChars    = 10000
     numLines = sum(1 for line in open(outfile))
-    numChars = len( open(outfile).read() )
 
     print("======== CMSSW OUTPUT STARTING ========")
     print("NOTICE: lines longer than %s characters will be truncated" % maxLineLen)
 
-    tooBig = numLines > maxLines or numChars > maxChars
+    tooBig = numLines > maxLines
     prefix = "== CMSSW: "
     if tooBig:
+        print("WARNING: output more then %d lines; truncating to first %d and last %d" % (maxLines, keepAtStart, keepAtEnd))
+        print("Use 'crab getlog' to retrieve full output of this job from storage.")
+        print("=======================================")
         with open(outfile) as fp:
-            fp = shorten(fp, numLines, keepAtStart, keepAtEnd, maxLines, maxChars, tag=prefix)
-            for line in fp:
-                printCMSSWLine(line, maxLineLen)
+            for nl, line in enumerate(fp):
+                if nl < keepAtStart:
+                    printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
+                if nl == keepAtStart + 1:
+                    print("== CMSSW: ")
+                    print("== CMSSW: [...BIG SNIP...]")
+                    print("== CMSSW: ")
+                if numLines - nl <= keepAtEnd:
+                    printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
     else:
         for line in open(outfile):
-            printCMSSWLine(prefix + line, maxLineLen)
+            printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
 
     print("======== CMSSW OUTPUT FINSHING ========")
     logCMSSWSaved = True
     open('logCMSSWSaved.txt', 'a').close()
     os.utime('logCMSSWSaved.txt', None)
-
-def shorten(msg, numLines, keepAtStart, keepAtEnd, maxLines, maxChars, tag=""):
-    print("WARNING: output more than %d lines or %d characters; truncating to first %d and last %d lines and %d characters" % (maxLines, maxChars, keepAtStart, keepAtEnd, maxChars))
-    print("Use 'crab getlog' to retrieve full output of this job from storage.")
-    print("=======================================")
-
-    shortMsg = ""
-    tag = "\n" + tag
-    for nl, line in enumerate(msg):
-        if nl < keepAtStart:
-            shortMsg += tag + line
-        if nl == keepAtStart+1:
-            shortMsg += tag
-            shortMsg += tag + "[...BIG SNIP...]"
-            shortMsg += tag
-        if numLines-nl <= keepAtEnd:
-            shortMsg += tag + line
-
-    # Keep only the first maxChars chars
-    if len(shortMsg) > maxChars:
-        shortMsg = shortMsg[:maxChars]
-
-    return shortMsg
 
 def printCMSSWLine(line, lineLenLimit):
     """ Simple print auxiliary function that truncates lines"""
@@ -418,20 +402,11 @@ def handleException(exitAcronym, exitCode, exitMsg):
     report['exitAcronym'] = exitAcronym
     report['exitCode'] = exitCode
 
-    # check size of outfile
-    shortExitMsg = exitMsg
-    keepAtStart = 1000
-    keepAtEnd   = 3000
-    maxLines    = keepAtStart + keepAtEnd
-    maxChars    = 10000
-    numLines = len(exitMsg.splitlines())
-    numChars = len(exitMsg)
-
-    tooBig = numLines > maxLines or numChars > maxChars
-    if tooBig:
-        shortExitMsg = shorten(exitMsg.splitlines(), numLines, keepAtStart, keepAtEnd, maxLines, maxChars)
-
-    report['exitMsg'] = shortExitMsg
+    # check size of message string passed by caller
+    maxChars = 10 * 1000
+    if len(exitMsg) > maxChars:
+        exitMsg = exitMsg[0:maxChars] + " + ... message truncated at 10k chars"
+    report['exitMsg'] = exitMsg
     print("ERROR: Exceptional exit at %s (%s): %s" % (time.asctime(time.gmtime()), str(exitCode), str(exitMsg)))
     if not formatted_tb.startswith("None"):
         print("ERROR: Traceback follows:\n", formatted_tb)
