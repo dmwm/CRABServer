@@ -910,6 +910,7 @@ if __name__ == "__main__":
     try:
         setupLogging('.')
 
+        # following commented lines are not needed anymore with new scram() in WMCore 1.2+
         # Also add stdout to the logging
         #logHandler = logging.StreamHandler(sys.stdout)
         #logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
