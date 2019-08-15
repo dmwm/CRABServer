@@ -345,7 +345,7 @@ def logCMSSW():
     tooBig = numLines > maxLines
     prefix = "== CMSSW: "
     if tooBig:
-        print("WARNING: output more then %d lines; truncating to first %d and last %d" % (maxLines, keepAtStart, keepAtEnd))
+        print("WARNING: output more than %d lines; truncating to first %d and last %d" % (maxLines, keepAtStart, keepAtEnd))
         print("Use 'crab getlog' to retrieve full output of this job from storage.")
         print("=======================================")
         with open(outfile) as fp:
