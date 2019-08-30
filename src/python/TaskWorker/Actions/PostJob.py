@@ -2423,6 +2423,9 @@ class PostJob():
             self.transfer_outputs = 1
         else:
             self.transfer_outputs = int(self.job_ad['CRAB_TransferOutputs'])
+        if self.stage == 'probe':
+            self.transfer_logs = 0
+            self.transfer_outputs = 0
         ## If self.job_ad['CRAB_ASOTimeout'] = 0, will use default timeout logic.
         if 'CRAB_ASOTimeout' in self.job_ad and int(self.job_ad['CRAB_ASOTimeout']) > 0:
             self.retry_timeout = int(self.job_ad['CRAB_ASOTimeout'])

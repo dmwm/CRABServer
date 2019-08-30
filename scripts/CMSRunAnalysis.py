@@ -335,7 +335,7 @@ def logCMSSW():
     # check size of outfile
     keepAtStart = 1000
     keepAtEnd   = 3000
-    maxLineLen = 3000
+    maxLineLen  = 3000
     maxLines    = keepAtStart + keepAtEnd
     numLines = sum(1 for line in open(outfile))
 
@@ -343,19 +343,20 @@ def logCMSSW():
     print("NOTICE: lines longer than %s characters will be truncated" % maxLineLen)
 
     tooBig = numLines > maxLines
-    if tooBig :
-        print("WARNING: CMSSW output more then %d lines; truncating to first %d and last %d" % (maxLines, keepAtStart, keepAtEnd))
+    prefix = "== CMSSW: "
+    if tooBig:
+        print("WARNING: output more than %d lines; truncating to first %d and last %d" % (maxLines, keepAtStart, keepAtEnd))
         print("Use 'crab getlog' to retrieve full output of this job from storage.")
         print("=======================================")
         with open(outfile) as fp:
             for nl, line in enumerate(fp):
                 if nl < keepAtStart:
                     printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
-                if nl == keepAtStart+1:
+                if nl == keepAtStart + 1:
                     print("== CMSSW: ")
                     print("== CMSSW: [...BIG SNIP...]")
                     print("== CMSSW: ")
-                if numLines-nl <= keepAtEnd:
+                if numLines - nl <= keepAtEnd:
                     printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
     else:
         for line in open(outfile):
@@ -400,15 +401,20 @@ def handleException(exitAcronym, exitCode, exitMsg):
 
     report['exitAcronym'] = exitAcronym
     report['exitCode'] = exitCode
+
+    # check size of message string passed by caller
+    maxChars = 10 * 1000
+    if len(exitMsg) > maxChars:
+        exitMsg = exitMsg[0:maxChars] + " + ... message truncated at 10k chars"
     report['exitMsg'] = exitMsg
     print("ERROR: Exceptional exit at %s (%s): %s" % (time.asctime(time.gmtime()), str(exitCode), str(exitMsg)))
     if not formatted_tb.startswith("None"):
         print("ERROR: Traceback follows:\n", formatted_tb)
 
     try:
-        slCfg = SiteLocalConfig.loadSiteLocalConfig()
-        report['executed_site'] = slCfg.siteName
-        print("== Execution site for failed job from site-local-config.xml: %s" % slCfg.siteName)
+        sLCfg = SiteLocalConfig.loadSiteLocalConfig()
+        report['executed_site'] = sLCfg.siteName
+        print("== Execution site for failed job from site-local-config.xml: %s" % sLCfg.siteName)
     except:
         print("ERROR: Failed to record execution site name in the FJR from the site-local-config.xml")
         print(traceback.format_exc())
@@ -633,21 +639,24 @@ def executeScriptExe(opts, scram):
                                                            opts.eventsPerLumi,
                                                            opts.maxRuntime)
 
+    print ('Executing %s' % command_)
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
         ret = scram(command_, runtimeDir = os.getcwd())
     if ret > 0:
-        msg = scram.diagnostic()
-        handleException("FAILED", EC_CMSRunWrapper, 'Error executing TweakPSet.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
+        msg =  'Error executing TweakPSet.\n\tScram Diagnostic %s' % scram.diagnostic()
+        handleException("FAILED", EC_CMSRunWrapper, msg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
 
     command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
-
+    print ('Exdcuting user script: %s' % command_)
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
         ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
     if ret > 0:
-        msg = scram.diagnostic()
-        handleException("FAILED", EC_CMSRunWrapper, 'Error executing scriptExe.\n\tScram Env %s\n\tCommand: %s' % (msg, command_))
+        with open('cmsRun-stdout.log','w') as fh:
+            fh.write(scram.diagnostic())
+        msg = 'Error executing scriptExe.\n\tSee stdout log'
+        handleException("FAILED", EC_CMSRunWrapper, msg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
     with open('cmsRun-stdout.log','w') as fh:
@@ -665,8 +674,8 @@ def executeCMSSWStack(opts, scram):
         with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
             ret = scram("python -c '%s'" % pythonScript, runtimeDir=os.getcwd())
         if ret > 0:
-            msg = scram.diagnostic()
-            handleException("FAILED", EC_CMSRunWrapper, 'Error getting output modules from the pset.\n\tScram Env %s\n\tCommand:%s' % (msg, pythonScript))
+            msg = 'Error getting output modules from the pset.\n\tScram Diagnostic %s' % scram.diagnostic()
+            handleException("FAILED", EC_CMSRunWrapper, msg)
             mintime()
             sys.exit(EC_CMSRunWrapper)
         output = literal_eval(scram.getStdout())
@@ -901,12 +910,13 @@ if __name__ == "__main__":
     try:
         setupLogging('.')
 
+        # following commented lines are not needed anymore with new scram() in WMCore 1.2+
         # Also add stdout to the logging
-        logHandler = logging.StreamHandler(sys.stdout)
-        logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
-        logging.Formatter.converter = time.gmtime
-        logHandler.setFormatter(logFormatter)
-        logging.getLogger().addHandler(logHandler)
+        #logHandler = logging.StreamHandler(sys.stdout)
+        #logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
+        #logging.Formatter.converter = time.gmtime
+        #logHandler.setFormatter(logFormatter)
+        #logging.getLogger().addHandler(logHandler)
 
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             startDashboardMonitoring(ad)
@@ -939,6 +949,10 @@ if __name__ == "__main__":
             print("==== CMSSW Stack Execution FAILED at %s ====" % time.asctime(time.gmtime()))
             logCMSSW()
             raise
+        if options.scriptExe=='None':
+            print("==== CMSSW JOB Execution completed at %s ====" % time.asctime(time.gmtime()))
+        else:
+            print("==== ScriptEXE Execution completed at %s ====" % time.asctime(time.gmtime()))
         print("Job exit code: %s" % str(jobExitCode))
         print("==== CMSSW Stack Execution FINISHED at %s ====" % time.asctime(time.gmtime()))
         logCMSSW()

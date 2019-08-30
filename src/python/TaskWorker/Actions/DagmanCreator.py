@@ -418,7 +418,7 @@ class DagmanCreator(TaskAction.TaskAction):
         return task['tm_activity']
 
     def isHammerCloud(self, task):
-        if task['tm_activity'] and 'HC' in task['tm_activity']:
+        if task['tm_activity'] and 'HC' in task['tm_activity'].upper():
             return True
         else:
             return False
@@ -494,7 +494,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['publication'] = 1 if info['tm_publication'] == 'T' else 0
         info['userdn'] = info['tm_user_dn']
         info['requestname'] = task['tm_taskname'].replace('"', '')
-        info['savelogsflag'] = 1 if info['tm_save_logs'] == 'T' else 0
+        info['savelogsflag'] = 1 if info['tm_save_logs'] == 'T' else 0 # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
         info['blacklistT1'] = 0
         info['siteblacklist'] = task['tm_site_blacklist']
         info['sitewhitelist'] = task['tm_site_whitelist']
@@ -523,7 +523,7 @@ class DagmanCreator(TaskAction.TaskAction):
         # TODO: pass through these correctly.
         info['runs'] = []
         info['lumis'] = []
-        info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
+        info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0 # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
         egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
         if egroups and info['userhn'] in self.getHighPrioUsers(info['user_proxy'], info['workflow'], egroups):
             info['accounting_group'] = 'highprio'

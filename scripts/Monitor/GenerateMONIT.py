@@ -44,7 +44,7 @@ class CRAB3CreateJson(object):
         self.schedds = []
         self.resthost = "cmsweb.cern.ch"
         # use child collector on port 9620 to get schedd attributes
-        collName = "cmsgwms-collector-global.cern.ch:9620,cmssrv221.fnal.gov:9620"
+        collName = "cmsgwms-collector-global.cern.ch:9620,cmssrv623.fnal.gov:9620"
         self.coll = htcondor.Collector(collName)
 
     def getCountTasksByStatus(self):

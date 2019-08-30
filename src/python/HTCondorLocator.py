@@ -122,13 +122,16 @@ class HTCondorLocator(object):
         schedd = None
 
         try:
-            htcondor.param['COLLECTOR_HOST'] = collector.encode('ascii', 'ignore')
+            collParam = 'COLLECTOR_HOST'
+            htcondor.param[collParam] = collector.encode('ascii', 'ignore')
             coll = htcondor.Collector()
             # select from collector crabschedds and pull some add values
             # this call returns a list of schedd objects.
             schedds = coll.query(htcondor.AdTypes.Schedd, 'CMSGWMS_Type=?="crabschedd"',
                                  ['Name', 'DetectedMemory', 'TotalFreeMemoryMB', 'TransferQueueNumUploading',
                                   'TransferQueueMaxUploading','TotalRunningJobs', 'JobsRunning', 'MaxJobsRunning', 'IsOK'])
+            if not schedds:
+                raise Exception("No CRAB schedds returned by collecor query. '%s' parameter is '%s'. Try later" %(collParam, htcondor.param['COLLECTOR_HOST']))
 
             # Get only those schedds that are listed in our external REST configuration
             if self.config and "htcondorSchedds" in self.config:
