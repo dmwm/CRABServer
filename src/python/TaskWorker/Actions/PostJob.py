@@ -1803,7 +1803,7 @@ class PostJob():
                 counter = 0
                 while counter < 4:
                     cmd = 'condor_q -l %s > %s' % (self.dag_jobid, job_ad_file_name)
-                    rc = supbrocess.call(cmd, shell=True)
+                    rc = subprocess.call(cmd, shell=True)
                     if rc == 0: break
                     time.sleep(10*counter) # take a breath before trying to open the file which we just wrote
                     counter += 1
