@@ -72,6 +72,7 @@ import tarfile
 import hashlib
 import logging
 import commands
+import subprocess
 import unittest
 import datetime
 import tempfile
@@ -1795,9 +1796,27 @@ class PostJob():
         else:
             condor_history_dir = os.environ.get("_CONDOR_PER_JOB_HISTORY_DIR", "")
             job_ad_file_name = os.path.join(condor_history_dir, str("history." + str(self.dag_jobid)))
+            ## Since Summer 2019 ( https://github.com/dmwm/CRABServer/issues/5854 ) we keep
+            ## jobs in HTCondor queue after job terminate so that PostJob can edit classAds
+            ## and get the info propagated to MONIT, therefore we create the job ad file 1st time PostJob runs
+            if not os.path.exists(job_ad_file_name):
+                counter = 0
+                while counter < 4:
+                    cmd = 'condor_q -l %d > %s' % (self.dag_jobid, job_ad_file_name)
+                    rc = suprocess.call(cmd, shell=True)
+                    if rc == 0: break
+                    time.sleep(10*counter) # take a breath before trying to open the file which we just wrote
+                    counter += 1
+                if not rc == 0:
+                    # several tries, stil cant' talk to schedd. reschedule the PJ
+                    return 4
+
+        # there's no good reason anymore for the loop below. Guess was there to wait out a possible
+        # race where PostJob is starte very quickly but job has not left the queue yet and thust the
+        # job_ad file is not present. I am keeping the code to minimize changes but reduce the counter to 1
         counter = 0
         self.logger.info("====== Starting to parse job ad file %s.", job_ad_file_name)
-        while counter < 5:
+        while counter < 1:
             self.logger.info("       -----> Started %s time out of %s -----", str(counter), "5")
             parse_job_ad_exit = self.parse_job_ad(job_ad_file_name)
             if not parse_job_ad_exit:
