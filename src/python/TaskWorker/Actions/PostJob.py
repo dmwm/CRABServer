@@ -1802,7 +1802,7 @@ class PostJob():
             if not os.path.exists(job_ad_file_name):
                 counter = 0
                 while counter < 4:
-                    cmd = 'condor_q -l %d > %s' % (self.dag_jobid, job_ad_file_name)
+                    cmd = 'condor_q -l %s > %s' % (self.dag_jobid, job_ad_file_name)
                     rc = suprocess.call(cmd, shell=True)
                     if rc == 0: break
                     time.sleep(10*counter) # take a breath before trying to open the file which we just wrote
