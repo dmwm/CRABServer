@@ -32,6 +32,7 @@ from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
 STATE_ACTIONS_MAP = {'SUBMIT' : (handleNewTask, 'SUBMITFAILED'), 'KILL' : (handleKill, 'KILLFAILED'), 'RESUBMIT' : (handleResubmit, 'RESUBMITFAILED')}
 
 MODEURL = {'cmsweb-dev': {'host': 'cmsweb-dev.cern.ch', 'instance':  'dev'},
+           'cmsweb-test': {'host': 'cmsweb-test.cern.ch', 'instance': 'preprod'},
            'cmsweb-preprod': {'host': 'cmsweb-testbed.cern.ch', 'instance': 'preprod'},
            'cmsweb-prod': {'host': 'cmsweb.cern.ch', 'instance':  'prod'},
            'private': {'host': None, 'instance':  'dev'},}
