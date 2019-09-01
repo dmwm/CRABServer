@@ -1818,8 +1818,8 @@ class PostJob():
         self.logger.info("====== Starting to parse job ad file %s.", job_ad_file_name)
         while counter < 1:
             self.logger.info("       -----> Started %s time out of %s -----", str(counter), "5")
-            parse_job_ad_exit = self.parse_job_ad(job_ad_file_name)
-            if not parse_job_ad_exit:
+            parse_job_ad_exit = self.parse_job_ad(job_ad_file_name)    # note: returns 0 if OK
+            if not parse_job_ad_exit:    # means success in previous line
                 used_job_ad = True
                 self.logger.info("       -----> Succeeded to parse job ad file -----")
                 if self.dag_clusterid != -1:
