@@ -1800,6 +1800,8 @@ class PostJob():
             ## jobs in HTCondor queue after job terminate so that PostJob can edit classAds
             ## and get the info propagated to MONIT, therefore we create the job ad file 1st time PostJob runs
             if not os.path.exists(job_ad_file_name):
+                job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.dag_retry))
+            if not os.path.exists(job_ad_file_name):
                 counter = 0
                 while counter < 4:
                     cmd = 'condor_q -l %s > %s' % (self.dag_jobid, job_ad_file_name)
