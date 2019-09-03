@@ -1646,7 +1646,7 @@ class PostJob():
         if retval == 1:
             msg += " : RECOVERABLE JOB FAIL. This jobs will be retried"
         if retval == 2:
-            msg += " : FATAL JOB FAIL. This job will end here"
+            msg += " : NON-RECOVERABLE JOB FAIL. No retries"
         if retval == 3:
             msg += " : FATAL GLOBAL FAIL. Full DAG will stop"
         self.logger.info(msg)
