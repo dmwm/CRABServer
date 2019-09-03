@@ -1635,9 +1635,21 @@ class PostJob():
 
     def log_finish_msg(self, retval):
         """
-        Logs a message with the post-job return code.
+        Logs a message with the post-job return code. The meaning of the
+        exit codes has to be inferred by how/where appear in the DAGMAN spec
+        created in DagmanCreator.py's variable DAG_FRAGMENT and DAG manual
+        https://htcondor.readthedocs.io/en/v8_8_4/users-manual/dagman-applications.html
         """
-        self.logger.info("======== Finished post-job execution with status code %s.", retval)
+        msg = "======== Finished post-job execution with status code %s " % retval
+        if retval == 0:
+            msg += " : SUCCESS"
+        if retval == 1:
+            msg += " : RECOVERABLE JOB FAIL. This jobs will be retried"
+        if retval == 2:
+            msg += " : FATAL JOB FAIL. This job will end here"
+        if retval == 3:
+            msg += " : FATAL GLOBAL FAIL. Full DAG will stop"
+        self.logger.info(msg)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1800,21 +1812,35 @@ class PostJob():
             ## jobs in HTCondor queue after job terminate so that PostJob can edit classAds
             ## and get the info propagated to MONIT, therefore we create the job ad file 1st time PostJob runs
             if not os.path.exists(job_ad_file_name):
+                self.logger.info('History file %s not found in _CONDOR_PER_JOB_HISTORY_DIR, look in ./finished_jobs')
                 job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.dag_retry))
             if not os.path.exists(job_ad_file_name):
+                self.logger.info('History file not found in ./finished_jobs. Create it by queryin schedd')
                 counter = 0
                 while counter < 4:
                     cmd = 'condor_q -l %s > %s' % (self.dag_jobid, job_ad_file_name)
-                    rc = subprocess.call(cmd, shell=True)
-                    if rc == 0: break
-                    time.sleep(10*counter) # take a breath before trying to open the file which we just wrote
+                    self.logger.info('Executing %s' % cmd)
+                    subproc = subprocess.Popen(cmd, stderr=subprocess.PIPE, shell=True)
+                    (stdout_data,stderr_data) = subproc.communicate()
+                    rc = subproc.returncode
+                    if rc==0:
+                        if os.path.getsize(job_ad_file_name)==0 :
+                            stderr_data = 'Empty file created. Maybe job % was not found ?' % self.dag_jobid
+                        else:
+                            time.sleep(2) # take a breath before opening the file which we just wrote
+                            break
+                    sleep_time = 10*counter
+                    self.logger.error('condor_q failed with rc= %d and stderr:\n%s' % (rc, stderr_data))
+                    self.logger.info('will try again in $d seconds' % sleep_time)
+                    time.sleep(sleep_time)
                     counter += 1
                 if not rc == 0:
-                    # several tries, stil cant' talk to schedd. reschedule the PJ
+                    self.logger.error("Several tries, still cant't talk to schedd. Reschedule the PostJob")
                     return 4
+                self.logger.info('History file %s created' % job_ad_file_name)
 
         # there's no good reason anymore for the loop below. Guess was there to wait out a possible
-        # race where PostJob is starte very quickly but job has not left the queue yet and thust the
+        # race where PostJob is started very quickly but job has not left the queue yet and thus the
         # job_ad file is not present. I am keeping the code to minimize changes but reduce the counter to 1
         counter = 0
         self.logger.info("====== Starting to parse job ad file %s.", job_ad_file_name)
