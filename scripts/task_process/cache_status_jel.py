@@ -278,7 +278,7 @@ def storeNodesInfoInFile():
             logging.debug("cache file found, opening and reading")
             nodesStorage = open(STATUS_CACHE_FILE, "r")
 
-            jobLogCheckpoint = nodesStorage.readline()
+            jobLogCheckpoint = nodesStorage.readline().strip()
             fjrParseResCheckpoint = int(nodesStorage.readline())
             nodes = ast.literal_eval(nodesStorage.readline())
             nodeMap = ast.literal_eval(nodesStorage.readline())
