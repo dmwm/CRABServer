@@ -2361,7 +2361,7 @@ class PostJob():
                 publishname = "%s-%s" % (publishname.rsplit('-', 1)[0], file_info['pset_hash'])
             ## Convention for output dataset name:
             ## /<primarydataset>/<username>-<output_dataset_tag>-<PSETHASH>/USER
-            if file_info['filetype'] == 'EDM':
+            if file_info['filetype'] == 'EDM' or file_info['filetype'] == 'DQM':
                 if multiple_edm and file_info.get('module_label'):
                     left, right = publishname.rsplit('-', 1)
                     publishname = "%s_%s-%s" % (left, file_info['module_label'], right)
@@ -2622,6 +2622,9 @@ class PostJob():
                     file_info['filetype'] = 'EDM'
                 elif output_file_info.get(u'Source', '') == u'TFileService':
                     file_info['filetype'] = 'TFILE'
+                elif (output_file_info.get(u'output_module_class', '') == u'DQMRootOutputModule' or \
+                      output_file_info.get(u'ouput_module_class',  '') == u'DQMRootOutputModule'):
+                    file_info['filetype'] = 'DQM'
                 else:
                     file_info['filetype'] = 'FAKE'
                 file_info['module_label'] = output_file_info.get(u'module_label', 'unknown')
