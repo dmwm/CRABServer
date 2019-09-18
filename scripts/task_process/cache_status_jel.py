@@ -1,4 +1,8 @@
 #!/usr/bin/python
+"""
+VERSION OF CACHE_STATUS USING HTCONDOR JobEventLog API
+THIS REQUIRES HTCONDOR 8.9.3 OR ABOVE
+"""
 from __future__ import print_function, division
 import re
 import time
