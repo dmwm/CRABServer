@@ -2617,6 +2617,7 @@ class PostJob():
                 msg = "Output file info for %s: %s" % (orig_file_name, output_file_info)
                 self.logger.debug(msg)
                 file_info = {}
+                self.output_files_info.append(file_info)
                 ## Note incorrect spelling of 'output module' in current WMCore
                 if (output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
                     output_file_info.get(u'ouput_module_class',  '') == u'PoolOutputModule'):
@@ -2659,8 +2660,6 @@ class PostJob():
                     # Note that the events per lumi information is provided by WMCore version >=1.1.2 when parsing FWJR.
                     lumisAndEvents = ','.join(['{0}:{1}'.format(str(lumi), str(numEvents)) for lumi, numEvents in lumis.iteritems()])
                     file_info['outfilelumis'].append(lumisAndEvents)
-
-                self.output_files_info.append(file_info)
             else:
                 msg = "Output file info for %s not found in job report." % (orig_file_name)
                 self.logger.error(msg)
