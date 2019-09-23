@@ -1834,7 +1834,7 @@ class PostJob():
                     rc = subproc.returncode
                     if rc==0:
                         if os.path.getsize(job_ad_file_name)==0 :
-                            stderr_data = 'Empty ad file created. Maybe job % was not found ?' % self.dag_jobid
+                            stderr_data = 'Empty ad file created. Maybe job %s was not found?' % self.dag_jobid
                         else:
                             time.sleep(2) # take a breath before opening the file which we just wrote
                             break
@@ -1855,7 +1855,7 @@ class PostJob():
         num_iter = 1
         self.logger.info("====== Starting to parse job ad file %s.", job_ad_file_name)
         while counter < num_iter:
-            self.logger.info("       -----> Attempt # %s  of -----", str(counter), str(num_iter))
+            self.logger.info("       -----> Attempt # %s of %s -----", str(counter), str(num_iter))
             parse_job_ad_exit = self.parse_job_ad(job_ad_file_name)    # note: returns 0 if OK
             if not parse_job_ad_exit:    # means success in previous line
                 used_job_ad = True
@@ -2361,7 +2361,7 @@ class PostJob():
                 publishname = "%s-%s" % (publishname.rsplit('-', 1)[0], file_info['pset_hash'])
             ## Convention for output dataset name:
             ## /<primarydataset>/<username>-<output_dataset_tag>-<PSETHASH>/USER
-            if file_info['filetype'] == 'EDM':
+            if file_info['filetype'] in ['EDM','DQM']:
                 if multiple_edm and file_info.get('module_label'):
                     left, right = publishname.rsplit('-', 1)
                     publishname = "%s_%s-%s" % (left, file_info['module_label'], right)
@@ -2441,6 +2441,8 @@ class PostJob():
             except IOError:
                 msg = "Error writing the output_datasets file"
                 self.logger.error(msg)
+        else:
+            self.logger.debug("Output datasets considered for upload:\n%s", output_datasets)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -2622,6 +2624,9 @@ class PostJob():
                     file_info['filetype'] = 'EDM'
                 elif output_file_info.get(u'Source', '') == u'TFileService':
                     file_info['filetype'] = 'TFILE'
+                elif (output_file_info.get(u'output_module_class', '') == u'DQMRootOutputModule' or \
+                      output_file_info.get(u'ouput_module_class',  '') == u'DQMRootOutputModule'):
+                    file_info['filetype'] = 'DQM'
                 else:
                     file_info['filetype'] = 'FAKE'
                 file_info['module_label'] = output_file_info.get(u'module_label', 'unknown')
