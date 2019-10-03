@@ -1840,7 +1840,7 @@ class PostJob():
                             break
                     sleep_time = 10*pow(2,counter) # exponential backoff: 10, 20, 40, 80 ...
                     self.logger.error('condor_q failed with rc= %d and stderr:\n%s' % (rc, stderr_data))
-                    self.logger.info('will try again in $d seconds' % sleep_time)
+                    self.logger.info('will try again in %d seconds' % sleep_time)
                     time.sleep(sleep_time)
                     counter += 1
                 if not rc == 0:
