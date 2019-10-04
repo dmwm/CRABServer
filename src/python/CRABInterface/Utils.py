@@ -7,7 +7,7 @@ from hashlib import sha1
 import cherrypy
 import pycurl
 import StringIO
-import cjson as json
+import json
 import threading
 
 from WMCore.WMFactory import WMFactory
