@@ -796,8 +796,8 @@ def AddPsetHash(report, scram):
     processing_history_re = re.compile("^Processing History:$")
     for outputMod in report['steps']['cmsRun']['output'].values():
         for fileInfo in outputMod:
-            if not (fileInfo.get('output_module_class', '') == 'PoolOutputModule' or \
-                    fileInfo.get('ouput_module_class',  '') == 'PoolOutputModule'):
+            if not (fileInfo.get('output_module_class', '') in ['PoolOutputModule','DQMRootOutputModule'] or \
+                    fileInfo.get('ouput_module_class',  '') in ['PoolOutputModule','DQMRootOutputModule']):
                 continue
             if 'pfn' not in fileInfo:
                 continue
@@ -807,7 +807,7 @@ def AddPsetHash(report, scram):
                 continue
             m = re.match(r"^[A-Za-z0-9\-._]+$", fileInfo['pfn'])
             if not m:
-                print("== EDM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % fileInfo['pfn'])
+                print("== EDM/DQM output filename (%s) must match RE ^[A-Za-z0-9\\-._]+$" % fileInfo['pfn'])
                 continue
             print("==== PSet Hash computation STARTING at %s ====" % time.asctime(time.gmtime()))
             lines = getProv(fileInfo['pfn'], scram)
