@@ -263,11 +263,12 @@ class ASOServerJob(object):
     def __init__(self, logger, aso_start_time, aso_start_timestamp, dest_site, source_dir,
                  dest_dir, source_sites, job_id, filenames, reqname, log_size,
                  log_needs_transfer, job_report_output, job_ad, crab_retry, retry_timeout, \
-                 job_failed, transfer_logs, transfer_outputs, rest_host, rest_uri_no_api):
+                 job_failed, transfer_logs, transfer_outputs, rest_host, rest_uri_no_api, pubname):
         """
         ASOServerJob constructor.
         """
         self.logger = logger
+        self.publishname = pubname
         self.docs_in_transfer = None
         self.crab_retry = crab_retry
         self.retry_timeout = retry_timeout
@@ -431,6 +432,12 @@ class ASOServerJob(object):
             docs_to_cancel = {}
             reason = "Cancelled ASO transfer after timeout of %d seconds." % (self.retry_timeout)
             for doc_info in self.docs_in_transfer:
+                # TODO: subprocess for detach did
+
+                #cmd = "env -u LD_LIBRAY_PATH lcg-cp -b -D srmv2 -v file://%s %s" % (path, pfn)
+                #status, res = commands.getstatusoutput(cmd)
+
+
                 doc_id = doc_info['doc_id']
                 if doc_id not in done_transfers + failed_killed_transfers:
                     docs_to_cancel.update({doc_id: reason})
@@ -581,6 +588,7 @@ class ASOServerJob(object):
                             ## so it is OK to set it equal to the crab (post-job) retry count.
                             'job_retry_count': self.crab_retry,
                            }
+            direct = False
             if not needs_transfer:
                 msg  = "File %s is marked as having been directly staged out"
                 msg += " from the worker node to the permanent storage."
@@ -588,6 +596,7 @@ class ASOServerJob(object):
                 self.logger.info(msg)
                 doc_new_info['state'] = 'done'
                 doc_new_info['end_time'] = now
+                direct = True
             ## Set the publication flag.
             task_publish = int(self.job_ad['CRAB_Publish'])
             publication_msg = None
@@ -614,7 +623,7 @@ class ASOServerJob(object):
             if publish:
                 aso_tasks.append("publication")
             delayed_publicationflag_update = False
-            if not (needs_transfer or publish):
+            if not (needs_transfer or publish or direct):
                 ## This file doesn't need transfer nor publication, so we don't need to upload
                 ## a document to ASO database.
                 if publication_msg:
@@ -842,11 +851,31 @@ class ASOServerJob(object):
                     msg += "\n%s" % (str(hte.headers))
                     returnMsg['error'] = msg
             if toTransfer:
+                if not 'publishname' in newDoc:
+                    newDoc['publishname'] =  self.publishname
+                if not 'checksums' in newDoc:
+                    newDoc['checksums'] = doc['checksums']
                 if not 'destination_lfn' in newDoc:
                     newDoc['destination_lfn'] = doc['destination_lfn']
                 if not 'destination' in newDoc:
                     newDoc['destination'] = doc['destination']
-                with open('task_process/transfers.txt', 'a') as transfers_file:
+                with open('task_process/transfers.txt', 'a+') as transfers_file:
+                    transfer_dump = json.dumps(newDoc)
+                    transfers_file.write(transfer_dump+"\n")
+                if not os.path.exists('task_process/rest_filetransfers.txt'):
+                    with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
+                        rest_file.write(self.rest_host + self.rest_uri_no_api + '\n')
+                        rest_file.write(self.proxy)
+            else:
+                if not 'publishname' in newDoc:
+                    newDoc['publishname'] =  self.publishname
+                if not 'checksums' in newDoc:
+                    newDoc['checksums'] = doc['checksums']
+                if not 'destination_lfn' in newDoc:
+                    newDoc['destination_lfn'] = doc['destination_lfn']
+                if not 'destination' in newDoc:
+                    newDoc['destination'] = doc['destination']
+                with open('task_process/transfers_direct.txt', 'a+') as transfers_file:
                     transfer_dump = json.dumps(newDoc)
                     transfers_file.write(transfer_dump+"\n")
                 if not os.path.exists('task_process/rest_filetransfers.txt'):
@@ -1501,6 +1530,8 @@ class PostJob():
         ## Create the task web directory in the schedd. Ignore if it exists already.
         self.create_taskwebdir()
 
+        ## TODO: create dataset if doesn't exist
+
         ## Get/update the crab retry.
         calculate_crab_retry_retval, self.crab_retry = self.calculate_crab_retry()
 
@@ -2144,7 +2175,7 @@ class PostJob():
                                self.job_ad, self.crab_retry, \
                                self.retry_timeout, self.job_failed, \
                                self.transfer_logs, self.transfer_outputs,
-                               self.rest_host, self.rest_uri_no_api)
+                               self.rest_host, self.rest_uri_no_api, self.publish_name)
         if first_pj_execution():
             aso_job_retval = ASO_JOB.run()
         else:
@@ -2372,6 +2403,9 @@ class PostJob():
                         group_user_prefix = file_info['outlfn'].split('/')[3]
                 outdataset = os.path.join('/' + primary_dataset, group_user_prefix + '-' + publishname, 'USER')
                 output_datasets.add(outdataset)
+
+                # TODO: create dataset, not here, but as defined here
+
             else:
                 outdataset = '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER'
             configreq = {'taskname'        : self.reqname,

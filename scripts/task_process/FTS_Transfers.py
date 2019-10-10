@@ -268,6 +268,7 @@ class submit_thread(threading.Thread):
         for lfn in self.files:
             transfers.append(fts3.new_transfer(lfn[0],
                                                lfn[1],
+                                               checksum=lfn[7],
                                                filesize=lfn[6],
                                                metadata={'oracleId': lfn[2]}
                                                )
@@ -332,7 +333,7 @@ def submit(phedex, ftsContext, toTrans):
                       destination,
                       username,
                       taskname,
-                      filesize],....]
+                      filesize, checksum],....]
     :return: list of jobids submitted
     """
     threadLock = threading.Lock()
@@ -350,6 +351,7 @@ def submit(phedex, ftsContext, toTrans):
 
         ids = [x[2] for x in toTrans if x[3] == source]
         sizes = [x[7] for x in toTrans if x[3] == source]
+        checksums = [x[8] for x in toTrans if x[3] == source]
         username = toTrans[0][5]
         taskname = toTrans[0][6]
         src_lfns = [x[0] for x in toTrans if x[3] == source]
@@ -381,7 +383,7 @@ def submit(phedex, ftsContext, toTrans):
         source_pfns = sorted_source_pfns
         dest_pfns = sorted_dest_pfns
 
-        tx_from_source = [[x[0], x[1], x[2], source, username, taskname, x[3]] for x in zip(source_pfns, dest_pfns, ids, sizes)]
+        tx_from_source = [[x[0], x[1], x[2], source, username, taskname, x[3], x[4]['adler32'].rjust(8,'0')] for x in zip(source_pfns, dest_pfns, ids, sizes, checksums)]
 
         for files in chunks(tx_from_source, 200):
             thread = submit_thread(threadLock, logging, ftsContext, files, source, jobids, to_update)
@@ -428,7 +430,8 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
                               doc["destination"],
                               doc["username"],
                               doc["taskname"],
-                              doc["filesize"]])
+                              doc["filesize"],
+                              doc["checksums"]])
 
         jobids = []
         if len(transfers) > 0:
