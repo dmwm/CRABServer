@@ -42,22 +42,6 @@ rm -f $STARTDIR/CRAB3.zip
 rm -f $STARTDIR/WMCore.zip
 rm -f $STARTDIR/nose.tar.gz
 
-#
-# This is the one dep which can't be taken from the CMS RPM install.
-# The runtime on the HTCondor node uses the system python which, on SL6, is
-# not linked against OpenSSL.  This breaks communications with the frontend.
-#
-# This libcurl.so.4 is produced by taking the curl SRPM from RHEL and adding
-# a flag to use openssl as a backend.
-#
-# TODO: resolve this situation.
-#
-#if [[ ! -e libcurl.so.4 ]]; then
-#    curl -L https://github.com/dmwm/CRABServer/raw/master/lib/libcurl.so.4 > $STARTDIR/libcurl.so.4 || exit 2
-#    curl -L https://github.com/dmwm/CRABServer/raw/master/lib/libcurl.so.4.sha1sum > $STARTDIR/libcurl.so.4.sha1sum || exit 2
-#    sha1sum -c $STARTDIR/libcurl.so.4.sha1sum || exit 2
-#fi
-#chmod +x libcurl.so.4
 
 # For developers, we download all our dependencies from the various upstream servers.
 # For actual releases, we take the libraries from the build environment RPMs.
@@ -110,10 +94,6 @@ else
     pushd nose-release_1.3.0/
     zip -rq $STARTDIR/CRAB3.zip nose -x \*.pyc || exit 3
     popd
-
-    #cp -r /tmp/fts3 .
-
-    #zip -rq $STARTDIR/CRAB3.zip fts3 -x \*.pyc || exit 3
 
 
     # up until this point, evertying in CRAB3.zip is an external

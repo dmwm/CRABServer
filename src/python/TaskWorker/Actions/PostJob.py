@@ -432,12 +432,6 @@ class ASOServerJob(object):
             docs_to_cancel = {}
             reason = "Cancelled ASO transfer after timeout of %d seconds." % (self.retry_timeout)
             for doc_info in self.docs_in_transfer:
-                # TODO: subprocess for detach did
-
-                #cmd = "env -u LD_LIBRAY_PATH lcg-cp -b -D srmv2 -v file://%s %s" % (path, pfn)
-                #status, res = commands.getstatusoutput(cmd)
-
-
                 doc_id = doc_info['doc_id']
                 if doc_id not in done_transfers + failed_killed_transfers:
                     docs_to_cancel.update({doc_id: reason})
@@ -1530,8 +1524,6 @@ class PostJob():
         ## Create the task web directory in the schedd. Ignore if it exists already.
         self.create_taskwebdir()
 
-        ## TODO: create dataset if doesn't exist
-
         ## Get/update the crab retry.
         calculate_crab_retry_retval, self.crab_retry = self.calculate_crab_retry()
 
@@ -2403,8 +2395,6 @@ class PostJob():
                         group_user_prefix = file_info['outlfn'].split('/')[3]
                 outdataset = os.path.join('/' + primary_dataset, group_user_prefix + '-' + publishname, 'USER')
                 output_datasets.add(outdataset)
-
-                # TODO: create dataset, not here, but as defined here
 
             else:
                 outdataset = '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER'
