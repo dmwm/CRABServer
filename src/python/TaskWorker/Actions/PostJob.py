@@ -2704,10 +2704,6 @@ class PostJob():
         """
         Update PostJobStatus and job exit-code among the job ClassAds for the monitoring script to update the Grafana dashboard.
         """
-        if not os.path.exists('/etc/editClassAds'):
-            self.logger.info("====== Will not edit the job ClassAd.")
-            return
-
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
             return
@@ -2726,10 +2722,9 @@ class PostJob():
                 msg = "attempt %d out of %d" % (counter, limit)
                 self.logger.info("       -----> Started %s -----", msg)
                 with self.schedd.transaction(htcondor.TransactionFlags.NonDurable):
-                    if os.path.exists('/etc/editPostJobClassAdAttributes'):
-                        for param in params:
-                            self.schedd.edit([self.dag_jobid], param, str(params[param]))
-                        self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
+                    for param in params:
+                        self.schedd.edit([self.dag_jobid], param, str(params[param]))
+                    self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
                     # Once ClassAd state attributes have been updated, let HTCondor remove the job from the queue
                     self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
                     self.logger.info("       -----> Finished %s -----", msg)
