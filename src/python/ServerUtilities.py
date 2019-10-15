@@ -148,6 +148,12 @@ def checkOutLFN(lfn, username):
     if lfn.startswith('/store/user/'):
         if lfn.split('/')[3] != username:
             return False
+    elif lfn.startswith('/store/test/rucio/user/'):
+        if lfn.split('/')[5] != username:
+            return False
+    elif lfn.startswith('/store/rucio/user/'):
+        if lfn.split('/')[4] != username:
+            return False
     elif lfn.startswith('/store/group/') or lfn.startswith('/store/local/'):
         if lfn.split('/')[3] == '':
             return False
