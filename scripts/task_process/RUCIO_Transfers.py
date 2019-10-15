@@ -93,15 +93,15 @@ def perform_transfers(inputFile, lastLine, direct=False):
             transfers.append(file_to_submit)
             destination = doc["destination"]
 
-    # Store general job metadata
-    job_data = {'taskname': taskname,
-                'username': user,
-                'destination': destination,
-                'proxy': proxy,
-                'rest': rest_filetransfers}
 
     # Pass collected info to submit function
     if len(transfers) > 0:
+        # Store general job metadata
+        job_data = {'taskname': taskname,
+                    'username': user,
+                    'destination': destination+'_Test',
+                    'proxy': proxy,
+                    'rest': rest_filetransfers}
         if not direct:
             try:
                 submit((transfers, to_submit_columns), job_data, logging)
