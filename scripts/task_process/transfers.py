@@ -497,7 +497,7 @@ def state_manager(fts):
         logging.warning('No FTS job ID to monitor yet')
 
     with open("task_process/transfers/fts_jobids_new.txt", "w+") as _jobids:
-        for line in jobs_ongoing:
+        for line in list(set(jobs_ongoing)):
             logging.info("Writing: %s", line)
             _jobids.write(line+"\n")
 
