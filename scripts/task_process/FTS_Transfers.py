@@ -471,7 +471,7 @@ def state_manager(fts):
     if os.path.exists('task_process/transfers/fts_jobids.txt'):
         with open("task_process/transfers/fts_jobids.txt", "r") as _jobids:
             lines = _jobids.readlines()
-            for line in lines:
+            for line in list(set(lines)):
                 if line:
                     jobid = line.split('\n')[0]
                 if jobid:
