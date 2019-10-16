@@ -15,6 +15,7 @@ from WMCore.Storage.TrivialFileCatalog import readTFC
 import fts3.rest.client.easy as fts3
 from datetime import timedelta
 from RESTInteractions import HTTPRequests
+from httplib import HTTPException
 from ServerUtilities import encodeRequest
 
 if not os.path.exists('task_process/transfers'):
@@ -179,9 +180,15 @@ class check_states_thread(threading.Thread):
 
         try:
             status = self.fts.get("jobs/"+self.jobid)[0]
+        except HTTPException as hte:
+            self.log.exception("failed to retrieve status for %s " % self.jobid)
+            self.log.exception("httpExeption headers %s " % hte.headers)
+            if hte.status == 404:
+                self.log.exception("%s not found in FTS3 DB" % self.jobid)
+                self.jobs_ongoing.remove(self.jobid)
+            return
         except Exception:
             self.log.exception("failed to retrieve status for %s " % self.jobid)
-            self.jobs_ongoing.append(self.jobid)
             self.threadLock.release()
             return
 
@@ -500,7 +507,7 @@ def state_manager(fts):
         logging.warning('No FTS job ID to monitor yet')
 
     with open("task_process/transfers/fts_jobids_new.txt", "w+") as _jobids:
-        for line in jobs_ongoing:
+        for line in list(set(jobs_ongoing)):
             logging.info("Writing: %s", line)
             _jobids.write(line+"\n")
 
