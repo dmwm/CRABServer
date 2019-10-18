@@ -127,6 +127,8 @@ def submit(trans_tuple, job_data, log, direct=False):
     for t in threads:
         t.join()
 
+    if len(to_update) == 0:
+        return False
     # update statuses in oracle table as per threads result
     for fileDoc in to_update:
         try:
@@ -135,6 +137,8 @@ def submit(trans_tuple, job_data, log, direct=False):
             log.info("Marked submitted %s files" % (fileDoc['list_of_ids']))
         except Exception:
             log.exception('Failed to mark files as submitted on DBs')
+
+    return True
 
 
 class submit_thread(threading.Thread):
