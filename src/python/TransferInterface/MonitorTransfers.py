@@ -96,25 +96,25 @@ def monitor(user, taskname, log):
 
     # analyze replica locks info for each file
     sitename = None
-    try:
-        # TODO: should we split in threads ?
-        for file_ in locks_generator:
-            log.info("LOCK %s", file_)
-            filename = file_['name']
-            status = file_['state']
-            log.info("state %s", status)
-            sitename = file_['rse']
+    # TODO: should we split in threads ?
+    for file_ in locks_generator:
+        log.info("LOCK %s", file_)
+        filename = file_['name']
+        status = file_['state']
+        log.info("state %s", status)
+        sitename = file_['rse']
 
-            if status == "OK":
-                list_good.append(filename)
-            if status == "STUCK":
-                list_failed_tmp.append((filename, "Transfer Stuck", sitename))
-            if status == "REPLICATING":
+        if status == "OK":
+            list_good.append(filename)
+        if status == "STUCK":
+            list_failed_tmp.append((filename, "Transfer Stuck", sitename))
+        if status == "REPLICATING":
+            try:
                 ftsJobID = crabInj.cli.list_request_by_did(filename, sitename, scope)["external_id"]
                 if ftsJobID:
                     list_update.append((filename, ftsJobID))
-    except Exception:
-        log.exception("Replica locks not found")
+            except Exception:
+                log.exception("Replica lock not found")
 
     # Expose FTS job ID in case of failure (if available)   
     for name_ in [x[0] for x in list_failed_tmp]:
