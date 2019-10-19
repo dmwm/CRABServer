@@ -114,7 +114,7 @@ def getCentralConfig(extconfigurl, mode):
             cherrypy.log(msg)
             raise ExecutionError("Internal issue when retrieving external confifuration from %s" % extconfigurl)
 
-    centralCfgFallback = json.decode(bbuf.getvalue())[mode]
+    centralCfgFallback = json.loads(bbuf.getvalue())[mode]
     return centralCfgFallback
 
 
