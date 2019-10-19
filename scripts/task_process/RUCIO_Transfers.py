@@ -93,37 +93,39 @@ def perform_transfers(inputFile, lastLine, direct=False):
             transfers.append(file_to_submit)
             destination = doc["destination"]
 
-    # Store general job metadata
-    job_data = {'taskname': taskname,
-                'username': user,
-                'destination': destination,
-                'proxy': proxy,
-                'rest': rest_filetransfers}
 
     # Pass collected info to submit function
     if len(transfers) > 0:
+        # Store general job metadata
+        job_data = {'taskname': taskname,
+                    'username': user,
+                    'destination': destination+'_Test',
+                    'proxy': proxy,
+                    'rest': rest_filetransfers}
         if not direct:
             try:
-                submit((transfers, to_submit_columns), job_data, logging)
+                success = submit((transfers, to_submit_columns), job_data, logging)
                 # TODO: send to dashboard
             except Exception:
                 logging.exception('Submission process failed.')
 
-            # update last read line
-            with open("task_process/transfers/last_transfer_new.txt", "w+") as _last:
-                _last.write(str(lastLine))
-            os.rename("task_process/transfers/last_transfer_new.txt", "task_process/transfers/last_transfer.txt")
+            if success:
+                # update last read line
+                with open("task_process/transfers/last_transfer_new.txt", "w+") as _last:
+                    _last.write(str(lastLine))
+                os.rename("task_process/transfers/last_transfer_new.txt", "task_process/transfers/last_transfer.txt")
 
         elif direct:
             try:
-                submit((transfers, to_submit_columns), job_data, logging, direct=True)
+                success = submit((transfers, to_submit_columns), job_data, logging, direct=True)
             except Exception:
                 logging.exception('Registering direct stage files failed.')
 
-            # update last read line
-            with open("task_process/transfers/last_transfer_direct_new.txt", "w+") as _last:
-                _last.write(str(lastLine))
-            os.rename("task_process/transfers/last_transfer_direct_new.txt", "task_process/transfers/last_transfer_direct.txt")
+            if success:
+                # update last read line
+                with open("task_process/transfers/last_transfer_direct_new.txt", "w+") as _last:
+                    _last.write(str(lastLine))
+                os.rename("task_process/transfers/last_transfer_direct_new.txt", "task_process/transfers/last_transfer_direct.txt")
 
     return user, taskname
 
