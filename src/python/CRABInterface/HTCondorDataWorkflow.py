@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import re
 import json
 import time
@@ -20,8 +22,7 @@ from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 
 # WMCore Utils module
-##currently this input makes CRABSERVER REST crash. see #5962
-##from Utils.Throttled import global_user_throttle
+from Utils.Throttled import global_user_throttle
 
 from CRABInterface.Utils import conn_handler
 from ServerUtilities import FEEDBACKMAIL, PUBLICATIONDB_STATES, isCouchDBURL, getEpochFromDBTime
@@ -450,9 +451,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         yield res
 
-
-    ## comment out until  #5962 is solved
-    ##@global_user_throttle.make_throttled()
+    @global_user_throttle.make_throttled()
     @conn_handler(services=['centralconfig', 'servercert'])
     def status(self, workflow, userdn, userproxy=None, verbose=0):
         """Retrieve the status of the workflow.
