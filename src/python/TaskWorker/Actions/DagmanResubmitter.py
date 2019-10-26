@@ -64,13 +64,14 @@ class DagmanResubmitter(TaskAction):
 
         schedd = ""
         dummyAddress = ""
+        schedName = task['tm_schedd'].split('@')[-1]  # works also if schedname does not have @
         try:
             schedd, dummyAddress = loc.getScheddObjNew(task['tm_schedd'])
         except Exception as exp:
-            msg  = "The CRAB server backend was not able to contact the Grid scheduler."
+            msg  = "The CRAB TaskWorker was not able to contact Grid scheduler: %s." % schedName
             msg += " Please try again later."
             msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
-            msg += " Message from the scheduler: %s" % (str(exp))
+            msg += " Message from the scheduler:\n%s" % (str(exp))
             self.logger.exception("%s: %s", workflow, msg)
             raise TaskWorkerException(msg)
 
