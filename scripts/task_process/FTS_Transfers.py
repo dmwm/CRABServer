@@ -275,7 +275,6 @@ class submit_thread(threading.Thread):
         for lfn in self.files:
             transfers.append(fts3.new_transfer(lfn[0],
                                                lfn[1],
-                                               checksum='ADLER32:'+lfn[7],
                                                filesize=lfn[6],
                                                metadata={'oracleId': lfn[2]}
                                                )
