@@ -7,7 +7,7 @@ BASEDIR=$(cd "$(dirname "$0")"; pwd)
 ORIGDIR=$PWD
 STARTDIR=$PWD/tmp/runtime
 
-CRAB3_VERSION=3.3.1706.rc2
+CRAB3_VERSION=3.3.0-pre1
 
 WMCOREDIR=$STARTDIR/WMCore
 WMCOREVER=1.1.14.crab1
