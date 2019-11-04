@@ -454,6 +454,9 @@ class HTCondorDataWorkflow(DataWorkflow):
     @global_user_throttle.make_throttled()
     @conn_handler(services=['centralconfig', 'servercert'])
     def status(self, workflow, userdn, userproxy=None, verbose=0):
+
+        raise NotImplementedError
+
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
