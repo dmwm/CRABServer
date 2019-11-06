@@ -786,33 +786,11 @@ class HTCondorDataWorkflow(DataWorkflow):
         try:
             self.logger.debug("Retrieving task status from web with verbosity %d." % verbose)
             if verbose == 1:
-                jobs_url = url + "/jobs_log.txt"
-                curl.setopt(pycurl.URL, jobs_url)
-                self.logger.info("Starting download of job log")
-                self.myPerform(curl, jobs_url)
-                self.logger.info("Finished download of job log")
-                header = ResponseHeader(hbuf.getvalue())
-                if header.status == 200:
-                    fp.seek(0)
-                    self.logger.debug("Starting parse of job log")
-                    self.parseJobLog(fp, nodes)
-                    self.logger.debug("Finished parse of job log")
-                else:
-                    raise ExecutionError("Cannot get jobs log file. Retry in a minute if you just submitted the task")
+                self.logger.error("verbose mode is NOT implemented")
+                raise ExecutionError("HTCondorDataWorkflow verbose mode is NOT implemented")
             elif verbose == 2:
-                site_url = url + "/site_ad.txt"
-                curl.setopt(pycurl.URL, site_url)
-                self.logger.debug("Starting download of site ad")
-                self.myPerform(curl, site_url)
-                self.logger.debug("Finished download of site ad")
-                header = ResponseHeader(hbuf.getvalue())
-                if header.status == 200:
-                    fp.seek(0)
-                    self.logger.debug("Starting parse of site ad")
-                    self.parseSiteAd(fp, task_ad, nodes)
-                    self.logger.debug("Finished parse of site ad")
-                else:
-                    raise ExecutionError("Cannot get site ad. Retry in a minute if you just submitted the task")
+                self.logger.error("verbose mode is NOT implemented")
+                raise ExecutionError("HTCondorDataWorkflow verbose mode is NOT implemented")
 
             nodes_url = url + "/node_state.txt"
             curl.setopt(pycurl.URL, nodes_url)
@@ -961,128 +939,6 @@ class HTCondorDataWorkflow(DataWorkflow):
 
     node_name_re = re.compile("DAG Node: Job(\d+)")
     node_name2_re = re.compile("Job(\d+)")
-    def parseJobLog(self, fp, nodes):
-        node_map = {}
-        count = 0
-        for event in HTCondorUtils.readEvents(fp):
-            count += 1
-            eventtime = time.mktime(time.strptime(event['EventTime'], "%Y-%m-%dT%H:%M:%S"))
-            if event['MyType'] == 'SubmitEvent':
-                m = self.node_name_re.match(event['LogNotes'])
-                if m:
-                    node = m.groups()[0]
-                    proc = event['Cluster'], event['Proc']
-                    info = nodes.setdefault(node, {'Retries': 0, 'Restarts': 0, 'SiteHistory': [], 'ResidentSetSize': [], 'SubmitTimes': [], 'StartTimes': [],
-                                                'EndTimes': [], 'TotalUserCpuTimeHistory': [], 'TotalSysCpuTimeHistory': [], 'WallDurations': [], 'JobIds': []})
-                    info['State'] = 'idle'
-                    info['JobIds'].append("%d.%d" % proc)
-                    info['RecordedSite'] = False
-                    info['SubmitTimes'].append(eventtime)
-                    info['TotalUserCpuTimeHistory'].append(0)
-                    info['TotalSysCpuTimeHistory'].append(0)
-                    info['WallDurations'].append(0)
-                    info['ResidentSetSize'].append(0)
-                    info['Retries'] = len(info['SubmitTimes'])-1
-                    node_map[proc] = node
-            elif event['MyType'] == 'ExecuteEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['StartTimes'].append(eventtime)
-                nodes[node]['State'] = 'running'
-                nodes[node]['RecordedSite'] = False
-            elif event['MyType'] == 'JobTerminatedEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['EndTimes'].append(eventtime)
-                nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
-                self.insertCpu(event, nodes[node])
-                if event['TerminatedNormally']:
-                    if event['ReturnValue'] == 0:
-                        nodes[node]['State'] = 'transferring'
-                    else:
-                        nodes[node]['State'] = 'cooloff'
-                else:
-                    nodes[node]['State']  = 'cooloff'
-            elif event['MyType'] == 'PostScriptTerminatedEvent':
-                m = self.node_name2_re.match(event['DAGNodeName'])
-                if m:
-                    node = m.groups()[0]
-                    if event['TerminatedNormally']:
-                        if event['ReturnValue'] == 0:
-                            nodes[node]['State'] = 'finished'
-                        elif event['ReturnValue'] == 2:
-                            nodes[node]['State'] = 'failed'
-                        else:
-                            nodes[node]['State'] = 'cooloff'
-                    else:
-                        nodes[node]['State']  = 'cooloff'
-            elif event['MyType'] == 'ShadowExceptionEvent' or event["MyType"] == "JobReconnectFailedEvent" or event['MyType'] == 'JobEvictedEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                if nodes[node]['State'] != 'idle':
-                    nodes[node]['EndTimes'].append(eventtime)
-                    if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
-                        nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
-                    nodes[node]['State'] = 'idle'
-                    self.insertCpu(event, nodes[node])
-                    nodes[node]['TotalUserCpuTimeHistory'].append(0)
-                    nodes[node]['TotalSysCpuTimeHistory'].append(0)
-                    nodes[node]['WallDurations'].append(0)
-                    nodes[node]['ResidentSetSize'].append(0)
-                    nodes[node]['SubmitTimes'].append(-1)
-                    nodes[node]['JobIds'].append(nodes[node]['JobIds'][-1])
-                    nodes[node]['Restarts'] += 1
-            elif event['MyType'] == 'JobAbortedEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                if nodes[node]['State'] == "idle" or nodes[node]['State'] == "held":
-                    nodes[node]['StartTimes'].append(-1)
-                    if not nodes[node]['RecordedSite']:
-                        nodes[node]['SiteHistory'].append("Unknown")
-                nodes[node]['State'] = 'killed'
-                self.insertCpu(event, nodes[node])
-            elif event['MyType'] == 'JobHeldEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                if nodes[node]['State'] == 'running':
-                    nodes[node]['EndTimes'].append(eventtime)
-                    if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
-                        nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
-                    self.insertCpu(event, nodes[node])
-                    nodes[node]['TotalUserCpuTimeHistory'].append(0)
-                    nodes[node]['TotalSysCpuTimeHistory'].append(0)
-                    nodes[node]['WallDurations'].append(0)
-                    nodes[node]['ResidentSetSize'].append(0)
-                    nodes[node]['SubmitTimes'].append(-1)
-                    nodes[node]['JobIds'].append(nodes[node]['JobIds'][-1])
-                    nodes[node]['Restarts'] += 1
-                nodes[node]['State'] = 'held'
-            elif event['MyType'] == 'JobReleaseEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['State'] = 'idle'
-            elif event['MyType'] == 'JobAdInformationEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                if (not nodes[node]['RecordedSite']) and ('JOBGLIDEIN_CMSSite' in event) and not event['JOBGLIDEIN_CMSSite'].startswith("$$"):
-                    nodes[node]['SiteHistory'].append(event['JOBGLIDEIN_CMSSite'])
-                    nodes[node]['RecordedSite'] = True
-                self.insertCpu(event, nodes[node])
-            elif event['MyType'] == 'JobImageSizeEvent':
-                nodes[node]['ResidentSetSize'][-1] = int(event['ResidentSetSize'])
-                if nodes[node]['StartTimes']:
-                    nodes[node]['WallDurations'][-1] = eventtime - nodes[node]['StartTimes'][-1]
-                self.insertCpu(event, nodes[node])
-            elif event["MyType"] == "JobDisconnectedEvent" or event["MyType"] == "JobReconnectedEvent":
-                # These events don't really affect the node status
-                pass
-            else:
-                self.logger.warning("Unknown event type: %s" % event['MyType'])
-
-        self.logger.debug("There were %d events in the job log." % count)
-        now = time.time()
-        for node, info in nodes.items():
-            last_start = now
-            if info['StartTimes']:
-                last_start = info['StartTimes'][-1]
-            while len(info['WallDurations']) < len(info['SiteHistory']):
-                info['WallDurations'].append(now - last_start)
-            while len(info['WallDurations']) > len(info['SiteHistory']):
-                info['SiteHistory'].append("Unknown")
-
 
     def parseASOState(self, fp, nodes, statusResult):
         """ Parse aso_status and for each job change the job status from 'transferring'
@@ -1238,20 +1094,4 @@ class HTCondorDataWorkflow(DataWorkflow):
 
 
     job_name_re = re.compile(r"Job(\d+)")
-    def parseSiteAd(self, fp, task_ad, nodes):
-        site_ad = classad.parse(fp)
-        blacklist = set(task_ad['CRAB_SiteBlacklist'])
-        whitelist = set(task_ad['CRAB_SiteWhitelist'])
-        for key, val in site_ad.items():
-            m = self.job_name_re.match(key)
-            if not m:
-                continue
-            nodeid = m.groups()[0]
-            sites = set(val.eval())
-            if whitelist:
-                sites &= whitelist
-            # Never blacklist something on the whitelist
-            sites -= (blacklist-whitelist)
-            info = nodes.setdefault(nodeid, {})
-            info['AvailableSites'] = list([i.eval() for i in sites])
 
