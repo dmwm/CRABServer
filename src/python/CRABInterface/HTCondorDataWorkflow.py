@@ -451,6 +451,204 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         yield res
 
+    @global_user_throttle.make_throttled()
+    @conn_handler(services=['centralconfig', 'servercert'])
+    def status(self, workflow, userdn, userproxy=None):
+        """Retrieve the status of the workflow.
+
+           :arg str workflow: a valid workflow name
+           :return: a workflow status summary document"""
+
+        #Empty results
+        result = {"status"           : '', #from the db
+                  "command"          : '', #from the db
+                  "taskFailureMsg"   : '', #from the db
+                  "taskWarningMsg"   : [], #from the db
+                  "submissionTime"   : 0,  #from the db
+                  "statusFailureMsg" : '', #errors of the status itself
+                  "jobList"          : [],
+                  "schedd"           : '', #from the db
+                  "splitting"        : '', #from the db
+                  "taskWorker"       : '', #from the db
+                  "webdirPath"       : '', #from the db
+                  "username"         : ''} #from the db
+
+        # First, verify the task has been submitted by the backend.
+        self.logger.info("Got status request for workflow %s" % workflow)
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = workflow)
+        try:
+            #just one row is picked up by the previous query
+            row = self.Task.ID_tuple(*next(row))
+        except StopIteration:
+            raise ExecutionError("Impossible to find task %s in the database." % workflow)
+
+        result['submissionTime'] = getEpochFromDBTime(row.start_time)
+        if row.task_command:
+            result['command'] = row.task_command
+
+        ## Add scheduler and collector to the result dictionary.
+        if row.username:
+            result['username'] = row.username
+        if row.user_webdir:
+            result['webdirPath'] =  '/'.join(['/home/grid']+row.user_webdir.split('/')[-2:])
+        if row.schedd:
+            result['schedd'] = row.schedd
+        if row.twname:
+            result['taskWorker'] = row.twname
+        if row.split_algo:
+            result['splitting'] = row.split_algo
+
+        self.asoDBURL = row.asourl
+
+        # 0 - simple crab status
+        # 1 - crab status -long
+        # 2 - crab status -idle
+        self.logger.info("Status result for workflow %s: %s " % (workflow, row.task_status))
+
+        ## Apply taskWarning flag to output.
+        taskWarnings = literal_eval(row.task_warnings if isinstance(row.task_warnings, str) else row.task_warnings.read())
+        result["taskWarningMsg"] = taskWarnings
+
+        ## Helper function to add the task status and the failure message (both as taken
+        ## from the Task DB) to the result dictionary.
+        def addStatusAndFailureFromDB(result, row):
+            result['status'] = row.task_status
+            if row.task_failure is not None:
+                if isinstance(row.task_failure, str):
+                    result['taskFailureMsg'] = row.task_failure
+                else:
+                    result['taskFailureMsg'] = row.task_failure.read()
+
+        ## Helper function to add a failure message in retrieving the task/jobs status
+        ## (and eventually a task status if there was none) to the result dictionary.
+        def addStatusAndFailure(result, status, failure = None):
+            if not result['status']:
+                result['status'] = status
+            if failure:
+                #if not result['statusFailureMsg']:
+                result['statusFailureMsg'] = failure
+                #else:
+                #    result['statusFailureMsg'] += "\n%s" % (failure)
+
+        #get rid of this? If there is a clusterid we go ahead and get jobs info, otherwise we return result
+        self.logger.debug("Cluster id: %s" % row.clusterid)
+        if row.task_status in ['NEW', 'HOLDING', 'UPLOADED', 'SUBMITFAILED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']:
+            addStatusAndFailureFromDB(result, row)
+            if row.task_status in ['NEW', 'UPLOADED', 'SUBMITFAILED'] and row.task_command not in ['KILL', 'RESUBMIT']:
+                self.logger.debug("Detailed result for workflow %s: %s\n" % (workflow, result))
+                return [result]
+        #even if we get rid these two should be filled
+#                  "taskFailureMsg"   : '', #from the db
+#                  "taskWarningMsg"   : [], #from the db
+
+        #here we know we have a clusterid. But what if webdir is not there? return setting a proper statusFailureMsg
+        #Now what to do
+        #    get node_state/job_log from the schedd. Needs Justas patch (is it ok?)
+        #    get error_report
+        #    get aso_status (it is going to change once we are done whith the oracle implementation)
+        #    combine everything
+
+        ## Here we start to retrieve the jobs statuses.
+        jobsPerStatus = {}
+        taskJobCount = 0
+        taskStatus = {}
+        jobList = []
+        results = []
+        # task_codes are used if condor_q command is done to retrieve task status
+        task_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 4: 'COMPLETED', 5: 'KILLED'}
+        # dagman_codes are used if task status retrieved using node_state file
+        # 1 = STATUS_READY (Means that task was not yet started)
+        # 2 = STATUS_PRERUN (Means that task is doing PRE run)
+        # 3 = STATUS_SUBMITTED (Means that task is submitted)
+        # 4 = STATUS_POSTRUN (Means that task in PostRun)
+        # 5 = STATUS_DONE (Means that task is Done)
+        # 6 = STATUS_ERROR (Means that task is Failed/Killed)
+        dagman_codes = {1: 'SUBMITTED', 2: 'SUBMITTED', 3: 'SUBMITTED', 4: 'SUBMITTED', 5: 'COMPLETED', 6: 'FAILED'}
+        # User web directory is needed for getting files from scheduler.
+        if not row.user_webdir :
+            self.logger.error("webdir not found in DB. Impossible to retrieve task status")
+            addStatusAndFailure(result, status = 'UNKNOWN', failure = 'missing webdir info')
+            return [result]
+        else:
+            self.logger.info("Getting status for workflow %s using node state file.", workflow)
+            try:
+                taskStatus = self.taskWebStatus({'CRAB_UserWebDir' : row.user_webdir}, result)
+                #Check timestamp, if older then 2 minutes warn about stale info
+                nodeStateUpd = int(taskStatus.get('DagStatus', {}).get("Timestamp", 0))
+                DAGStatus = int(taskStatus.get('DagStatus', {}).get('DagStatus', -1))
+                epochTime = int(time.time())
+                # If DAGStatus is 5 or 6, it means it is final state and node_state file will not be updated anymore
+                # and there is no need to query schedd to get information about task.
+                # If not, we check when the last time file was updated. It should update every 30s, which is set in
+                # job classad:
+                # https://github.com/dmwm/CRABServer/blob/5caac0d379f5e4522f026eeaf3621f7eb5ced98e/src/python/TaskWorker/Actions/DagmanCreator.py#L39
+                if (nodeStateUpd > 0 and (int(epochTime - nodeStateUpd) < 120)) or DAGStatus in [5, 6]:
+                    self.logger.info("Node state is up to date, using it")
+                    taskJobCount = int(taskStatus.get('DagStatus', {}).get('NodesTotal'))
+                    self.logger.info(taskStatus)
+                    if row.task_status in ['QUEUED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']:
+                        result['status'] = row.task_status
+                    else:
+                        result['status'] = dagman_codes.get(DAGStatus, row.task_status)
+                    # make sure taskStatusCode is defined
+                    if result['status'] in ['KILLED', 'KILLFAILED']:
+                        taskStatusCode = 5
+                    else:
+                        taskStatusCode = 1
+                else:
+                    self.logger.info("Node state file is too old or does not have an update time. Stale info is shown")
+            except Exception as ee:
+                addStatusAndFailure(result, status = 'UNKNOWN', failure = ee.info)
+                return [result]
+
+        if 'DagStatus' in taskStatus:
+            del taskStatus['DagStatus']
+
+        for i in range(1, taskJobCount+1):
+            i = str(i)
+            if i not in taskStatus:
+                if taskStatusCode == 5:
+                    taskStatus[i] = {'State': 'killed'}
+                else:
+                    taskStatus[i] = {'State': 'unsubmitted'}
+
+        for job, info in taskStatus.items():
+            status = info['State']
+            jobsPerStatus.setdefault(status, 0)
+            jobsPerStatus[status] += 1
+            jobList.append((status, job))
+        result['jobList'] = jobList
+        #result['jobs'] = taskStatus
+
+        if len(taskStatus) == 0 and results and results['JobStatus'] == 2:
+            result['status'] = 'Running (jobs not submitted)'
+
+        #Always returning ASOURL also, it is required for kill, resubmit
+        self.logger.info("ASO: %s" % row.asourl)
+        result['ASOURL'] = row.asourl
+
+        ## Retrieve publication information.
+        publicationInfo = {}
+        if (row.publication == 'T' and 'finished' in jobsPerStatus):
+            #let's default asodb to asynctransfer, for old task this is empty!
+            asodb = row.asodb or 'asynctransfer'
+            publicationInfo = self.publicationStatus(workflow, row.asourl, asodb, row.username)
+            self.logger.info("Publication status for workflow %s done", workflow)
+        elif (row.publication == 'F'):
+            publicationInfo['status'] = {'disabled': []}
+        else:
+            self.logger.info("No files to publish: Publish flag %s, files transferred: %s" % (row.publication, jobsPerStatus.get('finished', 0)))
+        result['publication'] = publicationInfo.get('status', {})
+        result['publicationFailures'] = publicationInfo.get('failure_reasons', {})
+
+        ## The output datasets are written into the Task DB by the post-job
+        ## when uploading the output files metadata.
+        outdatasets = literal_eval(row.output_dataset.read() if row.output_dataset else 'None')
+        result['outdatasets'] = outdatasets
+
+        return [result]
+
+
     cpu_re = re.compile(r"Usr \d+ (\d+):(\d+):(\d+), Sys \d+ (\d+):(\d+):(\d+)")
     def insertCpu(self, event, info):
         if 'TotalRemoteUsage' in event:
@@ -499,7 +697,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                                   "contact %s if the error persist. Error from curl: %s"
                                   % (url, FEEDBACKMAIL, str(e))))
 
-    def taskWebStatus(self, task_ad, verbose, statusResult):
+    def taskWebStatus(self, task_ad,  statusResult):
         nodes = {}
         url = task_ad['CRAB_UserWebDir']
         curl = self.prepareCurl()
@@ -508,36 +706,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         hbuf = StringIO.StringIO()
         curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
         try:
-            self.logger.debug("Retrieving task status from web with verbosity %d." % verbose)
-            if verbose == 1:
-                jobs_url = url + "/jobs_log.txt"
-                curl.setopt(pycurl.URL, jobs_url)
-                self.logger.info("Starting download of job log")
-                self.myPerform(curl, jobs_url)
-                self.logger.info("Finished download of job log")
-                header = ResponseHeader(hbuf.getvalue())
-                if header.status == 200:
-                    fp.seek(0)
-                    self.logger.debug("Starting parse of job log")
-                    self.parseJobLog(fp, nodes)
-                    self.logger.debug("Finished parse of job log")
-                else:
-                    raise ExecutionError("Cannot get jobs log file. Retry in a minute if you just submitted the task")
-            elif verbose == 2:
-                site_url = url + "/site_ad.txt"
-                curl.setopt(pycurl.URL, site_url)
-                self.logger.debug("Starting download of site ad")
-                self.myPerform(curl, site_url)
-                self.logger.debug("Finished download of site ad")
-                header = ResponseHeader(hbuf.getvalue())
-                if header.status == 200:
-                    fp.seek(0)
-                    self.logger.debug("Starting parse of site ad")
-                    self.parseSiteAd(fp, task_ad, nodes)
-                    self.logger.debug("Finished parse of site ad")
-                else:
-                    raise ExecutionError("Cannot get site ad. Retry in a minute if you just submitted the task")
-
+            self.logger.debug("Retrieving task status from schedd via http")
             nodes_url = url + "/node_state.txt"
             curl.setopt(pycurl.URL, nodes_url)
             # Before executing any new curl, truncate and clean temp file
@@ -685,128 +854,6 @@ class HTCondorDataWorkflow(DataWorkflow):
 
     node_name_re = re.compile("DAG Node: Job(\d+)")
     node_name2_re = re.compile("Job(\d+)")
-    def parseJobLog(self, fp, nodes):
-        node_map = {}
-        count = 0
-        for event in HTCondorUtils.readEvents(fp):
-            count += 1
-            eventtime = time.mktime(time.strptime(event['EventTime'], "%Y-%m-%dT%H:%M:%S"))
-            if event['MyType'] == 'SubmitEvent':
-                m = self.node_name_re.match(event['LogNotes'])
-                if m:
-                    node = m.groups()[0]
-                    proc = event['Cluster'], event['Proc']
-                    info = nodes.setdefault(node, {'Retries': 0, 'Restarts': 0, 'SiteHistory': [], 'ResidentSetSize': [], 'SubmitTimes': [], 'StartTimes': [],
-                                                'EndTimes': [], 'TotalUserCpuTimeHistory': [], 'TotalSysCpuTimeHistory': [], 'WallDurations': [], 'JobIds': []})
-                    info['State'] = 'idle'
-                    info['JobIds'].append("%d.%d" % proc)
-                    info['RecordedSite'] = False
-                    info['SubmitTimes'].append(eventtime)
-                    info['TotalUserCpuTimeHistory'].append(0)
-                    info['TotalSysCpuTimeHistory'].append(0)
-                    info['WallDurations'].append(0)
-                    info['ResidentSetSize'].append(0)
-                    info['Retries'] = len(info['SubmitTimes'])-1
-                    node_map[proc] = node
-            elif event['MyType'] == 'ExecuteEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['StartTimes'].append(eventtime)
-                nodes[node]['State'] = 'running'
-                nodes[node]['RecordedSite'] = False
-            elif event['MyType'] == 'JobTerminatedEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['EndTimes'].append(eventtime)
-                nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
-                self.insertCpu(event, nodes[node])
-                if event['TerminatedNormally']:
-                    if event['ReturnValue'] == 0:
-                        nodes[node]['State'] = 'transferring'
-                    else:
-                        nodes[node]['State'] = 'cooloff'
-                else:
-                    nodes[node]['State']  = 'cooloff'
-            elif event['MyType'] == 'PostScriptTerminatedEvent':
-                m = self.node_name2_re.match(event['DAGNodeName'])
-                if m:
-                    node = m.groups()[0]
-                    if event['TerminatedNormally']:
-                        if event['ReturnValue'] == 0:
-                            nodes[node]['State'] = 'finished'
-                        elif event['ReturnValue'] == 2:
-                            nodes[node]['State'] = 'failed'
-                        else:
-                            nodes[node]['State'] = 'cooloff'
-                    else:
-                        nodes[node]['State']  = 'cooloff'
-            elif event['MyType'] == 'ShadowExceptionEvent' or event["MyType"] == "JobReconnectFailedEvent" or event['MyType'] == 'JobEvictedEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                if nodes[node]['State'] != 'idle':
-                    nodes[node]['EndTimes'].append(eventtime)
-                    if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
-                        nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
-                    nodes[node]['State'] = 'idle'
-                    self.insertCpu(event, nodes[node])
-                    nodes[node]['TotalUserCpuTimeHistory'].append(0)
-                    nodes[node]['TotalSysCpuTimeHistory'].append(0)
-                    nodes[node]['WallDurations'].append(0)
-                    nodes[node]['ResidentSetSize'].append(0)
-                    nodes[node]['SubmitTimes'].append(-1)
-                    nodes[node]['JobIds'].append(nodes[node]['JobIds'][-1])
-                    nodes[node]['Restarts'] += 1
-            elif event['MyType'] == 'JobAbortedEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                if nodes[node]['State'] == "idle" or nodes[node]['State'] == "held":
-                    nodes[node]['StartTimes'].append(-1)
-                    if not nodes[node]['RecordedSite']:
-                        nodes[node]['SiteHistory'].append("Unknown")
-                nodes[node]['State'] = 'killed'
-                self.insertCpu(event, nodes[node])
-            elif event['MyType'] == 'JobHeldEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                if nodes[node]['State'] == 'running':
-                    nodes[node]['EndTimes'].append(eventtime)
-                    if nodes[node]['WallDurations'] and nodes[node]['EndTimes'] and nodes[node]['StartTimes']:
-                        nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
-                    self.insertCpu(event, nodes[node])
-                    nodes[node]['TotalUserCpuTimeHistory'].append(0)
-                    nodes[node]['TotalSysCpuTimeHistory'].append(0)
-                    nodes[node]['WallDurations'].append(0)
-                    nodes[node]['ResidentSetSize'].append(0)
-                    nodes[node]['SubmitTimes'].append(-1)
-                    nodes[node]['JobIds'].append(nodes[node]['JobIds'][-1])
-                    nodes[node]['Restarts'] += 1
-                nodes[node]['State'] = 'held'
-            elif event['MyType'] == 'JobReleaseEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                nodes[node]['State'] = 'idle'
-            elif event['MyType'] == 'JobAdInformationEvent':
-                node = node_map[event['Cluster'], event['Proc']]
-                if (not nodes[node]['RecordedSite']) and ('JOBGLIDEIN_CMSSite' in event) and not event['JOBGLIDEIN_CMSSite'].startswith("$$"):
-                    nodes[node]['SiteHistory'].append(event['JOBGLIDEIN_CMSSite'])
-                    nodes[node]['RecordedSite'] = True
-                self.insertCpu(event, nodes[node])
-            elif event['MyType'] == 'JobImageSizeEvent':
-                nodes[node]['ResidentSetSize'][-1] = int(event['ResidentSetSize'])
-                if nodes[node]['StartTimes']:
-                    nodes[node]['WallDurations'][-1] = eventtime - nodes[node]['StartTimes'][-1]
-                self.insertCpu(event, nodes[node])
-            elif event["MyType"] == "JobDisconnectedEvent" or event["MyType"] == "JobReconnectedEvent":
-                # These events don't really affect the node status
-                pass
-            else:
-                self.logger.warning("Unknown event type: %s" % event['MyType'])
-
-        self.logger.debug("There were %d events in the job log." % count)
-        now = time.time()
-        for node, info in nodes.items():
-            last_start = now
-            if info['StartTimes']:
-                last_start = info['StartTimes'][-1]
-            while len(info['WallDurations']) < len(info['SiteHistory']):
-                info['WallDurations'].append(now - last_start)
-            while len(info['WallDurations']) > len(info['SiteHistory']):
-                info['SiteHistory'].append("Unknown")
-
 
     def parseASOState(self, fp, nodes, statusResult):
         """ Parse aso_status and for each job change the job status from 'transferring'
@@ -962,20 +1009,4 @@ class HTCondorDataWorkflow(DataWorkflow):
 
 
     job_name_re = re.compile(r"Job(\d+)")
-    def parseSiteAd(self, fp, task_ad, nodes):
-        site_ad = classad.parse(fp)
-        blacklist = set(task_ad['CRAB_SiteBlacklist'])
-        whitelist = set(task_ad['CRAB_SiteWhitelist'])
-        for key, val in site_ad.items():
-            m = self.job_name_re.match(key)
-            if not m:
-                continue
-            nodeid = m.groups()[0]
-            sites = set(val.eval())
-            if whitelist:
-                sites &= whitelist
-            # Never blacklist something on the whitelist
-            sites -= (blacklist-whitelist)
-            info = nodes.setdefault(nodeid, {})
-            info['AvailableSites'] = list([i.eval() for i in sites])
 
