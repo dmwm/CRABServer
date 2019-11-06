@@ -581,7 +581,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 # If not, we check when the last time file was updated. It should update every 30s, which is set in
                 # job classad:
                 # https://github.com/dmwm/CRABServer/blob/5caac0d379f5e4522f026eeaf3621f7eb5ced98e/src/python/TaskWorker/Actions/DagmanCreator.py#L39
-                if (nodeStateUpd > 0 and (int(nodeStateUpd - epochTime) > 60)) or DAGStatus in [5, 6]:
+                if (nodeStateUpd > 0 and (int(epochTime - nodeStateUpd) < 120)) or DAGStatus in [5, 6]:
                     self.logger.info("Node state is up to date, using it")
                     taskJobCount = int(taskStatus.get('DagStatus', {}).get('NodesTotal'))
                     self.logger.info(taskStatus)
