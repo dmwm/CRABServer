@@ -266,7 +266,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 return execInt
             except Exception as ex: #pylint: disable=broad-except
                 scheddStats.failure(schedd)
-                msg = "Failed to submit task %s; '%s'"% (task['tm_taskname'], str(ex))
+                msg = "Failed to submit task to: %s . Task: %s;\n'%s'"% (schedd, task['tm_taskname'], str(ex))
                 self.logger.exception(msg)
                 scheddStats.taskError(schedd, msg)
                 if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
@@ -286,7 +286,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         msg += " This could be a temporary glitch. Please try again later."
         msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
         msg += " The submission was retried %s times on %s schedulers." % (sum([len(x) for x in scheddStats.taskErrors.values()]), len(scheddStats.taskErrors))
-        msg += " These are the failures per Grid scheduler: %s" % (str(scheddStats.taskErrors))
+        msg += " These are the failures per Grid scheduler:\n %s" % (str(scheddStats.taskErrors))
 
         raise TaskWorkerException(msg, retry=(schedd != None))
 
