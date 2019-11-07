@@ -158,6 +158,7 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
 
     stdmaxjobruntime = 2750
     stdmaxmemory = 2500
+    absmaxmemory = 10000
     runtime = task[cmd+'_maxjobruntime']
     memory = task[cmd+'_maxmemory']
     if runtime is not None and runtime > stdmaxjobruntime:
@@ -167,13 +168,17 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
         logger.warning(msg)
         if info is not None: info['tm_maxjobruntime'] = str(stdmaxjobruntime)
         warningUploader(msg, task['user_proxy'], task['tm_taskname'])
+    if memory is not None and memory > absmaxmemory:
+            msg = "Task requests %s MB of memory, above the allowed maximum of 10GB." % (memory)
+            msg += " Maybe you misstyped ?"
+            logger.error(msg)
+            raise TaskWorkerException(msg)
     if memory is not None and memory > stdmaxmemory:
         if task[cmd+'_numcores'] is not None and task[cmd+'_numcores'] < 2:
             msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (memory, stdmaxmemory)
             msg += " Jobs may not find a site where to run and stay idle forever."
             logger.warning(msg)
             warningUploader(msg, task['user_proxy'], task['tm_taskname'])
-
 
 class DagmanSubmitter(TaskAction.TaskAction):
 
