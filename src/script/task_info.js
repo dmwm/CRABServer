@@ -862,7 +862,7 @@ $(document).ready(function() {
     function loadOtherData() {
         loadGlobalDataFromTaskInfo();
         queryWebDirProxyApi();
-        // displayConfigAndPSet(handleConfigPSetErr);
+        displayConfigAndPSet(handleConfigPSetErr);
         displayTaskWorkerLog(handleTaskWorkerLogErr);
         displayUploadLog(handleUploadLogErr);
         //displayTransferInfo(handleTransferInfoErr);
