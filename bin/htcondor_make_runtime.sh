@@ -14,7 +14,7 @@ WMCOREVER=1.1.14.crab1
 WMCOREREPO=dmwm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
-CRABSERVERVER=3.3.1706.rc2
+CRABSERVERVER=3.3.1909.rc1
 CRABSERVERREPO=dmwm
 
 [[ -d $STARTDIR ]] || mkdir -p $STARTDIR
@@ -42,6 +42,7 @@ rm -f $STARTDIR/CRAB3.zip
 rm -f $STARTDIR/WMCore.zip
 rm -f $STARTDIR/nose.tar.gz
 
+
 # For developers, we download all our dependencies from the various upstream servers.
 # For actual releases, we take the libraries from the build environment RPMs.
 if [[ "x$RPM_RELEASE" != "x" ]]; then
@@ -52,7 +53,7 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
     popd
 
     pushd $ORIGDIR/build/lib
-    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  -x \*.pyc || exit 3
+    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  TransferInterface -x \*.pyc || exit 3
     popd
 
     pushd $VO_CMS_SW_DIR/$SCRAM_ARCH/external/cherrypy/*/lib/python2.7/site-packages
@@ -94,6 +95,7 @@ else
     zip -rq $STARTDIR/CRAB3.zip nose -x \*.pyc || exit 3
     popd
 
+
     # up until this point, evertying in CRAB3.zip is an external
     cp $STARTDIR/CRAB3.zip $ORIGDIR/CRAB3-externals.zip
 
@@ -103,7 +105,7 @@ else
     popd
 
     pushd $CRABSERVER_PATH/src/python
-    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  -x \*.pyc || exit 3
+    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface TransferInterface -x \*.pyc || exit 3
     popd
 
     mkdir -p bin

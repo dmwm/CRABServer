@@ -15,6 +15,7 @@ from WMCore.Storage.TrivialFileCatalog import readTFC
 import fts3.rest.client.easy as fts3
 from datetime import timedelta
 from RESTInteractions import HTTPRequests
+from httplib import HTTPException
 from ServerUtilities import encodeRequest
 
 if not os.path.exists('task_process/transfers'):
@@ -179,9 +180,15 @@ class check_states_thread(threading.Thread):
 
         try:
             status = self.fts.get("jobs/"+self.jobid)[0]
+        except HTTPException as hte:
+            self.log.exception("failed to retrieve status for %s " % self.jobid)
+            self.log.exception("httpExeption headers %s " % hte.headers)
+            if hte.status == 404:
+                self.log.exception("%s not found in FTS3 DB" % self.jobid)
+                self.jobs_ongoing.remove(self.jobid)
+            return
         except Exception:
             self.log.exception("failed to retrieve status for %s " % self.jobid)
-            self.jobs_ongoing.append(self.jobid)
             self.threadLock.release()
             return
 
@@ -332,7 +339,7 @@ def submit(phedex, ftsContext, toTrans):
                       destination,
                       username,
                       taskname,
-                      filesize],....]
+                      filesize, checksum],....]
     :return: list of jobids submitted
     """
     threadLock = threading.Lock()
@@ -350,6 +357,7 @@ def submit(phedex, ftsContext, toTrans):
 
         ids = [x[2] for x in toTrans if x[3] == source]
         sizes = [x[7] for x in toTrans if x[3] == source]
+        checksums = [x[8] for x in toTrans if x[3] == source]
         username = toTrans[0][5]
         taskname = toTrans[0][6]
         src_lfns = [x[0] for x in toTrans if x[3] == source]
@@ -381,7 +389,7 @@ def submit(phedex, ftsContext, toTrans):
         source_pfns = sorted_source_pfns
         dest_pfns = sorted_dest_pfns
 
-        tx_from_source = [[x[0], x[1], x[2], source, username, taskname, x[3]] for x in zip(source_pfns, dest_pfns, ids, sizes)]
+        tx_from_source = [[x[0], x[1], x[2], source, username, taskname, x[3], x[4]['adler32'].rjust(8,'0')] for x in zip(source_pfns, dest_pfns, ids, sizes, checksums)]
 
         for files in chunks(tx_from_source, 200):
             thread = submit_thread(threadLock, logging, ftsContext, files, source, jobids, to_update)
@@ -428,7 +436,8 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
                               doc["destination"],
                               doc["username"],
                               doc["taskname"],
-                              doc["filesize"]])
+                              doc["filesize"],
+                              doc["checksums"]])
 
         jobids = []
         if len(transfers) > 0:
@@ -461,7 +470,7 @@ def state_manager(fts):
     if os.path.exists('task_process/transfers/fts_jobids.txt'):
         with open("task_process/transfers/fts_jobids.txt", "r") as _jobids:
             lines = _jobids.readlines()
-            for line in lines:
+            for line in list(set(lines)):
                 if line:
                     jobid = line.split('\n')[0]
                 if jobid:
@@ -497,7 +506,7 @@ def state_manager(fts):
         logging.warning('No FTS job ID to monitor yet')
 
     with open("task_process/transfers/fts_jobids_new.txt", "w+") as _jobids:
-        for line in jobs_ongoing:
+        for line in list(set(jobs_ongoing)):
             logging.info("Writing: %s", line)
             _jobids.write(line+"\n")
 
