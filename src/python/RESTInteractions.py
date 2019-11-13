@@ -112,6 +112,10 @@ class HTTPRequests(dict):
         as a string.
         """
         data = data or {}
+        if verb is 'GET' and isinstance(data,dict):
+            encode = True
+        else:
+            encode = False
         headers = {
                    "User-agent": "CRABClient/%s" % self['version'],
                    "Accept": "*/*",
@@ -125,8 +129,9 @@ class HTTPRequests(dict):
         #retries this up to self['retry'] times a range of exit codes
         for i in xrange(self['retry'] + 1):
             try:
-                response, datares = self['conn'].request(url, data, headers, verb=verb, doseq = True, ckey=self['key'], cert=self['cert'], \
-                                capath=caCertPath, verbose=self['verbose'])
+                response, datares = self['conn'].request(url, data, encode=encode, headers=headers, verb=verb, doseq = True,
+                                                         ckey=self['key'], cert=self['cert'], capath=caCertPath,
+                                                         verbose=self['verbose'])
             except Exception as ex:
                 #add here other temporary errors we need to retry
                 if (not retriableError(ex)) or (i == self['retry']):
