@@ -7,7 +7,6 @@ import time
 import urllib
 import pycurl
 import logging
-from urlparse import urlunparse
 from httplib import HTTPException
 
 from WMCore.Services.Requests import JSONRequests
@@ -123,7 +122,7 @@ class HTTPRequests(dict):
         url = 'https://' + self['host'] + uri
 
         #retries this up to self['retry'] times a range of exit codes
-        for i in xrange(self['retry'] + 1):
+        for i in range(self['retry'] + 1):
             try:
                 response, datares = self['conn'].request(url, data, encode=True, headers=headers, verb=verb, doseq = True,
                                                          ckey=self['key'], cert=self['cert'], capath=caCertPath,
@@ -142,26 +141,8 @@ class HTTPRequests(dict):
                 time.sleep(sleeptime) #sleeps 20s the first time, 40s the second time and so on
             else:
                 break
-
-        return self.decodeJson(datares), response.status, response.reason
-
-    def decodeJson(self, result):
-        """
-        decodeJson
-
-        decode the response result reveiced from the server
-        """
-        encoder = JSONRequests(idict={"pycurl" : True})
-        return encoder.decode(result)
-
-
-    def buildUrl(self, uri):
-        """
-        Prepares the remote URL
-        """
-        scheme = 'https'
-        netloc = '%s:%s' % (self['conn'].host, self['conn'].port)
-        return urlunparse([scheme, netloc, uri, '', '', ''])
+        result = JSONRequests(idict={"pycurl" : True}).decode(datares)
+        return result, response.status, response.reason
 
     @staticmethod
     def getCACertPath():
