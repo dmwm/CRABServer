@@ -157,6 +157,18 @@ then
   exit $EXIT_STATUS
 fi
 
+if [ $EXIT_STATUS -ne 0 ]
+then
+  echo "======== User Application failed (exit code =  $EXIT_STATUS) No stageout will be done"
+  echo "======== gWMS-CMSRunAnalysis.sh FINISHING at $(TZ=GMT date) on $(hostname) with (short) status $EXIT_STATUS ========"
+  echo "Local time: $(date)"
+  #set -x
+  echo "Short exit status: $EXIT_STATUS"
+  exit $EXIT_STATUS
+fi
+
+
+
 echo "======== python2.6 bootstrap for stageout at $(TZ=GMT date) STARTING ========"
 set -x
 ### Need python2.6 for stageout also
