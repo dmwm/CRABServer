@@ -15,7 +15,7 @@ export PATH="/data/srv/glidecondor/bin:/data/srv/glidecondor/sbin:/usr/local/bin
 export PYTHONPATH=/data/srv/glidecondor/lib/python:$PYTHONPATH
 export LD_LIBRARY_PATH=/data/srv/glidecondor/lib:/data/srv/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
 
-os_ver=$(lsb_release -rs|cut -d. -f1)
+os_ver=$(source /etc/os-release;echo $VERSION_ID)
 curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"
 libcurl_path="${curl_path}/lib"
 source ${curl_path}/etc/profile.d/init.sh

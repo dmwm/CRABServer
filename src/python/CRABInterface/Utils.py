@@ -7,7 +7,7 @@ from hashlib import sha1
 import cherrypy
 import pycurl
 import StringIO
-import cjson as json
+import json
 import threading
 
 from WMCore.WMFactory import WMFactory
@@ -114,7 +114,7 @@ def getCentralConfig(extconfigurl, mode):
             cherrypy.log(msg)
             raise ExecutionError("Internal issue when retrieving external confifuration from %s" % extconfigurl)
 
-    centralCfgFallback = json.decode(bbuf.getvalue())[mode]
+    centralCfgFallback = json.loads(bbuf.getvalue())[mode]
     return centralCfgFallback
 
 

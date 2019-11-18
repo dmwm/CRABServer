@@ -1,5 +1,5 @@
 from WMCore.REST.Server import RESTFrontPage
-import os, re, cjson
+import os, re
 
 class FrontPage(RESTFrontPage):
   """CRABServer front page.
