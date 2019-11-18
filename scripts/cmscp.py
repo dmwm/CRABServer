@@ -863,13 +863,15 @@ def main():
             msg  = "The transfer of output files flag in on,"
             msg += " but the job's HTCondor ClassAd attribute CRAB_localOutputFiles is empty,"
             msg += " indicating that the job doesn't produce any output file."
-            msg += " Turning off the transfer of output files flag."
+            msg += " Turning off the transfer of output files and logs flag."
             print(msg)
             transfer_outputs = False
+            transfer_logs = False
     else:
         if not transfer_outputs:
             msg  = "The user has specified to not transfer the output files."
-            msg += " No output files stageout (nor output files metadata upload) will be performed."
+            msg += " No output files or logs stageout (nor output files metadata upload) will be performed."
+            transfer_logs = False
             print(msg)
     ## If we don't have to transfer the log files or the output files, there is
     ## nothing to do in cmscp. So exit right here.
@@ -1168,10 +1170,11 @@ def main():
     ##--------------------------------------------------------------------------
 
     ## Define what are so far the conditions for doing the stageouts.
-    condition_logs_stageout = (cmscp_status['logs_archive']['return_code'] == 0)
     condition_outputs_stageout = (cmscp_status['outputs_exist']['return_code'] == 0 and \
                                   cmscp_status['outputs_in_job_report']['return_code'] == 0)
-    condition_stageout = (condition_logs_stageout or condition_outputs_stageout)
+    condition_logs_stageout = (cmscp_status['logs_archive']['return_code'] == 0) and \
+        condition_outputs_stageout            # do not upload logs w/o outputs
+    condition_stageout = condition_outputs_stageout
 
     ##--------------------------------------------------------------------------
     ## Start LOCAL STAGEOUT MANAGER INITIALIZATION
