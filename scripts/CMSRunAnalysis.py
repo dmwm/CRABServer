@@ -796,7 +796,6 @@ def AddPsetHash(report, scram):
     processing_history_re = re.compile("^Processing History:$")
     for outputMod in report['steps']['cmsRun']['output'].values():
         for fileInfo in outputMod:
-            # there's a typo in WMCore (ouput vs. output). We future proof in case it is fixed
             if not (fileInfo.get('output_module_class', '') == 'PoolOutputModule'):
                 continue
             if 'pfn' not in fileInfo:
