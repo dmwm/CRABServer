@@ -463,12 +463,13 @@ class DagmanCreator(TaskAction.TaskAction):
         """
         Create the submit file. This is reused by all jobs in the task; differences
         between the jobs are taken care of in the makeDagSpecs.
-        Any key defined in the 'info' dictionary before the call to transform_strings
+        Any key defined in the dictionary passed to transform_strings
         is deleted unless accounted for in the transform_strings method.
         """
 
         if os.path.exists("Job.submit"):
-            return {}
+            info = {'jobcount': int(task['jobcount'])}
+            return info
 
         # From here on out, we convert from tm_* names to the DataWorkflow names
         info = dict(task)
