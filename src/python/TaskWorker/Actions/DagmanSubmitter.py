@@ -158,7 +158,6 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
     """
 
     stdmaxjobruntime = 2750
-    stdmaxmemory = 2500
     runtime = task[cmd+'_maxjobruntime']
     memory = task[cmd+'_maxmemory']
     ncores = task[cmd+'_numcores']
@@ -176,9 +175,9 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
         msg += " for a %d cores job.\n" % ncores
         logger.error(msg)
         raise TaskWorkerException(msg)
-    if memory is not None and memory > stdmaxmemory:
+    if memory is not None and memory > MAX_MEMORY_PER_CORE:
         if ncores is not None and ncores < 2:
-            msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (memory, stdmaxmemory)
+            msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (memory, MAX_MEMORY_PER_CORE)
             msg += " Jobs may not find a site where to run and stay idle forever."
             logger.warning(msg)
             warningUploader(msg, task['user_proxy'], task['tm_taskname'])
