@@ -102,6 +102,7 @@ CRAB_JobArch = %(jobarch_flatten)s
 CRAB_Archive = %(cachefilename_flatten)s
 CRAB_Id = $(count)
 +CRAB_Id = "$(count)"
++CRAB_JobCount = %(jobcount)d
 +CRAB_OutTempLFNDir = "%(temp_dest)s"
 +CRAB_OutLFNDir = "%(output_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
@@ -270,7 +271,7 @@ def transform_strings(data):
     for var in 'accounting_group', 'accounting_group_user':
         info[var] = data[var]
 
-    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'publishgroupname':
+    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'publishgroupname', 'jobcount':
         info[var] = int(data[var])
 
     for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', 'tfileoutfiles', 'edmoutfiles':
@@ -460,12 +461,15 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def makeJobSubmit(self, task):
         """
-        Create the submit file.  This is reused by all jobs in the task; differences
+        Create the submit file. This is reused by all jobs in the task; differences
         between the jobs are taken care of in the makeDagSpecs.
+        Any key defined in the dictionary passed to transform_strings
+        is deleted unless accounted for in the transform_strings method.
         """
 
         if os.path.exists("Job.submit"):
-            return {}
+            info = {'jobcount': int(task['jobcount'])}
+            return info
 
         # From here on out, we convert from tm_* names to the DataWorkflow names
         info = dict(task)
@@ -771,8 +775,6 @@ class DagmanCreator(TaskAction.TaskAction):
             elif stage == 'tail':
                 kwargs['task']['max_runtime'] = -1
 
-        info = self.makeJobSubmit(kwargs['task'])
-
         outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
 
         os.chmod("CMSRunAnalysis.sh", 0o755)
@@ -1044,7 +1046,9 @@ class DagmanCreator(TaskAction.TaskAction):
         with open(name, "w") as fd:
             fd.write(dag)
 
-        info["jobcount"] = len(dagSpecs)
+        kwargs['task']['jobcount'] = len(dagSpecs)
+
+        info = self.makeJobSubmit(kwargs['task'])
 
         maxidle = getattr(self.config.TaskWorker, 'maxIdle', MAX_IDLE_JOBS)
         if maxidle == -1:

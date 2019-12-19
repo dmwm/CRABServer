@@ -138,6 +138,10 @@ def parseJobLog(fp, nodes, nodeMap):
                 nodes[node]['StartTimes'].append(-1)
                 if not nodes[node]['RecordedSite']:
                     nodes[node]['SiteHistory'].append("Unknown")
+            if nodes[node]['State'] == 'running':
+                nodes[node]['EndTimes'].append(eventtime)
+                # nodes[node]['State'] can be 'running' only if an ExcuteEvent was found, so StartTime must be defined
+                nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
             nodes[node]['State'] = 'killed'
             insertCpu(event, nodes[node])
         elif event['MyType'] == 'JobHeldEvent':

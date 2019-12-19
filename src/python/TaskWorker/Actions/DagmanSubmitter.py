@@ -18,6 +18,7 @@ import HTCondorLocator
 
 from ServerUtilities import FEEDBACKMAIL
 from ServerUtilities import TASKLIFETIME
+from ServerUtilities import MAX_MEMORY_PER_CORE, MAX_MEMORY_SINGLE_CORE
 
 import TaskWorker.DataObjects.Result as Result
 import TaskWorker.Actions.TaskAction as TaskAction
@@ -157,10 +158,11 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
     """
 
     stdmaxjobruntime = 2750
-    stdmaxmemory = 2500
-    absmaxmemory = 10000
     runtime = task[cmd+'_maxjobruntime']
     memory = task[cmd+'_maxmemory']
+    ncores = task[cmd+'_numcores']
+    if ncores is None: ncores = 1
+    absmaxmemory = max(MAX_MEMORY_SINGLE_CORE, ncores*MAX_MEMORY_PER_CORE)
     if runtime is not None and runtime > stdmaxjobruntime:
         msg = "Task requests %s minutes of runtime, but only %s minutes are guaranteed to be available." % (runtime, stdmaxjobruntime)
         msg += " Jobs may not find a site where to run."
@@ -169,13 +171,13 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
         if info is not None: info['tm_maxjobruntime'] = str(stdmaxjobruntime)
         warningUploader(msg, task['user_proxy'], task['tm_taskname'])
     if memory is not None and memory > absmaxmemory:
-            msg = "Task requests %s MB of memory, above the allowed maximum of 10GB." % (memory)
-            msg += " Maybe you misstyped ?"
-            logger.error(msg)
-            raise TaskWorkerException(msg)
-    if memory is not None and memory > stdmaxmemory:
-        if task[cmd+'_numcores'] is not None and task[cmd+'_numcores'] < 2:
-            msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (memory, stdmaxmemory)
+        msg = "Task requests %s MB of memory, above the allowed maximum of %s" % (memory, absmaxmemory)
+        msg += " for a %d cores job.\n" % ncores
+        logger.error(msg)
+        raise TaskWorkerException(msg)
+    if memory is not None and memory > MAX_MEMORY_PER_CORE:
+        if ncores is not None and ncores < 2:
+            msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (memory, MAX_MEMORY_PER_CORE)
             msg += " Jobs may not find a site where to run and stay idle forever."
             logger.warning(msg)
             warningUploader(msg, task['user_proxy'], task['tm_taskname'])
