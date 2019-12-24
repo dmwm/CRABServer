@@ -32,6 +32,9 @@ FILE_MEMORY_LIMIT = 512*1024
 # Otherwise it uses these values.
 MAX_WALLTIME = 21*60*60 + 30*60
 MAX_MEMORY = 2*1024
+# see https://github.com/dmwm/CRABServer/issues/5995
+MAX_MEMORY_PER_CORE = 2500
+MAX_MEMORY_SINGLE_CORE = 5000
 MAX_DISK_SPACE = 20000000 # Disk usage is not used from .job.ad as CRAB3 is not seeting it. 20GB is max.
 
 MAX_IDLE_JOBS = 1000
