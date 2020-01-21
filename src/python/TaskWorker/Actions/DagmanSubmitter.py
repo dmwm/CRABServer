@@ -172,7 +172,7 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
         warningUploader(msg, task['user_proxy'], task['tm_taskname'])
     if memory is not None and memory > absmaxmemory:
         msg = "Task requests %s MB of memory, above the allowed maximum of %s" % (memory, absmaxmemory)
-        msg += " for a %d cores job.\n" % ncores
+        msg += " for a %d core(s) job.\n" % ncores
         logger.error(msg)
         raise TaskWorkerException(msg)
     if memory is not None and memory > MAX_MEMORY_PER_CORE:
