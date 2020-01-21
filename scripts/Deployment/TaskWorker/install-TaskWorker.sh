@@ -6,12 +6,12 @@ env
         echo starting
         cd /data/srv/TaskManager
 
-        pkill -f TaskWorker
+        #pkill -f TaskWorker
 
         set -x
         echo 'Setting enviroment'
 
-        export RELEASE=3.3.1909.rc1
+        export RELEASE=3.3.2002  # edit as needed
 
         export MYTESTAREA=/data/srv/TaskManager/$RELEASE
         export SCRAM_ARCH=slc7_amd64_gcc630
@@ -27,9 +27,9 @@ env
         wget -O $MYTESTAREA/bootstrap.sh http://cmsrep.cern.ch/cmssw/repos/bootstrap.sh
         sh $MYTESTAREA/bootstrap.sh -architecture $SCRAM_ARCH -path $MYTESTAREA -repository $REPO setup
 
-	$RELEASE/common/cmspkg -a $SCRAM_ARCH upgrade
-	$RELEASE/common/cmspkg -a $SCRAM_ARCH update
-	$RELEASE/common/cmspkg -a $SCRAM_ARCH install cms+crabtaskworker+$RELEASE
+        $RELEASE/common/cmspkg -a $SCRAM_ARCH upgrade
+        $RELEASE/common/cmspkg -a $SCRAM_ARCH update
+        $RELEASE/common/cmspkg -a $SCRAM_ARCH install cms+crabtaskworker+$RELEASE
 
         set +x
         echo 'Creating symlink'
@@ -37,7 +37,7 @@ env
         ln -s $RELEASE current
         cd $MYTESTAREA
 
-        echo 'Make config file and source env and start.sh'
+        echo 'Make config file and stop + start '
 
 # else
 #         echo 'Please change to CRAB3 user, TW cannot be installed by root'
