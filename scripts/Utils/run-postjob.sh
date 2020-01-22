@@ -56,7 +56,7 @@ then
 fi
 
 # grab the proxy
-export X509_USER_PROXY=`ls|egrep  [a-z,0-9]{40}`
+export X509_USER_PROXY=`pwd`/`ls|egrep  [a-z,0-9]{40}`
 #voms-proxy-info
 
 # grab args from the dagman config

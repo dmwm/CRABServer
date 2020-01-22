@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# pylint: disable=line-too-long
 """
 
 """
@@ -7,7 +8,6 @@ import json
 import logging
 import threading
 import os
-import time
 import subprocess
 
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
@@ -15,57 +15,23 @@ from WMCore.Storage.TrivialFileCatalog import readTFC
 import fts3.rest.client.easy as fts3
 from datetime import timedelta
 from RESTInteractions import HTTPRequests
-from ServerUtilities import  encodeRequest
+from httplib import HTTPException
+from ServerUtilities import encodeRequest
 
 if not os.path.exists('task_process/transfers'):
     os.makedirs('task_process/transfers')
 
 logging.basicConfig(
     filename='task_process/transfers/transfer_inject.log',
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s[%(relativeCreated)6d]%(threadName)s: %(message)s'
 )
 
-if os.path.exists('task_process/rest_filetransfers.txt'): 
+if os.path.exists('task_process/rest_filetransfers.txt'):
     with open("task_process/rest_filetransfers.txt", "r") as _rest:
         rest_filetransfers = _rest.readline().split('\n')[0]
         proxy = os.getcwd() + "/" + _rest.readline()
         print("Proxy: %s", proxy)
-
-
-def execute_command(command, logger, timeout):
-    """
-    _execute_command_
-    Funtion to manage commands.
-    """
-
-    stdout, stderr, rc = None, None, 99999
-    proc = subprocess.Popen(
-            command, shell=True, cwd=os.environ['PWD'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            stdin=subprocess.PIPE,
-    )
-
-    t_beginning = time.time()
-    seconds_passed = 0
-    while True:
-        if proc.poll() is not None:
-            break
-        seconds_passed = time.time() - t_beginning
-        if timeout and seconds_passed > timeout:
-            proc.terminate()
-            logger.error('Timeout in %s execution.' % command )
-            return stdout, rc
-
-        time.sleep(0.1)
-
-    stdout, stderr = proc.communicate()
-    rc = proc.returncode
-
-    logger.debug('Executing : \n command : %s\n output : %s\n error: %s\n retcode : %s' % (command, stdout, stderr, rc))
-
-    return stdout, rc
 
 
 def get_tfc_rules(phedex, site):
@@ -116,7 +82,7 @@ def mark_transferred(ids):
 
         oracleDB.post('/filetransfers',
                       data=encodeRequest(data))
-        logging.debug("Marked good %s", ids)
+        logging.info("Marked good %s", ids)
     except Exception:
         logging.exception("Error updating documents")
         return 1
@@ -144,23 +110,33 @@ def mark_failed(ids, failures_reasons):
 
         oracleDB.post('/filetransfers',
                       data=encodeRequest(data))
-        logging.debug("Marked failed %s", ids)
+        logging.info("Marked failed %s", ids)
     except Exception:
         logging.exception("Error updating documents")
         return 1
     return 0
 
 
-def remove_files(pfn):
+def remove_files_in_bkg(pfns, logFile, timeout=None):
+    """
+    fork a process to remove the indicated PFN's without
+    wainting for it to complete and w/o any error checking
+    gfal-rm output is added to logFile
+    A timeout is applied on the gfal-rm command anyhow as a sanity measure
+        against runaway processes, we accept that some file may not be deleted.
+    :param pfns: list of SURL's
+    :param logFile: name of the logFile
+    :param timeout: timeout as a string valid as arg. for linux timeout command, default is 4 hours
+    :return: none
+    """
 
-    command = 'env -i X509_USER_PROXY=%s gfal-rm -v -t 180 %s'  % \
-              (proxy, pfn)
-    logging.debug("Running remove command %s" % command)
-    stdout, rc = execute_command(command, logging, 3600)
-    if rc:
-        logging.info("Deletion command failed with output %s" % (stdout))
-    else:
-        logging.info("File Deleted.")
+    if not timeout:
+        timeout = '%dm' % (len(pfns) * 3)    # default is 3minutes per file to be removed
+    command = 'env -i X509_USER_PROXY=%s timeout %s gfal-rm -v -t 180 %s >> %s 2>&1 &'  % \
+              (proxy, timeout, pfns, logFile)
+    logging.debug("Running remove command %s", command)
+    subprocess.call(command, shell=True)
+
     return
 
 
@@ -204,9 +180,15 @@ class check_states_thread(threading.Thread):
 
         try:
             status = self.fts.get("jobs/"+self.jobid)[0]
-        except Exception as ex:
+        except HTTPException as hte:
             self.log.exception("failed to retrieve status for %s " % self.jobid)
-            self.jobs_ongoing.append(self.jobid)
+            self.log.exception("httpExeption headers %s " % hte.headers)
+            if hte.status == 404:
+                self.log.exception("%s not found in FTS3 DB" % self.jobid)
+                self.jobs_ongoing.remove(self.jobid)
+            return
+        except Exception:
+            self.log.exception("failed to retrieve status for %s " % self.jobid)
             self.threadLock.release()
             return
 
@@ -219,6 +201,7 @@ class check_states_thread(threading.Thread):
             self.done_id[self.jobid] = []
             self.failed_id[self.jobid] = []
             self.failed_reasons[self.jobid] = []
+            files_to_remove = []
 
             for file_status in file_statuses:
                 _id = file_status['file_metadata']['oracleId']
@@ -234,28 +217,41 @@ class check_states_thread(threading.Thread):
                     else:
                         self.log.exception('Failure reason not found')
                         self.failed_reasons[self.jobid].append('unable to get failure reason')
-                try:
-                    remove_files(file_status['source_surl'])
-                except:
-                    self.log.exception('Failed to remove temp files')
+                files_to_remove.append(file_status['source_surl'])
+            try:
+                list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
+                for f in files_to_remove:
+                    list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
+                removeLogFile = './task_process/transfers/remove_files.log'
+                remove_files_in_bkg(list_of_surls, removeLogFile)
+            except Exception:
+                self.log.exception('Failed to remove temp files')
 
         self.threadLock.release()
 
 
 class submit_thread(threading.Thread):
-    """
+    """Thread for actual FTS job submission
 
     """
-    def __init__(self, threadLock, log, context, files, source, jobids, toUpdate):
+
+    def __init__(self, threadLock, log, ftsContext, files, source, jobids, toUpdate):
         """
-
-        :param threadLock:
-        :param log:
-        :param context:
-        :param files:
-        :param source:
-        :param jobids:
-        :param toUpdate:
+        :param threadLock: lock for the thread
+        :param log: log object
+        :param ftsContext: FTS context
+        :param files: [
+               [source_pfn,
+                dest_pfn,
+                file oracle id,
+                source site,
+                username,
+                taskname,
+                file size],
+               ...]
+        :param source: source site name
+        :param jobids: collect the list of job ids when submitted
+        :param toUpdate: list of oracle ids to update
         """
         threading.Thread.__init__(self)
         self.log = log
@@ -263,7 +259,7 @@ class submit_thread(threading.Thread):
         self.files = files
         self.source = source
         self.jobids = jobids
-        self.context = context
+        self.ftsContext = ftsContext
         self.toUpdate = toUpdate
 
     def run(self):
@@ -279,6 +275,7 @@ class submit_thread(threading.Thread):
         for lfn in self.files:
             transfers.append(fts3.new_transfer(lfn[0],
                                                lfn[1],
+                                               filesize=lfn[6],
                                                metadata={'oracleId': lfn[2]}
                                                )
                              )
@@ -307,7 +304,7 @@ class submit_thread(threading.Thread):
                            # timeout = 1300
                            )
 
-        jobid = fts3.submit(self.context, job)
+        jobid = fts3.submit(self.ftsContext, job)
 
         self.jobids.append(jobid)
 
@@ -326,7 +323,7 @@ class submit_thread(threading.Thread):
         self.threadLock.release()
 
 
-def submit(phedex, context, toTrans):
+def submit(phedex, ftsContext, toTrans):
     """
     submit tranfer jobs
 
@@ -334,8 +331,15 @@ def submit(phedex, context, toTrans):
     - prepare jobs chunks of max 200 transfers
     - submit fts job
 
-    :param context: fts client context
-    :param toTrans: [source pfn, destination pfn, oracle file id, source site]
+    :param ftsContext: fts client ftsContext
+    :param toTrans: [[source pfn,
+                      destination pfn,
+                      oracle file id,
+                      source site,
+                      destination,
+                      username,
+                      taskname,
+                      filesize, checksum],....]
     :return: list of jobids submitted
     """
     threadLock = threading.Lock()
@@ -352,6 +356,8 @@ def submit(phedex, context, toTrans):
     for source in sources:
 
         ids = [x[2] for x in toTrans if x[3] == source]
+        sizes = [x[7] for x in toTrans if x[3] == source]
+        checksums = [x[8] for x in toTrans if x[3] == source]
         username = toTrans[0][5]
         taskname = toTrans[0][6]
         src_lfns = [x[0] for x in toTrans if x[3] == source]
@@ -383,10 +389,10 @@ def submit(phedex, context, toTrans):
         source_pfns = sorted_source_pfns
         dest_pfns = sorted_dest_pfns
 
-        tx_from_source = [[x[0], x[1], x[2], source, username, taskname] for x in zip(source_pfns, dest_pfns, ids)] 
+        tx_from_source = [[x[0], x[1], x[2], source, username, taskname, x[3], x[4]['adler32'].rjust(8,'0')] for x in zip(source_pfns, dest_pfns, ids, sizes, checksums)]
 
         for files in chunks(tx_from_source, 200):
-            thread = submit_thread(threadLock, logging, context, files, source, jobids, to_update)
+            thread = submit_thread(threadLock, logging, ftsContext, files, source, jobids, to_update)
             thread.start()
             threads.append(thread)
 
@@ -401,16 +407,18 @@ def submit(phedex, context, toTrans):
     return jobids
 
 
-def perform_transfers(inputFile, lastLine, _lastFile, context, phedex):
+def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
     """
     get transfers and update last read line number
-    :param inputFile:
-    :param lastLine:
+
+    :param inputFile: path to the file with list of files to be transferred
+    :param lastLine: number of the last line processed
+    :param _last: path to the file keeping track of the last read line
+    :param ftsContext: FTS context
+    :param phedex: phedex client object
     :return:
     """
 
-    #threadLock = threading.Lock()
-    #threads = []
     transfers = []
     logging.info("starting from line: %s", lastLine)
 
@@ -419,7 +427,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, context, phedex):
             try:
                 lastLine += 1
                 doc = json.loads(_data)
-            except:
+            except Exception:
                 continue
             transfers.append([doc["source_lfn"],
                               doc["destination_lfn"],
@@ -427,11 +435,13 @@ def perform_transfers(inputFile, lastLine, _lastFile, context, phedex):
                               doc["source"],
                               doc["destination"],
                               doc["username"],
-                              doc["taskname"]])
+                              doc["taskname"],
+                              doc["filesize"],
+                              doc["checksums"]])
 
         jobids = []
         if len(transfers) > 0:
-            jobids = submit(phedex, context, transfers)
+            jobids = submit(phedex, ftsContext, transfers)
 
             for jobid in jobids:
                 logging.info("Monitor link: https://fts3.cern.ch:8449/fts3/ftsmon/#/job/"+jobid)
@@ -460,7 +470,7 @@ def state_manager(fts):
     if os.path.exists('task_process/transfers/fts_jobids.txt'):
         with open("task_process/transfers/fts_jobids.txt", "r") as _jobids:
             lines = _jobids.readlines()
-            for line in lines:
+            for line in list(set(lines)):
                 if line:
                     jobid = line.split('\n')[0]
                 if jobid:
@@ -473,7 +483,7 @@ def state_manager(fts):
             t.join()
 
         try:
-            for jobID, _ in done_id.iteritems():
+            for jobID, _ in done_id.items():
                 logging.info('Marking job %s files done and %s files failed for job %s', len(done_id[jobID]), len(failed_id[jobID]), jobID)
 
                 if len(done_id[jobID]) > 0:
@@ -496,7 +506,7 @@ def state_manager(fts):
         logging.warning('No FTS job ID to monitor yet')
 
     with open("task_process/transfers/fts_jobids_new.txt", "w+") as _jobids:
-        for line in jobs_ongoing:
+        for line in list(set(jobs_ongoing)):
             logging.info("Writing: %s", line)
             _jobids.write(line+"\n")
 
@@ -505,7 +515,7 @@ def state_manager(fts):
     return jobs_ongoing
 
 
-def submission_manager(phedex, context):
+def submission_manager(phedex, ftsContext):
     """
 
     """
@@ -519,7 +529,7 @@ def submission_manager(phedex, context):
 
     # TODO: if the following fails check not to leave a corrupted file
     with open("task_process/transfers/last_transfer_new.txt", "w+") as _last:
-        _, jobids = perform_transfers("task_process/transfers.txt", last_line, _last, context, phedex)
+        _, jobids = perform_transfers("task_process/transfers.txt", last_line, _last, ftsContext, phedex)
         _last.close()
         os.rename("task_process/transfers/last_transfer_new.txt", "task_process/transfers/last_transfer.txt")
 
@@ -550,20 +560,26 @@ def algorithm():
                        proxy,
                        proxy)
 
-    context = fts3.Context('https://fts3.cern.ch:8446', proxy, proxy, verify=True)
-    logging.debug("Delegating proxy: "+fts3.delegate(context, lifetime=timedelta(hours=48), force=False))
+    ftsContext = fts3.Context('https://fts3.cern.ch:8446', proxy, proxy, verify=True)
+    logging.debug("Delegating proxy to FTS: "+fts3.delegate(ftsContext, lifetime=timedelta(hours=48), force=False))
+
+    log_phedex = logging.getLogger('phedex')
+
+    # Uncomment the 2 lines below if you want to enable phedex logging 
+    # log_phedex.addHandler(logging.FileHandler('mylogfile.log', mode='a', encoding=None, delay=False))
+    # log_phedex.setLevel(logging.INFO)
 
     try:
-        phedex = PhEDEx(responseType='xml',
-                        httpDict={'key': proxy, 'cert': proxy, 'pycurl':True})
+        phedex = PhEDEx(responseType='xml', logger=log_phedex,
+                        httpDict={'key': proxy, 'cert': proxy, 'pycurl': True})
     except Exception as e:
         logging.exception('PhEDEx exception: %s', e)
         return
 
     jobs_ongoing = state_manager(fts)
-    new_jobs = submission_manager(phedex, context)
+    new_jobs = submission_manager(phedex, ftsContext)
 
-    logging.debug("Transfer jobs ongoing: %s, %s ", jobs_ongoing, new_jobs)
+    logging.info("Transfer jobs ongoing: %s, new: %s ", jobs_ongoing, new_jobs)
 
     return
 
@@ -573,5 +589,4 @@ if __name__ == "__main__":
         algorithm()
     except Exception:
         logging.exception("error during main loop")
-    logging.debug("transfer_inject.py exiting")
-
+    logging.info("transfer_inject.py exiting")

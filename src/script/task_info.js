@@ -543,8 +543,8 @@ $(document).ready(function() {
     function displayMainPage(errHandler) {
         if (userWebDir !== "" && inputTaskName !== "" && inputTaskName !== undefined) {
 
-            var dashboardUrl = "http://dashb-cms-job.cern.ch/dashboard/templates/" +
-                "task-analysis/#user=" + username + "&table=Mains&pattern=" + inputTaskName;
+            var monitDashboardUrl = "https://monit-grafana.cern.ch/d/cmsTMDetail/cms-task-monitoring-task-view?orgId=11" +
+                "&var-user=" + username + "&var-task=" + inputTaskName;
 
             var dasInputUrl = "https://cmsweb.cern.ch/das/request?view=list&limit=50&instance=" + dbsInstance + "&input=" + inputDataset;
 
@@ -555,7 +555,7 @@ $(document).ready(function() {
                 $("#main-das-link-output").text("DAS Output");
             }
 
-            $("#main-dashboard-link").attr("href", dashboardUrl);
+            $("#main-monit-dashboard-link").attr("href", monitDashboardUrl);
 
             webDirUrlToDisplay = "";
             if (proxiedWebDirUrl === "") {
@@ -862,7 +862,7 @@ $(document).ready(function() {
     function loadOtherData() {
         loadGlobalDataFromTaskInfo();
         queryWebDirProxyApi();
-        // displayConfigAndPSet(handleConfigPSetErr);
+        displayConfigAndPSet(handleConfigPSetErr);
         displayTaskWorkerLog(handleTaskWorkerLogErr);
         displayUploadLog(handleUploadLogErr);
         //displayTransferInfo(handleTransferInfoErr);
@@ -871,7 +871,7 @@ $(document).ready(function() {
     }
 
     function clearPreviousContent() {
-        $("#main-dashboard-link").attr("href", "#");
+        $("#main-monit-dashboard-link").attr("href", "#");
         $("#main-webdir-link").attr("href", "#");
         $("#main-das-link-input").attr("href", "#");
 

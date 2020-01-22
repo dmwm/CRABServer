@@ -1,4 +1,8 @@
 #!/usr/bin/python
+"""
+VERSION OF CACHE_STATUS USING HTCONDOR JobEventLog API
+THIS REQUIRES HTCONDOR 8.9.3 OR ABOVE
+"""
 from __future__ import print_function, division
 import re
 import time
@@ -10,11 +14,8 @@ import classad
 import glob
 import copy
 from shutil import move
-# Need to import HTCondorUtils from a parent directory, not easy when the files are not in python packages.
-# Solution by ajay, SO: http://stackoverflow.com/questions/11536764
-# /attempted-relative-import-in-non-package-even-with-init-py/27876800#comment28841658_19190695
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import HTCondorUtils
+import pickle
+import htcondor
 
 logging.basicConfig(filename='task_process/cache_status.log', level=logging.DEBUG)
 
@@ -33,6 +34,7 @@ NODE_DEFAULTS = {
 }
 
 STATUS_CACHE_FILE = "task_process/status_cache.txt"
+LOG_PARSING_POINTERS_DIR = "task_process/jel_pickles/"
 FJR_PARSE_RES_FILE = "task_process/fjr_parse_results.txt"
 
 #
@@ -62,9 +64,12 @@ def insertCpu(event, info):
 nodeNameRe = re.compile("DAG Node: Job(\d+(?:-\d+)?)")
 nodeName2Re = re.compile("Job(\d+(?:-\d+)?)")
 
-def parseJobLog(fp, nodes, nodeMap):
+# this now takes as input an htcondor.JobEventLog object
+# which as of HTCondor 8.9 can be saved/restored with memory of
+# where it had reached in processing the job log file
+def parseJobLog(jel, nodes, nodeMap):
     count = 0
-    for event in HTCondorUtils.readEvents(fp):
+    for event in jel.events(0):
         count += 1
         eventtime = time.mktime(time.strptime(event['EventTime'], "%Y-%m-%dT%H:%M:%S"))
         if event['MyType'] == 'SubmitEvent':
@@ -138,10 +143,6 @@ def parseJobLog(fp, nodes, nodeMap):
                 nodes[node]['StartTimes'].append(-1)
                 if not nodes[node]['RecordedSite']:
                     nodes[node]['SiteHistory'].append("Unknown")
-            if nodes[node]['State'] == 'running':
-                nodes[node]['EndTimes'].append(eventtime)
-                # nodes[node]['State'] can be 'running' only if an ExcuteEvent was found, so StartTime must be defined
-                nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
             nodes[node]['State'] = 'killed'
             insertCpu(event, nodes[node])
         elif event['MyType'] == 'JobHeldEvent':
@@ -275,31 +276,42 @@ def parseNodeStateV2(fp, nodes, level):
 
 def storeNodesInfoInFile():
     # Open cache file and get the location until which the jobs_log was parsed last time
+    jobLogCheckpoint = 'None'
     try:
         if os.path.exists(STATUS_CACHE_FILE) and os.stat(STATUS_CACHE_FILE).st_size > 0:
             logging.debug("cache file found, opening and reading")
             nodesStorage = open(STATUS_CACHE_FILE, "r")
 
-            jobLogCheckpoint = int(nodesStorage.readline())
+            jobLogCheckpoint = nodesStorage.readline().strip()
             fjrParseResCheckpoint = int(nodesStorage.readline())
             nodes = ast.literal_eval(nodesStorage.readline())
             nodeMap = ast.literal_eval(nodesStorage.readline())
             nodesStorage.close()
         else:
             logging.debug("cache file not found, creating")
-            jobLogCheckpoint = 0
+            jobLogCheckpoint = 'None'
             fjrParseResCheckpoint = 0
             nodes = {}
             nodeMap = {}
     except Exception:
         logging.exception("error during status_cache handling")
-    jobsLog = open("job_log", "r")
 
-    jobsLog.seek(jobLogCheckpoint)
+    if jobLogCheckpoint is not 'None':
+        with open((LOG_PARSING_POINTERS_DIR+ jobLogCheckpoint),'r') as f:
+            jel=pickle.load(f)
+    else:
+        jel = htcondor.JobEventLog('job_log')
+    #jobsLog = open("job_log", "r")
+    #jobsLog.seek(jobLogCheckpoint)
 
-    parseJobLog(jobsLog, nodes, nodeMap)
-    newJobLogCheckpoint = jobsLog.tell()
-    jobsLog.close()
+    parseJobLog(jel, nodes, nodeMap)
+    # save jel object in a pickle fine made unique by a timestamp
+    newJelPickleName = 'jel-%d.pkl' % int(time.time())
+    if not os.path.exists(LOG_PARSING_POINTERS_DIR):
+        os.mkdir(LOG_PARSING_POINTERS_DIR)
+    with open ((LOG_PARSING_POINTERS_DIR+newJelPickleName),'w') as f:
+        pickle.dump(jel, f)
+    newJobLogCheckpoint = newJelPickleName
 
     for fn in glob.glob("node_state*"):
         level = re.match(r'(\w+)(?:.(\w+))?', fn).group(2)

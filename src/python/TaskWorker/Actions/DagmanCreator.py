@@ -23,7 +23,7 @@ import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
 import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
-from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE
+from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS
 from CMSGroupMapper import get_egroup_users
 
 import WMCore.WMSpec.WMTask
@@ -72,6 +72,8 @@ JOB_SUBMIT = \
 +CRAB_JobSW = %(jobsw)s
 +CRAB_JobArch = %(jobarch)s
 +CRAB_DBSURL = %(dbsurl)s
++CRAB_PostJobStatus = "NOT RUN"
++CRAB_PostJobLastUpdate = 0
 +CRAB_PublishName = %(publishname)s
 +CRAB_PublishGroupName = %(publishgroupname)s
 +CRAB_Publish = %(publication)s
@@ -100,6 +102,7 @@ CRAB_JobArch = %(jobarch_flatten)s
 CRAB_Archive = %(cachefilename_flatten)s
 CRAB_Id = $(count)
 +CRAB_Id = "$(count)"
++CRAB_JobCount = %(jobcount)d
 +CRAB_OutTempLFNDir = "%(temp_dest)s"
 +CRAB_OutLFNDir = "%(output_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
@@ -132,6 +135,9 @@ job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, Rem
 # This allows us to return stdout to users when they hit memory limits (which triggers PeriodicRemove).
 WhenToTransferOutput = ON_EXIT_OR_EVICT
 +SpoolOnEvict = false
+
+# Keep job in the queue upon completion long enough for the postJob to run, allowing the monitoring script to fetch the postJob status and job exit-code updated by the postJob
+LeaveJobInQueue = ifThenElse((JobStatus=?=4 || JobStatus=?=3) && (time() - EnteredCurrentStatus < 30 * 60*60), true, false)
 
 universe = vanilla
 Executable = gWMS-CMSRunAnalysis.sh
@@ -265,7 +271,7 @@ def transform_strings(data):
     for var in 'accounting_group', 'accounting_group_user':
         info[var] = data[var]
 
-    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'publishgroupname':
+    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'publishgroupname', 'jobcount':
         info[var] = int(data[var])
 
     for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', 'tfileoutfiles', 'edmoutfiles':
@@ -413,7 +419,7 @@ class DagmanCreator(TaskAction.TaskAction):
         return task['tm_activity']
 
     def isHammerCloud(self, task):
-        if task['tm_activity'] and 'HC' in task['tm_activity']:
+        if task['tm_activity'] and 'HC' in task['tm_activity'].upper():
             return True
         else:
             return False
@@ -455,12 +461,15 @@ class DagmanCreator(TaskAction.TaskAction):
 
     def makeJobSubmit(self, task):
         """
-        Create the submit file.  This is reused by all jobs in the task; differences
+        Create the submit file. This is reused by all jobs in the task; differences
         between the jobs are taken care of in the makeDagSpecs.
+        Any key defined in the dictionary passed to transform_strings
+        is deleted unless accounted for in the transform_strings method.
         """
 
         if os.path.exists("Job.submit"):
-            return {}
+            info = {'jobcount': int(task['jobcount'])}
+            return info
 
         # From here on out, we convert from tm_* names to the DataWorkflow names
         info = dict(task)
@@ -489,7 +498,7 @@ class DagmanCreator(TaskAction.TaskAction):
         info['publication'] = 1 if info['tm_publication'] == 'T' else 0
         info['userdn'] = info['tm_user_dn']
         info['requestname'] = task['tm_taskname'].replace('"', '')
-        info['savelogsflag'] = 1 if info['tm_save_logs'] == 'T' else 0
+        info['savelogsflag'] = 1 if info['tm_save_logs'] == 'T' else 0 # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
         info['blacklistT1'] = 0
         info['siteblacklist'] = task['tm_site_blacklist']
         info['sitewhitelist'] = task['tm_site_whitelist']
@@ -518,7 +527,7 @@ class DagmanCreator(TaskAction.TaskAction):
         # TODO: pass through these correctly.
         info['runs'] = []
         info['lumis'] = []
-        info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0
+        info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0 # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
         egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
         if egroups and info['userhn'] in self.getHighPrioUsers(info['user_proxy'], info['workflow'], egroups):
             info['accounting_group'] = 'highprio'
@@ -679,7 +688,7 @@ class DagmanCreator(TaskAction.TaskAction):
             with a dictionary for each job. The dictionary key/value pairs are the arguments of gWMS-CMSRunAnalysis.sh
             N.B.: in the JDL: "Executable = gWMS-CMSRunAnalysis.sh" and "Arguments =  $(CRAB_Archive) --sourceURL=$(CRAB_ISB) ..."
             where each argument of each job is set in "input_args.json".
-            Also, this prepareLocal method prepare a single "InputFiles.taqr.gz" file with all the inputs files moved
+            Also, this prepareLocal method prepare a single "InputFiles.tar.gz" file with all the inputs files moved
             from the TW to the schedd.
             This is used by the client preparelocal command.
         """
@@ -765,8 +774,6 @@ class DagmanCreator(TaskAction.TaskAction):
                 kwargs['task']['tm_maxjobruntime'] = min(runtime + overhead, kwargs['task']['tm_maxjobruntime'])
             elif stage == 'tail':
                 kwargs['task']['max_runtime'] = -1
-
-        info = self.makeJobSubmit(kwargs['task'])
 
         outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
 
@@ -1039,12 +1046,22 @@ class DagmanCreator(TaskAction.TaskAction):
         with open(name, "w") as fd:
             fd.write(dag)
 
-        info["jobcount"] = len(dagSpecs)
-        maxpost = getattr(self.config.TaskWorker, 'maxPost', 20)
+        kwargs['task']['jobcount'] = len(dagSpecs)
+
+        info = self.makeJobSubmit(kwargs['task'])
+
+        maxidle = getattr(self.config.TaskWorker, 'maxIdle', MAX_IDLE_JOBS)
+        if maxidle == -1:
+            maxidle = info['jobcount']
+        elif maxidle == 0:
+            maxidle = int(max(MAX_IDLE_JOBS, info['jobcount']*.1))
+        info['maxidle'] = maxidle
+
+        maxpost = getattr(self.config.TaskWorker, 'maxPost', MAX_POST_JOBS)
         if maxpost == -1:
             maxpost = info['jobcount']
         elif maxpost == 0:
-            maxpost = int(max(20, info['jobcount']*.1))
+            maxpost = int(max(MAX_POST_JOBS, info['jobcount']*.1))
         info['maxpost'] = maxpost
 
         if info.get('faillimit') == None:

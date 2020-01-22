@@ -18,6 +18,7 @@ import HTCondorLocator
 
 from ServerUtilities import FEEDBACKMAIL
 from ServerUtilities import TASKLIFETIME
+from ServerUtilities import MAX_MEMORY_PER_CORE, MAX_MEMORY_SINGLE_CORE
 
 import TaskWorker.DataObjects.Result as Result
 import TaskWorker.Actions.TaskAction as TaskAction
@@ -88,8 +89,12 @@ SUBMIT_INFO = [ \
     ('CRAB_ASODB', 'tm_asodb'),
     ('CRAB_FailedNodeLimit', 'faillimit'),
     ('CRAB_DashboardTaskType', 'taskType'),
-    ('CRAB_MaxPost', 'maxpost')]
-
+    ('CRAB_MaxIdle', 'maxidle'),
+    ('CRAB_MaxPost', 'maxpost'),
+    ('CMS_Type', 'cms_type'),
+    ('CMS_WMTool', 'cms_wmtool'),
+    ('CMS_TaskType', 'cms_tasktype'),
+]
 
 def addCRABInfoToClassAd(ad, info):
     """
@@ -153,9 +158,11 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
     """
 
     stdmaxjobruntime = 2750
-    stdmaxmemory = 2500
     runtime = task[cmd+'_maxjobruntime']
     memory = task[cmd+'_maxmemory']
+    ncores = task[cmd+'_numcores']
+    if ncores is None: ncores = 1
+    absmaxmemory = max(MAX_MEMORY_SINGLE_CORE, ncores*MAX_MEMORY_PER_CORE)
     if runtime is not None and runtime > stdmaxjobruntime:
         msg = "Task requests %s minutes of runtime, but only %s minutes are guaranteed to be available." % (runtime, stdmaxjobruntime)
         msg += " Jobs may not find a site where to run."
@@ -163,13 +170,17 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
         logger.warning(msg)
         if info is not None: info['tm_maxjobruntime'] = str(stdmaxjobruntime)
         warningUploader(msg, task['user_proxy'], task['tm_taskname'])
-    if memory is not None and memory > stdmaxmemory:
-        if task[cmd+'_numcores'] is not None and task[cmd+'_numcores'] < 2:
-            msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (memory, stdmaxmemory)
+    if memory is not None and memory > absmaxmemory:
+        msg = "Task requests %s MB of memory, above the allowed maximum of %s" % (memory, absmaxmemory)
+        msg += " for a %d core(s) job.\n" % ncores
+        logger.error(msg)
+        raise TaskWorkerException(msg)
+    if memory is not None and memory > MAX_MEMORY_PER_CORE:
+        if ncores is not None and ncores < 2:
+            msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (memory, MAX_MEMORY_PER_CORE)
             msg += " Jobs may not find a site where to run and stay idle forever."
             logger.warning(msg)
             warningUploader(msg, task['user_proxy'], task['tm_taskname'])
-
 
 class DagmanSubmitter(TaskAction.TaskAction):
 
@@ -223,7 +234,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             schedd = loc.getSchedd(chooserFunction=self.config.TaskWorker.scheddPickerFunction)
         else:
             schedd = loc.getSchedd() #uses the default memory stuff
-        self.logger.debug("Finished picking up scheduler. Sending schedd (%s) to rest", schedd)
+        self.logger.debug("Finished picking up scheduler. Sending schedd name (%s) to REST", schedd)
         self.sendScheddToREST(task, schedd)
 
         return schedd
@@ -262,7 +273,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 return execInt
             except Exception as ex: #pylint: disable=broad-except
                 scheddStats.failure(schedd)
-                msg = "Failed to submit task %s; '%s'"% (task['tm_taskname'], str(ex))
+                msg = "Failed to submit task to: %s . Task: %s;\n'%s'"% (schedd, task['tm_taskname'], str(ex))
                 self.logger.exception(msg)
                 scheddStats.taskError(schedd, msg)
                 if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
@@ -282,7 +293,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         msg += " This could be a temporary glitch. Please try again later."
         msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
         msg += " The submission was retried %s times on %s schedulers." % (sum([len(x) for x in scheddStats.taskErrors.values()]), len(scheddStats.taskErrors))
-        msg += " These are the failures per Grid scheduler: %s" % (str(scheddStats.taskErrors))
+        msg += " These are the failures per Grid scheduler:\n %s" % (str(scheddStats.taskErrors))
 
         raise TaskWorkerException(msg, retry=(schedd != None))
 
@@ -451,6 +462,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
         dagAd["CRAB_Attempt"] = 0
+        dagAd["CMS_SubmissionTool"] = "CRAB"
         # We switched from local to scheduler universe.  Why?  It seems there's no way in the
         # local universe to change the hold signal at runtime.  That's fairly important for our
         # resubmit implementation.

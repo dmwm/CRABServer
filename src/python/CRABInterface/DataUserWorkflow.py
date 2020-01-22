@@ -170,7 +170,7 @@ class DataUserWorkflow(object):
            :arg str userproxy: the user proxy retrieved by `retrieveUserCert`
            :return: a generator of workflow states
         """
-        return self.workflow.status(workflow, userdn, userproxy, verbose=verbose)
+        return self.workflow.status(workflow, userdn, userproxy)
 
     def kill(self, workflow, force, killwarning, userdn, userproxy=None):
         """Request to Abort a workflow.

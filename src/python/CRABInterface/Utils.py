@@ -7,7 +7,7 @@ from hashlib import sha1
 import cherrypy
 import pycurl
 import StringIO
-import cjson as json
+import json
 import threading
 
 from WMCore.WMFactory import WMFactory
@@ -114,7 +114,7 @@ def getCentralConfig(extconfigurl, mode):
             cherrypy.log(msg)
             raise ExecutionError("Internal issue when retrieving external confifuration from %s" % extconfigurl)
 
-    centralCfgFallback = json.decode(bbuf.getvalue())[mode]
+    centralCfgFallback = json.loads(bbuf.getvalue())[mode]
     return centralCfgFallback
 
 
@@ -144,70 +144,6 @@ def conn_handler(services):
             return func(*args, **kwargs)
         return wrapped_func
     return wrap
-
-class _ThrottleCounter(object):
-
-    def __init__(self, throttle, user):
-        self.throttle = throttle
-        self.user = user
-
-    def __enter__(self):
-        ctr = self.throttle._incUser(self.user)
-        #self.throttle.logger.debug("Entering throttled function with counter %d for user %s" % (ctr, self.user))
-        if ctr >= self.throttle.getLimit():
-            self.throttle._decUser(self.user)
-            raise ExecutionError("The current number of active operations for this resource exceeds the limit of %d for user %s" % (self.throttle.getLimit(), self.user))
-
-    def __exit__(self, type, value, traceback):
-        ctr = self.throttle._decUser(self.user)
-        #self.throttle.logger.debug("Exiting throttled function with counter %d for user %s" % (ctr, self.user))
-
-class UserThrottle(object):
-
-    def __init__(self, limit=3):
-        self.lock = threading.Lock()
-        self.tls = threading.local()
-        self.users = {}
-        self.limit = limit
-        self.logger = logging.getLogger("CRABLogger.Utils.UserThrottle")
-
-    def getLimit(self):
-        return self.limit
-
-    def throttleContext(self, user):
-        self.users.setdefault(user, 0)
-        return _ThrottleCounter(self, user)
-
-    def make_throttled(self):
-        def throttled_decorator(fn):
-            def throttled_wrapped_function(*args, **kw):
-                username = cherrypy.request.user['login']
-                with self.throttleContext(username):
-                    return fn(*args, **kw)
-            return throttled_wrapped_function
-        return throttled_decorator
-
-    def _incUser(self, user):
-        retval = 0
-        with self.lock:
-            retval = self.users[user]
-            if getattr(self.tls, 'count', None) == None:
-                self.tls.count = 0
-            self.tls.count += 1
-            if self.tls.count == 1:
-                self.users[user] = retval + 1
-        return retval
-
-    def _decUser(self, user):
-        retval = 0
-        with self.lock:
-            retval = self.users[user]
-            self.tls.count -= 1
-            if self.tls.count == 0:
-                self.users[user] = retval - 1
-        return retval
-
-global_user_throttle = UserThrottle()
 
 def retrieveUserCert(func):
     def wrapped_func(*args, **kwargs):

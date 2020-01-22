@@ -423,7 +423,7 @@ class RetryJob(object):
             self.logger.debug(msg)
             self.get_job_ad_from_file()
         else:
-            msg = "Will use condor_q command to get finished job ads."
+            msg = "Will use condor_q command to get finished job ads from job_log."
             self.logger.debug(msg)
             self.get_job_ad_from_condor_q()
 

@@ -32,7 +32,13 @@ FILE_MEMORY_LIMIT = 512*1024
 # Otherwise it uses these values.
 MAX_WALLTIME = 21*60*60 + 30*60
 MAX_MEMORY = 2*1024
+# see https://github.com/dmwm/CRABServer/issues/5995
+MAX_MEMORY_PER_CORE = 2500
+MAX_MEMORY_SINGLE_CORE = 5000
 MAX_DISK_SPACE = 20000000 # Disk usage is not used from .job.ad as CRAB3 is not seeting it. 20GB is max.
+
+MAX_IDLE_JOBS = 1000
+MAX_POST_JOBS = 20
 
 ## Parameter used to set the LeaveJobInQueue and the PeriodicRemoveclassads.
 ## It's also used during resubmissions since we don't allow a resubmission during the last week
@@ -144,6 +150,15 @@ def checkOutLFN(lfn, username):
     """
     if lfn.startswith('/store/user/'):
         if lfn.split('/')[3] != username:
+            return False
+    elif lfn.startswith('/store/test/rucio/user/'):
+        if lfn.split('/')[5] != username:
+            return False
+    elif lfn.startswith('/store/test/rucio/int/user/'):
+        if lfn.split('/')[6] != username:
+            return False
+    elif lfn.startswith('/store/rucio/user/'):
+        if lfn.split('/')[4] != username:
             return False
     elif lfn.startswith('/store/group/') or lfn.startswith('/store/local/'):
         if lfn.split('/')[3] == '':

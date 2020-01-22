@@ -14,7 +14,7 @@ WMCOREVER=1.1.14.crab1
 WMCOREREPO=dmwm
 
 CRABSERVERDIR=$STARTDIR/CRABServer
-CRABSERVERVER=3.3.1706.rc2
+CRABSERVERVER=3.3.1909.rc1
 CRABSERVERREPO=dmwm
 
 [[ -d $STARTDIR ]] || mkdir -p $STARTDIR
@@ -42,22 +42,6 @@ rm -f $STARTDIR/CRAB3.zip
 rm -f $STARTDIR/WMCore.zip
 rm -f $STARTDIR/nose.tar.gz
 
-#
-# This is the one dep which can't be taken from the CMS RPM install.
-# The runtime on the HTCondor node uses the system python which, on SL6, is
-# not linked against OpenSSL.  This breaks communications with the frontend.
-#
-# This libcurl.so.4 is produced by taking the curl SRPM from RHEL and adding
-# a flag to use openssl as a backend.
-#
-# TODO: resolve this situation.
-#
-if [[ ! -e libcurl.so.4 ]]; then
-    curl -L https://github.com/dmwm/CRABServer/raw/master/lib/libcurl.so.4 > $STARTDIR/libcurl.so.4 || exit 2
-    curl -L https://github.com/dmwm/CRABServer/raw/master/lib/libcurl.so.4.sha1sum > $STARTDIR/libcurl.so.4.sha1sum || exit 2
-    sha1sum -c $STARTDIR/libcurl.so.4.sha1sum || exit 2
-fi
-chmod +x libcurl.so.4
 
 # For developers, we download all our dependencies from the various upstream servers.
 # For actual releases, we take the libraries from the build environment RPMs.
@@ -69,7 +53,7 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
     popd
 
     pushd $ORIGDIR/build/lib
-    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  -x \*.pyc || exit 3
+    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  TransferInterface -x \*.pyc || exit 3
     popd
 
     pushd $VO_CMS_SW_DIR/$SCRAM_ARCH/external/cherrypy/*/lib/python2.7/site-packages
@@ -81,11 +65,6 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
     cp $ORIGDIR/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py,ServerUtilities.py,CMSGroupMapper.py,RESTInteractions.py} .
 
 else
-
-    #if [[ ! -e libcurl.so.4 ]]; then
-    #    curl -L http://hcc-briantest.unl.edu/libcurl.so.4 > $STARTDIR/libcurl.so.4 || exit 2
-    #fi
-    #chmod +x libcurl.so.4
 
     if [[ -d "$REPLACEMENT_ABSOLUTE/WMCore" ]]; then
         echo "Using replacement WMCore source at $REPLACEMENT_ABSOLUTE/WMCore"
@@ -116,6 +95,7 @@ else
     zip -rq $STARTDIR/CRAB3.zip nose -x \*.pyc || exit 3
     popd
 
+
     # up until this point, evertying in CRAB3.zip is an external
     cp $STARTDIR/CRAB3.zip $ORIGDIR/CRAB3-externals.zip
 
@@ -125,7 +105,7 @@ else
     popd
 
     pushd $CRABSERVER_PATH/src/python
-    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  -x \*.pyc || exit 3
+    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface TransferInterface -x \*.pyc || exit 3
     popd
 
     mkdir -p bin
@@ -135,8 +115,8 @@ fi
 
 pwd
 echo "Making TaskManagerRun tarball"
-tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py task_process DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py libcurl.so.4 || exit 4
+tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py task_process DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py || exit 4
 echo "Making CMSRunAnalysis tarball"
-tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py DashboardFailure.sh libcurl.so.4 || exit 4
+tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py DashboardFailure.sh || exit 4
 popd
 

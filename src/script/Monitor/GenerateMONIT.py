@@ -6,6 +6,12 @@ import logging
 import htcondor
 import traceback
 import subprocess
+
+hostname = os.uname()[1]
+hostAllowRun = 'crab-prod-tw01.cern.ch'
+if hostname != hostAllowRun:
+    os._exit(0)
+
 from datetime import datetime
 from socket import gethostname
 from pprint import pprint
@@ -14,6 +20,10 @@ from RESTInteractions import HTTPRequests
 import json
 
 fmt = "%Y-%m-%dT%H:%M:%S%z"
+workdir = '/home/crab3/'
+logdir  = '/home/crab3/logs/'
+now = time.localtime()
+logfile = 'GenMonit-%s%s.log' % (now.tm_year, now.tm_mon)
 
 def send(document):
     return requests.post('http://monit-metrics:10012/', data=json.dumps(document),
@@ -44,7 +54,7 @@ class CRAB3CreateJson(object):
         self.schedds = []
         self.resthost = "cmsweb.cern.ch"
         # use child collector on port 9620 to get schedd attributes
-        collName = "cmsgwms-collector-global.cern.ch:9620,cmssrv221.fnal.gov:9620"
+        collName = "cmsgwms-collector-global.cern.ch:9620,cmsgwms-collector-global.fnal.gov:9620"
         self.coll = htcondor.Collector(collName)
 
     def getCountTasksByStatus(self):
@@ -60,7 +70,7 @@ class CRAB3CreateJson(object):
             e = sys.exc_info()
             if hasattr(e,"headers"):
                 self.logger.error(str(e.headers))
-            self.logger.debug("Error in getCountTasksByStatus:")
+            self.logger.debug("Error in getCountTasksByStatus:\n%s" %e)
             pprint(e[1])
             traceback.print_tb(e[2])
             return []
@@ -68,7 +78,8 @@ class CRAB3CreateJson(object):
     def getCountTasksByStatusAbs(self):
         try:
             resturi = "/crabserver/prod/task"
-            configreq = {'minutes': "1000000000", 'subresource': "counttasksbystatus"}
+            #configreq = {'minutes': "1000000000", 'subresource': "counttasksbystatus"}
+            configreq = {'minutes': "144000", 'subresource': "counttasksbystatus"} # query last 100 days only
             server = HTTPRequests(self.resthost, "/data/certs/servicecert.pem", "/data/certs/servicekey.pem", retry=10)
             result = server.get(resturi, data=configreq)
             return dict(result[0]['result'])
@@ -76,7 +87,7 @@ class CRAB3CreateJson(object):
             e = sys.exc_info()
             if hasattr(e,"headers"):
                 self.logger.error(str(e.headers))
-            self.logger.exception("Error in getCountTasksByStatusAbs:")
+            self.logger.exception("Error in getCountTasksByStatusAbs:\n%s" %e)
             pprint(e[1])
             traceback.print_tb(e[2])
             return []
@@ -91,15 +102,17 @@ class CRAB3CreateJson(object):
                                       'TotalSchedulerJobsRunning',
                                       'TotalIdleJobs',
                                       'TotalRunningJobs',
-                                      'TotalHeldJobs'])
+                                      'TotalHeldJobs',
+                                      'TotalJobAds'])
             for schedd in result:
                 data.append([schedd['Name'],
                              schedd['ShadowsRunning'],
                              schedd['TotalSchedulerJobsRunning'],
                              schedd['TotalIdleJobs'],
                              schedd['TotalRunningJobs'],
-                             schedd['TotalHeldJobs']])
-        except Exception as e:
+                             schedd['TotalHeldJobs'],
+                             schedd['TotalJobAds']])
+        except Exception, e:
             self.logger.debug("Error in getShadowsRunning: %s"%str(e))
         return data
 
@@ -137,7 +150,7 @@ class CRAB3CreateJson(object):
                 if state in states_filter:
                     self.jsonDoc['abs_task_states'].update({str(state): int(twStatus[state])})
 
-        # get the number of condor_shadown process per schedd
+        # get the number of condor_shadow processes per schedd
         ListOfSchedds = self.getScheddsInfo()
         totalRunningTasks = 0
         totalIdleTasks = 0
@@ -159,7 +172,8 @@ class CRAB3CreateJson(object):
                                 running_schedulers=0,
                                 idle_jobs=0,
                                 running_jobs=0,
-                                held_jobs=0
+                                held_jobs=0,
+                                all_jobs=0
                                 )
 
                 jsonDocSchedd['shadows'] = int(oneSchedd[1])
@@ -167,6 +181,7 @@ class CRAB3CreateJson(object):
                 jsonDocSchedd['idle_jobs'] = int(oneSchedd[3])
                 jsonDocSchedd['running_jobs'] = int(oneSchedd[4])
                 jsonDocSchedd['held_jobs'] = int(oneSchedd[5])
+                jsonDocSchedd['all_jobs'] = int(oneSchedd[6])
 
                 metrics.append(jsonDocSchedd)
 
@@ -192,11 +207,11 @@ class CRAB3CreateJson(object):
                 totalIdleTasks += numDagIdle
                 totalRunningTP += numTPRun
 
-            print (metrics)
+            #print metrics
             try:
                 send_and_check(metrics)
             except Exception as ex:
-                print (ex)
+                print(ex)
         self.jsonDoc['total_running_tasks'] = totalRunningTasks
         self.jsonDoc['total_idle_tasks'] = totalIdleTasks
         self.jsonDoc['total_running_tp'] = totalRunningTP
@@ -212,14 +227,14 @@ if __name__ == '__main__':
 
     start_time = time.time()
     resthost = 'cmsweb.cern.ch'
-    xmllocation = '/home/crab3/CRAB3_SCHEDD_XML_Report2.xml'
     logger = logging.getLogger()
-    handler = logging.StreamHandler(sys.stdout)
+    #handler = logging.StreamHandler(sys.stdout)
+    handler = logging.FileHandler(logdir + logfile)
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s",
                                   datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    logger.setLevel(logging.ERROR)
+    logger.setLevel(logging.INFO)
 
     jsonDoc = dict(
                    producer='crab',
@@ -235,15 +250,18 @@ if __name__ == '__main__':
     pr = CRAB3CreateJson(resthost, jsonDoc, logger)
 
     # before running make sure no other instance of this script is running
-    lockFile = '/home/crab3/CRAB3_SCHEDD_JSON.Lock'
+    lockFile = workdir + 'CRAB3_SCHEDD_JSON.Lock'
     if os.path.isfile(lockFile):
-        print ("%s already exists, abandon this run" % lockFile)
+        logger.error("%s already exists, abandon this run." % lockFile)
+        print "%s already exists, abandon this run" % lockFile
         exit()
     else:
         open(lockFile, 'wa').close()  # create the lock
+        logger.info('Lock created. Start data collection')
     metrics = pr.execute()
 
-    print (metrics)
+    logger.info('Metrics collected. Send to MONIT.')
+    #print metrics
     try:
         send_and_check([jsonDoc])
     except Exception as ex:
@@ -253,5 +271,6 @@ if __name__ == '__main__':
     elapsed = end_time - start_time
     now = time.strftime("%H:%M:%S", time.gmtime(end_time))
     elapsed_min = "%3d:%02d" % divmod(elapsed, 60)
+    logger.info('All done in %s minutes. Remove lock and exit' % elapsed_min)
 
     os.remove(lockFile)

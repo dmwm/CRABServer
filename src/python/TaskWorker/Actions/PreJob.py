@@ -29,7 +29,9 @@ class PreJob:
         self.job_id        = None
         self.taskname      = None
         self.backend       = None
+        self.stage         = None
         self.task_ad       = classad.ClassAd()
+        self.userWebDirPrx = ""
         self.resubmit_info = {}
         self.prejob_exit_code = None
         ## Set a logger for the pre-job.
@@ -155,31 +157,19 @@ class PreJob:
                   'SyncGridJobId': 'https://glidein.cern.ch/%s/%s' % (self.job_id, self.task_ad['CRAB_ReqName'].replace("_", ":")),
                  }
 
-        storage_rules = htcondor.param['CRAB_StorageRules']
-        userWebDir = getWebdirForDb(str(self.task_ad.get('CRAB_ReqName')), storage_rules)
+        if not self.userWebDirPrx:
+            storage_rules = htcondor.param['CRAB_StorageRules']
+            self.userWebDirPrx = getWebdirForDb(str(self.task_ad.get('CRAB_ReqName')), storage_rules)
 
-        userWebDirPrx = ""
-        try:
-            with open('proxied_webdir') as fd:
-                proxied_webdir = fd.read()
-            userWebDirPrx = proxied_webdir
-        except IOError as e:
-            self.logger.error(("'I/O error(%s): %s', when looking for the proxied_webdir file. Might be normal"
-                         " if the schedd does not have a proxiedurl in the REST external config." % (e.errno, e.strerror)))
-
-        self.logger.info("User web dir proxy: " + userWebDirPrx)
-        self.logger.info("web dir: " + userWebDir)
-
-        if userWebDirPrx:
-            setDashboardLogs(params, userWebDirPrx, self.job_id, crab_retry)
-        elif userWebDir:
-            setDashboardLogs(params, userWebDir, self.job_id, crab_retry)
+        self.logger.info("User web dir: %s", self.userWebDirPrx)
+        if self.userWebDirPrx:
+            setDashboardLogs(params, self.userWebDirPrx, self.job_id, crab_retry)
         else:
-            print("Not setting dashboard logfiles as I cannot find CRAB_UserWebDir nor CRAB_UserWebDirPrx.")
+            print("Not setting dashboard logfiles as I cannot find a web dir.")
 
         insertJobIdSid(params, self.job_id, self.task_ad['CRAB_ReqName'], crab_retry)
         apmon = ApmonIf()
-        self.logger.debug("Dashboard task info: %s" % str(params))
+        self.logger.debug("Dashboard task info: %s", str(params))
         apmon.sendToML(params)
         apmon.free()
 
@@ -190,8 +180,8 @@ class PreJob:
         """
         self.task_ad = {}
         try:
-            self.logger.info("Loading classads from: %s" % os.environ['_CONDOR_JOB_AD'])
-            self.task_ad = classad.parseOld(open(os.environ['_CONDOR_JOB_AD']))
+            self.logger.info("Loading classads from: %s", os.environ['_CONDOR_JOB_AD'])
+            self.task_ad = classad.parseOne(open(os.environ['_CONDOR_JOB_AD']))
             self.logger.info(str(self.task_ad))
         except:
             msg = "Got exception while trying to parse the job ad."
@@ -227,8 +217,7 @@ class PreJob:
             for state in JOB_RETURN_CODES._fields:
                 count = 0
                 with open("task_statistics.%s" % (state)) as fd:
-                    for line in fd:
-                        count += 1
+                    count = len(fd.read().split(b'\n')) - 1
                 results[state] = count
         except:
             return {}
@@ -244,8 +233,7 @@ class PreJob:
             for state in JOB_RETURN_CODES._fields:
                 count = 0
                 with open("task_statistics.%s.%s" % (site, state)) as fd:
-                    for line in fd:
-                        count += 1
+                    count = len(fd.read().split(b'\n')) - 1
                 results[state] = count
         except:
             return {}
@@ -272,6 +260,10 @@ class PreJob:
         new_submit_text = '+CRAB_Retry = %d\n' % (crab_retry)
         msg = "Setting CRAB_Retry = %s" % (crab_retry)
         self.logger.info(msg)
+        ## Add job and postjob log URLs
+        job_retry = "%s.%s" % (self.job_id, crab_retry)
+        new_submit_text += '+CRAB_JobLogURL = %s\n' % classad.quote(os.path.join(self.userWebDirPrx, "job_out."+job_retry+".txt"))
+        new_submit_text += '+CRAB_PostJobLogURL = %s\n' % classad.quote(os.path.join(self.userWebDirPrx, "postjob."+job_retry+".txt"))
         ## For the parameters that can be overwritten at each manual job resubmission,
         ## read them from the task ad, unless there is resubmission information there
         ## and this job is not one that has to be resubmitted, in which case we should
@@ -438,7 +430,7 @@ class PreJob:
             datasites = set(site_info['group_datasites'][str(group)])
         else:
             with open("site.ad") as fd:
-                site_ad = classad.parse(fd)
+                site_ad = classad.parseOne(fd)
             available = set(site_ad['Job%s' % (self.job_id)])
         ## Take the intersection between the available sites and the site whitelist.
         ## This is the new set of available sites.
@@ -475,10 +467,11 @@ class PreJob:
                     msg = "Failed to create log web-shared directory %s" % (logpath)
                     self.logger.info(msg)
                     return
-            fname = os.path.join(logpath, "job_out.%s.%s.txt" % (self.job_id, crab_retry))
+            job_retry = "%s.%s" % (self.job_id, crab_retry)
+            fname = os.path.join(logpath, "job_out.%s.txt" % job_retry)
             with open(fname, 'w') as fd:
                 fd.write("Job output has not been processed by post-job.\n")
-            fname = "postjob.%s.%s.txt" % (self.job_id, crab_retry)
+            fname = "postjob.%s.txt" % job_retry
             with open(fname, 'w') as fd:
                 fd.write("Post-job is currently queued.\n")
             try:
@@ -491,7 +484,6 @@ class PreJob:
         except:
             msg = "Exception executing touch_logs()."
             self.logger.exception(msg)
-            pass
 
 
     def needsDefer(self):
@@ -507,7 +499,7 @@ class PreJob:
             submitTime = int(self.task_ad.get("CRAB_TaskSubmitTime"))
             currentTime = time.time()
             if currentTime < (submitTime + totalDefer):
-                self.logger.info('  Defer time of this job (%s seconds since initial task submission) not elapsed yet, deferring for %s seconds' % (totalDefer, totalDefer))
+                self.logger.info('  Defer time of this job (%s seconds since initial task submission) not elapsed yet, deferring for %s seconds', totalDefer, totalDefer)
                 return True
             else:
                 self.logger.info('  Continuing normally since current time is greater than requested starttime of the job')
@@ -560,6 +552,13 @@ class PreJob:
         self.get_task_ad()
 
         try:
+            with open('webdir') as fd:
+                self.userWebDirPrx = fd.read()
+        except IOError as e:
+            self.logger.error("'I/O error(%s): %s', when looking for the 'webdir' file. Might be normal"
+                              " if the schedd does not have a proxiedurl in the REST external config.", e.errno, e.strerror)
+
+        try:
             self.get_resubmit_info()
             self.alter_submit(crab_retry)
             self.save_resubmit_info()
@@ -582,4 +581,3 @@ class PreJob:
         self.logger.info(msg)
         os.close(fd_prejob_log)
         os.execv("/bin/sleep", ["sleep", str(sleep_time)])
-

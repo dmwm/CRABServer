@@ -182,7 +182,7 @@ parser.add_option('--eventsPerLumi', dest='eventsPerLumi', default=None)
 parser.add_option('--maxRuntime', dest='maxRuntime', default=None)
 opts, args = parser.parse_args()
 
-if opts.oneEventMode:
+if opts.oneEventMode in ["1", "True", True] :
     print("One event mode disabled until we can put together a decent version of WMCore.")
     print("TweakPSet.py is going to force one event mode")
 
