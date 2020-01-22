@@ -26,7 +26,7 @@ from MultiProcessingLog import MultiProcessingLog
 from WMCore.Configuration import loadConfigurationFile
 from WMCore.Services.pycurl_manager import RequestHandler
 from RESTInteractions import HTTPRequests
-from Publisher.utils import getDNFromUserName
+#from Publisher.utils import getDNFromUserName
 from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping
 
 
@@ -46,7 +46,7 @@ def setProcessLogger(name):
 class Master(object):
     """I am the main daemon kicking off all Publisher work via slave Publishers"""
 
-    def __init__(self, config, quiet=False, debug=True, testMode=False):
+    def __init__(self, configurationFile, quiet=False, debug=True, testMode=False):
         """
         Initialise class members
 
@@ -55,20 +55,33 @@ class Master(object):
         :arg bool debug: it tells if needs a verbose logger
         :arg bool testMode: it tells if to run in test (no subprocesses) mode.
         """
+
+        self.configurationFile = configurationFile
+        config = loadConfigurationFile(configurationFile)
+
         self.config = config.General
         self.rest = self.config.oracleDB
         self.filetransfers = self.config.oracleFileTrans
         self.usertransfers = self.config.oracleUserTrans
         
         self.max_files_per_block = self.config.max_files_per_block
-        #self.userCert = self.config.opsCert
-        #self.userKey = self.config.opsKey
+        # these are used for talking to DBS
+        os.putenv('X509_USER_CERT', self.config.serviceCert)
+        os.putenv('X509_USER_KEY', self.config.serviceKey)
         self.block_publication_timeout = self.config.block_closure_timeout
         self.lfn_map = {}
         self.force_publication = False
         self.force_failure = False
         self.TestMode = testMode
         self.cache_area = self.config.cache_area
+        self.taskFilesDir = self.config.taskFilesDir
+        try:
+            os.makedirs(self.taskFilesDir)
+        except OSError as ose:
+            if ose.errno != 17: #ignore the "Directory already exists error"
+                print(str(ose))
+                print("The Publisher needs to access the '%s' directory" % dirname)
+                sys.exit(1)
 
         def createLogdir(dirname):
             """ Create the directory dirname ignoring erors in case it exists. Exit if
@@ -118,11 +131,17 @@ class Master(object):
 
         self.logger = setRootLogger(quiet, True, console=self.TestMode)
 
+        from WMCore.Credential.Proxy import Proxy
+        proxy = Proxy({'logger':self.logger})
+        from ServerUtilities import tempSetLogLevel
+        with tempSetLogLevel(self.logger,logging.ERROR):
+            self.myDN = proxy.getSubjectFromCert(certFile=self.config.serviceCert)
+
         try:
             self.oracleDB = HTTPRequests(self.config.oracleDB,
-                                         self.config.opsCert,
-                                         self.config.opsKey)
-            self.logger.debug('Contacting OracleDB:' + self.config.oracleDB)
+                                         self.config.serviceCert,
+                                         self.config.serviceKey)
+            self.logger.debug('Contacting Oracle via CRABREST:' + self.config.oracleDB)
         except:
             self.logger.exception('Failed when contacting Oracle')
             raise
@@ -308,8 +327,8 @@ class Master(object):
             data = {'workflow': workflow}
             url = self.rest
             connection = HTTPRequests(url,
-                                     self.config.opsCert,
-                                     self.config.opsKey)
+                                     self.config.serviceCert,
+                                     self.config.serviceKey)
             
             try:
                 res = connection.get(self.filetransfers.replace('filetransfers', 'workflow'), data=encodeRequest(data))
@@ -430,7 +449,7 @@ class Master(object):
                         input_dbs_url = str(active_file['value'][4])
                     lfn_ready.append(dest_lfn)
 
-                userDN = ''
+                #userDN = ''
                 username = task[0][0]
                 user_group = ""
                 if task[0][1]:
@@ -438,16 +457,6 @@ class Master(object):
                 user_role = ""
                 if task[0][2]:
                     user_role = task[0][2]
-                logger.debug("Trying to get DN %s %s %s" % (username, user_group, user_role))
-
-                try:
-                    userDN = getDNFromUserName(username, logger)
-                except Exception as ex:
-                    msg = "Error retrieving the user DN"
-                    msg += str(ex)
-                    msg += str(traceback.format_exc())
-                    logger.error(msg)
-                    return 1
 
                 # Get metadata
                 toPublish = []
@@ -460,18 +469,18 @@ class Master(object):
                             doc["User"] = username
                             doc["Group"] = file_["key"][1]
                             doc["Role"] = file_["key"][2]
-                            doc["UserDN"] = userDN
+                            doc["UserDN"] = self.myDN
                             doc["Destination"] = file_["value"][0]
                             doc["SourceLFN"] = file_["value"][1]
                             toPublish.append(doc)
-                with open("/tmp/publisher_files/"+workflow+'.json', 'w') as outfile:
+                with open(self.taskFilesDir + workflow + '.json', 'w') as outfile:
                     json.dump(toPublish, outfile)
                 logger.info(". publisher.py %s" % (workflow))
 
                 # find the location in the current environment of the script we want to run
                 import Publisher.TaskPublish as tp
                 taskPublishScript = tp.__file__
-                subprocess.call(["python", taskPublishScript, workflow])
+                subprocess.call(["python", taskPublishScript, "configurationFile=%s"%configurationFile, "taskname=%"%workflow])
 
         except:
             logger.exception("Exception!")
@@ -486,9 +495,10 @@ if __name__ == '__main__':
     parser.add_argument('--config', help='Publisher config file', default='PublisherConfig.py')
 
     args = parser.parse_args()
-    configuration = loadConfigurationFile(os.path.abspath(args.config))
+    #need to pass the configuration file path to the slaves
+    configurationFile = os.path.abspath(args.config)
 
-    master = Master(configuration)
+    master = Master(configurationFile)
     while(True):
         master.algorithm()
         time.sleep(configuration.General.pollInterval)

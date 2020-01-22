@@ -13,61 +13,10 @@ import argparse
 import re
 
 import dbs.apis.dbsClient as dbsClient
-from Publisher.utils import getProxy
 from ServerUtilities import getHashLfn, encodeRequest, oracleOutputMapping
 from RESTInteractions import HTTPRequests
 from WMCore.Configuration import loadConfigurationFile
 
-config = loadConfigurationFile(os.path.abspath('config.py'))
-
-task_path = config.General.task_path
-
-def Proxy(userDN, group, role, logger):
-    """
-
-    """
-    userProxy = ''
-
-    try:
-        serviceCert = config.General.serviceCert
-        serviceKey = config.General.serviceKey
-
-        defaultDelegation = {'logger': logger,
-                             'credServerPath': '/data/certs/creds/',
-                             'myProxySvr': 'myproxy.cern.ch',
-                             'min_time_left': 36000,
-                             'serverDN': config.General.serverDN,
-                             'uisource': "/dev/null"
-                            }
-
-        cache_area = config.General.cache_area
-        getCache = re.compile('https?://([^/]*)/.*')
-        myproxyAccount = getCache.findall(cache_area)[0]
-        defaultDelegation['myproxyAccount'] = myproxyAccount
-
-        defaultDelegation['server_cert'] = serviceCert
-        defaultDelegation['server_key'] = serviceKey
-
-        valid = False
-        defaultDelegation['userDN'] = userDN
-        defaultDelegation['group'] = group
-        defaultDelegation['role'] = role
-
-        valid, proxy = getProxy(defaultDelegation, logger)
-    except Exception as ex:
-        msg = "Error getting the user proxy"
-        print(msg)
-        msg += str(ex)
-        msg += str(traceback.format_exc())
-        logger.error(msg)
-    if valid:
-        userProxy = proxy
-    else:
-        logger.error('Did not get valid proxy.')
-
-    logger.info("userProxy: %s" % userProxy)
-
-    return userProxy
 
 
 def format_file_3(file_):
@@ -423,10 +372,14 @@ def mark_failed(files, oracleDB, logger, failure_reason=""):
             continue
 
 
-def publishInDBS3(taskname):
+def publishInDBS3(configFile, taskname):
     """
 
     """
+    config = loadConfigurationFile(configFile)
+    task_path = config.General.task_path
+    taskFilesDir = config.General.taskFilesDir
+
     def createLogdir(dirname):
         """
         Create the directory dirname ignoring erors in case it exists. Exit if
@@ -442,13 +395,13 @@ def publishInDBS3(taskname):
 
     createLogdir('taskLogs')
     logger = logging.getLogger(taskname)
-    logging.basicConfig(filename='taskLogs/'+taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
+    logging.basicConfig(filename='taskLogs/'+taskname+'.log', level=logging.INFO, format=config.TaskPublisher.logMsgFormat)
 
     logger.info("Getting files to publish")
 
     toPublish = []
     # TODO move from new to done when processed
-    with open("/tmp/publisher_files/"+taskname+".json") as f:
+    with open(taskFilesDir + taskname + ".json") as f:
         toPublish = json.load(f)
 
     workflow = taskname
@@ -480,9 +433,6 @@ def publishInDBS3(taskname):
     pnn = toPublish[0]["Destination"]
     logger.info(wfnamemsg+" "+user)
 
-    READ_PATH = "/DBSReader"
-    READ_PATH_1 = "/DBSReader/"
-
     # TODO: get user role and group
     try:
         proxy = Proxy(userDN, group, role, logger)
@@ -492,8 +442,8 @@ def publishInDBS3(taskname):
 
     oracelInstance = config.General.oracleDB
     oracleDB = HTTPRequests(oracelInstance,
-                            proxy,
-                            proxy)
+                            config.General.serviceCert,
+                            config.General.serviceKey)
 
     fileDoc = dict()
     fileDoc['subresource'] = 'search'
@@ -517,8 +467,8 @@ def publishInDBS3(taskname):
         publish_dbs_url = results[0]['result'][publish_dbs_urlIndex]
 
         #sourceURL = "https://cmsweb.cern.ch/dbs/prod/global/DBSReader"
-        if not sourceURL.endswith(READ_PATH) and not sourceURL.endswith(READ_PATH_1):
-            sourceURL += READ_PATH
+        if not sourceURL.endswith("/DBSReader") and not sourceURL.endswith("/DBSReader/"):
+            sourceURL += "/DBSReader"
     except Exception:
         logger.exception("ERROR")
     # When looking up parents may need to look in global DBS as well.
@@ -528,23 +478,22 @@ def publishInDBS3(taskname):
     globalURL = globalURL.replace('phys03', 'global')
     globalURL = globalURL.replace('caf', 'global')
 
-    pr = os.environ.get("SOCKS5_PROXY")
+    # DBS client relies on X509 env. vars
+    os.putenv('X509_USER_CERT', config.Global.serviceCert)
+    os.putenv('X509_USER_KEY', self.Global.serviceKey)
+
     logger.info(wfnamemsg+"Source API URL: %s" % sourceURL)
-    sourceApi = dbsClient.DbsApi(url=sourceURL, proxy=pr)
+    sourceApi = dbsClient.DbsApi(url=sourceURL)
     logger.info(wfnamemsg+"Global API URL: %s" % globalURL)
-    globalApi = dbsClient.DbsApi(url=globalURL, proxy=pr)
+    globalApi = dbsClient.DbsApi(url=globalURL)
 
-    WRITE_PATH = "/DBSWriter"
-    MIGRATE_PATH = "/DBSMigrate"
-    READ_PATH = "/DBSReader"
-
-    if publish_dbs_url.endswith(WRITE_PATH):
-        publish_read_url = publish_dbs_url[:-len(WRITE_PATH)] + READ_PATH
-        publish_migrate_url = publish_dbs_url[:-len(WRITE_PATH)] + MIGRATE_PATH
+    if publish_dbs_url.endswith('/DBSWriter'):
+        publish_read_url = publish_dbs_url[:-len('/DBSWriter')] + '/DBSReader'
+        publish_migrate_url = publish_dbs_url[:-len('/DBSWriter')] + 'DBSMigrate'
     else:
-        publish_migrate_url = publish_dbs_url + MIGRATE_PATH
-        publish_read_url = publish_dbs_url + READ_PATH
-        publish_dbs_url += WRITE_PATH
+        publish_migrate_url = publish_dbs_url + '/DBSMigrate'
+        publish_read_url = publish_dbs_url + '/DBSReader'
+        publish_dbs_url += '/DBSWriter'
 
     try:
         logger.debug(wfnamemsg+"Destination API URL: %s" % publish_dbs_url)
@@ -850,9 +799,11 @@ def publishInDBS3(taskname):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='Publish datasets.')
-    parser.add_argument('taskname', metavar='taskname', type=str, help='taskname')
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--configFile', help='Publisher configuration file', default='PublisherConfig.py')
+    parser.add_argument('--taskname', help='taskname', required=True)
 
     args = parser.parse_args()
 
-    print(publishInDBS3(args.taskname))
+    print(publishInDBS3(args.configFile, args.taskname))
