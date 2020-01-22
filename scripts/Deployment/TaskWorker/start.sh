@@ -5,7 +5,7 @@ unset X509_USER_CERT
 unset X509_USER_KEY
 source /data/srv/TaskManager/env.sh
 
-:> /data/srv/TaskManager/nohup.out
+rm -f /data/srv/TaskManager/nohup.out
 
 __strip_pythonpath(){
 # this function is used to strip the taskworker lines from $PYTHONPATH
@@ -25,21 +25,32 @@ export PYTHONPATH=$ppath_stripped
 }
 
 case $1 in
-    debug)
-	__strip_pythonpath
-	export PYTHONPATH=/data/user/CRABServer/src/python:/data/user/WMCore/src/python:$PYTHONPATH
-	python -m pdb $MYTESTAREA/${scram_arch}/cms/crabtaskworker/*/lib/python2.7/site-packages/TaskWorker/SequentialWorker.py $MYTESTAREA/TaskWorkerConfig.py --logDebug
+  debug)
+    # use private instance from /data/user in pdb mode via SequentialWorker
+	  __strip_pythonpath
+	  export PYTHONPATH=/data/user/CRABServer/src/python:/data/user/WMCore/src/python:$PYTHONPATH
+	  python -m pdb $MYTESTAREA/${scram_arch}/cms/crabtaskworker/*/lib/python2.7/site-packages/TaskWorker/SequentialWorker.py $MYTESTAREA/TaskWorkerConfig.py --logDebug
 	;;
-    private)
-	__strip_pythonpath
-	export PYTHONPATH=/data/user/CRABServer/src/python:/data/user/WMCore/src/python:$PYTHONPATH
-	echo
-	nohup python /data/user/CRABServer/src/python/TaskWorker/MasterWorker.py --config $MYTESTAREA/TaskWorkerConfig.py --logDebug &
+  private)
+    # run private instance from /data/user
+	  __strip_pythonpath
+	  export PYTHONPATH=/data/user/CRABServer/src/python:/data/user/WMCore/src/python:$PYTHONPATH
+	  nohup python /data/user/CRABServer/src/python/TaskWorker/MasterWorker.py --config $MYTESTAREA/TaskWorkerConfig.py --logDebug &
 	;;
-    test)
-        python $MYTESTAREA/${scram_arch}/cms/crabtaskworker/*/lib/python2.7/site-packages/TaskWorker/SequentialWorker.py  $MYTESTAREA/TaskWorkerConfig.py --logDebug
-        ;;
-    *)
+  test)
+    # use current instance in pdb mode  via SequentialWorker
+    python $MYTESTAREA/${scram_arch}/cms/crabtaskworker/*/lib/python2.7/site-packages/TaskWorker/SequentialWorker.py  $MYTESTAREA/TaskWorkerConfig.py --logDebug
+  ;;
+  help)
+    echo "There are 4 ways to run start.sh:"
+    echo "  start.sh             without any argument starts current TW instance"
+    echo "  start.sh private     starts the TW instance from /data/user/TaskWorker"
+    echo "  start.sh debug       runs private instance in debub mode. For hacking"
+    echo "  start.sh test        runs current instance in debug mode. For finding out"
+    echo "BEWARE: a misppelled argument is interpreted like no argument"
+  ;;
+  *)
+  # DEFAULT mode: run current instance
 	nohup python $MYTESTAREA/${scram_arch}/cms/crabtaskworker/*/lib/python2.7/site-packages/TaskWorker/MasterWorker.py --config $MYTESTAREA/TaskWorkerConfig.py --logDebug &
 	;;
 esac
