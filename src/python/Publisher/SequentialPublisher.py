@@ -1,8 +1,8 @@
 """ This worker can be used for testing purposes. Just run:
-         "python SequentialPublisher.py /path/to/config"
+         "python SequentialPublisher.py --config /path/to/config"
     and have fun!
-    If you want to immedately start a pdb session add a 2nd argument (any word will do)
-         "python SequentialPublisher.py /path/to/config d"
+    If you want to immediately start a pdb session
+         "python SequentialPublisher.py --config /path/to/config --debug"
 
     More details: it instantiates the Publisher Worker with the TEST flag True. This makes the Worker
     sequential (it does not instantiate new threads) and the logging is done at the console and not on
@@ -31,7 +31,6 @@ quiet = False
 debug = True
 testMode  = True
 
-#usePdb = ( len(sys.argv) == 3 )
 if usePdb:
    import pdb
    pdb.set_trace()

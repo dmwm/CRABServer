@@ -20,6 +20,7 @@ import sys
 import json
 import datetime
 import time
+from retry import retry
 from multiprocessing import Process
 
 from MultiProcessingLog import MultiProcessingLog
@@ -60,9 +61,12 @@ class Master(object):
         config = loadConfigurationFile(configurationFile)
 
         self.config = config.General
-        self.rest = self.config.oracleDB
-        self.filetransfers = self.config.oracleFileTrans
-        self.usertransfers = self.config.oracleUserTrans
+        # CRABServer REST API's (see CRABInterface)
+        self.REST_filetransfers = '/crabserver/' + self.config.instance + '/filetransfers'
+        #self.REST_usertransfers = '/crabserver/' + self.config.instance +  '/fileusertransfers'
+        self.REST_filemetadata = '/crabserver/' + self.config.instance + '/filemetadata'
+        self.REST_workflow = '/crabserver/' + self.config.instance + '/workflow'
+        self.REST_task = '/crabserver/' + self.config.instance + '/task'
         
         self.max_files_per_block = self.config.max_files_per_block
         # these are used for talking to DBS
@@ -73,7 +77,6 @@ class Master(object):
         self.force_publication = False
         self.force_failure = False
         self.TestMode = testMode
-        self.cache_area = self.config.cache_area
         self.taskFilesDir = self.config.taskFilesDir
         try:
             os.makedirs(self.taskFilesDir)
@@ -137,11 +140,12 @@ class Master(object):
         with tempSetLogLevel(self.logger,logging.ERROR):
             self.myDN = proxy.getSubjectFromCert(certFile=self.config.serviceCert)
 
+        self.logger.debug('Contacting Oracle via CRABREST:' + self.config.RestHostName)
         try:
-            self.oracleDB = HTTPRequests(self.config.oracleDB,
-                                         self.config.serviceCert,
-                                         self.config.serviceKey)
-            self.logger.debug('Contacting Oracle via CRABREST:' + self.config.oracleDB)
+            self.oracleDB = HTTPRequests(url=self.config.RestHostName,
+                                         localcert=self.config.serviceCert,
+                                         localkey=self.config.serviceKey,
+                                         retry=3)
         except:
             self.logger.exception('Failed when contacting Oracle')
             raise
@@ -169,38 +173,34 @@ class Master(object):
                    u'user_group', u'taskname', u'transfer_state', u'destination_lfn'
         """
 
+        self.logger.debug("Retrieving publications from oracleDB")
+        uri = self.REST_filetransfers
         fileDoc = {}
         fileDoc['asoworker'] = self.config.asoworker
         fileDoc['subresource'] = 'acquirePublication'
-
-        self.logger.debug("Retrieving publications from oracleDB")
-
+        data=encodeRequest(fileDoc)
         results = ''
         try:
-            results = db.post(self.config.oracleFileTrans,
-                              data=encodeRequest(fileDoc))
+            results = db.post(uri=uri, data=data)
         except Exception as ex:
-            self.logger.error("Failed to acquire publications \
-                                from oracleDB: %s" % ex)
+            self.logger.error("Failed to acquire publications from %s: %s", uri, ex)
             return []
 
+        self.logger.debug("Retrieving max.100000 acquired publications from oracleDB")
         fileDoc = dict()
         fileDoc['asoworker'] = self.config.asoworker
         fileDoc['subresource'] = 'acquiredPublication'
         fileDoc['grouping'] = 0
         fileDoc['limit'] = 100000
-
-        self.logger.debug("Retrieving max.100000 acquired publications from oracleDB")
-
         result = []
+        uri=self.REST_filetransfers
+        data=encodeRequest(fileDoc)
 
         try:
-            results = db.get(self.config.oracleFileTrans,
-                             data=encodeRequest(fileDoc))
+            results = db.get(uri=uri, data=data)
             result.extend(oracleOutputMapping(results))
         except Exception as ex:
-            self.logger.error("Failed to acquire publications \
-                                from oracleDB: %s" %ex)
+            self.logger.error("Failed to acquire publications from %s: %s", uri, ex)
             return []
 
         self.logger.debug("publen: %s" % len(result))
@@ -224,9 +224,9 @@ class Master(object):
         Download and read the files describing
         what needs to be published
         """
-        data = {}
-        data['taskname'] = workflow
-        data['filetype'] = 'EDM'
+        dataDict = {}
+        dataDict['taskname'] = workflow
+        dataDict['filetype'] = 'EDM'
 
         out = []
 
@@ -242,14 +242,16 @@ class Master(object):
                 yield l[i:i + n]
 
         for lfn_ in chunks(lfn_ready, 50):
-            data['lfn'] = lfn_
+            dataDict['lfn'] = lfn_
+            data = encodeRequest(dataDict, listParams=["lfn"])
+            uri = self.REST_filemetadata
 
             try:
-                res = self.oracleDB.get(self.filetransfers.replace('filetransfers', 'filemetadata'),
-                                        data=encodeRequest(data, listParams=["lfn"]))
+                #res = self.oracleDB.get(uri=uri, data=encodeRequest(data, listParams=["lfn"]))
+                res = self.oracleDB.get(uri=uri, data=data)
                 res = res[0]
             except Exception as ex:
-                self.logger.error("Error during metadata retrieving: %s" % ex)
+                self.logger.error("Error during metadata retrieving from %s: %s", uri, ex)
                 continue
 
             print(len(res['result']))
@@ -305,8 +307,8 @@ class Master(object):
         workflow = str(task[0][3])
         wfnamemsg = "%s: " % (workflow)
 
-        if int(workflow[0:2]) < 18:
-            msg = "Skipped. Ignore tasks created before 2018."
+        if int(workflow[0:2]) < 20:
+            msg = "Skipped. Ignore tasks created before 2020."
             logger.info(wfnamemsg+msg)
             return 0
 
@@ -321,20 +323,17 @@ class Master(object):
             # Retrieve the workflow status. If the status can not be retrieved, continue
             # with the next workflow.
             workflow_status = ''
-            url = '/'.join(self.cache_area.split('/')[:-1]) #+ '/workflow'
-            msg = "Retrieving status from %s" % (url)
+            msg = "Retrieving status from %s" % (self.config.RestHostName)
             logger.info(wfnamemsg+msg)
-            data = {'workflow': workflow}
-            url = self.rest
-            connection = HTTPRequests(url,
-                                     self.config.serviceCert,
-                                     self.config.serviceKey)
-            
+            #urlPath = '/crabserver/' + self.config.instance + '/workflow'
+            uri = self.REST_workflow
+            data = encodeRequest({'workflow': workflow})
             try:
-                res = connection.get(self.filetransfers.replace('filetransfers', 'workflow'), data=encodeRequest(data))
+                #connection = HTTPRequests(self.config.RestHostName, self.config.serviceCert, self.config.serviceKey)
+                res = self.oracleDB.get(uri=uri, data=data)
             except Exception as ex:
                 # logger.info(wfnamemsg+encodeRequest(data))
-                logger.warn('Error retrieving status from cache for %s.' % workflow)
+                logger.warn('Error retrieving status from %s for %s.', uri, workflow)
                 return 0
 
             try:
@@ -368,12 +367,9 @@ class Master(object):
                 # should be more or less independent of the output dataset in case there are
                 # more than one).
                 last_publication_time = None
-                data = {}
-                data['workflow'] = workflow
-                data['subresource'] = 'search'
+                data = encodeRequest({'workflow':workflow, 'subresource':'search'})
                 try:
-                    result = self.oracleDB.get(self.config.oracleFileTrans.replace('filetransfers', 'task'),
-                                               data=encodeRequest(data))
+                    result = self.oracleDB.get(self.config.REST_task, data)
                     logger.debug("task: %s " %  str(result[0]))
                     logger.debug("task: %s " %  getColumn(result[0], 'tm_last_publication'))
                 except Exception as ex:
@@ -436,10 +432,8 @@ class Master(object):
                 pnn, input_dataset, input_dbs_url = "", "", ""
                 for active_file in active_:
                     job_end_time = active_file['value'][5]
-                    if job_end_time and self.config.isOracle:
+                    if job_end_time :
                         wf_jobs_endtime.append(int(job_end_time) - time.timezone)
-                    elif job_end_time:
-                        wf_jobs_endtime.append(int(time.mktime(time.strptime(str(job_end_time), '%Y-%m-%d %H:%M:%S'))) - time.timezone)
                     source_lfn = active_file['value'][1]
                     dest_lfn = active_file['value'][2]
                     self.lfn_map[dest_lfn] = source_lfn
@@ -480,7 +474,9 @@ class Master(object):
                 # find the location in the current environment of the script we want to run
                 import Publisher.TaskPublish as tp
                 taskPublishScript = tp.__file__
-                subprocess.call(["python", taskPublishScript, "configurationFile=%s"%configurationFile, "taskname=%"%workflow])
+                subprocess.call(["python", taskPublishScript,
+                                 "configurationFile=%s" % self.configurationFile,
+                                 "taskname=%s" % workflow])
 
         except:
             logger.exception("Exception!")
