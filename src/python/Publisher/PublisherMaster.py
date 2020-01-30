@@ -62,7 +62,7 @@ class Master(object):
 
         self.config = config.General
         # CRABServer REST API's (see CRABInterface)
-        #self.REST_filetransfers = '/crabserver/' + self.config.instance + '/filetransfers'
+        self.REST_filetransfers = '/crabserver/' + self.config.instance + '/filetransfers'
         #self.REST_usertransfers = '/crabserver/' + self.config.instance +  '/fileusertransfers'
         self.REST_filemetadata = '/crabserver/' + self.config.instance + '/filemetadata'
         self.REST_workflow = '/crabserver/' + self.config.instance + 'workflow'
@@ -181,8 +181,7 @@ class Master(object):
 
         results = ''
         try:
-            results = db.post(self.config.oracleFileTrans,
-                              data=encodeRequest(fileDoc))
+            results = db.post(self.REST_filetransfers, data=encodeRequest(fileDoc))
         except Exception as ex:
             self.logger.error("Failed to acquire publications \
                                 from oracleDB: %s" % ex)
@@ -199,8 +198,7 @@ class Master(object):
         result = []
 
         try:
-            results = db.get(self.config.oracleFileTrans,
-                             data=encodeRequest(fileDoc))
+            results = db.get(self.REST_filetransfers, data=encodeRequest(fileDoc))
             result.extend(oracleOutputMapping(results))
         except Exception as ex:
             self.logger.error("Failed to acquire publications \

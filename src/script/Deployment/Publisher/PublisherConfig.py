@@ -10,8 +10,8 @@ config.section_('General')
 config.General.asoworker = 'asoless'
 config.General.instance = 'preprod' # should be 'prod' or 'preprod'
 config.General.RestHostName = 'cmsweb-testbed.cern.ch'
-config.General.oracleFileTrans = '/crabserver/preprod/filetransfers'
-config.General.oracleUserTrans = '/crabserver/preprod/fileusertransfers'
+#config.General.oracleFileTrans = '/crabserver/preprod/filetransfers'
+#config.General.oracleUserTrans = '/crabserver/preprod/fileusertransfers'
 config.General.logLevel = 'INFO'
 config.General.pollInterval = 1800
 config.General.publish_dbs_url = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter'
