@@ -329,7 +329,7 @@ class Master(object):
             data = encodeRequest({'workflow': workflow})
             try:
                 #connection = HTTPRequests(self.config.RestHostName, self.config.serviceCert, self.config.serviceKey)
-                res = self.oracleDB(self.REST_workflow, data)
+                res = self.oracleDB.get(self.REST_workflow, data)
             except Exception as ex:
                 # logger.info(wfnamemsg+encodeRequest(data))
                 logger.warn('Error retrieving status from %s for %s.', self.REST_workflow, workflow)
