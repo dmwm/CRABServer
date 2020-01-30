@@ -474,7 +474,9 @@ class Master(object):
                 # find the location in the current environment of the script we want to run
                 import Publisher.TaskPublish as tp
                 taskPublishScript = tp.__file__
-                subprocess.call(["python", taskPublishScript, "configurationFile=%s"%configurationFile, "taskname=%"%workflow])
+                subprocess.call(["python", taskPublishScript,
+                                 "configurationFile=%s"%self.configurationFile,
+                                 "taskname=%"%workflow])
 
         except:
             logger.exception("Exception!")
