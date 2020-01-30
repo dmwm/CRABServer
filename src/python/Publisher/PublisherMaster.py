@@ -20,6 +20,7 @@ import sys
 import json
 import datetime
 import time
+from retry import retry
 from multiprocessing import Process
 
 from MultiProcessingLog import MultiProcessingLog
@@ -60,9 +61,12 @@ class Master(object):
         config = loadConfigurationFile(configurationFile)
 
         self.config = config.General
-        self.rest = self.config.oracleDB
-        self.filetransfers = self.config.oracleFileTrans
-        self.usertransfers = self.config.oracleUserTrans
+        # CRABServer REST API's (see CRABInterface)
+        #self.REST_filetransfers = '/crabserver/' + self.config.instance + '/filetransfers'
+        #self.REST_usertransfers = '/crabserver/' + self.config.instance +  '/fileusertransfers'
+        self.REST_filemetadata = '/crabserver/' + self.config.instance + '/filemetadata'
+        self.REST_workflow = '/crabserver/' + self.config.instance + 'workflow'
+        self.REST_task = '/crabserver/' + self.config.instance + 'task'
         
         self.max_files_per_block = self.config.max_files_per_block
         # these are used for talking to DBS
@@ -73,7 +77,6 @@ class Master(object):
         self.force_publication = False
         self.force_failure = False
         self.TestMode = testMode
-        self.cache_area = self.config.cache_area
         self.taskFilesDir = self.config.taskFilesDir
         try:
             os.makedirs(self.taskFilesDir)
@@ -137,11 +140,12 @@ class Master(object):
         with tempSetLogLevel(self.logger,logging.ERROR):
             self.myDN = proxy.getSubjectFromCert(certFile=self.config.serviceCert)
 
+        self.logger.debug('Contacting Oracle via CRABREST:' + self.config.RestHostName)
         try:
-            self.oracleDB = HTTPRequests(self.config.oracleDB,
-                                         self.config.serviceCert,
-                                         self.config.serviceKey)
-            self.logger.debug('Contacting Oracle via CRABREST:' + self.config.oracleDB)
+            self.oracleDB = HTTPRequests(url=self.config.RestHostName,
+                                         localcert=self.config.serviceCert,
+                                         localkey=self.config.serviceKey,
+                                         retry=3)
         except:
             self.logger.exception('Failed when contacting Oracle')
             raise
@@ -245,7 +249,7 @@ class Master(object):
             data['lfn'] = lfn_
 
             try:
-                res = self.oracleDB.get(self.filetransfers.replace('filetransfers', 'filemetadata'),
+                res = self.oracleDB.get(self.REST_filemetadata,
                                         data=encodeRequest(data, listParams=["lfn"]))
                 res = res[0]
             except Exception as ex:
@@ -305,8 +309,8 @@ class Master(object):
         workflow = str(task[0][3])
         wfnamemsg = "%s: " % (workflow)
 
-        if int(workflow[0:2]) < 18:
-            msg = "Skipped. Ignore tasks created before 2018."
+        if int(workflow[0:2]) < 20:
+            msg = "Skipped. Ignore tasks created before 2020."
             logger.info(wfnamemsg+msg)
             return 0
 
@@ -321,20 +325,16 @@ class Master(object):
             # Retrieve the workflow status. If the status can not be retrieved, continue
             # with the next workflow.
             workflow_status = ''
-            url = '/'.join(self.cache_area.split('/')[:-1]) #+ '/workflow'
-            msg = "Retrieving status from %s" % (url)
+            msg = "Retrieving status from %s" % (self.config.RestHostName)
             logger.info(wfnamemsg+msg)
-            data = {'workflow': workflow}
-            url = self.rest
-            connection = HTTPRequests(url,
-                                     self.config.serviceCert,
-                                     self.config.serviceKey)
-            
+            #urlPath = '/crabserver/' + self.config.instance + '/workflow'
+            data = encodeRequest({'workflow': workflow})
             try:
-                res = connection.get(self.filetransfers.replace('filetransfers', 'workflow'), data=encodeRequest(data))
+                #connection = HTTPRequests(self.config.RestHostName, self.config.serviceCert, self.config.serviceKey)
+                res = self.oracleDB(self.REST_workflow, data)
             except Exception as ex:
                 # logger.info(wfnamemsg+encodeRequest(data))
-                logger.warn('Error retrieving status from cache for %s.' % workflow)
+                logger.warn('Error retrieving status from %s for %s.', self.REST_workflow, workflow)
                 return 0
 
             try:
@@ -368,12 +368,9 @@ class Master(object):
                 # should be more or less independent of the output dataset in case there are
                 # more than one).
                 last_publication_time = None
-                data = {}
-                data['workflow'] = workflow
-                data['subresource'] = 'search'
+                data = encodeRequest({'workflow':workflow, 'subresource':'search'})
                 try:
-                    result = self.oracleDB.get(self.config.oracleFileTrans.replace('filetransfers', 'task'),
-                                               data=encodeRequest(data))
+                    result = self.oracleDB.get(self.config.REST_task, data)
                     logger.debug("task: %s " %  str(result[0]))
                     logger.debug("task: %s " %  getColumn(result[0], 'tm_last_publication'))
                 except Exception as ex:
@@ -436,10 +433,8 @@ class Master(object):
                 pnn, input_dataset, input_dbs_url = "", "", ""
                 for active_file in active_:
                     job_end_time = active_file['value'][5]
-                    if job_end_time and self.config.isOracle:
+                    if job_end_time :
                         wf_jobs_endtime.append(int(job_end_time) - time.timezone)
-                    elif job_end_time:
-                        wf_jobs_endtime.append(int(time.mktime(time.strptime(str(job_end_time), '%Y-%m-%d %H:%M:%S'))) - time.timezone)
                     source_lfn = active_file['value'][1]
                     dest_lfn = active_file['value'][2]
                     self.lfn_map[dest_lfn] = source_lfn
