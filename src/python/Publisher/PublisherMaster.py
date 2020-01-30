@@ -65,8 +65,8 @@ class Master(object):
         self.REST_filetransfers = '/crabserver/' + self.config.instance + '/filetransfers'
         #self.REST_usertransfers = '/crabserver/' + self.config.instance +  '/fileusertransfers'
         self.REST_filemetadata = '/crabserver/' + self.config.instance + '/filemetadata'
-        self.REST_workflow = '/crabserver/' + self.config.instance + 'workflow'
-        self.REST_task = '/crabserver/' + self.config.instance + 'task'
+        self.REST_workflow = '/crabserver/' + self.config.instance + '/workflow'
+        self.REST_task = '/crabserver/' + self.config.instance + '/task'
         
         self.max_files_per_block = self.config.max_files_per_block
         # these are used for talking to DBS
@@ -173,36 +173,34 @@ class Master(object):
                    u'user_group', u'taskname', u'transfer_state', u'destination_lfn'
         """
 
+        self.logger.debug("Retrieving publications from oracleDB")
+        uri = self.REST_filetransfers
         fileDoc = {}
         fileDoc['asoworker'] = self.config.asoworker
         fileDoc['subresource'] = 'acquirePublication'
-
-        self.logger.debug("Retrieving publications from oracleDB")
-
+        data=encodeRequest(fileDoc)
         results = ''
         try:
-            results = db.post(self.REST_filetransfers, data=encodeRequest(fileDoc))
+            results = db.post(uri=uri, data=data)
         except Exception as ex:
-            self.logger.error("Failed to acquire publications \
-                                from oracleDB: %s" % ex)
+            self.logger.error("Failed to acquire publications from %s: %s", uri, ex)
             return []
 
+        self.logger.debug("Retrieving max.100000 acquired publications from oracleDB")
         fileDoc = dict()
         fileDoc['asoworker'] = self.config.asoworker
         fileDoc['subresource'] = 'acquiredPublication'
         fileDoc['grouping'] = 0
         fileDoc['limit'] = 100000
-
-        self.logger.debug("Retrieving max.100000 acquired publications from oracleDB")
-
         result = []
+        uri=self.REST_filetransfers
+        data=encodeRequest(fileDoc)
 
         try:
-            results = db.get(self.REST_filetransfers, data=encodeRequest(fileDoc))
+            results = db.get(uri=uri, data=data)
             result.extend(oracleOutputMapping(results))
         except Exception as ex:
-            self.logger.error("Failed to acquire publications \
-                                from oracleDB: %s" %ex)
+            self.logger.error("Failed to acquire publications from %s: %s" uri, ex)
             return []
 
         self.logger.debug("publen: %s" % len(result))
@@ -245,13 +243,15 @@ class Master(object):
 
         for lfn_ in chunks(lfn_ready, 50):
             data['lfn'] = lfn_
+            data = encodeRequest({'lfn':lfn_}, listParams=["lfn"])
+            uri = self.REST_filemetadata
 
             try:
-                res = self.oracleDB.get(self.REST_filemetadata,
-                                        data=encodeRequest(data, listParams=["lfn"]))
+                #res = self.oracleDB.get(uri=uri, data=encodeRequest(data, listParams=["lfn"]))
+                res = self.oracleDB.get(uri=uri, data=data)
                 res = res[0]
             except Exception as ex:
-                self.logger.error("Error during metadata retrieving: %s" % ex)
+                self.logger.error("Error during metadata retrieving from %s: %s", uri, ex)
                 continue
 
             print(len(res['result']))
@@ -326,13 +326,14 @@ class Master(object):
             msg = "Retrieving status from %s" % (self.config.RestHostName)
             logger.info(wfnamemsg+msg)
             #urlPath = '/crabserver/' + self.config.instance + '/workflow'
+            uri = self.REST_workflow
             data = encodeRequest({'workflow': workflow})
             try:
                 #connection = HTTPRequests(self.config.RestHostName, self.config.serviceCert, self.config.serviceKey)
-                res = self.oracleDB.get(self.REST_workflow, data)
+                res = self.oracleDB.get(uri=uri, data=data)
             except Exception as ex:
                 # logger.info(wfnamemsg+encodeRequest(data))
-                logger.warn('Error retrieving status from %s for %s.', self.REST_workflow, workflow)
+                logger.warn('Error retrieving status from %s for %s.', uri, workflow)
                 return 0
 
             try:
