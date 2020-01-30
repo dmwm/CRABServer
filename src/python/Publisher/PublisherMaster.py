@@ -224,9 +224,9 @@ class Master(object):
         Download and read the files describing
         what needs to be published
         """
-        data = {}
-        data['taskname'] = workflow
-        data['filetype'] = 'EDM'
+        dataDict = {}
+        dataDict['taskname'] = workflow
+        dataDict['filetype'] = 'EDM'
 
         out = []
 
@@ -242,8 +242,8 @@ class Master(object):
                 yield l[i:i + n]
 
         for lfn_ in chunks(lfn_ready, 50):
-            data['lfn'] = lfn_
-            data = encodeRequest({'lfn':lfn_}, listParams=["lfn"])
+            dataDict['lfn'] = lfn_
+            data = encodeRequest(dataDict, listParams=["lfn"])
             uri = self.REST_filemetadata
 
             try:
@@ -475,8 +475,8 @@ class Master(object):
                 import Publisher.TaskPublish as tp
                 taskPublishScript = tp.__file__
                 subprocess.call(["python", taskPublishScript,
-                                 "configurationFile=%s"%self.configurationFile,
-                                 "taskname=%"%workflow])
+                                 "configurationFile=%s" % self.configurationFile,
+                                 "taskname=%s" % workflow])
 
         except:
             logger.exception("Exception!")
