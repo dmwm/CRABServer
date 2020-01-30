@@ -200,7 +200,7 @@ class Master(object):
             results = db.get(uri=uri, data=data)
             result.extend(oracleOutputMapping(results))
         except Exception as ex:
-            self.logger.error("Failed to acquire publications from %s: %s" uri, ex)
+            self.logger.error("Failed to acquire publications from %s: %s", uri, ex)
             return []
 
         self.logger.debug("publen: %s" % len(result))
