@@ -36,5 +36,9 @@ if usePdb:
    pdb.set_trace()
 
 master = Master(configurationFile, quiet, debug, testMode)
-master.algorithm()
+
+while (True):
+   master.algorithm()
+   time.sleep(master.pollInterval())
+   
 
