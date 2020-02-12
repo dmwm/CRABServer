@@ -36,7 +36,8 @@ MODEURL = {'cmsweb-dev': {'host': 'cmsweb-dev.cern.ch', 'instance':  'dev'},
            'cmsweb-preprod': {'host': 'cmsweb-testbed.cern.ch', 'instance': 'preprod'},
            'cmsweb-prod': {'host': 'cmsweb.cern.ch', 'instance':  'prod'},
            'test' :{'host': None, 'instance': 'preprod'},
-           'private': {'host': None, 'instance':  'dev'},}
+           'private': {'host': None, 'instance':  'dev'},
+          }
 
 def validateConfig(config):
     """Verify that the input configuration contains all needed info
