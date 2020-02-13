@@ -15,8 +15,7 @@ if hostname != hostAllowRun:
 from datetime import datetime
 from socket import gethostname
 from pprint import pprint
-#import requests
-from CMSMonitoring.StompAMQ import StompAMQ
+import requests
 from RESTInteractions import HTTPRequests
 import json
 
@@ -27,29 +26,9 @@ now = time.localtime()
 logfile = 'GenMonit-%s%s.log' % (now.tm_year, now.tm_mon)
 
 def send(document):
-#    return requests.post('http://monit-metrics:10012/', data=json.dumps(document),
-#                         headers={"Content-Type": "application/json; charset=UTF-8"})
-    username = ""
-    password = ""
-    ckey = '/afs/cern.ch/user/c/cmsmonit/public/.globus/robot-training-key.pem'
-    cert = '/afs/cern.ch/user/c/cmsmonit/public/.globus/robot-training-cert.pem'
-    creds = credentials()
-    producer = creds['producer']
-    topic = creds['topic']
+    return requests.post('http://monit-metrics:10012/', data=json.dumps(document),
+                         headers={"Content-Type": "application/json; charset=UTF-8"})
 
-    amq = StompAMQ(username, password,
-                   producer, topic,
-                   key=ckey, cert=cert,
-                   validation_schema=None, host_and_ports=[('http://monit-metrics', '10012')])
-
-    data = []
-    for doc in document:
-        # every document should be hash id
-        hid = doc.get("hash", 1) # replace this line with your hash id generation
-        notification, _, _ = amq.make_notification(doc, hid)
-        data.append(notification)
-
-    return amq.send(data)
 
 def send_and_check(document, should_fail=False):
     response = send(document)
