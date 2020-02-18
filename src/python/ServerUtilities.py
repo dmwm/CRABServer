@@ -470,7 +470,11 @@ def checkTaskLifetime(submissionTime):
     return msg
 
 def getEpochFromDBTime(startTime):
-    """ Provide a meaningful description
+    """
+    args:
+    startTime: a time tuple such as returned by the gmtime() function in the time module
+    returns:
+    seconds from Epoch
     """
     return calendar.timegm(startTime.utctimetuple())
 
