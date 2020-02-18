@@ -223,7 +223,7 @@ def algorithm():
     try:
         with open("task_process/transfers.txt") as _list:
             doc = json.loads(_list.readlines()[0])
-            publishname = doc['publishname']
+            publishname = doc['publishname'].replace('-00000000000000000000000000000000', '/rucio/USER')
         monitor_manager(user, publishname)
     except Exception:
         logging.exception('Monitor proccess failed.')
