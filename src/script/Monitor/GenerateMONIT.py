@@ -26,6 +26,15 @@ now = time.localtime()
 logfile = 'GenMonit-%s%s.log' % (now.tm_year, now.tm_mon)
 
 def send(document):
+    """
+    sends this document to Elastic Search via MONIT
+    the document may contain InfluxDB data, but those will be ignored unless the end point
+    in MONIT is changed. See main code body for more
+    Currently there is no need for using InfluxDB, see discussion in
+    https://its.cern.ch/jira/browse/CMSMONIT-72?focusedCommentId=2920389&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-2920389
+    :param document:
+    :return:
+    """
     return requests.post('http://monit-metrics:10012/', data=json.dumps(document),
                          headers={"Content-Type": "application/json; charset=UTF-8"})
 
@@ -163,6 +172,11 @@ class CRAB3CreateJson(object):
             metrics = []
             for oneSchedd in ListOfSchedds:
                 scheddName = oneSchedd[0]
+                # influxDB tags and fields are also added according to
+                # https://monitdocs.web.cern.ch/monitdocs/ingestion/service_metrics.html#writing-to-influxdb
+                # see https://github.com/dmwm/CRABServer/pull/6017  But they are irrelevant
+                # as long as MONIT entry point data are sent to is an Elastic Search one. See comments
+                # above in "send" function
                 influxDb_measures = dict(shadows = int(oneSchedd[1]),
                                          running_schedulers = int(oneSchedd[2]),
                                          idle_jobs = int(oneSchedd[3]),
@@ -233,6 +247,7 @@ if __name__ == '__main__':
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
+    # see comments above about InfluxDB tags and fields, they are added but will not be used by MONIT
     influxDb_measures = dict(abs_task_states={},
                              current_task_states={},
                              total_running_tasks=0,
