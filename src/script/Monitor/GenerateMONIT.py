@@ -163,25 +163,22 @@ class CRAB3CreateJson(object):
             metrics = []
             for oneSchedd in ListOfSchedds:
                 scheddName = oneSchedd[0]
+                influxDb_measures = dict(shadows = int(oneSchedd[1]),
+                                         running_schedulers = int(oneSchedd[2]),
+                                         idle_jobs = int(oneSchedd[3]),
+                                         running_jobs = int(oneSchedd[4]),
+                                         held_jobs = int(oneSchedd[5]),
+                                         all_jobs = int(oneSchedd[6]),
+                                        )
                 jsonDocSchedd = dict(
                                 producer='crab',
                                 type='schedd',
                                 hostname=gethostname(),
                                 name=scheddName,
-                                shadows=0,
-                                running_schedulers=0,
-                                idle_jobs=0,
-                                running_jobs=0,
-                                held_jobs=0,
-                                all_jobs=0
+                                idb_tags=["name"], # for InfluxDB
+                                idb_fields=influxDb_measures.keys(), # for InfluxDB
                                 )
-
-                jsonDocSchedd['shadows'] = int(oneSchedd[1])
-                jsonDocSchedd['running_schedulers'] = int(oneSchedd[2])
-                jsonDocSchedd['idle_jobs'] = int(oneSchedd[3])
-                jsonDocSchedd['running_jobs'] = int(oneSchedd[4])
-                jsonDocSchedd['held_jobs'] = int(oneSchedd[5])
-                jsonDocSchedd['all_jobs'] = int(oneSchedd[6])
+                jsonDocSchedd.update(influxDb_measures)
 
                 metrics.append(jsonDocSchedd)
 
@@ -236,16 +233,18 @@ if __name__ == '__main__':
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
+    influxDb_measures = dict(abs_task_states={},
+                             current_task_states={},
+                             total_running_tasks=0,
+                             total_idle_tasks=0,
+                             total_running_tp=0)
     jsonDoc = dict(
                    producer='crab',
                    type='taskworker',
                    hostname=gethostname(),
-                   abs_task_states={},
-                   current_task_states={},
-                   total_running_tasks=0,
-                   total_idle_tasks=0,
-                   total_running_tp=0,
+                   idb_fields=influxDb_measures.keys(), # for InfluxDB
                    )
+    jsonDoc.update(influxDb_measures)
 
     pr = CRAB3CreateJson(resthost, jsonDoc, logger)
 
@@ -253,7 +252,7 @@ if __name__ == '__main__':
     lockFile = workdir + 'CRAB3_SCHEDD_JSON.Lock'
     if os.path.isfile(lockFile):
         logger.error("%s already exists, abandon this run." % lockFile)
-        print "%s already exists, abandon this run" % lockFile
+        print("%s already exists, abandon this run" % lockFile)
         exit()
     else:
         open(lockFile, 'wa').close()  # create the lock
