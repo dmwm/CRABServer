@@ -143,7 +143,12 @@ class HTTPRequests(dict):
                 time.sleep(sleeptime) #sleeps 20s the first time, 40s the second time and so on
             else:
                 break
-        result = JSONRequests(idict={"pycurl" : True}).decode(datares)
+        try:
+            result = JSONRequests(idict={"pycurl" : True}).decode(datares)
+        except Exception as ex:
+            msg = "Fatal error reading data from %s" % url
+            self.logger.error(msg)
+            raise #really exit and raise exception
         return result, response.status, response.reason
 
     @staticmethod
