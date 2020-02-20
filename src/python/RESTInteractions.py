@@ -130,6 +130,8 @@ class HTTPRequests(dict):
             except Exception as ex:
                 #add here other temporary errors we need to retry
                 if (not retriableError(ex)) or (i == self['retry']):
+                    msg = "Fatal error trying to connect to %s" % url
+                    self.logger.error(msg)
                     raise #really exit and raise exception if this was the last retry or the exit code is not among the list of the one we retry
                 sleeptime = 20 * (i + 1)
                 msg = "Sleeping %s seconds after HTTP error. Error details:  " % sleeptime
