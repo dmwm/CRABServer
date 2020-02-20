@@ -130,7 +130,7 @@ class HTTPRequests(dict):
             except Exception as ex:
                 #add here other temporary errors we need to retry
                 if (not retriableError(ex)) or (i == self['retry']):
-                    msg = "Fatal error trying to connect to %s" % url
+                    msg = "Fatal error trying to connect to %s using %s" % (url, data)
                     self.logger.error(msg)
                     raise #really exit and raise exception if this was the last retry or the exit code is not among the list of the one we retry
                 sleeptime = 20 * (i + 1)
@@ -146,7 +146,7 @@ class HTTPRequests(dict):
         try:
             result = JSONRequests(idict={"pycurl" : True}).decode(datares)
         except Exception as ex:
-            msg = "Fatal error reading data from %s" % url
+            msg = "Fatal error reading data from %s using %s" % (url, data)
             self.logger.error(msg)
             raise #really exit and raise exception
         return result, response.status, response.reason
