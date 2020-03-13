@@ -249,6 +249,28 @@ class MasterWorker(object):
                 self.logger.info("Failed %s tasks (limit %s), getting next chunk of tasks", len(pendingwork), limit)
 
 
+    def failBannedTask(self, task):
+        """ This method is used at the TW startup and it fails NEW tasks which I do not like
+        The method put those task to SUBMITFAILED, KILLFAILED, RESUBMITFAILED depending on the value of
+         the command field.
+        Initial implementation bans based on a list of usernames, other task attributes can
+          be checked if needed by adding a bit of code
+        Returns:
+            True : if the task was declared bad and was failed
+            False: for normal (good) tasks
+        """
+        bannedUsernames = getattr(self.config.TaskWorker, 'bannedUsernames', [])
+        if task['tm_username'] in bannedUsernames:
+            self.logger.debug("Forcefully failing task %s", task['tm_taskname'])
+            if task['tm_task_command']:
+                dummyWorktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
+            else:
+                failstatus = 'FAILED'
+            self.updateWork(task['tm_taskname'], task['tm_task_command'], failstatus)
+            # TODO look into logging a message for the user
+            return True
+        return False
+
     def algorithm(self):
         """I'm the intelligent guy taking care of getting the work
            and distributing it to the slave processes."""
@@ -270,6 +292,8 @@ class MasterWorker(object):
 
             toInject = []
             for task in pendingwork:
+                if self.failBannedTask(task):
+                    continue
                 if self.updateWork(task['tm_taskname'], task['tm_task_command'], 'QUEUED'):
                     worktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
                     toInject.append((worktype, task, failstatus, None))
