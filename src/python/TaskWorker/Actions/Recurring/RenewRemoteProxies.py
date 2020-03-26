@@ -66,6 +66,7 @@ class CRAB3ProxyRenewer(object):
             group = ad['CRAB_UserGroup']
         if 'CRAB_UserRole' in ad and ad['CRAB_UserRole'] and ad['CRAB_UserRole'] != classad.Value.Undefined:
             role = ad['CRAB_UserRole']
+        username = ad['CRAB_UserHN']  # this better exist at all times !
         proxycfg = {'vo': vo,
                     'logger': self.logger,
                     'myProxySvr': self.config.Services.MyProxy,
@@ -81,10 +82,17 @@ class CRAB3ProxyRenewer(object):
                     'uisource': getattr(self.config.MyProxy, 'uisource', ''),
                     'credServerPath': self.config.MyProxy.credpath,
                     'cleanEnvironment' : getattr(self.config.MyProxy, 'cleanEnvironment', False)}
+        # try with old fashioned DN hash as myproxy login name
         proxy = Proxy(proxycfg)
         userproxy = proxy.getProxyFilename(serverRenewer=True)
         proxy.logonRenewMyProxy()
-        timeleft = proxy.getTimeLeft(userproxy)
+        timeleft1 = proxy.getTimeLeft(userproxy)
+        # try also with new username_CRAB
+        proxycfg['userName'] = username + '_CRAB'
+        userproxy = proxy.getProxyFilename(serverRenewer=True)
+        proxy.logonRenewMyProxy()
+        timeleft2 = proxy.getTimeLeft(userproxy)
+        timeleft = max (timeleft1, timeleft2)
         if timeleft is None or timeleft <= 0:
             self.logger.error("Impossible to retrieve proxy from %s for %s." %(proxycfg['myProxySvr'], proxycfg['userDN']))
             raise Exception("Failed to retrieve proxy.")
