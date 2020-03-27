@@ -428,7 +428,7 @@ class DagmanCreator(TaskAction.TaskAction):
         if self.isHammerCloud(task):
             WMTool = 'HammerCloud'
         else:
-            WMTool = 'USER'
+            WMTool = 'User'
         return WMTool
 
     def setCMS_TaskType(self, task):
