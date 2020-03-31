@@ -89,6 +89,7 @@ class CRAB3ProxyRenewer(object):
         timeleft1 = proxy.getTimeLeft(userproxy)
         # try also with new username_CRAB
         proxycfg['userName'] = username + '_CRAB'
+        proxy = Proxy(proxycfg)
         userproxy = proxy.getProxyFilename(serverRenewer=True)
         proxy.logonRenewMyProxy()
         timeleft2 = proxy.getTimeLeft(userproxy)
