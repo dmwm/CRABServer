@@ -37,7 +37,8 @@ class DataDiscovery(TaskAction):
         blocksWithNoLocations = set()
         ## Loop over the sorted list of files.
         configDict = {"cacheduration": 1, "pycurl": True} # cache duration is in hours
-        resourceCatalog = CRIC(logger=self.logger, configDict=configDict)
+        with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
+            resourceCatalog = CRIC(logger=self.logger, configDict=configDict)
         # can't affort one message from CRIC per file, unless critical !
         with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
             for lfn, infos in datasetfiles.iteritems():
