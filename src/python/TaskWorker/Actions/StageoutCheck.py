@@ -8,6 +8,8 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import isFailurePermanent
 from ServerUtilities import getCheckWriteCommand, createDummyFile
 from ServerUtilities import removeDummyFile, getPFN, executeCommand
+from ServerUtilities import tempSetLogLevel
+import logging
 
 class StageoutCheck(TaskAction):
 
@@ -77,7 +79,8 @@ class StageoutCheck(TaskAction):
             return
         filename = re.sub("[:-_]", "", self.task['tm_taskname']) + '_crab3check.tmp'
         try:
-            pfn = getPFN(self.proxy, self.task['tm_output_lfn'], filename, self.task['tm_asyncdest'], self.logger)
+            with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
+                pfn = getPFN(self.proxy, self.task['tm_output_lfn'], filename, self.task['tm_asyncdest'], self.logger)
             cpCmd += append + os.path.abspath(filename) + " " + pfn
             rmCmd += " " + pfn
             createDummyFile(filename, self.logger)
