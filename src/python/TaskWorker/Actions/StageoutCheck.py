@@ -71,7 +71,6 @@ class StageoutCheck(TaskAction):
             return
         self.workflow = self.task['tm_taskname']
         self.proxy = self.task['user_proxy']
-        self.logger.info(self.task)
         cpCmd, rmCmd, append = getCheckWriteCommand(self.proxy, self.logger)
         if not cpCmd:
             self.logger.info("CRAB3 is not configured to check write permissions. There is no GFAL2 or LCG commands installed. Continuing")
