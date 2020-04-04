@@ -84,14 +84,11 @@ class StageoutCheck(TaskAction):
             cpCmd += append + os.path.abspath(filename) + " " + pfn
             rmCmd += " " + pfn
             createDummyFile(filename, self.logger)
-            try:
-                self.logger.info("Executing cp command: %s ", cpCmd)
-                res = self.checkPermissions(cpCmd)
-                if res==0:
-                    self.logger.info("Executing rm command: %s ", rmCmd)
-                    self.checkPermissions(rmCmd)
-            finally:
-                removeDummyFile(filename, self.logger)
+            self.logger.info("Executing cp command: %s ", cpCmd)
+            res = self.checkPermissions(cpCmd)
+            if res==0:
+                self.logger.info("Executing rm command: %s ", rmCmd)
+                self.checkPermissions(rmCmd)
         except IOError as er:
             self.logger.info('IOError %s. CRAB3 backend disk is full. Please report to experts. Task will not be submitted', er)
             raise
