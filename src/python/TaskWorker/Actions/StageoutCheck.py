@@ -8,6 +8,8 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import isFailurePermanent
 from ServerUtilities import getCheckWriteCommand, createDummyFile
 from ServerUtilities import removeDummyFile, getPFN, executeCommand
+from ServerUtilities import tempSetLogLevel
+import logging
 
 class StageoutCheck(TaskAction):
 
@@ -71,25 +73,22 @@ class StageoutCheck(TaskAction):
             return
         self.workflow = self.task['tm_taskname']
         self.proxy = self.task['user_proxy']
-        self.logger.info(self.task)
         cpCmd, rmCmd, append = getCheckWriteCommand(self.proxy, self.logger)
         if not cpCmd:
             self.logger.info("CRAB3 is not configured to check write permissions. There is no GFAL2 or LCG commands installed. Continuing")
             return
         filename = re.sub("[:-_]", "", self.task['tm_taskname']) + '_crab3check.tmp'
         try:
-            pfn = getPFN(self.proxy, self.task['tm_output_lfn'], filename, self.task['tm_asyncdest'], self.logger)
+            with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
+                pfn = getPFN(self.proxy, self.task['tm_output_lfn'], filename, self.task['tm_asyncdest'], self.logger)
             cpCmd += append + os.path.abspath(filename) + " " + pfn
             rmCmd += " " + pfn
             createDummyFile(filename, self.logger)
-            try:
-                self.logger.info("Executing cp command: %s ", cpCmd)
-                res = self.checkPermissions(cpCmd)
-                if res==0:
-                    self.logger.info("Executing rm command: %s ", rmCmd)
-                    self.checkPermissions(rmCmd)
-            finally:
-                removeDummyFile(filename, self.logger)
+            self.logger.info("Executing cp command: %s ", cpCmd)
+            res = self.checkPermissions(cpCmd)
+            if res==0:
+                self.logger.info("Executing rm command: %s ", rmCmd)
+                self.checkPermissions(rmCmd)
         except IOError as er:
             self.logger.info('IOError %s. CRAB3 backend disk is full. Please report to experts. Task will not be submitted', er)
             raise
