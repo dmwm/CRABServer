@@ -142,7 +142,7 @@ class DBSDataDiscovery(DataDiscovery):
         ## '/JetHT/Run2016B-PromptReco-v2/AOD#89b03ca6-1dc9-11e6-b567-001e67ac06a0': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL']}
         try:
             dbsOnly = self.dbsInstance.split('/')[1] != 'global'
-            locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly)
+            locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly, config=self.config)
             if secondaryDataset:
                 secondaryLocationsMap = self.dbs.listFileBlockLocation(list(secondaryBlocks), dbsOnly=dbsOnly)
         except Exception as ex: # TODO should we catch HttpException instead?

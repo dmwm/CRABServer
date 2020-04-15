@@ -86,8 +86,10 @@ def perform_transfers(inputFile, lastLine, direct=False):
             except Exception:
                 continue
             for column in to_submit_columns:
-                if column not in ['checksums']:
+                if column not in ['checksums', 'publishname']:
                     file_to_submit.append(doc[column])
+                if column == "publishname":
+                    file_to_submit.append(doc["publishname"].replace('-00000000000000000000000000000000', '/rucio/USER'))
                 if column == "checksums":
                     file_to_submit.append(doc["checksums"]["adler32"].rjust(8,'0'))
             transfers.append(file_to_submit)
@@ -223,7 +225,7 @@ def algorithm():
     try:
         with open("task_process/transfers.txt") as _list:
             doc = json.loads(_list.readlines()[0])
-            publishname = doc['publishname']
+            publishname = doc['publishname'].replace('-00000000000000000000000000000000', '/rucio/USER')
         monitor_manager(user, publishname)
     except Exception:
         logging.exception('Monitor proccess failed.')
