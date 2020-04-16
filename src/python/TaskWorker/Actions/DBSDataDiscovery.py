@@ -8,6 +8,7 @@ import urllib
 
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
+from WMCore.Services.Rucio.Rucio import Rucio
 from WMCore.Services.DBS.DBSReader import DBSReader
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
@@ -104,18 +105,24 @@ class DBSDataDiscovery(DataDiscovery):
         rucio_config_dict = {
             "phedexCompatible": True,
             "auth_type": "x509",
+            "ca_cert": self.config.Services.Rucio_caPath,
             "creds": {
-                "client_cert": self.config.TaskWorker.cmscert
+                "client_cert": self.config.TaskWorker.cmscert,
                 "client_key": self.config.TaskWorker.cmskey
             }
         }   
 
         rucioClient = Rucio(
-            self.config.Services.Rucio.account,
-            hostUrl=self.config.Services.Rucio.host,
-            authUrl=self.config.Services.Rucio.authUrl,
+            self.config.Services.Rucio_account,
+            hostUrl=self.config.Services.Rucio_host,
+            authUrl=self.config.Services.Rucio_authUrl,
             configDict=rucio_config_dict
         )
+
+        try:
+            rucioClient.whoAmI()
+        except Exception as ex:
+            raise TaskWorkerException("Failed to initialize Rucio client: %s" % str(ex))
 
         self.logger.info("Data discovery with DBS") ## to be changed into debug
 
@@ -158,14 +165,14 @@ class DBSDataDiscovery(DataDiscovery):
         ## '/JetHT/Run2016B-PromptReco-v2/AOD#89b03ca6-1dc9-11e6-b567-001e67ac06a0': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL']}
         try:
             dbsOnly = self.dbsInstance.split('/')[1] != 'global'
-            locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly, config=self.config)
+            locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly)
             if secondaryDataset:
                 secondaryLocationsMap = self.dbs.listFileBlockLocation(list(secondaryBlocks), dbsOnly=dbsOnly)
         except Exception as ex: # TODO should we catch HttpException instead?
             self.logger.warn(ex)
             self.logger.info("Trying with Rucio data location")
             try:
-                blocksInfo = self.rucio.getReplicaInfoForBlocks(fileBlockNames)
+                blocksInfo = rucioClient.getReplicaInfoForBlocks(fileBlockNames)
             except Exception as ex:
                 raise TaskWorkerException(
                     "The CRAB3 server backend could not get the location of the files from dbs or phedex or rucio.\n"+\
