@@ -101,6 +101,22 @@ class DBSDataDiscovery(DataDiscovery):
         return result
 
     def executeInternal(self, *args, **kwargs):
+        rucio_config_dict = {
+            "phedexCompatible": True,
+            "auth_type": "x509",
+            "creds": {
+                "client_cert": self.config.TaskWorker.cmscert
+                "client_key": self.config.TaskWorker.cmskey
+            }
+        }   
+
+        rucioClient = Rucio(
+            self.config.Services.Rucio.account,
+            hostUrl=self.config.Services.Rucio.host,
+            authUrl=self.config.Services.Rucio.authUrl,
+            configDict=rucio_config_dict
+        )
+
         self.logger.info("Data discovery with DBS") ## to be changed into debug
 
 
@@ -146,10 +162,16 @@ class DBSDataDiscovery(DataDiscovery):
             if secondaryDataset:
                 secondaryLocationsMap = self.dbs.listFileBlockLocation(list(secondaryBlocks), dbsOnly=dbsOnly)
         except Exception as ex: # TODO should we catch HttpException instead?
-            self.logger.exception(ex)
-            raise TaskWorkerException("The CRAB3 server backend could not get the location of the files from dbs or phedex.\n"+\
-                                      "This is could be a temporary phedex/dbs glitch, please try to submit a new task (resubmit will not work)"+\
-                                      " and contact the experts if the error persists.\nError reason: %s" % str(ex))
+            self.logger.warn(ex)
+            self.logger.info("Trying with Rucio data location")
+            try:
+                blocksInfo = self.rucio.getReplicaInfoForBlocks(fileBlockNames)
+            except Exception as ex:
+                raise TaskWorkerException(
+                    "The CRAB3 server backend could not get the location of the files from dbs or phedex or rucio.\n"+\
+                    "This is could be a temporary phedex/rucio/dbs glitch, please try to submit a new task (resubmit will not work)"+\
+                    " and contact the experts if the error persists.\nError reason: %s" % str(ex)
+                    )
         locationsMap = {key: value for key, value in locationsMap.iteritems() if value}
         blocksWithLocation = locationsMap.keys()
         if secondaryDataset:
