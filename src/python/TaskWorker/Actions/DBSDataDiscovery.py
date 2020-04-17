@@ -165,19 +165,49 @@ class DBSDataDiscovery(DataDiscovery):
         ## '/JetHT/Run2016B-PromptReco-v2/AOD#89b03ca6-1dc9-11e6-b567-001e67ac06a0': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL']}
         try:
             dbsOnly = self.dbsInstance.split('/')[1] != 'global'
-            locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly)
-            if secondaryDataset:
-                secondaryLocationsMap = self.dbs.listFileBlockLocation(list(secondaryBlocks), dbsOnly=dbsOnly)
+            # TODO:
+            #scope = "cms" if dbsOnly else "user.%s" % username 
+            scope = "cms"
+            self.logger.info("Trying data location with Rucio first")
+
+            locations = rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(blocks))
+            located_blocks = locations['phedex']['block']
+            locationsMap = {}
+
+            if len(located_blocks) == 0:
+                raise Exception('No location found for blocks')
+
+            for element in located_blocks:
+                locationsMap.update({element['name']: [ x['node'] for x in element['replica'] ] })
+
+            #self.logger.info("LOCATIONS RUCIO: %s" % locationsMap)
         except Exception as ex: # TODO should we catch HttpException instead?
-            self.logger.warn(ex)
-            self.logger.info("Trying with Rucio data location")
+            self.logger.warn("No locations foud with rucio: %s \n Trying with DBS and PhEDEx" % str(ex))
             try:
-                blocksInfo = rucioClient.getReplicaInfoForBlocks(fileBlockNames)
+                locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly)
             except Exception as ex:
                 raise TaskWorkerException(
                     "The CRAB3 server backend could not get the location of the files from dbs or phedex or rucio.\n"+\
                     "This is could be a temporary phedex/rucio/dbs glitch, please try to submit a new task (resubmit will not work)"+\
                     " and contact the experts if the error persists.\nError reason: %s" % str(ex)
+                    )
+        if secondaryDataset:
+            try:
+                #scope = "cms" if dbsOnly else "user.%s" % username 
+                scope = "cms"
+                secDids = [{ "name": x , "scope": scope } for x in list(secondaryBlocks)]
+                self.logger.info("Trying data location of secondary blocks with Rucio first")
+                secondaryLocationsMap = rucioClient.getReplicaInfoForBlocks(dids=secDids)
+            except Exception as ex: # TODO should we catch HttpException instead?
+                self.logger.warn("No locations foud with rucio: %s \n Trying with DBS and PhEDEx" % str(ex))
+                try:
+                    dbsOnly = self.dbsInstance.split('/')[1] != 'global'
+                    secondaryLocationsMap = self.dbs.listFileBlockLocation(list(secondaryBlocks), dbsOnly=dbsOnly)
+                except Exception as ex:
+                    raise TaskWorkerException(
+                        "The CRAB3 server backend could not get the location of the files from dbs or phedex or rucio.\n"+\
+                        "This is could be a temporary phedex/rucio/dbs glitch, please try to submit a new task (resubmit will not work)"+\
+                        " and contact the experts if the error persists.\nError reason: %s" % str(ex)
                     )
         locationsMap = {key: value for key, value in locationsMap.iteritems() if value}
         blocksWithLocation = locationsMap.keys()
