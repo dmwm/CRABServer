@@ -195,9 +195,18 @@ class DBSDataDiscovery(DataDiscovery):
             try:
                 #scope = "cms" if dbsOnly else "user.%s" % username 
                 scope = "cms"
-                secDids = [{ "name": x , "scope": scope } for x in list(secondaryBlocks)]
+
                 self.logger.info("Trying data location of secondary blocks with Rucio first")
-                secondaryLocationsMap = rucioClient.getReplicaInfoForBlocks(dids=secDids)
+                locations = rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(secondaryBlocks))
+                located_blocks = locations['phedex']['block']
+                secondaryLocationsMap = {}
+
+                if len(located_blocks) == 0:
+                    raise Exception('No location found for blocks')
+
+                for element in located_blocks:
+                    secondaryLocationsMap.update({element['name']: [ x['node'] for x in element['replica'] ] })
+
             except Exception as ex: # TODO should we catch HttpException instead?
                 self.logger.warn("No locations foud with rucio: %s \n Trying with DBS and PhEDEx" % str(ex))
                 try:
