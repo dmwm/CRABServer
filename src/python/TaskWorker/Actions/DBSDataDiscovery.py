@@ -193,6 +193,8 @@ class DBSDataDiscovery(DataDiscovery):
                     )
         if secondaryDataset:
             try:
+                dbsOnly = self.dbsInstance.split('/')[1] != 'global'
+                # TODO:
                 #scope = "cms" if dbsOnly else "user.%s" % username 
                 scope = "cms"
 
@@ -210,7 +212,6 @@ class DBSDataDiscovery(DataDiscovery):
             except Exception as ex: # TODO should we catch HttpException instead?
                 self.logger.warn("No locations foud with rucio: %s \n Trying with DBS and PhEDEx" % str(ex))
                 try:
-                    dbsOnly = self.dbsInstance.split('/')[1] != 'global'
                     secondaryLocationsMap = self.dbs.listFileBlockLocation(list(secondaryBlocks), dbsOnly=dbsOnly)
                 except Exception as ex:
                     raise TaskWorkerException(
