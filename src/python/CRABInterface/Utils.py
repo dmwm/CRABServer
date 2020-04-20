@@ -86,35 +86,74 @@ def execute_command(command, logger, timeout):
 centralCfgFallback = None
 def getCentralConfig(extconfigurl, mode):
     """Utility to retrieve the central configuration to be used for dynamic variables
-
     arg str extconfigurl: the url pointing to the exteranl configuration parameter
     arg str mode: also known as the variant of the rest (prod, preprod, dev, private)
     return: the dictionary containing the external configuration for the selected mode."""
 
     global centralCfgFallback
-    hbuf = StringIO.StringIO()
-    bbuf = StringIO.StringIO()
 
-    curl = pycurl.Curl()
-    curl.setopt(pycurl.URL, extconfigurl)
-    curl.setopt(pycurl.WRITEFUNCTION, bbuf.write)
-    curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
-    curl.setopt(pycurl.FOLLOWLOCATION, 1)
-    curl.perform()
-    curl.close()
+    def retrieveConfig(externalLink):
 
-    header = ResponseHeader(hbuf.getvalue())
-    if (header.status < 200 or header.status >= 300):
-        msg = "Reading %s returned %s." % (extconfigurl, header.status)
-        if centralCfgFallback:
-            msg += "\nUsing cached values for external configuration."
-            cherrypy.log(msg)
-            return centralCfgFallback
+        hbuf = StringIO.StringIO()
+        bbuf = StringIO.StringIO()
+
+        curl = pycurl.Curl()
+        curl.setopt(pycurl.URL, externalLink)
+        curl.setopt(pycurl.WRITEFUNCTION, bbuf.write)
+        curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
+        curl.setopt(pycurl.FOLLOWLOCATION, 1)
+        curl.perform()
+        curl.close()
+
+        header = ResponseHeader(hbuf.getvalue())
+        if (header.status < 200 or header.status >= 300):
+            msg = "Reading %s returned %s." % (externalLink, header.status)
+            if centralCfgFallback:
+                msg += "\nUsing cached values for external configuration."
+                cherrypy.log(msg)
+                return centralCfgFallback
+            else:
+                cherrypy.log(msg)
+                raise ExecutionError("Internal issue when retrieving external configuration from %s" % externalLink)        
+        jsonConfig = bbuf.getvalue() 
+        
+        return jsonConfig
+
+    extConfCommon = json.loads(retrieveConfig(extconfigurl))
+
+    # below 'if' condition is only added for the transition period from the old config file to the new one. It should be removed after some time.
+    if 'modes' in extConfCommon:
+        extConfSchedds = json.loads(retrieveConfig(extConfCommon['htcondorScheddsLink']))
+
+        # The code below constructs dict from below provided JSON structure
+        # {   u'htcondorPool': '', u'compatible-version': [''], u'htcondorScheddsLink': '',
+        #     u'modes': [{
+        #         u'mode': '', u'backend-urls': {
+        #             u'asoConfig': [{ u'couchURL': '', u'couchDBName': ''}],
+        #             u'htcondorSchedds': [''], u'cacheSSL': '', u'baseURL': ''}}],
+        #     u'banned-out-destinations': [], u'delegate-dn': ['']}
+        # to match expected dict structure which is:
+        # {   u'compatible-version': [''], u'htcondorScheddsLink': '',
+        #     'backend-urls': {
+        #         u'asoConfig': [{u'couchURL': '', u'couchDBName': ''}],
+        #         u'htcondorSchedds': {u'crab3@vocmsXXXX.cern.ch': {u'proxiedurl': '', u'weightfactor': 1}},
+        #         u'cacheSSL': '', u'baseURL': '', 'htcondorPool': ''},
+        #     u'banned-out-destinations': [], u'delegate-dn': ['']}
+        extConfCommon['backend-urls'] = next((item['backend-urls'] for item in extConfCommon['modes'] if item['mode'] == mode), None)
+        extConfCommon['backend-urls']['htcondorPool'] = extConfCommon.pop('htcondorPool')
+        del extConfCommon['modes']
+
+        # if htcondorSchedds": [] is not empty, it gets populated with the specified list of schedds,
+        # otherwise it takes default list of schedds
+        if extConfCommon['backend-urls']['htcondorSchedds']:
+            extConfCommon['backend-urls']['htcondorSchedds'] = {k: v for k, v in extConfSchedds.items() if
+                                                                k in extConfCommon['backend-urls']['htcondorSchedds']}
         else:
-            cherrypy.log(msg)
-            raise ExecutionError("Internal issue when retrieving external confifuration from %s" % extconfigurl)
-
-    centralCfgFallback = json.loads(bbuf.getvalue())[mode]
+            extConfCommon["backend-urls"]["htcondorSchedds"] = extConfSchedds
+        centralCfgFallback = extConfCommon
+    else:
+        centralCfgFallback = extConfCommon[mode]
+        
     return centralCfgFallback
 
 
