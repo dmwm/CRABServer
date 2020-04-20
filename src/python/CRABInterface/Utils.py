@@ -114,8 +114,10 @@ def getCentralConfig(extconfigurl, mode):
                 return centralCfgFallback
             else:
                 cherrypy.log(msg)
-                raise ExecutionError("Internal issue when retrieving external configuration from %s" % externalLink)
-        return bbuf.getvalue()
+                raise ExecutionError("Internal issue when retrieving external configuration from %s" % externalLink)        
+        jsonConfig = bbuf.getvalue() 
+        
+        return jsonConfig
 
     extConfCommon = json.loads(retrieveConfig(extconfigurl))
 
@@ -124,20 +126,25 @@ def getCentralConfig(extconfigurl, mode):
         extConfSchedds = json.loads(retrieveConfig(extConfCommon['htcondorScheddsLink']))
 
         # The code below constructs dict from below provided JSON structure
-        # {u'htcondorPool': '', u'compatible-version': [], u'htcondorScheddsLink': '',u'modes':
-        # [{u'mode': u'crab-dev', u'backend-urls': {u'asoConfig': [{u'couchURL': '', u'couchDBName': ''}],u'htcondorSchedds': [],
-        # u'cacheSSL': '', u'baseURL': ''}}, ...], u'banned-out-destinations': [], u'delegate-dn': [] }
+        # {   u'htcondorPool': '', u'compatible-version': [''], u'htcondorScheddsLink': '',
+        #     u'modes': [{
+        #         u'mode': '', u'backend-urls': {
+        #             u'asoConfig': [{ u'couchURL': '', u'couchDBName': ''}],
+        #             u'htcondorSchedds': [''], u'cacheSSL': '', u'baseURL': ''}}],
+        #     u'banned-out-destinations': [], u'delegate-dn': ['']}
         # to match expected dict structure which is:
-        # {u'compatible-version': [], u'htcondorScheddsLink': '', u'mode': u'crab-dev',
-        # u'backend-urls': {u'asoConfig': [{u'couchURL': '',u'couchDBName': ''}],
-        # u'htcondorSchedds': {u'crab3@vocms0155.cern.ch': {u'proxiedurl': u'', u'weightfactor': 1},...},
-        # u'cacheSSL': '', u'baseURL': '', 'htcondorPool': ''}, u'banned-out-destinations': [], u'delegate-dn': [] }
+        # {   u'compatible-version': [''], u'htcondorScheddsLink': '',
+        #     'backend-urls': {
+        #         u'asoConfig': [{u'couchURL': '', u'couchDBName': ''}],
+        #         u'htcondorSchedds': {u'crab3@vocmsXXXX.cern.ch': {u'proxiedurl': '', u'weightfactor': 1}},
+        #         u'cacheSSL': '', u'baseURL': '', 'htcondorPool': ''},
+        #     u'banned-out-destinations': [], u'delegate-dn': ['']}
         extConfCommon['backend-urls'] = next((item['backend-urls'] for item in extConfCommon['modes'] if item['mode'] == mode), None)
         extConfCommon['backend-urls']['htcondorPool'] = extConfCommon.pop('htcondorPool')
         del extConfCommon['modes']
 
-        # if htcondorSchedds": [] is not empty, it gets populated with the default list of schedds,
-        # otherwise it takes specified list of schedds
+        # if htcondorSchedds": [] is not empty, it gets populated with the specified list of schedds,
+        # otherwise it takes default list of schedds
         if extConfCommon['backend-urls']['htcondorSchedds']:
             extConfCommon['backend-urls']['htcondorSchedds'] = {k: v for k, v in extConfSchedds.items() if
                                                                 k in extConfCommon['backend-urls']['htcondorSchedds']}
