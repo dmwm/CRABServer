@@ -165,24 +165,33 @@ class DBSDataDiscovery(DataDiscovery):
         ## '/JetHT/Run2016B-PromptReco-v2/AOD#89b03ca6-1dc9-11e6-b567-001e67ac06a0': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL']}
         try:
             dbsOnly = self.dbsInstance.split('/')[1] != 'global'
-            # TODO:
-            #scope = "cms" if dbsOnly else "user.%s" % username 
-            scope = "cms"
-            self.logger.info("Trying data location with Rucio first")
 
-            locations = rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(blocks))
-            located_blocks = locations['phedex']['block']
-            locationsMap = {}
+            # If the dataset is a /USER one, use the Rucio user scope to find it
+            # TODO: we need a way to enable users to indicate others user scopes as source
+            scope = "cms" if not dbsOnly else "user.%s" % kwargs['task']['tm_username']
 
-            if len(located_blocks) == 0:
-                raise Exception('No location found for blocks')
+            # For now apply Rucio data location only to NANOAOD*
+            isNano = blocks[0].split("#")[0].split("/")[-1] in ["NANOAOD", "NANOAODSIM"]
+            if isNano:
+                self.logger.info("NANOAOD dataset. Trying data location with Rucio first. Scope: %s" % scope)
+                locations = rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(blocks))
+                located_blocks = locations['phedex']['block']
+                locationsMap = {}
+                if len(located_blocks) == 0:
+                    raise Exception('No location found for blocks')
 
-            for element in located_blocks:
-                locationsMap.update({element['name']: [ x['node'] for x in element['replica'] ] })
+                for element in located_blocks:
+                    # self.logger.info(element)
+                    locationsMap.update({element['name']: [ x['node'] for x in element['replica'] ] })
 
-            #self.logger.info("LOCATIONS RUCIO: %s" % locationsMap)
-        except Exception as ex: # TODO should we catch HttpException instead?
-            self.logger.warn("No locations foud with rucio: %s \n Trying with DBS and PhEDEx" % str(ex))
+                self.keepOnlyDisks(locationsMap)
+                if not locationsMap:
+                    raise Exception('No location found on DISK')
+                # self.logger.info("LOCATIONS RUCIO: %s" % locationsMap)
+            else:
+                raise Exception('Dataset is not a NANOAOD. Skipping RUCIO data location')
+        except Exception as ex:
+            self.logger.warn("No locations found with rucio: %s \n Trying with DBS and PhEDEx" % str(ex))
             try:
                 locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=dbsOnly)
             except Exception as ex:
@@ -194,21 +203,26 @@ class DBSDataDiscovery(DataDiscovery):
         if secondaryDataset:
             try:
                 dbsOnly = self.dbsInstance.split('/')[1] != 'global'
-                # TODO:
-                #scope = "cms" if dbsOnly else "user.%s" % username 
-                scope = "cms"
+                scope = "cms" if dbsOnly else "user.%s" % kwargs['task']['tm_username']
 
-                self.logger.info("Trying data location of secondary blocks with Rucio first")
-                locations = rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(secondaryBlocks))
-                located_blocks = locations['phedex']['block']
-                secondaryLocationsMap = {}
+                isNano = blocks[0].split("#")[0].split("/")[-1] in ["NANOAOD", "NANOAODSIM"]
+                if isNano:
+                    self.logger.info("NANOAOD dataset. Trying data location of secondary blocks with Rucio first")
+                    locations = rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(secondaryBlocks))
+                    located_blocks = locations['phedex']['block']
+                    secondaryLocationsMap = {}
 
-                if len(located_blocks) == 0:
-                    raise Exception('No location found for blocks')
+                    if len(located_blocks) == 0:
+                        raise Exception('No location found for blocks')
 
-                for element in located_blocks:
-                    secondaryLocationsMap.update({element['name']: [ x['node'] for x in element['replica'] ] })
+                    for element in located_blocks:
+                        secondaryLocationsMap.update({element['name']: [ x['node'] for x in element['replica'] ] })
 
+                    self.keepOnlyDisks(secondaryLocationsMap)
+                    if not locationsMap:
+                        raise Exception('No location found on DISK')
+                else:
+                    raise Exception('Dataset is not a NANOAOD. Skipping RUCIO data location')
             except Exception as ex: # TODO should we catch HttpException instead?
                 self.logger.warn("No locations foud with rucio: %s \n Trying with DBS and PhEDEx" % str(ex))
                 try:

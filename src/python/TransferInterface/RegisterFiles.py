@@ -175,7 +175,6 @@ class submit_thread(threading.Thread):
         self.source = self.files[0][self.file_col.index('source')]
         self.toUpdate = toUpdate
 
-        # N.B: Replace ":" in taskname as not accepted by Rucio
         self.taskname = self.job[0][self.job_col.index('pubnames')]
         self.username = self.files[0][self.file_col.index('user')]
         self.destination = self.files[0][self.file_col.index('destination')]
@@ -224,13 +223,14 @@ class submit_thread(threading.Thread):
             dest_lfns = [x[self.job_col.index('dest_lfns')] for x in self.job if x[self.job_col.index('dest_lfns')] not in direct_files]
             source_pfns = [x[self.job_col.index('source_pfns')] for x in self.job if x[self.job_col.index('dest_lfns')] not in direct_files]
 
-            self.log.info(self.source+"_Temp")
-            self.log.info(dest_lfns)
-            self.log.info(source_pfns)
+            self.log.debug(self.source+"_Temp")
+            self.log.debug(dest_lfns)
+            self.log.debug(source_pfns)
 
             sizes = [x[self.job_col.index('filesizes')] for x in self.job if x[self.job_col.index('dest_lfns')] not in direct_files]
             checksums = [x[self.job_col.index('checksums')] for x in self.job if x[self.job_col.index('dest_lfns')] not in direct_files]
 
+            # For direct stageout simply register the final location of the file in rucio
             if self.direct:
                 try:
                     self.log.info("Registering direct files")
@@ -248,9 +248,9 @@ class submit_thread(threading.Thread):
                     self.threadLock.release()
                     return
 
+            # Otherwise register files staged in temporary area
             self.log.info("Registering temp file")
             crabInj.register_temp_replicas(self.source+"_Temp", dest_lfns, source_pfns, sizes, checksums)
-            #crabInj.register_temp_replicas(self.source+"_Temp", dest_lfns, source_pfns, sizes, None)
             crabInj.attach_files(dest_lfns, self.taskname)
 
         except Exception:
@@ -258,7 +258,7 @@ class submit_thread(threading.Thread):
             self.threadLock.release()
             return
 
-        # update statuses on OracleDB
+        # eventually update statuses on OracleDB
         try:
             fileDoc = dict()
             fileDoc['asoworker'] = 'rucio'
