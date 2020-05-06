@@ -102,27 +102,7 @@ class DBSDataDiscovery(DataDiscovery):
         return result
 
     def executeInternal(self, *args, **kwargs):
-        rucio_config_dict = {
-            "phedexCompatible": True,
-            "auth_type": "x509",
-            "ca_cert": self.config.Services.Rucio_caPath,
-            "creds": {
-                "client_cert": self.config.TaskWorker.cmscert,
-                "client_key": self.config.TaskWorker.cmskey
-            }
-        }   
 
-        rucioClient = Rucio(
-            self.config.Services.Rucio_account,
-            hostUrl=self.config.Services.Rucio_host,
-            authUrl=self.config.Services.Rucio_authUrl,
-            configDict=rucio_config_dict
-        )
-
-        try:
-            rucioClient.whoAmI()
-        except Exception as ex:
-            raise TaskWorkerException("Failed to initialize Rucio client: %s" % str(ex))
 
         self.logger.info("Data discovery with DBS") ## to be changed into debug
 
@@ -172,7 +152,29 @@ class DBSDataDiscovery(DataDiscovery):
 
             # For now apply Rucio data location only to NANOAOD*
             isNano = blocks[0].split("#")[0].split("/")[-1] in ["NANOAOD", "NANOAODSIM"]
+            rucio_config_dict = {}
+            rucioClient = None
+
             if isNano:
+                rucio_config_dict = {
+                    "phedexCompatible": True,
+                    "auth_type": "x509",
+                    "ca_cert": self.config.Services.Rucio_caPath,
+                    "creds": {
+                        "client_cert": self.config.TaskWorker.cmscert,
+                        "client_key": self.config.TaskWorker.cmskey
+                    }
+                }   
+
+                rucioClient = Rucio(
+                    self.config.Services.Rucio_account,
+                    hostUrl=self.config.Services.Rucio_host,
+                    authUrl=self.config.Services.Rucio_authUrl,
+                    configDict=rucio_config_dict
+                )
+
+                rucioClient.whoAmI()
+
                 self.logger.info("NANOAOD dataset. Trying data location with Rucio first. Scope: %s" % scope)
                 locations = rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(blocks))
                 located_blocks = locations['phedex']['block']
@@ -206,7 +208,7 @@ class DBSDataDiscovery(DataDiscovery):
                 scope = "cms" if dbsOnly else "user.%s" % kwargs['task']['tm_username']
 
                 isNano = blocks[0].split("#")[0].split("/")[-1] in ["NANOAOD", "NANOAODSIM"]
-                if isNano:
+                if isNano and rucioClient is not None:
                     self.logger.info("NANOAOD dataset. Trying data location of secondary blocks with Rucio first")
                     locations = rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(secondaryBlocks))
                     located_blocks = locations['phedex']['block']
@@ -222,7 +224,7 @@ class DBSDataDiscovery(DataDiscovery):
                     if not locationsMap:
                         raise Exception('No location found on DISK')
                 else:
-                    raise Exception('Dataset is not a NANOAOD. Skipping RUCIO data location')
+                    raise Exception('Dataset is not a NANOAOD or Rucio client could not be initialized. Skipping RUCIO data location')
             except Exception as ex: # TODO should we catch HttpException instead?
                 self.logger.warn("No locations foud with rucio: %s \n Trying with DBS and PhEDEx" % str(ex))
                 try:
