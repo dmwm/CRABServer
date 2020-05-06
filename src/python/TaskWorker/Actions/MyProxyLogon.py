@@ -36,19 +36,11 @@ class MyProxyLogon(TaskAction):
             usergroups = set(proxy.getAllUserGroups(userproxy))
             proxy.logonRenewMyProxy()
             timeleft = proxy.getTimeLeft(userproxy)
-            if timeleft is None or timeleft <= 0:
-                self.logger.error("proxy retrieval from %s failed with login name %s.",
-                                  proxycfg['myProxySvr'], proxycfg['userName'])
-                self.logger.error("will try with old-style DN hash")
-                del proxycfg['userName']
-                proxy = Proxy(proxycfg)
-                proxy.logonRenewMyProxy()
-                timeleft = proxy.getTimeLeft(userproxy)
 
         if timeleft is None or timeleft <= 0:
             msg = "Impossible to retrieve proxy from %s for %s." % (proxycfg['myProxySvr'], proxycfg['userDN'])
             self.logger.error(msg)
-            self.logger.error("\n Will try again in verbose mode")
+            self.logger.error("Will try again in verbose mode")
             self.logger.error("===========PROXY ERROR START ==========================")
             with tempSetLogLevel(logger=self.logger, level=logging.DEBUG):
                 userproxy = proxy.getProxyFilename(serverRenewer=True)
