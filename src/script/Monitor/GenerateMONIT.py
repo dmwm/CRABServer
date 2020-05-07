@@ -6,6 +6,7 @@ import logging
 import htcondor
 import traceback
 import subprocess
+import errno
 
 hostname = os.uname()[1]
 hostAllowRun = 'crab-prod-tw01.cern.ch'
@@ -265,16 +266,40 @@ if __name__ == '__main__':
 
     # before running make sure no other instance of this script is running
     lockFile = workdir + 'CRAB3_SCHEDD_JSON.Lock'
-    if os.path.isfile(lockFile):
-        logger.error("%s already exists, abandon this run." % lockFile)
-        print("%s already exists, abandon this run" % lockFile)
-        exit()
-    else:
-        open(lockFile, 'wa').close()  # create the lock
-        logger.info('Lock created. Start data collection')
-    metrics = pr.execute()
+    currentPid = str(os.getpid())
 
+    # Check if lockfile already exists and if it does, check PID number in the lockfile if it is running
+    if os.path.isfile(lockFile):
+        if os.stat(lockFile).st_size == 0:
+            logger.info("Lockfile is there but it is empty. Removing old lockfile.")
+            os.remove(lockFile)
+        else:
+            with open(lockFile, 'r') as lf:
+                pid = int(lf.read())
+            try:
+                os.kill(pid, 0)
+            except OSError as e:
+                if e.errno == errno.ESRCH:  # ESRCH - No such process
+                    logger.info("Lockfile is there but program is not running. Removing old lockfile.")
+                    os.remove(lockFile)
+                elif e.errno == errno.EPERM:  # EPERM - Opration not permitted (i.e., process exists)
+                    logger.info("Opration not permitted (i.e., process exists), abandon this run.")
+                    exit()
+                else:  # EINVAL - An invalid signal was specified.
+                    logger.info("An invalid signal was specified. Removing old lockfile.")
+                    os.remove(lockFile)
+            else:
+                logger.info("Lockfile is there and program is running, abandon this run.")
+                exit()
+
+    # Put PID in the lockfile
+    with open(lockFile, 'w') as lf:
+        lf.write(currentPid)
+    
+    logger.info('Lock created. Start data collection')            
+    metrics = pr.execute()
     logger.info('Metrics collected. Send to MONIT.')
+    
     #print metrics
     try:
         send_and_check([jsonDoc])
