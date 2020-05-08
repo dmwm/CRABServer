@@ -43,10 +43,7 @@ class MyProxyLogon(TaskAction):
             self.logger.error("Will try again in verbose mode")
             self.logger.error("===========PROXY ERROR START ==========================")
             with tempSetLogLevel(logger=self.logger, level=logging.DEBUG):
-                userproxy = proxy.getProxyFilename(serverRenewer=True)
                 proxy.logonRenewMyProxy()
-                timeleft = proxy.getTimeLeft(userproxy)
-                usergroups = set(proxy.getAllUserGroups(userproxy))
             self.logger.error("===========PROXY ERROR END   ==========================")
             raise TaskWorkerException(msg)
 
