@@ -394,7 +394,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         arg = "RunJobs.dag"
 
         info['resthost'] = '"%s"' % (self.server['host'])
-        #info['resthost'] = self.config.TaskWorker.resturl
         info['resturinoapi'] = '"%s"' % (self.restURInoAPI)
 
         try:
