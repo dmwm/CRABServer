@@ -271,7 +271,7 @@ if __name__ == '__main__':
     # Check if lockfile already exists and if it does, check PID number in the lockfile if it is running
     if os.path.isfile(lockFile):
         if os.stat(lockFile).st_size == 0:
-            logger.info("Lockfile is there but it is empty. Removing old lockfile.")
+            logger.error("Lockfile is there but it is empty. Removing old lockfile.")
             os.remove(lockFile)
         else:
             with open(lockFile, 'r') as lf:
@@ -280,13 +280,13 @@ if __name__ == '__main__':
                 os.kill(pid, 0)
             except OSError as e:
                 if e.errno == errno.ESRCH:  # ESRCH - No such process
-                    logger.info("Lockfile is there but program is not running. Removing old lockfile.")
+                    logger.error("Lockfile is there but program is not running. Removing old lockfile.")
                     os.remove(lockFile)
-                elif e.errno == errno.EPERM:  # EPERM - Opration not permitted (i.e., process exists)
-                    logger.info("Opration not permitted (i.e., process exists), abandon this run.")
+                elif e.errno == errno.EPERM:  # EPERM - Operation not permitted (i.e., process exists)
+                    logger.error("Operation not permitted (i.e., process exists), abandon this run.")
                     exit()
                 else:  # EINVAL - An invalid signal was specified.
-                    logger.info("An invalid signal was specified. Removing old lockfile.")
+                    logger.error("An invalid signal was specified. Removing old lockfile.")
                     os.remove(lockFile)
             else:
                 logger.info("Lockfile is there and program is running, abandon this run.")
