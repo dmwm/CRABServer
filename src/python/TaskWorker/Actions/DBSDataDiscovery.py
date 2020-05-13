@@ -265,7 +265,7 @@ class DBSDataDiscovery(DataDiscovery):
                     # set status to TAPERECALL
                     tapeRecallStatus = 'TAPERECALL'
                     ddmReqId = ddmRequest["data"][0]["request_id"]
-                    server = HTTPRequests(url=self.config.TaskWorker.resturl, localcert=userProxy, localkey=userProxy, verbose=False)
+                    server = HTTPRequests(url=self.config.TaskWorker.restHost, localcert=userProxy, localkey=userProxy, verbose=False)
                     configreq = {'workflow': taskName,
                                  'taskstatus': tapeRecallStatus,
                                  'ddmreqid': ddmReqId,
@@ -275,7 +275,7 @@ class DBSDataDiscovery(DataDiscovery):
                         tapeRecallStatusSet = server.post(self.config.TaskWorker.restURInoAPI+'task', data = urllib.urlencode(configreq))
                     except HTTPException as hte:
                         self.logger.exception(hte)
-                        msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (self.config.TaskWorker.resturl, str(hte))
+                        msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (self.config.TaskWorker.restHost, str(hte))
                         msg += "\nSetting %s status and DDM request ID (%d) failed for task %s" % (tapeRecallStatus, ddmReqId, taskName)
                         msg += "\nHTTP Headers are: %s" % hte.headers
                         raise TaskWorkerException(msg, retry=True)
@@ -382,7 +382,7 @@ if __name__ == '__main__':
                                                 X509_USER_KEY = config.TaskWorker.cmskey)
 
     config.TaskWorker.DDMServer = 'dynamo.mit.edu'
-    config.TaskWorker.resturl = 'cmsweb.cern.ch'
+    config.TaskWorker.restHost = 'cmsweb.cern.ch'
     # The second word identifies the DB instance defined in CRABServerAuth.py on the REST
     config.TaskWorker.restURInoAPI = '/crabserver/prod/'
 

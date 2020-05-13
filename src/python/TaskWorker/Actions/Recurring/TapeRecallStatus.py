@@ -33,14 +33,14 @@ class TapeRecallStatus(BaseRecurringAction):
                     self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", taskName)
                     continue
 
-                server = HTTPRequests(config.TaskWorker.resturl, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=self.logger)
+                server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=self.logger)
                 if (time.time() - getTimeFromTaskname(str(taskName)) > MAX_DAYS_FOR_TAPERECALL*24*60*60):
                     self.logger.info("Task %s is older than %d days, setting its status to FAILED", taskName, MAX_DAYS_FOR_TAPERECALL)
                     msg = "The disk replica request (ID: %d) for the input dataset did not complete in %d days." % (reqId, MAX_DAYS_FOR_TAPERECALL)
-                    failTask(taskName, server, config.TaskWorker.restURInoAPI+'workflowdb', msg, self.logger, 'FAILED')
+                    failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
                     continue
 
-                mpl = MyProxyLogon(config=config, server=server, resturi=config.TaskWorker.restURInoAPI, myproxylen=self.pollingTime)
+                mpl = MyProxyLogon(config=config, server=server, resturi=resturi, myproxylen=self.pollingTime)
                 user_proxy = True
                 try:
                     mpl.execute(task=recallingTask) # this adds 'user_proxy' to recallingTask
@@ -83,7 +83,7 @@ class TapeRecallStatus(BaseRecurringAction):
                     elif status == "rejected":
                         msg = "The DDM request (ID: %d) has been rejected with this reason: %s" % (reqId, ddmRequest["data"][0]["reason"])
                         self.logger.info(msg + "\nSetting status of task %s to FAILED", taskName)
-                        failTask(taskName, server, config.TaskWorker.restURInoAPI+'workflowdb', msg, self.logger, 'FAILED')
+                        failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
 
                 else:
                     msg = "DDM request_id %d not found. Please report to experts" % reqId

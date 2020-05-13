@@ -17,6 +17,7 @@ from RESTInteractions import HTTPRequests
 
 import HTCondorLocator
 from ServerUtilities import newX509env
+from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.TestWorker import TestWorker
 from MultiProcessingLog import MultiProcessingLog
 from TaskWorker.Worker import Worker, setProcessLogger
@@ -117,21 +118,37 @@ class MasterWorker(object):
         self.TEST = sequential
         self.logger = setRootLogger(logWarning, logDebug, console)
         self.config = config
-        resthost = None
-        self.restURInoAPI = None
-        if not self.config.TaskWorker.mode in MODEURL.keys():
-            raise ConfigException("No mode provided: need to specify config.TaskWorker.mode in the configuration")
-        elif MODEURL[self.config.TaskWorker.mode]['host'] is not None:
-            resthost = MODEURL[self.config.TaskWorker.mode]['host']
-            self.restURInoAPI = '/crabserver/' + MODEURL[self.config.TaskWorker.mode]['instance']
+        self.restHost = None
+        dbInstance = None
+
+        try:
+            instance = self.config.TaskWorker.instance
+        except:
+            msg = "No instance provided: need to specify config.TaskWorker.instance in the configuration"
+            raise ConfigException(msg)
+
+        if instance in SERVICE_INSTANCES:
+            self.logger.info('Will connect to CRAB service: %s', instance)
+            self.restHost = SERVICE_INSTANCES[instance]['restHost']
+            dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
         else:
-            resthost = self.config.TaskWorker.resturl #this should be called resthost in the TaskWorkerConfig -_-
-            self.restURInoAPI = '/crabserver/' + MODEURL[self.config.TaskWorker.mode]['instance']
-        if resthost is None:
-            raise ConfigException("No correct mode provided: need to specify config.TaskWorker.mode in the configuration")
+            msg = "Invalid instance value '%s'" % instance
+            raise ConfigException(msg)
+        if instance is 'other':
+            self.logger.info('Will use restHost and dbInstance from config file')
+            try:
+                self.restHost = self.config.TaskWorker.restHost
+                dbInstance = self.config.TaskWorker.dbInstance
+            except:
+                msg = "Need to specify config.TaskWorker.restHost and dbInstance in the configuration"
+                raise ConfigException(msg)
+        self.restURInoAPI = '/crabserver/' + dbInstance
+
+        self.logger.info('Will connect via URL: https://%s/%s', self.restHost, self.restURInoAPI)
+        
         #Let's increase the server's retries for recoverable errors in the MasterWorker
         #60 means we'll keep retrying for 1 hour basically (we retry at 20*NUMRETRY seconds, so at: 20s, 60s, 120s, 200s, 300s ...)
-        self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry=20,
+        self.server = HTTPRequests(self.restHost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry=20,
                                    logger=self.logger)
         self.logger.debug("Hostcert: %s, hostkey: %s", str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey))
         # Retries for any failures
@@ -147,9 +164,9 @@ class MasterWorker(object):
                                                          X509_USER_KEY=self.config.TaskWorker.cmskey)
 
         if self.TEST:
-            self.slaves = TestWorker(self.config, resthost, self.restURInoAPI + '/workflowdb')
+            self.slaves = TestWorker(self.config, self.restHost, self.restURInoAPI + '/workflowdb')
         else:
-            self.slaves = Worker(self.config, resthost, self.restURInoAPI + '/workflowdb')
+            self.slaves = Worker(self.config, self.restHost, self.restURInoAPI + '/workflowdb')
         self.slaves.begin()
         recurringActionsNames = getattr(self.config.TaskWorker, 'recurringActions', [])
         self.recurringActions = [self.getRecurringActionInst(name) for name in recurringActionsNames]
