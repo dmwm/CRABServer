@@ -22,7 +22,7 @@ class RenewRemoteProxies(BaseRecurringAction):
         renewer.execute()
 
 MINPROXYLENGTH = 60 * 60 * 24
-QUERY_ATTRS = ['x509userproxyexpiration', 'CRAB_ReqName', 'ClusterId', 'ProcId', 'CRAB_UserDN', 'CRAB_UserVO', 'CRAB_UserGroup', 'CRAB_UserRole', 'JobStatus']
+QUERY_ATTRS = ['x509userproxyexpiration', 'CRAB_ReqName', 'ClusterId', 'ProcId', 'CRAB_UserHN', 'CRAB_UserDN', 'CRAB_UserVO', 'CRAB_UserGroup', 'CRAB_UserRole', 'JobStatus']
 
 class CRAB3ProxyRenewer(object):
 
@@ -66,7 +66,7 @@ class CRAB3ProxyRenewer(object):
             group = ad['CRAB_UserGroup']
         if 'CRAB_UserRole' in ad and ad['CRAB_UserRole'] and ad['CRAB_UserRole'] != classad.Value.Undefined:
             role = ad['CRAB_UserRole']
-        username = ad['CRAB_UserHN']  # this better exist at all times !
+        username = ad['CRAB_UserHN']
         proxycfg = {'vo': vo,
                     'logger': self.logger,
                     'myProxySvr': self.config.Services.MyProxy,
