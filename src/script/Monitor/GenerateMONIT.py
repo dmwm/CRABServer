@@ -7,6 +7,7 @@ import htcondor
 import traceback
 import subprocess
 import errno
+import signal
 
 hostname = os.uname()[1]
 hostAllowRun = 'crab-prod-tw01.cern.ch'
@@ -44,6 +45,57 @@ def send_and_check(document, should_fail=False):
     response = send(document)
     assert ((response.status_code in [200]) != should_fail), \
         'With document: {0}. Status code: {1}. Message: {2}'.format(document, response.status_code, response.text)
+    
+    
+def check_time_constrains(pid):
+    """
+    checks if previous process is running not longer than the allowedTime
+    """
+    
+    allowedTime = 1800  # allowed time for the script to run: 30minutes = 30*60
+    timeCmd = "ps -p %s -o etimes=" % (pid)
+    timeProcess = subprocess.Popen(timeCmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    stdout, stderr = timeProcess.communicate()
+    exitcode = timeProcess.returncode
+
+    if exitcode != 0:
+        msg = "Failed to execute command: %s. \n StdOut: %s\n StdErr: %s" % (timeCmd, stdout, stderr)
+        logger.error(msg)
+        raise Exception(msg)
+    else:
+        if int(stdout) >= allowedTime:
+            os.kill(pid, signal.SIGTERM)
+            tc = False
+            msg = "However, process with PID %s timed out. Killing it and removing old lockfile." % pid
+        else:
+            tc = True
+            msg = "Abandon this run."
+    return tc, msg
+
+def pid_exists(lockFile):
+    """
+    checks if previous process exists. Remove old lockfile if previous process is not running
+    """
+    
+    with open(lockFile, 'r') as lf:
+        pid = int(lf.read())
+    try:
+        os.kill(pid, 0)
+    except OSError as e:
+        if e.errno == errno.ESRCH:  # ESRCH - No such process
+            logger.error("Lockfile exists but process is not running. Removing old lockfile.")
+            pe = False
+        elif e.errno == errno.EPERM:  # EPERM - Operation not permitted (i.e., process exists)
+            pe, tcMsg = check_time_constrains(pid)
+            logger.info("Previous process still running. " + tcMsg)
+        else:
+            logger.error("Unexpected error!")
+            raise
+    else:
+        pe, tcMsg = check_time_constrains(pid)
+        logger.info("Lockfile is there and process is running. " + tcMsg)
+    return pe
+
 
 class CRAB3CreateJson(object):
 
@@ -266,33 +318,22 @@ if __name__ == '__main__':
 
     # before running make sure no other instance of this script is running
     lockFile = workdir + 'CRAB3_SCHEDD_JSON.Lock'
-    currentPid = str(os.getpid())
 
     # Check if lockfile already exists and if it does, check PID number in the lockfile if it is running
     if os.path.isfile(lockFile):
         if os.stat(lockFile).st_size == 0:
-            logger.error("Lockfile is there but it is empty. Removing old lockfile.")
+            logger.error("Lockfile is empty. Removing old lockfile.")
             os.remove(lockFile)
         else:
-            with open(lockFile, 'r') as lf:
-                pid = int(lf.read())
-            try:
-                os.kill(pid, 0)
-            except OSError as e:
-                if e.errno == errno.ESRCH:  # ESRCH - No such process
-                    logger.error("Lockfile is there but program is not running. Removing old lockfile.")
-                    os.remove(lockFile)
-                elif e.errno == errno.EPERM:  # EPERM - Operation not permitted (i.e., process exists)
-                    logger.error("Operation not permitted (i.e., process exists), abandon this run.")
-                    exit()
-                else:  # EINVAL - An invalid signal was specified.
-                    logger.error("An invalid signal was specified. Removing old lockfile.")
-                    os.remove(lockFile)
-            else:
-                logger.info("Lockfile is there and program is running, abandon this run.")
+            pidFile = pid_exists(lockFile)
+            if pidFile:
                 exit()
+            else:
+                os.remove(lockFile)
+    
 
     # Put PID in the lockfile
+    currentPid = str(os.getpid())
     with open(lockFile, 'w') as lf:
         lf.write(currentPid)
     
