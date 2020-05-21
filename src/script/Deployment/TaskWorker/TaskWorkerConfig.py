@@ -78,14 +78,13 @@ config.TaskWorker.ASOTimeout = 86400
 # - remote means a copy from the worker node to the final destination SE directly.
 # - local means a copy from the worker node to the worker node site's SE.
 # One can include any combination of the above, or leaving one of the methods out.
-# For example, CRAB2 is effectively:
-# config.TaskWorker.stageoutPolicy = ["remote"]
 # This is the CRAB3 default: ["local", "remote"]:
 config.TaskWorker.stageoutPolicy = ["local", "remote"]
-config.TaskWorker.dashboardTaskType = 'analysis'
 
 # This is needed for Site Metrics
-# It should not block any site for Site Metrics and if needed for other activities
+config.TaskWorker.dashboardTaskType = 'analysis'
+
+# HammerCloud and other submissions for Site Metrics should always run
 config.TaskWorker.ActivitiesToRunEverywhere = ['hctest', 'hcdev']
 
 config.TaskWorker.maxIdle = 1000
