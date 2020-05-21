@@ -78,7 +78,7 @@ class CRAB3ProxyRenewer(object):
                     'role' : role,
                     'server_key': self.config.MyProxy.serverhostkey,
                     'server_cert': self.config.MyProxy.serverhostcert,
-                    'serverDN': self.config.MyProxy.serverdn,
+                    'serverDN': 'dummy',  # this is only used inside WMCore/Proxy.py functions not used by CRAB
                     'uisource': getattr(self.config.MyProxy, 'uisource', ''),
                     'credServerPath': self.config.MyProxy.credpath,
                     'cleanEnvironment' : getattr(self.config.MyProxy, 'cleanEnvironment', False)}
