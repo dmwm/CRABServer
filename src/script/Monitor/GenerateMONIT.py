@@ -47,16 +47,17 @@ def send_and_check(document, should_fail=False):
         'With document: {0}. Status code: {1}. Message: {2}'.format(document, response.status_code, response.text)
     
     
-def check_time_constrains(pid):
+def isRunningTooLong(pid):
     """
-    checks if previous process is running not longer than the allowedTime
+    checks if previous process is not running longer than the allowedTime
     """
-    
+
     allowedTime = 1800  # allowed time for the script to run: 30minutes = 30*60
     timeCmd = "ps -p %s -o etimes=" % (pid)
     timeProcess = subprocess.Popen(timeCmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     stdout, stderr = timeProcess.communicate()
     exitcode = timeProcess.returncode
+    timedOut = True
 
     if exitcode != 0:
         msg = "Failed to execute command: %s. \n StdOut: %s\n StdErr: %s" % (timeCmd, stdout, stderr)
@@ -64,37 +65,46 @@ def check_time_constrains(pid):
         raise Exception(msg)
     else:
         if int(stdout) >= allowedTime:
-            os.kill(pid, signal.SIGTERM)
-            tc = False
-            msg = "However, process with PID %s timed out. Killing it and removing old lockfile." % pid
+            logger.error("Process with PID %s timed out." % pid)
         else:
-            tc = True
-            msg = "Abandon this run."
-    return tc, msg
+            timedOut = False
+    return timedOut 
 
-def pid_exists(lockFile):
+
+def isRunning(pid):
     """
-    checks if previous process exists. Remove old lockfile if previous process is not running
+    checks if previous process is still running
     """
-    
-    with open(lockFile, 'r') as lf:
-        pid = int(lf.read())
+
+    exists = True
     try:
         os.kill(pid, 0)
     except OSError as e:
         if e.errno == errno.ESRCH:  # ESRCH - No such process
-            logger.error("Lockfile exists but process is not running. Removing old lockfile.")
-            pe = False
+            logger.info("Process with PID %s is not running." % pid)
+            exists = False
         elif e.errno == errno.EPERM:  # EPERM - Operation not permitted (i.e., process exists)
-            pe, tcMsg = check_time_constrains(pid)
-            logger.info("Previous process still running. " + tcMsg)
+            logger.info("Process with PID %s is still running." % pid)
         else:
             logger.error("Unexpected error!")
             raise
     else:
-        pe, tcMsg = check_time_constrains(pid)
-        logger.info("Lockfile is there and process is running. " + tcMsg)
-    return pe
+        logger.info("Process with PID %s is still running." % pid)
+    return exists
+
+
+def killProcess(pid):
+    """
+    sends SIGTERM to the old process and later SIGKILL if it wasn't killed successfully at first try
+    """
+
+    logger.info("Sending SIGTERM to kill the process with PID %s." % pid)
+    os.kill(pid, signal.SIGTERM)
+    time.sleep(60)
+    if isRunning(pid):
+        logger.info("Sending SIGKILL to kill the process with PID %s." % pid)
+        os.kill(pid, signal.SIGKILL)
+    return
 
 
 class CRAB3CreateJson(object):
@@ -316,20 +326,28 @@ if __name__ == '__main__':
 
     pr = CRAB3CreateJson(resthost, jsonDoc, logger)
 
-    # before running make sure no other instance of this script is running
     lockFile = workdir + 'CRAB3_SCHEDD_JSON.Lock'
-
-    # Check if lockfile already exists and if it does, check PID number in the lockfile if it is running
+    
+    # Check if lockfile already exists and if it does, check if process is running
     if os.path.isfile(lockFile):
+        skip = False
+
         if os.stat(lockFile).st_size == 0:
-            logger.error("Lockfile is empty. Removing old lockfile.")
-            os.remove(lockFile)
+            logger.error("Lockfile is empty.")
         else:
-            pidFile = pid_exists(lockFile)
-            if pidFile:
-                exit()
-            else:
-                os.remove(lockFile)
+            with open(lockFile, 'r') as lf:
+                oldProcess = int(lf.read())
+            if isRunning(oldProcess):
+                skip = True
+                if isRunningTooLong(oldProcess):
+                    killProcess(oldProcess)
+                    skip = False
+        if skip:
+            logger.info("Abandon this run.")
+            exit()
+        else:
+            logger.info("Removing old lockfile.")
+            os.remove(lockFile)
     
 
     # Put PID in the lockfile
