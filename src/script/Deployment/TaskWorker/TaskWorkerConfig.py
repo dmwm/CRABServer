@@ -46,6 +46,7 @@ config.TaskWorker.recurringActions = ['RemovetmpDir']
 config.TaskWorker.instance = 'other'
 config.TaskWorker.restHost = 'cmsweb-test.cern.ch'
 config.TaskWorker.dbInstance = 'dev'
+##PROD config.TaskWorker.instance = 'prod'
 
 
 ############################################################################
@@ -108,9 +109,6 @@ config.TaskWorker.minAutomaticRuntimeMins = 60
 
 config.TaskWorker.highPrioEgroups = ['cms-crab-HighPrioUsers']
 config.TaskWorker.bannedUsernames = ['mickeymouse','donaldduck']
-
-config.MyProxy.serverdn = 'dummy'  # this is a WMcore/Credential config param which is not actually used in CRAB
-##PROD config.MyProxy.serverdn ='/../tw/DN=crab-prod-tw01/'
 
 # Setting the list of users for the highprio accounting group
 # not usually needed since the list if automatically populated from e-group
