@@ -6,6 +6,8 @@ import logging
 import htcondor
 import traceback
 import subprocess
+import errno
+import signal
 
 hostname = os.uname()[1]
 hostAllowRun = 'crab-prod-tw01.cern.ch'
@@ -43,6 +45,67 @@ def send_and_check(document, should_fail=False):
     response = send(document)
     assert ((response.status_code in [200]) != should_fail), \
         'With document: {0}. Status code: {1}. Message: {2}'.format(document, response.status_code, response.text)
+    
+    
+def isRunningTooLong(pid):
+    """
+    checks if previous process is not running longer than the allowedTime
+    """
+
+    allowedTime = 1800  # allowed time for the script to run: 30minutes = 30*60
+    timeCmd = "ps -p %s -o etimes=" % (pid)
+    timeProcess = subprocess.Popen(timeCmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    stdout, stderr = timeProcess.communicate()
+    exitcode = timeProcess.returncode
+    timedOut = True
+
+    if exitcode != 0:
+        msg = "Failed to execute command: %s. \n StdOut: %s\n StdErr: %s" % (timeCmd, stdout, stderr)
+        logger.error(msg)
+        raise Exception(msg)
+    else:
+        if int(stdout) >= allowedTime:
+            logger.error("Process with PID %s timed out." % pid)
+        else:
+            timedOut = False
+    return timedOut 
+
+
+def isRunning(pid):
+    """
+    checks if previous process is still running
+    """
+
+    exists = True
+    try:
+        os.kill(pid, 0)
+    except OSError as e:
+        if e.errno == errno.ESRCH:  # ESRCH - No such process
+            logger.info("Process with PID %s is not running." % pid)
+            exists = False
+        elif e.errno == errno.EPERM:  # EPERM - Operation not permitted (i.e., process exists)
+            logger.info("Process with PID %s is still running." % pid)
+        else:
+            logger.error("Unexpected error!")
+            raise
+    else:
+        logger.info("Process with PID %s is still running." % pid)
+    return exists
+
+
+def killProcess(pid):
+    """
+    sends SIGTERM to the old process and later SIGKILL if it wasn't killed successfully at first try
+    """
+
+    logger.info("Sending SIGTERM to kill the process with PID %s." % pid)
+    os.kill(pid, signal.SIGTERM)
+    time.sleep(60)
+    if isRunning(pid):
+        logger.info("Sending SIGKILL to kill the process with PID %s." % pid)
+        os.kill(pid, signal.SIGKILL)
+    return
+
 
 class CRAB3CreateJson(object):
 
@@ -263,18 +326,39 @@ if __name__ == '__main__':
 
     pr = CRAB3CreateJson(resthost, jsonDoc, logger)
 
-    # before running make sure no other instance of this script is running
     lockFile = workdir + 'CRAB3_SCHEDD_JSON.Lock'
+    
+    # Check if lockfile already exists and if it does, check if process is running
     if os.path.isfile(lockFile):
-        logger.error("%s already exists, abandon this run." % lockFile)
-        print("%s already exists, abandon this run" % lockFile)
-        exit()
-    else:
-        open(lockFile, 'wa').close()  # create the lock
-        logger.info('Lock created. Start data collection')
-    metrics = pr.execute()
+        skip = False
 
+        if os.stat(lockFile).st_size == 0:
+            logger.error("Lockfile is empty.")
+        else:
+            with open(lockFile, 'r') as lf:
+                oldProcess = int(lf.read())
+            if isRunning(oldProcess):
+                skip = True
+                if isRunningTooLong(oldProcess):
+                    killProcess(oldProcess)
+                    skip = False
+        if skip:
+            logger.info("Abandon this run.")
+            exit()
+        else:
+            logger.info("Removing old lockfile.")
+            os.remove(lockFile)
+    
+
+    # Put PID in the lockfile
+    currentPid = str(os.getpid())
+    with open(lockFile, 'w') as lf:
+        lf.write(currentPid)
+    
+    logger.info('Lock created. Start data collection')            
+    metrics = pr.execute()
     logger.info('Metrics collected. Send to MONIT.')
+    
     #print metrics
     try:
         send_and_check([jsonDoc])
