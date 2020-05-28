@@ -142,7 +142,7 @@ class CRAB3CreateJson(object):
             e = sys.exc_info()
             if hasattr(e,"headers"):
                 self.logger.error(str(e.headers))
-            self.logger.debug("Error in getCountTasksByStatus:\n%s" %e)
+            self.logger.debug("Error in getCountTasksByStatus:\n%s", e)
             pprint(e[1])
             traceback.print_tb(e[2])
             return []
