@@ -265,14 +265,13 @@ class DBSDataDiscovery(DataDiscovery):
                     # set status to TAPERECALL
                     tapeRecallStatus = 'TAPERECALL'
                     ddmReqId = ddmRequest["data"][0]["request_id"]
-                    server = HTTPRequests(url=self.config.TaskWorker.restHost, localcert=userProxy, localkey=userProxy, verbose=False)
                     configreq = {'workflow': taskName,
                                  'taskstatus': tapeRecallStatus,
                                  'ddmreqid': ddmReqId,
                                  'subresource': 'addddmreqid'
                     }
                     try:
-                        tapeRecallStatusSet = server.post(self.config.TaskWorker.restURInoAPI+'task', data = urllib.urlencode(configreq))
+                        tapeRecallStatusSet = self.server.post(self.restURInoAPI+'/task', data = urllib.urlencode(configreq))
                     except HTTPException as hte:
                         self.logger.exception(hte)
                         msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (self.config.TaskWorker.restHost, str(hte))
