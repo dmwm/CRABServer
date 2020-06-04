@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import string
 import json
 import urllib
 import logging
@@ -119,7 +120,6 @@ class CRAB3ProxyRenewer(object):
         return userproxy
 
     def push_new_proxy_to_schedd(self, schedd, ad, proxy):
-        self.logger.info("Renewing proxy for task %s." % ad['CRAB_ReqName'])
         if not hasattr(schedd, 'refreshGSIProxy'):
             raise NotImplementedError()
         with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
@@ -167,7 +167,9 @@ class CRAB3ProxyRenewer(object):
             try:
                 proxyfile = self.get_proxy_from_MyProxy(ad_list[0])
             except Exception:
-                self.logger.exception("Failed to retrieve proxy.  Skipping user")
+                self.logger.exception("Failed to retrieve proxy.  Skipping user %s", key[0])
+                tasks = string.join((ad['CRAB_ReqName'] for ad in ad_list), '\n\t')
+                self.logger.error("Will not update proxy for tasks:\n\t%s", tasks)
                 continue
             for ad in ad_list:
                 try:
@@ -175,7 +177,8 @@ class CRAB3ProxyRenewer(object):
                 except NotImplementedError:
                     raise
                 except Exception:
-                    self.logger.exception("Failed to renew proxy for task %s due to exception.", ad['CRAB_ReqName'])
+                    self.logger.exception("Failed to push new proxy to schedd for task %s due to exception.", ad['CRAB_ReqName'])
+                    continue
                 self.logger.debug("Updated proxy pushed to schedd for task %s", ad['CRAB_ReqName'])
 
     def execute(self):
