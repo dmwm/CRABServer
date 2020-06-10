@@ -167,7 +167,7 @@ class CRAB3ProxyRenewer(object):
             try:
                 proxyfile = self.get_proxy_from_MyProxy(ad_list[0])
             except Exception:
-                self.logger.exception("Failed to retrieve proxy.  Skipping user %s", key[0])
+                self.logger.error("Failed to retrieve proxy.  Skipping user %s", key[0])
                 tasks = string.join((ad['CRAB_ReqName'] for ad in ad_list), '\n\t')
                 self.logger.error("Will not update proxy for tasks:\n\t%s", tasks)
                 continue
