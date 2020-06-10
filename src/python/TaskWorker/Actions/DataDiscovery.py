@@ -86,7 +86,7 @@ class DataDiscovery(TaskAction):
                 wmfiles.append(wmfile)
 
         if blocksWithNoLocations:
-            msg = "%d blocks will be skipped because are not located on DISK: %s" % (len(blocksWithNoLocations), list(blocksWithNoLocations))
+            msg = "%d blocks will be skipped because are not completely replicated on DISK: %s" % (len(blocksWithNoLocations), list(blocksWithNoLocations))
             self.logger.warning(msg)
             self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
 
