@@ -2,6 +2,7 @@
 #external dependencies
 from __future__ import print_function
 import os
+import shutil
 import sys
 import time
 import urllib
@@ -55,18 +56,19 @@ def validateConfig(config):
 class MasterWorker(object):
     """I am the master of the TaskWorker"""
 
-    def __init__(self, config, logWarning, logDebug, sequential=False, console=False):
+    def __init__(self, config, logWarning, logDebug, sequential=False, console=False, name='master'):
         """Initializer
 
         :arg WMCore.Configuration config: input TaskWorker configuration
         :arg bool logWarning: it tells if a quiet logger is needed
         :arg bool logDebug: it tells if needs a verbose logger
         :arg bool sequential: it tells if to run in sequential (no subprocesses) mode.
-        :arg bool console: it tells if to log to console."""
+        :arg bool console: it tells if to log to console.
+        :arg string name: defines a name for the log of this master process"""
 
 
         def createLogdir(dirname):
-            """ Create the directory dirname ignoring erors in case it exists. Exit if
+            """ Create the directory dirname ignoring errors in case it exists. Exit if
                 the directory cannot be created.
             """
             try:
@@ -77,8 +79,22 @@ class MasterWorker(object):
                     print("The task worker need to access the '%s' directory" % dirname)
                     sys.exit(1)
 
+        def createAndCleanLogDirectories(logsDir):
+            createLogdir(logsDir)
+            currentProcessesDir = logsDir + '/processes'
+            YYMMDD= time.strftime('%y%m%d', time.localtime())
+            oldProcessesDir = currentProcessesDir + '/OldLogs-' + YYMMDD
+            createLogdir(currentProcessesDir)
+            files = os.listdir(currentProcessesDir)
+            if files:
+                createLogdir(oldProcessesDir)
+                for f in files:
+                    if f.startswith('proc.c3id') :
+                        shutil.move(currentProcessesDir+ '/' + f, oldProcessesDir)
+            createLogdir(logsDir+'/tasks')
 
-        def setRootLogger(logWarning, logDebug, console):
+
+        def setRootLogger(logWarning, logDebug, console, name):
             """Sets the root logger with the desired verbosity level
                The root logger logs to logsDir/twlog.txt and every single
                logging instruction is propagated to it (not really nice
@@ -87,12 +103,13 @@ class MasterWorker(object):
             :arg bool logWarning: it tells if a quiet logger is needed
             :arg bool logDebug: it tells if needs a verbose logger
             :arg bool console: it tells if to log to console
+            :arg string name: define a name for the log file of this master process
             :return logger: a logger with the appropriate logger level."""
 
+            # this must only done for real Master, not when it is used by TapeRecallStatus
             logsDir = config.TaskWorker.logsDir
-            createLogdir(logsDir)
-            createLogdir(logsDir+'/processes')
-            createLogdir(logsDir+'/tasks')
+            if name == 'master':
+                    createAndCleanLogDirectories(logsDir)
 
             if console:
                 logging.getLogger().addHandler(logging.StreamHandler())
@@ -108,7 +125,7 @@ class MasterWorker(object):
             if logDebug:
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
-            logger = setProcessLogger("master", logsDir)
+            logger = setProcessLogger(name, logsDir)
             logger.debug("PID %s.", os.getpid())
             logger.debug("Logging level initialized to %s.", loglevel)
             return logger
@@ -116,7 +133,7 @@ class MasterWorker(object):
 
         self.STOP = False
         self.TEST = sequential
-        self.logger = setRootLogger(logWarning, logDebug, console)
+        self.logger = setRootLogger(logWarning, logDebug, console, name)
         self.config = config
         self.restHost = None
         dbInstance = None
