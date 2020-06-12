@@ -17,7 +17,32 @@ class TapeRecallStatus(BaseRecurringAction):
     pollingTime = 60*4 # minutes
 
     def _execute(self, resthost, resturi, config, task):
-        mw = MasterWorker(config, logWarning=False, logDebug=False, sequential=True, console=False)
+
+        # setup logger
+        if not self.logger:
+            self.logger = logging.getLogger(__name__)
+            handler = logging.StreamHandler(sys.stdout)
+            formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s")
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.DEBUG)
+        else:
+        # do not use BaseRecurringAction logger but create a new logger
+        # which writes to config.TaskWorker.logsDir/taks/recurring/TapeRecallStatus_YYMMDD-HHMM.log
+            self.logger = logging.getLogger('TapeRecallStatus')
+            logDir = config.TaskWorker.logsDir + '/tasks/recurring/'
+            if not os.path.exists(logDir):
+                os.makedirs(logDir)
+            timeStamp = time.strftime('%y%m%d-%H%M',time.localtime())
+            logFile = 'TapeRecallStatus_' + timeStamp + '.log'
+            handler = logging.FileHandler(logDir + logFile)
+            formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+
+
+        mw = MasterWorker(config, logWarning=False, logDebug=False, sequential=True,
+                          console=False, name='masterForTapeRecall')
 
         tapeRecallStatus = 'TAPERECALL'
         self.logger.info("Retrieving %s tasks", tapeRecallStatus)
