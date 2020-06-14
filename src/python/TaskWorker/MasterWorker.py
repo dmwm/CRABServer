@@ -80,18 +80,38 @@ class MasterWorker(object):
                     sys.exit(1)
 
         def createAndCleanLogDirectories(logsDir):
+            # it can be named with the time stamp a TW started
             createLogdir(logsDir)
-            currentProcessesDir = logsDir + '/processes'
-            YYMMDD= time.strftime('%y%m%d', time.localtime())
-            oldProcessesDir = currentProcessesDir + '/OldLogs-' + YYMMDD
-            createLogdir(currentProcessesDir)
-            files = os.listdir(currentProcessesDir)
-            if files:
-                createLogdir(oldProcessesDir)
-                for f in files:
-                    if f.startswith('proc.c3id') :
-                        shutil.move(currentProcessesDir+ '/' + f, oldProcessesDir)
             createLogdir(logsDir+'/tasks')
+            currentProcessesDir = logsDir + '/processes/'
+            createLogdir(currentProcessesDir)
+            # when running inside a container process logs will start with same
+            # process numbers, i.e. same name, at any container restart.
+            # to avoid clashes and confusion, we will put away all previous processes
+            # logs when a TW instance starts. To this goal each TW which runs
+            # creates a directory where new containers will move its logs, so
+            # identify LastLogs_timestamp directory
+            files = os.listdir(currentProcessesDir)
+            files.sort(reverse=True)
+            for f in files:   # if there are multiple Latest*, pick the latest
+                if f.startswith('Latest'):  latestLogDir = currentProcessesDir + f
+            if files and latestLogDir:
+                # rename from Latest to Old
+                oldLogsDir = latestLogDir.replace('Latest','Old')
+                shutil.move(latestLogDir, oldLogsDir)
+            else:
+                print("LatestLogDir not found in logs/processes, create a dummy dir to store old files")
+                oldLogsDir = currentProcessesDir + 'OldLog-Unknwown'
+                createLogdir(oldLogsDir)
+            # move process logs for latest TW run to old directory
+            for f in files:
+                if f.startswith('proc.c3id'):
+                    shutil.move(currentProcessesDir + f, oldLogsDir)
+
+            # create a new LateastLogs directory where to store logs from this TaskWorker
+            YYMMDD_HHMMSS= time.strftime('%y%m%d_%H%M%S', time.localtime())
+            myDir = currentProcessesDir + 'LatestLogs-' + YYMMDD_HHMMSS
+            createLogdir(myDir)
 
 
         def setRootLogger(logWarning, logDebug, console, name):
