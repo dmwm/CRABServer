@@ -250,7 +250,6 @@ def algorithm():
         logging.info('Nothing to monitor yet.')
         return
     try:
-        with open("task_process/transfers.txt") as _list:
         monitor_manager(user, taskname)
     except Exception:
         logging.exception('Monitor proccess failed.')
