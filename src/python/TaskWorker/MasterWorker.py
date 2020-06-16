@@ -91,10 +91,13 @@ class MasterWorker(object):
             # logs when a TW instance starts. To this goal each TW which runs
             # creates a directory where new containers will move its logs, so
             # identify LastLogs_timestamp directory
+            latestLogDir = None  # the logs directory could be empty
             files = os.listdir(currentProcessesDir)
-            files.sort(reverse=True)
-            for f in files:   # if there are multiple Latest*, pick the latest
-                if f.startswith('Latest'):  latestLogDir = currentProcessesDir + f
+            files.sort(reverse=True)   # if there are multiple Latest*, will hit the latest first
+            for f in files:
+                if f.startswith('Latest'):
+                    latestLogDir = currentProcessesDir + f
+                    break
             if files and latestLogDir:
                 # rename from Latest to Old
                 oldLogsDir = latestLogDir.replace('Latest','Old')
