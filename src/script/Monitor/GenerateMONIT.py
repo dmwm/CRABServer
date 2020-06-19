@@ -12,9 +12,8 @@ import signal
 hostname = os.uname()[1]
 hostAllowRun = 'crab-prod-tw01.cern.ch'
 if hostname != hostAllowRun:
-    os._exit(0)
+    sys.exit(0)
 
-from datetime import datetime
 from socket import gethostname
 from pprint import pprint
 import requests
@@ -65,7 +64,7 @@ def isRunningTooLong(pid):
         raise Exception(msg)
     else:
         if int(stdout) >= allowedTime:
-            logger.error("Process with PID %s timed out." % pid)
+            logger.error("Process with PID %s timed out.", pid)
         else:
             timedOut = False
     return timedOut 
@@ -81,15 +80,15 @@ def isRunning(pid):
         os.kill(pid, 0)
     except OSError as e:
         if e.errno == errno.ESRCH:  # ESRCH - No such process
-            logger.info("Process with PID %s is not running." % pid)
+            logger.info("Process with PID %s is not running.", pid)
             exists = False
         elif e.errno == errno.EPERM:  # EPERM - Operation not permitted (i.e., process exists)
-            logger.info("Process with PID %s is still running." % pid)
+            logger.info("Process with PID %s is still running.", pid)
         else:
             logger.error("Unexpected error!")
             raise
     else:
-        logger.info("Process with PID %s is still running." % pid)
+        logger.info("Process with PID %s is still running.", pid)
     return exists
 
 
@@ -98,11 +97,11 @@ def killProcess(pid):
     sends SIGTERM to the old process and later SIGKILL if it wasn't killed successfully at first try
     """
 
-    logger.info("Sending SIGTERM to kill the process with PID %s." % pid)
+    logger.info("Sending SIGTERM to kill the process with PID %s.", pid)
     os.kill(pid, signal.SIGTERM)
     time.sleep(60)
     if isRunning(pid):
-        logger.info("Sending SIGKILL to kill the process with PID %s." % pid)
+        logger.info("Sending SIGKILL to kill the process with PID %s.", pid)
         os.kill(pid, signal.SIGKILL)
     return
 
@@ -159,7 +158,7 @@ class CRAB3CreateJson(object):
             e = sys.exc_info()
             if hasattr(e,"headers"):
                 self.logger.error(str(e.headers))
-            self.logger.exception("Error in getCountTasksByStatusAbs:\n%s" %e)
+            self.logger.exception("Error in getCountTasksByStatusAbs:\n%s", e)
             pprint(e[1])
             traceback.print_tb(e[2])
             return []
@@ -184,8 +183,8 @@ class CRAB3CreateJson(object):
                              schedd['TotalRunningJobs'],
                              schedd['TotalHeldJobs'],
                              schedd['TotalJobAds']])
-        except Exception, e:
-            self.logger.debug("Error in getShadowsRunning: %s"%str(e))
+        except Exception as e:
+            self.logger.debug("Error in getShadowsRunning: %s", e)
         return data
 
     def execute(self):
@@ -263,19 +262,17 @@ class CRAB3CreateJson(object):
                 # if one schedd does not answer, go on and try the others
                 try:
                     scheddAdd = self.coll.locate(htcondor.DaemonTypes.Schedd, scheddName)
-                except:
+                except Exception:
                     continue
                 schedd = htcondor.Schedd(scheddAdd)
                 try:
                     idleDags = list(schedd.xquery(pickSchedulerIdle))
-                except:
+                except Exception:
                     idleDags = []
-                    pass
                 try:
                     runningTPs = list(schedd.xquery(pickLocalRunning))
-                except:
+                except Exception:
                     runningTPs = []
-                    pass
                 numDagIdle = len(idleDags)
                 numTPRun = len(runningTPs)
                 totalIdleTasks += numDagIdle
@@ -292,7 +289,7 @@ class CRAB3CreateJson(object):
 
         return self.jsonDoc
 
-if __name__ == '__main__':
+def main():
     """ Simple main to execute the action standalon. You just need to set the task worker environment.
         The main is set up to work with the production task worker. If you want to use it on your own
         instance you need to change resthost, resturi, and twconfig.
@@ -369,6 +366,10 @@ if __name__ == '__main__':
     elapsed = end_time - start_time
     now = time.strftime("%H:%M:%S", time.gmtime(end_time))
     elapsed_min = "%3d:%02d" % divmod(elapsed, 60)
-    logger.info('All done in %s minutes. Remove lock and exit' % elapsed_min)
+    logger.info('All done in %s minutes. Remove lock and exit', elapsed_min)
 
     os.remove(lockFile)
+
+
+if __name__ == '__main__':
+    main()

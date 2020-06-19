@@ -73,7 +73,7 @@ def monitor(user, taskname, log):
         list_stuck = []
         list_update = []
 
-        rules = rules_.next()
+        rules = next(rules_)
         log.debug("RULES %s", rules)
 
     except Exception:

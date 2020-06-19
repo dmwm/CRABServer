@@ -147,6 +147,18 @@ else
     exit 1
 fi
 
+# Decide if this task will use old cache_status.py or the new cache_status_jel.py
+# for parsing the condor job_log ( git issues: #5942 #5939 ) via the new JobEventLog API
+# Do it here so that decision stays for task lifetime, even if schedd configuratoion
+# is changed at some point
+if [ -f /etc/use_condor_jel ] ;
+then
+    echo "Set this task to use condor JobEventLog API"
+    touch USE_JEL
+fi
+
+
+
 export _CONDOR_DAGMAN_LOG=$PWD/$1.dagman.out
 export _CONDOR_DAGMAN_GENERATE_SUBDAG_SUBMITS=False
 export _CONDOR_MAX_DAGMAN_LOG=0
