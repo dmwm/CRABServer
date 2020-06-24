@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import string
 import json
 import urllib
 import logging
@@ -12,6 +13,7 @@ import htcondor
 import HTCondorUtils
 from WMCore.Credential.Proxy import Proxy
 from RESTInteractions import HTTPRequests
+from ServerUtilities import tempSetLogLevel
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
 class RenewRemoteProxies(BaseRecurringAction):
@@ -22,7 +24,7 @@ class RenewRemoteProxies(BaseRecurringAction):
         renewer.execute()
 
 MINPROXYLENGTH = 60 * 60 * 24
-QUERY_ATTRS = ['x509userproxyexpiration', 'CRAB_ReqName', 'ClusterId', 'ProcId', 'CRAB_UserDN', 'CRAB_UserVO', 'CRAB_UserGroup', 'CRAB_UserRole', 'JobStatus']
+QUERY_ATTRS = ['x509userproxyexpiration', 'CRAB_ReqName', 'ClusterId', 'ProcId', 'CRAB_UserHN', 'CRAB_UserDN', 'CRAB_UserVO', 'CRAB_UserGroup', 'CRAB_UserRole', 'JobStatus']
 
 class CRAB3ProxyRenewer(object):
 
@@ -35,7 +37,18 @@ class CRAB3ProxyRenewer(object):
             self.logger.addHandler(handler)
             self.logger.setLevel(logging.DEBUG)
         else:
-            self.logger = logger
+        # do not use BaseRecurringAction logger but create a new logger
+        # which writes to config.TaskWorker.logsDir/taks/recurring/RenewRemoveProxies_YYMMDD-HHMM.log
+            self.logger = logging.getLogger('RenewRemoteProxies')
+            logDir = config.TaskWorker.logsDir + '/tasks/recurring/'
+            if not os.path.exists(logDir):
+                os.makedirs(logDir)
+            timeStamp = time.strftime('%y%m%d-%H%M',time.localtime())
+            logFile = 'RenewRemoveProxies_' + timeStamp + '.log'
+            handler = logging.FileHandler(logDir + logFile)
+            formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
 
         self.resturi = resturi
         self.resthost = resthost
@@ -55,7 +68,7 @@ class CRAB3ProxyRenewer(object):
         self.schedds = [str(i) for i in result['htcondorSchedds']]
         self.logger.info("Resulting pool %s; schedds %s" % (self.pool, ",".join(self.schedds)))
 
-    def get_proxy(self, ad):
+    def get_proxy_from_MyProxy(self, ad):
         result = None
         vo = 'cms'
         group = ''
@@ -66,41 +79,47 @@ class CRAB3ProxyRenewer(object):
             group = ad['CRAB_UserGroup']
         if 'CRAB_UserRole' in ad and ad['CRAB_UserRole'] and ad['CRAB_UserRole'] != classad.Value.Undefined:
             role = ad['CRAB_UserRole']
-        username = ad['CRAB_UserHN']  # this better exist at all times !
+        username = ad['CRAB_UserHN']
         proxycfg = {'vo': vo,
                     'logger': self.logger,
                     'myProxySvr': self.config.Services.MyProxy,
-                    'myproxyAccount': self.config.TaskWorker.resturl,
+                    'myproxyAccount': self.resthost,
                     'proxyValidity' : '144:0',
                     'min_time_left' : MINPROXYLENGTH, ## do we need this ? or should we use self.myproxylen? 
                     'userDN' : ad['CRAB_UserDN'],
+                    'userName' : username + '_CRAB',
                     'group' : group,
                     'role' : role,
                     'server_key': self.config.MyProxy.serverhostkey,
                     'server_cert': self.config.MyProxy.serverhostcert,
-                    'serverDN': self.config.MyProxy.serverdn,
+                    'serverDN': 'dummy',  # this is only used inside WMCore/Proxy.py functions not used by CRAB
                     'uisource': getattr(self.config.MyProxy, 'uisource', ''),
                     'credServerPath': self.config.MyProxy.credpath,
                     'cleanEnvironment' : getattr(self.config.MyProxy, 'cleanEnvironment', False)}
-        # try with old fashioned DN hash as myproxy login name
+
         proxy = Proxy(proxycfg)
         userproxy = proxy.getProxyFilename(serverRenewer=True)
-        proxy.logonRenewMyProxy()
-        timeleft1 = proxy.getTimeLeft(userproxy)
-        # try also with new username_CRAB
-        proxycfg['userName'] = username + '_CRAB'
-        proxy = Proxy(proxycfg)
-        userproxy = proxy.getProxyFilename(serverRenewer=True)
-        proxy.logonRenewMyProxy()
-        timeleft2 = proxy.getTimeLeft(userproxy)
-        timeleft = max (timeleft1, timeleft2)
+        # try first with new username_CRAB
+        with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
+            proxy.logonRenewMyProxy()
+            timeleft = proxy.getTimeLeft(userproxy)
+        if not timeleft or timeleft <= 0:
+            # if that fails, try with old fashioned DN hash
+            del proxycfg['userName']
+            proxy = Proxy(proxycfg)
+            with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
+                proxy.logonRenewMyProxy()
+                timeleft = proxy.getTimeLeft(userproxy)
         if timeleft is None or timeleft <= 0:
-            self.logger.error("Impossible to retrieve proxy from %s for %s." %(proxycfg['myProxySvr'], proxycfg['userDN']))
+            self.logger.error("Impossible to retrieve proxy from %s for %s.", proxycfg['myProxySvr'], proxycfg['userDN'] )
+            self.logger.error("repeat the command in verbose mode")
+            proxycfg['userName'] = username + '_CRAB',
+            proxy = Proxy(proxycfg)
+            proxy.logonRenewMyProxy()
             raise Exception("Failed to retrieve proxy.")
         return userproxy
 
-    def renew_proxy(self, schedd, ad, proxy):
-        self.logger.info("Renewing proxy for task %s." % ad['CRAB_ReqName'])
+    def push_new_proxy_to_schedd(self, schedd, ad, proxy):
         if not hasattr(schedd, 'refreshGSIProxy'):
             raise NotImplementedError()
         with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
@@ -112,11 +131,11 @@ class CRAB3ProxyRenewer(object):
 
     def execute_schedd(self, schedd_name, collector):
         self.logger.info("Updating tasks in schedd %s" % schedd_name)
-        self.logger.info("Trying to locate schedd.")
+        self.logger.debug("Trying to locate schedd.")
         schedd_ad = collector.locate(htcondor.DaemonTypes.Schedd, schedd_name)
-        self.logger.info("Schedd found at %s" % schedd_ad['MyAddress'])
+        self.logger.debug("Schedd found at %s" % schedd_ad['MyAddress'])
         schedd = htcondor.Schedd(schedd_ad)
-        self.logger.info("Querying schedd for CRAB3 tasks.")
+        self.logger.debug("Querying schedd for CRAB3 tasks.")
         task_ads = list(schedd.xquery('TaskType =?= "ROOT" && CRAB_HC =!= "True"', QUERY_ATTRS))
         self.logger.info("There were %d tasks found." % len(task_ads))
         ads = {}
@@ -146,17 +165,21 @@ class CRAB3ProxyRenewer(object):
         for key, ad_list in ads.items():
             self.logger.info("Retrieving proxy for %s" % str(key))
             try:
-                proxyfile = self.get_proxy(ad_list[0])
+                proxyfile = self.get_proxy_from_MyProxy(ad_list[0])
             except Exception:
-                self.logger.exception("Failed to retrieve proxy.  Skipping user")
+                self.logger.error("Failed to retrieve proxy.  Skipping user %s", key[0])
+                tasks = string.join((ad['CRAB_ReqName'] for ad in ad_list), '\n\t')
+                self.logger.error("Will not update proxy for tasks:\n\t%s", tasks)
                 continue
             for ad in ad_list:
                 try:
-                    self.renew_proxy(schedd, ad, proxyfile)
+                    self.push_new_proxy_to_schedd(schedd, ad, proxyfile)
                 except NotImplementedError:
                     raise
                 except Exception:
-                    self.logger.exception("Failed to renew proxy for task %s due to exception." % ad['CRAB_ReqName'])
+                    self.logger.exception("Failed to push new proxy to schedd for task %s due to exception.", ad['CRAB_ReqName'])
+                    continue
+                self.logger.debug("Updated proxy pushed to schedd for task %s", ad['CRAB_ReqName'])
 
     def execute(self):
         self.get_backendurls()

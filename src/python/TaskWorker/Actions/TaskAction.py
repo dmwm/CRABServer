@@ -29,7 +29,7 @@ class TaskAction(object):
         ## Trying to give the right naming to the variables.
         ## In the resturl arg we have the REST URI (e.g. '/crabserver/prod/workflowdb').
         ## The first field in the REST URI (e.g. 'crabserver') I will call it the server
-        ## API. The second field (e.g. 'prod', 'preprod', 'dev') is the REST database
+        ## API. The second field (e.g. 'prod', 'preprod', 'dev') is the REST database instance
         ## instance. The third field (e.g. 'workflowdb', 'info', 'filemetadata') is the
         ## REST API.
         self.resturi = resturi # everything new should use self.resturi and not self.resturl.

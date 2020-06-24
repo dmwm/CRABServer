@@ -2,6 +2,7 @@
 #external dependencies
 from __future__ import print_function
 import os
+import shutil
 import sys
 import time
 import urllib
@@ -17,6 +18,7 @@ from RESTInteractions import HTTPRequests
 
 import HTCondorLocator
 from ServerUtilities import newX509env
+from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.TestWorker import TestWorker
 from MultiProcessingLog import MultiProcessingLog
 from TaskWorker.Worker import Worker, setProcessLogger
@@ -54,18 +56,19 @@ def validateConfig(config):
 class MasterWorker(object):
     """I am the master of the TaskWorker"""
 
-    def __init__(self, config, logWarning, logDebug, sequential=False, console=False):
+    def __init__(self, config, logWarning, logDebug, sequential=False, console=False, name='master'):
         """Initializer
 
         :arg WMCore.Configuration config: input TaskWorker configuration
         :arg bool logWarning: it tells if a quiet logger is needed
         :arg bool logDebug: it tells if needs a verbose logger
         :arg bool sequential: it tells if to run in sequential (no subprocesses) mode.
-        :arg bool console: it tells if to log to console."""
+        :arg bool console: it tells if to log to console.
+        :arg string name: defines a name for the log of this master process"""
 
 
         def createLogdir(dirname):
-            """ Create the directory dirname ignoring erors in case it exists. Exit if
+            """ Create the directory dirname ignoring errors in case it exists. Exit if
                 the directory cannot be created.
             """
             try:
@@ -76,8 +79,45 @@ class MasterWorker(object):
                     print("The task worker need to access the '%s' directory" % dirname)
                     sys.exit(1)
 
+        def createAndCleanLogDirectories(logsDir):
+            # it can be named with the time stamp a TW started
+            createLogdir(logsDir)
+            createLogdir(logsDir+'/tasks')
+            currentProcessesDir = logsDir + '/processes/'
+            createLogdir(currentProcessesDir)
+            # when running inside a container process logs will start with same
+            # process numbers, i.e. same name, at any container restart.
+            # to avoid clashes and confusion, we will put away all previous processes
+            # logs when a TW instance starts. To this goal each TW which runs
+            # creates a directory where new containers will move its logs, so
+            # identify LastLogs_timestamp directory
+            latestLogDir = None  # the logs directory could be empty
+            files = os.listdir(currentProcessesDir)
+            files.sort(reverse=True)   # if there are multiple Latest*, will hit the latest first
+            for f in files:
+                if f.startswith('Latest'):
+                    latestLogDir = currentProcessesDir + f
+                    break
+            if files and latestLogDir:
+                # rename from Latest to Old
+                oldLogsDir = latestLogDir.replace('Latest','Old')
+                shutil.move(latestLogDir, oldLogsDir)
+            else:
+                print("LatestLogDir not found in logs/processes, create a dummy dir to store old files")
+                oldLogsDir = currentProcessesDir + 'OldLog-Unknwown'
+                createLogdir(oldLogsDir)
+            # move process logs for latest TW run to old directory
+            for f in files:
+                if f.startswith('proc.c3id'):
+                    shutil.move(currentProcessesDir + f, oldLogsDir)
 
-        def setRootLogger(logWarning, logDebug, console):
+            # create a new LateastLogs directory where to store logs from this TaskWorker
+            YYMMDD_HHMMSS= time.strftime('%y%m%d_%H%M%S', time.localtime())
+            myDir = currentProcessesDir + 'LatestLogs-' + YYMMDD_HHMMSS
+            createLogdir(myDir)
+
+
+        def setRootLogger(logWarning, logDebug, console, name):
             """Sets the root logger with the desired verbosity level
                The root logger logs to logsDir/twlog.txt and every single
                logging instruction is propagated to it (not really nice
@@ -86,12 +126,13 @@ class MasterWorker(object):
             :arg bool logWarning: it tells if a quiet logger is needed
             :arg bool logDebug: it tells if needs a verbose logger
             :arg bool console: it tells if to log to console
+            :arg string name: define a name for the log file of this master process
             :return logger: a logger with the appropriate logger level."""
 
+            # this must only done for real Master, not when it is used by TapeRecallStatus
             logsDir = config.TaskWorker.logsDir
-            createLogdir(logsDir)
-            createLogdir(logsDir+'/processes')
-            createLogdir(logsDir+'/tasks')
+            if name == 'master':
+                    createAndCleanLogDirectories(logsDir)
 
             if console:
                 logging.getLogger().addHandler(logging.StreamHandler())
@@ -107,7 +148,7 @@ class MasterWorker(object):
             if logDebug:
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
-            logger = setProcessLogger("master", logsDir)
+            logger = setProcessLogger(name, logsDir)
             logger.debug("PID %s.", os.getpid())
             logger.debug("Logging level initialized to %s.", loglevel)
             return logger
@@ -115,23 +156,39 @@ class MasterWorker(object):
 
         self.STOP = False
         self.TEST = sequential
-        self.logger = setRootLogger(logWarning, logDebug, console)
+        self.logger = setRootLogger(logWarning, logDebug, console, name)
         self.config = config
-        resthost = None
-        self.restURInoAPI = None
-        if not self.config.TaskWorker.mode in MODEURL.keys():
-            raise ConfigException("No mode provided: need to specify config.TaskWorker.mode in the configuration")
-        elif MODEURL[self.config.TaskWorker.mode]['host'] is not None:
-            resthost = MODEURL[self.config.TaskWorker.mode]['host']
-            self.restURInoAPI = '/crabserver/' + MODEURL[self.config.TaskWorker.mode]['instance']
+        self.restHost = None
+        dbInstance = None
+
+        try:
+            instance = self.config.TaskWorker.instance
+        except:
+            msg = "No instance provided: need to specify config.TaskWorker.instance in the configuration"
+            raise ConfigException(msg)
+
+        if instance in SERVICE_INSTANCES:
+            self.logger.info('Will connect to CRAB service: %s', instance)
+            self.restHost = SERVICE_INSTANCES[instance]['restHost']
+            dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
         else:
-            resthost = self.config.TaskWorker.resturl #this should be called resthost in the TaskWorkerConfig -_-
-            self.restURInoAPI = '/crabserver/' + MODEURL[self.config.TaskWorker.mode]['instance']
-        if resthost is None:
-            raise ConfigException("No correct mode provided: need to specify config.TaskWorker.mode in the configuration")
+            msg = "Invalid instance value '%s'" % instance
+            raise ConfigException(msg)
+        if instance is 'other':
+            self.logger.info('Will use restHost and dbInstance from config file')
+            try:
+                self.restHost = self.config.TaskWorker.restHost
+                dbInstance = self.config.TaskWorker.dbInstance
+            except:
+                msg = "Need to specify config.TaskWorker.restHost and dbInstance in the configuration"
+                raise ConfigException(msg)
+        self.restURInoAPI = '/crabserver/' + dbInstance
+
+        self.logger.info('Will connect via URL: https://%s/%s', self.restHost, self.restURInoAPI)
+        
         #Let's increase the server's retries for recoverable errors in the MasterWorker
         #60 means we'll keep retrying for 1 hour basically (we retry at 20*NUMRETRY seconds, so at: 20s, 60s, 120s, 200s, 300s ...)
-        self.server = HTTPRequests(resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry=20,
+        self.server = HTTPRequests(self.restHost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry=20,
                                    logger=self.logger)
         self.logger.debug("Hostcert: %s, hostkey: %s", str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey))
         # Retries for any failures
@@ -147,9 +204,9 @@ class MasterWorker(object):
                                                          X509_USER_KEY=self.config.TaskWorker.cmskey)
 
         if self.TEST:
-            self.slaves = TestWorker(self.config, resthost, self.restURInoAPI + '/workflowdb')
+            self.slaves = TestWorker(self.config, self.restHost, self.restURInoAPI + '/workflowdb')
         else:
-            self.slaves = Worker(self.config, resthost, self.restURInoAPI + '/workflowdb')
+            self.slaves = Worker(self.config, self.restHost, self.restURInoAPI + '/workflowdb')
         self.slaves.begin()
         recurringActionsNames = getattr(self.config.TaskWorker, 'recurringActions', [])
         self.recurringActions = [self.getRecurringActionInst(name) for name in recurringActionsNames]

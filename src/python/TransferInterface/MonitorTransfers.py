@@ -32,9 +32,9 @@ def monitor(user, taskname, log):
         log.info('No proxy available yet - waiting for first post-job')
         return None
 
-    # TODO: what about the taskname char substitution?
+    # Prepare user and task info for monitoring
     scope = "user."+user
-    name = "/"+taskname.replace(":", "_")
+    name = taskname
     log.info("Initializing Monitor Rucio client for %s", taskname)
     crabInj = CRABDataInjector("", "", scope=scope, account=user, auth_type='x509_proxy')
 
@@ -73,8 +73,8 @@ def monitor(user, taskname, log):
         list_stuck = []
         list_update = []
 
-        rules = rules_.next()
-        log.info("RULES %s", rules)
+        rules = next(rules_)
+        log.debug("RULES %s", rules)
 
     except Exception:
         log.exception("Failed to retrieve rule information")
@@ -98,7 +98,7 @@ def monitor(user, taskname, log):
     sitename = None
     # TODO: should we split in threads ?
     for file_ in locks_generator:
-        log.info("LOCK %s", file_)
+        log.debug("LOCK %s", file_)
         filename = file_['name']
         status = file_['state']
         log.info("state %s", status)

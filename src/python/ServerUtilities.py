@@ -27,6 +27,22 @@ FILE_SIZE_LIMIT = 120*1048576
 # 0.5MB is the maximum limit for file completely loaded into memory
 FILE_MEMORY_LIMIT = 512*1024
 
+# these are known, pre-defined nickames for "CRAB configuration" at large
+# which correspond to a well known and specified REST host name and DataBase instance
+SERVICE_INSTANCES = {'prod': {'restHost':'cmsweb.cern.ch', 'dbInstance':'prod'},
+                     'preprod': {'restHost':'cmsweb-testbed.cern.ch', 'dbInstance':'preprod'},
+                     'k8s': {'restHost':'cmsweb-k8s-testbed.cern.ch', 'dbInstance':'preprod'},
+                     'test1': {'restHost':'cmsweb-test1.cern.ch', 'dbInstance':'dev'},
+                     'test2': {'restHost':'cmsweb-test2.cern.ch', 'dbInstance':'dev'},
+                     'test3': {'restHost':'cmsweb-test3.cern.ch', 'dbInstance':'dev'},
+                     'test4': {'restHost':'cmsweb-test4.cern.ch', 'dbInstance':'dev'},
+                     'test5': {'restHost':'cmsweb-test5.cern.ch', 'dbInstance':'dev'},
+                     'test6': {'restHost':'cmsweb-test6.cern.ch', 'dbInstance':'dev'},
+                     'stefanovm': {'restHost':'stefanovm.cern.ch', 'dbInstace':'dev'},
+                     'stefanovm2': {'restHost':'stefanovm2.cern.ch', 'dbInstace':'dev'},
+                     'other': {'restHost':None, 'dbInstance':None},
+                     }
+
 # Fatal error limits for job resource usage
 # Defaults are used if unable to load from .job.ad
 # Otherwise it uses these values.

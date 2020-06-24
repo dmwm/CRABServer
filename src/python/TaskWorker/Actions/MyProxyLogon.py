@@ -36,25 +36,14 @@ class MyProxyLogon(TaskAction):
             usergroups = set(proxy.getAllUserGroups(userproxy))
             proxy.logonRenewMyProxy()
             timeleft = proxy.getTimeLeft(userproxy)
-            if timeleft is None or timeleft <= 0:
-                self.logger.error("proxy retrieval from %s failed with login name %s.",
-                                  proxycfg['myProxySvr'], proxycfg['userName'])
-                self.logger.error("will try with old-style DN hash")
-                del proxycfg['userName']
-                proxy = Proxy(proxycfg)
-                proxy.logonRenewMyProxy()
-                timeleft = proxy.getTimeLeft(userproxy)
 
         if timeleft is None or timeleft <= 0:
             msg = "Impossible to retrieve proxy from %s for %s." % (proxycfg['myProxySvr'], proxycfg['userDN'])
             self.logger.error(msg)
-            self.logger.error("\n Will try again in verbose mode")
+            self.logger.error("Will try again in verbose mode")
             self.logger.error("===========PROXY ERROR START ==========================")
             with tempSetLogLevel(logger=self.logger, level=logging.DEBUG):
-                userproxy = proxy.getProxyFilename(serverRenewer=True)
                 proxy.logonRenewMyProxy()
-                timeleft = proxy.getTimeLeft(userproxy)
-                usergroups = set(proxy.getAllUserGroups(userproxy))
             self.logger.error("===========PROXY ERROR END   ==========================")
             raise TaskWorkerException(msg)
 
@@ -73,7 +62,7 @@ class MyProxyLogon(TaskAction):
                     'role' : kwargs['task']['tm_user_role'] if kwargs['task']['tm_user_role'] else '',
                     'server_key': self.config.MyProxy.serverhostkey,
                     'server_cert': self.config.MyProxy.serverhostcert,
-                    'serverDN': self.config.MyProxy.serverdn,
+                    'serverDN': 'dummy',  # this is only used inside WMCore/Proxy.py functions not used by CRAB
                     'uisource': getattr(self.config.MyProxy, 'uisource', ''),
                     'credServerPath': self.config.MyProxy.credpath,
                     'myproxyAccount' : self.server['host'],
