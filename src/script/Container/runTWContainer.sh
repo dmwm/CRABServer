@@ -1,19 +1,19 @@
 #!/bin/bash
 
-# runContainer.sh: script to pull specified CRAB TW image from defined repo and run it
+# runTWContainer.sh: script to pull specified CRAB TW image from defined repo and run it
 # use TW_VERSION to specify TW version
 # use TWREPO to specify docker hub repo, default is cmssw/crabtaskworker
 
 # define help
 if [ "$1" == "-h" ] || [ "$1" == "-help" ] || [ "$1" == "--help" ] || [ "$1" == "help" ]; then
-    echo "Usage: <TW_VERSION> runContainer.sh"
+    echo "Usage: <TW_VERSION> runTWContainer.sh"
     echo "  use TW_VERSION to specify TW version"
     echo "  use TWREPO to specify docker hub repo, default is cmssw/crabtaskworker"
     echo "Examples:"
     echo "  # pull TW image from TWREPO for tag 3.3.2005.rc3 and run it"
-    echo "  TW_VERSION=3.3.2005.rc3 ./runContainer.sh"
+    echo "  TW_VERSION=3.3.2005.rc3 ./runTWContainer.sh"
     echo "  # pull TW image from from your personal docker hub repo for tag 3.3.2005.rc3 and run it, X is name of docker repository"
-    echo "  TWREPO=X TW_VERSION=3.3.2005.rc3 ./runContainer.sh"
+    echo "  TWREPO=X TW_VERSION=3.3.2005.rc3 ./runTWContainer.sh"
     exit 1
 fi
 
