@@ -60,7 +60,7 @@ def perform_transfers(inputFile, lastLine, direct=False):
         logging.info('No proxy available yet - waiting for first post-job')
         return None
 
-    logging.info("starting from line: %s" % lastLine)
+    logging.info("starting from line: %s", lastLine)
 
     # define ntuples and column names
     # TODO: make use of dict instead of this
@@ -166,7 +166,6 @@ def monitor_manager(user, taskname):
     proxy = None
     if os.path.exists('task_process/rest_filetransfers.txt'):
         with open("task_process/rest_filetransfers.txt", "r") as _rest:
-            _rest.readline().split('\n')[0]
             proxy = os.getcwd() + "/" + _rest.readline()
             logging.info("Proxy: %s", proxy)
             os.environ["X509_USER_PROXY"] = proxy
