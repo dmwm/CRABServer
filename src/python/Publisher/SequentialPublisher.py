@@ -30,7 +30,7 @@ usePdb = args.debug
 # ask for verbose logging in test mode
 quiet = False
 debug = True
-testMode  = True
+testMode = True
 
 if usePdb:
     import pdb
@@ -38,8 +38,6 @@ if usePdb:
 
 master = Master(configurationFile, quiet, debug, testMode)
 
-while (True):
+while True:
     master.algorithm()
     time.sleep(master.pollInterval())
-   
-
