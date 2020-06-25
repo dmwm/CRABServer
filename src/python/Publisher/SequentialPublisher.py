@@ -33,13 +33,13 @@ debug = True
 testMode  = True
 
 if usePdb:
-   import pdb
-   pdb.set_trace()
+    import pdb
+    pdb.set_trace()
 
 master = Master(configurationFile, quiet, debug, testMode)
 
 while (True):
-   master.algorithm()
-   time.sleep(master.pollInterval())
+    master.algorithm()
+    time.sleep(master.pollInterval())
    
 
