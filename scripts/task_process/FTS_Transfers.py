@@ -564,7 +564,7 @@ def algorithm():
     logging.info("using user's proxy from %s", proxy)
     ftsContext = fts3.Context('https://fts3.cern.ch:8446', proxy, proxy, verify=True)
     logging.info("Delegating proxy to FTS...")
-    delegationId = fts3.delegate(ftsContext, lifetime=timedelta(hours=48), force=False)
+    delegationId = fts3.delegate(ftsContext, lifetime=timedelta(hours=48), delegate_when_lifetime_lt=timedelta(hours=24), force=False)
     delegationStatus = fts.get("delegation/"+delegationId)
     logging.info("Delegated proxy valid until %s", delegationStatus[0]['termination_time'])
 
