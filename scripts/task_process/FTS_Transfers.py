@@ -543,6 +543,7 @@ def submission_manager(phedex, ftsContext):
 
 def algorithm():
     """
+
     script algorithm
     - create fts REST HTTPRequest
     - delegate user proxy to fts if needed
@@ -562,7 +563,11 @@ def algorithm():
 
     logging.info("using user's proxy from %s", proxy)
     ftsContext = fts3.Context('https://fts3.cern.ch:8446', proxy, proxy, verify=True)
-    logging.info("Delegating proxy to FTS: "+fts3.delegate(ftsContext, lifetime=timedelta(hours=48), force=False))
+    logging.info("Delegating proxy to FTS...")
+    delegationId = fts3.delegate(ftsContext, lifetime=timedelta(hours=48), force=False)
+    delegationStatus = fts.get("delegation/"+delegationId)
+    logging.info("Delegated proxy valid until %s", delegationStatus[0]['termination_time'])
+
 
     log_phedex = logging.getLogger('phedex')
 
