@@ -31,7 +31,7 @@ if os.path.exists('task_process/rest_filetransfers.txt'):
     with open("task_process/rest_filetransfers.txt", "r") as _rest:
         rest_filetransfers = _rest.readline().split('\n')[0]
         proxy = os.getcwd() + "/" + _rest.readline()
-        print("Proxy: %s", proxy)
+        print("Proxy: %s" % proxy)
 
 
 def get_tfc_rules(phedex, site):
@@ -560,8 +560,9 @@ def algorithm():
                        proxy,
                        proxy)
 
+    logging.info("using user's proxy from %s", proxy)
     ftsContext = fts3.Context('https://fts3.cern.ch:8446', proxy, proxy, verify=True)
-    logging.debug("Delegating proxy to FTS: "+fts3.delegate(ftsContext, lifetime=timedelta(hours=48), force=False))
+    logging.info("Delegating proxy to FTS: "+fts3.delegate(ftsContext, lifetime=timedelta(hours=48), force=False))
 
     log_phedex = logging.getLogger('phedex')
 
