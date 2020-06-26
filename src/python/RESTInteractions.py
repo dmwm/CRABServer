@@ -7,7 +7,7 @@ import time
 import urllib
 import pycurl
 import logging
-from httplib import HTTPException
+from http.client import HTTPException
 
 from WMCore.Services.Requests import JSONRequests
 from WMCore.Services.pycurl_manager import RequestHandler

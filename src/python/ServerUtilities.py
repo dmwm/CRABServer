@@ -16,7 +16,7 @@ import datetime
 import traceback
 import subprocess
 import contextlib
-from httplib import HTTPException
+from http.client import HTTPException
 
 BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
@@ -87,7 +87,7 @@ TRANSFERDB_STATES = {0: "NEW",
                      5: "SUBMITTED",
                      6: "KILL",
                      7: "KILLED"}
-TRANSFERDB_STATUSES = dict((v, k) for k, v in TRANSFERDB_STATES.iteritems())
+TRANSFERDB_STATUSES = dict((v, k) for k, v in TRANSFERDB_STATES.items())
 
 PUBLICATIONDB_STATES = {0: "NEW",
                         1: "ACQUIRED",
@@ -95,18 +95,18 @@ PUBLICATIONDB_STATES = {0: "NEW",
                         3: "DONE",
                         4: "RETRY",
                         5: "NOT_REQUIRED"}
-PUBLICATIONDB_STATUSES = dict((v, k) for k, v in PUBLICATIONDB_STATES.iteritems())
+PUBLICATIONDB_STATUSES = dict((v, k) for k, v in PUBLICATIONDB_STATES.items())
 
 ## Whenever user is putting a new Doc, these statuses will be used for double checking
 ## and also for adding in database correct value
 USER_ALLOWED_TRANSFERDB_STATES = {0: "NEW",
                                   3: "DONE"}
-USER_ALLOWED_TRANSFERDB_STATUSES = dict((v, k) for k, v in TRANSFERDB_STATES.iteritems())
+USER_ALLOWED_TRANSFERDB_STATUSES = dict((v, k) for k, v in TRANSFERDB_STATES.items())
 
 USER_ALLOWED_PUBLICATIONDB_STATES = {0: "NEW",
                                      4: "RETRY",
                                      5: "NOT_REQUIRED"}
-USER_ALLOWED_PUBLICATIONDB_STATUSES = dict((v, k) for k, v in PUBLICATIONDB_STATES.iteritems())
+USER_ALLOWED_PUBLICATIONDB_STATUSES = dict((v, k) for k, v in PUBLICATIONDB_STATES.items())
 
 def USER_SANDBOX_EXCLUSIONS(tarmembers):
     """ The function is used by both the client and the crabcache to get a list of files to exclude during the
@@ -415,7 +415,7 @@ def encodeRequest(configreq, listParams=None):
             del configreq[lparam]
     if isinstance(configreq, dict):
         #Make sure parameters we encode are streing. Otherwise u'IamAstring' may become 'uIamAstring' in the DB
-        for k, v in configreq.iteritems():
+        for k, v in configreq.items():
             if isinstance(v, basestring):
                 configreq[k] = str(v)
             if isinstance(v, list):
