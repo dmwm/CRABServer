@@ -299,7 +299,8 @@ class Master(object):
         #  tasksToDo.append(t)
         # tasks = tasksToDo
 
-        self.logger.debug('kicking off pool %s', [x[0][3] for x in tasks])
+        self.logger.info('kicking off pool for %s tasks', len(tasks))
+        self.logger.debug('list of tasks %s', [x[0][3] for x in tasks])
         processes = []
 
         try:
@@ -413,7 +414,7 @@ class Master(object):
                 # Otherwise...
                 else:
                     last = last_publication_time
-                    msg = "Last published block: %s" % last
+                    msg = "Last published block time: %s" % last
                     logger.debug(wfnamemsg+msg)
                     # If the last publication was long time ago (> our block publication timeout),
                     # go ahead and publish.
