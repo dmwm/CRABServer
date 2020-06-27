@@ -801,8 +801,7 @@ def publishInDBS3(config, taskname, verbose):
 
     return 0
 
-if __name__ == '__main__':
-
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--configFile', help='Publisher configuration file', default='PublisherConfig.py')
     parser.add_argument('--taskname', help='taskname', required=True)
@@ -822,3 +821,7 @@ if __name__ == '__main__':
 
     result = publishInDBS3(config, taskname, verbose)
     print(result)
+
+
+if __name__ == '__main__':
+    main()
