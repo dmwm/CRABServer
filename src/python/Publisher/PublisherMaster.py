@@ -285,7 +285,7 @@ class Master(object):
 
     def algorithm(self):
         """
-        1. Get a list of users with files to publish from the couchdb instance
+        1. Get a list of users with files to publish from the REST
         2. For each user get a suitably sized input for publish
         3. Submit the publish to a subprocess
         """
