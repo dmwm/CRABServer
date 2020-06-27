@@ -74,6 +74,7 @@ class Master(object):
         self.configurationFile = configurationFile
         config = loadConfigurationFile(configurationFile)
         self.config = config.General
+        self.TPconfig = config.TaskPublisher
 
         # these are used for talking to DBS
         os.putenv('X509_USER_CERT', self.config.serviceCert)
@@ -486,7 +487,7 @@ class Master(object):
                 cmd = "python %s " % taskPublishScript
                 cmd += " --configFile=%s" % self.configurationFile
                 cmd += " --taskname=%s" % workflow
-                if self.config.dryRun:
+                if self.TPconfig.dryRun:
                     cmd += " --dry"
                 logger.info("Now execute: %s", cmd)
                 subprocess.call(cmd, shell=True)

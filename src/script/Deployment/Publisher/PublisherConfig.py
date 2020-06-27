@@ -7,6 +7,7 @@ from WMCore.Configuration import Configuration
 config = Configuration()
 config.section_('General')
 
+# never change following line
 config.General.asoworker = 'asoless'
 
 ## Which CRAB SERVICE instance is this Publisher using
@@ -20,10 +21,6 @@ config.General.instance = 'preprod'
 #config.General.restHost = 'stefanovm.cern.ch'
 #config.General.dbInstance = 'dev'
 
-config.General.RestHostName = 'cmsweb-testbed.cern.ch'
-
-#config.General.oracleFileTrans = '/crabserver/preprod/filetransfers'
-#config.General.oracleUserTrans = '/crabserver/preprod/fileusertransfers'
 config.General.pollInterval = 1800
 config.General.publish_dbs_url = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter'
 config.General.block_closure_timeout = 9400
@@ -35,7 +32,7 @@ config.General.taskFilesDir = '/data/srv/Publisher_files/'
 config.General.logsDir = './logs'
 config.General.logMsgFormat = '%(asctime)s:%(levelname)s:%(module)s:%(name)s: %(message)s'
 config.General.logLevel = 'INFO'
-config.General.dryRun = False
 
 config.section_('TaskPublisher')
 config.TaskPublisher.logMsgFormat = '%(asctime)s:%(levelname)s: %(message)s'
+config.TaskPublisher.dryRun = False
