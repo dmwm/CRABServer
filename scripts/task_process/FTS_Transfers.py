@@ -444,7 +444,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
             jobids = submit(phedex, ftsContext, transfers)
 
             for jobid in jobids:
-                logging.info("Monitor link: https://fts3.cern.ch:8449/fts3/ftsmon/#/job/"+jobid)
+                logging.info("Monitor link: https://fts3.cern.ch:8449/fts3/ftsmon/#/job/%s", jobid)
 
             # TODO: send to dashboard
 
