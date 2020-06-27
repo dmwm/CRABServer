@@ -1,5 +1,8 @@
 # pylint: disable=C0103, W0703, R0912, R0914, R0915
-
+"""
+this is a standalone script. It is spawned by PushisherMaster or could
+be executed from CLI (in the Publisher environment) to retry or debug failures
+"""
 from __future__ import division
 from __future__ import print_function
 import os
@@ -72,7 +75,7 @@ def createBulkBlock(output_config, processing_era_config, primds_config, \
     return blockDump
 
 
-def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, dataset, blocks=None):
+def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, dataset, blocks=None, verbose=False):
     """
     Submit one migration request for each block that needs to be migrated.
     If blocks argument is not specified, migrate the whole dataset.
@@ -255,7 +258,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
     Submit migration request for one block, checking the request output.
     """
     logger = logging.getLogger(taskname)
-    logging.basicConfig(filename=taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
+#    logging.basicConfig(filename=taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
 
     atDestination = False
     alreadyQueued = False
@@ -699,6 +702,7 @@ def publishInDBS3(config, taskname, verbose):
                                                         sourceApi,
                                                         inputDataset,
                                                         localParentBlocks,
+                                                        verbose
                                                        )
             if statusCode:
                 failureMsg += " Not publishing any files."
@@ -715,7 +719,8 @@ def publishInDBS3(config, taskname, verbose):
         if dryRun:
             logger.info("DryRun: skipping migration request")
         else:
-            statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, globalApi, inputDataset, globalParentBlocks)
+            statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, globalApi,
+                                                        inputDataset, globalParentBlocks, verbose)
             if statusCode:
                 failureMsg += " Not publishing any files."
                 logger.info(failureMsg)
@@ -762,8 +767,8 @@ def publishInDBS3(config, taskname, verbose):
             msg += str(traceback.format_exc())
             logger.error(msg)
             failure_reason = str(ex)
-            file = '/tmp/failed-block-at-%s.txt' % time.time()
-            with open(file, 'w') as fd:
+            fname = '/tmp/failed-block-at-%s.txt' % time.time()
+            with open(fname, 'w') as fd:
                 fd.write(blockDump)
             logger.error("FAILING BLOCK SAVED AS %s", file)
         count += max_files_per_block
@@ -802,6 +807,11 @@ def publishInDBS3(config, taskname, verbose):
     return 0
 
 def main():
+    """
+    starting from json file prepared by PusblishMaster with info on filed to be published, does
+    the actual DBS publication
+    :return:
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('--configFile', help='Publisher configuration file', default='PublisherConfig.py')
     parser.add_argument('--taskname', help='taskname', required=True)
@@ -821,7 +831,6 @@ def main():
 
     result = publishInDBS3(config, taskname, verbose)
     print(result)
-
 
 if __name__ == '__main__':
     main()
