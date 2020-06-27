@@ -49,7 +49,7 @@ def setProcessLogger(name):
 class Master(object):
     """I am the main daemon kicking off all Publisher work via slave Publishers"""
 
-    def __init__(self, configurationFile, quiet=False, debug=True, testMode=False):
+    def __init__(self, confFile=None, quiet=False, debug=True, testMode=False):
         """
         Initialise class members
 
@@ -71,8 +71,8 @@ class Master(object):
                     print("The Publisher Worker needs to access the '%s' directory" % dirname)
                     sys.exit(1)
 
-        self.configurationFile = configurationFile
-        config = loadConfigurationFile(configurationFile)
+        self.configurationFile = confFile         # remember this, will have to pass it to TaskPublish
+        config = loadConfigurationFile(confFile)
         self.config = config.General
         self.TPconfig = config.TaskPublisher
 
@@ -317,6 +317,11 @@ class Master(object):
             self.logger.exception("Error during process mapping")
 
     def startSlave(self, task):
+        """
+        start a slave process to deal with publication for a single task
+        :param task: a task name
+        :return: 0  It will always terminate normally, if publication fails it will mark it in the DB
+        """
         # TODO: lock task!
         # - process logger
         logger = setProcessLogger(str(task[0][3]))
@@ -513,7 +518,7 @@ if __name__ == '__main__':
     #need to pass the configuration file path to the slaves
     configurationFile = os.path.abspath(args.config)
 
-    master = Master(configurationFile)
+    master = Master(confFile=configurationFile)
     while True:
         master.algorithm()
         time.sleep(master.pollInterval())
