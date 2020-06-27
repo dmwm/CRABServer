@@ -374,7 +374,7 @@ def publishInDBS3(config, taskname, verbose):
                 sys.exit(1)
 
     taskFilesDir = config.General.taskFilesDir
-    dryRun = config.General.dryRun
+    dryRun = config.TaskPublisher.dryRun
     username = taskname.split(':')[1].split('_')[0]
     logdir = config.General.logsDir + '/tasks/' + username
     logfile = logdir + '/' + taskname + '.log'
@@ -816,7 +816,7 @@ if __name__ == '__main__':
     modeMsg = " in DRY RUN mode" if dryRun else ""
     config = loadConfigurationFile(configFile)
     if dryRun:
-        config.General.dryRun = True
+        config.TaskPublisher.dryRun = True
 
     print("will run%s with:\nconfigFile: %s\ntaskname  : %s\n" % (modeMsg, configFile, taskname))
 
