@@ -504,6 +504,7 @@ class Master(object):
                     cmd += " --dry"
                 logger.info("Now execute: %s", cmd)
                 subprocess.call(cmd, shell=True)
+                logger.info('ALL DONE')
 
         except Exception:
             logger.exception("Exception when calling TaskPublish!")
