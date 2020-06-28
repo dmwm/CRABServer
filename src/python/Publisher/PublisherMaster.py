@@ -311,7 +311,7 @@ class Master(object):
                 else:                       # deal with each task in a separate process
                     p = Process(target=self.startSlave, args=(task,))
                     p.start()
-                    self.logger.info('Starting process %s alive=%s pid=%s', p, p.is_alive(), p.pid)
+                    self.logger.info('Starting process %s  pid=%s', p, p.pid)
                     processes.append(p)
                 if len(processes) == maxSlaves:
                     # wait until a batch of maxSlaves processes have completed before starting more
