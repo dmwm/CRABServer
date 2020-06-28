@@ -13,6 +13,7 @@ from __future__ import division
 import logging
 import os
 import argparse
+import time
 
 from Publisher.PublisherMaster import Master
 
@@ -29,12 +30,14 @@ usePdb = args.debug
 # ask for verbose logging in test mode
 quiet = False
 debug = True
-testMode  = True
+testMode = True
 
 if usePdb:
-   import pdb
-   pdb.set_trace()
+    import pdb
+    pdb.set_trace()
 
 master = Master(configurationFile, quiet, debug, testMode)
-master.algorithm()
 
+while True:
+    master.algorithm()
+    time.sleep(master.pollInterval())
