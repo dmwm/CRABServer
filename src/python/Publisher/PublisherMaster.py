@@ -299,7 +299,8 @@ class Master(object):
         #  tasksToDo.append(t)
         # tasks = tasksToDo
 
-        self.logger.info('kicking off pool for %s tasks', len(tasks))
+        maxSlaves = self.config.max_slaves
+        self.logger.info('kicking off pool for %s tasks in batches of %s', len(tasks), maxSlaves)
         self.logger.debug('list of tasks %s', [x[0][3] for x in tasks])
         processes = []
 
@@ -310,10 +311,16 @@ class Master(object):
                 else:                       # deal with each task in a separate process
                     p = Process(target=self.startSlave, args=(task,))
                     p.start()
+                    self.logger.info('Starting process %s alive=%s pid=%s', p, p.is_alive(), p.pid)
                     processes.append(p)
+                if len(processes) == maxSlaves:
+                    # wait until a batch of maxSlaves processes have completed before starting more
+                    for proc in processes:
+                        proc.join()
+                    self.logger.info('All processes in the batch have ended')
+                    time.sleep(10)  # take a breath, mostly useful for debugging
+                    processes = []
 
-            for proc in processes:
-                proc.join()
         except Exception:
             self.logger.exception("Error during process mapping")
 
