@@ -33,13 +33,26 @@ from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping
 from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.WorkerExceptions import ConfigException
 
-def setProcessLogger(name):
-    """ Set the logger for a single process. The file used for it is logs/processes/proc.name.txt and it
+def setMasterLogger():
+    """ Set the logger for the master process. The file used for it is logs/processes/proc.name.txt and it
+        can be retrieved with logging.getLogger(name) in other parts of the code
+    """
+    logger = logging.getLogger(name)
+    handler = TimedRotatingFileHandler('logs/processes/proc.c3id_master.pid_%s.txt' % (os.getpid()), 'midnight', backupCount=30)
+    #formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+"PublisherMaster+":%(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    return logger
+
+def setSlaveLogger(name):
+    """ Set the logger for a single slave process. The file used for it is logs/processes/proc.name.txt and it
         can be retrieved with logging.getLogger(name) in other parts of the code
     """
     logger = logging.getLogger(name)
     handler = TimedRotatingFileHandler('logs/processes/proc.c3id_%s.pid_%s.txt' % (name, os.getpid()), 'midnight', backupCount=30)
-    formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:"+name+":%(message)s")
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+"PublisherSlave+":%(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
@@ -116,7 +129,7 @@ class Master(object):
             if debug:
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
-            logger = setProcessLogger("master")
+            logger = setMasterLogger()
             logger.debug("PID %s.", os.getpid())
             logger.debug("Logging level initialized to %s.", loglevel)
             return logger
@@ -332,54 +345,51 @@ class Master(object):
         """
         # TODO: lock task!
         # - process logger
-        logger = setProcessLogger(str(task[0][3]))
+        logger = setSlaveLogger(str(task[0][3]))
         logger.info("Process %s is starting. PID %s", task[0][3], os.getpid())
 
         self.force_publication = False
         workflow = str(task[0][3])
-        wfnamemsg = "%s: " % (workflow)
 
         if int(workflow[0:2]) < 20:
             msg = "Skipped. Ignore tasks created before 2020."
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
             return 0
 
         if len(task[1]) > self.max_files_per_block:
             self.force_publication = True
             msg = "All datasets have more than %s ready files." % (self.max_files_per_block)
             msg += " No need to retrieve task status nor last publication time."
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
         else:
             msg = "At least one dataset has less than %s ready files." % (self.max_files_per_block)
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
             # Retrieve the workflow status. If the status can not be retrieved, continue
             # with the next workflow.
             workflow_status = ''
             msg = "Retrieving status"
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
             uri = self.REST_workflow
             data = encodeRequest({'workflow': workflow})
             try:
-                #connection = HTTPRequests(self.config.RestHostName, self.config.serviceCert, self.config.serviceKey)
                 res = self.crabServer.get(uri=uri, data=data)
             except Exception as ex:
-                # logger.info(wfnamemsg+encodeRequest(data))
                 logger.warn('Error retrieving status from %s for %s.', uri, workflow)
                 return 0
 
             try:
                 workflow_status = res[0]['result'][0]['status']
                 msg = "Task status is %s." % workflow_status
-                logger.info(wfnamemsg+msg)
+                logger.info(msg)
             except ValueError:
                 msg = "Workflow removed from WM."
-                logger.error(wfnamemsg+msg)
+                logger.error(msg)
                 workflow_status = 'REMOVED'
             except Exception as ex:
                 msg = "Error loading task status!"
                 msg += str(ex)
                 msg += str(traceback.format_exc())
-                logger.error(wfnamemsg+msg)
+                logger.error(msg)
             # If the workflow status is terminal, go ahead and publish all the ready files
             # in the workflow.
             if workflow_status in ['COMPLETED', 'FAILED', 'KILLED', 'REMOVED']:
@@ -387,13 +397,13 @@ class Master(object):
                 if workflow_status in ['KILLED', 'REMOVED']:
                     self.force_failure = True
                 msg = "Considering task status as terminal. Will force publication."
-                logger.info(wfnamemsg+msg)
+                logger.info(msg)
             # Otherwise...
             else:
                 msg = "Task status is not considered terminal."
-                logger.info(wfnamemsg+msg)
+                logger.info(msg)
                 msg = "Getting last publication time."
-                logger.info(wfnamemsg+msg)
+                logger.info(msg)
                 # Get when was the last time a publication was done for this workflow (this
                 # should be more or less independent of the output dataset in case there are
                 # more than one).
@@ -411,18 +421,18 @@ class Master(object):
                     last_publication_time = time.mktime(seconds)
 
                 msg = "Last publication time: %s." % str(last_publication_time)
-                logger.debug(wfnamemsg+msg)
+                logger.debug(msg)
                 # If this is the first time a publication would be done for this workflow, go
                 # ahead and publish.
                 if not last_publication_time:
                     self.force_publication = True
                     msg = "There was no previous publication. Will force publication."
-                    logger.info(wfnamemsg+msg)
+                    logger.info(msg)
                 # Otherwise...
                 else:
                     last = last_publication_time
                     msg = "Last published block time: %s" % last
-                    logger.debug(wfnamemsg+msg)
+                    logger.debug(msg)
                     # If the last publication was long time ago (> our block publication timeout),
                     # go ahead and publish.
                     now = int(time.time()) - time.timezone
@@ -439,7 +449,7 @@ class Master(object):
                     else:
                         msg += " (less than the timeout of %sh:%sm)." % (timeout_hours, timeout_minutes)
                         msg += " Not enough to force publication."
-                    logger.info(wfnamemsg+msg)
+                    logger.info(msg)
 
         # logger.info(task[1])
         try:
