@@ -40,7 +40,7 @@ def setMasterLogger():
     logger = logging.getLogger(name)
     handler = TimedRotatingFileHandler('logs/processes/proc.c3id_master.pid_%s.txt' % (os.getpid()), 'midnight', backupCount=30)
     #formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
-    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+"PublisherMaster+":%(message)s")
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+"PublisherMaster"+":%(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
@@ -52,7 +52,7 @@ def setSlaveLogger(name):
     """
     logger = logging.getLogger(name)
     handler = TimedRotatingFileHandler('logs/processes/proc.c3id_%s.pid_%s.txt' % (name, os.getpid()), 'midnight', backupCount=30)
-    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+"PublisherSlave+":%(message)s")
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+"PublisherSlave"+":%(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
