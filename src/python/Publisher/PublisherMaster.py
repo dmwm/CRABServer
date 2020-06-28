@@ -411,13 +411,13 @@ class Master(object):
                 try:
                     result = self.crabServer.get(self.REST_task, data)
                     logger.debug("task: %s ", str(result[0]))
-                    logger.debug("task: %s ", getColumn(result[0], 'tm_last_publication'))
+                    last_publication_time = getColumn(result[0], 'tm_last_publication')
                 except Exception as ex:
                     logger.error("Error during task doc retrieving: %s", ex)
                 if last_publication_time:
-                    date = oracleOutputMapping(result)['last_publication']
-                    seconds = datetime.strptime(date, "%Y-%m-%d %H:%M:%S.%f").timetuple()
-                    last_publication_time = time.mktime(seconds)
+                    date = last_publication_time # datetime in Oracle format
+                    timetuple = datetime.strptime(date, "%Y-%m-%d %H:%M:%S.%f").timetuple()  # convert to time tuple
+                    last_publication_time = time.mktime(timetuple)      # convert to seconds since Epoch (float)
 
                 msg = "Last publication time: %s." % str(last_publication_time)
                 logger.debug(msg)
