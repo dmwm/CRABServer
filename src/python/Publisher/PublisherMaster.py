@@ -33,14 +33,13 @@ from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping
 from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.WorkerExceptions import ConfigException
 
-def setMasterLogger():
+def setMasterLogger(name='master'):
     """ Set the logger for the master process. The file used for it is logs/processes/proc.name.txt and it
         can be retrieved with logging.getLogger(name) in other parts of the code
     """
     logger = logging.getLogger(name)
-    handler = TimedRotatingFileHandler('logs/processes/proc.c3id_master.pid_%s.txt' % (os.getpid()), 'midnight', backupCount=30)
-    #formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
-    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+"PublisherMaster"+":%(message)s")
+    handler = TimedRotatingFileHandler('logs/processes/proc.c3id_%s.pid_%s.txt' % (name, os.getpid()), 'midnight', backupCount=30)
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+name+":%(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
@@ -52,7 +51,7 @@ def setSlaveLogger(name):
     """
     logger = logging.getLogger(name)
     handler = TimedRotatingFileHandler('logs/processes/proc.c3id_%s.pid_%s.txt' % (name, os.getpid()), 'midnight', backupCount=30)
-    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+"PublisherSlave"+":%(message)s")
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+"slave"+":%(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
