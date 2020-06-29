@@ -478,7 +478,7 @@ def publishInDBS3(config, taskname, verbose):
 
     if publish_dbs_url.endswith('/DBSWriter'):
         publish_read_url = publish_dbs_url[:-len('/DBSWriter')] + '/DBSReader'
-        publish_migrate_url = publish_dbs_url[:-len('/DBSWriter')] + 'DBSMigrate'
+        publish_migrate_url = publish_dbs_url[:-len('/DBSWriter')] + '/DBSMigrate'
     else:
         publish_migrate_url = publish_dbs_url + '/DBSMigrate'
         publish_read_url = publish_dbs_url + '/DBSReader'
