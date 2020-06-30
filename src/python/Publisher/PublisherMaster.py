@@ -272,7 +272,12 @@ class Master(object):
             for i in range(0, len(l), n):
                 yield l[i:i + n]
 
-        for lfn_ in chunks(lfn_ready, 50):
+        chunkSize = 10
+        if len(lfn_) > chunkSize :
+            self.logger.info("retrieving input file metadata for %s files in chunks of %s", len(lfn_), chunkSize)
+            nIter=0
+        for lfn_ in chunks(lfn_ready, chunkSize):
+            nIter += 1
             dataDict['lfn'] = lfn_
             data = encodeRequest(dataDict, listParams=["lfn"])
             uri = self.REST_filemetadata
@@ -285,13 +290,15 @@ class Master(object):
                 self.logger.error("Error during metadata retrieving from %s: %s", uri, ex)
                 continue
 
-            print(len(res['result']))
+            # print(len(res['result']))
             for obj in res['result']:
                 if isinstance(obj, dict):
                     out.append(obj)
                 else:
                     # print type(obj)
                     out.append(json.loads(str(obj)))
+            if nIter % 10 == 0:
+                self.logger.info("... retrieved %s metadata", len(out))
 
         return out
 
