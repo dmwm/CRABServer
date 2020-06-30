@@ -799,14 +799,14 @@ def publishInDBS3(config, taskname, verbose):
     try:
         if published:
             mark_good(published, crabServer, logger)
+            data['workflow'] = taskname
+            data['subresource'] = 'updatepublicationtime'
+            crabServer.post(REST_task, data=encodeRequest(data))
         if failed:
             logger.debug("Failed files: %s ", failed)
             mark_failed(failed, crabServer, logger, failure_reason)
-        data['workflow'] = taskname
-        data['subresource'] = 'updatepublicationtime'
-        crabServer.post(REST_task, data=encodeRequest(data))
-    except Exception:
-        logger.exception("Status update failed")
+    except Exception as ex:
+        logger.exception("Status update failed: %s", ex)
 
     return 0
 
