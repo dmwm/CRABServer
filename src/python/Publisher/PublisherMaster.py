@@ -273,9 +273,9 @@ class Master(object):
                 yield l[i:i + n]
 
         chunkSize = 10
+        nIter = 0
         if len(lfn_ready) > chunkSize:
             self.logger.info("retrieving input file metadata for %s files in chunks of %s", len(lfn_ready), chunkSize)
-            nIter = 0
         for lfn_ in chunks(lfn_ready, chunkSize):
             nIter += 1
             dataDict['lfn'] = lfn_
