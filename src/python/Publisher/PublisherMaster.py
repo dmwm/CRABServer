@@ -318,6 +318,10 @@ class Master(object):
 
         try:
             for task in tasks:
+                taskname = str(task[0][3])
+                if int(taskname[0:2]) < 20:
+                    self.logger.info("Skipped %s. Ignore tasks created before 2020.", taskname)
+                    continue
                 if self.TestMode:
                     self.startSlave(task)   # sequentially do one task after another
                 else:                       # deal with each task in a separate process
@@ -339,7 +343,7 @@ class Master(object):
     def startSlave(self, task):
         """
         start a slave process to deal with publication for a single task
-        :param task: a task name
+        :param task: one tupla describing  a task as returned by  active_tasks()
         :return: 0  It will always terminate normally, if publication fails it will mark it in the DB
         """
         # TODO: lock task!
