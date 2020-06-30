@@ -744,7 +744,6 @@ def publishInDBS3(config, taskname, verbose):
         files_to_publish = dbsFiles[count:count+max_files_per_block]
         try:
             block_config = {'block_name': block_name, 'origin_site_name': pnn, 'open_for_writing': 0}
-            block_config = {'block_name': block_name, 'origin_site_name': pnn, 'open_for_writing': 0}
             if verbose:
                 msg = "Inserting files %s into block %s." % ([f['logical_file_name']
                                                               for f in files_to_publish], block_name)
