@@ -391,10 +391,12 @@ def publishInDBS3(config, taskname, verbose):
 
     toPublish = []
     # TODO move from new to done when processed
-    with open(taskFilesDir + taskname + ".json") as f:
+    fname = taskFilesDir + taskname + ".json"
+    with open(fname) as f:
         toPublish = json.load(f)
 
     if not toPublish:
+        logger.info("Empty data file %s", fname)
         return "EMPTY"
 
 
