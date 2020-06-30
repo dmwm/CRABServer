@@ -250,7 +250,7 @@ class Master(object):
             info.append([x for x in result if x['taskname'] == task[3]])
         return zip(unique_tasks, info)
 
-    def getPublDescFiles(self, workflow, lfn_ready):
+    def getPublDescFiles(self, workflow, lfn_ready, logger):
         """
         Download and read the files describing
         what needs to be published
@@ -275,7 +275,7 @@ class Master(object):
         chunkSize = 10
         nIter = 0
         if len(lfn_ready) > chunkSize:
-            self.logger.info("retrieving input file metadata for %s files in chunks of %s", len(lfn_ready), chunkSize)
+            logger.info("retrieving input file metadata for %s files in chunks of %s", len(lfn_ready), chunkSize)
         for lfn_ in chunks(lfn_ready, chunkSize):
             nIter += 1
             dataDict['lfn'] = lfn_
@@ -287,7 +287,7 @@ class Master(object):
                 res = self.crabServer.get(uri=uri, data=data)
                 res = res[0]
             except Exception as ex:
-                self.logger.error("Error during metadata retrieving from %s: %s", uri, ex)
+                logger.error("Error during metadata retrieving from %s: %s", uri, ex)
                 continue
 
             # print(len(res['result']))
@@ -298,7 +298,7 @@ class Master(object):
                     # print type(obj)
                     out.append(json.loads(str(obj)))
             if nIter % 10 == 0:
-                self.logger.info("... retrieved %s metadata", len(out))
+                logger.info("... retrieved %s metadata", len(out))
 
         return out
 
@@ -498,7 +498,7 @@ class Master(object):
 
                 # Get metadata
                 toPublish = []
-                publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready)
+                publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready, logger)
                 for file_ in active_:
                     for _, doc in enumerate(publDescFiles_list):
                         # logger.info(type(doc))
