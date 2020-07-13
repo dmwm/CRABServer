@@ -181,6 +181,13 @@ class CRAB3ProxyRenewer(object):
                     continue
                 self.logger.debug("Updated proxy pushed to schedd for task %s", ad['CRAB_ReqName'])
 
+    def remove_handler(self):
+        handlers = self.logger.handlers[:]
+        for file_handler in handlers:
+            file_handler.close()
+            self.logger.removeHandler(file_handler)
+
+
     def execute(self):
         self.get_backendurls()
         collector = htcondor.Collector(self.pool)
@@ -192,6 +199,8 @@ class CRAB3ProxyRenewer(object):
                 raise
             except Exception:
                 self.logger.exception("Unable to update all proxies for schedd %s" % schedd_name)
+        self.remove_handler()
+
 
 if __name__ == '__main__':
     """ Simple main to execute the action standalon. You just need to set the task worker environment.
