@@ -64,7 +64,7 @@ class CRAB3ProxyRenewer(object):
         result = server.get(self.resturi, data={'subresource':'backendurls'})[0]['result'][0]
         self.pool = str(result['htcondorPool'])
         self.schedds = [str(i) for i in result['htcondorSchedds']]
-        self.logger.info("Resulting pool %s; schedds %s", (self.pool, ",".join(self.schedds)))
+        self.logger.info("Resulting pool %s; schedds %s", self.pool, ",".join(self.schedds))
 
     def get_proxy_from_MyProxy(self, ad):
         vo = 'cms'
@@ -143,7 +143,7 @@ class CRAB3ProxyRenewer(object):
             if 'x509userproxyexpiration' in ad:
                 lifetime = ad['x509userproxyexpiration'] - now
                 if lifetime > MINPROXYLENGTH:
-                    self.logger.info("Skipping refresh of proxy for task %s because it still has a lifetime of %.1f hours.", (ad['CRAB_ReqName'], lifetime/3600.0))
+                    self.logger.info("Skipping refresh of proxy for task %s because it still has a lifetime of %.1f hours.", ad['CRAB_ReqName'], lifetime/3600.0)
                     continue
             user = ad['CRAB_UserDN']
             vo = 'cms'
