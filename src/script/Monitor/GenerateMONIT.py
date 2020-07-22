@@ -363,7 +363,7 @@ def main():
     
     #print metrics
     try:
-        send_and_check([jsonDoc])
+        send_and_check([metrics])
     except Exception as ex:
         print(ex)
 
