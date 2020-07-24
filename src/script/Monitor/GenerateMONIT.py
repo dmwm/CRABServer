@@ -49,6 +49,8 @@ def send_and_check(document, should_fail=False):
 def isRunningTooLong(pid):
     """
     checks if previous process is not running longer than the allowedTime
+    returns: True or False
+    raises if error
     """
 
     allowedTime = 1800  # allowed time for the script to run: 30minutes = 30*60
@@ -69,6 +71,8 @@ def isRunningTooLong(pid):
 def isRunning(pid):
     """
     checks if previous process is still running
+    returns: True or False
+    raises if error
     """
 
     exists = True
@@ -86,6 +90,8 @@ def isRunning(pid):
 def killProcess(pid):
     """
     sends SIGTERM to the old process and later SIGKILL if it wasn't killed successfully at first try
+    returns: string with list of actions done
+    never raises
     """
 
     msg = "Sending SIGTERM to kill the process with PID %s. " % pid
