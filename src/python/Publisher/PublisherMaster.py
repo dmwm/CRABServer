@@ -1,4 +1,4 @@
-# pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915,C0112,C0111
+# pylint: disable=C0103, W0703, R0912, R0914, R0915
 
 """
 Here's the algorithm
@@ -8,6 +8,7 @@ Here's the algorithm
 3. create a multiprocessing Pool of size N
 4. spawn a process per task that publish their files
 """
+
 from __future__ import division
 from __future__ import print_function
 import argparse
@@ -20,24 +21,37 @@ import sys
 import json
 import datetime
 import time
-from retry import retry
 from multiprocessing import Process
 
 from MultiProcessingLog import MultiProcessingLog
+
 from WMCore.Configuration import loadConfigurationFile
-from WMCore.Services.pycurl_manager import RequestHandler
+#from WMCore.Services.pycurl_manager import RequestHandler
+#from retry import retry
 from RESTInteractions import HTTPRequests
-#from Publisher.utils import getDNFromUserName
 from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping
+from ServerUtilities import SERVICE_INSTANCES
+from TaskWorker.WorkerExceptions import ConfigException
 
-
-def setProcessLogger(name):
-    """ Set the logger for a single process. The file used for it is logs/processes/proc.name.txt and it
+def setMasterLogger(name='master'):
+    """ Set the logger for the master process. The file used for it is logs/processes/proc.name.txt and it
         can be retrieved with logging.getLogger(name) in other parts of the code
     """
     logger = logging.getLogger(name)
     handler = TimedRotatingFileHandler('logs/processes/proc.c3id_%s.pid_%s.txt' % (name, os.getpid()), 'midnight', backupCount=30)
-    formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:"+name+":%(message)s")
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+name+":%(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    return logger
+
+def setSlaveLogger(name):
+    """ Set the logger for a single slave process. The file used for it is logs/processes/proc.name.txt and it
+        can be retrieved with logging.getLogger(name) in other parts of the code
+    """
+    logger = logging.getLogger(name)
+    handler = TimedRotatingFileHandler('logs/processes/proc.c3id_%s.pid_%s.txt' % (name, os.getpid()), 'midnight', backupCount=30)
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+"slave"+":%(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
@@ -47,7 +61,7 @@ def setProcessLogger(name):
 class Master(object):
     """I am the main daemon kicking off all Publisher work via slave Publishers"""
 
-    def __init__(self, configurationFile, quiet=False, debug=True, testMode=False):
+    def __init__(self, confFile=None, quiet=False, debug=True, testMode=False):
         """
         Initialise class members
 
@@ -56,35 +70,6 @@ class Master(object):
         :arg bool debug: it tells if needs a verbose logger
         :arg bool testMode: it tells if to run in test (no subprocesses) mode.
         """
-
-        self.configurationFile = configurationFile
-        config = loadConfigurationFile(configurationFile)
-
-        self.config = config.General
-        # CRABServer REST API's (see CRABInterface)
-        self.REST_filetransfers = '/crabserver/' + self.config.instance + '/filetransfers'
-        #self.REST_usertransfers = '/crabserver/' + self.config.instance +  '/fileusertransfers'
-        self.REST_filemetadata = '/crabserver/' + self.config.instance + '/filemetadata'
-        self.REST_workflow = '/crabserver/' + self.config.instance + '/workflow'
-        self.REST_task = '/crabserver/' + self.config.instance + '/task'
-        
-        self.max_files_per_block = self.config.max_files_per_block
-        # these are used for talking to DBS
-        os.putenv('X509_USER_CERT', self.config.serviceCert)
-        os.putenv('X509_USER_KEY', self.config.serviceKey)
-        self.block_publication_timeout = self.config.block_closure_timeout
-        self.lfn_map = {}
-        self.force_publication = False
-        self.force_failure = False
-        self.TestMode = testMode
-        self.taskFilesDir = self.config.taskFilesDir
-        try:
-            os.makedirs(self.taskFilesDir)
-        except OSError as ose:
-            if ose.errno != 17: #ignore the "Directory already exists error"
-                print(str(ose))
-                print("The Publisher needs to access the '%s' directory" % dirname)
-                sys.exit(1)
 
         def createLogdir(dirname):
             """ Create the directory dirname ignoring erors in case it exists. Exit if
@@ -98,7 +83,23 @@ class Master(object):
                     print("The Publisher Worker needs to access the '%s' directory" % dirname)
                     sys.exit(1)
 
-        def setRootLogger(quiet=False, debug=True, console=False):
+        self.configurationFile = confFile         # remember this, will have to pass it to TaskPublish
+        config = loadConfigurationFile(confFile)
+        self.config = config.General
+        self.TPconfig = config.TaskPublisher
+
+        # these are used for talking to DBS
+        os.putenv('X509_USER_CERT', self.config.serviceCert)
+        os.putenv('X509_USER_KEY', self.config.serviceKey)
+        self.block_publication_timeout = self.config.block_closure_timeout
+        self.lfn_map = {}
+        self.force_publication = False
+        self.force_failure = False
+        self.TestMode = testMode
+        self.taskFilesDir = self.config.taskFilesDir
+        createLogdir(self.taskFilesDir)
+
+        def setRootLogger(logsDir, quiet=False, debug=True, console=False):
             """Sets the root logger with the desired verbosity level
                The root logger logs to logs/twlog.txt and every single
                logging instruction is propagated to it (not really nice
@@ -109,15 +110,15 @@ class Master(object):
             :arg bool console: it tells if to direct all printoput to console rather then files, useful for debug
             :return logger: a logger with the appropriate logger level."""
 
-            createLogdir('logs')
-            createLogdir('logs/processes')
-            createLogdir('logs/tasks')
+            createLogdir(logsDir)
+            createLogdir(logsDir + '/processes')
+            createLogdir(logsDir + '/tasks')
 
             if console:
                 # if we are testing log to the console is easier
                 logging.getLogger().addHandler(logging.StreamHandler())
             else:
-                logHandler = MultiProcessingLog('logs/log.txt', when='midnight')
+                logHandler = MultiProcessingLog(logsDir + '/log.txt', when='midnight')
                 logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
                 logHandler.setFormatter(logFormatter)
                 logging.getLogger().addHandler(logHandler)
@@ -127,28 +128,58 @@ class Master(object):
             if debug:
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
-            logger = setProcessLogger("master")
+            logger = setMasterLogger()
             logger.debug("PID %s.", os.getpid())
             logger.debug("Logging level initialized to %s.", loglevel)
             return logger
 
-        self.logger = setRootLogger(quiet, True, console=self.TestMode)
+        self.logger = setRootLogger(self.config.logsDir, quiet=quiet, debug=debug, console=self.TestMode)
 
         from WMCore.Credential.Proxy import Proxy
         proxy = Proxy({'logger':self.logger})
         from ServerUtilities import tempSetLogLevel
-        with tempSetLogLevel(self.logger,logging.ERROR):
+        with tempSetLogLevel(self.logger, logging.ERROR):
             self.myDN = proxy.getSubjectFromCert(certFile=self.config.serviceCert)
 
-        self.logger.debug('Contacting Oracle via CRABREST:' + self.config.RestHostName)
+
+        # CRABServer REST API's (see CRABInterface)
         try:
-            self.oracleDB = HTTPRequests(url=self.config.RestHostName,
-                                         localcert=self.config.serviceCert,
-                                         localkey=self.config.serviceKey,
-                                         retry=3)
+            instance = self.config.instance
         except:
-            self.logger.exception('Failed when contacting Oracle')
-            raise
+            msg = "No instance provided: need to specify config.General.instance in the configuration"
+            raise ConfigException(msg)
+
+        if instance in SERVICE_INSTANCES:
+            self.logger.info('Will connect to CRAB service: %s', instance)
+            restHost = SERVICE_INSTANCES[instance]['restHost']
+            dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
+        else:
+            msg = "Invalid instance value '%s'" % instance
+            raise ConfigException(msg)
+        if instance == 'other':
+            self.logger.info('Will use restHost and dbInstance from config file')
+            try:
+                restHost = self.config.restHost
+                dbInstance = self.config.dbInstance
+            except:
+                msg = "Need to specify config.General.restHost and dbInstance in the configuration"
+                raise ConfigException(msg)
+
+        restURInoAPI = '/crabserver/' + dbInstance
+        self.logger.info('Will connect to CRAB Data Base via URL: https://%s/%s', restHost, restURInoAPI)
+
+        # CRAB REST API's
+        self.REST_filetransfers = restURInoAPI + '/filetransfers'
+        #self.REST_usertransfers = restURInoAPI +  '/fileusertransfers'
+        self.REST_filemetadata = restURInoAPI + '/filemetadata'
+        self.REST_workflow = restURInoAPI + '/workflow'
+        self.REST_task = restURInoAPI + '/task'
+        self.max_files_per_block = self.config.max_files_per_block
+        self.crabServer = HTTPRequests(url=restHost,
+                                       localcert=self.config.serviceCert,
+                                       localkey=self.config.serviceKey,
+                                       retry=3)
+
 
         #try:
         #    self.connection = RequestHandler(config={'timeout': 900, 'connecttimeout' : 900})
@@ -178,7 +209,7 @@ class Master(object):
         fileDoc = {}
         fileDoc['asoworker'] = self.config.asoworker
         fileDoc['subresource'] = 'acquirePublication'
-        data=encodeRequest(fileDoc)
+        data = encodeRequest(fileDoc)
         results = ''
         try:
             results = db.post(uri=uri, data=data)
@@ -193,8 +224,8 @@ class Master(object):
         fileDoc['grouping'] = 0
         fileDoc['limit'] = 100000
         result = []
-        uri=self.REST_filetransfers
-        data=encodeRequest(fileDoc)
+        uri = self.REST_filetransfers
+        data = encodeRequest(fileDoc)
 
         try:
             results = db.get(uri=uri, data=data)
@@ -203,16 +234,16 @@ class Master(object):
             self.logger.error("Failed to acquire publications from %s: %s", uri, ex)
             return []
 
-        self.logger.debug("publen: %s" % len(result))
+        self.logger.debug("publen: %s", len(result))
 
-        self.logger.debug("%s acquired publications retrieved" % len(result))
+        self.logger.debug("%s acquired publications retrieved", len(result))
 
         # TODO: join query for publisher (same of submitter)
         unique_tasks = [list(i) for i in set(tuple([x['username'],
                                                     x['user_group'],
                                                     x['user_role'],
                                                     x['taskname']]
-                                                   ) for x in result if x['transfer_state'] == 3)]
+                                                  ) for x in result if x['transfer_state'] == 3)]
 
         info = []
         for task in unique_tasks:
@@ -247,8 +278,8 @@ class Master(object):
             uri = self.REST_filemetadata
 
             try:
-                #res = self.oracleDB.get(uri=uri, data=encodeRequest(data, listParams=["lfn"]))
-                res = self.oracleDB.get(uri=uri, data=data)
+                #res = self.crabServer.get(uri=uri, data=encodeRequest(data, listParams=["lfn"]))
+                res = self.crabServer.get(uri=uri, data=data)
                 res = res[0]
             except Exception as ex:
                 self.logger.error("Error during metadata retrieving from %s: %s", uri, ex)
@@ -266,11 +297,11 @@ class Master(object):
 
     def algorithm(self):
         """
-        1. Get a list of users with files to publish from the couchdb instance
+        1. Get a list of users with files to publish from the REST
         2. For each user get a suitably sized input for publish
         3. Submit the publish to a subprocess
         """
-        tasks = self.active_tasks(self.oracleDB)
+        tasks = self.active_tasks(self.crabServer)
 
         # example code, uncomment to pick only one task
         # myTask='180912_142016:arizzi_crab_NanoDnRMXDYJetsToLL_M-105To160_TuneCUETP8M1_13TeV-amcaRunIISummer16MiniAODv2-PUMorio__heIV_v6-v22201'
@@ -280,7 +311,9 @@ class Master(object):
         #  tasksToDo.append(t)
         # tasks = tasksToDo
 
-        self.logger.debug('kicking off pool %s' % [x[0][3] for x in tasks])
+        maxSlaves = self.config.max_slaves
+        self.logger.info('kicking off pool for %s tasks in batches of %s', len(tasks), maxSlaves)
+        self.logger.debug('list of tasks %s', [x[0][3] for x in tasks])
         processes = []
 
         try:
@@ -290,65 +323,72 @@ class Master(object):
                 else:                       # deal with each task in a separate process
                     p = Process(target=self.startSlave, args=(task,))
                     p.start()
+                    self.logger.info('Starting process %s  pid=%s', p, p.pid)
                     processes.append(p)
+                if len(processes) == maxSlaves:
+                    # wait until a batch of maxSlaves processes have completed before starting more
+                    for proc in processes:
+                        proc.join()
+                    self.logger.info('All processes in the batch have ended')
+                    time.sleep(10)  # take a breath, mostly useful for debugging
+                    processes = []
 
-            for proc in processes:
-                proc.join()
-        except:
+        except Exception:
             self.logger.exception("Error during process mapping")
 
     def startSlave(self, task):
+        """
+        start a slave process to deal with publication for a single task
+        :param task: a task name
+        :return: 0  It will always terminate normally, if publication fails it will mark it in the DB
+        """
         # TODO: lock task!
         # - process logger
-        logger = setProcessLogger(str(task[0][3]))
+        logger = setSlaveLogger(str(task[0][3]))
         logger.info("Process %s is starting. PID %s", task[0][3], os.getpid())
 
         self.force_publication = False
         workflow = str(task[0][3])
-        wfnamemsg = "%s: " % (workflow)
 
         if int(workflow[0:2]) < 20:
             msg = "Skipped. Ignore tasks created before 2020."
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
             return 0
 
         if len(task[1]) > self.max_files_per_block:
             self.force_publication = True
             msg = "All datasets have more than %s ready files." % (self.max_files_per_block)
             msg += " No need to retrieve task status nor last publication time."
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
         else:
             msg = "At least one dataset has less than %s ready files." % (self.max_files_per_block)
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
             # Retrieve the workflow status. If the status can not be retrieved, continue
             # with the next workflow.
             workflow_status = ''
-            msg = "Retrieving status from %s" % (self.config.RestHostName)
-            logger.info(wfnamemsg+msg)
-            #urlPath = '/crabserver/' + self.config.instance + '/workflow'
+            msg = "Retrieving status"
+            logger.info(msg)
             uri = self.REST_workflow
             data = encodeRequest({'workflow': workflow})
             try:
-                #connection = HTTPRequests(self.config.RestHostName, self.config.serviceCert, self.config.serviceKey)
-                res = self.oracleDB.get(uri=uri, data=data)
+                res = self.crabServer.get(uri=uri, data=data)
             except Exception as ex:
-                # logger.info(wfnamemsg+encodeRequest(data))
                 logger.warn('Error retrieving status from %s for %s.', uri, workflow)
                 return 0
 
             try:
                 workflow_status = res[0]['result'][0]['status']
                 msg = "Task status is %s." % workflow_status
-                logger.info(wfnamemsg+msg)
+                logger.info(msg)
             except ValueError:
                 msg = "Workflow removed from WM."
-                logger.error(wfnamemsg+msg)
+                logger.error(msg)
                 workflow_status = 'REMOVED'
             except Exception as ex:
                 msg = "Error loading task status!"
                 msg += str(ex)
                 msg += str(traceback.format_exc())
-                logger.error(wfnamemsg+msg)
+                logger.error(msg)
             # If the workflow status is terminal, go ahead and publish all the ready files
             # in the workflow.
             if workflow_status in ['COMPLETED', 'FAILED', 'KILLED', 'REMOVED']:
@@ -356,42 +396,42 @@ class Master(object):
                 if workflow_status in ['KILLED', 'REMOVED']:
                     self.force_failure = True
                 msg = "Considering task status as terminal. Will force publication."
-                logger.info(wfnamemsg+msg)
+                logger.info(msg)
             # Otherwise...
             else:
                 msg = "Task status is not considered terminal."
-                logger.info(wfnamemsg+msg)
+                logger.info(msg)
                 msg = "Getting last publication time."
-                logger.info(wfnamemsg+msg)
+                logger.info(msg)
                 # Get when was the last time a publication was done for this workflow (this
                 # should be more or less independent of the output dataset in case there are
                 # more than one).
                 last_publication_time = None
                 data = encodeRequest({'workflow':workflow, 'subresource':'search'})
                 try:
-                    result = self.oracleDB.get(self.config.REST_task, data)
-                    logger.debug("task: %s " %  str(result[0]))
-                    logger.debug("task: %s " %  getColumn(result[0], 'tm_last_publication'))
+                    result = self.crabServer.get(self.REST_task, data)
+                    logger.debug("task: %s ", str(result[0]))
+                    last_publication_time = getColumn(result[0], 'tm_last_publication')
                 except Exception as ex:
-                    logger.error("Error during task doc retrieving: %s" %ex)
+                    logger.error("Error during task doc retrieving: %s", ex)
                 if last_publication_time:
-                    date = oracleOutputMapping(result)['last_publication']
-                    seconds = datetime.strptime(date, "%Y-%m-%d %H:%M:%S.%f").timetuple()
-                    last_publication_time = time.mktime(seconds)
+                    date = last_publication_time # datetime in Oracle format
+                    timetuple = datetime.strptime(date, "%Y-%m-%d %H:%M:%S.%f").timetuple()  # convert to time tuple
+                    last_publication_time = time.mktime(timetuple)      # convert to seconds since Epoch (float)
 
                 msg = "Last publication time: %s." % str(last_publication_time)
-                logger.debug(wfnamemsg+msg)
+                logger.debug(msg)
                 # If this is the first time a publication would be done for this workflow, go
                 # ahead and publish.
                 if not last_publication_time:
                     self.force_publication = True
                     msg = "There was no previous publication. Will force publication."
-                    logger.info(wfnamemsg+msg)
+                    logger.info(msg)
                 # Otherwise...
                 else:
                     last = last_publication_time
-                    msg = "Last published block: %s" % (last)
-                    logger.debug(wfnamemsg+msg)
+                    msg = "Last published block time: %s" % last
+                    logger.debug(msg)
                     # If the last publication was long time ago (> our block publication timeout),
                     # go ahead and publish.
                     now = int(time.time()) - time.timezone
@@ -408,7 +448,7 @@ class Master(object):
                     else:
                         msg += " (less than the timeout of %sh:%sm)." % (timeout_hours, timeout_minutes)
                         msg += " Not enough to force publication."
-                    logger.info(wfnamemsg+msg)
+                    logger.info(msg)
 
         # logger.info(task[1])
         try:
@@ -432,7 +472,7 @@ class Master(object):
                 pnn, input_dataset, input_dbs_url = "", "", ""
                 for active_file in active_:
                     job_end_time = active_file['value'][5]
-                    if job_end_time :
+                    if job_end_time:
                         wf_jobs_endtime.append(int(job_end_time) - time.timezone)
                     source_lfn = active_file['value'][1]
                     dest_lfn = active_file['value'][2]
@@ -443,14 +483,7 @@ class Master(object):
                         input_dbs_url = str(active_file['value'][4])
                     lfn_ready.append(dest_lfn)
 
-                #userDN = ''
                 username = task[0][0]
-                user_group = ""
-                if task[0][1]:
-                    user_group = task[0][1]
-                user_role = ""
-                if task[0][2]:
-                    user_role = task[0][2]
 
                 # Get metadata
                 toPublish = []
@@ -469,20 +502,29 @@ class Master(object):
                             toPublish.append(doc)
                 with open(self.taskFilesDir + workflow + '.json', 'w') as outfile:
                     json.dump(toPublish, outfile)
-                logger.info(". publisher.py %s" % (workflow))
 
                 # find the location in the current environment of the script we want to run
                 import Publisher.TaskPublish as tp
                 taskPublishScript = tp.__file__
-                subprocess.call(["python", taskPublishScript,
-                                 "configurationFile=%s" % self.configurationFile,
-                                 "taskname=%s" % workflow])
+                cmd = "python %s " % taskPublishScript
+                cmd += " --configFile=%s" % self.configurationFile
+                cmd += " --taskname=%s" % workflow
+                if self.TPconfig.dryRun:
+                    cmd += " --dry"
+                logger.info("Now execute: %s", cmd)
+                subprocess.call(cmd, shell=True)
+                logger.info('ALL DONE')
 
-        except:
-            logger.exception("Exception!")
-
+        except Exception:
+            logger.exception("Exception when calling TaskPublish!")
 
         return 0
+
+    def pollInterval(self):
+        """
+        :return: the poll Interval from thius master configuration
+        """
+        return self.config.pollInterval
 
 
 if __name__ == '__main__':
@@ -494,7 +536,7 @@ if __name__ == '__main__':
     #need to pass the configuration file path to the slaves
     configurationFile = os.path.abspath(args.config)
 
-    master = Master(configurationFile)
-    while(True):
+    master = Master(confFile=configurationFile)
+    while True:
         master.algorithm()
-        time.sleep(configuration.General.pollInterval)
+        time.sleep(master.pollInterval())

@@ -1,3 +1,4 @@
+# pylint: disable=W0703
 from __future__ import print_function
 import os
 import sys
@@ -45,10 +46,11 @@ def send_and_check(document, should_fail=False):
     assert ((response.status_code in [200]) != should_fail), \
         'With document: {0}. Status code: {1}. Message: {2}'.format(document, response.status_code, response.text)
     
-    
 def isRunningTooLong(pid):
     """
     checks if previous process is not running longer than the allowedTime
+    returns: True or False
+    raises if error
     """
 
     allowedTime = 1800  # allowed time for the script to run: 30minutes = 30*60
@@ -59,51 +61,47 @@ def isRunningTooLong(pid):
     timedOut = True
 
     if exitcode != 0:
-        msg = "Failed to execute command: %s. \n StdOut: %s\n StdErr: %s" % (timeCmd, stdout, stderr)
-        logger.error(msg)
-        raise Exception(msg)
-    else:
-        if int(stdout) >= allowedTime:
-            logger.error("Process with PID %s timed out.", pid)
-        else:
-            timedOut = False
-    return timedOut 
+        raise Exception("Failed to execute command: %s. \n StdOut: %s\n StdErr: %s." % (timeCmd, stdout, stderr))
+    elif int(stdout) < allowedTime:
+        timedOut = False
+
+    return timedOut
 
 
 def isRunning(pid):
     """
     checks if previous process is still running
+    returns: True or False
+    raises if error
     """
 
     exists = True
     try:
         os.kill(pid, 0)
     except OSError as e:
-        if e.errno == errno.ESRCH:  # ESRCH - No such process
-            logger.info("Process with PID %s is not running.", pid)
+        if e.errno == errno.ESRCH:  #ESRCH - No such process
             exists = False
-        elif e.errno == errno.EPERM:  # EPERM - Operation not permitted (i.e., process exists)
-            logger.info("Process with PID %s is still running.", pid)
-        else:
-            logger.error("Unexpected error!")
+        elif e.errno != errno.EPERM:  #EPERM - Operation not permitted (i.e., process exists)
             raise
-    else:
-        logger.info("Process with PID %s is still running.", pid)
+
     return exists
 
 
 def killProcess(pid):
     """
     sends SIGTERM to the old process and later SIGKILL if it wasn't killed successfully at first try
+    returns: string with list of actions done
+    never raises
     """
 
-    logger.info("Sending SIGTERM to kill the process with PID %s.", pid)
+    msg = "Sending SIGTERM to kill the process with PID %s. " % pid
     os.kill(pid, signal.SIGTERM)
     time.sleep(60)
     if isRunning(pid):
-        logger.info("Sending SIGKILL to kill the process with PID %s.", pid)
+        msg += "Sending SIGKILL to kill the process with PID %s." % pid
         os.kill(pid, signal.SIGKILL)
-    return
+
+    return msg
 
 
 class CRAB3CreateJson(object):
@@ -328,17 +326,30 @@ def main():
     # Check if lockfile already exists and if it does, check if process is running
     if os.path.isfile(lockFile):
         skip = False
+        kill = False
 
         if os.stat(lockFile).st_size == 0:
             logger.error("Lockfile is empty.")
         else:
             with open(lockFile, 'r') as lf:
                 oldProcess = int(lf.read())
-            if isRunning(oldProcess):
-                skip = True
-                if isRunningTooLong(oldProcess):
-                    killProcess(oldProcess)
-                    skip = False
+            try:
+                if isRunning(oldProcess):
+                    logger.info("Process with PID %s is still running.", oldProcess)
+                    skip = True
+                    if isRunningTooLong(oldProcess):
+                        logger.info("Process with PID %s timed out.", oldProcess)
+                        skip, kill = False, True
+                else:
+                    logger.info("Process with PID %s is not running.", oldProcess)
+            except Exception as e:
+                logger.error(e)
+                skip, kill = False, True
+
+        if kill:
+            msg = killProcess(oldProcess)
+            logger.info(msg)
+
         if skip:
             logger.info("Abandon this run.")
             exit()
@@ -358,13 +369,12 @@ def main():
     
     #print metrics
     try:
-        send_and_check([jsonDoc])
+        send_and_check([metrics])
     except Exception as ex:
         print(ex)
 
     end_time = time.time()
     elapsed = end_time - start_time
-    now = time.strftime("%H:%M:%S", time.gmtime(end_time))
     elapsed_min = "%3d:%02d" % divmod(elapsed, 60)
     logger.info('All done in %s minutes. Remove lock and exit', elapsed_min)
 

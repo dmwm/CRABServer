@@ -1,5 +1,8 @@
-# pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915
-
+# pylint: disable=C0103, W0703, R0912, R0914, R0915
+"""
+this is a standalone script. It is spawned by PushisherMaster or could
+be executed from CLI (in the Publisher environment) to retry or debug failures
+"""
 from __future__ import division
 from __future__ import print_function
 import os
@@ -10,13 +13,13 @@ import sys
 import json
 import traceback
 import argparse
-import re
 
 import dbs.apis.dbsClient as dbsClient
-from ServerUtilities import getHashLfn, encodeRequest, oracleOutputMapping
+from ServerUtilities import getHashLfn, encodeRequest
+from ServerUtilities import SERVICE_INSTANCES
+from TaskWorker.WorkerExceptions import ConfigException
 from RESTInteractions import HTTPRequests
 from WMCore.Configuration import loadConfigurationFile
-
 
 
 def format_file_3(file_):
@@ -72,14 +75,14 @@ def createBulkBlock(output_config, processing_era_config, primds_config, \
     return blockDump
 
 
-def migrateByBlockDBS3(workflow, migrateApi, destReadApi, sourceApi, dataset, blocks=None):
+def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, dataset, blocks=None, verbose=False):
     """
     Submit one migration request for each block that needs to be migrated.
     If blocks argument is not specified, migrate the whole dataset.
     """
-    wfnamemsg = "%s: " % (workflow)
-    logger = logging.getLogger(workflow)
-    logging.basicConfig(filename=workflow+'.log', level=logging.INFO)
+    #wfnamemsg = "%s: " % taskname
+    logger = logging.getLogger(taskname)
+    logging.basicConfig(filename=taskname+'.log', level=logging.INFO)
 
     if blocks:
         blocksToMigrate = set(blocks)
@@ -92,24 +95,26 @@ def migrateByBlockDBS3(workflow, migrateApi, destReadApi, sourceApi, dataset, bl
         blocksToMigrate = blocksInSourceDBS - blocksInDestDBS
         msg = "Dataset %s in destination DBS with %d blocks; %d blocks in source DBS."
         msg = msg % (dataset, len(blocksInDestDBS), len(blocksInSourceDBS))
-        logger.info(wfnamemsg+msg)
+        logger.info(msg)
     numBlocksToMigrate = len(blocksToMigrate)
     if numBlocksToMigrate == 0:
-        logger.info(wfnamemsg+"No migration needed.")
+        msg = "No migration needed."
+        logger.info(msg)
     else:
         msg = "Have to migrate %d blocks from %s to %s." % (numBlocksToMigrate, sourceApi.url, destReadApi.url)
-        logger.info(wfnamemsg+msg)
-        msg = "List of blocks to migrate:\n%s." % (", ".join(blocksToMigrate))
-        logger.debug(wfnamemsg+msg)
+        logger.info(msg)
+        if verbose:
+            msg = "List of blocks to migrate:\n%s." % (", ".join(blocksToMigrate))
+            logger.debug(msg)
         msg = "Submitting %d block migration requests to DBS3 ..." % (numBlocksToMigrate)
-        logger.info(wfnamemsg+msg)
+        logger.info(msg)
         numBlocksAtDestination = 0
         numQueuedUnkwonIds = 0
         numFailedSubmissions = 0
         migrationIdsInProgress = []
         for block in list(blocksToMigrate):
             # Submit migration request for this block.
-            (reqid, atDestination, alreadyQueued) = requestBlockMigration(workflow, migrateApi, sourceApi, block)
+            (reqid, atDestination, alreadyQueued) = requestBlockMigration(taskname, migrateApi, sourceApi, block)
             # If the block is already in the destination DBS instance, we don't need
             # to monitor its migration status. If the migration request failed to be
             # submitted, we retry it next time. Otherwise, save the migration request
@@ -126,24 +131,24 @@ def migrateByBlockDBS3(workflow, migrateApi, destReadApi, sourceApi, dataset, bl
                 migrationIdsInProgress.append(reqid)
         if numBlocksAtDestination > 0:
             msg = "%d blocks already in destination DBS." % numBlocksAtDestination
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
         if numFailedSubmissions > 0:
             msg = "%d block migration requests failed to be submitted." % numFailedSubmissions
             msg += " Will retry them later."
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
         if numQueuedUnkwonIds > 0:
             msg = "%d block migration requests were already queued," % numQueuedUnkwonIds
             msg += " but could not retrieve their request id."
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
         numMigrationsInProgress = len(migrationIdsInProgress)
         if numMigrationsInProgress == 0:
             msg = "No migrations in progress."
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
         else:
             msg = "%d block migration requests successfully submitted." % numMigrationsInProgress
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
             msg = "List of migration requests ids: %s" % migrationIdsInProgress
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
             # Wait for up to 300 seconds, then return to the main loop. Note that we
             # don't fail or cancel any migration request, but just retry it next time.
             # Migration states:
@@ -159,11 +164,11 @@ def migrateByBlockDBS3(workflow, migrateApi, destReadApi, sourceApi, dataset, bl
             waitTime = 30
             numTimes = 10
             msg = "Will monitor their status for up to %d seconds." % waitTime * numTimes
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
             for _ in range(numTimes):
                 msg = "%d block migrations in progress." % numMigrationsInProgress
                 msg += " Will check migrations status in %d seconds." % waitTime
-                logger.info(wfnamemsg+msg)
+                logger.info(msg)
                 time.sleep(waitTime)
                 # Check the migration status of each block migration request.
                 # If a block migration has succeeded or terminally failes, remove the
@@ -175,29 +180,29 @@ def migrateByBlockDBS3(workflow, migrateApi, destReadApi, sourceApi, dataset, bl
                         retry = status[0].get('retry_count')
                     except Exception as ex:
                         msg = "Could not get status for migration id %d:\n%s" % reqid, ex
-                        logger.error(wfnamemsg+msg)
+                        logger.error(msg)
                     else:
                         if state == 2:
                             msg = "Migration id %d succeeded." % reqid
-                            logger.info(wfnamemsg+msg)
+                            logger.info(msg)
                             migrationIdsInProgress.remove(reqid)
                             numSuccessfulMigrations += 1
                         if state == 9:
                             msg = "Migration id %d terminally failed." % reqid
-                            logger.info(wfnamemsg+msg)
+                            logger.info(msg)
                             msg = "Full status for migration id %d:\n%s" % (reqid, str(status))
-                            logger.debug(wfnamemsg+msg)
+                            logger.info(msg)
                             migrationIdsInProgress.remove(reqid)
                             numFailedMigrations += 1
                         if state == 3:
                             if retry < 3:
                                 msg = "Migration id %d failed (retry %d), but should be retried." % (reqid, retry)
-                                logger.info(wfnamemsg+msg)
+                                logger.info(msg)
                             else:
                                 msg = "Migration id %d failed (retry %d)." % (reqid, retry)
-                                logger.info(wfnamemsg+msg)
+                                logger.info(msg)
                                 msg = "Full status for migration id %d:\n%s" % (reqid, str(status))
-                                logger.debug(wfnamemsg+msg)
+                                logger.info(msg)
                                 migrationIdsInProgress.remove(reqid)
                                 numFailedMigrations += 1
                 numMigrationsInProgress = len(migrationIdsInProgress)
@@ -208,36 +213,36 @@ def migrateByBlockDBS3(workflow, migrateApi, destReadApi, sourceApi, dataset, bl
             # with status 1.
             if numMigrationsInProgress > 0:
                 msg = "Migration of %s is taking too long - will delay the publication." % dataset
-                logger.info(wfnamemsg+msg)
+                logger.info(msg)
                 return 1, "Migration of %s is taking too long." % (dataset)
         msg = "Migration of %s has finished." % dataset
-        logger.info(wfnamemsg+msg)
+        logger.info(msg)
         msg = "Migration status summary (from %d input blocks to migrate):" % numBlocksToMigrate
         msg += " at destination = %d," % numBlocksAtDestination
         msg += " succeeded = %d," % numSuccessfulMigrations
         msg += " failed = %d," % numFailedMigrations
         msg += " submission failed = %d," % numFailedSubmissions
         msg += " queued with unknown id = %d." % numQueuedUnkwonIds
-        logger.info(wfnamemsg+msg)
+        logger.info(msg)
         # If there were failed migrations, return with status 2.
         if numFailedMigrations > 0 or numFailedSubmissions > 0:
             msg = "Some blocks failed to be migrated."
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
             return 2, "Migration of %s failed." % (dataset)
         # If there were no failed migrations, but we could not retrieve the request id
         # from some already queued requests, return with status 3.
         if numQueuedUnkwonIds > 0:
             msg = "Some block migrations were already queued, but failed to retrieve their request id."
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
             return 3, "Migration of %s in unknown status." % dataset
         if (numBlocksAtDestination + numSuccessfulMigrations) != numBlocksToMigrate:
             msg = "Something unexpected has happened."
             msg += " The numbers in the migration summary are not consistent."
             msg += " Make sure there is no bug in the code."
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
             return 4, "Migration of %s in some inconsistent status." % dataset
         msg = "Migration completed."
-        logger.info(wfnamemsg+msg)
+        logger.info(msg)
     try:
         migratedDataset = destReadApi.listDatasets(dataset=dataset, detail=True, dataset_access_type='*')
         if not migratedDataset or migratedDataset[0].get('dataset', None) != dataset:
@@ -248,19 +253,18 @@ def migrateByBlockDBS3(workflow, migrateApi, destReadApi, sourceApi, dataset, bl
     return 0, ""
 
 
-def requestBlockMigration(workflow, migrateApi, sourceApi, block):
+def requestBlockMigration(taskname, migrateApi, sourceApi, block):
     """
     Submit migration request for one block, checking the request output.
     """
-    logger = logging.getLogger(workflow)
-    logging.basicConfig(filename=workflow+'.log', level=logging.INFO, format=config.General.logMsgFormat)
+    logger = logging.getLogger(taskname)
+#    logging.basicConfig(filename=taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
 
-    wfnamemsg = "%s: " % workflow
     atDestination = False
     alreadyQueued = False
     reqid = None
     msg = "Submiting migration request for block %s ..." % block
-    logger.info(wfnamemsg+msg)
+    logger.info(msg)
     sourceURL = sourceApi.url
     data = {'migration_url': sourceURL, 'migration_input': block}
     try:
@@ -268,22 +272,22 @@ def requestBlockMigration(workflow, migrateApi, sourceApi, block):
     except Exception as ex:
         if "is already at destination" in ex:
             msg = "Block is already at destination."
-            logger.info(wfnamemsg+msg)
+            logger.info(msg)
             atDestination = True
         else:
             msg = "Request to migrate %s failed." % block
             msg += "\nRequest detail: %s" % data
             msg += "\nDBS3 exception: %s" % ex
-            logger.error(wfnamemsg+msg)
+            logger.error(msg)
     if not atDestination:
         msg = "Result of migration request: %s" % str(result)
-        logger.debug(wfnamemsg+msg)
+        logger.info(msg)
         reqid = result.get('migration_details', {}).get('migration_request_id')
         report = result.get('migration_report')
         if reqid is None:
             msg = "Migration request failed to submit."
             msg += "\nMigration request results: %s" % str(result)
-            logger.error(wfnamemsg+msg)
+            logger.error(msg)
         if "REQUEST ALREADY QUEUED" in report:
             # Request could be queued in another thread, then there would be
             # no id here, so look by block and use the id of the queued request.
@@ -293,92 +297,71 @@ def requestBlockMigration(workflow, migrateApi, sourceApi, block):
                 reqid = status[0].get('migration_request_id')
             except Exception:
                 msg = "Could not get status for already queued migration of block %s." % (block)
-                logger.error(wfnamemsg+msg)
+                logger.error(msg)
     return reqid, atDestination, alreadyQueued
 
 
-def mark_good(workflow, files, oracleDB, logger):
+
+def publishInDBS3(config, taskname, verbose):
     """
-    Mark the list of files as tranferred
-    """
-    wfnamemsg = "%s: " % workflow
-    for lfn in files:
-        data = {}
-        source_lfn = lfn
-        docId = getHashLfn(source_lfn)
-        msg = "Marking file %s as published." % lfn
-        msg += " Document id: %s (source LFN: %s)." % (docId, source_lfn)
-        logger.info(wfnamemsg+msg)
-        data['asoworker'] = config.General.asoworker 
-        data['subresource'] = 'updatePublication'
-        data['list_of_ids'] = docId
-        data['list_of_publication_state'] = 'DONE'
-        data['list_of_retry_value'] = 1
-        data['list_of_failure_reason'] = ''
-
-        try:
-            result = oracleDB.post(config.General.oracleFileTrans,
-                                   data=encodeRequest(data))
-            logger.debug("updated: %s %s " % (docId, result))
-        except Exception as ex:
-            logger.error("Error during status update: %s" %ex)
-
-
-def mark_failed(files, oracleDB, logger, failure_reason=""):
-    """
-    Something failed for these files so increment the retry count
-    """
-    h = 0
-    for lfn in files:
-        h += 1
-        logger.debug("Marking failed %s" % h)
-        source_lfn = lfn
-        docId = getHashLfn(source_lfn)
-        logger.debug("Marking failed %s" % docId)
-        try:
-            docbyId = oracleDB.get(config.General.oracleUserTrans,
-                                   data=encodeRequest({'subresource': 'getById', 'id': docId}))
-        except Exception:
-            logger.exception("Error updating failed docs.")
-            continue
-        document = oracleOutputMapping(docbyId, None)[0]
-        logger.debug("Document: %s" % document)
-
-        try:
-            fileDoc = dict()
-            fileDoc['asoworker'] = config.General.asoworker
-            fileDoc['subresource'] = 'updatePublication'
-            fileDoc['list_of_ids'] = docId
-
-            fileDoc['list_of_publication_state'] = 'FAILED'
-            #if force_failure or document['publish_retry_count'] > self.max_retry:
-            #    fileDoc['list_of_publication_state'] = 'FAILED'
-            #else:
-            #    fileDoc['list_of_publication_state'] = 'RETRY'
-            # TODO: implement retry
-            fileDoc['list_of_retry_value'] = 1
-            fileDoc['list_of_failure_reason'] = failure_reason
-
-            logger.debug("fileDoc: %s " % fileDoc)
-
-            _ = oracleDB.post(config.General.oracleFileTrans,
-                              data=encodeRequest(fileDoc))
-            logger.debug("updated: %s " % docId)
-        except Exception as ex:
-            msg = "Error updating document: %s" % fileDoc
-            msg += str(ex)
-            msg += str(traceback.format_exc())
-            logger.error(msg)
-            continue
-
-
-def publishInDBS3(configFile, taskname):
+    Publish output from one task in DBS
     """
 
-    """
-    config = loadConfigurationFile(configFile)
-    task_path = config.General.task_path
-    taskFilesDir = config.General.taskFilesDir
+    def mark_good(files, crabServer, logger):
+        """
+        Mark the list of files as tranferred
+        """
+
+        msg = "Marking %s file(s) as published." % len(files)
+        logger.info(msg)
+        for lfn in files:
+            data = {}
+            source_lfn = lfn
+            docId = getHashLfn(source_lfn)
+            data['asoworker'] = config.General.asoworker
+            data['subresource'] = 'updatePublication'
+            data['list_of_ids'] = docId
+            data['list_of_publication_state'] = 'DONE'
+            data['list_of_retry_value'] = 1
+            data['list_of_failure_reason'] = ''
+
+            if dryRun:
+                logger.info("DryRun: skip marking good file")
+            else:
+                try:
+                    result = crabServer.post(REST_filetransfers, data=encodeRequest(data))
+                    logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
+                except Exception as ex:
+                    logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
+                    logger.error("Error reason: %s", ex)
+
+    def mark_failed(files, crabServer, logger, failure_reason=""):
+        """
+        Something failed for these files so increment the retry count
+        """
+        msg = "Marking %s file(s) as failed" % len(files)
+        logger.info(msg)
+        for lfn in files:
+            source_lfn = lfn
+            docId = getHashLfn(source_lfn)
+            data = dict()
+            data['asoworker'] = config.General.asoworker
+            data['subresource'] = 'updatePublication'
+            data['list_of_ids'] = docId
+            data['list_of_publication_state'] = 'FAILED'
+            data['list_of_retry_value'] = 1
+            data['list_of_failure_reason'] = failure_reason
+
+            logger.debug("data: %s ", data)
+            if dryRun:
+                logger.debug("DryRun: skip marking failes files")
+            else:
+                try:
+                    result = crabServer.post(REST_filetransfers, data=encodeRequest(data))
+                    logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
+                except Exception as ex:
+                    logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
+                    logger.error("Error reason: %s", ex)
 
     def createLogdir(dirname):
         """
@@ -393,9 +376,16 @@ def publishInDBS3(configFile, taskname):
                 print("The task worker need to access the '%s' directory" % dirname)
                 sys.exit(1)
 
-    createLogdir('taskLogs')
+    taskFilesDir = config.General.taskFilesDir
+    dryRun = config.TaskPublisher.dryRun
+    username = taskname.split(':')[1].split('_')[0]
+    logdir = config.General.logsDir + '/tasks/' + username
+    logfile = logdir + '/' + taskname + '.log'
+    createLogdir(logdir)
     logger = logging.getLogger(taskname)
-    logging.basicConfig(filename='taskLogs/'+taskname+'.log', level=logging.INFO, format=config.TaskPublisher.logMsgFormat)
+    logging.basicConfig(filename=logfile, level=logging.INFO, format=config.TaskPublisher.logMsgFormat)
+    if verbose:
+        logger.setLevel(logging.DEBUG)
 
     logger.info("Getting files to publish")
 
@@ -404,59 +394,59 @@ def publishInDBS3(configFile, taskname):
     with open(taskFilesDir + taskname + ".json") as f:
         toPublish = json.load(f)
 
-    workflow = taskname
-
-    if len(toPublish) == 0:
+    if not toPublish:
         return "EMPTY"
 
-    if not workflow:
-        logger.info("NO TASKNAME: %s" % toPublish[0])
-    for k, v in toPublish[0].iteritems():
-        if k == 'taskname':
-            logger.info("Starting: %s: %s" % (k, v))
-    wfnamemsg = "%s: " % (workflow)
 
-    user = toPublish[0]["User"]
-    try:
-        group = toPublish[0]["Group"]
-        role = toPublish[0]["Role"]
-    except:
-        group = ""
-        role = ""
-
-    if not group or group in ['null']:
-        group = ""
-    if not role or role in ['null']:
-        role = ""
-
-    userDN = toPublish[0]["UserDN"]
     pnn = toPublish[0]["Destination"]
-    logger.info(wfnamemsg+" "+user)
 
-    # TODO: get user role and group
+    # CRABServer REST API's (see CRABInterface)
     try:
-        proxy = Proxy(userDN, group, role, logger)
+        instance = config.General.instance
     except:
-        logger.exception("Failed to retrieve user proxy")
-        return "FAILED"
+        msg = "No instance provided: need to specify config.General.instance in the configuration"
+        raise ConfigException(msg)
 
-    oracelInstance = config.General.oracleDB
-    oracleDB = HTTPRequests(oracelInstance,
-                            config.General.serviceCert,
-                            config.General.serviceKey)
+    if instance in SERVICE_INSTANCES:
+        logger.info('Will connect to CRAB service: %s', instance)
+        restHost = SERVICE_INSTANCES[instance]['restHost']
+        dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
+    else:
+        msg = "Invalid instance value '%s'" % instance
+        raise ConfigException(msg)
+    if instance == 'other':
+        logger.info('Will use restHost and dbInstance from config file')
+        try:
+            restHost = config.General.restHost
+            dbInstance = config.General.dbInstance
+        except:
+            msg = "Need to specify config.General.restHost and dbInstance in the configuration"
+            raise ConfigException(msg)
 
-    fileDoc = dict()
-    fileDoc['subresource'] = 'search'
-    fileDoc['workflow'] = workflow
+    restURInoAPI = '/crabserver/' + dbInstance
+    logger.info('Will connect to CRAB Data Base via URL: https://%s/%s', restHost, restURInoAPI)
+
+    # CRAB REST API's
+    REST_filetransfers = restURInoAPI + '/filetransfers'
+    REST_task = restURInoAPI + '/task'
+    crabServer = HTTPRequests(url=restHost,
+                              localcert=config.General.serviceCert,
+                              localkey=config.General.serviceKey,
+                              retry=3)
+
+
+    data = dict()
+    data['subresource'] = 'search'
+    data['workflow'] = taskname
 
     try:
-        results = oracleDB.get(task_path,
-                               data=encodeRequest(fileDoc))
+        results = crabServer.get(REST_task, data=encodeRequest(data))
     except Exception as ex:
-        logger.error("Failed to get acquired publications from oracleDB for %s: %s" % (workflow, ex))
+        logger.error("Failed to get acquired publications from oracleDB for %s: %s", taskname, ex)
         return "FAILED"
 
-    logger.info(results[0]['desc']['columns'])
+    if verbose:
+        logger.info(results[0]['desc']['columns'])
 
     try:
         inputDatasetIndex = results[0]['desc']['columns'].index("tm_input_dataset")
@@ -466,7 +456,6 @@ def publishInDBS3(configFile, taskname):
         publish_dbs_urlIndex = results[0]['desc']['columns'].index("tm_publish_dbs_url")
         publish_dbs_url = results[0]['result'][publish_dbs_urlIndex]
 
-        #sourceURL = "https://cmsweb.cern.ch/dbs/prod/global/DBSReader"
         if not sourceURL.endswith("/DBSReader") and not sourceURL.endswith("/DBSReader/"):
             sourceURL += "/DBSReader"
     except Exception:
@@ -479,12 +468,12 @@ def publishInDBS3(configFile, taskname):
     globalURL = globalURL.replace('caf', 'global')
 
     # DBS client relies on X509 env. vars
-    os.putenv('X509_USER_CERT', config.Global.serviceCert)
-    os.putenv('X509_USER_KEY', self.Global.serviceKey)
+    os.environ['X509_USER_CERT'] = config.General.serviceCert
+    os.environ['X509_USER_KEY'] = config.General.serviceKey
 
-    logger.info(wfnamemsg+"Source API URL: %s" % sourceURL)
+    logger.info("Source API URL: %s", sourceURL)
     sourceApi = dbsClient.DbsApi(url=sourceURL)
-    logger.info(wfnamemsg+"Global API URL: %s" % globalURL)
+    logger.info("Global API URL: %s", globalURL)
     globalApi = dbsClient.DbsApi(url=globalURL)
 
     if publish_dbs_url.endswith('/DBSWriter'):
@@ -496,17 +485,17 @@ def publishInDBS3(configFile, taskname):
         publish_dbs_url += '/DBSWriter'
 
     try:
-        logger.debug(wfnamemsg+"Destination API URL: %s" % publish_dbs_url)
-        destApi = dbsClient.DbsApi(url=publish_dbs_url, proxy=pr)
-        logger.debug(wfnamemsg+"Destination read API URL: %s" % publish_read_url)
-        destReadApi = dbsClient.DbsApi(url=publish_read_url, proxy=pr)
-        logger.debug(wfnamemsg+"Migration API URL: %s" % publish_migrate_url)
-        migrateApi = dbsClient.DbsApi(url=publish_migrate_url, proxy=pr)
-    except:
-        logger.exception('Wrong DBS URL %s' % publish_dbs_url)
+        logger.info("Destination API URL: %s", publish_dbs_url)
+        destApi = dbsClient.DbsApi(url=publish_dbs_url)
+        logger.info("Destination read API URL: %s", publish_read_url)
+        destReadApi = dbsClient.DbsApi(url=publish_read_url)
+        logger.info("Migration API URL: %s", publish_migrate_url)
+        migrateApi = dbsClient.DbsApi(url=publish_migrate_url)
+    except Exception:
+        logger.exception('Wrong DBS URL %s', publish_dbs_url)
         return "FAILED"
 
-    logger.info("inputDataset: %s" % inputDataset)
+    logger.info("inputDataset: %s", inputDataset)
     noInput = len(inputDataset.split("/")) <= 3
 
     # TODO: fix dbs dep
@@ -517,18 +506,18 @@ def publishInDBS3(configFile, taskname):
             # There's little chance this is correct, but it's our best guess for now.
             # CRAB2 uses 'crab2_tag' for all cases
             existing_output = destReadApi.listOutputConfigs(dataset=inputDataset)
-        except:
-            logger.exception('Wrong DBS URL %s' % publish_dbs_url)
+        except Exception:
+            logger.exception('Wrong DBS URL %s', publish_dbs_url)
             return "FAILED"
         if not existing_output:
             msg = "Unable to list output config for input dataset %s." % (inputDataset)
-            logger.error(wfnamemsg+msg)
+            logger.error(msg)
             global_tag = 'crab3_tag'
         else:
             global_tag = existing_output[0]['global_tag']
     else:
         msg = "This publication appears to be for private MC."
-        logger.info(wfnamemsg+msg)
+        logger.info(msg)
         primary_ds_type = 'mc'
         global_tag = 'crab3_tag'
 
@@ -546,17 +535,20 @@ def publishInDBS3(configFile, taskname):
             acquisitionera = str(toPublish[0]['acquisitionera'])
         else:
             acquisitionera = acquisition_era_name
-    except:
+    except Exception:
         acquisitionera = acquisition_era_name
 
     _, primName, procName, tier = toPublish[0]['outdataset'].split('/')
 
     primds_config = {'primary_ds_name': primName, 'primary_ds_type': primary_ds_type}
     msg = "About to insert primary dataset: %s" % (str(primds_config))
-    logger.debug(wfnamemsg+msg)
-    destApi.insertPrimaryDataset(primds_config)
-    msg = "Successfully inserted primary dataset %s." % (primName)
-    logger.debug(wfnamemsg+msg)
+    logger.debug(msg)
+    if dryRun:
+        logger.info("DryRun: skip insertPrimaryDataset")
+    else:
+        destApi.insertPrimaryDataset(primds_config)
+        msg = "Successfully inserted primary dataset %s." % (primName)
+        logger.info(msg)
 
     final = {}
     failed = []
@@ -571,12 +563,12 @@ def publishInDBS3(configFile, taskname):
         existingFilesValid = [f['logical_file_name'] for f in existingDBSFiles if f['is_file_valid']]
         msg = "Dataset %s already contains %d files" % (dataset, len(existingFiles))
         msg += " (%d valid, %d invalid)." % (len(existingFilesValid), len(existingFiles) - len(existingFilesValid))
-        logger.info(wfnamemsg+msg)
+        logger.info(msg)
         final['existingFiles'] = len(existingFiles)
     except Exception as ex:
         msg = "Error when listing files in DBS: %s" % (str(ex))
         msg += "\n%s" % (str(traceback.format_exc()))
-        logger.error(wfnamemsg+msg)
+        logger.error(msg)
         return "FAILED"
 
     # check if actions are needed
@@ -590,7 +582,7 @@ def publishInDBS3(configFile, taskname):
 
     if not workToDo:
         msg = "Nothing uploaded, %s has these files already or not enough files." % (dataset)
-        logger.info(wfnamemsg+msg)
+        logger.info(msg)
         return "NOTHING TO DO"
 
     acquisition_era_config = {'acquisition_era_name': acquisitionera, 'start_date': 0}
@@ -602,19 +594,17 @@ def publishInDBS3(configFile, taskname):
                      'global_tag': global_tag,
                     }
     msg = "Published output config."
-    logger.debug(wfnamemsg+msg)
+    logger.info(msg)
 
     dataset_config = {'dataset': dataset,
                       'processed_ds_name': procName,
                       'data_tier_name': tier,
-                      'acquisition_era_name': acquisitionera,
                       'dataset_access_type': 'VALID',
                       'physics_group_name': 'CRAB3',
                       'last_modification_date': int(time.time()),
                      }
     msg = "About to insert dataset: %s" % (str(dataset_config))
-    logger.info(wfnamemsg+msg)
-    del dataset_config['acquisition_era_name']
+    logger.info(msg)
 
     # List of all files that must (and can) be published.
     dbsFiles = []
@@ -633,7 +623,8 @@ def publishInDBS3(configFile, taskname):
 
     # Loop over all files to publish.
     for file_ in toPublish:
-        logger.info(file_)
+        if verbose:
+            logger.info(file_)
         # Check if this file was already published and if it is valid.
         if file_['lfn'] not in existingFilesValid:
             # We have a file to publish.
@@ -676,7 +667,7 @@ def publishInDBS3(configFile, taskname):
                 # (so that when publishing, this "parent" file will not appear as a parent).
                 if parentFile in parentsToSkip:
                     msg = "Skipping parent file %s, as it doesn't seem to be known to DBS." % (parentFile)
-                    logger.info(wfnamemsg+msg)
+                    logger.info(msg)
                     if parentFile in file_['parents']:
                         file_['parents'].remove(parentFile)
             # Add this file to the list of files to be published.
@@ -688,12 +679,12 @@ def publishInDBS3(configFile, taskname):
 
     # Print a message with the number of files to publish.
     msg = "Found %d files not already present in DBS which will be published." % (len(dbsFiles))
-    logger.info(wfnamemsg+msg)
+    logger.info(msg)
 
     # If there are no files to publish, continue with the next dataset.
-    if len(dbsFiles_f) == 0:
+    if not dbsFiles_f:
         msg = "Nothing to do for this dataset."
-        logger.info(wfnamemsg+msg)
+        logger.info(msg)
         return "NOTHING TO DO"
 
     # Migrate parent blocks before publishing.
@@ -701,35 +692,43 @@ def publishInDBS3(configFile, taskname):
     # as the input dataset.
     if localParentBlocks:
         msg = "List of parent blocks that need to be migrated from %s:\n%s" % (sourceApi.url, localParentBlocks)
-        logger.info(wfnamemsg+msg)
-        statusCode, failureMsg = migrateByBlockDBS3(workflow,
-                                                    migrateApi,
-                                                    destReadApi,
-                                                    sourceApi,
-                                                    inputDataset,
-                                                    localParentBlocks
-                                                   )
-        if statusCode:
-            failureMsg += " Not publishing any files."
-            logger.info(wfnamemsg+failureMsg)
-            failed.extend([f['SourceLFN'] for f in dbsFiles_f])
-            #failed.extend([f['lfn'].replace("/store","/store/temp") for f in dbsFiles_f])
-            failure_reason = failureMsg
-            published = [x for x in published[dataset] if x not in failed[dataset]]
-            return "NOTHING TO DO"
+        logger.info(msg)
+        if dryRun:
+            logger.info("DryRun: skipping migration request")
+        else:
+            statusCode, failureMsg = migrateByBlockDBS3(taskname,
+                                                        migrateApi,
+                                                        destReadApi,
+                                                        sourceApi,
+                                                        inputDataset,
+                                                        localParentBlocks,
+                                                        verbose
+                                                       )
+            if statusCode:
+                failureMsg += " Not publishing any files."
+                logger.info(failureMsg)
+                failed.extend([f['SourceLFN'] for f in dbsFiles_f])
+                #failed.extend([f['lfn'].replace("/store","/store/temp") for f in dbsFiles_f])
+                failure_reason = failureMsg
+                published = [x for x in published[dataset] if x not in failed[dataset]]
+                return "NOTHING TO DO"
     # Then migrate the parent blocks that are in the global DBS instance.
     if globalParentBlocks:
         msg = "List of parent blocks that need to be migrated from %s:\n%s" % (globalApi.url, globalParentBlocks)
-        logger.info(wfnamemsg+msg)
-        statusCode, failureMsg = migrateByBlockDBS3(workflow, migrateApi, destReadApi, globalApi, inputDataset, globalParentBlocks)
-        if statusCode:
-            failureMsg += " Not publishing any files."
-            logger.info(wfnamemsg+failureMsg)
-            failed.extend([f['SourceLFN'] for f in dbsFiles_f])
-            #failed.extend([f['lfn'].replace("/store","/store/temp") for f in dbsFiles_f])
-            failure_reason = failureMsg
-            published = [x for x in published[dataset] if x not in failed[dataset]]
-            return "NOTHING TO DO"
+        logger.info(msg)
+        if dryRun:
+            logger.info("DryRun: skipping migration request")
+        else:
+            statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, globalApi,
+                                                        inputDataset, globalParentBlocks, verbose)
+            if statusCode:
+                failureMsg += " Not publishing any files."
+                logger.info(failureMsg)
+                failed.extend([f['SourceLFN'] for f in dbsFiles_f])
+                #failed.extend([f['lfn'].replace("/store","/store/temp") for f in dbsFiles_f])
+                failure_reason = failureMsg
+                published = [x for x in published[dataset] if x not in failed[dataset]]
+                return "NOTHING TO DO"
     # Publish the files in blocks. The blocks must have exactly max_files_per_block
     # files, unless there are less than max_files_per_block files to publish to
     # begin with. If there are more than max_files_per_block files to publish,
@@ -743,30 +742,35 @@ def publishInDBS3(configFile, taskname):
         files_to_publish = dbsFiles[count:count+max_files_per_block]
         try:
             block_config = {'block_name': block_name, 'origin_site_name': pnn, 'open_for_writing': 0}
-            msg = "Inserting files %s into block %s." % ([f['logical_file_name']
-                                                          for f in files_to_publish], block_name)
-            logger.info(wfnamemsg+msg)
+            block_config = {'block_name': block_name, 'origin_site_name': pnn, 'open_for_writing': 0}
+            if verbose:
+                msg = "Inserting files %s into block %s." % ([f['logical_file_name']
+                                                              for f in files_to_publish], block_name)
+                logger.info(msg)
             blockDump = createBulkBlock(output_config, processing_era_config,
                                         primds_config, dataset_config,
                                         acquisition_era_config, block_config, files_to_publish)
-            #logger.debug(wfnamemsg+"Block to insert: %s\n %s" % (blockDump, destApi.__dict__ ))
+            #logger.debug("Block to insert: %s\n %s" % (blockDump, destApi.__dict__ ))
 
-            destApi.insertBulkBlock(blockDump)
+            if dryRun:
+                logger.info("DryRun: skip insertBulkBlock")
+            else:
+                destApi.insertBulkBlock(blockDump)
             block_count += 1
         except Exception as ex:
             #logger.error("Error for files: %s" % [f['SourceLFN'] for f in toPublish])
-            logger.error("Error for files: %s" % [f['lfn'] for f in toPublish])
+            logger.error("Error for files: %s", [f['lfn'] for f in toPublish])
             failed.extend([f['SourceLFN'] for f in toPublish])
             #failed.extend([f['lfn'].replace("/store","/store/temp") for f in toPublish])
             msg = "Error when publishing (%s) " % ", ".join(failed)
             msg += str(ex)
             msg += str(traceback.format_exc())
-            logger.error(wfnamemsg+msg)
+            logger.error(msg)
             failure_reason = str(ex)
-            file='/tmp/failed-block-at-%s.txt' % time.time()
-            with open(file,'write') as fd:
+            fname = '/tmp/failed-block-at-%s.txt' % time.time()
+            with open(fname, 'w') as fd:
                 fd.write(blockDump)
-            logger.error("FAILING BLOCK SAVED AS %s" % file)
+            logger.error("FAILING BLOCK SAVED AS %s", file)
         count += max_files_per_block
         files_to_publish_next = dbsFiles_f[count:count+max_files_per_block]
         if len(files_to_publish_next) < max_files_per_block:
@@ -779,31 +783,57 @@ def publishInDBS3(configFile, taskname):
     final['blocks'] = block_count
     # Print a publication status summary for this dataset.
     msg = "End of publication status for dataset %s:" % (dataset)
-    msg += " failed (%s) %s" % (len(failed), failed)
-    msg += ", published (%s) %s" % (len(published), published)
-    msg += ", publish_in_next_iteration (%s) %s" % (len(publish_in_next_iteration),
-                                                    publish_in_next_iteration)
+    msg += " failed %s" % len(failed)
+    if verbose:
+        msg += ": %s" % failed
+    msg += ", published %s" % len(published)
+    if verbose:
+        msg += ": %s" % published
+    msg += ", publish_in_next_iteration %s" % len(publish_in_next_iteration)
+    if verbose:
+        msg += ": %s" % publish_in_next_iteration
     msg += ", results %s" % (final)
-    logger.info(wfnamemsg+msg)
+    logger.info(msg)
 
     try:
         if published:
-            mark_good(workflow, published, oracleDB, logger)
+            mark_good(published, crabServer, logger)
         if failed:
-            logger.debug("Failed files: %s " % failed)
-            mark_failed(failed, oracleDB, logger, failure_reason)
-    except:
+            logger.debug("Failed files: %s ", failed)
+            mark_failed(failed, crabServer, logger, failure_reason)
+        data['workflow'] = taskname
+        data['subresource'] = 'updatepublicationtime'
+        crabServer.post(REST_task, data=encodeRequest(data))
+    except Exception:
         logger.exception("Status update failed")
 
     return 0
 
-if __name__ == '__main__':
-
+def main():
+    """
+    starting from json file prepared by PusblishMaster with info on filed to be published, does
+    the actual DBS publication
+    :return:
+    """
     parser = argparse.ArgumentParser()
-
     parser.add_argument('--configFile', help='Publisher configuration file', default='PublisherConfig.py')
     parser.add_argument('--taskname', help='taskname', required=True)
-
+    parser.add_argument('--verbose', help='Verbose mode, print dictionaries', action='store_true')
+    parser.add_argument('--dry', help='Dry run mode, no changes done in DBS', action='store_true')
     args = parser.parse_args()
+    configFile = os.path.abspath(args.configFile)
+    taskname = args.taskname
+    verbose = args.verbose
+    dryRun = args.dry
+    modeMsg = " in DRY RUN mode" if dryRun else ""
+    config = loadConfigurationFile(configFile)
+    if dryRun:
+        config.TaskPublisher.dryRun = True
 
-    print(publishInDBS3(args.configFile, args.taskname))
+    print("will run%s with:\nconfigFile: %s\ntaskname  : %s\n" % (modeMsg, configFile, taskname))
+
+    result = publishInDBS3(config, taskname, verbose)
+    print(result)
+
+if __name__ == '__main__':
+    main()
