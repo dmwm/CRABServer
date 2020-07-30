@@ -424,6 +424,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
             info["CMSGroups"] = set.union(CMSGroupMapper.map_user_to_groups(kwargs['task']['tm_username']), kwargs['task']['user_groups'])
             self.logger.info("User %s mapped to local groups %s.", kwargs['task']['tm_username'], info["CMSGroups"])
+            if not info["CMSGroups"]:
+                raise TaskWorkerException("CMSGroups can not be empty. Failing task %s" % (task['tm_taskname']), retry=True)
 
             self.logger.debug("Finally submitting to the schedd")
             if address:

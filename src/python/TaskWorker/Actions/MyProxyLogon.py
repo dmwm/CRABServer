@@ -77,6 +77,9 @@ class MyProxyLogon(TaskAction):
             self.logger.error("will try with old-style DN hash")
             del proxycfg['userName']
             (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
+        #  minimal sanity check. Submission will fail if there's no group
+        if not usergroups:
+            raise TaskWorkerException('Could not retrieve VOMS groups list from %s', userproxy)
         kwargs['task']['user_proxy'] = userproxy
         kwargs['task']['user_groups'] = usergroups
         self.logger.debug("Valid proxy for %s now in %s", proxycfg['userDN'], userproxy)
