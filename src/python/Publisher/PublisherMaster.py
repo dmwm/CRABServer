@@ -326,8 +326,8 @@ class Master(object):
         try:
             for task in tasks:
                 taskname = str(task[0][3])
-                if int(taskname[0:2]) < 20:
-                    self.logger.info("Skipped %s. Ignore tasks created before 2020.", taskname)
+                if int(taskname[0:4]) < 2007:
+                    self.logger.info("Skipped %s. Ignore tasks created before July 2020.", taskname)
                     continue
                 if self.TestMode:
                     self.startSlave(task)   # sequentially do one task after another
