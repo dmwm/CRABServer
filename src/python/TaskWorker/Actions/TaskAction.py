@@ -11,7 +11,7 @@ from RESTInteractions import HTTPRequests
 class TaskAction(object):
     """The ABC of all actions"""
 
-    def __init__(self, config, server = '', resturi = '', procnum = -1):
+    def __init__(self, config, server='', resturi='', procnum=-1):
         self.logger = logging.getLogger(str(procnum))
         self.config = config
         self.jobtypeMapper = {'Analysis': 'Processing',
@@ -37,7 +37,7 @@ class TaskAction(object):
         ## However we are saving the base uri in case the API is different
         self.restURInoAPI = resturi.rsplit('/', 1)[0] ## That's like '/crabserver/prod'
         if server: ## When testing, the server can be None.
-            self.backendurls = self.server.get(self.restURInoAPI + '/info', data = {'subresource': 'backendurls'})[0]['result'][0]
+            self.backendurls = self.server.get(self.restURInoAPI + '/info', data={'subresource': 'backendurls'})[0]['result'][0]
 
     def execute(self, *args, **kwargs):
         raise NotImplementedError
@@ -50,12 +50,12 @@ class TaskAction(object):
 
         truncWarning = truncateError(warning)
         userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2,
-                                  logger = self.logger)
+                                  logger=self.logger)
         configreq = {'subresource': 'addwarning',
-                        'workflow': taskname,
-                         'warning': b64encode(truncWarning)}
+                     'workflow': taskname,
+                     'warning': b64encode(truncWarning)}
         try:
-            userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
+            userServer.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
         except HTTPException as hte:
             self.logger.error("Error uploading warning: %s", str(hte))
             self.logger.warning("Cannot add a warning to REST interface. Warning message: %s", warning)
@@ -63,11 +63,10 @@ class TaskAction(object):
 
     def deleteWarnings(self, userProxy, taskname):
         userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2,
-                                  logger = self.logger)
-        configreq = {'subresource': 'deletewarnings',
-                        'workflow': taskname}
+                                  logger=self.logger)
+        configreq = {'subresource': 'deletewarnings', 'workflow': taskname}
         try:
-            userServer.post(self.restURInoAPI + '/task', data = urllib.urlencode(configreq))
+            userServer.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
         except HTTPException as hte:
             self.logger.error("Error deleting warnings: %s", str(hte))
             self.logger.warning("Can not delete warnings from REST interface.")

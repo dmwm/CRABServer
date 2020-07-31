@@ -71,7 +71,7 @@ class MyProxyLogon(TaskAction):
         try:
             # try first to retrieve credential with login name = <username>_CRAB
             (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
-        except TaskWorkerException as twe:
+        except TaskWorkerException:
             self.logger.error("proxy retrieval from %s failed with login name %s.",
                               proxycfg['myProxySvr'], proxycfg['userName'])
             self.logger.error("will try with old-style DN hash")
