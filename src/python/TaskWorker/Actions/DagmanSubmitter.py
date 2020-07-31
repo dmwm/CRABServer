@@ -94,7 +94,7 @@ SUBMIT_INFO = [ \
     ('CMS_Type', 'cms_type'),
     ('CMS_WMTool', 'cms_wmtool'),
     ('CMS_TaskType', 'cms_tasktype'),
-]
+              ]
 
 def addCRABInfoToClassAd(ad, info):
     """
@@ -106,7 +106,7 @@ def addCRABInfoToClassAd(ad, info):
             ad[adName] = classad.ExprTree(str(info[dictName]))
     if 'extra_jdl' in info and info['extra_jdl']:
         for jdl in info['extra_jdl'].split('\n'):
-            adName, adVal = jdl.lstrip('+').split('=',1)
+            adName, adVal = jdl.lstrip('+').split('=', 1)
             ad[adName] = adVal
 
 
@@ -161,14 +161,16 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
     runtime = task[cmd+'_maxjobruntime']
     memory = task[cmd+'_maxmemory']
     ncores = task[cmd+'_numcores']
-    if ncores is None: ncores = 1
+    if ncores is None:
+        ncores = 1
     absmaxmemory = max(MAX_MEMORY_SINGLE_CORE, ncores*MAX_MEMORY_PER_CORE)
     if runtime is not None and runtime > stdmaxjobruntime:
         msg = "Task requests %s minutes of runtime, but only %s minutes are guaranteed to be available." % (runtime, stdmaxjobruntime)
         msg += " Jobs may not find a site where to run."
         msg += " CRAB has changed this value to %s minutes." % (stdmaxjobruntime)
         logger.warning(msg)
-        if info is not None: info['tm_maxjobruntime'] = str(stdmaxjobruntime)
+        if info is not None:
+            info['tm_maxjobruntime'] = str(stdmaxjobruntime)
         warningUploader(msg, task['user_proxy'], task['tm_taskname'])
     if memory is not None and memory > absmaxmemory:
         msg = "Task requests %s MB of memory, above the allowed maximum of %s" % (memory, absmaxmemory)
@@ -201,8 +203,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         """
         task['tm_schedd'] = schedd
         userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
-        configreq = {'workflow':task['tm_taskname'], 'subresource':'updateschedd',
-            'scheddname':schedd}
+        configreq = {'workflow':task['tm_taskname'],
+                     'subresource':'updateschedd', 'scheddname':schedd}
         try:
             userServer.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
         except HTTPException as hte:
@@ -226,8 +228,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         alreadyTriedSchedds = scheddStats.taskErrors.keys() #keys in the taskerrors are schedd
 
         currentBackendurls = copy.deepcopy(self.backendurls)
-        currentBackendurls['htcondorSchedds'] = dict([(s,restSchedulers[s]) for s in restSchedulers if s not in alreadyTriedSchedds])
-        if len(currentBackendurls['htcondorSchedds']) == 0:
+        currentBackendurls['htcondorSchedds'] = dict([(s, restSchedulers[s]) for s in restSchedulers if s not in alreadyTriedSchedds])
+        if not currentBackendurls['htcondorSchedds']:
             return None
         loc = HTCondorLocator.HTCondorLocator(currentBackendurls, self.logger)
         if hasattr(self.config.TaskWorker, 'scheddPickerFunction'):
@@ -247,7 +249,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 If it contains a schedd it will do the duplicate check and try to submit the task to it
                 In case of multiple failures is will set a new schedd and return back to the asction handler for retries.
         """
-        task =  kwargs['task']
+        task = kwargs['task']
         schedd = task['tm_schedd']
         info = args[0][0]
         dashboardParams = args[0][1]
@@ -345,7 +347,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         # All other statuses means that task is not submitted or failed to be submitted.
         # There was issue with spooling files to scheduler and duplicate check found dagman on scheduler
         # but the filew were not correctly transferred.
-        if results[0]['JobStatus'] not in [1,2]:
+        if results[0]['JobStatus'] not in [1, 2]:
             # if the state of the dag is not idle or running then we raise exception and let
             # the dagman submitter retry later. hopefully after seven minutes the dag gets removed
             # from the schedd and the submission succeds
@@ -439,7 +441,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         configreq = {'workflow': kwargs['task']['tm_taskname'],
                      'status': "SUBMITTED",
                      'subresource': 'success',
-                     'clusterid' : self.clusterId } #that's the condor cluster id of the dag (actually dag_bootstrap.sh that becomes that dag if everything goes well)
+                     'clusterid' : self.clusterId} #that's the condor cluster id of the dag_bootstrap.sh
         self.logger.debug("Pushing information centrally %s", configreq)
         data = urllib.urlencode(configreq)
         self.server.post(self.resturi, data=data)
@@ -487,7 +489,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["OtherJobRemoveRequirements"] = classad.ExprTree("DAGManJobId =?= ClusterId")
         dagAd["RemoveKillSig"] = "SIGUSR1"
 
-        with open('subdag.ad' ,'w') as fd:
+        with open('subdag.ad', 'w') as fd:
             for k, v in dagAd.items():
                 if k == 'X509UserProxy':
                     v = os.path.basename(v)
@@ -544,11 +546,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         for job in info:
             job.update(params)
             apmon.sendToML(job)
-        if info :
+        if info:
             self.logger.debug("Dashboard job info submitted. Last job for example is: %s", info[-1])
         else:
             self.logger.debug("No dashboard job info submitted")
         apmon.free()
-
-
-

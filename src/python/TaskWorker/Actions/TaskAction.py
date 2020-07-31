@@ -39,7 +39,7 @@ class TaskAction(object):
         if server: ## When testing, the server can be None.
             self.backendurls = self.server.get(self.restURInoAPI + '/info', data = {'subresource': 'backendurls'})[0]['result'][0]
 
-    def execute(self):
+    def execute(self, *args, **kwargs):
         raise NotImplementedError
 
 
