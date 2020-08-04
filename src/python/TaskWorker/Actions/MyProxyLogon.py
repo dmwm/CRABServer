@@ -78,8 +78,8 @@ class MyProxyLogon(TaskAction):
             try:
                 (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
             except TaskWorkerException:
-                self.logger.error("proxy retrieval from %s failed with login name %s.",
-                                  proxycfg['myProxySvr'], proxycfg['userName'])
+                self.logger.error("proxy retrieval from %s failed with DN hash as credential name.",
+                                  proxycfg['myProxySvr'])
                 self.logger.error("will try with old-style DN hash adding REST host name")
                 proxycfg['myproxyAccount'] = self.server['host']
                 (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
