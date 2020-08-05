@@ -34,7 +34,8 @@ class MyProxyLogon(TaskAction):
             proxy = Proxy(proxycfg)
             userproxy = proxy.getProxyFilename(serverRenewer=True)  # this only returns a filename
             proxy.logonRenewMyProxy()  # this tries to create the proxy, but if it fails it does not rise
-            timeleft = proxy.getTimeLeft(userproxy)  # this is the way to tell if above succeeded
+            usergroups = set(proxy.getAllUserGroups(userproxy))  # get VOMS groups from created proxy (if any)
+            timeleft = proxy.getTimeLeft(userproxy)  # this is the way to tell if proxy creation succeeded
 
         if timeleft is None or timeleft <= 0:
             msg = "Impossible to retrieve proxy from %s for %s." % (proxycfg['myProxySvr'], proxycfg['userDN'])
@@ -46,9 +47,6 @@ class MyProxyLogon(TaskAction):
             self.logger.error("===========PROXY ERROR END   ==========================")
             raise TaskWorkerException(msg)
 
-        # reach here when logonRenewMyProxy was successful. Now that there is
-        # a proxy in userproxy file, usergroups can be filled
-        usergroups = set(proxy.getAllUserGroups(userproxy))
         return (userproxy, usergroups)
 
     def execute(self, *args, **kwargs):
