@@ -68,7 +68,8 @@ class MyProxyLogon(TaskAction):
                     'cleanEnvironment' : getattr(self.config.MyProxy, 'cleanEnvironment', False)
                    }
         try:
-            # try first to retrieve credential with login name = <username>_CRAB
+            self.logger.info("try first to retrieve credential with login name %s",
+                             proxycfg['userName'])
             (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
         except TaskWorkerException:
             self.logger.error("proxy retrieval from %s failed with login name %s.",
