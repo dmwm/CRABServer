@@ -24,7 +24,7 @@ class MyProxyLogon(TaskAction):
         It tries to retrieve a valid proxy from myproxy using the configuration
         passed as argument. See WMCore.Credential.Proxy for configuration details.
         If successful returns the proxy filename and list of VOMS groups
-        for later addition via voms-proxy-init. If not rises a TW exception
+        for later addition via voms-proxy-init. If not rises a TW exception.
         Note that logonRenewMyProxy() does not rise exceptions.
         """
         from WMCore.Credential.Proxy import Proxy
@@ -32,10 +32,10 @@ class MyProxyLogon(TaskAction):
         # WMCore proxy methods are awfully verbose, reduce logging level when using them
         with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
             proxy = Proxy(proxycfg)
-            userproxy = proxy.getProxyFilename(serverRenewer=True)
-            usergroups = set(proxy.getAllUserGroups(userproxy))
-            proxy.logonRenewMyProxy()
-            timeleft = proxy.getTimeLeft(userproxy)
+            userproxy = proxy.getProxyFilename(serverRenewer=True)  # this only returns a filename
+            proxy.logonRenewMyProxy()  # this tries to create the proxy, but if it fails it does not rise
+            usergroups = set(proxy.getAllUserGroups(userproxy))  # get VOMS groups from created proxy (if any)
+            timeleft = proxy.getTimeLeft(userproxy)  # this is the way to tell if proxy creation succeeded
 
         if timeleft is None or timeleft <= 0:
             msg = "Impossible to retrieve proxy from %s for %s." % (proxycfg['myProxySvr'], proxycfg['userDN'])
