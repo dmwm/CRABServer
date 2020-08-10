@@ -203,9 +203,12 @@ class DBSDataDiscovery(DataDiscovery):
                     locationsFoundWithRucio = True
                 else:
                     msg = "No locations found with Rucio for this dataset"
-                    # TODO when removing fall-back to PhEDEx, this should be a fatal error
-                    # raise TaskWorkerException(msg)
-                    self.logger.warn(msg)
+                    # since NANO* are not in PhEDEx, this should be a fatal error
+                    if isNano:
+                        raise TaskWorkerException(msg)
+                    else:
+                        # note it down and try with PhEDEx
+                        self.logger.warn(msg)
 
         if not locationsFoundWithRucio : # fall back to pre-Rucio methods
             try:
