@@ -22,10 +22,10 @@ class DBSDataDiscovery(DataDiscovery):
 
     def checkDatasetStatus(self, dataset, kwargs):
         res = self.dbs.dbs.listDatasets(dataset=dataset, detail=1, dataset_access_type='*')
-        if res:
-            raise TaskWorkerException("Found more than one dataset while checking in DBS the status of %s" % dataset)
-        else:
+        if not res:
             raise TaskWorkerException("Cannot find dataset %s in %s DBS instance" % (dataset, self.dbsInstance))
+        if len(res) > 1:
+            raise TaskWorkerException("Found more than one dataset while checking in DBS the status of %s" % dataset)
         res = res[0]
         #import pprint
         #self.logger.info("Input dataset details: %s", pprint.pformat(res))
