@@ -1,7 +1,6 @@
 from __future__ import print_function
 import os
 import sys
-import pprint
 import logging
 from httplib import HTTPException
 import urllib
@@ -23,25 +22,26 @@ class DBSDataDiscovery(DataDiscovery):
 
     def checkDatasetStatus(self, dataset, kwargs):
         res = self.dbs.dbs.listDatasets(dataset=dataset, detail=1, dataset_access_type='*')
-        if len(res) > 1:
+        if res:
             raise TaskWorkerException("Found more than one dataset while checking in DBS the status of %s" % dataset)
-        if len(res) == 0:
+        else:
             raise TaskWorkerException("Cannot find dataset %s in %s DBS instance" % (dataset, self.dbsInstance))
         res = res[0]
+        #import pprint
         #self.logger.info("Input dataset details: %s", pprint.pformat(res))
         accessType = res['dataset_access_type']
         if accessType != 'VALID':
             # as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
             msgForDeprecDS = "Please contact your physics group if you think the dataset should not be deprecated."
             if kwargs['task']['tm_nonvalid_input_dataset'] != 'T':
-                msg  = "CRAB refuses to proceed in getting the details of the dataset %s from DBS, because the dataset is not 'VALID' but '%s'." % (dataset, accessType)
+                msg = "CRAB refuses to proceed in getting the details of the dataset %s from DBS, because the dataset is not 'VALID' but '%s'." % (dataset, accessType)
                 if accessType == 'DEPRECATED':
                     msg += " (%s)" % (msgForDeprecDS)
                 msg += " To allow CRAB to consider a dataset that is not 'VALID', set Data.allowNonValidInputDataset = True in the CRAB configuration."
                 msg += " Notice that this will not force CRAB to run over all files in the dataset;"
                 msg += " CRAB will still check if there are any valid files in the dataset and run only over those files."
                 raise TaskWorkerException(msg)
-            msg  = "The input dataset %s is not 'VALID' but '%s'." % (dataset, accessType)
+            msg = "The input dataset %s is not 'VALID' but '%s'." % (dataset, accessType)
             msg += " CRAB will check if there are any valid files in the dataset and run only over those files."
             if accessType == 'DEPRECATED':
                 msg += " %s" % (msgForDeprecDS)
@@ -53,7 +53,7 @@ class DBSDataDiscovery(DataDiscovery):
         phedex = PhEDEx() # TODO use certs from the config!
         # get all the PNNs that are of kind 'Disk'
         try:
-            diskLocations = set([pnn['name'] for pnn in phedex.getNodeMap()['phedex']['node'] if pnn['kind']=='Disk'])
+            diskLocations = set([pnn['name'] for pnn in phedex.getNodeMap()['phedex']['node'] if pnn['kind'] == 'Disk'])
         except HTTPException as ex:
             self.logger.error(ex.headers)
             raise TaskWorkerException("The CRAB3 server backend could not contact phedex to get the list of site storages.\n"+\
@@ -62,7 +62,7 @@ class DBSDataDiscovery(DataDiscovery):
         diskLocationsMap = {}
         for block, locations in locationsMap.iteritems():
             locations[:] = [x for x in locations if x != 'T3_CH_CERN_OpenData'] # ignore OpenData until it is accessible by CRAB
-            if (set(locations) & diskLocations):
+            if set(locations) & diskLocations:
                 # at least some locations are disk
                 diskLocationsMap[block] = locationsMap[block]
             else:
@@ -78,7 +78,7 @@ class DBSDataDiscovery(DataDiscovery):
         MAX_LUMIS = 100000
         for block in blocks:
             blockInfo = self.dbs.getDBSSummaryInfo(block=block)
-            if blockInfo.get('NumberOfLumis',0) > MAX_LUMIS:
+            if blockInfo.get('NumberOfLumis', 0) > MAX_LUMIS:
                 msg = "Block %s contains more than %s lumis.\nThis blows up CRAB server memory" % (block, MAX_LUMIS)
                 msg += "\nCRAB can only split this by ignoring lumi information. You can do this"
                 msg += "\nusing FileBased split algorithm and avoiding any additional request"
@@ -121,7 +121,7 @@ class DBSDataDiscovery(DataDiscovery):
 
         inputDataset = kwargs['task']['tm_input_dataset']
         secondaryDataset = kwargs['task'].get('tm_secondary_input_dataset', None)
-        
+
         self.checkDatasetStatus(inputDataset, kwargs)
         if secondaryDataset:
             self.checkDatasetStatus(secondaryDataset, kwargs)
@@ -130,9 +130,9 @@ class DBSDataDiscovery(DataDiscovery):
             # Get the list of blocks for the locations.
             # The WMCore DBS3 implementation makes one call to DBS for each block
             # when using locations=True so we are using locations=False and looking up location later
-            blocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(inputDataset, locations=False)]
+            blocks = [x['Name'] for x in self.dbs.getFileBlocksInfo(inputDataset, locations=False)]
             if secondaryDataset:
-                secondaryBlocks = [ x['Name'] for x in self.dbs.getFileBlocksInfo(secondaryDataset, locations=False)]
+                secondaryBlocks = [x['Name'] for x in self.dbs.getFileBlocksInfo(secondaryDataset, locations=False)]
         except DBSReaderError as dbsexc:
             # dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
@@ -198,7 +198,7 @@ class DBSDataDiscovery(DataDiscovery):
                 located_blocks = locations['phedex']['block']
                 for element in located_blocks:
                     if element['replica']:  # only fill map for blocks which have at least one location
-                        locationsMap.update({element['name']: [ x['node'] for x in element['replica'] ] })
+                        locationsMap.update({element['name']: [x['node'] for x in element['replica']]})
                 if locationsMap:
                     locationsFoundWithRucio = True
                 else:
@@ -210,7 +210,7 @@ class DBSDataDiscovery(DataDiscovery):
                         # note it down and try with PhEDEx
                         self.logger.warn(msg)
 
-        if not locationsFoundWithRucio : # fall back to pre-Rucio methods
+        if not locationsFoundWithRucio:  # fall back to pre-Rucio methods
             try:
                 self.logger.info("Looking up data locations using %s", PhEDExOrDBS)
                 locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=isUserDataset)
@@ -237,7 +237,7 @@ class DBSDataDiscovery(DataDiscovery):
                 located_blocks = locations['phedex']['block']
                 for element in located_blocks:
                     if element['replica']:   # only fill map for blocks which have at least one location
-                        secondaryLocationsMap.update({element['name']: [ x['node'] for x in element['replica'] ] })
+                        secondaryLocationsMap.update({element['name']: [x['node'] for x in element['replica']]})
             if not secondaryLocationsMap:
                 msg = "No locations found with Rucio for secondaryDataset."
                 # TODO when removing fall-back to PhEDEx, this should be a fatal error
@@ -288,10 +288,10 @@ class DBSDataDiscovery(DataDiscovery):
                     configreq = {'workflow': taskName,
                                  'taskstatus': tapeRecallStatus,
                                  'ddmreqid': ddmReqId,
-                                 'subresource': 'addddmreqid'
-                    }
+                                 'subresource': 'addddmreqid',
+                                }
                     try:
-                        tapeRecallStatusSet = self.server.post(self.restURInoAPI+'/task', data = urllib.urlencode(configreq))
+                        tapeRecallStatusSet = self.server.post(self.restURInoAPI+'/task', data=urllib.urlencode(configreq))
                     except HTTPException as hte:
                         self.logger.exception(hte)
                         msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (self.config.TaskWorker.restHost, str(hte))
@@ -317,13 +317,13 @@ class DBSDataDiscovery(DataDiscovery):
 
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
-        lumiMask  = kwargs['task']['tm_split_args']['lumis']
-        runRange  = kwargs['task']['tm_split_args']['runs']
+        lumiMask = kwargs['task']['tm_split_args']['lumis']
+        runRange = kwargs['task']['tm_split_args']['runs']
 
         needLumiInfo = splitAlgo != 'FileBased' or lumiMask != [] or runRange != []
         # secondary dataset access relies on run/lumi info
-        if secondaryDataset: needLumiInfo = True
-
+        if secondaryDataset:
+            needLumiInfo = True
         if needLumiInfo:
             self.checkBlocksSize(blocksWithLocation) # Interested only in blocks with locations, 'blocks' may contain invalid ones and trigger an Exception
             if secondaryDataset:
@@ -341,7 +341,7 @@ class DBSDataDiscovery(DataDiscovery):
                     infos['Parents'] = []
                     lumis = LumiList(runsAndLumis=infos['Lumis'])
                     for secfilename, secinfos in moredetails.items():
-                        if (lumis & secinfos['lumiobj']):
+                        if lumis & secinfos['lumiobj']:
                             infos['Parents'].append(secfilename)
                 self.logger.info("Done matching files from secondary dataset")
                 kwargs['task']['tm_use_parent'] = 1
@@ -349,22 +349,23 @@ class DBSDataDiscovery(DataDiscovery):
             self.logger.exception(ex)
             raise TaskWorkerException("The CRAB3 server backend could not contact DBS to get the files details (Lumis, events, etc).\n"+\
                                 "This is could be a temporary DBS glitch. Please try to submit a new task (resubmit will not work)"+\
-                                " and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO addo the nodes phedex so the user can check themselves
+                                " and contact the experts if the error persists.\nError reason: %s" % str(ex))
+                                #TODO addo the nodes phedex so the user can check themselves
         if not filedetails:
-            raise TaskWorkerException(("Cannot find any file inside the dataset. Please, check your dataset in DAS, %s.\n"
-                                      "Aborting submission. Resubmitting your task will not help.") %
-                                      ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
-                                      (self.dbsInstance, inputDataset))
+            raise TaskWorkerException(("Cannot find any file inside the dataset. Please, check your dataset in DAS, %s.\n" +\
+                                "Aborting submission. Resubmitting your task will not help.") %\
+                                ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %\
+                                (self.dbsInstance, inputDataset))
 
         ## Format the output creating the data structures required by WMCore. Filters out invalid files,
         ## files whose block has no location, and figures out the PSN
-        result = self.formatOutput(task = kwargs['task'], requestname = taskName,
-                                   datasetfiles = filedetails, locations = locationsMap,
-                                   tempDir = kwargs['tempDir'])
+        result = self.formatOutput(task=kwargs['task'], requestname=taskName,
+                                   datasetfiles=filedetails, locations=locationsMap,
+                                   tempDir=kwargs['tempDir'])
 
         if not result.result:
-            raise TaskWorkerException(("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, %s.\n"
-                                      "Aborting submission. Resubmitting your task will not help.") %
+            raise TaskWorkerException(("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, %s.\n" +
+                                       "Aborting submission. Resubmitting your task will not help.") %
                                       ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
                                       (self.dbsInstance, inputDataset))
 
@@ -373,7 +374,8 @@ class DBSDataDiscovery(DataDiscovery):
         return result
 
 if __name__ == '__main__':
-    """Usage: python DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
+    """
+    Usage: python DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
     where dbs_instance should be either prod/global or prod/phys03
     Needs to define first: X509_USER_CERT/KEY e.g. tp /data/certs/servicecert.perm /data/certs/servicekey.pem
 
@@ -383,7 +385,7 @@ if __name__ == '__main__':
     dbsDataset = sys.argv[2]
     dbsSecondaryDataset = sys.argv[3] if len(sys.argv) == 4 else None
 
-    logging.basicConfig(level = logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
     from WMCore.Configuration import ConfigurationEx
     from ServerUtilities import newX509env
 
@@ -398,8 +400,8 @@ if __name__ == '__main__':
     # will user service cert as defined for TW
     config.TaskWorker.cmscert = os.environ["X509_USER_CERT"]
     config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
-    config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT= config.TaskWorker.cmscert,
-                                                X509_USER_KEY = config.TaskWorker.cmskey)
+    config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
+                                                X509_USER_KEY=config.TaskWorker.cmskey)
 
     config.TaskWorker.DDMServer = 'dynamo.mit.edu'
     config.TaskWorker.instance = 'prod'
@@ -414,7 +416,7 @@ if __name__ == '__main__':
 
     fileset = DBSDataDiscovery(config)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': 'None',
-                          'tm_input_dataset': dbsDataset,  'tm_secondary_input_dataset': dbsSecondaryDataset, 'tm_taskname': 'pippo1',
+                          'tm_input_dataset': dbsDataset, 'tm_secondary_input_dataset': dbsSecondaryDataset, 'tm_taskname': 'pippo1',
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
                           'tm_dbs_url': config.Services.DBSUrl}, tempDir='')
     
