@@ -150,7 +150,7 @@ class DBSDataDiscovery(DataDiscovery):
         # in time useRucioForLocations may become a more rich expression
         isNano = blocks[0].split("#")[0].split("/")[-1] in ["NANOAOD", "NANOAODSIM"]
         if isNano:
-            self.logger.info("NANOAOD* datset. Will user Rucio for data location")
+            self.logger.info("NANOAOD* datset. Will use Rucio for data location")
         useRucioForLocations = isNano
         locationsFoundWithRucio = False
 
@@ -377,7 +377,9 @@ if __name__ == '__main__':
     """
     Usage: python DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
     where dbs_instance should be either prod/global or prod/phys03
-    Needs to define first: X509_USER_CERT/KEY e.g. tp /data/certs/servicecert.perm /data/certs/servicekey.pem
+    Needs to define first:
+    export X509_USER_CERT=/data/certs/servicecert.pem
+    export X509_USER_KEY=/data/certs/servicekey.pem
 
     Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
     """
