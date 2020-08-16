@@ -38,8 +38,8 @@ SERVICE_INSTANCES = {'prod': {'restHost':'cmsweb.cern.ch', 'dbInstance':'prod'},
                      'test4': {'restHost':'cmsweb-test4.cern.ch', 'dbInstance':'dev'},
                      'test5': {'restHost':'cmsweb-test5.cern.ch', 'dbInstance':'dev'},
                      'test6': {'restHost':'cmsweb-test6.cern.ch', 'dbInstance':'dev'},
-                     'stefanovm': {'restHost':'stefanovm.cern.ch', 'dbInstace':'dev'},
-                     'stefanovm2': {'restHost':'stefanovm2.cern.ch', 'dbInstace':'dev'},
+                     'stefanovm': {'restHost':'stefanovm.cern.ch', 'dbInstance':'dev'},
+                     'stefanovm2': {'restHost':'stefanovm2.cern.ch', 'dbInstance':'dev'},
                      'other': {'restHost':None, 'dbInstance':None},
                      }
 

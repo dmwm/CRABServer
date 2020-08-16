@@ -1,11 +1,9 @@
+# pylint: disable=C0103, W0703, R0912, R0914, R0915
+
 import os
 import sys
 import time
-import string
-import json
-import urllib
 import logging
-import traceback
 
 import classad
 import htcondor
@@ -61,15 +59,14 @@ class CRAB3ProxyRenewer(object):
             htcondor.enable_debug()
 
     def get_backendurls(self):
-        self.logger.info("Querying server %s for HTCondor schedds and pool names." % self.resturi)
+        self.logger.info("Querying server %s for HTCondor schedds and pool names.", self.resturi)
         server = HTTPRequests(self.resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry = 2)
         result = server.get(self.resturi, data={'subresource':'backendurls'})[0]['result'][0]
         self.pool = str(result['htcondorPool'])
         self.schedds = [str(i) for i in result['htcondorSchedds']]
-        self.logger.info("Resulting pool %s; schedds %s" % (self.pool, ",".join(self.schedds)))
+        self.logger.info("Resulting pool %s; schedds %s", self.pool, ",".join(self.schedds))
 
     def get_proxy_from_MyProxy(self, ad):
-        result = None
         vo = 'cms'
         group = ''
         role = ''
@@ -130,14 +127,14 @@ class CRAB3ProxyRenewer(object):
             raise Exception("Failure when renewing HTCondor task proxy: '%s'" % results)
 
     def execute_schedd(self, schedd_name, collector):
-        self.logger.info("Updating tasks in schedd %s" % schedd_name)
+        self.logger.info("Updating tasks in schedd %s", schedd_name)
         self.logger.debug("Trying to locate schedd.")
         schedd_ad = collector.locate(htcondor.DaemonTypes.Schedd, schedd_name)
-        self.logger.debug("Schedd found at %s" % schedd_ad['MyAddress'])
+        self.logger.debug("Schedd found at %s", schedd_ad['MyAddress'])
         schedd = htcondor.Schedd(schedd_ad)
         self.logger.debug("Querying schedd for CRAB3 tasks.")
         task_ads = list(schedd.xquery('TaskType =?= "ROOT" && CRAB_HC =!= "True"', QUERY_ATTRS))
-        self.logger.info("There were %d tasks found." % len(task_ads))
+        self.logger.info("There were %d tasks found.", len(task_ads))
         ads = {}
         now = time.time()
         for ad in task_ads:
@@ -146,7 +143,7 @@ class CRAB3ProxyRenewer(object):
             if 'x509userproxyexpiration' in ad:
                 lifetime = ad['x509userproxyexpiration'] - now
                 if lifetime > MINPROXYLENGTH:
-                    self.logger.info("Skipping refresh of proxy for task %s because it still has a lifetime of %.1f hours." % (ad['CRAB_ReqName'], lifetime/3600.0))
+                    self.logger.info("Skipping refresh of proxy for task %s because it still has a lifetime of %.1f hours.", ad['CRAB_ReqName'], lifetime/3600.0)
                     continue
             user = ad['CRAB_UserDN']
             vo = 'cms'
@@ -163,12 +160,12 @@ class CRAB3ProxyRenewer(object):
             ad_list.append(ad)
 
         for key, ad_list in ads.items():
-            self.logger.info("Retrieving proxy for %s" % str(key))
+            self.logger.info("Retrieving proxy for %s", str(key))
             try:
                 proxyfile = self.get_proxy_from_MyProxy(ad_list[0])
             except Exception:
                 self.logger.error("Failed to retrieve proxy.  Skipping user %s", key[0])
-                tasks = string.join((ad['CRAB_ReqName'] for ad in ad_list), '\n\t')
+                tasks = '\n\t'.join((ad['CRAB_ReqName'] for ad in ad_list))
                 self.logger.error("Will not update proxy for tasks:\n\t%s", tasks)
                 continue
             for ad in ad_list:
@@ -181,19 +178,26 @@ class CRAB3ProxyRenewer(object):
                     continue
                 self.logger.debug("Updated proxy pushed to schedd for task %s", ad['CRAB_ReqName'])
 
+    def remove_handler(self):
+        handlers = self.logger.handlers[:]
+        for file_handler in handlers:
+            file_handler.close()
+            self.logger.removeHandler(file_handler)
+
     def execute(self):
         self.get_backendurls()
         collector = htcondor.Collector(self.pool)
         for schedd_name in self.schedds:
             try:
                 self.execute_schedd(schedd_name, collector)
-                self.logger.info("Done updating proxies for schedd %s" % schedd_name)
+                self.logger.info("Done updating proxies for schedd %s", schedd_name)
             except NotImplementedError:
                 raise
             except Exception:
-                self.logger.exception("Unable to update all proxies for schedd %s" % schedd_name)
+                self.logger.exception("Unable to update all proxies for schedd %s", schedd_name)
+        self.remove_handler()
 
-if __name__ == '__main__':
+def main():
     """ Simple main to execute the action standalon. You just need to set the task worker environment.
         The main is set up to work with the production task worker. If you want to use it on your own
         instance you need to change resthost, resturi, and twconfig. For example:
@@ -217,3 +221,6 @@ if __name__ == '__main__':
 
     pr = CRAB3ProxyRenewer(config, resthost, resturi, logger)
     pr.execute()
+
+if __name__ == '__main__':
+    main()
