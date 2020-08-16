@@ -314,6 +314,7 @@ def publishInDBS3(config, taskname, verbose):
 
         msg = "Marking %s file(s) as published." % len(files)
         logger.info(msg)
+        nMarked = 0
         for lfn in files:
             data = {}
             source_lfn = lfn
@@ -334,6 +335,9 @@ def publishInDBS3(config, taskname, verbose):
                 except Exception as ex:
                     logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
                     logger.error("Error reason: %s", ex)
+            nMarked += 1
+            if nMarked % 10 == 0:
+                logger.info('marked %d files', nMarked)
 
     def mark_failed(files, crabServer, logger, failure_reason=""):
         """
@@ -341,6 +345,7 @@ def publishInDBS3(config, taskname, verbose):
         """
         msg = "Marking %s file(s) as failed" % len(files)
         logger.info(msg)
+        nMarked = 0
         for lfn in files:
             source_lfn = lfn
             docId = getHashLfn(source_lfn)
@@ -362,6 +367,9 @@ def publishInDBS3(config, taskname, verbose):
                 except Exception as ex:
                     logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
                     logger.error("Error reason: %s", ex)
+            nMarked += 1
+            if nMarked % 10 == 0:
+                logger.info('marked %d files', nMarked)
 
     def createLogdir(dirname):
         """
