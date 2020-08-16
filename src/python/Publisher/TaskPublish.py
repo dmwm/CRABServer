@@ -314,6 +314,7 @@ def publishInDBS3(config, taskname, verbose):
 
         msg = "Marking %s file(s) as published." % len(files)
         logger.info(msg)
+        nMarked = 0
         for lfn in files:
             data = {}
             source_lfn = lfn
@@ -334,6 +335,9 @@ def publishInDBS3(config, taskname, verbose):
                 except Exception as ex:
                     logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
                     logger.error("Error reason: %s", ex)
+            nMarked += 1
+            if nMarked % 10 == 0:
+                logger.info('marked %d files', nMarked)
 
     def mark_failed(files, crabServer, logger, failure_reason=""):
         """
@@ -341,6 +345,7 @@ def publishInDBS3(config, taskname, verbose):
         """
         msg = "Marking %s file(s) as failed" % len(files)
         logger.info(msg)
+        nMarked = 0
         for lfn in files:
             source_lfn = lfn
             docId = getHashLfn(source_lfn)
@@ -362,6 +367,9 @@ def publishInDBS3(config, taskname, verbose):
                 except Exception as ex:
                     logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
                     logger.error("Error reason: %s", ex)
+            nMarked += 1
+            if nMarked % 10 == 0:
+                logger.info('marked %d files', nMarked)
 
     def createLogdir(dirname):
         """
@@ -391,10 +399,12 @@ def publishInDBS3(config, taskname, verbose):
 
     toPublish = []
     # TODO move from new to done when processed
-    with open(taskFilesDir + taskname + ".json") as f:
+    fname = taskFilesDir + taskname + ".json"
+    with open(fname) as f:
         toPublish = json.load(f)
 
     if not toPublish:
+        logger.info("Empty data file %s", fname)
         return "EMPTY"
 
 
@@ -478,7 +488,7 @@ def publishInDBS3(config, taskname, verbose):
 
     if publish_dbs_url.endswith('/DBSWriter'):
         publish_read_url = publish_dbs_url[:-len('/DBSWriter')] + '/DBSReader'
-        publish_migrate_url = publish_dbs_url[:-len('/DBSWriter')] + 'DBSMigrate'
+        publish_migrate_url = publish_dbs_url[:-len('/DBSWriter')] + '/DBSMigrate'
     else:
         publish_migrate_url = publish_dbs_url + '/DBSMigrate'
         publish_read_url = publish_dbs_url + '/DBSReader'
@@ -742,7 +752,6 @@ def publishInDBS3(config, taskname, verbose):
         files_to_publish = dbsFiles[count:count+max_files_per_block]
         try:
             block_config = {'block_name': block_name, 'origin_site_name': pnn, 'open_for_writing': 0}
-            block_config = {'block_name': block_name, 'origin_site_name': pnn, 'open_for_writing': 0}
             if verbose:
                 msg = "Inserting files %s into block %s." % ([f['logical_file_name']
                                                               for f in files_to_publish], block_name)
@@ -798,14 +807,14 @@ def publishInDBS3(config, taskname, verbose):
     try:
         if published:
             mark_good(published, crabServer, logger)
+            data['workflow'] = taskname
+            data['subresource'] = 'updatepublicationtime'
+            crabServer.post(REST_task, data=encodeRequest(data))
         if failed:
             logger.debug("Failed files: %s ", failed)
             mark_failed(failed, crabServer, logger, failure_reason)
-        data['workflow'] = taskname
-        data['subresource'] = 'updatepublicationtime'
-        crabServer.post(REST_task, data=encodeRequest(data))
-    except Exception:
-        logger.exception("Status update failed")
+    except Exception as ex:
+        logger.exception("Status update failed: %s", ex)
 
     return 0
 

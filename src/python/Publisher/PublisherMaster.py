@@ -19,7 +19,7 @@ import subprocess
 import traceback
 import sys
 import json
-import datetime
+from datetime import datetime
 import time
 from multiprocessing import Process
 
@@ -250,7 +250,7 @@ class Master(object):
             info.append([x for x in result if x['taskname'] == task[3]])
         return zip(unique_tasks, info)
 
-    def getPublDescFiles(self, workflow, lfn_ready):
+    def getPublDescFiles(self, workflow, lfn_ready, logger):
         """
         Download and read the files describing
         what needs to be published
@@ -272,7 +272,12 @@ class Master(object):
             for i in range(0, len(l), n):
                 yield l[i:i + n]
 
-        for lfn_ in chunks(lfn_ready, 50):
+        chunkSize = 10
+        nIter = 0
+        if len(lfn_ready) > chunkSize:
+            logger.info("retrieving input file metadata for %s files in chunks of %s", len(lfn_ready), chunkSize)
+        for lfn_ in chunks(lfn_ready, chunkSize):
+            nIter += 1
             dataDict['lfn'] = lfn_
             data = encodeRequest(dataDict, listParams=["lfn"])
             uri = self.REST_filemetadata
@@ -282,16 +287,18 @@ class Master(object):
                 res = self.crabServer.get(uri=uri, data=data)
                 res = res[0]
             except Exception as ex:
-                self.logger.error("Error during metadata retrieving from %s: %s", uri, ex)
+                logger.error("Error during metadata retrieving from %s: %s", uri, ex)
                 continue
 
-            print(len(res['result']))
+            # print(len(res['result']))
             for obj in res['result']:
                 if isinstance(obj, dict):
                     out.append(obj)
                 else:
                     # print type(obj)
                     out.append(json.loads(str(obj)))
+            if nIter % 10 == 0:
+                logger.info("... retrieved %s metadata", len(out))
 
         return out
 
@@ -318,6 +325,10 @@ class Master(object):
 
         try:
             for task in tasks:
+                taskname = str(task[0][3])
+                if int(taskname[0:4]) < 2007:
+                    self.logger.info("Skipped %s. Ignore tasks created before July 2020.", taskname)
+                    continue
                 if self.TestMode:
                     self.startSlave(task)   # sequentially do one task after another
                 else:                       # deal with each task in a separate process
@@ -339,7 +350,7 @@ class Master(object):
     def startSlave(self, task):
         """
         start a slave process to deal with publication for a single task
-        :param task: a task name
+        :param task: one tupla describing  a task as returned by  active_tasks()
         :return: 0  It will always terminate normally, if publication fails it will mark it in the DB
         """
         # TODO: lock task!
@@ -487,7 +498,7 @@ class Master(object):
 
                 # Get metadata
                 toPublish = []
-                publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready)
+                publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready, logger)
                 for file_ in active_:
                     for _, doc in enumerate(publDescFiles_list):
                         # logger.info(type(doc))

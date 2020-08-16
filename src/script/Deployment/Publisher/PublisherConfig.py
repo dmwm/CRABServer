@@ -24,13 +24,12 @@ config.General.instance = 'preprod'
 config.General.pollInterval = 1800
 config.General.publish_dbs_url = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter'
 config.General.block_closure_timeout = 9400
-#config.General.workflow_expiration_time = 3
 config.General.max_files_per_block = 100
 config.General.max_slaves = 5
 config.General.serviceCert = '/data/certs/servicecert.pem'
 config.General.serviceKey = '/data/certs/servicekey.pem'
 config.General.taskFilesDir = '/data/srv/Publisher_files/'
-config.General.logsDir = './logs'
+config.General.logsDir = '/data/srv/Publisher/logs'
 config.General.logMsgFormat = '%(asctime)s:%(levelname)s:%(module)s:%(name)s: %(message)s'
 config.General.logLevel = 'INFO'
 
