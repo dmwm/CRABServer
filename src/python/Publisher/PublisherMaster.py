@@ -321,18 +321,19 @@ class Master(object):
                     continue
                 if self.TestMode:
                     self.startSlave(task)   # sequentially do one task after another
+                    continue
                 else:                       # deal with each task in a separate process
                     p = Process(target=self.startSlave, args=(task,))
                     p.start()
                     self.logger.info('Starting process %s  pid=%s', p, p.pid)
                     processes.append(p)
                 if len(processes) == maxSlaves:
-                    # wait until a batch of maxSlaves processes have completed before starting more
-                    for proc in processes:
-                        proc.join()
-                    self.logger.info('All processes in the batch have ended')
-                    time.sleep(10)  # take a breath, mostly useful for debugging
-                    processes = []
+                    while len(processes) == maxSlaves:
+                        # wait until one process has completed
+                        time.sleep(10)
+                        for proc in processes:
+                            if not proc.is_alive():
+                                processes.remove(proc)
 
         except Exception:
             self.logger.exception("Error during process mapping")
