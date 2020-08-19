@@ -37,24 +37,32 @@ export PYTHONPATH=$ppath_stripped
 }
 
 case $1 in
-    debug)
-        # debug current installation
-	python $PUBLISHER_ROOT/lib/python2.7/site-packages/Publisher/SequentialPublisher.py --config $PUBLISHER_HOME/PublisherConfig.py --debug
+  debug)
+    # use private instance from /data/user in pdb mode via SequentialWorker
+    __strip_pythonpath
+    export PYTHONPATH=/data/user/CRABServer/src/python:/data/user/WMCore/src/python:$PYTHONPATH
+    python -m pdb /data/user/CRABServer/src/python/Publisher/SequentialPublisher.py --config $PUBLISHER_HOME/PublisherConfig.py --debug
 	;;
-    private)
-        # run from private repos in /data/user
-	__strip_pythonpath
-	export PYTHONPATH=/data/user/CRABServer/src/python:/data/user/WMCore/src/python:$PYTHONPATH
-	nohup python /data/user/CRABServer/src/python/Publisher/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
+  private)
+    # run private instance from /data/user
+    __strip_pythonpath
+    export PYTHONPATH=/data/user/CRABServer/src/python:/data/user/WMCore/src/python:$PYTHONPATH
+    nohup python /data/user/CRABServer/src/python/Publisher/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
 	;;
-    test)
-        # debug private repos in /data/user
-        __strip_pythonpath
-        export PYTHONPATH=/data/user/CRABServer/src/python:/data/user/WMCore/src/python:$PYTHONPATH
-        python -m pdb /data/user/CRABServer/src/python/Publisher/SequentialPublisher.py --config $PUBLISHER_HOME/PublisherConfig.py --debug
-	;;
-    *)
-        # run current installation (production mode)
+  test)
+    # use current instance in pdb mode  via SequentialWorker
+    python $PUBLISHER_ROOT/lib/python2.7/site-packages/Publisher/SequentialPublisher.py --config $PUBLISHER_HOME/PublisherConfig.py --debug
+  ;;
+  help)
+    echo "There are 4 ways to run start.sh:"
+    echo "  start.sh             without any argument starts current instance"
+    echo "  start.sh private     starts the instance from /data/user/CRABServer"
+    echo "  start.sh debug       runs private instance in debub mode. For hacking"
+    echo "  start.sh test        runs current instance in debug mode. For finding out"
+    echo "BEWARE: a misspelled argument is interpreted like no argument"
+  ;;
+  *)
+  # DEFAULT mode: run current instance
 	nohup python $PUBLISHER_ROOT/lib/python2.7/site-packages/Publisher/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
 	;;
 esac
