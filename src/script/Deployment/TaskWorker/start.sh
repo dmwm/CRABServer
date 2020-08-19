@@ -47,7 +47,7 @@ case $1 in
     echo "  start.sh private     starts the instance from /data/user/CRABServer"
     echo "  start.sh debug       runs private instance in debub mode. For hacking"
     echo "  start.sh test        runs current instance in debug mode. For finding out"
-    echo "BEWARE: a misppelled argument is interpreted like no argument"
+    echo "BEWARE: a misspelled argument is interpreted like no argument"
   ;;
   *)
   # DEFAULT mode: run current instance
