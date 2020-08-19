@@ -17,7 +17,7 @@ fi
 
 source ${PUBLISHER_HOME}/env.sh
 
-rm -f nohup.out
+rm -f ${PUBLISHER_HOME}/nohup.out
 
 __strip_pythonpath(){
 # this function is used to strip the taskworker lines from $PYTHONPATH
