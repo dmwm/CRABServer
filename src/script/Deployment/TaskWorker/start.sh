@@ -29,7 +29,7 @@ case $1 in
     # use private instance from /data/user in pdb mode via SequentialWorker
     __strip_pythonpath
     export PYTHONPATH=/data/user/CRABServer/src/python:/data/user/WMCore/src/python:$PYTHONPATH
-    python -m pdb $MYTESTAREA/${scram_arch}/cms/crabtaskworker/*/lib/python2.7/site-packages/TaskWorker/SequentialWorker.py $MYTESTAREA/TaskWorkerConfig.py --logDebug
+    python -m pdb /data/user/CRABServer/src/python/TaskWorker/SequentialWorker.py $MYTESTAREA/TaskWorkerConfig.py --logDebug
 	;;
   private)
     # run private instance from /data/user
