@@ -525,7 +525,7 @@ class Master(object):
                 toPublish = []
                 publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready, logger)
                 for file_ in active_:
-                    for _, doc in enumerate(publDescFiles_list):
+                    for doc in publDescFiles_list:
                         # logger.info(type(doc))
                         # logger.info(doc)
                         if doc["lfn"] == file_["value"][2]:
