@@ -33,6 +33,17 @@ from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping
 from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.WorkerExceptions import ConfigException
 
+
+def chunks(l, n):
+    """
+    Yield successive n-sized chunks from l.
+    :param l: list to splitt in chunks
+    :param n: chunk size
+    :return: yield the next list chunk
+    """
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
+
 def setMasterLogger(name='master'):
     """ Set the logger for the master process. The file used for it is logs/processes/proc.name.txt and it
         can be retrieved with logging.getLogger(name) in other parts of the code
@@ -252,25 +263,39 @@ class Master(object):
 
     def getPublDescFiles(self, workflow, lfn_ready, logger):
         """
-        Download and read the files describing
-        what needs to be published
+        Download and read the files describing what needs to be published
+        CRAB REST does not have any good way to select from the DB only what we need
+        most efficient way is to get full list for the task, and then trim it here
+        see: https://github.com/dmwm/CRABServer/issues/6124
         """
+        out = []
+
+        uri = self.REST_filemetadata
         dataDict = {}
         dataDict['taskname'] = workflow
         dataDict['filetype'] = 'EDM'
+        data = encodeRequest(dataDict)
+        try:
+            res = self.crabServer.get(uri=uri, data=data)
+            # res is a 3-plu: (result, exit code, status)
+            res = res[0]
+        except Exception as ex:
+            logger.error("Error during metadata retrieving from %s: %s", uri, ex)
+            return out
 
-        out = []
+        metadataList = [json.loads(md) for md in res['result']]  # CRAB REST returns a list of JSON objects
+        for md in metadataList:
+            # pick only the metadata we need
+            if md['lfn'] in lfn_ready:
+                out.append(md)
+
+        tl = len(out)
+        logger.info('Got filemetadata for %d LFNs', tl)
+
+        """
+        old implementation
 
         # divide lfn per chunks, avoiding URI-too long exception
-        def chunks(l, n):
-            """
-            Yield successive n-sized chunks from l.
-            :param l: list to splitt in chunks
-            :param n: chunk size
-            :return: yield the next list chunk
-            """
-            for i in range(0, len(l), n):
-                yield l[i:i + n]
 
         chunkSize = 10
         nIter = 0
@@ -299,7 +324,7 @@ class Master(object):
                     out.append(json.loads(str(obj)))
             if nIter % 10 == 0:
                 logger.info("... retrieved %s metadata", len(out))
-
+        """
         return out
 
     def algorithm(self):
