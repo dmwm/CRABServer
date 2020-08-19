@@ -289,42 +289,7 @@ class Master(object):
             if md['lfn'] in lfn_ready:
                 out.append(md)
 
-        tl = len(out)
-        logger.info('Got filemetadata for %d LFNs', tl)
-
-        """
-        old implementation
-
-        # divide lfn per chunks, avoiding URI-too long exception
-
-        chunkSize = 10
-        nIter = 0
-        if len(lfn_ready) > chunkSize:
-            logger.info("retrieving input file metadata for %s files in chunks of %s", len(lfn_ready), chunkSize)
-        for lfn_ in chunks(lfn_ready, chunkSize):
-            nIter += 1
-            dataDict['lfn'] = lfn_
-            data = encodeRequest(dataDict, listParams=["lfn"])
-            uri = self.REST_filemetadata
-
-            try:
-                #res = self.crabServer.get(uri=uri, data=encodeRequest(data, listParams=["lfn"]))
-                res = self.crabServer.get(uri=uri, data=data)
-                res = res[0]
-            except Exception as ex:
-                logger.error("Error during metadata retrieving from %s: %s", uri, ex)
-                continue
-
-            # print(len(res['result']))
-            for obj in res['result']:
-                if isinstance(obj, dict):
-                    out.append(obj)
-                else:
-                    # print type(obj)
-                    out.append(json.loads(str(obj)))
-            if nIter % 10 == 0:
-                logger.info("... retrieved %s metadata", len(out))
-        """
+        logger.info('Got filemetadata for %d LFNs', len(out))
         return out
 
     def algorithm(self):
