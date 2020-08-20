@@ -316,8 +316,9 @@ class Master(object):
         try:
             for task in tasks:
                 taskname = str(task[0][3])
-                if int(taskname[0:4]) < 2007:
-                    self.logger.info("Skipped %s. Ignore tasks created before July 2020.", taskname)
+                # this IF is for testing on preprod or dev DB's, which are full of old unpublished tasks
+                if int(taskname[0:4]) < 2008:
+                    self.logger.info("Skipped %s. Ignore tasks created before August 2020.", taskname)
                     continue
                 if self.TestMode:
                     self.startSlave(task)   # sequentially do one task after another
@@ -351,11 +352,6 @@ class Master(object):
 
         self.force_publication = False
         workflow = str(task[0][3])
-
-        if int(workflow[0:2]) < 20:
-            msg = "Skipped. Ignore tasks created before 2020."
-            logger.info(msg)
-            return 0
 
         if len(task[1]) > self.max_files_per_block:
             self.force_publication = True
