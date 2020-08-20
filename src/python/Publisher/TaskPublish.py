@@ -314,6 +314,10 @@ def publishInDBS3(config, taskname, verbose):
 
         msg = "Marking %s file(s) as published." % len(files)
         logger.info(msg)
+        if dryRun:
+            logger.info("DryRun: skip marking good file")
+            return
+
         nMarked = 0
         for lfn in files:
             data = {}
@@ -326,15 +330,13 @@ def publishInDBS3(config, taskname, verbose):
             data['list_of_retry_value'] = 1
             data['list_of_failure_reason'] = ''
 
-            if dryRun:
-                logger.info("DryRun: skip marking good file")
-            else:
-                try:
-                    result = crabServer.post(REST_filetransfers, data=encodeRequest(data))
-                    logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
-                except Exception as ex:
-                    logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
-                    logger.error("Error reason: %s", ex)
+            try:
+                result = crabServer.post(REST_filetransfers, data=encodeRequest(data))
+                logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
+            except Exception as ex:
+                logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
+                logger.error("Error reason: %s", ex)
+
             nMarked += 1
             if nMarked % 10 == 0:
                 logger.info('marked %d files', nMarked)
@@ -345,6 +347,10 @@ def publishInDBS3(config, taskname, verbose):
         """
         msg = "Marking %s file(s) as failed" % len(files)
         logger.info(msg)
+        if dryRun:
+            logger.debug("DryRun: skip marking failes files")
+            return
+
         nMarked = 0
         for lfn in files:
             source_lfn = lfn
@@ -358,15 +364,13 @@ def publishInDBS3(config, taskname, verbose):
             data['list_of_failure_reason'] = failure_reason
 
             logger.debug("data: %s ", data)
-            if dryRun:
-                logger.debug("DryRun: skip marking failes files")
-            else:
-                try:
-                    result = crabServer.post(REST_filetransfers, data=encodeRequest(data))
-                    logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
-                except Exception as ex:
-                    logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
-                    logger.error("Error reason: %s", ex)
+            try:
+                result = crabServer.post(REST_filetransfers, data=encodeRequest(data))
+                logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
+            except Exception as ex:
+                logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
+                logger.error("Error reason: %s", ex)
+
             nMarked += 1
             if nMarked % 10 == 0:
                 logger.info('marked %d files', nMarked)
