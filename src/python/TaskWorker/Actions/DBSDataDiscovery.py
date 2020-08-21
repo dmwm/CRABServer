@@ -110,7 +110,7 @@ class DBSDataDiscovery(DataDiscovery):
             dbsurl = kwargs['task']['tm_dbs_url']
         else:
             dbsurl = 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'  # a sensible default
-        if self.config.Services.DBSHostName:
+        if hasattr(self.config.Services, 'DBSHostName'):
             hostname = dbsurl.split('//')[1].split('/')[0]
             dbsurl = dbsurl.replace(hostname, self.config.Services.DBSHostName)
         self.logger.info("will connect to DBS at URL: %s", dbsurl)
