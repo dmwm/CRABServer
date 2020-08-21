@@ -11,7 +11,7 @@ fi
 
 # we only run from 'current' which points to current taskworker installation
 
-source ${PUBLISHER_HOME}/current/*/cms/crabtaskworker/*/etc/profile.d/init.sh
+source /data/srv/Publisher/current/*/cms/crabtaskworker/*/etc/profile.d/init.sh
 
 export PUBLISHER_ROOT=${CRABTASKWORKER_ROOT}
 export PUBLISHER_VERSION=${CRABTASKWORKER_VERSION} 
