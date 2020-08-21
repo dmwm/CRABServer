@@ -19,7 +19,7 @@ import subprocess
 import traceback
 import sys
 import json
-import datetime
+from datetime import datetime
 import time
 from multiprocessing import Process
 
@@ -32,6 +32,17 @@ from RESTInteractions import HTTPRequests
 from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping
 from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.WorkerExceptions import ConfigException
+
+
+def chunks(l, n):
+    """
+    Yield successive n-sized chunks from l.
+    :param l: list to splitt in chunks
+    :param n: chunk size
+    :return: yield the next list chunk
+    """
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
 
 def setMasterLogger(name='master'):
     """ Set the logger for the master process. The file used for it is logs/processes/proc.name.txt and it
@@ -250,49 +261,35 @@ class Master(object):
             info.append([x for x in result if x['taskname'] == task[3]])
         return zip(unique_tasks, info)
 
-    def getPublDescFiles(self, workflow, lfn_ready):
+    def getPublDescFiles(self, workflow, lfn_ready, logger):
         """
-        Download and read the files describing
-        what needs to be published
+        Download and read the files describing what needs to be published
+        CRAB REST does not have any good way to select from the DB only what we need
+        most efficient way is to get full list for the task, and then trim it here
+        see: https://github.com/dmwm/CRABServer/issues/6124
         """
+        out = []
+
+        uri = self.REST_filemetadata
         dataDict = {}
         dataDict['taskname'] = workflow
         dataDict['filetype'] = 'EDM'
+        data = encodeRequest(dataDict)
+        try:
+            res = self.crabServer.get(uri=uri, data=data)
+            # res is a 3-plu: (result, exit code, status)
+            res = res[0]
+        except Exception as ex:
+            logger.error("Error during metadata retrieving from %s: %s", uri, ex)
+            return out
 
-        out = []
+        metadataList = [json.loads(md) for md in res['result']]  # CRAB REST returns a list of JSON objects
+        for md in metadataList:
+            # pick only the metadata we need
+            if md['lfn'] in lfn_ready:
+                out.append(md)
 
-        # divide lfn per chunks, avoiding URI-too long exception
-        def chunks(l, n):
-            """
-            Yield successive n-sized chunks from l.
-            :param l: list to splitt in chunks
-            :param n: chunk size
-            :return: yield the next list chunk
-            """
-            for i in range(0, len(l), n):
-                yield l[i:i + n]
-
-        for lfn_ in chunks(lfn_ready, 50):
-            dataDict['lfn'] = lfn_
-            data = encodeRequest(dataDict, listParams=["lfn"])
-            uri = self.REST_filemetadata
-
-            try:
-                #res = self.crabServer.get(uri=uri, data=encodeRequest(data, listParams=["lfn"]))
-                res = self.crabServer.get(uri=uri, data=data)
-                res = res[0]
-            except Exception as ex:
-                self.logger.error("Error during metadata retrieving from %s: %s", uri, ex)
-                continue
-
-            print(len(res['result']))
-            for obj in res['result']:
-                if isinstance(obj, dict):
-                    out.append(obj)
-                else:
-                    # print type(obj)
-                    out.append(json.loads(str(obj)))
-
+        logger.info('Got filemetadata for %d LFNs', len(out))
         return out
 
     def algorithm(self):
@@ -318,6 +315,11 @@ class Master(object):
 
         try:
             for task in tasks:
+                taskname = str(task[0][3])
+                # this IF is for testing on preprod or dev DB's, which are full of old unpublished tasks
+                if int(taskname[0:4]) < 2008:
+                    self.logger.info("Skipped %s. Ignore tasks created before August 2020.", taskname)
+                    continue
                 if self.TestMode:
                     self.startSlave(task)   # sequentially do one task after another
                 else:                       # deal with each task in a separate process
@@ -339,7 +341,7 @@ class Master(object):
     def startSlave(self, task):
         """
         start a slave process to deal with publication for a single task
-        :param task: a task name
+        :param task: one tupla describing  a task as returned by  active_tasks()
         :return: 0  It will always terminate normally, if publication fails it will mark it in the DB
         """
         # TODO: lock task!
@@ -349,11 +351,6 @@ class Master(object):
 
         self.force_publication = False
         workflow = str(task[0][3])
-
-        if int(workflow[0:2]) < 20:
-            msg = "Skipped. Ignore tasks created before 2020."
-            logger.info(msg)
-            return 0
 
         if len(task[1]) > self.max_files_per_block:
             self.force_publication = True
@@ -487,9 +484,9 @@ class Master(object):
 
                 # Get metadata
                 toPublish = []
-                publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready)
+                publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready, logger)
                 for file_ in active_:
-                    for _, doc in enumerate(publDescFiles_list):
+                    for doc in publDescFiles_list:
                         # logger.info(type(doc))
                         # logger.info(doc)
                         if doc["lfn"] == file_["value"][2]:

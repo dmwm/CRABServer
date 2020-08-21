@@ -3,9 +3,21 @@
 unset X509_USER_PROXY
 unset X509_USER_CERT
 unset X509_USER_KEY
-source /data/srv/TaskManager/env.sh
 
-rm -f /data/srv/TaskManager/nohup.out
+# if PUBLISHER_HOME is already defined, use it
+if [ -v PUBLISHER_HOME ]
+then
+  echo "PUBLISHER_HOME already set to $PUBLISHER_HOME. Will use that"
+else
+  thisScript=`realpath $0`
+  myDir=`dirname ${thisScript}`
+  export PUBLISHER_HOME=${myDir}  # where we run the Publisher and where Config is
+  echo "Define environment for Publisher in $PUBLISHER_HOME"
+fi
+
+source ${PUBLISHER_HOME}/env.sh
+
+rm -f ${PUBLISHER_HOME}/nohup.out
 
 __strip_pythonpath(){
 # this function is used to strip the taskworker lines from $PYTHONPATH
@@ -29,17 +41,17 @@ case $1 in
     # use private instance from /data/user in pdb mode via SequentialWorker
     __strip_pythonpath
     export PYTHONPATH=/data/user/CRABServer/src/python:/data/user/WMCore/src/python:$PYTHONPATH
-    python -m pdb /data/user/CRABServer/src/python/TaskWorker/SequentialWorker.py $MYTESTAREA/TaskWorkerConfig.py --logDebug
+    python -m pdb /data/user/CRABServer/src/python/Publisher/SequentialPublisher.py --config $PUBLISHER_HOME/PublisherConfig.py --debug
 	;;
   private)
     # run private instance from /data/user
     __strip_pythonpath
     export PYTHONPATH=/data/user/CRABServer/src/python:/data/user/WMCore/src/python:$PYTHONPATH
-    nohup python /data/user/CRABServer/src/python/TaskWorker/MasterWorker.py --config $MYTESTAREA/TaskWorkerConfig.py --logDebug &
+    nohup python /data/user/CRABServer/src/python/Publisher/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
 	;;
   test)
     # use current instance in pdb mode  via SequentialWorker
-    python $MYTESTAREA/${scram_arch}/cms/crabtaskworker/*/lib/python2.7/site-packages/TaskWorker/SequentialWorker.py  $MYTESTAREA/TaskWorkerConfig.py --logDebug
+    python $PUBLISHER_ROOT/lib/python2.7/site-packages/Publisher/SequentialPublisher.py --config $PUBLISHER_HOME/PublisherConfig.py --debug
   ;;
   help)
     echo "There are 4 ways to run start.sh:"
@@ -51,6 +63,6 @@ case $1 in
   ;;
   *)
   # DEFAULT mode: run current instance
-	nohup python $MYTESTAREA/${scram_arch}/cms/crabtaskworker/*/lib/python2.7/site-packages/TaskWorker/MasterWorker.py --config $MYTESTAREA/TaskWorkerConfig.py --logDebug &
+	nohup python $PUBLISHER_ROOT/lib/python2.7/site-packages/Publisher/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
 	;;
 esac

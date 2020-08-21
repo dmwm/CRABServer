@@ -65,18 +65,25 @@ class MyProxyLogon(TaskAction):
                     'serverDN': 'dummy',  # this is only used inside WMCore/Proxy.py functions not used by CRAB
                     'uisource': getattr(self.config.MyProxy, 'uisource', ''),
                     'credServerPath': self.config.MyProxy.credpath,
-                    'myproxyAccount' : self.server['host'],
                     'cleanEnvironment' : getattr(self.config.MyProxy, 'cleanEnvironment', False)
                    }
         try:
-            # try first to retrieve credential with login name = <username>_CRAB
+            self.logger.info("try first to retrieve credential with login name %s",
+                             proxycfg['userName'])
             (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
         except TaskWorkerException:
             self.logger.error("proxy retrieval from %s failed with login name %s.",
                               proxycfg['myProxySvr'], proxycfg['userName'])
             self.logger.error("will try with old-style DN hash")
             del proxycfg['userName']
-            (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
+            try:
+                (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
+            except TaskWorkerException:
+                self.logger.error("proxy retrieval from %s failed with DN hash as credential name.",
+                                  proxycfg['myProxySvr'])
+                self.logger.error("will try with old-style DN hash adding REST host name")
+                proxycfg['myproxyAccount'] = self.server['host']
+                (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
         #  minimal sanity check. Submission will fail if there's no group
         if not usergroups:
             raise TaskWorkerException('Could not retrieve VOMS groups list from %s' % userproxy)
