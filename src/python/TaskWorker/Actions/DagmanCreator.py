@@ -741,7 +741,7 @@ class DagmanCreator(TaskAction.TaskAction):
 
         # disable direct stageout for rucio tasks
         if kwargs['task']['tm_output_lfn'].startswith('/store/user/rucio'):
-            kwargs['task']['stageoutpolicy'] = "remote"
+            kwargs['task']['stageoutpolicy'] = "local"
         elif hasattr(self.config.TaskWorker, 'stageoutPolicy'):
             kwargs['task']['stageoutpolicy'] = ",".join(self.config.TaskWorker.stageoutPolicy)
         else:
