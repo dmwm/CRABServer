@@ -391,6 +391,7 @@ if __name__ == '__main__':
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
     dbsSecondaryDataset = sys.argv[3] if len(sys.argv) == 4 else None
+    DBSUrl = 'https://cmsweb.cern.ch/dbs/%s/DBSReader/' % dbsInstance
 
     logging.basicConfig(level=logging.DEBUG)
     from WMCore.Configuration import ConfigurationEx
@@ -398,7 +399,6 @@ if __name__ == '__main__':
 
     config = ConfigurationEx()
     config.section_("Services")
-    DBSUrl = 'https://cmsweb.cern.ch/dbs/%s/DBSReader/' % dbsInstance
     config.section_("TaskWorker")
     # will use X509_USER_PROXY var for this test
     #config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
