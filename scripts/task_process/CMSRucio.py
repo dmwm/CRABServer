@@ -209,7 +209,7 @@ class CMSRucio(object):
             print(' Dry run only. Not registering files.')
             return
         if checksums:
-            replicas = [{'scope': self.scope, 'pfn': pfn,'name': lfn, 'bytes': size, 'adler32': checksum, 'state': 'A'} for lfn, pfn, size, checksum in zip(lfns, pfns, sizes, checksums)]
+            replicas = [{'scope': self.scope, 'name': lfn, 'bytes': size, 'adler32': checksum, 'state': 'A'} for lfn, size, checksum in zip(lfns, sizes, checksums)]
         else:
             replicas = [{'scope': self.scope, 'name': lfn, 'bytes': size, 'state': 'A'} for lfn, size in zip(lfns, sizes)]
         print(replicas)

@@ -164,10 +164,10 @@ def monitor(user, taskname, log):
                 crabInj.delete_replicas(source, to_delete)
             mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], oracleDB)
     except ReplicaNotFound:
-            try:
-                mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], oracleDB)
-            except Exception:
-                log.exception("Failed to update status for failed files")
+        try:
+            mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], oracleDB)
+        except Exception:
+            log.exception("Failed to update status for failed files")
     except Exception:
         log.exception("Failed to update status for failed files")
 
@@ -184,10 +184,10 @@ def monitor(user, taskname, log):
                 crabInj.delete_replicas(source, to_delete)
             mark_failed([id_map[x[0]] for x in list_stuck], [x[1] for x in list_stuck], oracleDB)
     except ReplicaNotFound:
-            try:
-                mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], oracleDB)
-            except Exception:
-                log.exception("Failed to update status for failed files")
+        try:
+            mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], oracleDB)
+        except Exception:
+            log.exception("Failed to update status for failed files")
     except Exception:
         log.exception("Failed to update status for stuck rule")
 
