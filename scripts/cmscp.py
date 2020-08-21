@@ -904,12 +904,17 @@ def main():
             update_exit_info(exit_info, 80000, msg, True)
             return exit_info
     ## Retrieve the above attributes from the job ad.
-    stageout_policy = split_re.split(G_JOB_AD['CRAB_StageoutPolicy'])
-    print("Stageout policy: %s" % (", ".join(stageout_policy)))
     dest_temp_dir = G_JOB_AD['CRAB_OutTempLFNDir']
     dest_final_dir = G_JOB_AD['CRAB_OutLFNDir']
     dest_files = split_re.split(G_JOB_AD['CRAB_Destination'])
     dest_site = G_JOB_AD['CRAB_AsyncDest']
+    # Disable direct stageout for RUCIO
+    if dest_final_dir.startswith('/store/user/rucio/'):
+        stageout_policy = ['local']
+    else:
+        stageout_policy = split_re.split(G_JOB_AD['CRAB_StageoutPolicy'])
+        print("Stageout policy: %s" % (", ".join(stageout_policy)))
+
     ##--------------------------------------------------------------------------
     ## Finish PARSE JOB AD
     ##--------------------------------------------------------------------------

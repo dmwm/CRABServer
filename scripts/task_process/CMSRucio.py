@@ -215,16 +215,16 @@ class CMSRucio(object):
         print(replicas)
         # TODO: check if did already exists and choose between the following 2
         try:
-
             self.cli.add_replicas(rse=rse, files=replicas)
-        except Exception:
-            pass
+        except Exception as ex:
+            logging.exception("Failed to add replicas")
+            raise ex
 
         try:
-
             self.cli.update_replicas_states(rse=rse, files=replicas)
-        except Exception:
-            pass
+        except Exception as ex:
+            logging.exception("Failed to update states")
+            raise ex
 
 
     def register_temp_replicas(self, rse, lfns, pfns, sizes, checksums):
