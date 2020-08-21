@@ -100,6 +100,11 @@ def monitor(user, taskname, log):
     for file_ in locks_generator:
         log.debug("LOCK %s", file_)
         filename = file_['name']
+        if filename not in id_map:
+            # This is needed because in Rucio we allow user to publish 2 different tasks
+            # within the same Rucio dataset
+            log.info("Skipping file from previous tasks: %s", filename)
+            continue
         status = file_['state']
         log.info("state %s", status)
         sitename = file_['rse']

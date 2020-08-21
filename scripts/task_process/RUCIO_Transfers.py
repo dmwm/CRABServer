@@ -27,7 +27,7 @@ logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s[%(relativeCreated)6d]%(threadName)s: %(message)s'
 )
-  
+
 
 def perform_transfers(inputFile, lastLine, direct=False):
     """
@@ -83,6 +83,7 @@ def perform_transfers(inputFile, lastLine, direct=False):
     with open(inputFile) as _list:
         doc = json.loads(_list.readlines()[0])
         user = doc['username']
+        taskname = doc["publishname"].replace('-00000000000000000000000000000000', '/rucio/USER#000000')
 
     # Save needed info in ordered lists
     with open(inputFile) as _list:
@@ -98,10 +99,10 @@ def perform_transfers(inputFile, lastLine, direct=False):
                 # They will be managed below
                 if column not in ['checksums', 'publishname']:
                     file_to_submit.append(doc[column])
-                # Change publishname for task with publication disabled 
+                # Change publishname for task with publication disabled
                 # as discussed in https://github.com/dmwm/CRABServer/pull/6038#issuecomment-618654580
                 if column == "publishname":
-                    taskname = doc["publishname"].replace('-00000000000000000000000000000000', '/rucio/USER')
+                    taskname = doc["publishname"].replace('-00000000000000000000000000000000', '/rucio/USER#000000')
                     file_to_submit.append(taskname)
                 # Save adler checksum in a form accepted by Rucio
                 if column == "checksums":
@@ -114,7 +115,7 @@ def perform_transfers(inputFile, lastLine, direct=False):
         # Store general job metadata
         job_data = {'taskname': taskname,
                     'username': user,
-                    'destination': destination+'_Test',
+                    'destination': destination,
                     'proxy': proxy,
                     'rest': rest_filetransfers}
         # Split the processing for the directly staged files
@@ -188,7 +189,7 @@ def monitor_manager(user, taskname):
 
 def submission_manager():
     """
-    Wrapper for Rucio submission algorithm. 
+    Wrapper for Rucio submission algorithm.
 
     :return: results of perform_transfers function
     :rtype: tuple or None
@@ -203,10 +204,11 @@ def submission_manager():
     # TODO: check if everything is aligned here with the FTS script
     # expecially the safety of the locks
 
-    # Perform transfers of files that are not directly staged 
+    # Perform transfers of files that are not directly staged
     r = perform_transfers("task_process/transfers.txt",
                           last_line)
 
+    logging.info("Perform transfers: %s", r)
     # Manage the direct stageout cases
     if os.path.exists('task_process/transfers/last_transfer_direct.txt'):
         with open("task_process/transfers/last_transfer_direct.txt", "r") as _last:
@@ -215,7 +217,7 @@ def submission_manager():
             logging.info("last line is: %s", last_line)
     else:
         with open("task_process/transfers/last_transfer_direct.txt", "w+") as _last:
-            last_line = 0 
+            last_line = 0
             _last.write(str(last_line))
             logging.info("last line direct is: %s", last_line)
 
