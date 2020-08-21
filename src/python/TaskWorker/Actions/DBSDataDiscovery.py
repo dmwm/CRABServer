@@ -106,9 +106,14 @@ class DBSDataDiscovery(DataDiscovery):
         self.logger.info("Data discovery with DBS") ## to be changed into debug
 
 
-        dbsurl = self.config.Services.DBSUrl
         if kwargs['task']['tm_dbs_url']:
             dbsurl = kwargs['task']['tm_dbs_url']
+        else:
+            dbsurl = 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'  # a sensible default
+        if self.config.Services.DBSHostName:
+            hostname = dbsurl.split('//')[1].split('/')[0]
+            dbsurl = dbsurl.replace(hostname, self.config.Services.DBSHostName)
+        self.logger.info("will connect to DBS at URL: %s", dbsurl)
         self.dbs = DBSReader(dbsurl)
         self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
         isUserDataset = self.dbsInstance.split('/')[1] != 'global'
@@ -393,7 +398,7 @@ if __name__ == '__main__':
 
     config = ConfigurationEx()
     config.section_("Services")
-    config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/%s/DBSReader/' % dbsInstance
+    DBSUrl = 'https://cmsweb.cern.ch/dbs/%s/DBSReader/' % dbsInstance
     config.section_("TaskWorker")
     # will use X509_USER_PROXY var for this test
     #config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
@@ -420,7 +425,7 @@ if __name__ == '__main__':
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': 'None',
                           'tm_input_dataset': dbsDataset, 'tm_secondary_input_dataset': dbsSecondaryDataset, 'tm_taskname': 'pippo1',
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
-                          'tm_dbs_url': config.Services.DBSUrl}, tempDir='')
+                          'tm_dbs_url': DBSUrl}, tempDir='')
     
 #===============================================================================
 #    Some interesting datasets for testing

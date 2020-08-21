@@ -5,8 +5,7 @@ config = ConfigurationEx()
 
 ## External services url's
 config.section_("Services")
-config.Services.PhEDExurl = 'https://phedex.cern.ch'
-config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'
+config.Services.DBSHostName = 'cmsweb.cern.ch'
 config.Services.MyProxy= 'myproxy.cern.ch'
 config.Services.Rucio_host = 'https://cms-rucio.cern.ch'
 config.Services.Rucio_account = 'crab_server'
