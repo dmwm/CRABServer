@@ -15,7 +15,7 @@ else
   echo "Define environment for Publisher in $PUBLISHER_HOME"
 fi
 
-source ${PUBLISHER_HOME}/env.sh
+source /data/srv/Publisher/env.sh
 
 rm -f ${PUBLISHER_HOME}/nohup.out
 
