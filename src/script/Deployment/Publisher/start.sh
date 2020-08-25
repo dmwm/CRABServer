@@ -17,7 +17,7 @@ fi
 
 source /data/srv/Publisher/env.sh
 
-rm -f ${PUBLISHER_HOME}/nohup.out
+rm -f /data/srv/Publisher/nohup.out
 
 __strip_pythonpath(){
 # this function is used to strip the taskworker lines from $PYTHONPATH
@@ -63,6 +63,6 @@ case $1 in
   ;;
   *)
   # DEFAULT mode: run current instance
-	nohup python $PUBLISHER_ROOT/lib/python2.7/site-packages/Publisher/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
+	nohup python $PUBLISHER_ROOT/lib/python2.7/site-packages/Publisher/PublisherMaster.py --config /data/srv/Publisher/PublisherConfig.py &
 	;;
 esac
