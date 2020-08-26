@@ -66,3 +66,5 @@ case $1 in
 	nohup python $PUBLISHER_ROOT/lib/python2.7/site-packages/Publisher/PublisherMaster.py --config /data/srv/Publisher/PublisherConfig.py &
 	;;
 esac
+
+cd /data/srv/Publisher
