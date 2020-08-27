@@ -70,6 +70,8 @@ def file_size(argfile):
 def list_users(cachedir):
     #file are stored in directories like u/username
     for name in listdir(cachedir): #iterate over u ...
+        if name == 'lost+found':  # skip root-owned file at top mount point
+            continue
         if path.isdir(path.join(cachedir, name)):
             for username in listdir(path.join(cachedir, name)): #list all the users under u
                 yield username
