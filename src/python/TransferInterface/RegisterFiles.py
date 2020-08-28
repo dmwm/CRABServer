@@ -205,7 +205,7 @@ class submit_thread(threading.Thread):
             try:
                 crabInj.add_dataset()
             except Exception as ex:
-                self.log.error("Failed to create dataset %s:%s on Rucio server: %s", "user.%s" % self.taskname, self.taskname, ex)
+                self.log.error("Failed to create dataset %s:%s on Rucio server: %s", "user.%s" % self.username, self.taskname, ex)
                 self.threadLock.release()
                 return
 
@@ -243,9 +243,22 @@ class submit_thread(threading.Thread):
                     self.log.debug("Registered direct files: {0}".format(dest_lfns))
                     self.threadLock.release()
                     return
-                except Exception:
+                except Exception as ex:
                     self.log.exception("Failed to register direct files.")
                     self.threadLock.release()
+                    try:
+                        ids =  [x[self.job_col.index('ids')] for x in self.job]
+                        fileDoc = dict()
+                        fileDoc['asoworker'] = 'rucio'
+                        fileDoc['subresource'] = 'updateTransfers'
+                        fileDoc['list_of_ids'] = ids 
+                        fileDoc['list_of_transfer_state'] = ["FAILED" for _ in ids]
+                        fileDoc['list_of_failure_reason'] = [str(ex) for _ in ids]
+                        fileDoc['list_of_retry_value'] = [0 for _ in ids]
+
+                        self.toUpdate.append(fileDoc)
+                    except Exception as ex:
+                        self.log.exception("Failed to mark failed files")
                     return
 
             # Otherwise register files staged in temporary area
@@ -253,9 +266,22 @@ class submit_thread(threading.Thread):
             crabInj.register_temp_replicas(self.source+"_Temp", dest_lfns, source_pfns, sizes, checksums)
             crabInj.attach_files(dest_lfns, self.taskname)
 
-        except Exception:
-            self.log.exception("Failed to register replicas")
+        except Exception as ex:
+            self.log.error("Failed to register replicas: \n %s" % ex)
             self.threadLock.release()
+            try:
+                ids =  [x[self.job_col.index('ids')] for x in self.job]
+                fileDoc = dict()
+                fileDoc['asoworker'] = 'rucio'
+                fileDoc['subresource'] = 'updateTransfers'
+                fileDoc['list_of_ids'] = ids 
+                fileDoc['list_of_transfer_state'] = ["FAILED" for _ in ids]
+                fileDoc['list_of_failure_reason'] = [str(ex) for _ in ids]
+                fileDoc['list_of_retry_value'] = [0 for _ in ids]
+
+                self.toUpdate.append(fileDoc)
+            except Exception as ex:
+                self.log.exception("Failed to mark failed files")
             return
 
         # eventually update statuses on OracleDB

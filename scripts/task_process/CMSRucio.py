@@ -13,7 +13,6 @@ from subprocess import PIPE, Popen
 import requests
 from requests.exceptions import ReadTimeout
 
-import rucio.rse.rsemanager as rsemgr
 from rucio.client.client import Client
 from rucio.common.exception import (DataIdentifierAlreadyExists, FileAlreadyExists, RucioException,
                                     AccessDenied)
@@ -209,22 +208,22 @@ class CMSRucio(object):
             print(' Dry run only. Not registering files.')
             return
         if checksums:
-            replicas = [{'scope': self.scope, 'pfn': pfn,'name': lfn, 'bytes': size, 'adler32': checksum, 'state': 'A'} for lfn, pfn, size, checksum in zip(lfns, pfns, sizes, checksums)]
+            replicas = [{'scope': self.scope, 'name': lfn, 'bytes': size, 'adler32': checksum, 'state': 'A'} for lfn, size, checksum in zip(lfns, sizes, checksums)]
         else:
             replicas = [{'scope': self.scope, 'name': lfn, 'bytes': size, 'state': 'A'} for lfn, size in zip(lfns, sizes)]
         print(replicas)
         # TODO: check if did already exists and choose between the following 2
         try:
-
             self.cli.add_replicas(rse=rse, files=replicas)
-        except Exception:
-            pass
+        except Exception as ex:
+            logging.exception("Failed to add replicas")
+            raise ex
 
         try:
-
             self.cli.update_replicas_states(rse=rse, files=replicas)
-        except Exception:
-            pass
+        except Exception as ex:
+            logging.exception("Failed to update states")
+            raise ex
 
 
     def register_temp_replicas(self, rse, lfns, pfns, sizes, checksums):
@@ -260,9 +259,9 @@ class CMSRucio(object):
             print(" Dry run only.  Not deleting replicas.")
             return
 
-        logging.debug('%s: %s' % (rse, [{'scope': self.scope,
+        logging.debug('%s: %s', rse, [{'scope': self.scope,
                                                       'name': filemd['name'],
-                                                     } for filemd in replicas]))
+                                                     } for filemd in replicas])
         try:
             self.cli.delete_replicas(rse=rse, files=[{'scope': self.scope,
                                                       'name': filemd['name'],

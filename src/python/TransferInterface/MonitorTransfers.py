@@ -4,7 +4,7 @@ import json
 from rucio.common.exception import ReplicaNotFound
 from RESTInteractions import HTTPRequests
 from ServerUtilities import encodeRequest
-from TransferInterface import chunks, mark_failed, mark_transferred, CRABDataInjector
+from TransferInterface import mark_failed, mark_transferred, CRABDataInjector
 
 
 def monitor(user, taskname, log):
@@ -100,6 +100,11 @@ def monitor(user, taskname, log):
     for file_ in locks_generator:
         log.debug("LOCK %s", file_)
         filename = file_['name']
+        if filename not in id_map:
+            # This is needed because in Rucio we allow user to publish 2 different tasks
+            # within the same Rucio dataset
+            log.info("Skipping file from previous tasks: %s", filename)
+            continue
         status = file_['state']
         log.info("state %s", status)
         sitename = file_['rse']
@@ -159,10 +164,10 @@ def monitor(user, taskname, log):
                 crabInj.delete_replicas(source, to_delete)
             mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], oracleDB)
     except ReplicaNotFound:
-            try:
-                mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], oracleDB)
-            except Exception:
-                log.exception("Failed to update status for failed files")
+        try:
+            mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], oracleDB)
+        except Exception:
+            log.exception("Failed to update status for failed files")
     except Exception:
         log.exception("Failed to update status for failed files")
 
@@ -179,10 +184,10 @@ def monitor(user, taskname, log):
                 crabInj.delete_replicas(source, to_delete)
             mark_failed([id_map[x[0]] for x in list_stuck], [x[1] for x in list_stuck], oracleDB)
     except ReplicaNotFound:
-            try:
-                mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], oracleDB)
-            except Exception:
-                log.exception("Failed to update status for failed files")
+        try:
+            mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], oracleDB)
+        except Exception:
+            log.exception("Failed to update status for failed files")
     except Exception:
         log.exception("Failed to update status for stuck rule")
 

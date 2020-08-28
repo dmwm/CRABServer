@@ -164,7 +164,10 @@ def truncateError(msg):
 def checkOutLFN(lfn, username):
     """ Check if the lfn provided contains the username or is /store/local/ or /store/local/
     """
-    if lfn.startswith('/store/user/'):
+    if lfn.startswith('/store/user/rucio/'):
+        if lfn.split('/')[4] != username:
+            return False 
+    elif lfn.startswith('/store/user/'):
         if lfn.split('/')[3] != username:
             return False
     elif lfn.startswith('/store/test/rucio/user/'):
@@ -172,9 +175,6 @@ def checkOutLFN(lfn, username):
             return False
     elif lfn.startswith('/store/test/rucio/int/user/'):
         if lfn.split('/')[6] != username:
-            return False
-    elif lfn.startswith('/store/rucio/user/'):
-        if lfn.split('/')[4] != username:
             return False
     elif lfn.startswith('/store/group/') or lfn.startswith('/store/local/'):
         if lfn.split('/')[3] == '':
