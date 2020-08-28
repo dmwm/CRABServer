@@ -294,7 +294,7 @@ def removeDummyFile(filename, logger):
     abspath = os.path.abspath(filename)
     try:
         os.remove(abspath)
-    except:
+    except Exception:
         logger.info('Warning: Failed to delete file %s' % filename)
 
 
