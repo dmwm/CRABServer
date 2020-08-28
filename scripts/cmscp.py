@@ -310,7 +310,7 @@ def add_output_file_to_job_report(file_name, key = 'addoutput'):
     output_file_info['pfn'] = file_name
     try:
         file_size = os.stat(file_name).st_size
-    except:
+    except Exception:
         msg = "WARNING: Unable to add output file size to job report."
         print(msg)
     else:
@@ -681,12 +681,11 @@ def clean_stageout_area(local_stageout_mgr, direct_stageout_impl, policy, \
                     print("       <----- Stageout implementation log finish")
                     msg = "File successfully removed."
                     print(msg)
-                except:
+                except Exception:
                     print("       <----- Stageout implementation log finish")
                     msg  = "WARNING: Failed to remove file"
                     msg += " (maybe the file was not transferred)."
                     print(msg)
-                    pass
         else:
             msg = "There are no %sfiles to remove in the permanent storage at %s."
             msg = msg % ('other ' if found_log and keep_log else '', dest_site)
@@ -1496,7 +1495,7 @@ if __name__ == '__main__':
     JOB_STGOUT_WRAPPER_EXIT_INFO = {}
     try:
         JOB_STGOUT_WRAPPER_EXIT_INFO = main()
-    except:
+    except Exception:
         MSG  = "ERROR: Unhandled exception."
         MSG += "\n%s" % (traceback.format_exc())
         print(MSG)
@@ -1535,7 +1534,7 @@ if __name__ == '__main__':
                 MSG += " Will report failure to Dashboard."
                 print(MSG)
                 DashboardAPI.reportFailureToDashboard(CMSCP_EXIT_CODE, G_JOB_AD)
-            except:
+            except Exception:
                 MSG  = "ERROR: Unhandled exception when reporting failure to dashboard."
                 MSG += "\n%s" % (traceback.format_exc())
                 print(MSG)
