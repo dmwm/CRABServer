@@ -13,7 +13,6 @@ from subprocess import PIPE, Popen
 import requests
 from requests.exceptions import ReadTimeout
 
-import rucio.rse.rsemanager as rsemgr
 from rucio.client.client import Client
 from rucio.common.exception import (DataIdentifierAlreadyExists, FileAlreadyExists, RucioException,
                                     AccessDenied)
@@ -260,9 +259,9 @@ class CMSRucio(object):
             print(" Dry run only.  Not deleting replicas.")
             return
 
-        logging.debug('%s: %s' % (rse, [{'scope': self.scope,
+        logging.debug('%s: %s', rse, [{'scope': self.scope,
                                                       'name': filemd['name'],
-                                                     } for filemd in replicas]))
+                                                     } for filemd in replicas])
         try:
             self.cli.delete_replicas(rse=rse, files=[{'scope': self.scope,
                                                       'name': filemd['name'],
