@@ -4,7 +4,7 @@ import json
 from rucio.common.exception import ReplicaNotFound
 from RESTInteractions import HTTPRequests
 from ServerUtilities import encodeRequest
-from TransferInterface import chunks, mark_failed, mark_transferred, CRABDataInjector
+from TransferInterface import mark_failed, mark_transferred, CRABDataInjector
 
 
 def monitor(user, taskname, log):
