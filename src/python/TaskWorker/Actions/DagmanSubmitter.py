@@ -444,7 +444,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     constrain = 'crab_reqname=="%s"' % kwargs['task']['tm_taskname']
                     constrain = str(constrain)  # beware unicode, it breaks htcondor binding
                     self.logger.error("Sending: condor_rm -constrain '%s'", constrain)
-                    result = schedd.act(htcondor.JobAction.Remove, constrain)
+                    schedd.act(htcondor.JobAction.Remove, constrain)
                     # raise again to communicate failure upstream
                 raise submissionError
             else:
