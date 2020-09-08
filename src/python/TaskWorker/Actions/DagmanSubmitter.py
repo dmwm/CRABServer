@@ -533,7 +533,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         if 'ClusterId' in results.outputObj:
             self.logger.debug("Condor cluster ID just submitted is: %s", results.outputObj['ClusterId'])
         if results.outputMessage != "OK":
-            self.logger.debug("Now printing the environment used for submission:\n" + "-"*70 + "\n" + results.environmentStr + "-"*70)
+            #self.logger.debug("Now printing the environment used for submission:\n" + "-"*70 + "\n" + results.environmentStr + "-"*70)
             raise TaskWorkerException("Failure when submitting task to scheduler. Error reason: '%s'" % results.outputMessage, retry=True)
 
         #if we don't raise exception above the id is here
