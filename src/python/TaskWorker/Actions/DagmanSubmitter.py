@@ -548,7 +548,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         if 'ClusterId' in results.outputObj:
             self.logger.debug("Condor cluster ID returned from submit is: %s", results.outputObj['ClusterId'])
         if results.outputMessage != "OK":
-            self.logger.debug("Now printing the environment used for submission:\n" + "-"*70 + "\n" + results.environmentStr + "-"*70)
+            #self.logger.debug("Now printing the environment used for submission:\n" + "-"*70 + "\n" + results.environmentStr + "-"*70)
             msg = "Failure when submitting task to scheduler. Error reason: '%s'" % results.outputMessage
             # most times submission fails simply because schedd was very busy, worth waiting and trying again
             raise TaskWorkerException(msg, retry=True)
