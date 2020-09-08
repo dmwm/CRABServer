@@ -431,7 +431,22 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
             self.logger.debug("Finally submitting to the schedd")
             if address:
-                self.clusterId = self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
+                try:
+                    self.clusterId = self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
+                except Exception as submissionError:
+                    msg = "Something went wrong: %s \n" % str(submissionError)
+                    if self.clusterId:
+                        msg += "But a dagman_bootstrap was submitted with clusterId %s." % self.clusterId
+                    else:
+                        msg += 'No clusterId was returned to DagmanSubmitter.'
+                    msg += " Clean up condor queue before trying again."
+                    self.logger.error(msg)
+                    constrain = 'crab_reqname=="%s"' % kwargs['task']['tm_taskname']
+                    constrain = str(constrain)  # beware unicode, it breaks htcondor binding
+                    self.logger.error("Sending: condor_rm -constrain '%s'", constrain)
+                    result = schedd.act(htcondor.JobAction.Remove, constrain)
+                    # raise again to communicate failure upstream
+                raise submissionError
             else:
                 raise TaskWorkerException("Not able to get schedd address.", retry=True)
             self.logger.debug("Submission finished")
@@ -521,20 +536,22 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 if resultAds:
                     id_ = "%s.%s" % (resultAds[0]['ClusterId'], resultAds[0]['ProcId'])
                     schedd.edit([id_], "LeaveJobInQueue", classad.ExprTree("true"))
-
         try:
             results = pickle.load(rpipe)
         except EOFError:
-            #Do not want to retry this since error may happen after submit (during edit for example).
-            #And this can cause the task to be submitted twice (although we have a protection in the duplicatedCheck)
+            # this means timeout. It is bad because a clusterId is not returned even if job is submitted.
+            # and surely can't parse results structure in this case.  Retry on this schedd does not look promising
             raise TaskWorkerException("Timeout executing condor submit command.", retry=False)
 
-        #notice that the clusterId might be set even if there was a failure. This is if the schedd.submit succeded, but the spool  call failed
+        # notice that the clusterId might be set even if there was a failure.
+        # e.g. if the schedd.submit succeded, but the spool  call failed
         if 'ClusterId' in results.outputObj:
-            self.logger.debug("Condor cluster ID just submitted is: %s", results.outputObj['ClusterId'])
+            self.logger.debug("Condor cluster ID returned from submit is: %s", results.outputObj['ClusterId'])
         if results.outputMessage != "OK":
             self.logger.debug("Now printing the environment used for submission:\n" + "-"*70 + "\n" + results.environmentStr + "-"*70)
-            raise TaskWorkerException("Failure when submitting task to scheduler. Error reason: '%s'" % results.outputMessage, retry=True)
+            msg = "Failure when submitting task to scheduler. Error reason: '%s'" % results.outputMessage
+            # most times submission fails simply because schedd was very busy, worth waiting and trying again
+            raise TaskWorkerException(msg, retry=True)
 
         #if we don't raise exception above the id is here
         return results.outputObj['ClusterId']
