@@ -207,6 +207,7 @@ def makeWebDir(ad):
     try:
         ## Create the web directory.
         os.makedirs(path)
+        os.makedirs(path + '/AutomaticSplitting')
         ## Copy the sandbox to the web directory.
         shutil.copy2(os.path.join(".", "sandbox.tar.gz"), os.path.join(path, "sandbox.tar.gz"))
         ## Copy the debug folder. It might not be available if an older (<3.3.1607) crabclient is used.
@@ -230,6 +231,9 @@ def makeWebDir(ad):
         os.symlink(os.path.abspath(os.path.join(".", ".job.ad")), os.path.join(path, "job_ad.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "task_process/status_cache.txt")), os.path.join(path, "status_cache"))
         os.symlink(os.path.abspath(os.path.join(".", "prejob_logs/predag.0.txt")), os.path.join(path, "AutomaticSplitting_Log0.txt"))
+        os.symlink(os.path.abspath(os.path.join(".", "prejob_logs/predag.0.txt")), os.path.join(path, "AutomaticSplitting/DagLog0.txt"))
+        os.symlink(os.path.abspath(os.path.join(".", "prejob_logs/predag.1.txt")), os.path.join(path, "AutomaticSplitting/DagLog1.txt"))
+        os.symlink(os.path.abspath(os.path.join(".", "prejob_logs/predag.2.txt")), os.path.join(path, "AutomaticSplitting/DagLog2.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "InputFiles.tar.gz")), os.path.join(path, "InputFiles.tar.gz"))
         ## Symlinks to ease operator navigation across spool/web directories
         os.symlink(os.path.abspath("."), os.path.join(path, "SPOOL_DIR"))
