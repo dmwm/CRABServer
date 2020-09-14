@@ -446,7 +446,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     self.logger.error("Sending: condor_rm -constrain '%s'", constrain)
                     schedd.act(htcondor.JobAction.Remove, constrain)
                     # raise again to communicate failure upstream
-                raise submissionError
+                    raise submissionError
             else:
                 raise TaskWorkerException("Not able to get schedd address.", retry=True)
             self.logger.debug("Submission finished")
