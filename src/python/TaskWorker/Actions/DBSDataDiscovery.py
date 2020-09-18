@@ -48,6 +48,24 @@ class DBSDataDiscovery(DataDiscovery):
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
         return
 
+    def keepOnlyDiskRSEs(self, locationsMap):
+        # get all the RucioStorageElements (RSEs) which are of kind 'Disk'
+        # locationsMap is a dictionary {block1:[locations], block2:[locations],...}
+
+        diskLocationsMap = {}
+        for block, locations in locationsMap.iteritems():
+            diskRSEs = [rse for rse in locations if not 'Tape' in rse]  # as of Sept 2020, tape RSEs ends with _Tape
+            if  'T3_CH_CERN_OpenData' in diskRSEs:
+                diskRSEs.remove('T3_CH_CERN_OpenData') # ignore OpenData until it is accessible by CRAB
+            if diskRSEs:
+                # at least some locations are disk
+                diskLocationsMap[block] = diskRSEs
+            else:
+                # no locations are disk, assume that they are tape
+                # and keep tally of tape-only locations for this dataset
+                self.tapeLocations = self.tapeLocations.union(set(locations) - set(diskRSEs))
+        locationsMap.clear() # remove all blocks
+        locationsMap.update(diskLocationsMap) # add only blocks with disk locations
 
     def keepOnlyDisks(self, locationsMap):
         phedex = PhEDEx() # TODO use certs from the config!
@@ -133,11 +151,9 @@ class DBSDataDiscovery(DataDiscovery):
 
         try:
             # Get the list of blocks for the locations.
-            # The WMCore DBS3 implementation makes one call to DBS for each block
-            # when using locations=True so we are using locations=False and looking up location later
-            blocks = [x['Name'] for x in self.dbs.getFileBlocksInfo(inputDataset, locations=False)]
+            blocks = self.dbs.listFileBlocks(inputDataset)
             if secondaryDataset:
-                secondaryBlocks = [x['Name'] for x in self.dbs.getFileBlocksInfo(secondaryDataset, locations=False)]
+                secondaryBlocks = self.dbs.listFileBlocks(secondaryDataset)
         except DBSReaderError as dbsexc:
             # dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
@@ -201,11 +217,14 @@ class DBSDataDiscovery(DataDiscovery):
             # the following "if" must be removed and the code shifted left
             if locations:
                 located_blocks = locations['phedex']['block']
-                for element in located_blocks:
-                    if element['replica']:  # only fill map for blocks which have at least one location
-                        locationsMap.update({element['name']: [x['node'] for x in element['replica']]})
+                for block in located_blocks:
+                    if block['replica']:  # only fill map for blocks which have at least one location
+                        locationsMap.update({block['name']: [x['node'] for x in block['replica']]})
                 if locationsMap:
                     locationsFoundWithRucio = True
+                    # filter out TAPE locations
+                    self.keepOnlyDiskRSEs(locationsMap)
+
                 else:
                     msg = "No locations found with Rucio for this dataset"
                     # since NANO* are not in PhEDEx, this should be a fatal error
@@ -217,6 +236,7 @@ class DBSDataDiscovery(DataDiscovery):
 
         if not locationsFoundWithRucio:  # fall back to pre-Rucio methods
             try:
+                self.logger.info("No locations found with Rucio", PhEDExOrDBS)
                 self.logger.info("Looking up data locations using %s", PhEDExOrDBS)
                 locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=isUserDataset)
             except Exception as ex:
@@ -227,6 +247,7 @@ class DBSDataDiscovery(DataDiscovery):
                     )
             # only fill map for blocks which have at least one location
             locationsMap = {key: value for key, value in locationsMap.iteritems() if value}
+            self.keepOnlyDisks(locationsMap)
 
         if secondaryDataset:
             secondaryLocationsMap = {}
@@ -240,9 +261,9 @@ class DBSDataDiscovery(DataDiscovery):
                 self.logger.warn("Rucio lookup failed with. %s", exc)
             if locations:
                 located_blocks = locations['phedex']['block']
-                for element in located_blocks:
-                    if element['replica']:   # only fill map for blocks which have at least one location
-                        secondaryLocationsMap.update({element['name']: [x['node'] for x in element['replica']]})
+                for block in located_blocks:
+                    if block['replica']:   # only fill map for blocks which have at least one location
+                        secondaryLocationsMap.update({block['name']: [x['node'] for x in block['replica']]})
             if not secondaryLocationsMap:
                 msg = "No locations found with Rucio for secondaryDataset."
                 # TODO when removing fall-back to PhEDEx, this should be a fatal error
@@ -266,7 +287,6 @@ class DBSDataDiscovery(DataDiscovery):
         if secondaryDataset:
             secondaryBlocksWithLocation = secondaryLocationsMap.keys()
 
-        self.keepOnlyDisks(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
             if self.tapeLocations:
