@@ -101,7 +101,7 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsD
                 server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey, retry = 20, logger = logger)
                 failTask(task['tm_taskname'], server, resturi, msg, logger, failstatus)
         t1 = time.time()
-        logger.debug("%s: ...work on %s completed in %d seconds: %s", procName, task['tm_taskname'], t1-t0, outputs)
+        logger.debug("%s: Work on %s completed in %d seconds: %s", procName, task['tm_taskname'], t1-t0, outputs)
 
         try:
             out, _, _ = executeCommand("ps u -p %s | awk '{sum=sum+$6}; END {print sum/1024}'" % os.getpid())
