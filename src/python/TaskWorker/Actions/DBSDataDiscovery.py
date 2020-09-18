@@ -156,7 +156,7 @@ class DBSDataDiscovery(DataDiscovery):
         isNano = blocks[0].split("#")[0].split("/")[-1] in ["NANOAOD", "NANOAODSIM"]
         if isNano:
             self.logger.info("NANOAOD* datset. Will use Rucio for data location")
-        useRucioForLocations = isNano
+        useRucioForLocations = not isUserDataset
         locationsFoundWithRucio = False
 
         if not useRucioForLocations:
