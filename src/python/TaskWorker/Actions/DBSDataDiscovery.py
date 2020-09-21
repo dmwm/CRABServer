@@ -218,9 +218,9 @@ class DBSDataDiscovery(DataDiscovery):
             # the following "if" must be removed and the code shifted left
             if locations:
                 located_blocks = locations['phedex']['block']
-                for element in located_blocks:
-                    if element['replica']:  # only fill map for blocks which have at least one location
-                        locationsMap.update({element['name']: [x['node'] for x in element['replica']]})
+                for block in located_blocks:
+                    if block['replica']:  # only fill map for blocks which have at least one location
+                        locationsMap.update({block['name']: [x['node'] for x in block['replica']]})
                 if locationsMap:
                     locationsFoundWithRucio = True
                     # filter out TAPE locations
@@ -261,9 +261,9 @@ class DBSDataDiscovery(DataDiscovery):
                 self.logger.warn("Rucio lookup failed with. %s", exc)
             if locations:
                 located_blocks = locations['phedex']['block']
-                for element in located_blocks:
-                    if element['replica']:   # only fill map for blocks which have at least one location
-                        secondaryLocationsMap.update({element['name']: [x['node'] for x in element['replica']]})
+                for block in located_blocks:
+                    if block['replica']:   # only fill map for blocks which have at least one location
+                        secondaryLocationsMap.update({block['name']: [x['node'] for x in block['replica']]})
             if not secondaryLocationsMap:
                 msg = "No locations found with Rucio for secondaryDataset."
                 # TODO when removing fall-back to PhEDEx, this should be a fatal error
