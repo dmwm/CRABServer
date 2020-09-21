@@ -48,6 +48,23 @@ class DBSDataDiscovery(DataDiscovery):
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
         return
 
+    def keepOnlyDiskRSEs(self, locationsMap):
+        # get all the RucioStorageElements (RSEs) which are of kind 'Disk'
+        # locationsMap is a dictionary {block1:[locations], block2:[locations],...}
+        diskLocationsMap = {}
+        for block, locations in locationsMap.iteritems():
+            diskRSEs = [rse for rse in locations if not 'Tape' in rse]  # as of Sept 2020, tape RSEs ends with _Tape
+            if  'T3_CH_CERN_OpenData' in diskRSEs:
+                diskRSEs.remove('T3_CH_CERN_OpenData') # ignore OpenData until it is accessible by CRAB
+            if diskRSEs:
+                # at least some locations are disk
+                diskLocationsMap[block] = diskRSEs
+            else:
+                # no locations are disk, assume that they are tape
+                # and keep tally of tape-only locations for this dataset
+                self.tapeLocations = self.tapeLocations.union(set(locations) - set(diskRSEs))
+        locationsMap.clear() # remove all blocks
+        locationsMap.update(diskLocationsMap) # add only blocks with disk locations
 
     def keepOnlyDisks(self, locationsMap):
         phedex = PhEDEx() # TODO use certs from the config!
@@ -206,6 +223,8 @@ class DBSDataDiscovery(DataDiscovery):
                         locationsMap.update({element['name']: [x['node'] for x in element['replica']]})
                 if locationsMap:
                     locationsFoundWithRucio = True
+                    # filter out TAPE locations
+                    self.keepOnlyDiskRSEs(locationsMap)
                 else:
                     msg = "No locations found with Rucio for this dataset"
                     # since NANO* are not in PhEDEx, this should be a fatal error
@@ -227,6 +246,7 @@ class DBSDataDiscovery(DataDiscovery):
                     )
             # only fill map for blocks which have at least one location
             locationsMap = {key: value for key, value in locationsMap.iteritems() if value}
+            self.keepOnlyDisks(locationsMap)
 
         if secondaryDataset:
             secondaryLocationsMap = {}
@@ -266,7 +286,6 @@ class DBSDataDiscovery(DataDiscovery):
         if secondaryDataset:
             secondaryBlocksWithLocation = secondaryLocationsMap.keys()
 
-        self.keepOnlyDisks(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
             if self.tapeLocations:
