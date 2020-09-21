@@ -236,7 +236,7 @@ class DBSDataDiscovery(DataDiscovery):
 
         if not locationsFoundWithRucio:  # fall back to pre-Rucio methods
             try:
-                self.logger.info("No locations found with Rucio", PhEDExOrDBS)
+                self.logger.info("No locations found with Rucio")
                 self.logger.info("Looking up data locations using %s", PhEDExOrDBS)
                 locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=isUserDataset)
             except Exception as ex:
