@@ -399,15 +399,15 @@ class DBSDataDiscovery(DataDiscovery):
         return result
 
 if __name__ == '__main__':
-    """
-    Usage: python DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
-    where dbs_instance should be either prod/global or prod/phys03
-    Needs to define first:
-    export X509_USER_CERT=/data/certs/servicecert.pem
-    export X509_USER_KEY=/data/certs/servicekey.pem
-
-    Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
-    """
+    ###
+    # Usage: python DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
+    # where dbs_instance should be either prod/global or prod/phys03
+    # Needs to define first:
+    # export X509_USER_CERT=/data/certs/servicecert.pem
+    # export X509_USER_KEY=/data/certs/servicekey.pem
+    #
+    # Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
+    ###
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
     dbsSecondaryDataset = sys.argv[3] if len(sys.argv) == 4 else None
