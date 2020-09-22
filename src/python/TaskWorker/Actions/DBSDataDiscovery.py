@@ -150,11 +150,9 @@ class DBSDataDiscovery(DataDiscovery):
 
         try:
             # Get the list of blocks for the locations.
-            # The WMCore DBS3 implementation makes one call to DBS for each block
-            # when using locations=True so we are using locations=False and looking up location later
-            blocks = [x['Name'] for x in self.dbs.getFileBlocksInfo(inputDataset, locations=False)]
+            blocks = self.dbs.listFileBlocks(inputDataset)
             if secondaryDataset:
-                secondaryBlocks = [x['Name'] for x in self.dbs.getFileBlocksInfo(secondaryDataset, locations=False)]
+                secondaryBlocks = self.dbs.listFileBlocks(secondaryDataset)
         except DBSReaderError as dbsexc:
             # dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
