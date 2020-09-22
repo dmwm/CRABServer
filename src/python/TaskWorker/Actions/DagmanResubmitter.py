@@ -14,6 +14,7 @@ from ServerUtilities import FEEDBACKMAIL
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.Actions.DagmanSubmitter import checkMemoryWalltime
 from TaskWorker.WorkerExceptions import TaskWorkerException
+import TaskWorker.DataObjects.Result as Result
 
 from httplib import HTTPException
 
