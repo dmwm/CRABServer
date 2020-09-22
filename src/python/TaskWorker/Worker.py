@@ -242,7 +242,7 @@ class Worker(object):
             except Empty:
                 pass
             if out is not None:
-                self.logger.debug('Retrieved work %s', str(out))
+                self.logger.debug('Completed work %s', str(out))
                 if isinstance(out['out'], list):
                     allout.extend(out['out'])
                 else:
