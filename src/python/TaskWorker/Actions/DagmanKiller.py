@@ -14,6 +14,8 @@ from ServerUtilities import FEEDBACKMAIL
 import TaskWorker.WorkerExceptions
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
+import TaskWorker.DataObjects.Result as Result
+
 from ServerUtilities import insertJobIdSid
 
 import HTCondorLocator
@@ -157,3 +159,4 @@ class DagmanKiller(TaskAction):
         finally:
             apmon.free()
 
+        return Result.Result(task=kwargs['task'], result='OK')

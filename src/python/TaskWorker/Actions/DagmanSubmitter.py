@@ -463,8 +463,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         self.sendDashboardJobs(dashboardParams, info['apmon'])
 
-        return Result.Result(task=kwargs['task'], result=(-1))
-
+        return Result.Result(task=kwargs['task'], result='OK')
 
     def submitDirect(self, schedd, cmd, arg, info): #pylint: disable=R0201
         """

@@ -68,7 +68,11 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsD
     while True:
         try:
             ## Get (and remove) an item from the input queue. If the queue is empty, wait
-            ## until an item is available.
+            ## until an item is available. Item content is:
+            ##  workid : an integer assigne by the queue module
+            ##  work   : a function handler to the needed action e.g. function handleNewTask
+            ##  task   : a task dictionary
+            ##  failstatus : the status to assign to the task if work fails (e.g. 'SUBMITFAILED')
             workid, work, task, failstatus, inputargs = inputs.get()
             if work == 'STOP':
                 break
@@ -101,7 +105,8 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsD
                 server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey, retry = 20, logger = logger)
                 failTask(task['tm_taskname'], server, resturi, msg, logger, failstatus)
         t1 = time.time()
-        logger.debug("%s: ...work on %s completed in %d seconds: %s", procName, task['tm_taskname'], t1-t0, outputs)
+        workType = task.get('tm_task_command', 'RECURRING')
+        logger.debug("%s: %s work on %s completed in %d seconds: %s", procName, workType, task['tm_taskname'], t1-t0, outputs)
 
         try:
             out, _, _ = executeCommand("ps u -p %s | awk '{sum=sum+$6}; END {print sum/1024}'" % os.getpid())
@@ -242,7 +247,7 @@ class Worker(object):
             except Empty:
                 pass
             if out is not None:
-                self.logger.debug('Retrieved work %s', str(out))
+                self.logger.debug('Completed work %s', str(out))
                 if isinstance(out['out'], list):
                     allout.extend(out['out'])
                 else:
