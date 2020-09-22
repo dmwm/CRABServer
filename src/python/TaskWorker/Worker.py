@@ -17,6 +17,8 @@ from ServerUtilities import truncateError, executeCommand
 from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException
 
 ## Creating configuration globals to avoid passing these around at every request
+## and tell pylink to bare with this :-)
+# pylint: disable=W0604, W0601
 global WORKER_CONFIG
 
 
@@ -112,7 +114,7 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsD
             out, _, _ = executeCommand("ps u -p %s | awk '{sum=sum+$6}; END {print sum/1024}'" % os.getpid())
             msg = "RSS after finishing %s: %s MB" % (task['tm_taskname'], out.strip())
             logger.debug(msg)
-        except:
+        except Exception:
             logger.exception("Problem getting worker RSS:")
 
         removeTaskLogHandler(logger, taskhandler)
