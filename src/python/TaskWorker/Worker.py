@@ -68,7 +68,11 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsD
     while True:
         try:
             ## Get (and remove) an item from the input queue. If the queue is empty, wait
-            ## until an item is available.
+            ## until an item is available. Item content is:
+            ##  workid : an integer assigne by the queue module
+            ##  work   : a function handler to the needed action e.g. function handleNewTask
+            ##  task   : a task dictionary
+            ##  failstatus : the status to assign to the task if work fails (e.g. 'SUBMITFAILED')
             workid, work, task, failstatus, inputargs = inputs.get()
             if work == 'STOP':
                 break

@@ -128,11 +128,7 @@ class TaskHandler(object):
             t1 = time.time()
             self.logger.info("Finished %s on %s in %d seconds", str(action), self._task['tm_taskname'], t1 - t0)
 
-            #XXX MM - Not really sure what this is and why it's here, but I hate this..
-            try:
-                nextinput = output.result
-            except AttributeError:
-                nextinput = output
+            nextinput = output
 
 
         return nextinput

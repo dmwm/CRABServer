@@ -157,3 +157,4 @@ class DagmanKiller(TaskAction):
         finally:
             apmon.free()
 
+        return Result.Result(task=kwargs['task'], result='OK')

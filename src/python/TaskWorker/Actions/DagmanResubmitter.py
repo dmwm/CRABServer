@@ -189,6 +189,7 @@ class DagmanResubmitter(TaskAction):
             msg += " but was unable to update the task status to %s in the database." % (configreq['status'])
             msg += " This should be a harmless (temporary) error."
             raise TaskWorkerException(msg)
+        return Result.Result(task=kwargs['task'], result='OK')
 
 
     def resubmitPublication(self, asourl, asodb, proxy, taskname):

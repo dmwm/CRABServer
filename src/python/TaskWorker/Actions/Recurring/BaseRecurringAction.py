@@ -37,4 +37,4 @@ class BaseRecurringAction:
         except Exception as ex:
             self.logger.error("Error while runnig recurring action.")
             self.logger.exception(ex)
-            return Result(task=task['tm_taskname'], result="KO")
+            return Result(task=task['tm_taskname'], error="RecurringAction FAILED")
