@@ -344,8 +344,10 @@ class MasterWorker(object):
             pendingwork = self.getWork(limit=limit, getstatus='HOLDING')
 
             if len(pendingwork) > 0:
+                keys = ['tm_task_command', 'tm_taskname']
+                tasksInfo = [{k:v for k, v in task.items() if k in keys} for task in pendingwork]
                 self.logger.info("Retrieved a total of %d works", len(pendingwork))
-                self.logger.debug("Retrieved the following works: \n%s", str(pendingwork))
+                self.logger.debug("Retrieved the following works: \n%s", str(tasksInfo))
 
             toInject = []
             for task in pendingwork:
