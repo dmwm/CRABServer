@@ -247,7 +247,17 @@ class Worker(object):
             except Empty:
                 pass
             if out is not None:
-                self.logger.debug('Completed work %s', str(out))
+                # getting output from queue returns the workid in the queue and
+                # the Result object from the action handler
+                workid = out['workid']
+                result = out['out']
+                if result:
+                    taskname = result.task['tm_taskname']
+                    self.logger.debug('Completed work %d on %s', workid, taskname)
+                else:
+                    # recurring actions do not return a Result object
+                    self.logger.debug('Completed work %s', str(out))
+
                 if isinstance(out['out'], list):
                     allout.extend(out['out'])
                 else:
