@@ -129,13 +129,14 @@ class TaskHandler(object):
             self.logger.info("Finished %s on %s in %d seconds", str(action), self._task['tm_taskname'], t1 - t0)
 
             #XXX MM - Not really sure what this is and why it's here, but I hate this..
+            #XXX SB - if there is a next action to dot, the result field of the Result object returned by this action (!)
+            # will contain the needed input for the next action. I also hate this, but could not find a better way
             try:
                 nextinput = output.result
             except AttributeError:
                 nextinput = output
 
-
-        return nextinput
+        return output
 
 
 def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):

@@ -14,6 +14,7 @@ from ServerUtilities import FEEDBACKMAIL
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.Actions.DagmanSubmitter import checkMemoryWalltime
 from TaskWorker.WorkerExceptions import TaskWorkerException
+import TaskWorker.DataObjects.Result as Result
 
 from httplib import HTTPException
 
@@ -189,6 +190,7 @@ class DagmanResubmitter(TaskAction):
             msg += " but was unable to update the task status to %s in the database." % (configreq['status'])
             msg += " This should be a harmless (temporary) error."
             raise TaskWorkerException(msg)
+        return Result.Result(task=kwargs['task'], result='OK')
 
 
     def resubmitPublication(self, asourl, asodb, proxy, taskname):

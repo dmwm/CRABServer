@@ -40,11 +40,18 @@ class Result(object):
 
     def __str__(self):
         """Use me just to print out in case it is needed to debug"""
-        msg = 'Task = %s\n' %self.task['tm_taskname']
+        # this is only used in Worker.py where the task name is already part of the message,
+        # so here only print the actual result. Up to the called to print out self.task as
+        # well if needed.
+        msgTail = ""
         if self.result:
-            msg += "Result = %s\n" %str(self.result)
-        if self.error:
-            msg += "Error = %s\n" %str(self.error)
+            status = 'OK'
+            msgTail += "Result = %s\n" %str(self.result)
         if self.warning:
-            msg += "Warning = %s\n" %str(self.warning)
+            status = 'WARNING'
+            msgTail += "Warning = %s\n" %str(self.warning)
+        if self.error:
+            status = 'ERROR'
+            msgTail += "Error = %s\n" %str(self.error)
+        msg = ('Status: %s\n' % status) + msgTail
         return msg
