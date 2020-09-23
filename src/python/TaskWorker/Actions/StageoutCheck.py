@@ -73,27 +73,41 @@ class StageoutCheck(TaskAction):
             return
         self.workflow = self.task['tm_taskname']
         self.proxy = self.task['user_proxy']
-        cpCmd, rmCmd, append = getCheckWriteCommand(self.proxy, self.logger)
-        if not cpCmd:
-            self.logger.info("CRAB3 is not configured to check write permissions. There is no GFAL2 or LCG commands installed. Continuing")
+
+        # In test machines this check is often only annoying
+        if hasattr(self.config.TaskWorker, 'checkStageout') and not self.config.TaskWorker.checkStageout:
+            self.logger.info("StageoutCheck disabled in this TaskWorker configuration. Skipping.")
             return
-        filename = re.sub("[:-_]", "", self.task['tm_taskname']) + '_crab3check.tmp'
-        try:
-            with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-                pfn = getPFN(self.proxy, self.task['tm_output_lfn'], filename, self.task['tm_asyncdest'], self.logger)
-            cpCmd += append + os.path.abspath(filename) + " " + pfn
-            rmCmd += " " + pfn
-            createDummyFile(filename, self.logger)
-            self.logger.info("Executing cp command: %s ", cpCmd)
-            res = self.checkPermissions(cpCmd)
-            if res==0:
-                self.logger.info("Executing rm command: %s ", rmCmd)
-                self.checkPermissions(rmCmd)
-        except IOError as er:
-            self.logger.info('IOError %s. CRAB3 backend disk is full. Please report to experts. Task will not be submitted', er)
-            raise
-        except HTTPException as er:
-            self.logger.warning("CRAB3 is not able to get pfn from PhEDEx. Error %s", er)
-        finally:
-            removeDummyFile(filename, self.logger)
-        return
+
+        # OK, we are interested in telling if output can be actually transferred to user destination
+        # if user wants to user Rucio, we can only check quota, since transfer will be done
+        # by Rucio robot without using user credentials
+        if self.task['tm_output_lfn'].startswith('/store/user/rucio'):
+            # to be filled with actual quota check, for the time being.. just go
+            return
+        # if not using Rucio, old code:
+        else:
+            cpCmd, rmCmd, append = getCheckWriteCommand(self.proxy, self.logger)
+            if not cpCmd:
+                self.logger.info("CRAB3 is not configured to check write permissions. There is no GFAL2 or LCG commands installed. Continuing")
+                return
+            filename = re.sub("[:-_]", "", self.task['tm_taskname']) + '_crab3check.tmp'
+            try:
+                with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
+                    pfn = getPFN(self.proxy, self.task['tm_output_lfn'], filename, self.task['tm_asyncdest'], self.logger)
+                cpCmd += append + os.path.abspath(filename) + " " + pfn
+                rmCmd += " " + pfn
+                createDummyFile(filename, self.logger)
+                self.logger.info("Executing cp command: %s ", cpCmd)
+                res = self.checkPermissions(cpCmd)
+                if res==0:
+                    self.logger.info("Executing rm command: %s ", rmCmd)
+                    self.checkPermissions(rmCmd)
+            except IOError as er:
+                self.logger.info('IOError %s. CRAB3 backend disk is full. Please report to experts. Task will not be submitted', er)
+                raise
+            except HTTPException as er:
+                self.logger.warning("CRAB3 is not able to get pfn from PhEDEx. Error %s", er)
+            finally:
+                removeDummyFile(filename, self.logger)
+            return
