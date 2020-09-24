@@ -53,7 +53,13 @@ class DBSDataDiscovery(DataDiscovery):
         # locationsMap is a dictionary {block1:[locations], block2:[locations],...}
         diskLocationsMap = {}
         for block, locations in locationsMap.iteritems():
-            diskRSEs = [rse for rse in locations if not 'Tape' in rse]  # as of Sept 2020, tape RSEs ends with _Tape
+            try:
+                diskRSEs = self.rucioClient.dropTapeRSEs(locations)
+            except AttributeError:
+                # we built with a WMCore tag w/o the dropTapeRSEs method, do the legwork
+                # this part can be removed once we use upddated WMCore
+                # as of Sept 2020, tape RSEs ends with _Tape, go for the quick hack
+                diskRSEs = [rse for rse in locations if not 'Tape' in rse]
             if  'T3_CH_CERN_OpenData' in diskRSEs:
                 diskRSEs.remove('T3_CH_CERN_OpenData') # ignore OpenData until it is accessible by CRAB
             if diskRSEs:
