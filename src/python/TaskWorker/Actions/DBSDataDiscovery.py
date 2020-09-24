@@ -195,16 +195,16 @@ class DBSDataDiscovery(DataDiscovery):
                 self.logger.info("Initializing Rucio client")
                 # WMCore is awfully verbose
                 with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-                    rucioClient = Rucio(
+                    self.rucioClient = Rucio(
                         self.config.Services.Rucio_account,
                         hostUrl=self.config.Services.Rucio_host,
                         authUrl=self.config.Services.Rucio_authUrl,
                         configDict=rucio_config_dict
                     )
-                rucioClient.whoAmI()
+                self.rucioClient.whoAmI()
                 self.logger.info("Looking up data location with Rucio in %s scope.", scope)
                 with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-                    locations = rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(blocks))
+                    locations = self.rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(blocks))
             except Exception as exc:
                 msg = "Rucio lookup failed with\n%s" % str(exc)
                 # TODO when removing fall-back to PhEDEx, this should be a fatal error
@@ -252,7 +252,7 @@ class DBSDataDiscovery(DataDiscovery):
             # see https://github.com/dmwm/CRABServer/issues/6075#issuecomment-641569446
             self.logger.info("Trying data location of secondary blocks with Rucio")
             try:
-                locations = rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(secondaryBlocks))
+                locations = self.rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(secondaryBlocks))
             except Exception as exc:
                 locations = None
                 secondaryLocationsMap = {}
