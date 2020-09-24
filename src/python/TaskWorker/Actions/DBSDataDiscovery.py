@@ -53,7 +53,13 @@ class DBSDataDiscovery(DataDiscovery):
         # locationsMap is a dictionary {block1:[locations], block2:[locations],...}
         diskLocationsMap = {}
         for block, locations in locationsMap.iteritems():
-            diskRSEs = [rse for rse in locations if not 'Tape' in rse]  # as of Sept 2020, tape RSEs ends with _Tape
+            try:
+                diskRSEs = self.rucioClient.dropTapeRSEs(locations)
+            except AttributeError:
+                # we built with a WMCore tag w/o the dropTapeRSEs method, do the legwork
+                # this part can be removed once we use upddated WMCore
+                # as of Sept 2020, tape RSEs ends with _Tape, go for the quick hack
+                diskRSEs = [rse for rse in locations if not 'Tape' in rse]
             if  'T3_CH_CERN_OpenData' in diskRSEs:
                 diskRSEs.remove('T3_CH_CERN_OpenData') # ignore OpenData until it is accessible by CRAB
             if diskRSEs:
@@ -195,16 +201,16 @@ class DBSDataDiscovery(DataDiscovery):
                 self.logger.info("Initializing Rucio client")
                 # WMCore is awfully verbose
                 with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-                    rucioClient = Rucio(
+                    self.rucioClient = Rucio(
                         self.config.Services.Rucio_account,
                         hostUrl=self.config.Services.Rucio_host,
                         authUrl=self.config.Services.Rucio_authUrl,
                         configDict=rucio_config_dict
                     )
-                rucioClient.whoAmI()
+                self.rucioClient.whoAmI()
                 self.logger.info("Looking up data location with Rucio in %s scope.", scope)
                 with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-                    locations = rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(blocks))
+                    locations = self.rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(blocks))
             except Exception as exc:
                 msg = "Rucio lookup failed with\n%s" % str(exc)
                 # TODO when removing fall-back to PhEDEx, this should be a fatal error
@@ -252,7 +258,7 @@ class DBSDataDiscovery(DataDiscovery):
             # see https://github.com/dmwm/CRABServer/issues/6075#issuecomment-641569446
             self.logger.info("Trying data location of secondary blocks with Rucio")
             try:
-                locations = rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(secondaryBlocks))
+                locations = self.rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(secondaryBlocks))
             except Exception as exc:
                 locations = None
                 secondaryLocationsMap = {}
