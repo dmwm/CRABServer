@@ -816,6 +816,8 @@ class ASOServerJob(object):
                           'type': doc['type'],
                           'rest_host': doc['rest_host'],
                           'rest_uri': doc['rest_uri']}
+                if os.path.exists('USE_NEW_PUBLISHER'):
+                    newDoc['aso_worker'] = 'schedd'
                 try:
                     self.server.put(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc))
                 except HTTPException as hte:
