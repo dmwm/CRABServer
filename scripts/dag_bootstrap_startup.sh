@@ -163,7 +163,7 @@ fi
 # is changed at some point
 if [ -f /etc/use_new_publisher ] ;
 then
-    echo "Set this task to use condor JobEventLog API"
+    echo "Found file /etc/use_new_publisher. Set this task to use New Publisher"
     touch USE_NEW_PUBLISHER
 fi
 
