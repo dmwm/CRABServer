@@ -817,6 +817,7 @@ class ASOServerJob(object):
                           'rest_host': doc['rest_host'],
                           'rest_uri': doc['rest_uri']}
                 if os.path.exists('USE_NEW_PUBLISHER'):
+                    self.logger.info("USE_NEW_PUBLISHER: set asoworker=schedd in transferdb")
                     newDoc['asoworker'] = 'schedd'
                 try:
                     self.server.put(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc))
