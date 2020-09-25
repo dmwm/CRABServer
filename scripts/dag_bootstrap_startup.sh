@@ -158,6 +158,15 @@ then
 fi
 
 
+# Decide if this task will use old ASO based DBSPublisher, or new standalone Publisher
+# Do it here so that decision stays for task lifetime, even if schedd configuratoion
+# is changed at some point
+if [ -f /etc/use_new_publisher ] ;
+then
+    echo "Set this task to use condor JobEventLog API"
+    touch USE_NEW_PUBLISHER
+fi
+
 
 export _CONDOR_DAGMAN_LOG=$PWD/$1.dagman.out
 export _CONDOR_DAGMAN_GENERATE_SUBDAG_SUBMITS=False
