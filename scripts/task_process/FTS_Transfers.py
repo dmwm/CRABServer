@@ -33,6 +33,11 @@ if os.path.exists('task_process/rest_filetransfers.txt'):
         proxy = os.getcwd() + "/" + _rest.readline()
         print("Proxy: %s" % proxy)
 
+if os.path.exists('USE_NEW_PUBLISHER'):
+    asoworker = 'schedd'
+else:
+    asoworker = 'asoless'
+
 
 def get_tfc_rules(phedex, site):
     """
@@ -75,7 +80,7 @@ def mark_transferred(ids):
         logging.debug("Marking done %s", ids)
 
         data = dict()
-        data['asoworker'] = 'asoless'
+        data['asoworker'] = asoworker
         data['subresource'] = 'updateTransfers'
         data['list_of_ids'] = ids
         data['list_of_transfer_state'] = ["DONE" for _ in ids]
@@ -101,7 +106,7 @@ def mark_failed(ids, failures_reasons):
                                 proxy,
                                 proxy)
         data = dict()
-        data['asoworker'] = 'asoless'
+        data['asoworker'] = asoworker
         data['subresource'] = 'updateTransfers'
         data['list_of_ids'] = ids
         data['list_of_transfer_state'] = ["FAILED" for _ in ids]
@@ -310,7 +315,7 @@ class submit_thread(threading.Thread):
 
         # TODO: manage exception here, what we should do?
         fileDoc = dict()
-        fileDoc['asoworker'] = 'asoless'
+        fileDoc['asoworker'] = asoworker
         fileDoc['subresource'] = 'updateTransfers'
         fileDoc['list_of_ids'] = [x[2] for x in self.files]
         fileDoc['list_of_transfer_state'] = ["SUBMITTED" for _ in self.files]
