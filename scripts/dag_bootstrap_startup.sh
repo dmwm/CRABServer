@@ -167,12 +167,6 @@ then
     touch USE_NEW_PUBLISHER
 fi
 
-if [ "X$USE_NEWPUBLISHER" != "X" ] ;
-then
-    echo "\$USE_NEW_PUBLISHER defined. Set this task to use New Publisher"
-    touch USE_NEW_PUBLISHER
-fi
-
 UseNewPublisher=`grep '^CRAB_USE_NEW_PUBLISHER =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
 if [ "$UseNewPublisher" = "True" ];
 then
