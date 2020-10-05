@@ -158,6 +158,21 @@ then
 fi
 
 
+# Decide if this task will use old ASO based DBSPublisher, or new standalone Publisher
+# Do it here so that decision stays for task lifetime, even if schedd configuratoion
+# is changed at some point
+if [ -f /etc/use_new_publisher ] ;
+then
+    echo "Found file /etc/use_new_publisher. Set this task to use New Publisher"
+    touch USE_NEW_PUBLISHER
+fi
+
+UseNewPublisher=`grep '^CRAB_USE_NEW_PUBLISHER =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
+if [ "$UseNewPublisher" = "True" ];
+then
+    echo "+CRAB_USE_NEW_PUBLISHER classAd is True. Set this task to use New Publisher"
+    touch USE_NEW_PUBLISHER
+fi
 
 export _CONDOR_DAGMAN_LOG=$PWD/$1.dagman.out
 export _CONDOR_DAGMAN_GENERATE_SUBDAG_SUBMITS=False
