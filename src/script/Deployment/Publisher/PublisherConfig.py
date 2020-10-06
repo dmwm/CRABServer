@@ -8,7 +8,7 @@ config = Configuration()
 config.section_('General')
 
 # never change following line
-config.General.asoworker = 'asoless'
+config.General.asoworker = 'schedd'
 
 ## Which CRAB SERVICE instance is this Publisher using
 ## Possible values for instance are:
