@@ -907,8 +907,12 @@ def main():
     dest_final_dir = G_JOB_AD['CRAB_OutLFNDir']
     dest_files = split_re.split(G_JOB_AD['CRAB_Destination'])
     dest_site = G_JOB_AD['CRAB_AsyncDest']
-    stageout_policy = split_re.split(G_JOB_AD['CRAB_StageoutPolicy'])
-    print("Stageout policy: %s" % (", ".join(stageout_policy)))
+    # Disable direct stageout for RUCIO
+    if dest_final_dir.startswith('/store/user/rucio/'):
+        stageout_policy = ['local']
+    else:
+        stageout_policy = split_re.split(G_JOB_AD['CRAB_StageoutPolicy'])
+        print("Stageout policy: %s" % (", ".join(stageout_policy)))
 
     ##--------------------------------------------------------------------------
     ## Finish PARSE JOB AD

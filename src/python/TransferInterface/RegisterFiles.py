@@ -279,7 +279,6 @@ class submit_thread(threading.Thread):
                 fileDoc['list_of_failure_reason'] = [str(ex) for _ in ids]
                 fileDoc['list_of_retry_value'] = [0 for _ in ids]
 
-                self.log.info("Marking failed %s files" % (len(fileDoc['list_of_ids'])))
                 self.toUpdate.append(fileDoc)
             except Exception as ex:
                 self.log.exception("Failed to mark failed files")
