@@ -6,6 +6,7 @@
 set -x
 echo "Beginning dag_bootstrap.sh (stdout)"
 echo "Beginning dag_bootstrap.sh (stderr)" 1>&2
+export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/current/lib/python2.7/site-packages
 if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]
 then
 

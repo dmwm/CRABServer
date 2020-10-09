@@ -171,6 +171,21 @@ def conn_handler(services):
             if 'cric' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
                 args[0].allCMSNames = CMSSitesCache(sites=CRIC().getAllPSNs(), cachetime=mktime(gmtime()))
                 args[0].allPNNNames = CMSSitesCache(sites=CRIC().getAllPhEDExNodeNames(), cachetime=mktime(gmtime()))
+            if 'rucio' in services and not args[0].rucio:
+                # TODO
+                config = args[0].config
+                rucio_config_dict = {
+                    "phedexCompatible": True,
+                    "auth_type": "x509", "ca_cert": config.Services.Rucio_caPath,
+                    "logger" : logger,
+                    "creds": {"client_cert": config.TaskWorker.cmscert, "client_key": config.TaskWorker.cmskey}
+                }
+                args[0].rucio =  Rucio(
+                        config.Services.Rucio_account,
+                        hostUrl=config.Services.Rucio_host,
+                        authUrl=config.Services.Rucio_authUrl,
+                        configDict=rucio_config_dict
+                    )
             if 'phedex' in services and not args[0].phedex:
                 phdict = args[0].phedexargs
                 phdict.update({'cert': serverCert, 'key': serverKey})

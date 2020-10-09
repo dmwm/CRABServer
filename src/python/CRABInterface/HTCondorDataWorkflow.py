@@ -20,6 +20,7 @@ from WMCore.Services.DBS.DBSReader import DBSReader
 from CRABInterface.DataWorkflow import DataWorkflow
 from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Error import ExecutionError, InvalidParameter
+from WMCore.Services.Rucio.Rucio import Rucio
 
 # WMCore Utils module
 from Utils.Throttled import global_user_throttle
@@ -157,7 +158,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                    'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
                   }
 
-    @conn_handler(services=['phedex'])
+    @conn_handler(services=['rucio'])
     def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, username, role, group, userproxy = None):
         """
         Retrieves the output PFN aggregating output in final and temporary locations.
@@ -200,21 +201,21 @@ class HTCondorDataWorkflow(DataWorkflow):
             try:
                 jobid = row[GetFromTaskAndType.JOBID] or str(row[GetFromTaskAndType.PANDAID])
                 if row[GetFromTaskAndType.DIRECTSTAGEOUT]:
-                    lfn  = row[GetFromTaskAndType.LFN]
+                    lfn  = "user."+username+":"+row[GetFromTaskAndType.LFN]
                     site = row[GetFromTaskAndType.LOCATION]
                     self.logger.debug("LFN: %s and site %s" % (lfn, site))
-                    pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
+                    pfn  = self.rucio.getPFN(site, lfn)[(site, lfn)]
                 else:
                     if jobid in transferingIds:
-                        lfn  = row[GetFromTaskAndType.LFN]
+                        lfn  = "user."+username+":"+row[GetFromTaskAndType.LFN]
                         site = row[GetFromTaskAndType.LOCATION]
                         self.logger.debug("LFN: %s and site %s" % (lfn, site))
-                        pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
+                        pfn  = self.rucio.getPFN(site, lfn)[(site, lfn)]
                     elif jobid in finishedIds:
-                        lfn  = row[GetFromTaskAndType.TMPLFN]
+                        lfn  = "user."+username+":"+row[GetFromTaskAndType.TMPLFN]
                         site = row[GetFromTaskAndType.TMPLOCATION]
                         self.logger.debug("LFN: %s and site %s" % (lfn, site))
-                        pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
+                        pfn  = self.rucio.getPFN(site, lfn)[(site, lfn)]
                     else:
                         continue
             except Exception as err:

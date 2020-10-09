@@ -29,6 +29,7 @@ class DataWorkflow(object):
         DataWorkflow.api = dbapi
         DataWorkflow.phedexargs = phedexargs
         DataWorkflow.phedex = None
+        DataWorkflow.rucio = None
         DataWorkflow.credpath = credpath
         DataWorkflow.centralcfg = centralcfg
         DataWorkflow.config = config

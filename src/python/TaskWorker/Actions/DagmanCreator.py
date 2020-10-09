@@ -29,6 +29,7 @@ from CMSGroupMapper import get_egroup_users
 import WMCore.WMSpec.WMTask
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 from WMCore.Services.CRIC.CRIC import CRIC
+from WMCore.Services.Rucio.Rucio import Rucio
 
 import classad
 
@@ -369,27 +370,43 @@ class DagmanCreator(TaskAction.TaskAction):
         return params
 
 
-    def resolvePFNs(self, dest_site, dest_dir):
+    def resolvePFNs(self, dest_site, dest_dir, user):
         """
         Given a directory and destination, resolve the directory to a srmv2 PFN
         """
-        lfns = [dest_dir]
+
+        rucio_config_dict = {
+            "phedexCompatible": True,
+            "auth_type": "x509", "ca_cert": self.config.Services.Rucio_caPath,
+            "logger" : self.logger,
+            "creds": {"client_cert": self.config.TaskWorker.cmscert, "client_key": self.config.TaskWorker.cmskey}
+        }
+        rucioClient =  Rucio(
+                self.config.Services.Rucio_account,
+                hostUrl=self.config.Services.Rucio_host,
+                authUrl=self.config.Services.Rucio_authUrl,
+                configDict=rucio_config_dict
+            )
+
+        lfns = ["user."+user+":"+dest_dir]
         dest_sites_ = [dest_site]
 
         with self.config.TaskWorker.envForCMSWEB:
             cert = self.config.TaskWorker.cmscert
             key  = self.config.TaskWorker.cmskey
             try:
-                phedex = PhEDEx.PhEDEx({'cert': cert, 'key': key, 'pycurl': True})
-                pfn_info = phedex.getPFN(nodes=dest_sites_, lfns=lfns)
+                #phedex = PhEDEx.PhEDEx({'cert': cert, 'key': key, 'pycurl': True})
+                pfn_info = rucioClient.getPFN(nodes=dest_sites_, lfns= lfns)
             except HTTPException as ex:
                 self.logger.error(ex.headers)
                 raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not contact phedex to do the site+lfn=>pfn translation.\n"+\
                                 "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex))
         results = []
+        #self.logger.info(pfn_info)
         for lfn in lfns:
             found_lfn = False
+        #    self.logger.info((dest_site, lfn))
             if (dest_site, lfn) in pfn_info:
                 results.append(pfn_info[dest_site, lfn])
                 found_lfn = True
@@ -646,7 +663,7 @@ class DagmanCreator(TaskAction.TaskAction):
             tempDest = os.path.join(temp_dest, counter)
             directDest = os.path.join(dest, counter)
             if lastDirectDest != directDest:
-                lastDirectPfn = self.resolvePFNs(task['tm_asyncdest'], directDest)
+                lastDirectPfn = self.resolvePFNs(task['tm_asyncdest'], directDest, task['tm_username'])
                 lastDirectDest = directDest
             pfns = ["log/cmsRun_{0}.log.tar.gz".format(count)] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
