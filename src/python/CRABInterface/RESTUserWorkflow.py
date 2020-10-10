@@ -288,7 +288,11 @@ class RESTUserWorkflow(RESTEntity):
         sites = self.allPNNNames.sites if pnn else self.allCMSNames.sites
         if site not in sites:
             excasync = ValueError("A site name you specified is not valid")
-            invalidp = InvalidParameter("The parameter %s is not in the list of known CMS PhEDEx nodes." % (site), errobj=excasync)
+            if pnn:
+                msg = "The parameter %s is not in the list of known CMS PhEDEx nodes." % site
+            else:
+                msg = "The parameter %s is not in the list of known CMS Processing Site Names" % site
+            invalidp = InvalidParameter(msg, errobj=excasync)
             setattr(invalidp, 'trace', '')
             raise invalidp
 
