@@ -216,49 +216,52 @@ class Master(object):
         """
 
         self.logger.debug("Retrieving publications from oracleDB")
+        filesToPublish = []
         uri = self.REST_filetransfers
-        fileDoc = {}
-        fileDoc['asoworker'] = self.config.asoworker
-        fileDoc['subresource'] = 'acquirePublication'
-        data = encodeRequest(fileDoc)
-        results = ''
-        try:
-            results = db.post(uri=uri, data=data)
-        except Exception as ex:
-            self.logger.error("Failed to acquire publications from %s: %s", uri, ex)
-            return []
+        asoworkers = self.config.asoworker
+        # asoworkers can be a string or a list of strings
+        # but if it is a string, do not turn it into a list of chars !
+        asoworkers = [asoworkers] if isinstance(asoworkers, basestring) else asoworkers
+        for asoworker in asoworkers:
+            self.logger.info("Processing publication requests for asoworker: %s", asoworker)
+            fileDoc = {}
+            fileDoc['asoworker'] = asoworker
+            fileDoc['subresource'] = 'acquirePublication'
+            data = encodeRequest(fileDoc)
+            try:
+                result = db.post(uri=uri, data=data)
+            except Exception as ex:
+                self.logger.error("Failed to acquire publications from %s: %s", uri, ex)
+                return []
 
-        self.logger.debug("Retrieving max.100000 acquired publications from oracleDB")
-        fileDoc = dict()
-        fileDoc['asoworker'] = self.config.asoworker
-        fileDoc['subresource'] = 'acquiredPublication'
-        fileDoc['grouping'] = 0
-        fileDoc['limit'] = 100000
-        result = []
-        uri = self.REST_filetransfers
-        data = encodeRequest(fileDoc)
+            self.logger.debug("Retrieving max.100000 acquired publications from oracleDB")
+            fileDoc = dict()
+            fileDoc['asoworker'] = asoworker
+            fileDoc['subresource'] = 'acquiredPublication'
+            fileDoc['grouping'] = 0
+            fileDoc['limit'] = 100000
+            uri = self.REST_filetransfers
+            data = encodeRequest(fileDoc)
+            try:
+                results = db.get(uri=uri, data=data)
+            except Exception as ex:
+                self.logger.error("Failed to acquire publications from %s: %s", uri, ex)
+                return []
+            files = oracleOutputMapping(results)
+            self.logger.info("%s acquired publications retrieved for asoworker %s", len(files), asoworker)
+            filesToPublish.extend(files)
 
-        try:
-            results = db.get(uri=uri, data=data)
-            result.extend(oracleOutputMapping(results))
-        except Exception as ex:
-            self.logger.error("Failed to acquire publications from %s: %s", uri, ex)
-            return []
-
-        self.logger.debug("publen: %s", len(result))
-
-        self.logger.debug("%s acquired publications retrieved", len(result))
 
         # TODO: join query for publisher (same of submitter)
         unique_tasks = [list(i) for i in set(tuple([x['username'],
                                                     x['user_group'],
                                                     x['user_role'],
                                                     x['taskname']]
-                                                  ) for x in result if x['transfer_state'] == 3)]
+                                                  ) for x in filesToPublish if x['transfer_state'] == 3)]
 
         info = []
         for task in unique_tasks:
-            info.append([x for x in result if x['taskname'] == task[3]])
+            info.append([x for x in filesToPublish if x['taskname'] == task[3]])
         return zip(unique_tasks, info)
 
     def getPublDescFiles(self, workflow, lfn_ready, logger):
