@@ -74,11 +74,11 @@ class Daemon(object):
         os.dup2(se.fileno(), sys.stderr.fileno())
        
         # write pidfile
-        atexit.register(self.delpid)
+        atexit.register(self.removePidfile)
         pid = str(os.getpid())
         file(self.pidfile, 'w+').write("%s\n" % pid)
        
-    def delpid(self):
+    def removePidfile(self):
         os.remove(self.pidfile)
  
     def start(self):
@@ -103,7 +103,7 @@ class Daemon(object):
                 sys.stderr.write(message % self.pidfile)
                 sys.exit(1)
             else:
-                self.delpid()           
+                self.removePidfile()           
 
         # Start the daemon
         self.daemonize()
