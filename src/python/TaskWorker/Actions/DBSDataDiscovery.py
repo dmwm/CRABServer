@@ -109,6 +109,75 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nhttps://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
                 raise TaskWorkerException(msg)
 
+    def requestTapeRecall(self, blockList=[], system='Dynamo', msgHead=''):
+        """
+        :param blockList: a list of blocks to recall from Tape to Disk
+        :param system: a string identifying the DDM system to use 'Dynamo' or 'Rucio' or 'None'
+        :param msgHead: a string with the initial part of a message to be used for exceptions
+        since data on tape means no submission possible this function will always raise
+        a TaskWorkerException to stop the action flow. The exception message contains details
+        and an attempt is done to upload it to TaskDB so that crab status can report it
+        """
+        # start with old Dyanmo implementation. A new implementation with Rucio will come
+
+        msg = msgHead
+        if system == 'Dynamo':
+            ddmServer = self.config.TaskWorker.DDMServer
+            ddmRequest = None
+            try:
+                ddmRequest = blocksRequest(blockList, ddmServer, self.config.TaskWorker.cmscert,
+                                           self.config.TaskWorker.cmskey, verbose=False)
+            except HTTPException as hte:
+                self.logger.exception(hte)
+                msg += "\nThe automatic stage-out failed, please try again later. If the error persists contact the experts and provide this error message:"
+                msg += "\nHTTP Error while contacting the DDM server %s:\n%s" % (ddmServer, str(hte))
+                msg += "\nHTTP Headers are: %s" % hte.headers
+                raise TaskWorkerException(msg, retry=True)
+
+            self.logger.info("Contacted %s using %s and %s, got:\n%s", self.config.TaskWorker.DDMServer,
+                             self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, ddmRequest)
+            # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
+            ddmReqId = ddmRequest["data"][0]["request_id"]
+            if ddmRequest['result'] != 'OK':
+                msg += "\nThe disk replica request failed with this error:\n %s" % ddmRequest["message"]
+                raise TaskWorkerException(msg)
+            msg += "\nA disk replica has been requested on %s to Dynamo (request ID: %s)" % \
+                   (ddmRequest["data"][0]["first_request"], ddmReqId)
+            # set status to TAPERECALL
+            tapeRecallStatus = 'TAPERECALL'
+            ddmReqId = ddmRequest["data"][0]["request_id"]
+            configreq = {'workflow': self.taskName,
+                         'taskstatus': tapeRecallStatus,
+                         'ddmreqid': ddmReqId,
+                         'subresource': 'addddmreqid',
+                        }
+            try:
+                tapeRecallStatusSet = self.server.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
+            except HTTPException as hte:
+                self.logger.exception(hte)
+                msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (
+                    self.config.TaskWorker.restHost, str(hte))
+                msg += "\nSetting %s status and DDM request ID (%d) failed for task %s" % (
+                    tapeRecallStatus, ddmReqId, self.taskName)
+                msg += "\nHTTP Headers are: %s" % hte.headers
+                raise TaskWorkerException(msg, retry=True)
+            if tapeRecallStatusSet[2] == "OK":
+                self.logger.info("Status for task %s set to '%s'", self.taskName, tapeRecallStatus)
+                msg += "\nThis task will be automatically submitted as soon as the stage-out is completed."
+                self.uploadWarning(msg, self.userproxy, self.taskName)
+                raise TapeDatasetException(msg)
+            else:
+                msg += ", please try again in two days."
+                raise TaskWorkerException(msg)
+
+        if system == 'Rucio':
+            raise NotImplementedError
+
+        if system == 'None':
+            msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
+            msg += '\nPlease see this CRAB FAQ for possible actions: https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul'
+            raise TaskWorkerException(msg)
+
     def execute(self, *args, **kwargs):
         """
         This is a convenience wrapper around the executeInternal function
@@ -143,9 +212,9 @@ class DBSDataDiscovery(DataDiscovery):
         # where to look locations in pre-Rucio world
         PhEDExOrDBS = 'PhEDEx' if not isUserDataset else 'DBS origin site'
 
-        taskName = kwargs['task']['tm_taskname']
-        userProxy = kwargs['task']['user_proxy']
-        self.logger.debug("Data discovery through %s for %s", self.dbs, taskName)
+        self.taskName = kwargs['task']['tm_taskname']
+        self.userproxy = kwargs['task']['user_proxy']
+        self.logger.debug("Data discovery through %s for %s", self.dbs, self.taskName)
 
         inputDataset = kwargs['task']['tm_input_dataset']
         secondaryDataset = kwargs['task'].get('tm_secondary_input_dataset', None)
@@ -286,7 +355,7 @@ class DBSDataDiscovery(DataDiscovery):
                 secondaryLocationsMap = {key: value for key, value in secondaryLocationsMap.iteritems() if value}
 
         # From now on code is not dependent from having used Rucio or PhEDEx
-        
+
         blocksWithLocation = locationsMap.keys()
         if secondaryDataset:
             secondaryBlocksWithLocation = secondaryLocationsMap.keys()
@@ -295,54 +364,9 @@ class DBSDataDiscovery(DataDiscovery):
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
             if self.tapeLocations:
                 msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ', '.join(sorted(self.tapeLocations))
-                # submit request to DDM
-                ddmRequest = None
-                ddmServer = self.config.TaskWorker.DDMServer
-                try:
-                    ddmRequest = blocksRequest(blocksWithLocation, ddmServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, verbose=False)
-                except HTTPException as hte:
-                    self.logger.exception(hte)
-                    msg += "\nThe automatic stage-out failed, please try again later. If the error persists contact the experts and provide this error message:"
-                    msg += "\nHTTP Error while contacting the DDM server %s:\n%s" % (ddmServer, str(hte))
-                    msg += "\nHTTP Headers are: %s" % hte.headers
-                    msg += "\nYou might want to contact your physics group if you need a disk replica."
-                    raise TaskWorkerException(msg, retry=True)
-
-                self.logger.info("Contacted %s using %s and %s, got:\n%s", self.config.TaskWorker.DDMServer, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, ddmRequest)
-                # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
-                if ddmRequest["result"] == "OK":
-                    # set status to TAPERECALL
-                    tapeRecallStatus = 'TAPERECALL'
-                    ddmReqId = ddmRequest["data"][0]["request_id"]
-                    configreq = {'workflow': taskName,
-                                 'taskstatus': tapeRecallStatus,
-                                 'ddmreqid': ddmReqId,
-                                 'subresource': 'addddmreqid',
-                                }
-                    try:
-                        tapeRecallStatusSet = self.server.post(self.restURInoAPI+'/task', data=urllib.urlencode(configreq))
-                    except HTTPException as hte:
-                        self.logger.exception(hte)
-                        msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (self.config.TaskWorker.restHost, str(hte))
-                        msg += "\nSetting %s status and DDM request ID (%d) failed for task %s" % (tapeRecallStatus, ddmReqId, taskName)
-                        msg += "\nHTTP Headers are: %s" % hte.headers
-                        raise TaskWorkerException(msg, retry=True)
-
-                    msg += "\nA disk replica has been requested on %s to CMS DDM (request ID: %d)" % (ddmRequest["data"][0]["first_request"], ddmReqId)
-                    if tapeRecallStatusSet[2] == "OK":
-                        self.logger.info("Status for task %s set to '%s'", taskName, tapeRecallStatus)
-                        msg += "\nThis task will be automatically submitted as soon as the stage-out is completed."
-                        self.uploadWarning(msg, userProxy, taskName)
-
-                        raise TapeDatasetException(msg)
-                    else:
-                        msg += ", please try again in two days."
-
-                else:
-                    msg += "\nThe disk replica request failed with this error:\n %s" % ddmRequest["message"]
-
-            msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
-            raise TaskWorkerException(msg)
+                # following function will always raise error and top flow here, but will first
+                # try to trigger a tape recall and place the task in tapeRecall status
+                self.requestTapeRecall(blockList=blocksWithLocation, system='None', msgHead=msg)
 
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
@@ -388,7 +412,7 @@ class DBSDataDiscovery(DataDiscovery):
 
         ## Format the output creating the data structures required by WMCore. Filters out invalid files,
         ## files whose block has no location, and figures out the PSN
-        result = self.formatOutput(task=kwargs['task'], requestname=taskName,
+        result = self.formatOutput(task=kwargs['task'], requestname=self.taskName,
                                    datasetfiles=filedetails, locations=locationsMap,
                                    tempDir=kwargs['tempDir'])
 
