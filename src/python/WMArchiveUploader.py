@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from __future__ import print_function
+from __future__ import print_function, division
 
 import os
 import sys
@@ -10,6 +10,7 @@ import atexit
 import pycurl
 import signal
 import logging
+import subprocess
 from httplib import HTTPException
 from logging.handlers import TimedRotatingFileHandler
 
@@ -93,10 +94,17 @@ class Daemon(object):
             pid = None
        
         if pid:
-            message = "pidfile %s already exist. Daemon already running?\n"
-            sys.stderr.write(message % self.pidfile)
-            sys.exit(1)
-           
+            processes = subprocess.Popen(['pgrep', '-f', 'WMArchiveUploader'], stdout=subprocess.PIPE, shell=False)
+            response = processes.communicate()[0]
+            listOfProcesses = [int(processes) for processes in response.split()]
+
+            if pid in listOfProcesses:
+                message = "pidfile %s already exist and process is running.\n"
+                sys.stderr.write(message % self.pidfile)
+                sys.exit(1)
+            else:
+                self.delpid()           
+
         # Start the daemon
         self.daemonize()
         try:
