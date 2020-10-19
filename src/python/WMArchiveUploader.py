@@ -167,7 +167,7 @@ class QuietExit(Exception):
 
 class WMArchiveUploader(Daemon):
     
-    def __init__(self):
+    def __init__(self): #pylint: disable=super-init-not-called
         #  super(WMArchiveUploader, self).__init__("/data/srv/SubmissionInfrastructureScripts/WMArchiveWD/WMArchiveUploader.lock")    
         self.baseDir = None
         self.uploadCert = None
