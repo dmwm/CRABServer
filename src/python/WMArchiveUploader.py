@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from __future__ import print_function
+from __future__ import print_function, division
 
 import os
 import sys
@@ -10,6 +10,7 @@ import atexit
 import pycurl
 import signal
 import logging
+import subprocess
 from httplib import HTTPException
 from logging.handlers import TimedRotatingFileHandler
 
@@ -43,7 +44,7 @@ class Daemon(object):
             if pid > 0:
                 # exit first parent
                 sys.exit(0)
-        except OSError, e:
+        except OSError as e:
             sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
        
@@ -58,7 +59,7 @@ class Daemon(object):
             if pid > 0:
                 # exit from second parent
                 sys.exit(0)
-        except OSError, e:
+        except OSError as e:
             sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
        
@@ -73,11 +74,11 @@ class Daemon(object):
         os.dup2(se.fileno(), sys.stderr.fileno())
        
         # write pidfile
-        atexit.register(self.delpid)
+        atexit.register(self.removePidfile)
         pid = str(os.getpid())
         file(self.pidfile, 'w+').write("%s\n" % pid)
        
-    def delpid(self):
+    def removePidfile(self):
         os.remove(self.pidfile)
  
     def start(self):
@@ -93,15 +94,22 @@ class Daemon(object):
             pid = None
        
         if pid:
-            message = "pidfile %s already exist. Daemon already running?\n"
-            sys.stderr.write(message % self.pidfile)
-            sys.exit(1)
-           
+            processes = subprocess.Popen(['pgrep', '-f', 'WMArchiveUploader'], stdout=subprocess.PIPE, shell=False)
+            response = processes.communicate()[0]
+            listOfProcesses = [int(processes) for processes in response.split()]
+
+            if pid in listOfProcesses:
+                message = "pidfile %s already exist and process is running.\n"
+                sys.stderr.write(message % self.pidfile)
+                sys.exit(1)
+            else:
+                self.removePidfile()           
+
         # Start the daemon
         self.daemonize()
         try:
             self.run()
-        except:
+        except Exception: #pylint: disable=broad-except
             logger = logging.getLogger()
             logger.exception("Unhandled exception. Exiting.")
  
@@ -127,7 +135,7 @@ class Daemon(object):
             while True:
                 os.kill(pid, signal.SIGTERM)
                 time.sleep(1)
-        except OSError, err:
+        except OSError as err:
             err = str(err)
             if err.find("No such process") > 0:
                 if os.path.exists(self.pidfile):
@@ -159,7 +167,7 @@ class QuietExit(Exception):
 
 class WMArchiveUploader(Daemon):
     
-    def __init__(self):
+    def __init__(self): #pylint: disable=super-init-not-called
         #  super(WMArchiveUploader, self).__init__("/data/srv/SubmissionInfrastructureScripts/WMArchiveWD/WMArchiveUploader.lock")    
         self.baseDir = None
         self.uploadCert = None
@@ -237,7 +245,7 @@ class WMArchiveUploader(Daemon):
         while not self.stopFlag:
             reports = os.listdir(os.path.join(self.baseDir, self.newFjrDir))
             currentReps = sorted(reports[:self.bulksize])
-            logger.debug("Current reports are %s" % currentReps)
+            logger.debug("Current reports are %s", currentReps)
             docs = []
     
             if currentReps:
@@ -260,7 +268,7 @@ class WMArchiveUploader(Daemon):
                 try:
                     response = wmarchiver.archiveData(docs)
                 except (pycurl.error, HTTPException, WMException) as e:
-                    logger.error("Error uploading docs: %s" % e)
+                    logger.error("Error uploading docs: %s", e)
                     time.sleep(60)
                     continue
     
