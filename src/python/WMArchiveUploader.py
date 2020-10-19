@@ -109,7 +109,7 @@ class Daemon(object):
         self.daemonize()
         try:
             self.run()
-        except:
+        except Exception: #pylint: disable=broad-except
             logger = logging.getLogger()
             logger.exception("Unhandled exception. Exiting.")
  
@@ -245,7 +245,7 @@ class WMArchiveUploader(Daemon):
         while not self.stopFlag:
             reports = os.listdir(os.path.join(self.baseDir, self.newFjrDir))
             currentReps = sorted(reports[:self.bulksize])
-            logger.debug("Current reports are %s" % currentReps)
+            logger.debug("Current reports are %s", currentReps)
             docs = []
     
             if currentReps:
@@ -268,7 +268,7 @@ class WMArchiveUploader(Daemon):
                 try:
                     response = wmarchiver.archiveData(docs)
                 except (pycurl.error, HTTPException, WMException) as e:
-                    logger.error("Error uploading docs: %s" % e)
+                    logger.error("Error uploading docs: %s", e)
                     time.sleep(60)
                     continue
     
