@@ -57,6 +57,11 @@ class TapeRecallStatus(BaseRecurringAction):
                 if not reqId:
                     self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", taskName)
                     continue
+                else:
+                    msg = "The DDM request (ID: %d) has been rejected with this reason: DRAININF" % reqId
+                    self.logger.info(msg + "\nSetting status of task %s to FAILED", taskName)
+                    failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
+                    continue
 
                 server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=self.logger)
                 if (time.time() - getTimeFromTaskname(str(taskName)) > MAX_DAYS_FOR_TAPERECALL*24*60*60):
@@ -95,6 +100,7 @@ class TapeRecallStatus(BaseRecurringAction):
                         if os.path.exists(debugFilesPath): os.remove(debugFilesPath)
 
                 ddmRequest = statusRequest(reqId, config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, verbose=False)
+
                 # The query above returns a JSON with a format {"result": "OK", "message": "Request found", "data": [{"request_id": 14, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:25:41", "last_request": "2018-02-26 23:25:41", "request_count": 1}]}                
                 self.logger.info("Contacted %s using %s and %s for request_id = %d, got:\n%s", config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, reqId, ddmRequest)
 
