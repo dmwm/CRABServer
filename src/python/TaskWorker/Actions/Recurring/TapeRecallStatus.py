@@ -62,7 +62,8 @@ class TapeRecallStatus(BaseRecurringAction):
                     continue
                 else:
                     msg = "The DDM request (ID: %d) has been rejected because DDM is DRAINING for migration to Rucio" % reqId
-                    self.logger.info(msg + "\nSetting status of task %s to FAILED", taskName)
+                    msg1 = "\nSetting status of task %s to FAILED" % taskName
+                    self.logger.info(msg + msg1)
                     failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
                     continue
 
@@ -94,9 +95,12 @@ class TapeRecallStatus(BaseRecurringAction):
                         self.logger.info("Successfully touched input and debug sandboxes (%s and %s) of task %s (frontend: %s) using the '%s' username (request_id = %d).",
                                          sandbox, debugFiles, taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId)
                     except Exception as ex:
-                        self.logger.info("The CRAB3 server backend could not download the input and/or debug sandbox (%s and/or %s) of task %s from the frontend (%s) using the '%s' username (request_id = %d)."+\
-                                         " This could be a temporary glitch, will try again in next occurrence of the recurring action."+\
-                                         " Error reason:\n%s", sandbox, debugFiles, taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId, str(ex))
+                        msg = "The CRAB3 server backend could not download the input and/or debug sandbox (%s and/or %s) " % (sandbox, debugFiles)
+                        msg += "of task %s from the frontend (%s) using the '%s' username (request_id = %d). " % \
+                               (taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId)
+                        msg += "\nThis could be a temporary glitch, will try again in next occurrence of the recurring action."
+                        msg += "Error reason:\n%s" % str(ex)
+                        self.logger.info(msg)
                     finally:
                         if os.path.exists(sandboxPath): os.remove(sandboxPath)
                         if os.path.exists(debugFilesPath): os.remove(debugFilesPath)
@@ -113,7 +117,8 @@ class TapeRecallStatus(BaseRecurringAction):
                         if user_proxy: mpl.deleteWarnings(recallingTask['user_proxy'], taskName)
                     elif status == "rejected":
                         msg = "The DDM request (ID: %d) has been rejected with this reason: %s" % (reqId, ddmRequest["data"][0]["reason"])
-                        self.logger.info(msg + "\nSetting status of task %s to FAILED", taskName)
+                        msg1 = "\nSetting status of task %s to FAILED" % taskName
+                        self.logger.info(msg + msg1)
                         failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
 
                 else:
