@@ -2,7 +2,8 @@ from __future__ import division
 
 import logging
 import sys
-import os, time
+import os
+import time
 
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 from TaskWorker.MasterWorker import MasterWorker
@@ -33,7 +34,7 @@ class TapeRecallStatus(BaseRecurringAction):
             logDir = config.TaskWorker.logsDir + '/tasks/recurring/'
             if not os.path.exists(logDir):
                 os.makedirs(logDir)
-            timeStamp = time.strftime('%y%m%d-%H%M',time.localtime())
+            timeStamp = time.strftime('%y%m%d-%H%M', time.localtime())
             logFile = 'TapeRecallStatus_' + timeStamp + '.log'
             handler = logging.FileHandler(logDir + logFile)
             formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
@@ -47,8 +48,10 @@ class TapeRecallStatus(BaseRecurringAction):
         tapeRecallStatus = 'TAPERECALL'
         self.logger.info("Retrieving %s tasks", tapeRecallStatus)
         recallingTasks = mw.getWork(limit=999999, getstatus=tapeRecallStatus, ignoreTWName=True)
-        if len(recallingTasks) > 0:
+        if recallingTasks:
             self.logger.info("Retrieved a total of %d %s tasks", len(recallingTasks), tapeRecallStatus)
+            server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
+                                  logger=self.logger)
             for recallingTask in recallingTasks:
                 taskName = recallingTask['tm_taskname']
                 self.logger.info("Working on task %s", taskName)
@@ -57,9 +60,14 @@ class TapeRecallStatus(BaseRecurringAction):
                 if not reqId:
                     self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", taskName)
                     continue
+                else:
+                    msg = "The DDM request (ID: %d) has been rejected because DDM is DRAINING for migration to Rucio" % reqId
+                    msg1 = "\nSetting status of task %s to FAILED" % taskName
+                    self.logger.info(msg + msg1)
+                    failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
+                    continue
 
-                server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=self.logger)
-                if (time.time() - getTimeFromTaskname(str(taskName)) > MAX_DAYS_FOR_TAPERECALL*24*60*60):
+                if (time.time() - getTimeFromTaskname(str(taskName))) > MAX_DAYS_FOR_TAPERECALL*24*60*60:
                     self.logger.info("Task %s is older than %d days, setting its status to FAILED", taskName, MAX_DAYS_FOR_TAPERECALL)
                     msg = "The disk replica request (ID: %d) for the input dataset did not complete in %d days." % (reqId, MAX_DAYS_FOR_TAPERECALL)
                     failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
@@ -77,8 +85,8 @@ class TapeRecallStatus(BaseRecurringAction):
                 if user_proxy:
                     from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
                     ufc = UserFileCache({'cert': recallingTask['user_proxy'], 'key': recallingTask['user_proxy'], 'endpoint': recallingTask['tm_cache_url'], "pycurl": True})
-                    sandbox = recallingTask['tm_user_sandbox'].replace(".tar.gz","")
-                    debugFiles = recallingTask['tm_debug_files'].replace(".tar.gz","")
+                    sandbox = recallingTask['tm_user_sandbox'].replace(".tar.gz", "")
+                    debugFiles = recallingTask['tm_debug_files'].replace(".tar.gz", "")
                     sandboxPath = os.path.join("/tmp", sandbox)
                     debugFilesPath = os.path.join("/tmp", debugFiles)
                     try:
@@ -87,13 +95,15 @@ class TapeRecallStatus(BaseRecurringAction):
                         self.logger.info("Successfully touched input and debug sandboxes (%s and %s) of task %s (frontend: %s) using the '%s' username (request_id = %d).",
                                          sandbox, debugFiles, taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId)
                     except Exception as ex:
-                        self.logger.info("The CRAB3 server backend could not download the input and/or debug sandbox (%s and/or %s) of task %s from the frontend (%s) using the '%s' username (request_id = %d)."+\
-                                         " This could be a temporary glitch, will try again in next occurrence of the recurring action."+\
-                                         " Error reason:\n%s", sandbox, debugFiles, taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId, str(ex))
+                        msg = "The CRAB3 server backend could not download the input and/or debug sandbox (%s and/or %s) " % (sandbox, debugFiles)
+                        msg += "of task %s from the frontend (%s) using the '%s' username (request_id = %d). " % \
+                               (taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId)
+                        msg += "\nThis could be a temporary glitch, will try again in next occurrence of the recurring action."
+                        msg += "Error reason:\n%s" % str(ex)
+                        self.logger.info(msg)
                     finally:
                         if os.path.exists(sandboxPath): os.remove(sandboxPath)
                         if os.path.exists(debugFilesPath): os.remove(debugFilesPath)
-
                 ddmRequest = statusRequest(reqId, config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, verbose=False)
                 # The query above returns a JSON with a format {"result": "OK", "message": "Request found", "data": [{"request_id": 14, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:25:41", "last_request": "2018-02-26 23:25:41", "request_count": 1}]}                
                 self.logger.info("Contacted %s using %s and %s for request_id = %d, got:\n%s", config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, reqId, ddmRequest)
@@ -107,7 +117,8 @@ class TapeRecallStatus(BaseRecurringAction):
                         if user_proxy: mpl.deleteWarnings(recallingTask['user_proxy'], taskName)
                     elif status == "rejected":
                         msg = "The DDM request (ID: %d) has been rejected with this reason: %s" % (reqId, ddmRequest["data"][0]["reason"])
-                        self.logger.info(msg + "\nSetting status of task %s to FAILED", taskName)
+                        msg1 = "\nSetting status of task %s to FAILED" % taskName
+                        self.logger.info(msg + msg1)
                         failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
 
                 else:
@@ -136,4 +147,3 @@ if __name__ == '__main__':
 
     trs = TapeRecallStatus(cfg.TaskWorker.logsDir)
     trs._execute(None, None, cfg, None)
-
