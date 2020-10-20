@@ -98,7 +98,6 @@ class TapeRecallStatus(BaseRecurringAction):
                     finally:
                         if os.path.exists(sandboxPath): os.remove(sandboxPath)
                         if os.path.exists(debugFilesPath): os.remove(debugFilesPath)
-
                 ddmRequest = statusRequest(reqId, config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, verbose=False)
 
                 # The query above returns a JSON with a format {"result": "OK", "message": "Request found", "data": [{"request_id": 14, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:25:41", "last_request": "2018-02-26 23:25:41", "request_count": 1}]}                
