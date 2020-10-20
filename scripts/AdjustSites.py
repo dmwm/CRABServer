@@ -58,7 +58,10 @@ def adjustPostScriptExitStatus(resubmitJobIds, filename):
     printLog("Looking for resubmitJobIds {0} in {1}".format(resubmitJobIds, filename))
     resubmitAllFailed = (resubmitJobIds is True)
     terminator_re = re.compile(r"^\.\.\.$")
-    event_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
+    # date field has two different format, this is for condor up to version 8.8.8
+    event1_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
+    # and this for 8.9.7
+    event2_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+-\d+-\d+ \d+:\d+:\d+ POST Script terminated.")
     if resubmitAllFailed:
         retvalue_re = re.compile(r"Normal termination \(return value 2\)")
     else:
@@ -76,8 +79,9 @@ def adjustPostScriptExitStatus(resubmitJobIds, filename):
             else:
                 output += line
         elif len(ra_buffer) == 1:
-            m = event_re.search(line)
-            if m:
+            m1 = event1_re.search(line)
+            m2 = event2_re.search(line)
+            if m1 or m2:
                 ra_buffer.append(line)
             else:
                 for l in ra_buffer:
