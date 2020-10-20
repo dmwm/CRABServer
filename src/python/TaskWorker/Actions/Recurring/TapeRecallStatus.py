@@ -58,7 +58,7 @@ class TapeRecallStatus(BaseRecurringAction):
                     self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", taskName)
                     continue
                 else:
-                    msg = "The DDM request (ID: %d) has been rejected with this reason: DRAININF" % reqId
+                    msg = "The DDM request (ID: %d) has been rejected because DDM is DRAINING for migration to Rucio" % reqId
                     self.logger.info(msg + "\nSetting status of task %s to FAILED", taskName)
                     failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
                     continue
