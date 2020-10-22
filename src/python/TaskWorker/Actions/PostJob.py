@@ -818,11 +818,30 @@ class ASOServerJob(object):
                           'type': doc['type'],
                           'rest_host': doc['rest_host'],
                           'rest_uri': doc['rest_uri']}
-                if os.path.exists('USE_NEW_PUBLISHER'):
-                    self.logger.info("USE_NEW_PUBLISHER: set asoworker=schedd in transferdb")
-                    newDoc['asoworker'] = 'schedd'
                 try:
                     self.server.put(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc))
+                except HTTPException as hte:
+                    msg = "Error uploading document to database."
+                    msg += " Transfer submission failed."
+                    msg += "\n%s" % (str(hte.headers))
+                    returnMsg['error'] = msg
+                updateDoc={'subresource':'updateTransfers', 'list_of_ids':[doc['_id']]}
+                updateDoc['list_of_transfer_state'] = [newDoc['transfer_state']]
+                # make sure that asoworker field in transfersdb is always filled, since
+                # otherwise whichever Publisher process looks first for things to do, grabs them
+                # https://github.com/dmwm/CRABServer/blob/8012e1297759bab620d89c8cb253f1832b4eb466/src/python/Databases/FileTransfersDB/Oracle/FileTransfers/FileTransfers.py#L27-L33
+                # but since PUT API ignores an asoworker argument when inserting
+                # https://github.com/dmwm/CRABServer/blob/43f6377447922d46353072e86d960e3c78967a17/src/python/CRABInterface/RESTFileUserTransfers.py#L122-L125
+                # we need to update the record after insetion with a POST, which requires list of ids and states
+                # https://github.com/dmwm/CRABServer/blob/43f6377447922d46353072e86d960e3c78967a17/src/python/CRABInterface/RESTFileTransfers.py#L131-L133
+                if os.path.exists('USE_NEW_PUBLISHER'):
+                    self.logger.info("USE_NEW_PUBLISHER: set asoworker=schedd in transferdb")
+                    updateDoc['asoworker'] = 'schedd'
+                else:
+                    self.logger.info("OLD Publisher: set asoworker=asoless in transferdb")
+                    updateDoc['asoworker'] = 'asoless'
+                try:
+                    self.server.post(self.rest_uri_file_transfers, data=encodeRequest(updateDoc))
                 except HTTPException as hte:
                     msg = "Error uploading document to database."
                     msg += " Transfer submission failed."
