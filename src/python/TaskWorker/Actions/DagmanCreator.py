@@ -473,6 +473,11 @@ class DagmanCreator(TaskAction.TaskAction):
 
         # From here on out, we convert from tm_* names to the DataWorkflow names
         info = dict(task)
+
+        if info['resthost'] == 'cmsweb-k8s-prod.cern.ch':
+            info['resthost'] = 'cmsweb.cern.ch'
+            self.logger.info('resthost for Jobs changed from k8s to cmsweb.cern.ch')
+
         info['workflow'] = task['tm_taskname']
         info['jobtype'] = 'Analysis'
         info['jobsw'] = info['tm_job_sw']
@@ -954,8 +959,14 @@ class DagmanCreator(TaskAction.TaskAction):
             self.logger.warning(msg)
 
         ## Write down the DAG as needed by DAGMan.
+        # temporary for K8s transition, allow TW to use cmsweb-k8s-prod while keeping schedd traffic on cmsweb (VM)
+        restHostForSchedd = kwargs['task']['resthost']
+        if restHostForSchedd == 'cmsweb-k8s-prod.cern.ch':
+            restHostForSchedd = 'cmsweb.cern.ch'
+            self.logger.info('resthost for DAG Header changed from k8s to cmsweb.cern.ch')
+
         dag = DAG_HEADER.format(nodestate='.{0}'.format(parent) if parent else ('.0' if stage == 'processing' else ''),
-                                resthost=kwargs['task']['resthost'],
+                                resthost=restHostForSchedd,
                                 resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
         if stage == 'probe':
             dagSpecs = dagSpecs[:getattr(self.config.TaskWorker, 'numAutomaticProbes', 5)]

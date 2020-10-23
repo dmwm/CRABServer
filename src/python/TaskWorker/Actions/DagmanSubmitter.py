@@ -396,6 +396,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
         arg = "RunJobs.dag"
 
         info['resthost'] = '"%s"' % (self.server['host'])
+        if info['resthost'] == '"cmsweb-k8s-prod.cern.ch"':
+            info['resthost'] = '"cmsweb.cern.ch"'
+            self.logger.info('resthost for Jobs changed from k8s to cmsweb.cern.ch')
         info['resturinoapi'] = '"%s"' % (self.restURInoAPI)
 
         try:
