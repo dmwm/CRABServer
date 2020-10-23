@@ -77,20 +77,20 @@ import signal
 import tarfile
 import hashlib
 import logging
+import logging.handlers
 import commands
 import subprocess
 import unittest
 import datetime
 import tempfile
 import traceback
-import logging.handlers
-import classad
 import random
 import shutil
 from shutil import move
 from httplib import HTTPException
 
 import htcondor
+import classad
 import DashboardAPI
 import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.DataStructs.LumiList import LumiList
@@ -470,7 +470,7 @@ class ASOServerJob(object):
         """
         with getLock('get_transfers_statuses'):
             self.docs_in_transfer = self.inject_to_aso()
-        if self.docs_in_transfer == False:
+        if not self.docs_in_transfer:
             exmsg = "Couldn't upload document to ASO database"
             raise RuntimeError(exmsg)
         if not self.docs_in_transfer:
@@ -507,7 +507,7 @@ class ASOServerJob(object):
         now = str(datetime.datetime.now())
         last_update = int(time.time())
 
-        if self.aso_start_timestamp == None or self.aso_start_time == None:
+        if self.aso_start_timestamp is None or self.aso_start_time is None:
             self.aso_start_timestamp = last_update
             self.aso_start_time = now
             msg = "Unable to determine ASO start time from job report."
@@ -1834,7 +1834,7 @@ class PostJob():
         self.logger.info("Lumis expected to be processed: %d", len(inlumis.getLumis()))
         self.logger.info("Lumis actually processed:       %d", len(outlumis.getLumis()))
         self.logger.info("Difference in lumis:            %d", len(missing.getLumis()))
-        if len(missing.getLumis()) == 0:
+        if not missing.getLumis():
             # we don't want to create the subjobs if the job processed everything
             return
         missingLumisFileName = "automatic_splitting/missing_lumis/{0}".format(self.job_id)
@@ -1899,7 +1899,7 @@ class PostJob():
                     self.logger.info('will try again in %d seconds', sleep_time)
                     time.sleep(sleep_time)
                     counter += 1
-                if not rc == 0:
+                if rc != 0:
                     self.logger.error("%d tries, still cant't talk to schedd. Reschedule the PostJob", counter)
                     return 4
                 self.logger.info('History file %s created', job_ad_file_name)
@@ -3072,16 +3072,14 @@ class testServer(unittest.TestCase):
             "cmsRun" : { "input" : {},
               "output":
                 {"outmod1" :
-                    [ {"output_module_class": "PoolOutputModule",
-                        "input": ["/test/input2",
-                                   "/test/input2"
-                                  ],
+                     [ {"output_module_class": "PoolOutputModule",
+                        "input": ["/test/input2", "/test/input2"],
                         "events": 200,
                         "size": 100,
                         "SEName": sourceSite,
                         "runs": { 1: [1, 2, 3],
                                    2: [2, 3, 4]},
-                      }]}}}}
+                }]}}}}
 
 
     def setUp(self):
