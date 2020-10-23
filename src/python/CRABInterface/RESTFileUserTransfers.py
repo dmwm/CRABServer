@@ -97,7 +97,8 @@ class RESTFileUserTransfers(RESTEntity):
         # ---------------------------------------------
         # Description:
         # CRAB3 job wrapper or PostJob calls this API and provides all required variables
-        # for new file transfers.
+        # for new file transfers. Note that not all columns in transfersdb table are filled,
+        # even if values are passed in args, e.g. 'asowoker' is not
         # ---------------------------------------------
         # Always required variables:
         # id: unique id
