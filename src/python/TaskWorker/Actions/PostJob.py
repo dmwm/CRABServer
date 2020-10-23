@@ -4,8 +4,13 @@
 # in the future someone will want to use Mongo or ES...
 # ANOTHER TODO:
 # In the code it is hard to read: workflow, taskname, reqname. All are the same....
+
 # this code intenionally uses some GLOBAL statements
 # pylint: disable=W0603
+# the swalloging of exception in abort_dag is intentional
+# pylint: disable=W0150
+# there are many assignements which are better written with column alignement
+# pylint: disable=C0326
 """
 In the PostJob we read the FrameworkJobReport (FJR) to retrieve information
 about the output files. The FJR contains information for output files produced
@@ -68,36 +73,36 @@ import json
 import uuid
 import errno
 import pprint
-import shutil
 import signal
 import tarfile
 import hashlib
 import logging
+import logging.handlers
 import commands
 import subprocess
 import unittest
 import datetime
 import tempfile
 import traceback
-import logging.handlers
-import htcondor
-import classad
 import random
+import shutil
 from shutil import move
 from httplib import HTTPException
 
+import htcondor
+import classad
 import DashboardAPI
 import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.WMArchive.DataMap import createArchiverDoc
 
 from TaskWorker import __version__
-from ServerUtilities import getLock
-from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
-
 from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, isCouchDBURL, oracleOutputMapping
+from ServerUtilities import getLock
+from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
+
 
 
 ASO_JOB = None
@@ -465,7 +470,7 @@ class ASOServerJob(object):
         """
         with getLock('get_transfers_statuses'):
             self.docs_in_transfer = self.inject_to_aso()
-        if self.docs_in_transfer == False:
+        if not self.docs_in_transfer:
             exmsg = "Couldn't upload document to ASO database"
             raise RuntimeError(exmsg)
         if not self.docs_in_transfer:
@@ -502,7 +507,7 @@ class ASOServerJob(object):
         now = str(datetime.datetime.now())
         last_update = int(time.time())
 
-        if self.aso_start_timestamp == None or self.aso_start_time == None:
+        if self.aso_start_timestamp is None or self.aso_start_time is None:
             self.aso_start_timestamp = last_update
             self.aso_start_time = now
             msg = "Unable to determine ASO start time from job report."
@@ -818,11 +823,30 @@ class ASOServerJob(object):
                           'type': doc['type'],
                           'rest_host': doc['rest_host'],
                           'rest_uri': doc['rest_uri']}
-                if os.path.exists('USE_NEW_PUBLISHER'):
-                    self.logger.info("USE_NEW_PUBLISHER: set asoworker=schedd in transferdb")
-                    newDoc['asoworker'] = 'schedd'
                 try:
                     self.server.put(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc))
+                except HTTPException as hte:
+                    msg = "Error uploading document to database."
+                    msg += " Transfer submission failed."
+                    msg += "\n%s" % (str(hte.headers))
+                    returnMsg['error'] = msg
+                updateDoc={'subresource':'updateTransfers', 'list_of_ids':[doc['_id']]}
+                updateDoc['list_of_transfer_state'] = [newDoc['transfer_state']]
+                # make sure that asoworker field in transfersdb is always filled, since
+                # otherwise whichever Publisher process looks first for things to do, grabs them
+                # https://github.com/dmwm/CRABServer/blob/8012e1297759bab620d89c8cb253f1832b4eb466/src/python/Databases/FileTransfersDB/Oracle/FileTransfers/FileTransfers.py#L27-L33
+                # but since PUT API ignores an asoworker argument when inserting
+                # https://github.com/dmwm/CRABServer/blob/43f6377447922d46353072e86d960e3c78967a17/src/python/CRABInterface/RESTFileUserTransfers.py#L122-L125
+                # we need to update the record after insetion with a POST, which requires list of ids and states
+                # https://github.com/dmwm/CRABServer/blob/43f6377447922d46353072e86d960e3c78967a17/src/python/CRABInterface/RESTFileTransfers.py#L131-L133
+                if os.path.exists('USE_NEW_PUBLISHER'):
+                    self.logger.info("USE_NEW_PUBLISHER: set asoworker=schedd in transferdb")
+                    updateDoc['asoworker'] = 'schedd'
+                else:
+                    self.logger.info("OLD Publisher: set asoworker=asoless in transferdb")
+                    updateDoc['asoworker'] = 'asoless'
+                try:
+                    self.server.post(self.rest_uri_file_transfers, data=encodeRequest(updateDoc))
                 except HTTPException as hte:
                     msg = "Error uploading document to database."
                     msg += " Transfer submission failed."
@@ -1810,7 +1834,7 @@ class PostJob():
         self.logger.info("Lumis expected to be processed: %d", len(inlumis.getLumis()))
         self.logger.info("Lumis actually processed:       %d", len(outlumis.getLumis()))
         self.logger.info("Difference in lumis:            %d", len(missing.getLumis()))
-        if len(missing.getLumis()) == 0:
+        if not missing.getLumis():
             # we don't want to create the subjobs if the job processed everything
             return
         missingLumisFileName = "automatic_splitting/missing_lumis/{0}".format(self.job_id)
@@ -1871,11 +1895,11 @@ class PostJob():
                             time.sleep(2) # take a breath before opening the file which we just wrote
                             break
                     sleep_time = 10*pow(2, counter) # exponential backoff: 10, 20, 40, 80 ...
-                    self.logger.error('condor_q failed with rc= %d and stderr:\n%s', rc, stderr_data)
+                    self.logger.error('condor_q failed with rc= %d, stdout:%s and stderr:\n%s', rc, stdout_data, stderr_data)
                     self.logger.info('will try again in %d seconds', sleep_time)
                     time.sleep(sleep_time)
                     counter += 1
-                if not rc == 0:
+                if rc != 0:
                     self.logger.error("%d tries, still cant't talk to schedd. Reschedule the PostJob", counter)
                     return 4
                 self.logger.info('History file %s created', job_ad_file_name)
@@ -1981,7 +2005,7 @@ class PostJob():
                 msg = "The user has not specified to transfer the log files."
                 msg += " No log files stageout (nor log files metadata upload) will be performed."
                 self.logger.info(msg)
-            if len(self.output_files_names) == 0:
+            if not self.output_files_names:
                 if not self.transfer_outputs:
                     msg = "Post-job got an empty list of output files (i.e. no output file) to work on."
                     msg += " In any case, the user has specified to not transfer output files."
@@ -1997,7 +2021,7 @@ class PostJob():
                     msg += " No output files stageout (nor output files metadata upload) will be performed."
                     self.logger.info(msg)
         ## Turn off the transfer of output files if the are no output files to transfer.
-        if len(self.output_files_names) == 0:
+        if not self.output_files_names:
             self.transfer_outputs = 0
 
         ## Initialize the object we will use for making requests to the REST interface.
@@ -3048,16 +3072,14 @@ class testServer(unittest.TestCase):
             "cmsRun" : { "input" : {},
               "output":
                 {"outmod1" :
-                    [ {"output_module_class": "PoolOutputModule",
-                        "input": ["/test/input2",
-                                   "/test/input2"
-                                  ],
+                     [ {"output_module_class": "PoolOutputModule",
+                        "input": ["/test/input2", "/test/input2"],
                         "events": 200,
                         "size": 100,
                         "SEName": sourceSite,
                         "runs": { 1: [1, 2, 3],
                                    2: [2, 3, 4]},
-                      }]}}}}
+                }]}}}}
 
 
     def setUp(self):
