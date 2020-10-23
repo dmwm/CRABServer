@@ -6,7 +6,6 @@ from httplib import HTTPException
 import urllib
 
 from WMCore.DataStructs.LumiList import LumiList
-from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.Services.Rucio.Rucio import Rucio
 from WMCore.Services.DBS.DBSReader import DBSReader
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
@@ -69,28 +68,6 @@ class DBSDataDiscovery(DataDiscovery):
                 # no locations are disk, assume that they are tape
                 # and keep tally of tape-only locations for this dataset
                 self.tapeLocations = self.tapeLocations.union(set(locations) - set(diskRSEs))
-        locationsMap.clear() # remove all blocks
-        locationsMap.update(diskLocationsMap) # add only blocks with disk locations
-
-    def keepOnlyDisks(self, locationsMap):
-        phedex = PhEDEx() # TODO use certs from the config!
-        # get all the PNNs that are of kind 'Disk'
-        try:
-            diskLocations = set([pnn['name'] for pnn in phedex.getNodeMap()['phedex']['node'] if pnn['kind'] == 'Disk'])
-        except HTTPException as ex:
-            self.logger.error(ex.headers)
-            raise TaskWorkerException("The CRAB3 server backend could not contact phedex to get the list of site storages.\n"+\
-                                "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
-                                " and contact the experts if the error persists.\nError reason: %s" % str(ex)) # TODO addo the nodes phedex so the user can check themselves
-        diskLocationsMap = {}
-        for block, locations in locationsMap.iteritems():
-            locations[:] = [x for x in locations if x != 'T3_CH_CERN_OpenData'] # ignore OpenData until it is accessible by CRAB
-            if set(locations) & diskLocations:
-                # at least some locations are disk
-                diskLocationsMap[block] = locationsMap[block]
-            else:
-                # no locations are in the disk list, assume that they are tape
-                self.tapeLocations = self.tapeLocations.union(set(locations) - diskLocations)
         locationsMap.clear() # remove all blocks
         locationsMap.update(diskLocationsMap) # add only blocks with disk locations
 
@@ -209,8 +186,6 @@ class DBSDataDiscovery(DataDiscovery):
         self.dbs = DBSReader(dbsurl)
         self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
         isUserDataset = self.dbsInstance.split('/')[1] != 'global'
-        # where to look locations in pre-Rucio world
-        PhEDExOrDBS = 'PhEDEx' if not isUserDataset else 'DBS origin site'
 
         self.taskName = kwargs['task']['tm_taskname']
         self.userproxy = kwargs['task']['user_proxy']
@@ -241,18 +216,12 @@ class DBSDataDiscovery(DataDiscovery):
         ## {'/JetHT/Run2016B-PromptReco-v2/AOD#b10179dc-3723-11e6-9aa5-001e67abf228': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL'],
         ## '/JetHT/Run2016B-PromptReco-v2/AOD#89b03ca6-1dc9-11e6-b567-001e67ac06a0': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL']}
 
-        # For now apply Rucio data location only to NANOAOD*
-        # in time useRucioForLocations may become a more rich expression
-        isNano = blocks[0].split("#")[0].split("/")[-1] in ["NANOAOD", "NANOAODSIM"]
-        if isNano:
-            self.logger.info("NANOAOD* datset. Will use Rucio for data location")
         useRucioForLocations = not isUserDataset
         locationsFoundWithRucio = False
 
         if not useRucioForLocations:
             self.logger.info("Will not use Rucio for this dataset")
-        # if locations should be in Rucio, try it first and fall back to old ways if Rucio calls fail
-        # of if they return no locations (possible Rucio teething pain). If Rucio returns a list, trust it.
+
         if useRucioForLocations:
             locationsMap = {}
             scope = "cms"
@@ -282,13 +251,9 @@ class DBSDataDiscovery(DataDiscovery):
                     locations = self.rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(blocks))
             except Exception as exc:
                 msg = "Rucio lookup failed with\n%s" % str(exc)
-                # TODO when removing fall-back to PhEDEx, this should be a fatal error
-                # raise TaskWorkerException(msg)
                 self.logger.warn(msg)
                 locations = None
 
-            # TODO when removing fall-back to PhEDEx, above code will raise if it fails, therefore
-            # the following "if" must be removed and the code shifted left
             if locations:
                 located_blocks = locations['phedex']['block']
                 for block in located_blocks:
@@ -300,29 +265,30 @@ class DBSDataDiscovery(DataDiscovery):
                     self.keepOnlyDiskRSEs(locationsMap)
                 else:
                     msg = "No locations found with Rucio for this dataset"
-                    # since NANO* are not in PhEDEx, this should be a fatal error
-                    if isNano:
-                        raise TaskWorkerException(msg)
-                    else:
-                        # note it down and try with PhEDEx
-                        self.logger.warn(msg)
+                    self.logger.warn(msg)
 
-        if not locationsFoundWithRucio:  # fall back to pre-Rucio methods
+        if not locationsFoundWithRucio:
             self.logger.info("No locations found with Rucio for %s", inputDataset)
-            self.logger.info("Looking up data locations using %s", PhEDExOrDBS)
-            try:
-                locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=isUserDataset)
-            except Exception as ex:
+            if isUserDataset:
+                self.logger.info("USEDR dataset. Looking up data locations using origin site in DBS")
+                try:
+                    locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=True)
+                except Exception as ex:
+                        raise TaskWorkerException(
+                        "The CRAB3 server backend could not get the location of the files from rucio nor from dbs.\n"+\
+                        "This is could be a temporary rucio/dbs glitch, please try to submit a new task (resubmit will not work)"+\
+                        " and contact the experts if the error persists.\nError reason: %s" % str(ex)
+                        )
+            else:
+                # datasets other than USER *must* be in Rucio
                 raise TaskWorkerException(
-                    "The CRAB3 server backend could not get the location of the files from dbs nor phedex nor rucio.\n"+\
-                    "This is could be a temporary phedex/rucio/dbs glitch, please try to submit a new task (resubmit will not work)"+\
-                    " and contact the experts if the error persists.\nError reason: %s" % str(ex)
+                        "The CRAB3 server backend could not get the location of the file from rucio.\n" + \
+                        "This is could be a temporary rucio glitch, please try to submit a new task (resubmit will not work)" + \
+                        " and contact the experts if the error persists."
                     )
-            # only fill map for blocks which have at least one location
-            locationsMap = {key: value for key, value in locationsMap.iteritems() if value}
-            self.keepOnlyDisks(locationsMap)
 
         if secondaryDataset:
+            # for secondary dataset we only support official datasets in Rucio
             secondaryLocationsMap = {}
             # see https://github.com/dmwm/CRABServer/issues/6075#issuecomment-641569446
             self.logger.info("Trying data location of secondary blocks with Rucio")
@@ -339,20 +305,8 @@ class DBSDataDiscovery(DataDiscovery):
                         secondaryLocationsMap.update({block['name']: [x['node'] for x in block['replica']]})
             if not secondaryLocationsMap:
                 msg = "No locations found with Rucio for secondaryDataset."
-                # TODO when removing fall-back to PhEDEx, this should be a fatal error
-                # raise TaskWorkerException(msg)
-                self.logger.warn(msg)
-                self.logger.info("Trying data location of secondary blocks with PhEDEx")
-                try:
-                    secondaryLocationsMap = self.dbs.listFileBlockLocation(list(secondaryBlocks), dbsOnly=isUserDataset)
-                except Exception as ex:
-                    raise TaskWorkerException(
-                        "The CRAB3 server backend could not get the location of the secondary dataset files from dbs or phedex or rucio.\n" + \
-                        "This is could be a temporary phedex/rucio/dbs glitch, please try to submit a new task (resubmit will not work)" + \
-                        " and contact the experts if the error persists.\nError reason: %s" % str(ex)
-                    )
-                # only fill map for blocks which have at least one location
-                secondaryLocationsMap = {key: value for key, value in secondaryLocationsMap.iteritems() if value}
+                raise TaskWorkerException(msg)
+
 
         # From now on code is not dependent from having used Rucio or PhEDEx
 
@@ -364,7 +318,7 @@ class DBSDataDiscovery(DataDiscovery):
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
             if self.tapeLocations:
                 msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ', '.join(sorted(self.tapeLocations))
-                # following function will always raise error and top flow here, but will first
+                # following function will always raise error and stop flow here, but will first
                 # try to trigger a tape recall and place the task in tapeRecall status
                 self.requestTapeRecall(blockList=blocksWithLocation, system='None', msgHead=msg)
 
@@ -403,7 +357,6 @@ class DBSDataDiscovery(DataDiscovery):
             raise TaskWorkerException("The CRAB3 server backend could not contact DBS to get the files details (Lumis, events, etc).\n"+\
                                 "This is could be a temporary DBS glitch. Please try to submit a new task (resubmit will not work)"+\
                                 " and contact the experts if the error persists.\nError reason: %s" % str(ex))
-                                #TODO addo the nodes phedex so the user can check themselves
         if not filedetails:
             raise TaskWorkerException(("Cannot find any file inside the dataset. Please, check your dataset in DAS, %s.\n" +\
                                 "Aborting submission. Resubmitting your task will not help.") %\
