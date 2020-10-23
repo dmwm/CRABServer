@@ -436,4 +436,5 @@ if __name__ == '__main__':
 #    dataset = '/MuonEG/Run2016B-07Aug17_ver2-v1/AOD'         # no Nano on disk (at least atm)
 #    dataset = '/MuonEG/Run2016B-v1/RAW'                      # on tape
 #    dataset = '/MuonEG/Run2016B-23Sep2016-v3/MINIAOD'        # no NANO on disk (MINIAOD should always be on disk)
+#    dataset = '/GenericTTbar/belforte-Stefano-Test-bb695911428445ed11a1006c9940df69/USER' # USER dataset on prod/phys03
 #===============================================================================
