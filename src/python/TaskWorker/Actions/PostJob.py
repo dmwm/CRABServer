@@ -4,8 +4,13 @@
 # in the future someone will want to use Mongo or ES...
 # ANOTHER TODO:
 # In the code it is hard to read: workflow, taskname, reqname. All are the same....
+
 # this code intenionally uses some GLOBAL statements
 # pylint: disable=W0603
+# the swalloging of exception in abort_dag is intentional
+# pylint: disable=W0150
+# there are many assignements which are better written with column alignement
+# pylint: disable=C0326
 """
 In the PostJob we read the FrameworkJobReport (FJR) to retrieve information
 about the output files. The FJR contains information for output files produced
@@ -68,7 +73,6 @@ import json
 import uuid
 import errno
 import pprint
-import shutil
 import signal
 import tarfile
 import hashlib
@@ -80,24 +84,25 @@ import datetime
 import tempfile
 import traceback
 import logging.handlers
-import htcondor
 import classad
 import random
+import shutil
 from shutil import move
 from httplib import HTTPException
 
+import htcondor
 import DashboardAPI
 import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.WMArchive.DataMap import createArchiverDoc
 
 from TaskWorker import __version__
-from ServerUtilities import getLock
-from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
-
 from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, isCouchDBURL, oracleOutputMapping
+from ServerUtilities import getLock
+from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
+
 
 
 ASO_JOB = None
@@ -1890,7 +1895,7 @@ class PostJob():
                             time.sleep(2) # take a breath before opening the file which we just wrote
                             break
                     sleep_time = 10*pow(2, counter) # exponential backoff: 10, 20, 40, 80 ...
-                    self.logger.error('condor_q failed with rc= %d and stderr:\n%s', rc, stderr_data)
+                    self.logger.error('condor_q failed with rc= %d, stdout:%s and stderr:\n%s', rc, stdout_data, stderr_data)
                     self.logger.info('will try again in %d seconds', sleep_time)
                     time.sleep(sleep_time)
                     counter += 1
@@ -2000,7 +2005,7 @@ class PostJob():
                 msg = "The user has not specified to transfer the log files."
                 msg += " No log files stageout (nor log files metadata upload) will be performed."
                 self.logger.info(msg)
-            if len(self.output_files_names) == 0:
+            if not self.output_files_names:
                 if not self.transfer_outputs:
                     msg = "Post-job got an empty list of output files (i.e. no output file) to work on."
                     msg += " In any case, the user has specified to not transfer output files."
@@ -2016,7 +2021,7 @@ class PostJob():
                     msg += " No output files stageout (nor output files metadata upload) will be performed."
                     self.logger.info(msg)
         ## Turn off the transfer of output files if the are no output files to transfer.
-        if len(self.output_files_names) == 0:
+        if not self.output_files_names:
             self.transfer_outputs = 0
 
         ## Initialize the object we will use for making requests to the REST interface.
