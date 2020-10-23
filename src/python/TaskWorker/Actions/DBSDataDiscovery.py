@@ -86,7 +86,7 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nhttps://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
                 raise TaskWorkerException(msg)
 
-    def requestTapeRecall(self, blockList=[], system='Dynamo', msgHead=''): # pylink disable=W0102
+    def requestTapeRecall(self, blockList=[], system='Dynamo', msgHead=''):   # pylint: disable=W0102
         """
         :param blockList: a list of blocks to recall from Tape to Disk
         :param system: a string identifying the DDM system to use 'Dynamo' or 'Rucio' or 'None'
