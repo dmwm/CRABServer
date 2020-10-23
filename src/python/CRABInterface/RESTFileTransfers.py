@@ -107,7 +107,9 @@ class RESTFileTransfers(RESTEntity):
             # :transfer_done AND publish = :publish_new
             # ---------------------------------------------
             # Always required variables:
-            # (str) asoworker: ASO Worker name for which acquire Publication.
+            # (str) asoworker: ASO Worker name for which acquire Publication. It will select entries in
+            # transfersdb which have this asoworker AND all those where asoworker is null and in those
+            # set it to the value passed in arg
             ###############################################
             # TODO: Maybe we want to acquire publication per ASO machine
             # by meaning if we have 2 ASO concurrent running, each of them can acquire multiple files
@@ -124,8 +126,8 @@ class RESTFileTransfers(RESTEntity):
             # updateTransfers API
             # ---------------------------------------------
             # Description:
-            # ASO calls this view and CRABServer will mark all docs, which have asoworker
-            # in row and will make all posted modification.
+            # ASO calls this view and CRABServer will select entries in filetransferdb via their tm_id
+            # and will make all posted modification.
             # If there are passed N (2 or 4) items, it will do corresponding action in update
             # :::::::
             # 2 items, Required keys are:
@@ -140,7 +142,7 @@ class RESTFileTransfers(RESTEntity):
             # ([str, str]) list_of_fts_id: list of fts id for this specific document transfer
             # ---------------------------------------------
             # Always required variables:
-            # (str) asoworker: ASO Worker name for which these transfers there acquired.
+            # (str) asoworker: ASO Worker name to be set for transfers which were acquired
             ###############################################
             binds['last_update'] = [timeNow]
             # TODO: fix case: if 'fts_instance' in kwargs
