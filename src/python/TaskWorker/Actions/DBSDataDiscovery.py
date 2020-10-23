@@ -274,17 +274,17 @@ class DBSDataDiscovery(DataDiscovery):
                 try:
                     locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=True)
                 except Exception as ex:
-                        raise TaskWorkerException(
+                    raise TaskWorkerException(
                         "The CRAB3 server backend could not get the location of the files from rucio nor from dbs.\n"+\
                         "This is could be a temporary rucio/dbs glitch, please try to submit a new task (resubmit will not work)"+\
                         " and contact the experts if the error persists.\nError reason: %s" % str(ex)
-                        )
+                    )
             else:
                 # datasets other than USER *must* be in Rucio
                 raise TaskWorkerException(
-                        "The CRAB3 server backend could not get the location of the file from rucio.\n" + \
-                        "This is could be a temporary rucio glitch, please try to submit a new task (resubmit will not work)" + \
-                        " and contact the experts if the error persists."
+                    "The CRAB3 server backend could not get the location of the file from rucio.\n" + \
+                    "This is could be a temporary rucio glitch, please try to submit a new task (resubmit will not work)" + \
+                    " and contact the experts if the error persists."
                     )
 
         if secondaryDataset:
