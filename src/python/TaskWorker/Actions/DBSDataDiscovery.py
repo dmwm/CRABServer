@@ -86,7 +86,7 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nhttps://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
                 raise TaskWorkerException(msg)
 
-    def requestTapeRecall(self, blockList=[], system='Dynamo', msgHead=''):
+    def requestTapeRecall(self, blockList=[], system='Dynamo', msgHead=''): # pylink disable=W0102
         """
         :param blockList: a list of blocks to recall from Tape to Disk
         :param system: a string identifying the DDM system to use 'Dynamo' or 'Rucio' or 'None'
@@ -187,8 +187,8 @@ class DBSDataDiscovery(DataDiscovery):
         self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
         isUserDataset = self.dbsInstance.split('/')[1] != 'global'
 
-        self.taskName = kwargs['task']['tm_taskname']
-        self.userproxy = kwargs['task']['user_proxy']
+        self.taskName = kwargs['task']['tm_taskname']           # pylint: disable=W0201
+        self.userproxy = kwargs['task']['user_proxy']           # pylint: disable=W0201
         self.logger.debug("Data discovery through %s for %s", self.dbs, self.taskName)
 
         inputDataset = kwargs['task']['tm_input_dataset']
@@ -239,7 +239,7 @@ class DBSDataDiscovery(DataDiscovery):
                 self.logger.info("Initializing Rucio client")
                 # WMCore is awfully verbose
                 with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-                    self.rucioClient = Rucio(
+                    self.rucioClient = Rucio(                  # pylint: disable=W0201
                         self.config.Services.Rucio_account,
                         hostUrl=self.config.Services.Rucio_host,
                         authUrl=self.config.Services.Rucio_authUrl,
