@@ -470,7 +470,7 @@ class ASOServerJob(object):
         """
         with getLock('get_transfers_statuses'):
             self.docs_in_transfer = self.inject_to_aso()
-        if not self.docs_in_transfer:
+        if self.docs_in_transfer == False:
             exmsg = "Couldn't upload document to ASO database"
             raise RuntimeError(exmsg)
         if not self.docs_in_transfer:
@@ -499,6 +499,11 @@ class ASOServerJob(object):
     def inject_to_aso(self):
         """
         Inject documents to ASO database if not done by cmscp from worker node.
+        returs: docs_in_trasnfer a list of documents injected to ASO, possibly an emtpy list []
+                 if e.g. the file was transferred directly from job to destination
+                It returns False in case of error. So the caller must be careful to consider
+                 and empty list as success and only the False boolean as failure.
+                Clearly this could have been done better... e.g. raising an exception
         """
         self.found_doc_in_db = False  # This is only for oracle implementation and we want to check before adding new doc.
         self.logger.info("====== Starting to check uploads to ASO database.")
