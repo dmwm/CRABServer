@@ -120,7 +120,7 @@ def USER_SANDBOX_EXCLUSIONS(tarmembers):
         run into a problem since the same process objects have different dumps, see:
         https://github.com/dmwm/CRABServer/issues/4948#issuecomment-132984687
     """
-    if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers):
+    if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers):  # pylint: disable=deprecated-lambda
         #exclude the pickle pset if the dumpPython PSet is there
         return ['PSet.py', 'PSet.pkl', 'debug/crabConfig.py', 'debug/originalPSet.py.py']
     else:
@@ -132,7 +132,7 @@ def NEW_USER_SANDBOX_EXCLUSIONS(tarmembers):
         the hash of the debug tarball (a new addition in 3.3.1607). If the debug files are excluded, the tarball
         would always have the same hash and stay the same, serving no purpose.
     """
-    if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers):
+    if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers): # pylint: disable=deprecated-lambda
         #exclude the pickle pset if the dumpPython PSet is there
         return ['PSet.py', 'PSet.pkl']
     else:
