@@ -31,7 +31,10 @@ FILE_MEMORY_LIMIT = 512*1024
 # which correspond to a well known and specified REST host name and DataBase instance
 SERVICE_INSTANCES = {'prod': {'restHost':'cmsweb.cern.ch', 'dbInstance':'prod'},
                      'preprod': {'restHost':'cmsweb-testbed.cern.ch', 'dbInstance':'preprod'},
-                     'k8s': {'restHost':'cmsweb-k8s-testbed.cern.ch', 'dbInstance':'preprod'},
+                     'k8sprod': {'restHost':'cmsweb-k8s-prod.cern.ch', 'dbInstance':'prod'},
+                     'k8s': {'restHost':'cmsweb-k8s-prod.cern.ch', 'dbInstance':'prod'},
+                     'k8spreprod': {'restHost':'cmsweb-k8s-testbed.cern.ch', 'dbInstance':'preprod'},
+                     'auth' : {'restHost':'cmsweb-auth.cern.ch', 'dbInstance':'preprod'},
                      'test1': {'restHost':'cmsweb-test1.cern.ch', 'dbInstance':'dev'},
                      'test2': {'restHost':'cmsweb-test2.cern.ch', 'dbInstance':'dev'},
                      'test3': {'restHost':'cmsweb-test3.cern.ch', 'dbInstance':'dev'},
@@ -117,7 +120,7 @@ def USER_SANDBOX_EXCLUSIONS(tarmembers):
         run into a problem since the same process objects have different dumps, see:
         https://github.com/dmwm/CRABServer/issues/4948#issuecomment-132984687
     """
-    if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers):
+    if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers):  # pylint: disable=deprecated-lambda
         #exclude the pickle pset if the dumpPython PSet is there
         return ['PSet.py', 'PSet.pkl', 'debug/crabConfig.py', 'debug/originalPSet.py.py']
     else:
@@ -129,7 +132,7 @@ def NEW_USER_SANDBOX_EXCLUSIONS(tarmembers):
         the hash of the debug tarball (a new addition in 3.3.1607). If the debug files are excluded, the tarball
         would always have the same hash and stay the same, serving no purpose.
     """
-    if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers):
+    if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers): # pylint: disable=deprecated-lambda
         #exclude the pickle pset if the dumpPython PSet is there
         return ['PSet.py', 'PSet.pkl']
     else:
