@@ -45,8 +45,7 @@ class RESTBaseAPI(DatabaseRESTApi):
 
         #Global initialization of Data objects. Parameters coming from the config should go here
         DataUserWorkflow.globalinit(config)
-        DataWorkflow.globalinit(dbapi=self, phedexargs={'endpoint': config.phedexurl},\
-                                credpath=config.credpath, centralcfg=extconfig, config=config)
+        DataWorkflow.globalinit(dbapi=self, credpath=config.credpath, centralcfg=extconfig, config=config)
         DataFileMetadata.globalinit(dbapi=self, config=config)
         RESTTask.globalinit(centralcfg=extconfig)
         Utils.globalinit(config.serverhostkey, config.serverhostcert, serverdn, config.credpath)

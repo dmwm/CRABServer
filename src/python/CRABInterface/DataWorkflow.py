@@ -25,10 +25,8 @@ class DataWorkflow(object):
     failedList = ['failed']
 
     @staticmethod
-    def globalinit(dbapi, phedexargs=None, credpath='/tmp', centralcfg=None, config=None):
+    def globalinit(dbapi, credpath='/tmp', centralcfg=None, config=None):
         DataWorkflow.api = dbapi
-        DataWorkflow.phedexargs = phedexargs
-        DataWorkflow.phedex = None
         DataWorkflow.credpath = credpath
         DataWorkflow.centralcfg = centralcfg
         DataWorkflow.config = config

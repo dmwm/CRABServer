@@ -84,36 +84,6 @@ class HTCondorDataWorkflow(DataWorkflow):
             raise InvalidParameter("An invalid workflow name was requested: %s" % workflow)
         return results[-1]
 
-
-    def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
-        self.logger.info("About to get log of workflow: %s. Getting status first." % workflow)
-
-        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
-        row = self.Task.ID_tuple(*row)
-
-        statusRes = self.status(workflow, userdn, userproxy)[0]
-
-        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
-        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferred']]
-
-        return self.getFiles(workflow, howmany, jobids, ['LOG'], transferingIds, finishedIds, \
-                             row.user_dn, row.username, row.user_role, row.user_group, userproxy)
-
-
-    def output(self, workflow, howmany, jobids, userdn, userproxy=None):
-        self.logger.info("About to get output of workflow: %s. Getting status first." % workflow)
-
-        row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
-        row = self.Task.ID_tuple(*row)
-
-        statusRes = self.status(workflow, userdn, userproxy)[0]
-
-        transferingIds = [x[1] for x in statusRes['jobList'] if x[0] in ['transferring', 'cooloff', 'held']]
-        finishedIds = [x[1] for x in statusRes['jobList'] if x[0] in ['finished', 'failed', 'transferred']]
-
-        return self.getFiles(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'], transferingIds, finishedIds, \
-                             row.user_dn, row.username, row.user_role, row.user_group, userproxy)
-
     def logs2(self, workflow, howmany, jobids):
         self.logger.info("About to get log of workflow: %s." % workflow)
         return self.getFiles2(workflow, howmany, jobids, ['LOG'])
@@ -156,78 +126,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                    'size': row[GetFromTaskAndType.SIZE],
                    'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
                   }
-
-    @conn_handler(services=['phedex'])
-    def getFiles(self, workflow, howmany, jobids, filetype, transferingIds, finishedIds, userdn, username, role, group, userproxy = None):
-        """
-        Retrieves the output PFN aggregating output in final and temporary locations.
-
-        :arg str workflow: the unique workflow name
-        :arg int howmany: the limit on the number of PFN to return
-        :return: a generator of list of outputs"""
-
-        file_type = 'log' if filetype == ['LOG'] else 'output'
-
-        ## Check that the jobids passed by the user are in a valid state to retrieve files.
-        for jobid in jobids:
-            if not jobid in transferingIds + finishedIds:
-                raise InvalidParameter("The job with id %s is not in a valid state to retrieve %s files" % (jobid, file_type))
-
-        ## If the user does not give us jobids, set them to all possible ids.
-        if not jobids:
-            jobids = transferingIds + finishedIds
-        else:
-            howmany = -1 #if the user specify the jobids return all possible files with those ids
-
-        #user did not give us ids and no ids available in the task
-        if not jobids:
-            self.logger.info("No jobs found in the task with a valid state to retrieve %s files" % file_type)
-            return
-
-        self.logger.debug("Retrieving the %s files of the following jobs: %s" % (file_type, jobids))
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow, howmany = howmany)
-
-        # HOTFIX: Convert integer jobId lists to string because the JobIds
-        # coming from the database after automatic splitting changes are strings
-        # (can look like '2-1').
-        jobids = [str(intJobId) for intJobId in jobids]
-        transferingIds = [str(intTransferingId) for intTransferingId in transferingIds]
-        finishedIds = [str(intFinishedId) for intFinishedId in finishedIds]
-
-        rows = filter(lambda row: ((row[GetFromTaskAndType.JOBID] in jobids) or (str(row[GetFromTaskAndType.PANDAID])) in jobids), rows)
-        #jobids=','.join(map(str,jobids)), limit=str(howmany) if howmany!=-1 else str(len(jobids)*100))
-        for row in rows:
-            try:
-                jobid = row[GetFromTaskAndType.JOBID] or str(row[GetFromTaskAndType.PANDAID])
-                if row[GetFromTaskAndType.DIRECTSTAGEOUT]:
-                    lfn  = row[GetFromTaskAndType.LFN]
-                    site = row[GetFromTaskAndType.LOCATION]
-                    self.logger.debug("LFN: %s and site %s" % (lfn, site))
-                    pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
-                else:
-                    if jobid in transferingIds:
-                        lfn  = row[GetFromTaskAndType.LFN]
-                        site = row[GetFromTaskAndType.LOCATION]
-                        self.logger.debug("LFN: %s and site %s" % (lfn, site))
-                        pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
-                    elif jobid in finishedIds:
-                        lfn  = row[GetFromTaskAndType.TMPLFN]
-                        site = row[GetFromTaskAndType.TMPLOCATION]
-                        self.logger.debug("LFN: %s and site %s" % (lfn, site))
-                        pfn  = self.phedex.getPFN(site, lfn)[(site, lfn)]
-                    else:
-                        continue
-            except Exception as err:
-                self.logger.exception(err)
-                raise ExecutionError("Exception while contacting PhEDEX.")
-
-            yield {'jobid': jobid,
-                   'pfn': pfn,
-                   'lfn': lfn,
-                   'size': row[GetFromTaskAndType.SIZE],
-                   'checksum' : {'cksum' : row[GetFromTaskAndType.CKSUM], 'md5' : row[GetFromTaskAndType.ADLER32], 'adler32' : row[GetFromTaskAndType.ADLER32]}
-                  }
-
 
     def report2(self, workflow, userdn):
         """

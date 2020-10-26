@@ -13,7 +13,6 @@ import threading
 from WMCore.WMFactory import WMFactory
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.CRIC.CRIC import CRIC
-from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 from WMCore.Credential.SimpleMyProxy import SimpleMyProxy, MyProxyException
 from WMCore.Credential.Proxy import Proxy
 from WMCore.Services.pycurl_manager import ResponseHeader
@@ -160,7 +159,7 @@ def getCentralConfig(extconfigurl, mode):
 def conn_handler(services):
     """
     Decorator to be used among REST resources to optimize connections to other services
-    as CouchDB and CRIC, PhEDEx, WMStats monitoring
+    as CouchDB and CRIC, WMStats monitoring
 
     arg str list services: list of string telling which service connections
                            should be started; currently availables are
@@ -171,10 +170,6 @@ def conn_handler(services):
             if 'cric' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
                 args[0].allCMSNames = CMSSitesCache(sites=CRIC().getAllPSNs(), cachetime=mktime(gmtime()))
                 args[0].allPNNNames = CMSSitesCache(sites=CRIC().getAllPhEDExNodeNames(), cachetime=mktime(gmtime()))
-            if 'phedex' in services and not args[0].phedex:
-                phdict = args[0].phedexargs
-                phdict.update({'cert': serverCert, 'key': serverKey})
-                args[0].phedex = PhEDEx(responseType='xml', dict=phdict)
             if 'centralconfig' in services and (not args[0].centralcfg.centralconfig or (args[0].centralcfg.cachetime+1800 < mktime(gmtime()))):
                 args[0].centralcfg = ConfigCache(centralconfig=getCentralConfig(extconfigurl=args[0].config.extconfigurl, mode=args[0].config.mode), cachetime=mktime(gmtime()))
             if 'servercert' in services:

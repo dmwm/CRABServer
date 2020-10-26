@@ -289,7 +289,7 @@ class RESTUserWorkflow(RESTEntity):
         if site not in sites:
             excasync = ValueError("A site name you specified is not valid")
             if pnn:
-                msg = "The parameter %s is not in the list of known CMS PhEDEx nodes." % site
+                msg = "The parameter %s is not in the list of known CMS Storage nodes." % site
             else:
                 msg = "The parameter %s is not in the list of known CMS Processing Site Names" % site
             invalidp = InvalidParameter(msg, errobj=excasync)
