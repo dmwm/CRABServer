@@ -171,6 +171,7 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
         logger.warning(msg)
         if info is not None:
             info['tm_maxjobruntime'] = str(stdmaxjobruntime)
+        # somehow TaskAction/uploadWaning wants the user proxy to make a POST to task DB
         warningUploader(msg, task['user_proxy'], task['tm_taskname'])
     if memory is not None and memory > absmaxmemory:
         msg = "Task requests %s MB of memory, above the allowed maximum of %s" % (memory, absmaxmemory)
@@ -182,6 +183,7 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
             msg = "Task requests %s MB of memory, but only %s MB are guaranteed to be available." % (memory, MAX_MEMORY_PER_CORE)
             msg += " Jobs may not find a site where to run and stay idle forever."
             logger.warning(msg)
+            # somehow TaskAction/uploadWaning wants the user proxy to make a POST to task DB
             warningUploader(msg, task['user_proxy'], task['tm_taskname'])
 
 class DagmanSubmitter(TaskAction.TaskAction):
