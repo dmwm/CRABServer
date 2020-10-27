@@ -7,7 +7,7 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from ServerUtilities import isFailurePermanent
 from ServerUtilities import getCheckWriteCommand, createDummyFile
-from ServerUtilities import removeDummyFile, getPFN, executeCommand
+from ServerUtilities import removeDummyFile, executeCommand
 from ServerUtilities import tempSetLogLevel
 import logging
 
@@ -24,6 +24,37 @@ class StageoutCheck(TaskAction):
         self.proxy = None
         self.workflow = None
         TaskAction.__init__(self, *args, **kwargs)
+
+    def getPFN(self, lfnsaddprefix, filename, sitename):
+        from WMCore.Services.Rucio.Rucio import Rucio
+        rucio_config_dict = {
+            "phedexCompatible": True,
+            "auth_type": "x509", "ca_cert": self.config.Services.Rucio_caPath,
+            "logger": self.logger,
+            "creds": {"client_cert": self.config.TaskWorker.cmscert, "client_key": self.config.TaskWorker.cmskey}
+        }
+
+        self.logger.info("Initializing Rucio client")
+        # WMCore is awfully verbose
+        try:
+            with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
+                rucioClient = Rucio(
+                    self.config.Services.Rucio_account,
+                    hostUrl=self.config.Services.Rucio_host,
+                    authUrl=self.config.Services.Rucio_authUrl,
+                    configDict=rucio_config_dict
+                )
+            rucioClient.whoAmI()
+        except HTTPException as errormsg:
+            self.logger.info('Error: Failed to contact Rucio')
+            self.logger.info('Result: %s\nStatus :%s\nURL :%s' % (errormsg.result, errormsg.status, errormsg.url))
+            raise HTTPException(errormsg)
+
+        lfn = os.path.join(lfnsaddprefix, filename)
+        pfnDict = rucioClient.getPFN(sitename, lfn)
+        pfn = pfnDict[lfn]
+
+        return pfn
 
     def checkPermissions(self, Cmd):
         """
@@ -94,7 +125,7 @@ class StageoutCheck(TaskAction):
             filename = re.sub("[:-_]", "", self.task['tm_taskname']) + '_crab3check.tmp'
             try:
                 with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-                    pfn = getPFN(self.proxy, self.task['tm_output_lfn'], filename, self.task['tm_asyncdest'], self.logger)
+                    pfn = self.getPFN(self.task['tm_output_lfn'], filename, self.task['tm_asyncdest'])
                 cpCmd += append + os.path.abspath(filename) + " " + pfn
                 rmCmd += " " + pfn
                 createDummyFile(filename, self.logger)

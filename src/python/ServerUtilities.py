@@ -300,56 +300,6 @@ def removeDummyFile(filename, logger):
     except Exception:
         logger.info('Warning: Failed to delete file %s' % filename)
 
-"""
-def getPFN(proxy, lfnsaddprefix, filename, sitename, logger):
-    from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
-
-    phedex = PhEDEx({"cert": proxy, "key": proxy, "logger": logger})
-    lfnsadd = os.path.join(lfnsaddprefix, filename)
-    try:
-        pfndict = phedex.getPFN(nodes=[sitename], lfns=[lfnsadd])
-        pfn = pfndict[(sitename, lfnsadd)]
-        if not pfn:
-            logger.info('Error: Failed to get PFN from the site. Please check the site status')
-            return False
-    except HTTPException as errormsg:
-        logger.info('Error: Failed to contact PhEDEx or wrong PhEDEx node name is used')
-        logger.info('Result: %s\nStatus :%s\nURL :%s' % (errormsg.result, errormsg.status, errormsg.url))
-        raise HTTPException(errormsg)
-    return pfn
-"""
-"""
-def getPFN(proxy, lfnsaddprefix, filename, sitename, logger):
-    from WMCore.Services.Rucio.Rucio import Rucio
-    rucio_config_dict = {
-        "phedexCompatible": True,
-        "auth_type": "x509", "ca_cert": self.config.Services.Rucio_caPath,
-        "logger": logger,
-        "creds": {"client_cert": proxy, "client_key": proxy}
-    }
-
-    logger.info("Initializing Rucio client")
-    # WMCore is awfully verbose
-    try:
-        with tempSetLogLevel(logger=logger, level=logging.ERROR):
-            self.rucioClient = Rucio(  # pylint: disable=W0201
-                self.config.Services.Rucio_account,
-                hostUrl=self.config.Services.Rucio_host,
-                authUrl=self.config.Services.Rucio_authUrl,
-                configDict=rucio_config_dict
-            )
-        self.rucioClient.whoAmI()
-    except HTTPException as errormsg:
-        logger.info('Error: Failed to contact Rucio')
-        logger.info('Result: %s\nStatus :%s\nURL :%s' % (errormsg.result, errormsg.status, errormsg.url))
-        raise HTTPException(errormsg)
-
-    lfn = os.path.join(lfnsaddprefix, filename)
-    pfn = self.rucioClient.getPFN(sitename, lfn)
-
-    return pfn
-"""
-
 def executeCommand(command):
     """ Execute passed bash command. There is no check for command success or failure. Who`s calling
         this command, has to check exitcode, out and err
