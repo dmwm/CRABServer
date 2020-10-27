@@ -44,6 +44,18 @@ class TaskAction(object):
 
 
     def uploadWarning(self, warning, userProxy, taskname):
+        """
+        Uploads a warning message to the Task DB so that crab status can show it
+        :param warning: string: message text
+        :param userProxy: credential to use for the http POST call
+                           Stefano does not know why user proxy is used here instead of TW proxy,
+                           maybe some early version of the REST checked that POST was done by task owner,
+                           maybe some early developer feared that it would fail, but there are places where
+                           TW internal credential is used to change status of the task. So this could be
+                           investigate, cleaned up and possibly simplified. But... since it works..
+        :param taskname:
+        :return:
+        """
         if not self.server: # When testing, the server can be None
             self.logger.warning(warning)
             return
