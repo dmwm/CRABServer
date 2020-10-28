@@ -373,32 +373,36 @@ class DagmanCreator(TaskAction.TaskAction):
         """
         Given a directory and destination, resolve the directory to a srmv2 PFN
         """
-        lfns = [dest_dir]
-        dest_sites_ = [dest_site]
+        from WMCore.Services.Rucio.Rucio import Rucio
+        from ServerUtilities import tempSetLogLevel
+        import logging
+        rucio_config_dict = {
+            "phedexCompatible": True,
+            "auth_type": "x509", "ca_cert": self.config.Services.Rucio_caPath,
+            "logger": self.logger,
+            "creds": {"client_cert": self.config.TaskWorker.cmscert, "client_key": self.config.TaskWorker.cmskey}
+        }
 
-        with self.config.TaskWorker.envForCMSWEB:
-            cert = self.config.TaskWorker.cmscert
-            key  = self.config.TaskWorker.cmskey
-            try:
-                phedex = PhEDEx.PhEDEx({'cert': cert, 'key': key, 'pycurl': True})
-                pfn_info = phedex.getPFN(nodes=dest_sites_, lfns=lfns)
-            except HTTPException as ex:
-                self.logger.error(ex.headers)
-                raise TaskWorker.WorkerExceptions.TaskWorkerException("The CRAB3 server backend could not contact phedex to do the site+lfn=>pfn translation.\n"+\
-                                "This is could be a temporary phedex glitch, please try to submit a new task (resubmit will not work)"+\
-                                " and contact the experts if the error persists.\nError reason: %s" % str(ex))
-        results = []
-        for lfn in lfns:
-            found_lfn = False
-            if (dest_site, lfn) in pfn_info:
-                results.append(pfn_info[dest_site, lfn])
-                found_lfn = True
-                break
-            if not found_lfn:
-                raise TaskWorker.WorkerExceptions.NoAvailableSite("The CRAB3 server backend could not map LFN %s at site %s" % (lfn, dest_site)+\
-                                "This is a fatal error. Please, contact the experts")
-        return results[0]
+        self.logger.info("Initializing Rucio client")
+        # WMCore is awfully verbose
+        try:
+            with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
+                rucioClient = Rucio(
+                    self.config.Services.Rucio_account,
+                    hostUrl=self.config.Services.Rucio_host,
+                    authUrl=self.config.Services.Rucio_authUrl,
+                    configDict=rucio_config_dict
+                )
+            rucioClient.whoAmI()
+        except HTTPException as errormsg:
+            self.logger.info('Error: Failed to contact Rucio')
+            self.logger.info('Result: %s\nStatus :%s\nURL :%s' % (errormsg.result, errormsg.status, errormsg.url))
+            raise HTTPException(errormsg)
 
+        pfnDict = rucioClient.getPFN(dest_site, dest_dir)
+        pfn = pfnDict[dest_dir]
+
+        return pfn
 
     def populateGlideinMatching(self, info):
         scram_arch = info['tm_job_arch']
