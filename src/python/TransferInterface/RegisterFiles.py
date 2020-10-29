@@ -3,8 +3,6 @@ import os
 from RESTInteractions import HTTPRequests
 from ServerUtilities import encodeRequest
 from TransferInterface import chunks, mark_failed, CRABDataInjector
-from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
-import logging
 import threading
 
 
@@ -42,17 +40,8 @@ def submit(trans_tuple, job_data, log, direct=False):
                                     scope=scope,
                                     auth_type='x509_proxy')
     except Exception as ex:
-        self.log.error("Failed to load RUCIO client: %s", ex)
+        log.error("Failed to load RUCIO client: %s", ex)
         raise ex
-
-    try:
-        phedex = PhEDEx(responseType='xml',
-                        httpDict={'key': proxy,
-                                  'cert': proxy,
-                                  'pycurl': True})
-    except Exception:
-        log.exception('PhEDEx exception.')
-        return
 
     # Split threads by source RSEs
     sources = list(set([x[columns.index('source')] for x in toTrans]))

@@ -10,8 +10,6 @@ import threading
 import os
 import subprocess
 
-from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
-from WMCore.Storage.TrivialFileCatalog import readTFC
 import fts3.rest.client.easy as fts3
 from datetime import timedelta
 from RESTInteractions import HTTPRequests
@@ -38,24 +36,6 @@ if os.path.exists('USE_NEW_PUBLISHER'):
     asoworker = 'schedd'
 else:
     asoworker = 'asoless'
-
-
-def get_tfc_rules(phedex, site):
-    """
-    Get the TFC regexp for a given site.
-    """
-    tfc_file = None
-    try:
-        phedex.getNodeTFC(site)
-    except Exception as e:
-        logging.exception('PhEDEx exception: %s', e)
-    try:
-        tfc_file = phedex.cacheFileName('tfc',
-                                        inputdata={'node': site})
-    except Exception as e:
-        logging.exception('PhEDEx cache exception: %s', e)
-    return readTFC(tfc_file)
-
 
 def chunks(l, n):
     """
@@ -427,7 +407,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient):
     :param lastLine: number of the last line processed
     :param _last: path to the file keeping track of the last read line
     :param ftsContext: FTS context
-    :param phedex: phedex client object
+    :param rucioClient: a Rucio Client object
     :return:
     """
 
@@ -580,20 +560,6 @@ def algorithm():
     delegationStatus = fts.get("delegation/"+delegationId)
     logging.info("Delegated proxy valid until %s", delegationStatus[0]['termination_time'])
 
-
-    log_phedex = logging.getLogger('phedex')
-
-    # Uncomment the 2 lines below if you want to enable phedex logging 
-    # log_phedex.addHandler(logging.FileHandler('mylogfile.log', mode='a', encoding=None, delay=False))
-    # log_phedex.setLevel(logging.INFO)
-
-    try:
-        phedex = PhEDEx(responseType='xml', logger=log_phedex,
-                        httpDict={'key': proxy, 'cert': proxy, 'pycurl': True})
-    except Exception as e:
-        logging.exception('PhEDEx exception: %s', e)
-        return
-
     with open("task_process/transfers.txt") as _list:
         _data = _list.readlines()[0]
         try:
@@ -618,8 +584,6 @@ def algorithm():
                                     auth_type='x509_proxy')
     except Exception as exc:
         msg = "Rucio initialization failed with\n%s" % str(exc)
-        # TODO when removing fall-back to PhEDEx, this should be a fatal error
-        # raise TaskWorkerException(msg)
         logging.warn(msg)
         locations = None
         raise exc
