@@ -47,7 +47,7 @@ class StageoutCheck(TaskAction):
             rucioClient.whoAmI()
         except HTTPException as errormsg:
             self.logger.info('Error: Failed to contact Rucio')
-            self.logger.info('Result: %s\nStatus :%s\nURL :%s' % (errormsg.result, errormsg.status, errormsg.url))
+            self.logger.info('Result: %s\nStatus :%s\nURL :%s', errormsg.result, errormsg.status, errormsg.url)
             raise HTTPException(errormsg)
 
         lfn = os.path.join(lfnsaddprefix, filename)

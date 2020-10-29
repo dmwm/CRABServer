@@ -27,7 +27,6 @@ from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_P
 from CMSGroupMapper import get_egroup_users
 
 import WMCore.WMSpec.WMTask
-import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 from WMCore.Services.CRIC.CRIC import CRIC
 
 import classad
@@ -396,7 +395,7 @@ class DagmanCreator(TaskAction.TaskAction):
             rucioClient.whoAmI()
         except HTTPException as errormsg:
             self.logger.info('Error: Failed to contact Rucio')
-            self.logger.info('Result: %s\nStatus :%s\nURL :%s' % (errormsg.result, errormsg.status, errormsg.url))
+            self.logger.info('Result: %s\nStatus :%s\nURL :%s', errormsg.result, errormsg.status, errormsg.url)
             raise HTTPException(errormsg)
 
         pfnDict = rucioClient.getPFN(dest_site, dest_dir)
