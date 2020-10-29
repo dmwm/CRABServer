@@ -300,25 +300,6 @@ def removeDummyFile(filename, logger):
     except Exception:
         logger.info('Warning: Failed to delete file %s' % filename)
 
-
-def getPFN(proxy, lfnsaddprefix, filename, sitename, logger):
-    from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
-
-    phedex = PhEDEx({"cert": proxy, "key": proxy, "logger": logger})
-    lfnsadd = os.path.join(lfnsaddprefix, filename)
-    try:
-        pfndict = phedex.getPFN(nodes=[sitename], lfns=[lfnsadd])
-        pfn = pfndict[(sitename, lfnsadd)]
-        if not pfn:
-            logger.info('Error: Failed to get PFN from the site. Please check the site status')
-            return False
-    except HTTPException as errormsg:
-        logger.info('Error: Failed to contact PhEDEx or wrong PhEDEx node name is used')
-        logger.info('Result: %s\nStatus :%s\nURL :%s' % (errormsg.result, errormsg.status, errormsg.url))
-        raise HTTPException(errormsg)
-    return pfn
-
-
 def executeCommand(command):
     """ Execute passed bash command. There is no check for command success or failure. Who`s calling
         this command, has to check exitcode, out and err
