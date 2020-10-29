@@ -10,13 +10,12 @@ import threading
 import os
 import subprocess
 
-from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
-from WMCore.Storage.TrivialFileCatalog import readTFC
 import fts3.rest.client.easy as fts3
 from datetime import timedelta
 from RESTInteractions import HTTPRequests
 from httplib import HTTPException
 from ServerUtilities import encodeRequest
+from TransferInterface import CRABDataInjector
 
 if not os.path.exists('task_process/transfers'):
     os.makedirs('task_process/transfers')
@@ -37,24 +36,6 @@ if os.path.exists('USE_NEW_PUBLISHER'):
     asoworker = 'schedd'
 else:
     asoworker = 'asoless'
-
-
-def get_tfc_rules(phedex, site):
-    """
-    Get the TFC regexp for a given site.
-    """
-    tfc_file = None
-    try:
-        phedex.getNodeTFC(site)
-    except Exception as e:
-        logging.exception('PhEDEx exception: %s', e)
-    try:
-        tfc_file = phedex.cacheFileName('tfc',
-                                        inputdata={'node': site})
-    except Exception as e:
-        logging.exception('PhEDEx cache exception: %s', e)
-    return readTFC(tfc_file)
-
 
 def chunks(l, n):
     """
@@ -267,6 +248,7 @@ class submit_thread(threading.Thread):
         self.ftsContext = ftsContext
         self.toUpdate = toUpdate
 
+
     def run(self):
         """
 
@@ -328,7 +310,7 @@ class submit_thread(threading.Thread):
         self.threadLock.release()
 
 
-def submit(phedex, ftsContext, toTrans):
+def submit(rucioClient, ftsContext, toTrans):
     """
     submit tranfer jobs
 
@@ -364,6 +346,7 @@ def submit(phedex, ftsContext, toTrans):
         sizes = [x[7] for x in toTrans if x[3] == source]
         checksums = [x[8] for x in toTrans if x[3] == source]
         username = toTrans[0][5]
+        scope = "user."+username
         taskname = toTrans[0][6]
         src_lfns = [x[0] for x in toTrans if x[3] == source]
         dst_lfns = [x[1] for x in toTrans if x[3] == source]
@@ -373,7 +356,9 @@ def submit(phedex, ftsContext, toTrans):
 
         try:
             for chunk in chunks(src_lfns, 10):
-                unsorted_source_pfns = [[k[1], str(x)] for k, x in phedex.getPFN(source, chunk).items()]
+                rucio_chunk = [scope+":"+x for x in chunk]
+                unsorted_source_pfns = [[k.split(scope+":")[1], str(x)] for k, x in rucioClient.cli.lfns2pfns(source, rucio_chunk).items()]
+                #logging.info(unsorted_source_pfns)
                 for order_lfn in chunk:
                     for lfn, pfn in unsorted_source_pfns:
                         if order_lfn == lfn:
@@ -381,7 +366,9 @@ def submit(phedex, ftsContext, toTrans):
                             break
 
             for chunk in chunks(dst_lfns, 10):
-                unsorted_dest_pfns = [[k[1], str(x)] for k, x in phedex.getPFN(toTrans[0][4], chunk).items()]
+                rucio_chunk = [scope+":"+x for x in chunk]
+                unsorted_dest_pfns = [[k.split(scope+":")[1], str(x)] for k, x in rucioClient.cli.lfns2pfns(toTrans[0][4], rucio_chunk).items()]
+                #logging.info(unsorted_dest_pfns)
                 for order_lfn in chunk:
                     for lfn, pfn in unsorted_dest_pfns:
                         if order_lfn == lfn:
@@ -412,7 +399,7 @@ def submit(phedex, ftsContext, toTrans):
     return jobids
 
 
-def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
+def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient):
     """
     get transfers and update last read line number
 
@@ -420,7 +407,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
     :param lastLine: number of the last line processed
     :param _last: path to the file keeping track of the last read line
     :param ftsContext: FTS context
-    :param phedex: phedex client object
+    :param rucioClient: a Rucio Client object
     :return:
     """
 
@@ -446,7 +433,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, phedex):
 
         jobids = []
         if len(transfers) > 0:
-            jobids = submit(phedex, ftsContext, transfers)
+            jobids = submit(rucioClient, ftsContext, transfers)
 
             for jobid in jobids:
                 logging.info("Monitor link: https://fts3.cern.ch:8449/fts3/ftsmon/#/job/%s", jobid)
@@ -520,7 +507,7 @@ def state_manager(fts):
     return jobs_ongoing
 
 
-def submission_manager(phedex, ftsContext):
+def submission_manager(rucioClient, ftsContext):
     """
 
     """
@@ -534,7 +521,7 @@ def submission_manager(phedex, ftsContext):
 
     # TODO: if the following fails check not to leave a corrupted file
     with open("task_process/transfers/last_transfer_new.txt", "w+") as _last:
-        _, jobids = perform_transfers("task_process/transfers.txt", last_line, _last, ftsContext, phedex)
+        _, jobids = perform_transfers("task_process/transfers.txt", last_line, _last, ftsContext, rucioClient)
         _last.close()
         os.rename("task_process/transfers/last_transfer_new.txt", "task_process/transfers/last_transfer.txt")
 
@@ -573,22 +560,36 @@ def algorithm():
     delegationStatus = fts.get("delegation/"+delegationId)
     logging.info("Delegated proxy valid until %s", delegationStatus[0]['termination_time'])
 
-
-    log_phedex = logging.getLogger('phedex')
-
-    # Uncomment the 2 lines below if you want to enable phedex logging 
-    # log_phedex.addHandler(logging.FileHandler('mylogfile.log', mode='a', encoding=None, delay=False))
-    # log_phedex.setLevel(logging.INFO)
+    with open("task_process/transfers.txt") as _list:
+        _data = _list.readlines()[0]
+        try:
+            doc = json.loads(_data)
+            username = doc["username"]
+            taskname = doc["taskname"]
+            destination = doc["destination"]
+        except Exception as ex:
+            msg = "Username gathering failed with\n%s" % str(ex)
+            logging.warn(msg)
+            locations = None
+            raise ex
 
     try:
-        phedex = PhEDEx(responseType='xml', logger=log_phedex,
-                        httpDict={'key': proxy, 'cert': proxy, 'pycurl': True})
-    except Exception as e:
-        logging.exception('PhEDEx exception: %s', e)
-        return
+        logging.info("Initializing Rucio client")
+        os.environ["X509_USER_PROXY"] = proxy
+        logging.info("Initializing Rucio client for %s", taskname)
+        rucioClient = CRABDataInjector(taskname,
+                                    destination,
+                                    account=username,
+                                    scope="user."+username,
+                                    auth_type='x509_proxy')
+    except Exception as exc:
+        msg = "Rucio initialization failed with\n%s" % str(exc)
+        logging.warn(msg)
+        locations = None
+        raise exc
 
     jobs_ongoing = state_manager(fts)
-    new_jobs = submission_manager(phedex, ftsContext)
+    new_jobs = submission_manager(rucioClient, ftsContext)
 
     logging.info("Transfer jobs ongoing: %s, new: %s ", jobs_ongoing, new_jobs)
 
@@ -601,3 +602,4 @@ if __name__ == "__main__":
     except Exception:
         logging.exception("error during main loop")
     logging.info("transfer_inject.py exiting")
+

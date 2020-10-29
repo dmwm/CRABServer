@@ -3,7 +3,6 @@ import os
 from RESTInteractions import HTTPRequests
 from ServerUtilities import encodeRequest
 from TransferInterface import chunks, mark_failed, CRABDataInjector
-from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
 import threading
 
 
@@ -30,15 +29,19 @@ def submit(trans_tuple, job_data, log, direct=False):
     user = job_data['username']
     destination = job_data['destination']
     taskname = job_data['taskname']
+    scope = 'user.' + user
 
     try:
-        phedex = PhEDEx(responseType='xml',
-                        httpDict={'key': proxy,
-                                  'cert': proxy,
-                                  'pycurl': True})
-    except Exception:
-        log.exception('PhEDEx exception.')
-        return
+        os.environ["X509_USER_PROXY"] = proxy
+        log.info("Initializing Rucio client for %s", taskname)
+        crabInj = CRABDataInjector(taskname,
+                                    destination,
+                                    account=user,
+                                    scope=scope,
+                                    auth_type='x509_proxy')
+    except Exception as ex:
+        log.error("Failed to load RUCIO client: %s", ex)
+        raise ex
 
     # Split threads by source RSEs
     sources = list(set([x[columns.index('source')] for x in toTrans]))
@@ -64,7 +67,8 @@ def submit(trans_tuple, job_data, log, direct=False):
         # workaround for phedex.getPFN issue --> shuffling output order w.r.t. the list in input
         try:
             for chunk in chunks(src_lfns, 10):
-                unsorted_source_pfns = [[k[1], str(x)] for k, x in phedex.getPFN(source, chunk).items()]
+                unsorted_source_pfns = [[k.split(scope+":")[1], str(x)] for k, x in crabInj.cli.lfns2pfns(source, [scope + ":" + y for y in chunk]).items()]
+                #log.info(unsorted_source_pfns)
                 for order_lfn in chunk:
                     for lfn, pfn in unsorted_source_pfns:
                         if order_lfn == lfn:
@@ -72,7 +76,8 @@ def submit(trans_tuple, job_data, log, direct=False):
                             break
 
             for chunk in chunks(dst_lfns, 10):
-                unsorted_dest_pfns = [[k[1], str(x)] for k, x in phedex.getPFN(toTrans[0][4], chunk).items()]
+                unsorted_dest_pfns = [[k.split(scope+":")[1], str(x)] for k, x in  crabInj.cli.lfns2pfns(toTrans[0][4],  [scope + ":" + y for y in chunk]).items()]
+                #log.info(unsorted_dest_pfns)
                 for order_lfn in chunk:
                     for lfn, pfn in unsorted_dest_pfns:
                         if order_lfn == lfn:
@@ -93,9 +98,12 @@ def submit(trans_tuple, job_data, log, direct=False):
         pubnames = [x[columns.index('publishname')] for x in toTrans if x[columns.index('source')] == source]
 
         # ordered list of replicas information
-        jobs = zip(source_pfns, dest_lfns, ids, checksums, filesizes, pubnames)
+        try:
+            jobs = zip(source_pfns, dest_lfns, ids, checksums, filesizes, pubnames)
+        except Exception as ex:
+            log.error("Failed to gather all job information: %s", ex)
+        
         job_columns = ['source_pfns', 'dest_lfns', 'ids', 'checksums', 'filesizes', 'pubnames']
-
         # ordered list of transfers details
         tx_from_source = [[job, source, taskname, user, destination] for job in jobs]
         tx_columns = ['job', 'source', 'taskname', 'user', 'destination']
@@ -109,7 +117,8 @@ def submit(trans_tuple, job_data, log, direct=False):
                                        (files, tx_columns),
                                        job_columns,
                                        proxy,
-                                       to_update)
+                                       to_update,
+                                       crabInj)
                 thread.start()
                 threads.append(thread)
             elif direct:
@@ -120,6 +129,7 @@ def submit(trans_tuple, job_data, log, direct=False):
                                        job_columns,
                                        proxy,
                                        to_update,
+                                       crabInj,
                                        direct=True)
                 thread.start()
                 threads.append(thread)
@@ -132,6 +142,7 @@ def submit(trans_tuple, job_data, log, direct=False):
     # update statuses in oracle table as per threads result
     for fileDoc in to_update:
         try:
+            #TODO: split submitted from submitted failed!
             log.debug("%s/filetransfers?%s" % (rest_filetransfers, encodeRequest(fileDoc)))
             oracleDB.post('/filetransfers', data=encodeRequest(fileDoc))
             log.info("Marked submitted %s files" % (fileDoc['list_of_ids']))
@@ -145,7 +156,7 @@ class submit_thread(threading.Thread):
     """
 
     """
-    def __init__(self, threadLock, log, files, job_column, proxy, toUpdate, direct=False):
+    def __init__(self, threadLock, log, files, job_column, proxy, toUpdate, crabInj, direct=False):
         """Rucio submit thread class
 
         :param threadLock: thread lock
@@ -179,6 +190,7 @@ class submit_thread(threading.Thread):
         self.username = self.files[0][self.file_col.index('user')]
         self.destination = self.files[0][self.file_col.index('destination')]
         self.scope = 'user.' + self.username
+        self.crabInj = crabInj
 
     def run(self):
 
@@ -189,21 +201,15 @@ class submit_thread(threading.Thread):
 
         try:
             os.environ["X509_USER_PROXY"] = self.proxy
-            self.log.info("Initializing Rucio client for %s", self.taskname)
-            crabInj = CRABDataInjector(self.taskname,
-                                       self.destination,
-                                       account=self.username,
-                                       scope=self.scope,
-                                       auth_type='x509_proxy')
 
             # Check if the corresponding dataset is already present in RUCIO
             # In case is missing try to create it with the corresponding rule
             self.log.info("Checking for current dataset")
-            crabInj.cli.get_did(self.scope, self.taskname)
+            self.crabInj.cli.get_did(self.scope, self.taskname)
         except Exception as ex:
             self.log.warn("Failed to find dataset %s:%s On Rucio server: %s", "user.%s" % self.username, self.taskname, ex)
             try:
-                crabInj.add_dataset()
+                self.crabInj.add_dataset()
             except Exception as ex:
                 self.log.error("Failed to create dataset %s:%s on Rucio server: %s", "user.%s" % self.username, self.taskname, ex)
                 self.threadLock.release()
@@ -234,8 +240,8 @@ class submit_thread(threading.Thread):
             if self.direct:
                 try:
                     self.log.info("Registering direct files")
-                    crabInj.register_crab_replicas(self.destination, dest_lfns, sizes, None)
-                    crabInj.attach_files(dest_lfns, self.taskname)
+                    self.crabInj.register_crab_replicas(self.destination, dest_lfns, sizes, None)
+                    self.crabInj.attach_files(dest_lfns, self.taskname)
                     with open("task_process/transfers/registered_direct_files.txt", "a+") as list_file:
                         for dest_lfn in dest_lfns:
                             list_file.write("%s\n" % dest_lfn)
@@ -263,8 +269,8 @@ class submit_thread(threading.Thread):
 
             # Otherwise register files staged in temporary area
             self.log.info("Registering temp file")
-            crabInj.register_temp_replicas(self.source+"_Temp", dest_lfns, source_pfns, sizes, checksums)
-            crabInj.attach_files(dest_lfns, self.taskname)
+            self.crabInj.register_temp_replicas(self.source+"_Temp", dest_lfns, source_pfns, sizes, checksums)
+            self.crabInj.attach_files(dest_lfns, self.taskname)
 
         except Exception as ex:
             self.log.error("Failed to register replicas: \n %s" % ex)

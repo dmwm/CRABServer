@@ -3,14 +3,8 @@
 from __future__ import absolute_import, division, print_function
 import logging
 import os
-# import re
-# from argparse import ArgumentParser
 
 from CMSRucio import CMSRucio
-from WMCore.Services.PhEDEx.PhEDEx import PhEDEx
-from WMCore.Storage.TrivialFileCatalog import readTFC
-# import fts3.rest.client.easy as fts3
-# from datetime import timedelta
 from ServerUtilities import encodeRequest
 
 
@@ -43,7 +37,7 @@ def mark_transferred(ids, oracleDB):
 
     if len(ids) > 0:
         try:
-            logging.debug("Marking done %s" % ids)
+            logging.debug("Marking done %s", ids)
 
             data = dict()
             data['asoworker'] = 'rucio'
@@ -53,7 +47,7 @@ def mark_transferred(ids, oracleDB):
 
             oracleDB.post('/filetransfers',
                           data=encodeRequest(data))
-            logging.info("Marked good %s" % ids)
+            logging.info("Marked good %s", ids)
             with open("task_process/transfers/transferred_files.txt", "a+") as list_file:
                 for id_ in ids:
                     list_file.write("%s\n" % id_)
@@ -87,7 +81,7 @@ def mark_failed(ids, failures_reasons, oracleDB):
 
             oracleDB.post('/filetransfers',
                           data=encodeRequest(data))
-            logging.info("Marked failed %s" % ids)
+            logging.info("Marked failed %s", ids)
         except Exception:
             logging.exception("Error updating documents")
             return None
