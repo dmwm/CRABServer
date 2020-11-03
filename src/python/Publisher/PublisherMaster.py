@@ -341,6 +341,7 @@ class Master(object):
 
         except Exception:
             self.logger.exception("Error during process mapping")
+        self.logger.info("Algorithm iteration completed, wait %d sec for next cycle", self.pollInterval())
 
     def startSlave(self, task):
         """
