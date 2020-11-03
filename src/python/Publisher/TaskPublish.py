@@ -843,10 +843,10 @@ def main():
     if dryRun:
         config.TaskPublisher.dryRun = True
 
-    print("will run%s with:\nconfigFile: %s\ntaskname  : %s\n" % (modeMsg, configFile, taskname))
+    print("Will run%s with:\nconfigFile: %s\ntaskname  : %s\n" % (modeMsg, configFile, taskname))
 
     result = publishInDBS3(config, taskname, verbose)
-    print(result)
+    print("Completed with result: %s" % result)
 
 if __name__ == '__main__':
     main()

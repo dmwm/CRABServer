@@ -513,8 +513,8 @@ class Master(object):
                 if self.TPconfig.dryRun:
                     cmd += " --dry"
                 logger.info("Now execute: %s", cmd)
-                subprocess.call(cmd, shell=True)
-                logger.info('ALL DONE')
+                stdout = subprocess.check_output(cmd, shell=True)
+                logger.info('TaskPublishScript completed. Output is: %s', stdout)
 
         except Exception:
             logger.exception("Exception when calling TaskPublish!")
