@@ -409,7 +409,7 @@ def publishInDBS3(config, taskname, verbose):
 
     if not toPublish:
         logger.info("Empty data file %s", fname)
-        return "EMPTY"
+        return "NOTHING TO DO"
 
 
     pnn = toPublish[0]["Destination"]
@@ -595,7 +595,7 @@ def publishInDBS3(config, taskname, verbose):
             break
 
     if not workToDo:
-        msg = "Nothing uploaded, %s has these files already or not enough files." % (dataset)
+        msg = "Nothing uploaded, %s has these files already." % (dataset)
         logger.info(msg)
         return "NOTHING TO DO"
 
@@ -697,7 +697,7 @@ def publishInDBS3(config, taskname, verbose):
 
     # If there are no files to publish, continue with the next dataset.
     if not dbsFiles_f:
-        msg = "Nothing to do for this dataset."
+        msg = "No file to publish to do for this dataset."
         logger.info(msg)
         return "NOTHING TO DO"
 
