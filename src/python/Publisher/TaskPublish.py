@@ -597,6 +597,11 @@ def publishInDBS3(config, taskname, verbose):
     if not workToDo:
         msg = "Nothing uploaded, %s has these files already." % (dataset)
         logger.info(msg)
+        logger.info('Make sure those files are marked as Done')
+        # docId is the has of the source LFN i.e. the file in the tmp area at the running site
+        files = [f['SourceLFN'] for f in toPublish]
+        mark_good(files, crabServer, logger)
+
         return "NOTHING TO DO"
 
     acquisition_era_config = {'acquisition_era_name': acquisitionera, 'start_date': 0}
