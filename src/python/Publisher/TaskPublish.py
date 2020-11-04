@@ -284,6 +284,20 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
         logger.info(msg)
         reqid = result.get('migration_details', {}).get('migration_request_id')
         report = result.get('migration_report')
+        if "Migration terminally failed" in report:
+            migTime = time.gmtime(result['migration_details']['creation_date'])
+            logger.debug("MigFailed at %s", migTime)
+            # in May 2019 has a storm of failed migration which needed the following cleanup
+            # keep the code in case we ever need to do the same again
+            if migTime.tm_year == 2019 and migTime.tm_mon == 5 and migTime.tm_mday < 21:
+                logger.debug("Failed migration %s requested on %s. Remove it",
+                    reqid, time.ctime(result['migration_deta     ils']['creation_date']))
+                mdic = {'migration_rqst_id': reqid} # pylint: disable=unused-variable
+                migrateApi.removeMigration({'migration_rqst_id': reqid})
+                logger.debug("  and submit again")
+                result = migrateApi.submitMigration(data)
+                reqid = result.get('migration_details', {}).get('migration_request_id')
+                report = result.get('migration_report')
         if reqid is None:
             msg = "Migration request failed to submit."
             msg += "\nMigration request results: %s" % str(result)
@@ -299,8 +313,6 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
                 msg = "Could not get status for already queued migration of block %s." % (block)
                 logger.error(msg)
     return reqid, atDestination, alreadyQueued
-
-
 
 def publishInDBS3(config, taskname, verbose):
     """
@@ -409,7 +421,7 @@ def publishInDBS3(config, taskname, verbose):
 
     if not toPublish:
         logger.info("Empty data file %s", fname)
-        return "EMPTY"
+        return "NOTHING TO DO"
 
 
     pnn = toPublish[0]["Destination"]
@@ -595,8 +607,13 @@ def publishInDBS3(config, taskname, verbose):
             break
 
     if not workToDo:
-        msg = "Nothing uploaded, %s has these files already or not enough files." % (dataset)
+        msg = "Nothing uploaded, %s has these files already." % (dataset)
         logger.info(msg)
+        logger.info('Make sure those files are marked as Done')
+        # docId is the has of the source LFN i.e. the file in the tmp area at the running site
+        files = [f['SourceLFN'] for f in toPublish]
+        mark_good(files, crabServer, logger)
+
         return "NOTHING TO DO"
 
     acquisition_era_config = {'acquisition_era_name': acquisitionera, 'start_date': 0}
@@ -697,7 +714,7 @@ def publishInDBS3(config, taskname, verbose):
 
     # If there are no files to publish, continue with the next dataset.
     if not dbsFiles_f:
-        msg = "Nothing to do for this dataset."
+        msg = "No file to publish to do for this dataset."
         logger.info(msg)
         return "NOTHING TO DO"
 
@@ -843,10 +860,10 @@ def main():
     if dryRun:
         config.TaskPublisher.dryRun = True
 
-    print("will run%s with:\nconfigFile: %s\ntaskname  : %s\n" % (modeMsg, configFile, taskname))
+    print("Will run%s with:\nconfigFile: %s\ntaskname  : %s\n" % (modeMsg, configFile, taskname))
 
     result = publishInDBS3(config, taskname, verbose)
-    print(result)
+    print("Completed with result: %s" % result)
 
 if __name__ == '__main__':
     main()

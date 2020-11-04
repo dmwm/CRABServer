@@ -229,7 +229,7 @@ class Master(object):
             fileDoc['subresource'] = 'acquirePublication'
             data = encodeRequest(fileDoc)
             try:
-                result = db.post(uri=uri, data=data)
+                result = db.post(uri=uri, data=data)  # pylint: disable=unused-variable
             except Exception as ex:
                 self.logger.error("Failed to acquire publications from %s: %s", uri, ex)
                 return []
@@ -341,6 +341,7 @@ class Master(object):
 
         except Exception:
             self.logger.exception("Error during process mapping")
+        self.logger.info("Algorithm iteration completed, wait %d sec for next cycle", self.pollInterval())
 
     def startSlave(self, task):
         """
@@ -513,8 +514,8 @@ class Master(object):
                 if self.TPconfig.dryRun:
                     cmd += " --dry"
                 logger.info("Now execute: %s", cmd)
-                subprocess.call(cmd, shell=True)
-                logger.info('ALL DONE')
+                stdout = subprocess.check_output(cmd, shell=True)
+                logger.info('TaskPublishScript completed. Output is: %s', stdout)
 
         except Exception:
             logger.exception("Exception when calling TaskPublish!")
