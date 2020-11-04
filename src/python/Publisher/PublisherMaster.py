@@ -229,7 +229,7 @@ class Master(object):
             fileDoc['subresource'] = 'acquirePublication'
             data = encodeRequest(fileDoc)
             try:
-                result = db.post(uri=uri, data=data)
+                result = db.post(uri=uri, data=data)  # pylint: disable=unused-variable
             except Exception as ex:
                 self.logger.error("Failed to acquire publications from %s: %s", uri, ex)
                 return []

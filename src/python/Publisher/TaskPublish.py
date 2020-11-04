@@ -286,13 +286,13 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
         report = result.get('migration_report')
         if "Migration terminally failed" in report:
             migTime = time.gmtime(result['migration_details']['creation_date'])
-            logger.debug("MigFailed at %s" % migTime)
+            logger.debug("MigFailed at %s", migTime)
             # in May 2019 has a storm of failed migration which needed the following cleanup
             # keep the code in case we ever need to do the same again
             if migTime.tm_year == 2019 and migTime.tm_mon == 5 and migTime.tm_mday < 21:
-                logger.debug("Failed migration %s requested on %s. Remove it" % (
-                    reqid, time.ctime(result['migration_deta     ils']['creation_date'])))
-                mdic = {'migration_rqst_id': reqid}
+                logger.debug("Failed migration %s requested on %s. Remove it",
+                    reqid, time.ctime(result['migration_deta     ils']['creation_date']))
+                mdic = {'migration_rqst_id': reqid} # pylint: disable=unused-variable
                 migrateApi.removeMigration({'migration_rqst_id': reqid})
                 logger.debug("  and submit again")
                 result = migrateApi.submitMigration(data)
