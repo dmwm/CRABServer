@@ -87,6 +87,7 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsD
 
         outputs = None
         t0 = time.time()
+        #log entry below is used for logs parsing, therefore, changing it might require to update logstash configuration
         logger.debug("%s: Starting %s on %s", procName, str(work), task['tm_taskname'])
         try:
             msg = None
@@ -108,6 +109,7 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsD
                 failTask(task['tm_taskname'], server, resturi, msg, logger, failstatus)
         t1 = time.time()
         workType = task.get('tm_task_command', 'RECURRING')
+        #log entry below is used for logs parsing, therefore, changing it might require to update logstash configuration
         logger.debug("%s: %s work on %s completed in %d seconds: %s", procName, workType, task['tm_taskname'], t1-t0, outputs)
 
         try:
