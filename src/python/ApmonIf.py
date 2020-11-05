@@ -36,7 +36,7 @@ class ApmonIf:
         if jobid is not None :
             jobId = jobid
         # Send to Monalisa
-        apmonSend(taskId, jobId, params)
+        # apmonSend(taskId, jobId, params)
             
     def free(self):
         apmonFree()
