@@ -272,7 +272,7 @@ class DBSDataDiscovery(DataDiscovery):
             if isUserDataset:
                 self.logger.info("USEDR dataset. Looking up data locations using origin site in DBS")
                 try:
-                    locationsMap = self.dbs.listFileBlockLocation(list(blocks), dbsOnly=True)
+                    locationsMap = self.dbs.listFileBlockLocation(list(blocks))
                 except Exception as ex:
                     raise TaskWorkerException(
                         "The CRAB3 server backend could not get the location of the files from rucio nor from dbs.\n"+\
