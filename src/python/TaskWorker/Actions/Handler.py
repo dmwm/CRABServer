@@ -126,6 +126,7 @@ class TaskHandler(object):
                 else:
                     break
             t1 = time.time()
+            #log entry below is used for logs parsing, therefore, changing it might require to update logstash configuration
             self.logger.info("Finished %s on %s in %d seconds", str(action), self._task['tm_taskname'], t1 - t0)
 
             #XXX MM - Not really sure what this is and why it's here, but I hate this..
