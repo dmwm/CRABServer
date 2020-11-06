@@ -51,8 +51,13 @@ class StageoutCheck(TaskAction):
             raise HTTPException(errormsg)
 
         lfn = os.path.join(lfnsaddprefix, filename)
-        pfnDict = rucioClient.getPFN(sitename, lfn)
-        pfn = pfnDict[lfn]
+        try:
+            pfnDict = rucioClient.getPFN(sitename, lfn)
+            pfn = pfnDict[lfn]
+        except Exception as ex:
+            msg = 'lfn2pfn resolution with Rucio failed for site: %s  LFN: %s' % (sitename, lfn)
+            msg += ' with exception :\n%s' % str(ex)
+            raise TaskWorkerException(msg)
 
         return pfn
 
