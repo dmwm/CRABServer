@@ -357,7 +357,9 @@ def submit(rucioClient, ftsContext, toTrans):
         try:
             for chunk in chunks(src_lfns, 10):
                 rucio_chunk = [scope+":"+x for x in chunk]
-                unsorted_source_pfns = [[k.split(scope+":")[1], str(x)] for k, x in rucioClient.cli.lfns2pfns(source, rucio_chunk).items()]
+                # 'read' operation should better work here !
+                unsorted_source_pfns = [[k.split(scope+":")[1], str(x)] for k, x in \
+                                        rucioClient.cli.lfns2pfns(source, rucio_chunk, operation='read').items()]
                 #logging.info(unsorted_source_pfns)
                 for order_lfn in chunk:
                     for lfn, pfn in unsorted_source_pfns:
@@ -367,7 +369,13 @@ def submit(rucioClient, ftsContext, toTrans):
 
             for chunk in chunks(dst_lfns, 10):
                 rucio_chunk = [scope+":"+x for x in chunk]
-                unsorted_dest_pfns = [[k.split(scope+":")[1], str(x)] for k, x in rucioClient.cli.lfns2pfns(toTrans[0][4], rucio_chunk).items()]
+                # try 'write' but fall back to 'read' if the site only implemented one
+                try:
+                    unsorted_dest_pfns = [[k.split(scope+":")[1], str(x)] for k, x in \
+                                      rucioClient.cli.lfns2pfns(toTrans[0][4], rucio_chunk, operation='write').items()]
+                except Exception as ex:
+                    unsorted_dest_pfns = [[k.split(scope+":")[1], str(x)] for k, x in \
+                                      rucioClient.cli.lfns2pfns(toTrans[0][4], rucio_chunk, operation='read').items()]
                 #logging.info(unsorted_dest_pfns)
                 for order_lfn in chunk:
                     for lfn, pfn in unsorted_dest_pfns:
@@ -570,7 +578,6 @@ def algorithm():
         except Exception as ex:
             msg = "Username gathering failed with\n%s" % str(ex)
             logging.warn(msg)
-            locations = None
             raise ex
 
     try:
@@ -585,7 +592,6 @@ def algorithm():
     except Exception as exc:
         msg = "Rucio initialization failed with\n%s" % str(exc)
         logging.warn(msg)
-        locations = None
         raise exc
 
     jobs_ongoing = state_manager(fts)

@@ -52,12 +52,18 @@ class StageoutCheck(TaskAction):
 
         lfn = os.path.join(lfnsaddprefix, filename)
         try:
-            pfnDict = rucioClient.getPFN(sitename, lfn)
+            pfnDict = rucioClient.getPFN(sitename, lfn, operation='write')
             pfn = pfnDict[lfn]
         except Exception as ex:
-            msg = 'lfn2pfn resolution with Rucio failed for site: %s  LFN: %s' % (sitename, lfn)
-            msg += ' with exception :\n%s' % str(ex)
-            raise TaskWorkerException(msg)
+            self.logger.warning('Rucio lfn2pfn resolution for Write failed with:\n%s', ex)
+            self.logger.warning("Will try with operation='read'")
+            try:
+                pfnDict = rucioClient.getPFN(sitename, lfn, operation='read')
+                pfn = pfnDict[lfn]
+            except Exception as ex:
+                msg = 'lfn2pfn resolution with Rucio failed for site: %s  LFN: %s' % (sitename, lfn)
+                msg += ' with exception :\n%s' % str(ex)
+                raise TaskWorkerException(msg)
 
         return pfn
 
@@ -125,12 +131,12 @@ class StageoutCheck(TaskAction):
         else:
             cpCmd, rmCmd, append = getCheckWriteCommand(self.proxy, self.logger)
             if not cpCmd:
-                self.logger.info("CRAB3 is not configured to check write permissions. There is no GFAL2 or LCG commands installed. Continuing")
+                self.logger.info("Can not check write permissions. No GFAL2 or LCG commands installed. Continuing")
                 return
+            self.logger.info("Will check stageout at %s", self.task['tm_asyncdest'])
             filename = re.sub("[:-_]", "", self.task['tm_taskname']) + '_crab3check.tmp'
             try:
-                with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-                    pfn = self.getPFN(self.task['tm_output_lfn'], filename, self.task['tm_asyncdest'])
+                pfn = self.getPFN(self.task['tm_output_lfn'], filename, self.task['tm_asyncdest'])
                 cpCmd += append + os.path.abspath(filename) + " " + pfn
                 rmCmd += " " + pfn
                 createDummyFile(filename, self.logger)
@@ -140,10 +146,7 @@ class StageoutCheck(TaskAction):
                     self.logger.info("Executing rm command: %s ", rmCmd)
                     self.checkPermissions(rmCmd)
             except IOError as er:
-                self.logger.info('IOError %s. CRAB3 backend disk is full. Please report to experts. Task will not be submitted', er)
-                raise
-            except HTTPException as er:
-                self.logger.warning("CRAB3 is not able to get pfn from PhEDEx. Error %s", er)
+                raise TaskWorkerException("TaskWorker disk is full: %s" % er)
             finally:
                 removeDummyFile(filename, self.logger)
             return
