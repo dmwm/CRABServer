@@ -33,6 +33,8 @@ import tempfile
 import functools
 import subprocess
 
+import classad
+
 from ast import literal_eval
 from WMCore.DataStructs.LumiList import LumiList
 
@@ -172,6 +174,11 @@ class PreDAG(object):
         config.TaskWorker.cmskey  = os.environ.get('X509_USER_PROXY')
         config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
                                                          X509_USER_KEY=config.TaskWorker.cmskey)
+
+        # need to get username from classAd to setup for Rucio access
+        task_ad = classad.parseOne(open(os.environ['_CONDOR_JOB_AD']))
+        username = task_ad['CRAB_UserHN']
+        config.Services.Rucio_account = username
 
         # need the global black list
         config.TaskWorker.scratchDir = './scratchdir'
