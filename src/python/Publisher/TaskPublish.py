@@ -798,9 +798,10 @@ def publishInDBS3(config, taskname, verbose):
             logger.error(msg)
             failure_reason = str(ex)
             fname = '/tmp/failed-block-at-%s.txt' % time.time()
+            import pprint
             with open(fname, 'w') as fd:
-                fd.write(blockDump)
-            logger.error("FAILING BLOCK SAVED AS %s", file)
+                fd.write(pprint.pformat(blockDump))
+            logger.error("FAILING BLOCK SAVED AS %s", fname)
         count += max_files_per_block
         files_to_publish_next = dbsFiles_f[count:count+max_files_per_block]
         if len(files_to_publish_next) < max_files_per_block:
