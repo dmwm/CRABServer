@@ -305,6 +305,8 @@ class Master(object):
         2. For each taks get a suitably sized input for publish
         3. Submit the publish to a subprocess
         """
+
+        self.startTime = time.time()
         tasks = self.active_tasks(self.crabServer)
 
         # example code, uncomment to pick only one task
@@ -346,7 +348,8 @@ class Master(object):
 
         except Exception:
             self.logger.exception("Error during process mapping")
-        self.logger.info("Algorithm iteration completed, wait %d sec for next cycle", self.pollInterval())
+        self.logger.info("Algorithm iteration completed")
+        self.logger.info("Wait %d sec for next cycle", self.pollInterval())
 
     def startSlave(self, task):
         """
@@ -530,10 +533,13 @@ class Master(object):
                 taskname = summary['taskname']
                 if result == 'OK':
                     if reason == 'NOTHING TO DO':
-                        logger.info('Taskname %s is %s. Nothing to do', taskname, result)
+                        logger.info('Taskname %s is OK. Nothing to do', taskname)
                     else:
-                        logger.info('Taskname %s is %s. Published %d files in %d blocks',
-                                    taskname, result, summary['publishedBlocks'], summary['publishedFiles'])
+                        msg = 'Taskname %s is OK. Published %d files in %d blocks.' % \
+                              (taskname, summary['publishedFiles'], summary['publishedBlocks'])
+                        if summary['nextIterFiles'] :
+                            msg += ' %d files left for next iteration.' % summary['nextIterFiles']
+                        logger.info(msg)
                 if result == 'FAIL':
                     logger.error('Taskname %s : TaskPublish failed with: %s', taskname, reason)
                     if reason == 'DBS Publication Failure':
@@ -541,8 +547,8 @@ class Master(object):
                                      taskname, summary['failedBlocks'], summary['failedFiles'])
                         logger.error('Taskname %s : Failed block(s) details have been saved in %s',
                                      taskname, summary['failedBlockDumps'])
-        except Exception:
-            logger.exception("Exception when calling TaskPublish!")
+        except Exception as ex:
+            logger.exception("Exception when calling TaskPublish!\n%s", str(ex))
 
         return 0
 
@@ -554,13 +560,13 @@ class Master(object):
                obtained from a call to time.time()
         :return: timeToWait: integer: the intervat time to wait before starting next cycle, in seconds
         """
-        if startTime:
-            now = time.time()
-            elapsed = int(now - startTime)
-        else:
-            elapsed = 0
+        #if startTime:
+        now = time.time()
+        elapsed = int(now - self.startTime)
+        #else:
+        #   elapsed = 0
         timeToWait = self.config.pollInterval - elapsed
-        timeToWait = max(timeToWait, 0)  # it too long has passed, start now !
+        timeToWait = max(timeToWait, 0)  # if too long has passed, start now !
         return timeToWait
 
 
@@ -575,6 +581,5 @@ if __name__ == '__main__':
 
     master = Master(confFile=configurationFile)
     while True:
-        iterationStartTime = time.time()
         master.algorithm()
-        time.sleep(master.pollInterval(iterationStartTime))
+        time.sleep(master.pollInterval())
