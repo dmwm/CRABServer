@@ -8,6 +8,8 @@ source /data/srv/TaskManager/env.sh
 rm -f /data/srv/TaskManager/nohup.out
 
 check_link(){
+# function checks if symbolic links required to start service exists and if they are not broken
+
   if [ -L $1 ] ; then
     if [ -e $1 ] ; then
        return 0
