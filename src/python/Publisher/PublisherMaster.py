@@ -13,6 +13,7 @@ from __future__ import division
 from __future__ import print_function
 import argparse
 import logging
+from logging import FileHandler
 from logging.handlers import TimedRotatingFileHandler
 import os
 import subprocess
@@ -49,11 +50,11 @@ def setMasterLogger(name='master'):
         can be retrieved with logging.getLogger(name) in other parts of the code
     """
     logger = logging.getLogger(name)
-    handler = TimedRotatingFileHandler('logs/processes/proc.c3id_%s.pid_%s.txt' % (name, os.getpid()), 'midnight', backupCount=30)
+    fileName = os.path.join('logs', 'processes', "proc.c3id_%s.pid_%s.txt" % (name, os.getpid()))
+    handler = TimedRotatingFileHandler(fileName, 'midnight', backupCount=30)
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+name+":%(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-
     return logger
 
 def setSlaveLogger(name):
@@ -61,11 +62,13 @@ def setSlaveLogger(name):
         can be retrieved with logging.getLogger(name) in other parts of the code
     """
     logger = logging.getLogger(name)
-    handler = TimedRotatingFileHandler('logs/processes/proc.c3id_%s.pid_%s.txt' % (name, os.getpid()), 'midnight', backupCount=30)
+    fileName = os.path.join('logs', 'processes', "proc.c3id_%s.pid_%s.txt" % (name, os.getpid()))
+    #handler = TimedRotatingFileHandler(fileName, 'midnight', backupCount=30)
+    # slaves are short lived, use one log file for each
+    handler = FileHandler(fileName)
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+"slave"+":%(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-
     return logger
 
 
@@ -109,10 +112,11 @@ class Master(object):
         self.TestMode = testMode
         self.taskFilesDir = self.config.taskFilesDir
         createLogdir(self.taskFilesDir)
+        createLogdir(os.path.join(self.taskFilesDir, 'FailedBlocks'))
 
         def setRootLogger(logsDir, quiet=False, debug=True, console=False):
             """Sets the root logger with the desired verbosity level
-               The root logger logs to logs/twlog.txt and every single
+               The root logger logs to logs/log.txt and every single
                logging instruction is propagated to it (not really nice
                to read)
 
@@ -122,14 +126,14 @@ class Master(object):
             :return logger: a logger with the appropriate logger level."""
 
             createLogdir(logsDir)
-            createLogdir(logsDir + '/processes')
-            createLogdir(logsDir + '/tasks')
+            createLogdir(os.path.join(logsDir, 'processes'))
+            createLogdir(os.path.join(logsDir, 'tasks'))
 
             if console:
                 # if we are testing log to the console is easier
                 logging.getLogger().addHandler(logging.StreamHandler())
             else:
-                logHandler = MultiProcessingLog(logsDir + '/log.txt', when='midnight')
+                logHandler = MultiProcessingLog(os.path.join(logsDir, 'log.txt'), when='midnight')
                 logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
                 logHandler.setFormatter(logFormatter)
                 logging.getLogger().addHandler(logHandler)
@@ -190,7 +194,7 @@ class Master(object):
                                        localcert=self.config.serviceCert,
                                        localkey=self.config.serviceKey,
                                        retry=3)
-
+        self.startTime = time.time()
 
         #try:
         #    self.connection = RequestHandler(config={'timeout': 900, 'connecttimeout' : 900})
@@ -297,10 +301,12 @@ class Master(object):
 
     def algorithm(self):
         """
-        1. Get a list of users with files to publish from the REST
-        2. For each user get a suitably sized input for publish
+        1. Get a list of files to publish from the REST and organize by taskname
+        2. For each taks get a suitably sized input for publish
         3. Submit the publish to a subprocess
         """
+
+        self.startTime = time.time()
         tasks = self.active_tasks(self.crabServer)
 
         # example code, uncomment to pick only one task
@@ -312,7 +318,7 @@ class Master(object):
         # tasks = tasksToDo
 
         maxSlaves = self.config.max_slaves
-        self.logger.info('kicking off pool for %s tasks in batches of %s', len(tasks), maxSlaves)
+        self.logger.info('kicking off pool for %s tasks using up to %s concurrent slaves', len(tasks), maxSlaves)
         self.logger.debug('list of tasks %s', [x[0][3] for x in tasks])
         processes = []
 
@@ -337,11 +343,15 @@ class Master(object):
                         time.sleep(10)
                         for proc in processes:
                             if not proc.is_alive():
+                                self.logger.info('Terminated: %s pid=%s', proc, proc.pid)
                                 processes.remove(proc)
 
         except Exception:
             self.logger.exception("Error during process mapping")
-        self.logger.info("Algorithm iteration completed, wait %d sec for next cycle", self.pollInterval())
+        self.logger.info("Algorithm iteration completed")
+        self.logger.info("Wait %d sec for next cycle", self.pollInterval())
+        newStartTime = time.strftime("%H:%M:%S", time.localtime(time.time()+self.pollInterval()))
+        self.logger.info("Next cycle will start at %s", newStartTime)
 
     def startSlave(self, task):
         """
@@ -400,7 +410,7 @@ class Master(object):
                 msg = "Considering task status as terminal. Will force publication."
                 logger.info(msg)
             # Otherwise...
-            else:
+            else:    ## TODO put this else in a function like def checkForPublication()
                 msg = "Task status is not considered terminal."
                 logger.info(msg)
                 msg = "Getting last publication time."
@@ -515,18 +525,47 @@ class Master(object):
                     cmd += " --dry"
                 logger.info("Now execute: %s", cmd)
                 stdout = subprocess.check_output(cmd, shell=True)
-                logger.info('TaskPublishScript completed. Output is: %s', stdout)
+                logger.info('TaskPublishScript done : %s', stdout)
 
-        except Exception:
-            logger.exception("Exception when calling TaskPublish!")
+                jsonSummary = stdout.split()[-1]
+                with open(jsonSummary, 'r') as fd:
+                    summary = json.load(fd)
+                result = summary['result']
+                reason = summary['reason']
+
+                taskname = summary['taskname']
+                if result == 'OK':
+                    if reason == 'NOTHING TO DO':
+                        logger.info('Taskname %s is OK. Nothing to do', taskname)
+                    else:
+                        msg = 'Taskname %s is OK. Published %d files in %d blocks.' % \
+                              (taskname, summary['publishedFiles'], summary['publishedBlocks'])
+                        if summary['nextIterFiles'] :
+                            msg += ' %d files left for next iteration.' % summary['nextIterFiles']
+                        logger.info(msg)
+                if result == 'FAIL':
+                    logger.error('Taskname %s : TaskPublish failed with: %s', taskname, reason)
+                    if reason == 'DBS Publication Failure':
+                        logger.error('Taskname %s : %d blocks failed for a total of %d files',
+                                     taskname, summary['failedBlocks'], summary['failedFiles'])
+                        logger.error('Taskname %s : Failed block(s) details have been saved in %s',
+                                     taskname, summary['failedBlockDumps'])
+        except Exception as ex:
+            logger.exception("Exception when calling TaskPublish!\n%s", str(ex))
 
         return 0
 
     def pollInterval(self):
         """
-        :return: the poll Interval from thius master configuration
+        Decide when next polling cycle must start so that there is a start each
+        self.config.pollInterval seconds
+        :return: timeToWait: integer: the intervat time to wait before starting next cycle, in seconds
         """
-        return self.config.pollInterval
+        now = time.time()
+        elapsed = int(now - self.startTime)
+        timeToWait = self.config.pollInterval - elapsed
+        timeToWait = max(timeToWait, 0)  # if too muach time has passed, start now !
+        return timeToWait
 
 
 if __name__ == '__main__':

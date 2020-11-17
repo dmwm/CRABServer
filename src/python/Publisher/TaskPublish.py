@@ -13,6 +13,7 @@ import sys
 import json
 import traceback
 import argparse
+import pprint
 
 import dbs.apis.dbsClient as dbsClient
 from ServerUtilities import getHashLfn, encodeRequest
@@ -399,19 +400,49 @@ def publishInDBS3(config, taskname, verbose):
                 print(str(ose))
                 print("The task worker need to access the '%s' directory" % dirname)
                 sys.exit(1)
+        return
+
+    def saveSummaryJson(logdir, summary):
+        """
+        Save a publication summary as JSON. Make a new file every time this script runs
+        :param summary: a summary disctionary. Must at least have key 'taskname'
+        :param logdir: the directory where to write the summary
+        :return: the full path name of the written file
+        """
+        taskname = summary['taskname']
+        counter = 1
+        summaryFileName = os.path.join(logdir, taskname + '-1.json')
+        while os.path.exists(summaryFileName):
+            counter += 1
+            summaryFileName = os.path.join(logdir, taskname + '-%d.json' % counter)
+        with open(summaryFileName, 'w') as fd:
+            json.dump(summary, fd)
+        return summaryFileName
 
     taskFilesDir = config.General.taskFilesDir
     dryRun = config.TaskPublisher.dryRun
     username = taskname.split(':')[1].split('_')[0]
-    logdir = config.General.logsDir + '/tasks/' + username
-    logfile = logdir + '/' + taskname + '.log'
+    logdir = os.path.join(config.General.logsDir, 'tasks', username)
+    logfile = os.path.join(logdir, taskname + '.log')
     createLogdir(logdir)
     logger = logging.getLogger(taskname)
     logging.basicConfig(filename=logfile, level=logging.INFO, format=config.TaskPublisher.logMsgFormat)
     if verbose:
         logger.setLevel(logging.DEBUG)
 
-    logger.info("Getting files to publish")
+    logger.info("Start new iteration. Get files to publish")
+
+    # prepare a dummy summary JSON file in case there's nothing to do
+    nothingToDo = {}
+    nothingToDo['taskname'] = taskname
+    nothingToDo['result'] = 'OK'
+    nothingToDo['reason'] = 'NOTHING TO DO'
+    nothingToDo['publishedBlocks'] = 0
+    nothingToDo['failedBlocks'] = 0
+    nothingToDo['failedBlockDumps'] = []
+    nothingToDo['publishedFiles'] = 0
+    nothingToDo['failedFiles'] = 0
+    nothingToDo['nextIterFiles'] = 0
 
     toPublish = []
     # TODO move from new to done when processed
@@ -421,8 +452,8 @@ def publishInDBS3(config, taskname, verbose):
 
     if not toPublish:
         logger.info("Empty data file %s", fname)
-        return "NOTHING TO DO"
-
+        summaryFileName = saveSummaryJson(logdir, nothingToDo)
+        return summaryFileName
 
     pnn = toPublish[0]["Destination"]
 
@@ -469,7 +500,10 @@ def publishInDBS3(config, taskname, verbose):
         results = crabServer.get(REST_task, data=encodeRequest(data))
     except Exception as ex:
         logger.error("Failed to get acquired publications from oracleDB for %s: %s", taskname, ex)
-        return "FAILED"
+        nothingToDo['result'] = 'FAIL'
+        nothingToDo['reason'] = 'Error contacting CRAB REST'
+        summaryFileName = saveSummaryJson(logdir, nothingToDo)
+        return summaryFileName
 
     if verbose:
         logger.info(results[0]['desc']['columns'])
@@ -497,9 +531,9 @@ def publishInDBS3(config, taskname, verbose):
     os.environ['X509_USER_CERT'] = config.General.serviceCert
     os.environ['X509_USER_KEY'] = config.General.serviceKey
 
-    logger.info("Source API URL: %s", sourceURL)
+    logger.info("DBS Source API URL: %s", sourceURL)
     sourceApi = dbsClient.DbsApi(url=sourceURL)
-    logger.info("Global API URL: %s", globalURL)
+    logger.info("DBS Global API URL: %s", globalURL)
     globalApi = dbsClient.DbsApi(url=globalURL)
 
     if publish_dbs_url.endswith('/DBSWriter'):
@@ -511,15 +545,18 @@ def publishInDBS3(config, taskname, verbose):
         publish_dbs_url += '/DBSWriter'
 
     try:
-        logger.info("Destination API URL: %s", publish_dbs_url)
+        logger.info("DBS Destination API URL: %s", publish_dbs_url)
         destApi = dbsClient.DbsApi(url=publish_dbs_url)
-        logger.info("Destination read API URL: %s", publish_read_url)
+        logger.info("DBS Destination read API URL: %s", publish_read_url)
         destReadApi = dbsClient.DbsApi(url=publish_read_url)
-        logger.info("Migration API URL: %s", publish_migrate_url)
+        logger.info("DBS Migration API URL: %s", publish_migrate_url)
         migrateApi = dbsClient.DbsApi(url=publish_migrate_url)
     except Exception:
         logger.exception('Wrong DBS URL %s', publish_dbs_url)
-        return "FAILED"
+        nothingToDo['result'] = 'FAIL'
+        nothingToDo['reason'] = 'Error contacting DBS'
+        summaryFileName = saveSummaryJson(logdir, nothingToDo)
+        return summaryFileName
 
     logger.info("inputDataset: %s", inputDataset)
     noInput = len(inputDataset.split("/")) <= 3
@@ -534,7 +571,10 @@ def publishInDBS3(config, taskname, verbose):
             existing_output = destReadApi.listOutputConfigs(dataset=inputDataset)
         except Exception:
             logger.exception('Wrong DBS URL %s', publish_dbs_url)
-            return "FAILED"
+            nothingToDo['result'] = 'FAIL'
+            nothingToDo['reason'] = 'Error looking up input dataset in DBS'
+            summaryFileName = saveSummaryJson(logdir, nothingToDo)
+            return summaryFileName
         if not existing_output:
             msg = "Unable to list output config for input dataset %s." % (inputDataset)
             logger.error(msg)
@@ -595,7 +635,10 @@ def publishInDBS3(config, taskname, verbose):
         msg = "Error when listing files in DBS: %s" % (str(ex))
         msg += "\n%s" % (str(traceback.format_exc()))
         logger.error(msg)
-        return "FAILED"
+        nothingToDo['result'] = 'FAIL'
+        nothingToDo['reason'] = 'Error listing existing files in DBS'
+        summaryFileName = saveSummaryJson(logdir, nothingToDo)
+        return summaryFileName
 
     # check if actions are needed
     workToDo = False
@@ -613,8 +656,8 @@ def publishInDBS3(config, taskname, verbose):
         # docId is the has of the source LFN i.e. the file in the tmp area at the running site
         files = [f['SourceLFN'] for f in toPublish]
         mark_good(files, crabServer, logger)
-
-        return "NOTHING TO DO"
+        summaryFileName = saveSummaryJson(logdir, nothingToDo)
+        return summaryFileName
 
     acquisition_era_config = {'acquisition_era_name': acquisitionera, 'start_date': 0}
 
@@ -716,7 +759,8 @@ def publishInDBS3(config, taskname, verbose):
     if not dbsFiles_f:
         msg = "No file to publish to do for this dataset."
         logger.info(msg)
-        return "NOTHING TO DO"
+        summaryFileName = saveSummaryJson(logdir, nothingToDo)
+        return summaryFileName
 
     # Migrate parent blocks before publishing.
     # First migrate the parent blocks that are in the same DBS instance
@@ -742,7 +786,8 @@ def publishInDBS3(config, taskname, verbose):
                 #failed.extend([f['lfn'].replace("/store","/store/temp") for f in dbsFiles_f])
                 failure_reason = failureMsg
                 published = [x for x in published[dataset] if x not in failed[dataset]]
-                return "NOTHING TO DO"
+                summaryFileName = saveSummaryJson(logdir, nothingToDo)
+                return summaryFileName
     # Then migrate the parent blocks that are in the global DBS instance.
     if globalParentBlocks:
         msg = "List of parent blocks that need to be migrated from %s:\n%s" % (globalApi.url, globalParentBlocks)
@@ -759,7 +804,8 @@ def publishInDBS3(config, taskname, verbose):
                 #failed.extend([f['lfn'].replace("/store","/store/temp") for f in dbsFiles_f])
                 failure_reason = failureMsg
                 published = [x for x in published[dataset] if x not in failed[dataset]]
-                return "NOTHING TO DO"
+                summaryFileName = saveSummaryJson(logdir, nothingToDo)
+                return summaryFileName
     # Publish the files in blocks. The blocks must have exactly max_files_per_block
     # files, unless there are less than max_files_per_block files to publish to
     # begin with. If there are more than max_files_per_block files to publish,
@@ -767,7 +813,10 @@ def publishInDBS3(config, taskname, verbose):
     # PublisherWorker call, unless forced to published.
     block_count = 0
     count = 0
+    publishedBlocks = 0
+    failedBlocks = 0
     max_files_per_block = config.General.max_files_per_block
+    dumpList = []   # keep a list of files where blocks which fail publication are dumped
     while True:
         block_name = "%s#%s" % (dataset, str(uuid.uuid4()))
         files_to_publish = dbsFiles[count:count+max_files_per_block]
@@ -787,6 +836,7 @@ def publishInDBS3(config, taskname, verbose):
             else:
                 destApi.insertBulkBlock(blockDump)
             block_count += 1
+            publishedBlocks += 1
         except Exception as ex:
             #logger.error("Error for files: %s" % [f['SourceLFN'] for f in toPublish])
             logger.error("Error for files: %s", [f['lfn'] for f in toPublish])
@@ -797,11 +847,13 @@ def publishInDBS3(config, taskname, verbose):
             msg += str(traceback.format_exc())
             logger.error(msg)
             failure_reason = str(ex)
-            fname = '/tmp/failed-block-at-%s.txt' % time.time()
-            import pprint
+            taskFilesDir = config.General.taskFilesDir
+            fname = os.path.join(taskFilesDir, 'FailedBlocks', 'failed-block-at-%s.txt' % time.time())
             with open(fname, 'w') as fd:
                 fd.write(pprint.pformat(blockDump))
-            logger.error("FAILING BLOCK SAVED AS %s", fname)
+            dumpList.append(fname)
+            failedBlocks += 1
+            logger.error("FAILING BLOCK DUE TO %s SAVED AS %s", str(ex), fname)
         count += max_files_per_block
         files_to_publish_next = dbsFiles_f[count:count+max_files_per_block]
         if len(files_to_publish_next) < max_files_per_block:
@@ -838,13 +890,38 @@ def publishInDBS3(config, taskname, verbose):
     except Exception as ex:
         logger.exception("Status update failed: %s", ex)
 
-    return 0
+    summary = {}
+    summary['taskname'] = taskname
+    summary['result'] = 'OK' if not failed else 'FAIL'
+    summary['reason'] = '' if not failed else 'DBS Publication Failure'
+    summary['publishedBlocks'] = publishedBlocks
+    summary['failedBlocks'] = failedBlocks
+    summary['failedBlockDumps'] = dumpList
+    summary['publishedFiles'] = len(published)
+    summary['failedFiles'] = len(failed)
+    summary['nextIterFiles'] = len(publish_in_next_iteration)
+
+    summaryFileName = saveSummaryJson(logdir, summary)
+
+    return summaryFileName
+
 
 def main():
     """
     starting from json file prepared by PusblishMaster with info on filed to be published, does
     the actual DBS publication
-    :return:
+    :return: prints various things to stdout, last string is the name of a JSON file with summary of the work done
+            key          :    type, value
+        taskname         : string, name of the task
+        result           : string, 'OK' or 'FAIL'
+        reason           : string, the failure reason, empty ('') if result=='OK'
+        publishedBlocks  : integer, the number of published blocks
+        failedBlocks     : integer, the number of blocks which failed to be published
+        failedBlockDumps : list of strings, the one filename for each failed block containing the blockDump
+                           as passed in input to the failing DBS API insertBulkBlock(blockDump)
+        publishedFiles   : integer, the number of published files
+        failedFiles      : integer, the number of failed in the blocks which failed to be published
+        nextIterFiles    : integer, the number of files left to be handled in next iteration
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('--configFile', help='Publisher configuration file', default='PublisherConfig.py')
@@ -861,10 +938,11 @@ def main():
     if dryRun:
         config.TaskPublisher.dryRun = True
 
-    print("Will run%s with:\nconfigFile: %s\ntaskname  : %s\n" % (modeMsg, configFile, taskname))
+    if verbose:
+        print("Will run%s with:\nconfigFile: %s\ntaskname  : %s\n" % (modeMsg, configFile, taskname))
 
     result = publishInDBS3(config, taskname, verbose)
-    print("Completed with result: %s" % result)
+    print("Completed with result in %s" % result)
 
 if __name__ == '__main__':
     main()
