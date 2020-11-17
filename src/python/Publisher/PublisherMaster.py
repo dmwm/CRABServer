@@ -350,7 +350,7 @@ class Master(object):
             self.logger.exception("Error during process mapping")
         self.logger.info("Algorithm iteration completed")
         self.logger.info("Wait %d sec for next cycle", self.pollInterval())
-        newStartTime = time.strftime("%H:%M:%S", time.localtime(time.time())+self.pollInterval())
+        newStartTime = time.strftime("%H:%M:%S", time.localtime(time.time()+self.pollInterval()))
         self.logger.info("Next cycle will start at %s", newStartTime)
 
     def startSlave(self, task):
@@ -525,7 +525,7 @@ class Master(object):
                     cmd += " --dry"
                 logger.info("Now execute: %s", cmd)
                 stdout = subprocess.check_output(cmd, shell=True)
-                logger.info('TaskPublishScript completed. Output is: %s', stdout)
+                logger.info('TaskPublishScript done : %s', stdout)
 
                 jsonSummary = stdout.split()[-1]
                 with open(jsonSummary, 'r') as fd:
