@@ -194,7 +194,7 @@ class Master(object):
                                        localcert=self.config.serviceCert,
                                        localkey=self.config.serviceKey,
                                        retry=3)
-
+        self.startTime = time.time()
 
         #try:
         #    self.connection = RequestHandler(config={'timeout': 900, 'connecttimeout' : 900})
@@ -530,6 +530,7 @@ class Master(object):
                     summary = json.load(fd)
                 result = summary['result']
                 reason = summary['reason']
+
                 taskname = summary['taskname']
                 if result == 'OK':
                     if reason == 'NOTHING TO DO':
