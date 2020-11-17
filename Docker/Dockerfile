@@ -1,4 +1,4 @@
-FROM cmssw/cmsweb:20200901
+FROM cmssw/cmsweb:20201113
 MAINTAINER Daina Dirmaite daina.dirmaite@gmail.com
 
 #keep only voms-proxy basded on c++
@@ -24,8 +24,6 @@ WORKDIR ${WDIR}
 # install
 COPY --chown=${USER}:${USER} install.sh monitor.sh ./
 RUN echo "Y" > yes.repo && sh install.sh < yes.repo
-
-RUN echo '"cms" "lcg-voms2.cern.ch" "15002" "/DC=ch/DC=cern/OU=computers/CN=lcg-voms2.cern.ch" "cms" "24"' > /etc/vomses/cms-lcg-voms2.cern.ch && echo '"cms" "voms2.cern.ch" "15002" "/DC=ch/DC=cern/OU=computers/CN=voms2.cern.ch" "cms" "24"' > /etc/vomses/cms-voms2.cern.ch
 
 # run the service
 CMD sh start.sh && sh /data/monitor.sh && while true; do sleep 60;done
