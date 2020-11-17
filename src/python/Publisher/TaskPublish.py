@@ -942,7 +942,7 @@ def main():
         print("Will run%s with:\nconfigFile: %s\ntaskname  : %s\n" % (modeMsg, configFile, taskname))
 
     result = publishInDBS3(config, taskname, verbose)
-    print("Completed with result in: %s" % result)
+    print("Completed with result in %s" % result)
 
 if __name__ == '__main__':
     main()
