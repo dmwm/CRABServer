@@ -318,7 +318,6 @@ class Master(object):
         maxSlaves = self.config.max_slaves
         self.logger.info('kicking off pool for %s tasks using up to %s concurrent slaves', len(tasks), maxSlaves)
         self.logger.debug('list of tasks %s', [x[0][3] for x in tasks])
-        self.iterationStartTime = time.time()
         processes = []
 
         try:
@@ -529,7 +528,7 @@ class Master(object):
                 result = summary['result']
                 reason = summary['reason']
                 taskname = summary['taskname']
-                if result =='OK':
+                if result == 'OK':
                     if reason == 'NOTHING TO DO':
                         logger.info('Taskname %s is %s. Nothing to do', taskname, result)
                     else:
@@ -547,11 +546,22 @@ class Master(object):
 
         return 0
 
-    def pollInterval(self):
+    def pollInterval(self, startTime=None):
         """
-        :return: the poll Interval from thius master configuration
+        Decide when next polling cycle must start so that there is a start each
+        self.config.pollInterval seconds
+        :param startTime: float,  the timestamp (seconds from epcoch) at which last cycle started as
+               obtained from a call to time.time()
+        :return: timeToWait: integer: the intervat time to wait before starting next cycle, in seconds
         """
-        return self.config.pollInterval
+        if startTime:
+            now = time.time()
+            elapsed = int(now - startTime)
+        else:
+            elapsed = 0
+        timeToWait = self.config.pollInterval - elapsed
+        timeToWait = max(timeToWait, 0)  # it too long has passed, start now !
+        return timeToWait
 
 
 if __name__ == '__main__':
@@ -565,5 +575,6 @@ if __name__ == '__main__':
 
     master = Master(confFile=configurationFile)
     while True:
+        iterationStartTime = time.time()
         master.algorithm()
-        time.sleep(master.pollInterval())
+        time.sleep(master.pollInterval(iterationStartTime))
