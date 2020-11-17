@@ -19,6 +19,26 @@ source ${PUBLISHER_HOME}/env.sh
 
 rm -f ${PUBLISHER_HOME}/nohup.out
 
+check_link(){
+  if [ -L $1 ] ; then
+    if [ -e $1 ] ; then
+       return 0
+    else
+       unlink $1
+       return 1
+    fi
+  else
+    return 1
+  fi
+}
+
+declare -A links=( ["PublisherConfig.py"]="/data/hostdisk/${SERVICE}/cfg/PublisherConfig.py" ["logs"]="/data/hostdisk/${SERVICE}/logs" ["/data/srv/Publisher_files"]="/data/hostdisk/${SERVICE}/PublisherFiles" )
+
+for name in "${!links[@]}";
+do
+  check_link "${name}" || ln -s "${links[$name]}" "$name"
+done
+
 __strip_pythonpath(){
 # this function is used to strip the taskworker lines from $PYTHONPATH
 # in order for the debug |private calls to be able to add theirs
