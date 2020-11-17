@@ -350,6 +350,8 @@ class Master(object):
             self.logger.exception("Error during process mapping")
         self.logger.info("Algorithm iteration completed")
         self.logger.info("Wait %d sec for next cycle", self.pollInterval())
+        newStartTime = time.strftime("%H:%M:%S", time.localtime(time.time())+self.pollInterval())
+        self.logger.info("Next cycle will start at %s", newStartTime)
 
     def startSlave(self, task):
         """
@@ -408,7 +410,7 @@ class Master(object):
                 msg = "Considering task status as terminal. Will force publication."
                 logger.info(msg)
             # Otherwise...
-            else:
+            else:    ## TODO put this else in a function like def checkForPublication()
                 msg = "Task status is not considered terminal."
                 logger.info(msg)
                 msg = "Getting last publication time."
@@ -553,21 +555,16 @@ class Master(object):
 
         return 0
 
-    def pollInterval(self, startTime=None):
+    def pollInterval(self):
         """
         Decide when next polling cycle must start so that there is a start each
         self.config.pollInterval seconds
-        :param startTime: float,  the timestamp (seconds from epcoch) at which last cycle started as
-               obtained from a call to time.time()
         :return: timeToWait: integer: the intervat time to wait before starting next cycle, in seconds
         """
-        #if startTime:
         now = time.time()
         elapsed = int(now - self.startTime)
-        #else:
-        #   elapsed = 0
         timeToWait = self.config.pollInterval - elapsed
-        timeToWait = max(timeToWait, 0)  # if too long has passed, start now !
+        timeToWait = max(timeToWait, 0)  # if too muach time has passed, start now !
         return timeToWait
 
 
