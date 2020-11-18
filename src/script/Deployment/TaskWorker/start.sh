@@ -22,6 +22,9 @@ check_link(){
   fi
 }
 
+#directories/files that should exist before creating links (SERVICE will be set to 'TaskWorker'):
+# -/data/hostdisk/${SERVICE}/cfg/TaskWorkerConfig.py
+# -/data/hostdisk/${SERVICE}/logs
 declare -A links=( ["current/TaskWorkerConfig.py"]="/data/hostdisk/${SERVICE}/cfg/TaskWorkerConfig.py" ["logs"]="/data/hostdisk/${SERVICE}/logs")
 
 for name in "${!links[@]}";

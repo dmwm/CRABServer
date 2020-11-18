@@ -34,6 +34,10 @@ check_link(){
   fi
 }
 
+#directories/files that should exist before creating links (SERVICE is type of Publisher started, e.g.Publisher_rucio):
+# -/data/hostdisk/${SERVICE}/cfg/PublisherConfig.py
+# -/data/hostdisk/${SERVICE}/logs
+# -/data/hostdisk/${SERVICE}/PublisherFiles
 declare -A links=( ["PublisherConfig.py"]="/data/hostdisk/${SERVICE}/cfg/PublisherConfig.py" ["logs"]="/data/hostdisk/${SERVICE}/logs" ["/data/srv/Publisher_files"]="/data/hostdisk/${SERVICE}/PublisherFiles" )
 
 for name in "${!links[@]}";
