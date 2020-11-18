@@ -7,6 +7,31 @@ source /data/srv/TaskManager/env.sh
 
 rm -f /data/srv/TaskManager/nohup.out
 
+check_link(){
+# function checks if symbolic links required to start service exists and if they are not broken
+
+  if [ -L $1 ] ; then
+    if [ -e $1 ] ; then
+       return 0
+    else
+       unlink $1
+       return 1
+    fi
+  else
+    return 1
+  fi
+}
+
+#directories/files that should exist before creating links (SERVICE will be set to 'TaskWorker'):
+# -/data/hostdisk/${SERVICE}/cfg/TaskWorkerConfig.py
+# -/data/hostdisk/${SERVICE}/logs
+declare -A links=( ["current/TaskWorkerConfig.py"]="/data/hostdisk/${SERVICE}/cfg/TaskWorkerConfig.py" ["logs"]="/data/hostdisk/${SERVICE}/logs")
+
+for name in "${!links[@]}";
+do
+  check_link "${name}" || ln -s "${links[$name]}" "$name"
+done
+
 __strip_pythonpath(){
 # this function is used to strip the taskworker lines from $PYTHONPATH
 # in order for the debug |private calls to be able to add theirs
