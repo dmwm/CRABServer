@@ -34,7 +34,7 @@ check_link(){
   fi
 }
 
-#directories/files that should exist before creating links (SERVICE is type of Publisher started, e.g.Publisher_rucio):
+#directories/files that should be created before starting the container, (SERVICE is type of Publisher started, e.g.Publisher_rucio):
 # -/data/hostdisk/${SERVICE}/cfg/PublisherConfig.py
 # -/data/hostdisk/${SERVICE}/logs
 # -/data/hostdisk/${SERVICE}/PublisherFiles
