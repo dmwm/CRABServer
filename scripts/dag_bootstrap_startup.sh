@@ -147,8 +147,8 @@ then
     filesToChange="JobAdForK8s Job.submit subdag.ad"
     for file in $filesToChange
     do
-      sed -i 's/CRAB_RestHost = "cmsweb.cern.ch/"/CRAB_RestHost = "cmsweb-k8s-prod.cern.ch"/' $file
-      sed -i 's/CRAB_RestHost = "cmsweb-testbed.cern.ch/"/CRAB_RestHost = "cmsweb-k8s-prod.cern.ch"/' $file
+      sed -i 's/CRAB_RestHost = "cmsweb.cern.ch"/CRAB_RestHost = "cmsweb-k8s-prod.cern.ch"/' $file
+      sed -i 's/CRAB_RestHost = "cmsweb-testbed.cern.ch"/CRAB_RestHost = "cmsweb-k8s-prod.cern.ch"/' $file
     done
     echo "==================================================================="
 fi
