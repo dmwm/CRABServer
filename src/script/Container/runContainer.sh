@@ -5,7 +5,7 @@
 helpFunction(){
   echo -e "\nUsage example: ./runContainer.sh -v v3.201118 -s TaskWorker"
   echo -e "\t-v TW/Publisher version"
-  echo -e "\t-s which service should be started: Publisher, Publisher_scheddy, Publisher_asoless, Publisher_rucio or TaskWorker"
+  echo -e "\t-s which service should be started: Publisher, Publisher_schedd, Publisher_asoless, Publisher_rucio or TaskWorker"
   echo -e "\t-r docker hub repo, if not provided, default points to 'cmssw'"
   exit 1
   }
@@ -13,7 +13,7 @@ helpFunction(){
 while getopts ":v:s:r:h" opt
 do
     case "$opt" in
-      h|--help) helpFunction ;;
+      h) helpFunction ;;
       v) TW_VERSION="$OPTARG" ;;
       s) SERVICE="$OPTARG" ;;
       r) TW_REPO="$OPTARG" ;;
