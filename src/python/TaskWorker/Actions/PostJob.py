@@ -880,6 +880,25 @@ class ASOServerJob(object):
                     msg += " Transfer submission failed."
                     msg += "\n%s" % (str(hte.headers))
                     returnMsg['error'] = msg
+                # Previous post resets asoworker to NULL. This is not good, so we set it again
+                # using a different API to update the transfersDB record
+                updateDoc = {}
+                updateDoc['list_of_ids'] = [doc['id']]
+                updateDoc['list_of_transfer_state'] = ['NEW']
+                updateDoc['subresource'] = 'updateTransfers'
+                if os.path.exists('USE_NEW_PUBLISHER'):
+                    self.logger.info("USE_NEW_PUBLISHER: set asoworker=schedd in transferdb")
+                    updateDoc['asoworker'] = 'schedd'
+                else:
+                    self.logger.info("OLD Publisher: set asoworker=asoless in transferdb")
+                    updateDoc['asoworker'] = 'asoless'
+                try:
+                    self.server.post(self.rest_uri_file_transfers, data=encodeRequest(updateDoc))
+                except HTTPException as hte:
+                    msg = "Error uploading document to database."
+                    msg += " Transfer submission failed."
+                    msg += "\n%s" % (str(hte.headers))
+                    returnMsg['error'] = msg
             if toTransfer:
                 if not 'publishname' in newDoc:
                     newDoc['publishname'] = self.publishname
