@@ -270,41 +270,55 @@ class DBSDataDiscovery(DataDiscovery):
         if not locationsFoundWithRucio:
             self.logger.info("No locations found with Rucio for %s", inputDataset)
             if isUserDataset:
-                self.logger.info("USEDR dataset. Looking up data locations using origin site in DBS")
+                self.logger.info("USER dataset. Looking up data locations using origin site in DBS")
                 try:
                     locationsMap = self.dbs.listFileBlockLocation(list(blocks))
                 except Exception as ex:
                     raise TaskWorkerException(
-                        "The CRAB3 server backend could not get the location of the files from rucio nor from dbs.\n"+\
-                        "This is could be a temporary rucio/dbs glitch, please try to submit a new task (resubmit will not work)"+\
+                        "CRAB server could not get file locations from DBS for a USER dataset.\n"+\
+                        "This is could be a temporary DBS glitch, please try to submit a new task (resubmit will not work)"+\
                         " and contact the experts if the error persists.\nError reason: %s" % str(ex)
                     )
             else:
                 # datasets other than USER *must* be in Rucio
                 raise TaskWorkerException(
-                    "The CRAB3 server backend could not get the location of the file from rucio.\n" + \
-                    "This is could be a temporary rucio glitch, please try to submit a new task (resubmit will not work)" + \
+                    "CRAB server could not get file locations from Rucio.\n" + \
+                    "This is could be a temporary Rucio glitch, please try to submit a new task (resubmit will not work)" + \
                     " and contact the experts if the error persists."
                     )
 
         if secondaryDataset:
-            # for secondary dataset we only support official datasets in Rucio
             secondaryLocationsMap = {}
-            # see https://github.com/dmwm/CRABServer/issues/6075#issuecomment-641569446
-            self.logger.info("Trying data location of secondary blocks with Rucio")
-            try:
-                locations = self.rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(secondaryBlocks))
-            except Exception as exc:
-                locations = None
-                secondaryLocationsMap = {}
-                self.logger.warn("Rucio lookup failed with. %s", exc)
-            if locations:
-                located_blocks = locations['phedex']['block']
-                for block in located_blocks:
-                    if block['replica']:   # only fill map for blocks which have at least one location
-                        secondaryLocationsMap.update({block['name']: [x['node'] for x in block['replica']]})
+            if secondaryDataset.endswith('USER'):
+                self.logger.info("Secondary dataset is USER. Looking up data locations using origin site in DBS")
+                try:
+                    secondaryLocationsMap = self.dbs.listFileBlockLocation(list(secondaryBlocks))
+                except Exception as ex:
+                    raise TaskWorkerException(
+                        "CRAB server could not get file locations from DBS for secondary dataset of USER tier.\n"+\
+                        "This is could be a temporary DBS glitch, please try to submit a new task (resubmit will not work)"+\
+                        " and contact the experts if the error persists.\nError reason: %s" % str(ex)
+                    )
+            else:
+                self.logger.info("Trying data location of secondary dataset blocks with Rucio")
+                try:
+                    locations = self.rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(secondaryBlocks))
+                except Exception as exc:
+                    locations = None
+                    secondaryLocationsMap = {}
+                    self.logger.warn("Rucio lookup failed with. %s", exc)
+                    raise TaskWorkerException(
+                        "CRAB server could not get file locations for secondary dataset with Rucio.\n" + \
+                        "This is could be a temporary Rucio glitch, please try to submit a new task (resubmit will not work)" + \
+                        " and contact the experts if the error persists."
+                    )
+                if locations:
+                    located_blocks = locations['phedex']['block']
+                    for block in located_blocks:
+                        if block['replica']:   # only fill map for blocks which have at least one location
+                            secondaryLocationsMap.update({block['name']: [x['node'] for x in block['replica']]})
             if not secondaryLocationsMap:
-                msg = "No locations found with Rucio for secondaryDataset."
+                msg = "No locations found for secondaryDataset %s." % secondaryDataset
                 raise TaskWorkerException(msg)
 
 
