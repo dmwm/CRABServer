@@ -398,8 +398,18 @@ class DagmanCreator(TaskAction.TaskAction):
             self.logger.info('Result: %s\nStatus :%s\nURL :%s', errormsg.result, errormsg.status, errormsg.url)
             raise HTTPException(errormsg)
 
-        pfnDict = rucioClient.getPFN(dest_site, dest_dir)
-        pfn = pfnDict[dest_dir]
+        try:
+            pfnDict = rucioClient.getPFN(dest_site,dest_dir, operation='write')
+            pfn = pfnDict[dest_dir]
+        except Exception as ex:
+            self.logger.info('Rucio lfn2pfn resolution for Write failed. Will try Read')
+            try:
+                pfnDict = rucioClient.getPFN(dest_site,dest_dir, operation='read')
+                pfn = pfnDict[dest_dir]
+            except Exception as ex:
+                msg = 'lfn2pfn resolution with Rucio failed for site: %s  LFN: %s' % (dest_site, dest_dir)
+                msg += ' with exception :\n%s' % str(ex)
+                raise TaskWorkerException(msg)
 
         return pfn
 
