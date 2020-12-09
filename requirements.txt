@@ -1,0 +1,6 @@
+# Dependencies needed to run crabserver, crabcache, crabtaskworker
+# This file is used by Jenkins to create RPMs and docker image
+# Format:
+# Dependency==version          
+
+wmcver==1.3.6.crab5
