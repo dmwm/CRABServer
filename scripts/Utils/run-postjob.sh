@@ -88,3 +88,8 @@ maxRetries=10
 echo "copy/paste and execute this command to re-run the post job"
 echo "sh dag_bootstrap.sh POSTJOB ${jobClusterId} ${jobReturnCode} ${retryCount} ${maxRetries} $PJargs"
 
+echo ""
+echo "if you ran to run again, execute these lines:"
+echo "echo '{"pre": 1, "post": 0}' > retry_info/job.${jobId}.txt"
+echo "rm defer_info/defer_num.${jobId}.0.txt"
+echo "sh dag_bootstrap.sh POSTJOB ${jobClusterId} ${jobReturnCode} ${retryCount} ${maxRetries} $PJargs"
