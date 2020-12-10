@@ -261,6 +261,25 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
         move(tempFilename, G_ERROR_SUMMARY_FILE_NAME)
         logger.debug("Written error summary file")
 
+def fixUpTempStorageSite(logger=None, siteName=None):
+    """
+    overrides the name of the site used for local stageout at WN in /store/temp/user
+    for cases where new need to direct Rucio to use a different site name for
+    LFN2PFN resolution in order to work around the fact that Rucio does not
+    implement full CMS TFC functionalities
+    see https://github.com/dmwm/CRABServer/issues/6285
+    :param logger: a logger object where to log messages
+    :param siteName: the name to ovrerride
+    :return: the new Site
+    """
+    # pretend that CRAB output staged out at FNAL are at T3_US_FNALLPC
+    newName = siteName
+    if siteName == 'T1_US_FNAL_Disk':
+        newName = 'T3_US_FNALLPC'
+        if logger:
+            logger.warning('temp storage site changed from T1_US_FNAL_Disk to T3_US_FNALLPC ')
+    return newName
+
 ##==============================================================================
 
 class ASOServerJob(object):
@@ -582,7 +601,7 @@ class ASOServerJob(object):
             self.logger.info("Working on file %s" % (filename))
             doc_id = hashlib.sha224(source_lfn).hexdigest()
             doc_new_info = {'state': 'new',
-                            'source': source_site,
+                            'source': fixUpTempStorageSite(logger=self.logger, siteName=source_site),
                             'destination': self.dest_site,
                             'checksums': checksums,
                             'size': size,
@@ -2334,7 +2353,7 @@ class PostJob():
                      'events'          : 0,
                      'outlocation'     : self.dest_site,
                      'outlfn'          : os.path.join(self.dest_dir, 'log', self.logs_arch_file_name),
-                     'outtmplocation'  : temp_storage_site,
+                     'outtmplocation'  : fixUpTempStorageSite(logger=self.logger, siteName=temp_storage_site),
                      'outtmplfn'       : os.path.join(self.source_dir, 'log', self.logs_arch_file_name),
                      'outdatasetname'  : '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER',
                      'directstageout'  : int(self.job_report.get('direct_stageout', 0))
@@ -2468,7 +2487,7 @@ class PostJob():
                          'events'          : file_info.get('events', 0),
                          'outlocation'     : file_info['outlocation'],
                          'outlfn'          : file_info['outlfn'],
-                         'outtmplocation'  : file_info['outtmplocation'],
+                         'outtmplocation'  : fixUpTempStorageSite(logger=self.logger, siteName=file_info['outtmplocation']),
                          'outtmplfn'       : file_info['outtmplfn'],
                          'outdatasetname'  : outdataset,
                          'directstageout'  : int(file_info['direct_stageout']),
