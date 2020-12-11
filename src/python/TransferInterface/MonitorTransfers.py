@@ -217,7 +217,7 @@ def monitor(user, taskname, log):
             fileDoc['subresource'] = 'updateTransfers'
             fileDoc['list_of_ids'] = [id_map[x[0]] for x in list_update]
             fileDoc['list_of_transfer_state'] = ["SUBMITTED" for _ in list_update]
-            fileDoc['list_of_fts_instance'] = ['https://fts3.cern.ch:8446/' for _ in list_update]
+            fileDoc['list_of_fts_instance'] = ['https://fts3-cms.cern.ch:8446/' for _ in list_update]
             fileDoc['list_of_fts_id'] = [x[1] for x in list_update]
             oracleDB.post('/filetransfers',
                             data=encodeRequest(fileDoc))
