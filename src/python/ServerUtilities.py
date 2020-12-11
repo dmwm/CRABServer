@@ -29,7 +29,7 @@ FILE_MEMORY_LIMIT = 512*1024
 
 # these are known, pre-defined nickames for "CRAB configuration" at large
 # which correspond to a well known and specified REST host name and DataBase instance
-SERVICE_INSTANCES = {'prod': {'restHost':'cmsweb.cern.ch', 'dbInstance':'prod'},
+SERVICE_INSTANCES = {'prod': {'restHost':'cmsweb-k8s-prod.cern.ch', 'dbInstance':'prod'},
                      'preprod': {'restHost':'cmsweb-testbed.cern.ch', 'dbInstance':'preprod'},
                      'k8sprod': {'restHost':'cmsweb-k8s-prod.cern.ch', 'dbInstance':'prod'},
                      'k8s': {'restHost':'cmsweb-k8s-prod.cern.ch', 'dbInstance':'prod'},
