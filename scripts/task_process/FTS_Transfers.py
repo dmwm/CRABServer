@@ -17,6 +17,9 @@ from httplib import HTTPException
 from ServerUtilities import encodeRequest
 from TransferInterface import CRABDataInjector
 
+FTS_ENDPOINT = "https://fts3-cms.cern.ch:8446/"
+FTS_MONITORING = "https://fts3-cms.cern.ch:8449/"
+
 if not os.path.exists('task_process/transfers'):
     os.makedirs('task_process/transfers')
 
@@ -301,7 +304,7 @@ class submit_thread(threading.Thread):
         fileDoc['subresource'] = 'updateTransfers'
         fileDoc['list_of_ids'] = [x[2] for x in self.files]
         fileDoc['list_of_transfer_state'] = ["SUBMITTED" for _ in self.files]
-        fileDoc['list_of_fts_instance'] = ['https://fts3.cern.ch:8446/' for _ in self.files]
+        fileDoc['list_of_fts_instance'] = [FTS_ENDPOINT for _ in self.files]
         fileDoc['list_of_fts_id'] = [jobid for _ in self.files]
 
         self.log.info("Marking submitted %s files" % (len(fileDoc['list_of_ids'])))
@@ -444,7 +447,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient):
             jobids = submit(rucioClient, ftsContext, transfers)
 
             for jobid in jobids:
-                logging.info("Monitor link: https://fts3.cern.ch:8449/fts3/ftsmon/#/job/%s", jobid)
+                logging.info("Monitor link: " + FTS_MONITORING + "fts3/ftsmon/#/job/%s", jobid)
 
             # TODO: send to dashboard
 
@@ -557,12 +560,12 @@ def algorithm():
     """
 
     # TODO: pass by configuration
-    fts = HTTPRequests('fts3.cern.ch:8446/',
+    fts = HTTPRequests(FTS_ENDPOINT.split("https://")[1],
                        proxy,
                        proxy)
 
     logging.info("using user's proxy from %s", proxy)
-    ftsContext = fts3.Context('https://fts3.cern.ch:8446', proxy, proxy, verify=True)
+    ftsContext = fts3.Context(FTS_ENDPOINT, proxy, proxy, verify=True)
     logging.info("Delegating proxy to FTS...")
     delegationId = fts3.delegate(ftsContext, lifetime=timedelta(hours=48), delegate_when_lifetime_lt=timedelta(hours=24), force=False)
     delegationStatus = fts.get("delegation/"+delegationId)

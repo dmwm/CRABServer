@@ -424,7 +424,7 @@ class ASOServerJob(object):
                         if reasons:
                             # Do not add this if FTS jobID is not available
                             if doc['fts_id']:
-                                reasons += " [...CUT...] Full log at https://fts3.cern.ch:8449/fts3/ftsmon/#/job/%s" % doc['fts_id']
+                                reasons += " [...CUT...] Full log at https://fts3-cms.cern.ch:8449/fts3/ftsmon/#/job/%s" % doc['fts_id']
                         if app:
                             msg += "\n-----> %s log start -----" % str(app).upper()
                         msg += "\n%s" % reasons

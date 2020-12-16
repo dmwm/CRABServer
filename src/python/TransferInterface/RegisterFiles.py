@@ -297,7 +297,7 @@ class submit_thread(threading.Thread):
             fileDoc['subresource'] = 'updateTransfers'
             fileDoc['list_of_ids'] = [x[self.job_col.index('ids')] for x in self.job]
             fileDoc['list_of_transfer_state'] = ["SUBMITTED" for _ in self.files]
-            fileDoc['list_of_fts_instance'] = ['https://fts3.cern.ch:8446/' for _ in self.job]
+            fileDoc['list_of_fts_instance'] = ['https://fts3-cms.cern.ch:8446/' for _ in self.job]
             fileDoc['list_of_fts_id'] = ['NA' for _ in self.job]
 
             self.log.info("Marking submitted %s files" % (len(fileDoc['list_of_ids'])))
