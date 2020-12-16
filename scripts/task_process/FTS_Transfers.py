@@ -560,7 +560,7 @@ def algorithm():
     """
 
     # TODO: pass by configuration
-    fts = HTTPRequests(FTS_ENDPOINT,
+    fts = HTTPRequests(FTS_ENDPOINT.split("https://")[1],
                        proxy,
                        proxy)
 
