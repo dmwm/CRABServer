@@ -771,10 +771,10 @@ $(document).ready(function() {
     function setUrls(dbVersion) {
         switch (dbVersion) {
             case "prod":
-                taskInfoUrl = "https://cmsweb.cern.ch/crabserver/prod/task?subresource=search&workflow=";
-                taskStatusUrl = "https://cmsweb.cern.ch/crabserver/prod/workflow?workflow=";
-                webDirProxyApiUrl = "https://cmsweb.cern.ch/crabserver/prod/task?subresource=webdirprx&workflow="
-                transferInfo = "https://cmsweb.cern.ch/crabserver/prod/fileusertransfers?subresource=getTransferStatus&taskname="
+                taskInfoUrl = "https://" + document.domain + "/crabserver/prod/task?subresource=search&workflow=";
+                taskStatusUrl = "https://" + document.domain + "/crabserver/prod/workflow?workflow=";
+                webDirProxyApiUrl = "https://" + document.domain + "/crabserver/prod/task?subresource=webdirprx&workflow="
+                transferInfo = "https://" + document.domain + "/crabserver/prod/fileusertransfers?subresource=getTransferStatus&taskname="
                 docInfo = "https://" + document.domain + "/crabserver/prod/fileusertransfers?subresource=getById&id="
                 break;
             case "preprod":
