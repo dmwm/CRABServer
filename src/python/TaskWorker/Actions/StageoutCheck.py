@@ -9,7 +9,8 @@ from ServerUtilities import isFailurePermanent
 from ServerUtilities import getCheckWriteCommand, createDummyFile
 from ServerUtilities import removeDummyFile, executeCommand
 from ServerUtilities import tempSetLogLevel
-import logging
+
+from RucioUtils import getWritePFN
 
 class StageoutCheck(TaskAction):
 
@@ -19,53 +20,12 @@ class StageoutCheck(TaskAction):
     if stageout output and logs is false or
     if dryrun option True
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, config, server, resturi, procnum=-1, rucioClient=None):
+        TaskAction.__init__(self, config, server, resturi, procnum)
+        self.rucioClient = rucioClient
         self.task = None
         self.proxy = None
         self.workflow = None
-        TaskAction.__init__(self, *args, **kwargs)
-
-    def getPFN(self, lfnsaddprefix, filename, sitename):
-        from WMCore.Services.Rucio.Rucio import Rucio
-        rucio_config_dict = {
-            "phedexCompatible": True,
-            "auth_type": "x509", "ca_cert": self.config.Services.Rucio_caPath,
-            "logger": self.logger,
-            "creds": {"client_cert": self.config.TaskWorker.cmscert, "client_key": self.config.TaskWorker.cmskey}
-        }
-
-        self.logger.info("Initializing Rucio client")
-        # WMCore is awfully verbose
-        try:
-            with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-                rucioClient = Rucio(
-                    self.config.Services.Rucio_account,
-                    hostUrl=self.config.Services.Rucio_host,
-                    authUrl=self.config.Services.Rucio_authUrl,
-                    configDict=rucio_config_dict
-                )
-            rucioClient.whoAmI()
-        except HTTPException as errormsg:
-            self.logger.info('Error: Failed to contact Rucio')
-            self.logger.info('Result: %s\nStatus :%s\nURL :%s', errormsg.result, errormsg.status, errormsg.url)
-            raise HTTPException(errormsg)
-
-        lfn = os.path.join(lfnsaddprefix, filename)
-        try:
-            pfnDict = rucioClient.getPFN(sitename, lfn, operation='write')
-            pfn = pfnDict[lfn]
-        except Exception as ex:
-            self.logger.warning('Rucio lfn2pfn resolution for Write failed with:\n%s', ex)
-            self.logger.warning("Will try with operation='read'")
-            try:
-                pfnDict = rucioClient.getPFN(sitename, lfn, operation='read')
-                pfn = pfnDict[lfn]
-            except Exception as ex:
-                msg = 'lfn2pfn resolution with Rucio failed for site: %s  LFN: %s' % (sitename, lfn)
-                msg += ' with exception :\n%s' % str(ex)
-                raise TaskWorkerException(msg)
-
-        return pfn
 
     def checkPermissions(self, Cmd):
         """
@@ -136,7 +96,8 @@ class StageoutCheck(TaskAction):
             self.logger.info("Will check stageout at %s", self.task['tm_asyncdest'])
             filename = re.sub("[:-_]", "", self.task['tm_taskname']) + '_crab3check.tmp'
             try:
-                pfn = self.getPFN(self.task['tm_output_lfn'], filename, self.task['tm_asyncdest'])
+                lfn = os.path.join(self.task['tm_output_lfn'], filename)
+                pfn = getWritePFN(self.rucioClient, self.task['tm_asyncdest'], lfn)
                 cpCmd += append + os.path.abspath(filename) + " " + pfn
                 rmCmd += " " + pfn
                 createDummyFile(filename, self.logger)

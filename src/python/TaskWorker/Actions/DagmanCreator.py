@@ -21,9 +21,11 @@ from ServerUtilities import TASKLIFETIME
 
 import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
-import TaskWorker.Actions.TaskAction as TaskAction
+#import TaskWorker.Actions.TaskAction as TaskAction
+from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS
+from RucioUtils import getWritePFN
 from CMSGroupMapper import get_egroup_users
 
 import WMCore.WMSpec.WMTask
@@ -326,15 +328,15 @@ def getLocation(default_name, checkout_location):
     return loc
 
 
-class DagmanCreator(TaskAction.TaskAction):
+class DagmanCreator(TaskAction):
     """
     Given a task definition, create the corresponding DAG files for submission
     into HTCondor
     """
 
-
-    def __init__(self, *args, **kwargs):
-        TaskAction.TaskAction.__init__(self, *args, **kwargs)
+    def __init__(self, config, server, resturi, procnum=-1, rucioClient=None):
+        TaskAction.__init__(self, config, server, resturi, procnum)
+        self.rucioClient = rucioClient
 
     def buildDashboardInfo(self, task):
         taskType = self.getDashboardTaskType(task)
@@ -366,52 +368,6 @@ class DagmanCreator(TaskAction.TaskAction):
         apmon.sendToML(params_copy)
         apmon.free()
         return params
-
-
-    def resolvePFNs(self, dest_site, dest_dir):
-        """
-        Given a directory and destination, resolve the directory to a srmv2 PFN
-        """
-        from WMCore.Services.Rucio.Rucio import Rucio
-        from ServerUtilities import tempSetLogLevel
-        import logging
-        rucio_config_dict = {
-            "phedexCompatible": True,
-            "auth_type": "x509", "ca_cert": self.config.Services.Rucio_caPath,
-            "logger": self.logger,
-            "creds": {"client_cert": self.config.TaskWorker.cmscert, "client_key": self.config.TaskWorker.cmskey}
-        }
-
-        self.logger.info("Initializing Rucio client")
-        # WMCore is awfully verbose
-        try:
-            with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-                rucioClient = Rucio(
-                    self.config.Services.Rucio_account,
-                    hostUrl=self.config.Services.Rucio_host,
-                    authUrl=self.config.Services.Rucio_authUrl,
-                    configDict=rucio_config_dict
-                )
-            rucioClient.whoAmI()
-        except HTTPException as errormsg:
-            self.logger.info('Error: Failed to contact Rucio')
-            self.logger.info('Result: %s\nStatus :%s\nURL :%s', errormsg.result, errormsg.status, errormsg.url)
-            raise HTTPException(errormsg)
-
-        try:
-            pfnDict = rucioClient.getPFN(dest_site,dest_dir, operation='write')
-            pfn = pfnDict[dest_dir]
-        except Exception as ex:
-            self.logger.info('Rucio lfn2pfn resolution for Write failed. Will try Read')
-            try:
-                pfnDict = rucioClient.getPFN(dest_site,dest_dir, operation='read')
-                pfn = pfnDict[dest_dir]
-            except Exception as ex:
-                msg = 'lfn2pfn resolution with Rucio failed for site: %s  LFN: %s' % (dest_site, dest_dir)
-                msg += ' with exception :\n%s' % str(ex)
-                raise TaskWorkerException(msg)
-
-        return pfn
 
     def populateGlideinMatching(self, info):
         scram_arch = info['tm_job_arch']
@@ -664,7 +620,7 @@ class DagmanCreator(TaskAction.TaskAction):
             tempDest = os.path.join(temp_dest, counter)
             directDest = os.path.join(dest, counter)
             if lastDirectDest != directDest:
-                lastDirectPfn = self.resolvePFNs(task['tm_asyncdest'], directDest)
+                lastDirectPfn = getWritePFN(self.rucioClient, task['tm_asyncdest'], directDest)
                 lastDirectDest = directDest
             pfns = ["log/cmsRun_{0}.log.tar.gz".format(count)] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])

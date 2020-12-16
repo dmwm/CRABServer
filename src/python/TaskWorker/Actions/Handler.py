@@ -9,6 +9,7 @@ from httplib import HTTPException
 from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 
 from RESTInteractions import HTTPRequests
+from RucioUtils import getNativeRucioClient
 
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.DagmanKiller import DagmanKiller
@@ -152,17 +153,18 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     :return: the handler."""
     server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=logging.getLogger(str(procnum)))
     handler = TaskHandler(task, procnum, server, config, 'handleNewTask', createTempDir=True)
+    rucioClient = getNativeRucioClient(config=config, logger=handler.logger)
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
-    handler.addWork(StageoutCheck(config=config, server=server, resturi=resturi, procnum=procnum))
+    handler.addWork(StageoutCheck(config=config, server=server, resturi=resturi, procnum=procnum, rucioClient=rucioClient))
     if task['tm_job_type'] == 'Analysis':
         if task.get('tm_user_files'):
             handler.addWork(UserDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum))
         else:
-            handler.addWork(DBSDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum))
+            handler.addWork(DBSDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum, rucioClient=rucioClient))
     elif task['tm_job_type'] == 'PrivateMC':
         handler.addWork(MakeFakeFileSet(config=config, server=server, resturi=resturi, procnum=procnum))
     handler.addWork(Splitter(config=config, server=server, resturi=resturi, procnum=procnum))
-    handler.addWork(DagmanCreator(config=config, server=server, resturi=resturi, procnum=procnum))
+    handler.addWork(DagmanCreator(config=config, server=server, resturi=resturi, procnum=procnum, rucioClient=rucioClient))
     if task['tm_dry_run'] == 'T':
         handler.addWork(DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum))
     else:

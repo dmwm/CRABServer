@@ -6,7 +6,6 @@ from httplib import HTTPException
 import urllib
 
 from WMCore.DataStructs.LumiList import LumiList
-from WMCore.Services.Rucio.Rucio import Rucio
 from WMCore.Services.DBS.DBSReader import DBSReader
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
 
@@ -15,9 +14,15 @@ from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from TaskWorker.Actions.DDMRequests import blocksRequest
 from ServerUtilities import tempSetLogLevel
 
+from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent, RuleNotFound)
+
 class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service.
     """
+
+    def __init__(self, config, server='', resturi='', procnum=-1, rucioClient=None):
+        DataDiscovery.__init__(self, config, server, resturi, procnum)
+        self.rucioClient = rucioClient
 
     def checkDatasetStatus(self, dataset, kwargs):
         res = self.dbs.dbs.listDatasets(dataset=dataset, detail=1, dataset_access_type='*')
@@ -52,13 +57,8 @@ class DBSDataDiscovery(DataDiscovery):
         # locationsMap is a dictionary {block1:[locations], block2:[locations],...}
         diskLocationsMap = {}
         for block, locations in locationsMap.iteritems():
-            try:
-                diskRSEs = self.rucioClient.dropTapeRSEs(locations)
-            except AttributeError:
-                # we built with a WMCore tag w/o the dropTapeRSEs method, do the legwork
-                # this part can be removed once we use upddated WMCore
-                # as of Sept 2020, tape RSEs ends with _Tape, go for the quick hack
-                diskRSEs = [rse for rse in locations if not 'Tape' in rse]
+            # as of Sept 2020, tape RSEs ends with _Tape, go for the quick hack
+            diskRSEs = [rse for rse in locations if not 'Tape' in rse]
             if  'T3_CH_CERN_OpenData' in diskRSEs:
                 diskRSEs.remove('T3_CH_CERN_OpenData') # ignore OpenData until it is accessible by CRAB
             if diskRSEs:
@@ -91,14 +91,122 @@ class DBSDataDiscovery(DataDiscovery):
         :param blockList: a list of blocks to recall from Tape to Disk
         :param system: a string identifying the DDM system to use 'Dynamo' or 'Rucio' or 'None'
         :param msgHead: a string with the initial part of a message to be used for exceptions
-        since data on tape means no submission possible this function will always raise
+        Since data on tape means no submission possible, this function will always raise
         a TaskWorkerException to stop the action flow. The exception message contains details
         and an attempt is done to upload it to TaskDB so that crab status can report it
         """
         # start with old Dyanmo implementation. A new implementation with Rucio will come
 
         msg = msgHead
+        if system == 'Rucio':
+            # turn input CMS blocks into Rucio dids in cms scope
+            dids = [{'scope': 'cms', 'name': block} for block in blockList]
+            # prepare container /TapeRecall/taskname/USER in the service scope
+            myScope = 'user.%s' % self.config.Services.Rucio_account
+            containerName = '/TapeRecall/%s/USER' % self.taskName.replace(':', '.')
+            containerDid = {'scope':myScope, 'name':containerName}
+            self.logger.info("Create RUcio container %s", containerName)
+            try:
+                response = self.rucioClient.add_container(myScope, containerName)
+            except DataIdentifierAlreadyExists:
+                self.logger.debug("Container name already exists in Rucio. Keep going")
+                pass
+            except Exception as ex:
+                msg += "Rucio exception creating container: %s" %  (str(ex))
+                raise TaskWorkerException(msg)
+            try:
+                response = self.rucioClient.attach_dids(myScope, containerName, dids)
+            except DuplicateContent:
+                self.logger.debug("Some dids are already in this container. Keep going")
+                pass
+            except Exception as ex:
+                msg += "Rucio exception adding blocks to container: %s" %  (str(ex))
+                raise TaskWorkerException(msg)
+            self.logger.info("Rucio container %s:%s created with %d blocks", myScope, containerName, len(blockList))
+
+            # Compute size of recall request
+            sizeToRecall = 0
+            for block in blockList:
+                replicas = self.rucioClient.list_dataset_replicas('cms', block)
+                bytes = replicas.next()['bytes']  # pick first replica for each block, they better all have same size
+                sizeToRecall += bytes
+            TBtoRecall = sizeToRecall // 1e12
+            if TBtoRecall > 0:
+                self.logger.info("Total size of data to recall : %d TBytes", TBtoRecall)
+            else:
+                self.logger.info("Total size of data to recall : %d GBytes", sizeToRecall/1e9)
+
+            if TBtoRecall > 30.:
+                grouping = 'DATASET'  # Rucio DATASET i.e. CMS block !
+                self.logger.info("Will scatter blocks on multiple sites")
+            else:
+                grouping = 'ALL'
+                self.logger.info("Will place all blocks at a single site")
+
+            # create rule
+            RSE_EXPRESSION = 'ddm_quota>0&tier=2&rse_type=DISK'
+            RSE_EXPRESSION = 'T3_IT_Trieste' # for testing
+            WEIGHT = 'ddm_quota'
+            WEIGHT = None # for testing
+            DAYS = 14 * 24 * 3600
+            ASK_APPROVAL = False
+            ASK_APPROVAL = True # for testing
+            copies = 1
+            try:
+                ruleId = self.rucioClient.add_replication_rule(dids=[containerDid],
+                                                  copies=copies, rse_expression=RSE_EXPRESSION,
+                                                  grouping=grouping,
+                                                  weight=WEIGHT, lifetime=DAYS, account=self.username,
+                                                  activity='Analysis Input',
+                                                  comment='Staged from tape for %s' % self.username,
+                                                  ask_approval=ASK_APPROVAL, asynchronous=True,
+                                                  )
+            except DuplicateRule as ex:
+                # handle "A duplicate rule for this account, did, rse_expression, copies already exists"
+                # which should only happen when testing, since container name is unique like task name, anyhow...
+                self.logger.debug("A duplicate rule for this account, did, rse_expression, copies already exists. Use that")
+                # find the existing rule id
+                ruleId = self.rucioClient.list_did_rules(myScope, containerName)
+            except Exception as ex:
+                msg += "Rucio exception creating rule: %s" %  (str(ex))
+                raise TaskWorkerException(msg)
+
+            msg += "\nA disk replica has been requested to Rucio (rule ID: %s )" % str(ruleId[0])
+            automaticTapeRecallIsImplemented = False
+            if automaticTapeRecallIsImplemented:
+                # set status to TAPERECALL
+                tapeRecallStatus = 'TAPERECALL'
+                configreq = {'workflow': self.taskName,
+                             'taskstatus': tapeRecallStatus,
+                             'ddmreqid': ruleId,
+                             'subresource': 'addddmreqid',
+                             }
+                try:
+                    tapeRecallStatusSet = self.server.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
+                except HTTPException as hte:
+                    self.logger.exception(hte)
+                    msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (
+                        self.config.TaskWorker.restHost, str(hte))
+                    msg += "\nSetting %s status and DDM request ID (%d) failed for task %s" % (
+                        tapeRecallStatus, ddmReqId, self.taskName)
+                    msg += "\nHTTP Headers are: %s" % hte.headers
+                    raise TaskWorkerException(msg, retry=True)
+                if tapeRecallStatusSet[2] == "OK":
+                    self.logger.info("Status for task %s set to '%s'", self.taskName, tapeRecallStatus)
+                    msg += "\nThis task will be automatically submitted as soon as the stage-out is completed."
+                    self.uploadWarning(msg, self.userproxy, self.taskName)
+                    raise TapeDatasetException(msg)
+            # fall here if could not setup for automatic submission after recall
+            msg += ", please try again in two days."
+            raise TaskWorkerException(msg)
+
+        if system == 'None':
+            msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
+            msg += '\nPlease see this CRAB FAQ for possible actions: https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul'
+            raise TaskWorkerException(msg)
+
         if system == 'Dynamo':
+            raise NotImplementedError
             ddmServer = self.config.TaskWorker.DDMServer
             ddmRequest = None
             try:
@@ -147,13 +255,7 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += ", please try again in two days."
                 raise TaskWorkerException(msg)
 
-        if system == 'Rucio':
-            raise NotImplementedError
 
-        if system == 'None':
-            msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
-            msg += '\nPlease see this CRAB FAQ for possible actions: https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul'
-            raise TaskWorkerException(msg)
 
     def execute(self, *args, **kwargs):
         """
@@ -188,6 +290,7 @@ class DBSDataDiscovery(DataDiscovery):
         isUserDataset = self.dbsInstance.split('/')[1] != 'global'
 
         self.taskName = kwargs['task']['tm_taskname']           # pylint: disable=W0201
+        self.username = kwargs['task']['tm_username']           # pylint: disable=W0201
         self.userproxy = kwargs['task']['user_proxy']           # pylint: disable=W0201
         self.logger.debug("Data discovery through %s for %s", self.dbs, self.taskName)
 
@@ -223,49 +326,33 @@ class DBSDataDiscovery(DataDiscovery):
             self.logger.info("Will not use Rucio for this dataset")
 
         if useRucioForLocations:
-            locationsMap = {}
             scope = "cms"
             # If the dataset is a USER one, use the Rucio user scope to find it
             # TODO: we need a way to enable users to indicate others user scopes as source
             if isUserDataset:
-                scope = "user.%s" % kwargs['task']['tm_username']
-            rucio_config_dict = {
-                "phedexCompatible": True,
-                "auth_type": "x509", "ca_cert": self.config.Services.Rucio_caPath,
-                "logger" : self.logger,
-                "creds": {"client_cert": self.config.TaskWorker.cmscert, "client_key": self.config.TaskWorker.cmskey}
-            }
+                scope = "user.%s" % self.username
+            self.logger.info("Looking up data location with Rucio in %s scope.", scope)
+            locationsMap = {}
             try:
-                self.logger.info("Initializing Rucio client")
-                # WMCore is awfully verbose
-                with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-                    self.rucioClient = Rucio(                  # pylint: disable=W0201
-                        self.config.Services.Rucio_account,
-                        hostUrl=self.config.Services.Rucio_host,
-                        authUrl=self.config.Services.Rucio_authUrl,
-                        configDict=rucio_config_dict
-                    )
-                self.rucioClient.whoAmI()
-                self.logger.info("Looking up data location with Rucio in %s scope.", scope)
-                with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-                    locations = self.rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(blocks))
+                for blockName in list(blocks):
+                    replicas = set()
+                    response = self.rucioClient.list_dataset_replicas(scope, blockName)
+                    for item in response:
+                        # same as complete='y' used for PhEDEx
+                        if item['state'].upper() == 'AVAILABLE':
+                            replicas.add(item['rse'])
+                    if replicas:  # only fill map for blocks which have at least one location
+                        locationsMap[blockName] = replicas
             except Exception as exc:
                 msg = "Rucio lookup failed with\n%s" % str(exc)
                 self.logger.warn(msg)
-                locations = None
+                locationsMap = None
 
-            if locations:
-                located_blocks = locations['phedex']['block']
-                for block in located_blocks:
-                    if block['replica']:  # only fill map for blocks which have at least one location
-                        locationsMap.update({block['name']: [x['node'] for x in block['replica']]})
-                if locationsMap:
-                    locationsFoundWithRucio = True
-                    # filter out TAPE locations
-                    self.keepOnlyDiskRSEs(locationsMap)
-                else:
-                    msg = "No locations found with Rucio for this dataset"
-                    self.logger.warn(msg)
+            if locationsMap:
+                locationsFoundWithRucio = True
+            else:
+                msg = "No locations found with Rucio for this dataset"
+                self.logger.warn(msg)
 
         if not locationsFoundWithRucio:
             self.logger.info("No locations found with Rucio for %s", inputDataset)
@@ -288,7 +375,6 @@ class DBSDataDiscovery(DataDiscovery):
                     )
 
         if secondaryDataset:
-            secondaryLocationsMap = {}
             if secondaryDataset.endswith('USER'):
                 self.logger.info("Secondary dataset is USER. Looking up data locations using origin site in DBS")
                 try:
@@ -301,22 +387,21 @@ class DBSDataDiscovery(DataDiscovery):
                     )
             else:
                 self.logger.info("Trying data location of secondary dataset blocks with Rucio")
+                secondaryLocationsMap = {}
                 try:
-                    locations = self.rucioClient.getReplicaInfoForBlocks(scope=scope, block=list(secondaryBlocks))
+                    for blockName in list(secondaryBlocks):
+                        replicas = set()
+                        response = self.rucioClient.list_dataset_replicas(scope, blockName)
+                        for item in response:
+                            # same as complete='y' used for PhEDEx
+                            if item['state'].upper() == 'AVAILABLE':
+                                replicas.add(item['rse'])
+                        if replicas:  # only fill map for blocks which have at least one location
+                            secondaryLocationsMap[blockName] = replicas
                 except Exception as exc:
-                    locations = None
-                    secondaryLocationsMap = {}
-                    self.logger.warn("Rucio lookup failed with. %s", exc)
-                    raise TaskWorkerException(
-                        "CRAB server could not get file locations for secondary dataset with Rucio.\n" + \
-                        "This is could be a temporary Rucio glitch, please try to submit a new task (resubmit will not work)" + \
-                        " and contact the experts if the error persists."
-                    )
-                if locations:
-                    located_blocks = locations['phedex']['block']
-                    for block in located_blocks:
-                        if block['replica']:   # only fill map for blocks which have at least one location
-                            secondaryLocationsMap.update({block['name']: [x['node'] for x in block['replica']]})
+                    msg = "Rucio lookup failed with\n%s" % str(exc)
+                    self.logger.warn(msg)
+                    secondaryLocationsMap = None
             if not secondaryLocationsMap:
                 msg = "No locations found for secondaryDataset %s." % secondaryDataset
                 raise TaskWorkerException(msg)
@@ -328,13 +413,15 @@ class DBSDataDiscovery(DataDiscovery):
         if secondaryDataset:
             secondaryBlocksWithLocation = secondaryLocationsMap.keys()
 
+        # filter out TAPE locations
+        self.keepOnlyDiskRSEs(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
             if self.tapeLocations:
                 msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ', '.join(sorted(self.tapeLocations))
                 # following function will always raise error and stop flow here, but will first
                 # try to trigger a tape recall and place the task in tapeRecall status
-                self.requestTapeRecall(blockList=blocksWithLocation, system='None', msgHead=msg)
+                self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
 
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
@@ -411,6 +498,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     from WMCore.Configuration import ConfigurationEx
     from ServerUtilities import newX509env
+    from RucioUtils import getNativeRucioClient
 
     config = ConfigurationEx()
     config.section_("Services")
@@ -425,7 +513,7 @@ if __name__ == '__main__':
     config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
                                                 X509_USER_KEY=config.TaskWorker.cmskey)
 
-    config.TaskWorker.DDMServer = 'dynamo.mit.edu'
+    #config.TaskWorker.DDMServer = 'dynamo.mit.edu'
     config.TaskWorker.instance = 'prod'
     #config.TaskWorker.restHost = 'cmsweb.cern.ch'
     # The second word identifies the DB instance defined in CRABServerAuth.py on the REST
@@ -435,10 +523,12 @@ if __name__ == '__main__':
     config.Services.Rucio_account = 'crab_server'
     config.Services.Rucio_authUrl = 'https://cms-rucio-auth.cern.ch'
     config.Services.Rucio_caPath = '/etc/grid-security/certificates/'
+    rucioClient = getNativeRucioClient(config=config, logger=logging.getLogger())
 
-    fileset = DBSDataDiscovery(config)
+    fileset = DBSDataDiscovery(config=config, rucioClient=rucioClient)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': 'None',
-                          'tm_input_dataset': dbsDataset, 'tm_secondary_input_dataset': dbsSecondaryDataset, 'tm_taskname': 'pippo1',
+                          'tm_input_dataset': dbsDataset, 'tm_secondary_input_dataset': dbsSecondaryDataset,
+                          'tm_taskname': 'pippo1', 'tm_username':config.Services.Rucio_account,
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
                           'tm_dbs_url': DBSUrl}, tempDir='')
     
