@@ -499,8 +499,10 @@ class Master(object):
 
                 # Get metadata
                 toPublish = []
+                toFail = []
                 publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready, logger)
                 for file_ in active_:
+                    metadataFound = False
                     for doc in publDescFiles_list:
                         # logger.info(type(doc))
                         # logger.info(doc)
@@ -512,8 +514,42 @@ class Master(object):
                             doc["Destination"] = file_["value"][0]
                             doc["SourceLFN"] = file_["value"][1]
                             toPublish.append(doc)
+                            metadataFound = True
+                            break
+
+                    # if we failed to find metadata mark publication as failed to avoid to keep looking
+                    # at same files over and over
+                    if not metadataFound:
+                        toFail.append(file_["value"][1])
                 with open(self.taskFilesDir + workflow + '.json', 'w') as outfile:
                     json.dump(toPublish, outfile)
+                logger.debug('Unitarity check: active_:%d toPublish:%d toFail:%d', len(active_), len(toPublish), len(toFail))
+                if len(toPublish) + len(toFail) != len(active_):
+                    logger.error("SOMETHING WRONG IN toPublish vs toFail !!")
+                if toFail:
+                    logger.info('Did not find useful metadata for %d files. Mark as failed', len(toFail))
+                    from ServerUtilities import getHashLfn
+                    nMarked = 0
+                    for lfn in toFail:
+                        source_lfn = lfn
+                        docId = getHashLfn(source_lfn)
+                        data = dict()
+                        data['asoworker'] = self.config.asoworker
+                        data['subresource'] = 'updatePublication'
+                        data['list_of_ids'] = docId
+                        data['list_of_publication_state'] = 'FAILED'
+                        data['list_of_retry_value'] = 1
+                        data['list_of_failure_reason'] = 'File type not EDM or metadata not found'
+                        try:
+                            result = self.crabServer.post(self.REST_filetransfers, data=encodeRequest(data))
+                            #logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
+                        except Exception as ex:
+                            logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
+                            logger.error("Error reason: %s", ex)
+
+                        nMarked += 1
+                        #if nMarked % 10 == 0:
+                    logger.info('marked %d files as Failed', nMarked)
 
                 # find the location in the current environment of the script we want to run
                 import Publisher.TaskPublish as tp
