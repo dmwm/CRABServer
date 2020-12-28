@@ -356,6 +356,14 @@ class Master(object):
 
         except Exception:
             self.logger.exception("Error during process mapping")
+        self.logger.info('No more tasks to care for. Wait for remaining %d processes to terminate', len(processes))
+        while (processes):
+            time.sleep(10)
+            for proc in processes:
+                if not proc.is_alive():
+                    self.logger.info('Terminated: %s pid=%s', proc, proc.pid)
+                    processes.remove(proc)
+
         self.logger.info("Algorithm iteration completed")
         self.logger.info("Wait %d sec for next cycle", self.pollInterval())
         newStartTime = time.strftime("%H:%M:%S", time.localtime(time.time()+self.pollInterval()))
@@ -584,7 +592,7 @@ class Master(object):
                     else:
                         msg = 'Taskname %s is OK. Published %d files in %d blocks.' % \
                               (taskname, summary['publishedFiles'], summary['publishedBlocks'])
-                        if summary['nextIterFiles'] :
+                        if summary['nextIterFiles']:
                             msg += ' %d files left for next iteration.' % summary['nextIterFiles']
                         logger.info(msg)
                 if result == 'FAIL':
