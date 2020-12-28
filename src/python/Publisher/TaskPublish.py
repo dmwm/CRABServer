@@ -8,6 +8,7 @@ from __future__ import print_function
 import os
 import uuid
 import time
+from datetime import datetime
 import logging
 import sys
 import json
@@ -21,7 +22,6 @@ from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.WorkerExceptions import ConfigException
 from RESTInteractions import HTTPRequests
 from WMCore.Configuration import loadConfigurationFile
-
 
 def format_file_3(file_):
     """
@@ -76,7 +76,7 @@ def createBulkBlock(output_config, processing_era_config, primds_config, \
     return blockDump
 
 
-def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, dataset, blocks=None, verbose=False):
+def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, dataset, blocks, migLogDir, verbose=False):
     """
     Submit one migration request for each block that needs to be migrated.
     If blocks argument is not specified, migrate the whole dataset.
@@ -115,7 +115,7 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, dataset, bl
         migrationIdsInProgress = []
         for block in list(blocksToMigrate):
             # Submit migration request for this block.
-            (reqid, atDestination, alreadyQueued) = requestBlockMigration(taskname, migrateApi, sourceApi, block)
+            (reqid, atDestination, alreadyQueued) = requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir)
             # If the block is already in the destination DBS instance, we don't need
             # to monitor its migration status. If the migration request failed to be
             # submitted, we retry it next time. Otherwise, save the migration request
@@ -164,7 +164,7 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, dataset, bl
             numSuccessfulMigrations = 0
             waitTime = 30
             numTimes = 10
-            msg = "Will monitor their status for up to %d seconds." % waitTime * numTimes
+            msg = "Will monitor their status for up to %d seconds." % (waitTime * numTimes)
             logger.info(msg)
             for _ in range(numTimes):
                 msg = "%d block migrations in progress." % numMigrationsInProgress
@@ -254,7 +254,7 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, dataset, bl
     return 0, ""
 
 
-def requestBlockMigration(taskname, migrateApi, sourceApi, block):
+def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
     """
     Submit migration request for one block, checking the request output.
     """
@@ -285,14 +285,23 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
         logger.info(msg)
         reqid = result.get('migration_details', {}).get('migration_request_id')
         report = result.get('migration_report')
+        migInput = result.get('migration_details', {}).get('migration_input')
+        creationDate = result.get('migration_details', {}).get('creation_date')
+        # convert to human format
+        migCreation = datetime.fromtimestamp(creationDate).strftime('%Y-%m-%d,%H:%M:%S')
         if "Migration terminally failed" in report:
-            migTime = time.gmtime(result['migration_details']['creation_date'])
-            logger.debug("MigFailed at %s", migTime)
+            failedMigrationsLog = os.path.join(migLogDir, 'TerminallyFailedLog.txt')
+            logger.debug("Migration terminally failed, log to %s", failedMigrationsLog)
+            # FiledMigFile format is CSV: id,creationDate,creationTime,block(s)
+            with open(failedMigrationsLog, 'a') as fp:
+                line = "%d,%s,%s\n" % (reqid, migCreation, migInput)
+                fp.write(line)
             # in May 2019 has a storm of failed migration which needed the following cleanup
             # keep the code in case we ever need to do the same again
+            migTime = time.gmtime(result['migration_details']['creation_date'])
             if migTime.tm_year == 2019 and migTime.tm_mon == 5 and migTime.tm_mday < 21:
                 logger.debug("Failed migration %s requested on %s. Remove it",
-                    reqid, time.ctime(result['migration_details']['creation_date']))
+                             reqid, time.ctime(result['migration_details']['creation_date']))
                 mdic = {'migration_rqst_id': reqid} # pylint: disable=unused-variable
                 migrateApi.removeMigration({'migration_rqst_id': reqid})
                 logger.debug("  and submit again")
@@ -425,6 +434,8 @@ def publishInDBS3(config, taskname, verbose):
     logdir = os.path.join(config.General.logsDir, 'tasks', username)
     logfile = os.path.join(logdir, taskname + '.log')
     createLogdir(logdir)
+    migrationLogDir = os.path.join(config.General.logsDir, 'migrations')
+    createLogdir(migrationLogDir)
     logger = logging.getLogger(taskname)
     logging.basicConfig(filename=logfile, level=logging.INFO, format=config.TaskPublisher.logMsgFormat)
     if verbose:
@@ -771,21 +782,11 @@ def publishInDBS3(config, taskname, verbose):
         if dryRun:
             logger.info("DryRun: skipping migration request")
         else:
-            statusCode, failureMsg = migrateByBlockDBS3(taskname,
-                                                        migrateApi,
-                                                        destReadApi,
-                                                        sourceApi,
-                                                        inputDataset,
-                                                        localParentBlocks,
-                                                        verbose
-                                                       )
+            statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi,
+                                                        inputDataset, localParentBlocks, migrationLogDir, verbose)
             if statusCode:
                 failureMsg += " Not publishing any files."
                 logger.info(failureMsg)
-                failed.extend([f['SourceLFN'] for f in dbsFiles_f])
-                #failed.extend([f['lfn'].replace("/store","/store/temp") for f in dbsFiles_f])
-                failure_reason = failureMsg
-                published = [x for x in published[dataset] if x not in failed[dataset]]
                 summaryFileName = saveSummaryJson(logdir, nothingToDo)
                 return summaryFileName
     # Then migrate the parent blocks that are in the global DBS instance.
@@ -796,14 +797,10 @@ def publishInDBS3(config, taskname, verbose):
             logger.info("DryRun: skipping migration request")
         else:
             statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, globalApi,
-                                                        inputDataset, globalParentBlocks, verbose)
+                                                        inputDataset, globalParentBlocks, migrationLogDir, verbose)
             if statusCode:
                 failureMsg += " Not publishing any files."
                 logger.info(failureMsg)
-                failed.extend([f['SourceLFN'] for f in dbsFiles_f])
-                #failed.extend([f['lfn'].replace("/store","/store/temp") for f in dbsFiles_f])
-                failure_reason = failureMsg
-                published = [x for x in published[dataset] if x not in failed[dataset]]
                 summaryFileName = saveSummaryJson(logdir, nothingToDo)
                 return summaryFileName
     # Publish the files in blocks. The blocks must have exactly max_files_per_block
