@@ -319,7 +319,15 @@ class Master(object):
 
         maxSlaves = self.config.max_slaves
         self.logger.info('kicking off pool for %s tasks using up to %s concurrent slaves', len(tasks), maxSlaves)
-        self.logger.debug('list of tasks %s', [x[0][3] for x in tasks])
+        #self.logger.debug('list of tasks %s', [x[0][3] for x in tasks])
+        ## print one line per task with the number of files to be published. Allow to find stuck tasks
+        self.logger.debug(' # of acquired files : taskname')
+        for task in tasks:
+            taskName = task[0][3]
+            acquiredFiles = len(task[1])
+            flag = '(***)' if acquiredFiles > 1000 else '     '  # mark suspicious tasks
+            self.logger.debug('%s %5d : %s', flag, acquiredFiles, taskName)
+
         processes = []
 
         try:
@@ -348,6 +356,14 @@ class Master(object):
 
         except Exception:
             self.logger.exception("Error during process mapping")
+        self.logger.info('No more tasks to care for. Wait for remaining %d processes to terminate', len(processes))
+        while (processes):
+            time.sleep(10)
+            for proc in processes:
+                if not proc.is_alive():
+                    self.logger.info('Terminated: %s pid=%s', proc, proc.pid)
+                    processes.remove(proc)
+
         self.logger.info("Algorithm iteration completed")
         self.logger.info("Wait %d sec for next cycle", self.pollInterval())
         newStartTime = time.strftime("%H:%M:%S", time.localtime(time.time()+self.pollInterval()))
@@ -576,7 +592,7 @@ class Master(object):
                     else:
                         msg = 'Taskname %s is OK. Published %d files in %d blocks.' % \
                               (taskname, summary['publishedFiles'], summary['publishedBlocks'])
-                        if summary['nextIterFiles'] :
+                        if summary['nextIterFiles']:
                             msg += ' %d files left for next iteration.' % summary['nextIterFiles']
                         logger.info(msg)
                 if result == 'FAIL':
