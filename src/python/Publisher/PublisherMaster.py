@@ -319,7 +319,7 @@ class Master(object):
 
         maxSlaves = self.config.max_slaves
         self.logger.info('kicking off pool for %s tasks using up to %s concurrent slaves', len(tasks), maxSlaves)
-        self.logger.debug('list of tasks %s', [x[0][3] for x in tasks])
+        #self.logger.debug('list of tasks %s', [x[0][3] for x in tasks])
         ## print one line per task with the number of files to be published. Allow to find stuck tasks
         self.logger.debug(' # of acquired files : taskname')
         for task in tasks:
