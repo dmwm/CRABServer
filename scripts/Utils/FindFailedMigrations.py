@@ -39,7 +39,7 @@ def readAndParse(csvFile, apiMig):
     for id in uniqueIDs:
         status = apiMig.statusMigration(migration_rqst_id=id)
         if not status:
-            print("%d has beem removed" % id)
+            print(" %d has been removed" % id)
             continue
         state = status[0].get("migration_status")
         # values for state:
