@@ -37,6 +37,12 @@ def main():
     print ("migrationId: %d was created on %s by %s for block:" % (migrationId, created, creator))
     print (" %s" % block)
 
+    answer = raw_input(("Do you want to remove it ? Yes/[No]: "))
+    if answer in ['Yes', 'YES', 'Y', 'y','yes']:
+        answer = 'Yes'
+    if answer is not 'Yes':
+        return
+
     print ("\nRemoving it...")
     try:
         apiMig.removeMigration({'migration_rqst_id': migrationId})
