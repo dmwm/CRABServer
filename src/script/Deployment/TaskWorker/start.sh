@@ -5,7 +5,7 @@ unset X509_USER_CERT
 unset X509_USER_KEY
 source /data/srv/TaskManager/env.sh
 
-rm -f /data/srv/TaskManager/nohup.out
+rm -f /data/hostdisk/${SERVICE}/nohup.out
 
 check_link(){
 # function checks if symbolic links required to start service exists and if they are not broken
@@ -25,7 +25,7 @@ check_link(){
 #directories/files that should be created before starting the container (SERVICE will be set to 'TaskWorker'):
 # -/data/hostdisk/${SERVICE}/cfg/TaskWorkerConfig.py
 # -/data/hostdisk/${SERVICE}/logs
-declare -A links=( ["current/TaskWorkerConfig.py"]="/data/hostdisk/${SERVICE}/cfg/TaskWorkerConfig.py" ["logs"]="/data/hostdisk/${SERVICE}/logs")
+declare -A links=( ["current/TaskWorkerConfig.py"]="/data/hostdisk/${SERVICE}/cfg/TaskWorkerConfig.py" ["logs"]="/data/hostdisk/${SERVICE}/logs" ["nohup.out"]="/data/hostdisk/${SERVICE}/nohup.out")
 
 for name in "${!links[@]}";
 do
