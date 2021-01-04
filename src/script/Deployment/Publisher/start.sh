@@ -17,7 +17,7 @@ fi
 
 source ${PUBLISHER_HOME}/env.sh
 
-rm -f ${PUBLISHER_HOME}/nohup.out
+rm -f /data/hostdisk/${SERVICE}/nohup.out
 
 check_link(){
 # function checks if symbolic links required to start service exists and if they are not broken
@@ -38,7 +38,7 @@ check_link(){
 # -/data/hostdisk/${SERVICE}/cfg/PublisherConfig.py
 # -/data/hostdisk/${SERVICE}/logs
 # -/data/hostdisk/${SERVICE}/PublisherFiles
-declare -A links=( ["PublisherConfig.py"]="/data/hostdisk/${SERVICE}/cfg/PublisherConfig.py" ["logs"]="/data/hostdisk/${SERVICE}/logs" ["/data/srv/Publisher_files"]="/data/hostdisk/${SERVICE}/PublisherFiles" )
+declare -A links=( ["PublisherConfig.py"]="/data/hostdisk/${SERVICE}/cfg/PublisherConfig.py" ["logs"]="/data/hostdisk/${SERVICE}/logs" ["/data/srv/Publisher_files"]="/data/hostdisk/${SERVICE}/PublisherFiles" ["nohup.out"]="/data/hostdisk/${SERVICE}/nohup.out")
 
 for name in "${!links[@]}";
 do
