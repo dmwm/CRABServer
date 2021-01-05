@@ -9,7 +9,7 @@ import os
 import sys
 import json
 import time
-import pycurl 
+import pycurl
 import urllib
 import urllib2
 import httplib
@@ -25,125 +25,91 @@ from RESTInteractions import HTTPRequests
 from ServerUtilities import encodeRequest, oracleOutputMapping
 from ServerUtilities import TRANSFERDB_STATES, PUBLICATIONDB_STATES
 
-def send(document):
-    return requests.post('http://monit-metrics:10012/', data=json.dumps(document), headers={ "Content-Type": "application/json; charset=UTF-8"})
+MONIT           ='http://monit-metrics:10012/'
+CMSWEB          ='cmsweb.cern.ch'
+CERTIFICATE     ='/data/certs/servicecert.pem'
+KEY             ='/data/certs/servicekey.pem'
+DATA_SOURCE_URL ='/crabserver/prod/filetransfers'
 
-def send_and_check(document, should_fail=False):
-    response = send(document)
-    assert( (response.status_code in [200]) != should_fail), 'With document: {0}. Status code: {1}. Message: {2}'.format(document, response.status_code, response.text)
+#======================================================================================================================================
+def getData(subresource):
 
+        server = HTTPRequests(CMSWEB,CERTIFICATE,KEY)
+        result = server.get(DATA_SOURCE_URL,data=encodeRequest({'subresource': subresource, 'grouping': 0}))
 
-if __name__ == "__main__":
-    server = HTTPRequests('cmsweb.cern.ch',
-                          '/data/srv/asyncstageout/state/asyncstageout/creds/OpsProxy',
-                          '/data/srv/asyncstageout/state/asyncstageout/creds/OpsProxy')
+        return oracleOutputMapping(result)
 
-    result = server.get('/crabserver/prod/filetransfers', 
-                        data=encodeRequest({'subresource': 'groupedTransferStatistics', 'grouping': 0}))
+#======================================================================================================================================
+def printData(data,header):
 
-    results = oracleOutputMapping(result)
+        i=1
+        print("="*70)
+        print("%-4s%-15s%-10s%-10s" % header)
+        print("-"*70)
+        for row in data:
+                print("%-4d%-15s%-10d%-10d" % (i,row[header[1]],row[header[2]],row[header[3]]))
+                i=i+1
 
-    tmp = {
-        'producer': 'crab',
-        'type': 'aso_total',
-        'hostname': gethostname(),
-        'transfers':{ 'DONE':{'count':0,'size':0}, 'ACQUIRED':{'count':0,'size':0}, 'SUBMITTED':{'count':0,'size':0}, 'FAILED':{'count':0,'size':0}, 'RETRY':{'count':0,'size':0} }, 
-        'publications':{'DONE':{'count':0}, 'ACQUIRED':{'count':0}, 'NEW':{'count':0}, 'FAILED':{'count':0}, 'RETRY':{'count':0}}
-    }
-    status=tmp
+        print("="*70)
+#======================================================================================================================================
 
+def fillData(data,dict_key,aso_worker,state,inputDoc):
 
-    for doc in results:
-        if doc['aso_worker']=="asoprod1":
-            status['transfers'][TRANSFERDB_STATES[doc['transfer_state']]]['count'] = doc['nt']
-            tmp['transfers'][TRANSFERDB_STATES[doc['transfer_state']]]['count'] = doc['nt']
+        if state=='transfer_state':
+                STATES=TRANSFERDB_STATES
+        if state=='publication_state':
+                STATES=PUBLICATIONDB_STATES
 
-    while True:
-        try:
-            tmp_transfer = open("tmp_transfer","w")
-            tmp_transfer.write(json.dumps(tmp))
-            tmp_transfer.close()
-            break
-        except Exception as ex:
-            print(ex)
-            continue
+        for row in data:
+                if row['aso_worker'] == aso_worker:
+                        inputDoc[dict_key][STATES[row[state]]]['count'] = row['nt']
 
-    ## redo query
-    """
-    tmp = {
-        'producer': 'crab',
-        'type': 'aso_v2',
-        'hostname': gethostname(),
-        'transfers':{ 'DONE':{'count':0,'size':0}, 'ACQUIRED':{'count':0,'size':0}, 'SUBMITTED':{'count':0,'size':0}, 'FAILED':{'count':0,'size':0}, 'RETRY':{'count':0,'size':0} }, 
-        'publications':{'DONE':{'count':0}, 'ACQUIRED':{'count':0}, 'NEW':{'count':0}, 'FAILED':{'count':0}, 'RETRY':{'count':0}}
-    }
-    status=tmp
+#======================================================================================================================================
+def sendDocument(document):
+        response = requests.post(MONIT, data=json.dumps(document), headers={ "Content-Type": "application/json; charset=UTF-8"})
+        return response.status_code
+#======================================================================================================================================
 
-    for doc in results:
-        if doc['aso_worker']=="asov2":
-            status['transfers'][TRANSFERDB_STATES[doc['transfer_state']]]['count'] = doc['nt']
-            tmp['transfers'][TRANSFERDB_STATES[doc['transfer_state']]]['count'] = doc['nt']
-    """
-    #result = server.get('/crabserver/prod/filetransfers', 
-    #                    data=encodeRequest({'subresource': 'getGroupedPublicationQuery', 'username': 'asda', 'taskname': '12390_123:crab_dasda_dasdasd', 'asoworker': 'asoprod1' ,'grouping': 0}))
-
-    #results = oracleOutputMapping(result)
-    #result = server.get('/crabserver/prod/filetransfers', data=encodeRequest({'subresource': 'getGroupedPublicationQuery', 'grouping': 0}))
-                            #data=encodeRequest({'subresource': 'groupedPublishStatistics', 'grouping': 2}))
-
-    #results = oracleOutputMapping(result)
-    #print(results)
-
-    #for doc in results:
-    #    if doc['aso_worker']=="asoprod1" and not PUBLICATIONDB_STATES[doc['publication_state']]=="NOT_REQUIRED":
-    #        status['publications'][PUBLICATIONDB_STATES[doc['publication_state']]]['count'] = doc['nt']
-    #        tmp['publications'][PUBLICATIONDB_STATES[doc['publication_state']]]['count'] = doc['nt']
-
-    #past.close()
-
-    print (json.dumps([tmp]))
-    try:
-        send_and_check([tmp])
-    except Exception as ex:
-        print(ex)
-
-    tmp = {
-        'producer': 'crab',
-        'type': 'aso_total',
-        'hostname': gethostname(),
-        'transfers':{ 'DONE':{'count':0,'size':0}, 'ACQUIRED':{'count':0,'size':0}, 'SUBMITTED':{'count':0,'size':0}, 'FAILED':{'count':0,'size':0}, 'RETRY':{'count':0,'size':0} }, 
-        'publications':{'DONE':{'count':0}, 'ACQUIRED':{'count':0}, 'NEW':{'count':0}, 'FAILED':{'count':0}, 'RETRY':{'count':0}}
-    }
-    status=tmp
-
-    tmp = {
+inputDoc = {
         'producer': 'crab',
         'type': 'asoless',
         'hostname': gethostname(),
-        'transfers':{ 'DONE':{'count':0,'size':0}, 'ACQUIRED':{'count':0,'size':0}, 'SUBMITTED':{'count':0,'size':0}, 'FAILED':{'count':0,'size':0}, 'RETRY':{'count':0,'size':0} }, 
-        'publications':{'DONE':{'count':0}, 'ACQUIRED':{'count':0}, 'NEW':{'count':0}, 'FAILED':{'count':0}, 'RETRY':{'count':0}}
-    }
-    status=tmp
+        'transfers':{
+                        'NEW':{'count':0,'size':0},
+                        'ACQUIRED':{'count':0,'size':0},
+                        'FAILED':{'count':0,'size':0},
+                        'DONE':{'count':0,'size':0},
+                        'RETRY':{'count':0,'size':0},
+                        'SUBMITTED':{'count':0,'size':0},
+                        'KILL':{'count':0,'size':0},
+                        'KILLED':{'count':0,'size':0}
+        },
+        'publications':{
+                        'NEW':{'count':0},
+                        'ACQUIRED':{'count':0},
+                        'FAILED':{'count':0},
+                        'DONE':{'count':0},
+                        'RETRY':{'count':0},
+                        'NOT_REQUIRED':{'count':0}
+        }
+}
+results=getData('groupedTransferStatistics')
+printData(results,('Row','aso_worker','nt','transfer_state'))
+print("TRANSFERDB_STATES={0: 'NEW', 1: 'ACQUIRED', 2: 'FAILED', 3: 'DONE', 4: 'RETRY', 5: 'SUBMITTED', 6: 'KILL', 7: 'KILLED'}")
+fillData(results,'transfers','schedd','transfer_state',inputDoc)
 
-    for doc in results:
-        if doc['aso_worker']=="asoless":
-            status['transfers'][TRANSFERDB_STATES[doc['transfer_state']]]['count'] = doc['nt']
-            tmp['transfers'][TRANSFERDB_STATES[doc['transfer_state']]]['count'] = doc['nt']
+results=getData('groupedPublishStatistics')
+printData(results,('Row','aso_worker','nt','publication_state'))
+print("PUBLICATIONDB_STATES={0: 'NEW', 1: 'ACQUIRED', 2: 'FAILED', 3: 'DONE', 4: 'RETRY', 5: 'NOT_REQUIRED'}")
+fillData(results,'publications','schedd','publication_state',inputDoc)
 
-    while True:
-        try:
-            tmp_transfer = open("tmp_transfer","w")
-            tmp_transfer.write(json.dumps(tmp))
-            tmp_transfer.close()
-            break
-        except Exception as ex:
-            print(ex)
-            continue
 
-    print (json.dumps([tmp]))
-    try:
-        send_and_check([tmp])
-    except Exception as ex:
-        print(ex)
+print("Filled json doc with   where aso_worker=asoless")
+print("-"*70)
+print (json.dumps([inputDoc]))
 
-    sys .exit(0)
+print("="*70)
+if sendDocument([inputDoc])==200:
+        print('successfully uploaded')
+else:
+        print('errors in  uploaded')
