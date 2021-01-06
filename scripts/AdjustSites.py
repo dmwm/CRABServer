@@ -372,11 +372,11 @@ def checkTaskInfo(ad):
 
     scheddName = os.environ['schedd_name']
 
-    printLog("Task status on DB: %s, clusterID on DB: %s, scheddy name on DB: %s; \nclusterID on condor ads: %s, scheddy name on condor ads: %s "
+    printLog('Task status on DB: %s, clusterID on DB: %s, schedd name on DB: %s; \nclusterID on condor ads: %s, schedd name on condor ads: %s '
         % (taskStatusOnDB, clusteridOnDB, scheddOnDB, clusterIdOnSchedd, scheddName))
 
     if not (taskStatusOnDB == 'SUBMITTED' and scheddOnDB == scheddName and clusteridOnDB == str(clusterIdOnSchedd)):
-        printLog('Exiting AdjustSites because task already runs or is not submitted.')
+        printLog('Exiting AdjustSites because this dagman does not match task information in TASKS DB')
         sys.exit(3)
 
 

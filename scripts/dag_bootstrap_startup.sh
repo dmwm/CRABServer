@@ -168,8 +168,8 @@ if [ -e AdjustSites.py ]; then
         condor_qedit $CONDOR_ID DagmanHoldReason "'Cannot get data from REST Interface.'"
         exit 1   
     elif [ $ret -eq 3 ]; then
-        echo "Error: task already runs or is not submitted yet." >&2
-        condor_qedit $CONDOR_ID DagmanHoldReason "'Task already runs or is not submitted yet.'"
+        echo "Error: this dagman does not match task information in TASKS DB" >&2
+        condor_qedit $CONDOR_ID DagmanHoldReason "'This dagman does not match task information in TASKS DB'"
         exit 1
     fi
 else
