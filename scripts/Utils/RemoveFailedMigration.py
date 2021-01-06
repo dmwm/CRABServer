@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
+from __future__ import print_function
+from __future__ import division
 
-import os
 from  datetime import datetime
 import argparse
 
-import CRABClient
+import CRABClient # this is needed to make it possible for the following import to work
 from dbs.apis.dbsClient import DbsApi
 
 def main():
