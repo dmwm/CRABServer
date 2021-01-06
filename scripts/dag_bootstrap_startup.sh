@@ -155,12 +155,21 @@ fi
 
 # Recalculate the black / whitelist
 if [ -e AdjustSites.py ]; then
+    export schedd_name=`condor_config_val schedd_name`
     echo "Execute AdjustSites.py ..."
     python AdjustSites.py
     ret=$?
     if [ $ret -eq 1 ]; then
         echo "Error: AdjustSites.py failed to update the webdir." >&2
         condor_qedit $CONDOR_ID DagmanHoldReason "'AdjustSites.py failed to update the webdir.'"
+        exit 1
+    elif [ $ret -eq 2 ]; then
+        echo "Error: Cannot get data from REST Interface" >&2
+        condor_qedit $CONDOR_ID DagmanHoldReason "'Cannot get data from REST Interface.'"
+        exit 1   
+    elif [ $ret -eq 3 ]; then
+        echo "Error: this dagman does not match task information in TASKS DB" >&2
+        condor_qedit $CONDOR_ID DagmanHoldReason "'This dagman does not match task information in TASKS DB'"
         exit 1
     fi
 else

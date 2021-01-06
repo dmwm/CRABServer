@@ -20,7 +20,7 @@ from datetime import datetime
 from httplib import HTTPException
 
 from RESTInteractions import HTTPRequests
-from ServerUtilities import getProxiedWebDir
+from ServerUtilities import getProxiedWebDir, getColumn
 
 
 def printLog(msg):
@@ -343,6 +343,43 @@ def setupLog():
     os.close(logfd)
 
 
+def checkTaskInfo(ad):
+    """
+    Function checks that given task is registered in the database with status SUBMITTED and with the
+    same clusterId and schedd name in the database as in the condor ads where it is currently running.
+    In case above condition is not met, script immediately terminates
+    """
+
+    task = ad['CRAB_ReqName']
+    host = ad['CRAB_RestHost']
+    uri = ad['CRAB_RestURInoAPI'] + '/task'
+    cert = ad['X509UserProxy']
+    clusterIdOnSchedd = ad['ClusterId']
+    data = {'subresource': 'search', 'workflow': task}
+
+    try:
+        server = HTTPRequests(host, cert, cert, retry=3)
+        dictresult, _, _ = server.get(uri, data=data)
+    except HTTPException as hte:
+        printLog(traceback.format_exc())
+        printLog(hte.headers)
+        printLog(hte.result)
+        sys.exit(2)
+
+    taskStatusOnDB = getColumn(dictresult, 'tm_task_status')
+    clusteridOnDB = getColumn(dictresult, 'clusterid')
+    scheddOnDB = getColumn(dictresult, 'tm_schedd')
+
+    scheddName = os.environ['schedd_name']
+
+    printLog('Task status on DB: %s, clusterID on DB: %s, schedd name on DB: %s; \nclusterID on condor ads: %s, schedd name on condor ads: %s '
+        % (taskStatusOnDB, clusteridOnDB, scheddOnDB, clusterIdOnSchedd, scheddName))
+
+    if not (taskStatusOnDB == 'SUBMITTED' and scheddOnDB == scheddName and clusteridOnDB == str(clusterIdOnSchedd)):
+        printLog('Exiting AdjustSites because this dagman does not match task information in TASKS DB')
+        sys.exit(3)
+
+
 def main():
     """
     Need a doc string here.
@@ -359,6 +396,7 @@ def main():
         ad = classad.parseOne(fd)
     printLog("Parsed ad: %s" % ad)
 
+    checkTaskInfo(ad)
     makeWebDir(ad)
 
     printLog("Webdir has been set up. Uploading the webdir URL to the REST")
