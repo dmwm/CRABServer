@@ -43,7 +43,7 @@ systems = \
                        'apmon', 'DashboardAPI', 'Logger', 'ProcInfo',
                        'CRABQuality', 'HTCondorUtils', 'HTCondorLocator',
                        'ServerUtilities', 'MultiProcessingLog', 'CMSGroupMapper',
-                       'cache_status'],
+                       'RucioUtils', 'cache_status'],
         'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
                    'TaskWorker/Actions/Recurring', 'taskbuffer', 'Publisher', 'TransferInterface']
     },
@@ -64,7 +64,7 @@ systems = \
     }
 }
 
-# These repos come from git clone, so we need to speicify the repo and ref
+# These repos come from git clone, so we need to specify the repo and ref
 DEFAULT_CMSDIST_REPO = "git@github.com:cms-sw/cmsdist.git"
 DEFAULT_CMSDIST_REF = "comp"
 DEFAULT_PKGTOOLS_REPO = "git@github.com:cms-sw/cmsdist.git"
