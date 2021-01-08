@@ -90,11 +90,11 @@ class DBSDataDiscovery(DataDiscovery):
         :param blockList: a list of blocks to recall from Tape to Disk
         :param system: a string identifying the DDM system to use 'Dynamo' or 'Rucio' or 'None'
         :param msgHead: a string with the initial part of a message to be used for exceptions
-        Since data on tape means no submission possible, this function will always raise
-        a TaskWorkerException to stop the action flow. The exception message contains details
-        and an attempt is done to upload it to TaskDB so that crab status can report it
+        :return: nothing: Since data on tape means no submission possible, this function will
+            always raise a TaskWorkerException to stop the action flow.
+            The exception message contains details and an attempt is done to upload it to TaskDB
+            so that crab status can report it
         """
-        # start with old Dyanmo implementation. A new implementation with Rucio will come
 
         msg = msgHead
         if system == 'Rucio':
@@ -109,7 +109,6 @@ class DBSDataDiscovery(DataDiscovery):
                 response = self.rucioClient.add_container(myScope, containerName)
             except DataIdentifierAlreadyExists:
                 self.logger.debug("Container name already exists in Rucio. Keep going")
-                pass
             except Exception as ex:
                 msg += "Rucio exception creating container: %s" %  (str(ex))
                 raise TaskWorkerException(msg)
@@ -117,7 +116,6 @@ class DBSDataDiscovery(DataDiscovery):
                 response = self.rucioClient.attach_dids(myScope, containerName, dids)
             except DuplicateContent:
                 self.logger.debug("Some dids are already in this container. Keep going")
-                pass
             except Exception as ex:
                 msg += "Rucio exception adding blocks to container: %s" %  (str(ex))
                 raise TaskWorkerException(msg)
@@ -127,8 +125,8 @@ class DBSDataDiscovery(DataDiscovery):
             sizeToRecall = 0
             for block in blockList:
                 replicas = self.rucioClient.list_dataset_replicas('cms', block)
-                bytes = replicas.next()['bytes']  # pick first replica for each block, they better all have same size
-                sizeToRecall += bytes
+                blockBytes = replicas.next()['bytes']  # pick first replica for each block, they better all have same size
+                sizeToRecall += blockBytes
             TBtoRecall = sizeToRecall // 1e12
             if TBtoRecall > 0:
                 self.logger.info("Total size of data to recall : %d TBytes", TBtoRecall)
@@ -173,28 +171,30 @@ class DBSDataDiscovery(DataDiscovery):
             msg += "\nA disk replica has been requested to Rucio (rule ID: %s )" % str(ruleId[0])
             automaticTapeRecallIsImplemented = False
             if automaticTapeRecallIsImplemented:
-                # set status to TAPERECALL
                 tapeRecallStatus = 'TAPERECALL'
-                configreq = {'workflow': self.taskName,
-                             'taskstatus': tapeRecallStatus,
-                             'ddmreqid': ruleId,
-                             'subresource': 'addddmreqid',
-                             }
-                try:
-                    tapeRecallStatusSet = self.server.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
-                except HTTPException as hte:
-                    self.logger.exception(hte)
-                    msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (
-                        self.config.TaskWorker.restHost, str(hte))
-                    msg += "\nSetting %s status and DDM request ID (%d) failed for task %s" % (
-                        tapeRecallStatus, ddmReqId, self.taskName)
-                    msg += "\nHTTP Headers are: %s" % hte.headers
-                    raise TaskWorkerException(msg, retry=True)
-                if tapeRecallStatusSet[2] == "OK":
-                    self.logger.info("Status for task %s set to '%s'", self.taskName, tapeRecallStatus)
-                    msg += "\nThis task will be automatically submitted as soon as the stage-out is completed."
-                    self.uploadWarning(msg, self.userproxy, self.taskName)
-                    raise TapeDatasetException(msg)
+            else:
+                tapeRecallStatus = 'SUBMITFAILED'
+            configreq = {'workflo': self.taskName,
+                         'taskstatus': tapeRecallStatus,
+                         'ddmreqid': ruleId,
+                         'subresource': 'addddmreqid',
+                         }
+            try:
+                tapeRecallStatusSet = self.server.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
+            except HTTPException as hte:
+                self.logger.exception(hte)
+                msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (
+                    self.config.TaskWorker.restHost, str(hte))
+                msg += "\nStoring of %s status and ruleId (%d) failed for task %s" % (
+                    tapeRecallStatus, ruleId, self.taskName)
+                msg += "\nHTTP Headers are: %s" % hte.headers
+                raise TaskWorkerException(msg, retry=True)
+            if tapeRecallStatusSet[2] == "OK":
+                self.logger.info("Status for task %s set to '%s'", self.taskName, tapeRecallStatus)
+            if automaticTapeRecallIsImplemented:
+                msg += "\nThis task will be automatically submitted as soon as the stage-out is completed."
+                self.uploadWarning(msg, self.userproxy, self.taskName)
+                raise TapeDatasetException(msg)
             # fall here if could not setup for automatic submission after recall
             msg += ", please try again in two days."
             raise TaskWorkerException(msg)
@@ -206,6 +206,7 @@ class DBSDataDiscovery(DataDiscovery):
 
         if system == 'Dynamo':
             raise NotImplementedError
+            # keep following old, unused, unreachable code around for a bit as reference, to be removed once all works
             ddmServer = self.config.TaskWorker.DDMServer
             ddmRequest = None
             try:
@@ -344,14 +345,14 @@ class DBSDataDiscovery(DataDiscovery):
                         locationsMap[blockName] = replicas
             except Exception as exc:
                 msg = "Rucio lookup failed with\n%s" % str(exc)
-                self.logger.warn(msg)
+                self.logger.warning(msg)
                 locationsMap = None
 
             if locationsMap:
                 locationsFoundWithRucio = True
             else:
                 msg = "No locations found with Rucio for this dataset"
-                self.logger.warn(msg)
+                self.logger.warning(msg)
 
         if not locationsFoundWithRucio:
             self.logger.info("No locations found with Rucio for %s", inputDataset)
@@ -399,7 +400,7 @@ class DBSDataDiscovery(DataDiscovery):
                             secondaryLocationsMap[blockName] = replicas
                 except Exception as exc:
                     msg = "Rucio lookup failed with\n%s" % str(exc)
-                    self.logger.warn(msg)
+                    self.logger.warning(msg)
                     secondaryLocationsMap = None
             if not secondaryLocationsMap:
                 msg = "No locations found for secondaryDataset %s." % secondaryDataset
