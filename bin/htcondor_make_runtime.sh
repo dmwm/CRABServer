@@ -62,7 +62,7 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
 
     mkdir -p bin
     cp -r $ORIGDIR/scripts/{TweakPSet.py,CMSRunAnalysis.py,DashboardFailure.sh,task_process} .
-    cp $ORIGDIR/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py,ServerUtilities.py,CMSGroupMapper.py,RESTInteractions.py} .
+    cp $ORIGDIR/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py,ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
 
 else
 
