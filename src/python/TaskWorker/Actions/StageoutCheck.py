@@ -1,15 +1,11 @@
 import os
 import re
-from httplib import HTTPException
 
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
-
 from ServerUtilities import isFailurePermanent
 from ServerUtilities import getCheckWriteCommand, createDummyFile
 from ServerUtilities import removeDummyFile, executeCommand
-from ServerUtilities import tempSetLogLevel
-
 from RucioUtils import getWritePFN
 
 class StageoutCheck(TaskAction):

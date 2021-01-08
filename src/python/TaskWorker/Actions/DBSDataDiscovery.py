@@ -12,9 +12,8 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from TaskWorker.Actions.DDMRequests import blocksRequest
-from ServerUtilities import tempSetLogLevel
 
-from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent, RuleNotFound)
+from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent)
 
 class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service.

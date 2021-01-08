@@ -14,14 +14,12 @@ import tarfile
 import hashlib
 import tempfile
 from ast import literal_eval
-from httplib import HTTPException
 
 from ServerUtilities import getLock
 from ServerUtilities import TASKLIFETIME
 
 import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
-#import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS
