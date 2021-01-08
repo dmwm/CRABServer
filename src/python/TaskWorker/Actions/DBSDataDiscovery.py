@@ -150,12 +150,14 @@ class DBSDataDiscovery(DataDiscovery):
             DAYS = 14 * 24 * 3600
             ASK_APPROVAL = False
             ASK_APPROVAL = True # for testing
+            ACCOUNT = 'crab_tape_recall' # eventually, once crab TW DN's get access
+            ACCOUNT = self.config.Services.Rucio_account   # for testing
             copies = 1
             try:
                 ruleId = self.rucioClient.add_replication_rule(dids=[containerDid],
                                                   copies=copies, rse_expression=RSE_EXPRESSION,
                                                   grouping=grouping,
-                                                  weight=WEIGHT, lifetime=DAYS, account=self.username,
+                                                  weight=WEIGHT, lifetime=DAYS, account=ACCOUNT,
                                                   activity='Analysis Input',
                                                   comment='Staged from tape for %s' % self.username,
                                                   ask_approval=ASK_APPROVAL, asynchronous=True,
