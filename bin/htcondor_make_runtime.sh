@@ -110,12 +110,12 @@ else
 
     mkdir -p bin
     cp -r $CRABSERVER_PATH/scripts/{TweakPSet.py,CMSRunAnalysis.py,DashboardFailure.sh,task_process} .
-    cp $CRABSERVER_PATH/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py,ServerUtilities.py,CMSGroupMapper.py,RESTInteractions.py} .
+    cp $CRABSERVER_PATH/src/python/{ApmonIf.py,DashboardAPI.py,Logger.py,ProcInfo.py,apmon.py,ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
 fi
 
 pwd
 echo "Making TaskManagerRun tarball"
-tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py task_process DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py || exit 4
+tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py task_process DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py RucioUtils.py CMSGroupMapper.py RESTInteractions.py || exit 4
 echo "Making CMSRunAnalysis tarball"
 tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ApmonIf.py DashboardAPI.py Logger.py ProcInfo.py apmon.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py DashboardFailure.sh || exit 4
 popd
