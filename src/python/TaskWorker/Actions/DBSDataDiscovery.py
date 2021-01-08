@@ -169,14 +169,18 @@ class DBSDataDiscovery(DataDiscovery):
             except Exception as ex:
                 msg += "Rucio exception creating rule: %s" %  (str(ex))
                 raise TaskWorkerException(msg)
+            ruleId = str(ruleId[0])  # from list to singleId and remove unicode
 
-            msg += "\nA disk replica has been requested to Rucio (rule ID: %s )" % str(ruleId[0])
+            msg += "\nA disk replica has been requested to Rucio (rule ID: %s )" % ruleId
+            msg += "\nyou can check progress via either of the following two commands:"
+            msg += "\n rucio rule-info %s" % ruleId
+            msg += "\n rucio list-rules %s:%s" % (myScope, containerName)
             automaticTapeRecallIsImplemented = False
             if automaticTapeRecallIsImplemented:
                 tapeRecallStatus = 'TAPERECALL'
             else:
                 tapeRecallStatus = 'SUBMITFAILED'
-            configreq = {'workflo': self.taskName,
+            configreq = {'workflow': self.taskName,
                          'taskstatus': tapeRecallStatus,
                          'ddmreqid': ruleId,
                          'subresource': 'addddmreqid',
@@ -187,7 +191,7 @@ class DBSDataDiscovery(DataDiscovery):
                 self.logger.exception(hte)
                 msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (
                     self.config.TaskWorker.restHost, str(hte))
-                msg += "\nStoring of %s status and ruleId (%d) failed for task %s" % (
+                msg += "\nStoring of %s status and ruleId (%s) failed for task %s" % (
                     tapeRecallStatus, ruleId, self.taskName)
                 msg += "\nHTTP Headers are: %s" % hte.headers
                 raise TaskWorkerException(msg, retry=True)
@@ -198,7 +202,7 @@ class DBSDataDiscovery(DataDiscovery):
                 self.uploadWarning(msg, self.userproxy, self.taskName)
                 raise TapeDatasetException(msg)
             # fall here if could not setup for automatic submission after recall
-            msg += ", please try again in two days."
+            msg += "\nPlease monitor recall progress via Rucio or DAS and try again once data are on disk."
             raise TaskWorkerException(msg)
 
         if system == 'None':
