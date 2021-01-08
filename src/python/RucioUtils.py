@@ -1,3 +1,6 @@
+from __future__ import print_function
+from __future__ import division
+
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 def getNativeRucioClient(config=None, logger=None):
