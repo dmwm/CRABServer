@@ -19,7 +19,9 @@ class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service.
     """
 
-    def __init__(self, config, server='', resturi='', procnum=-1, rucioClient=None):
+    # disable pylint warning in next line since they refer to conflict with the main()
+    # at the bottom of this file which is only used for testing
+    def __init__(self, config, server='', resturi='', procnum=-1, rucioClient=None): # pylint: disable=redefined-outer-name
         DataDiscovery.__init__(self, config, server, resturi, procnum)
         self.rucioClient = rucioClient
 
@@ -106,14 +108,14 @@ class DBSDataDiscovery(DataDiscovery):
             containerDid = {'scope':myScope, 'name':containerName}
             self.logger.info("Create RUcio container %s", containerName)
             try:
-                response = self.rucioClient.add_container(myScope, containerName)
+                self.rucioClient.add_container(myScope, containerName)
             except DataIdentifierAlreadyExists:
                 self.logger.debug("Container name already exists in Rucio. Keep going")
             except Exception as ex:
                 msg += "Rucio exception creating container: %s" %  (str(ex))
                 raise TaskWorkerException(msg)
             try:
-                response = self.rucioClient.attach_dids(myScope, containerName, dids)
+                self.rucioClient.attach_dids(myScope, containerName, dids)
             except DuplicateContent:
                 self.logger.debug("Some dids are already in this container. Keep going")
             except Exception as ex:
@@ -207,7 +209,7 @@ class DBSDataDiscovery(DataDiscovery):
         if system == 'Dynamo':
             raise NotImplementedError
             # keep following old, unused, unreachable code around for a bit as reference, to be removed once all works
-            ddmServer = self.config.TaskWorker.DDMServer
+            ddmServer = self.config.TaskWorker.DDMServer # pylint: disable=unreachable
             ddmRequest = None
             try:
                 ddmRequest = blocksRequest(blockList, ddmServer, self.config.TaskWorker.cmscert,
