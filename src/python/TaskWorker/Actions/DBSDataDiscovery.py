@@ -102,7 +102,7 @@ class DBSDataDiscovery(DataDiscovery):
 
         msg = msgHead
         if system == 'Rucio':
-            # need to interact with Rucio with crab_tape_recall account
+            # need to use crab_tape_recall Rucio account to create containers and create rules
             tapeRecallConfig = copy.copy(self.config)
             tapeRecallConfig.Services.Rucio_account = 'crab_tape_recall'
             rucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)
@@ -156,8 +156,7 @@ class DBSDataDiscovery(DataDiscovery):
             DAYS = 14 * 24 * 3600
             ASK_APPROVAL = False
             ASK_APPROVAL = True # for testing
-            ACCOUNT = 'crab_tape_recall' # eventually, once crab TW DN's get access
-            #ACCOUNT = self.config.Services.Rucio_account   # for testing
+            ACCOUNT = 'crab_tape_recall'
             copies = 1
             try:
                 ruleId = rucioClient.add_replication_rule(dids=[containerDid],
