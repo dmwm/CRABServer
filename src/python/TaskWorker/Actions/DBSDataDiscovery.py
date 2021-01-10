@@ -2,6 +2,7 @@ from __future__ import print_function
 import os
 import sys
 import logging
+import copy
 from httplib import HTTPException
 import urllib
 
@@ -12,6 +13,7 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from TaskWorker.Actions.DDMRequests import blocksRequest
+from RucioUtils import getNativeRucioClient
 
 from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent)
 
@@ -100,22 +102,26 @@ class DBSDataDiscovery(DataDiscovery):
 
         msg = msgHead
         if system == 'Rucio':
+            # need to interact with Rucio with crab_tape_recall account
+            tapeRecallConfig = copy.copy(self.config)
+            tapeRecallConfig.Services.Rucio_account = 'crab_tape_recall'
+            rucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)
             # turn input CMS blocks into Rucio dids in cms scope
             dids = [{'scope': 'cms', 'name': block} for block in blockList]
             # prepare container /TapeRecall/taskname/USER in the service scope
-            myScope = 'user.%s' % self.config.Services.Rucio_account
+            myScope = 'user.crab_tape_recall'
             containerName = '/TapeRecall/%s/USER' % self.taskName.replace(':', '.')
             containerDid = {'scope':myScope, 'name':containerName}
             self.logger.info("Create RUcio container %s", containerName)
             try:
-                self.rucioClient.add_container(myScope, containerName)
+                rucioClient.add_container(myScope, containerName)
             except DataIdentifierAlreadyExists:
                 self.logger.debug("Container name already exists in Rucio. Keep going")
             except Exception as ex:
                 msg += "Rucio exception creating container: %s" %  (str(ex))
                 raise TaskWorkerException(msg)
             try:
-                self.rucioClient.attach_dids(myScope, containerName, dids)
+                rucioClient.attach_dids(myScope, containerName, dids)
             except DuplicateContent:
                 self.logger.debug("Some dids are already in this container. Keep going")
             except Exception as ex:
@@ -126,7 +132,7 @@ class DBSDataDiscovery(DataDiscovery):
             # Compute size of recall request
             sizeToRecall = 0
             for block in blockList:
-                replicas = self.rucioClient.list_dataset_replicas('cms', block)
+                replicas = rucioClient.list_dataset_replicas('cms', block)
                 blockBytes = replicas.next()['bytes']  # pick first replica for each block, they better all have same size
                 sizeToRecall += blockBytes
             TBtoRecall = sizeToRecall // 1e12
@@ -151,10 +157,10 @@ class DBSDataDiscovery(DataDiscovery):
             ASK_APPROVAL = False
             ASK_APPROVAL = True # for testing
             ACCOUNT = 'crab_tape_recall' # eventually, once crab TW DN's get access
-            ACCOUNT = self.config.Services.Rucio_account   # for testing
+            #ACCOUNT = self.config.Services.Rucio_account   # for testing
             copies = 1
             try:
-                ruleId = self.rucioClient.add_replication_rule(dids=[containerDid],
+                ruleId = rucioClient.add_replication_rule(dids=[containerDid],
                                                   copies=copies, rse_expression=RSE_EXPRESSION,
                                                   grouping=grouping,
                                                   weight=WEIGHT, lifetime=DAYS, account=ACCOUNT,
@@ -167,7 +173,7 @@ class DBSDataDiscovery(DataDiscovery):
                 # which should only happen when testing, since container name is unique like task name, anyhow...
                 self.logger.debug("A duplicate rule for this account, did, rse_expression, copies already exists. Use that")
                 # find the existing rule id
-                ruleId = self.rucioClient.list_did_rules(myScope, containerName)
+                ruleId = rucioClient.list_did_rules(myScope, containerName)
             except Exception as ex:
                 msg += "Rucio exception creating rule: %s" %  (str(ex))
                 raise TaskWorkerException(msg)
