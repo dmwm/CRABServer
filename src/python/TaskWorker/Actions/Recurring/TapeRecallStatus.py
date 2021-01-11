@@ -7,8 +7,6 @@ import time
 
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 from TaskWorker.MasterWorker import MasterWorker
-#from TaskWorker.Actions.DDMRequests import statusRequest
-from RESTInteractions import HTTPRequests
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, getTimeFromTaskname
