@@ -7,15 +7,43 @@ import time
 
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 from TaskWorker.MasterWorker import MasterWorker
-from TaskWorker.Actions.DDMRequests import statusRequest
-from RESTInteractions import HTTPRequests
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, getTimeFromTaskname
+from RucioUtils import getNativeRucioClient
 from TaskWorker.Worker import failTask
+from rucio.common.exception import RuleNotFound
 
 class TapeRecallStatus(BaseRecurringAction):
     pollingTime = 60*4 # minutes
+    rucioClient = None
+
+    def refreshSandbox(self, task):
+
+        from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
+        ufc = UserFileCache({'cert': task['user_proxy'], 'key': task['user_proxy'],
+                             'endpoint': task['tm_cache_url'], "pycurl": True})
+        sandbox = task['tm_user_sandbox'].replace(".tar.gz", "")
+        debugFiles = task['tm_debug_files'].replace(".tar.gz", "")
+        sandboxPath = os.path.join("/tmp", sandbox)
+        debugFilesPath = os.path.join("/tmp", debugFiles)
+        try:
+            ufc.download(sandbox, sandboxPath, task['tm_username'])
+            ufc.download(debugFiles, debugFilesPath, task['tm_username'])
+            self.logger.info(
+                "Successfully touched input and debug sandboxes (%s and %s) of task %s (frontend: %s) using the '%s' username (request_id = %s).",
+                sandbox, debugFiles, task['tm_taskname'], task['tm_cache_url'], task['tm_username'], task['tm_DDM_reqid'])
+        except Exception as ex:
+            msg = "The CRAB3 server backend could not download the input and/or debug sandbox (%s and/or %s) " % (
+            sandbox, debugFiles)
+            msg += "of task %s from the frontend (%s) using the '%s' username (request_id = %d). " % \
+                   (task['tm_taskname'], task['tm_cache_url'], task['tm_username'], task['tm_DDM_reqid'])
+            msg += "\nThis could be a temporary glitch, will try again in next occurrence of the recurring action."
+            msg += "Error reason:\n%s" % str(ex)
+            self.logger.info(msg)
+        finally:
+            if os.path.exists(sandboxPath): os.remove(sandboxPath)
+            if os.path.exists(debugFilesPath): os.remove(debugFilesPath)
 
     def _execute(self, resthost, resturi, config, task):
 
@@ -48,86 +76,76 @@ class TapeRecallStatus(BaseRecurringAction):
         tapeRecallStatus = 'TAPERECALL'
         self.logger.info("Retrieving %s tasks", tapeRecallStatus)
         recallingTasks = mw.getWork(limit=999999, getstatus=tapeRecallStatus, ignoreTWName=True)
-        if recallingTasks:
-            self.logger.info("Retrieved a total of %d %s tasks", len(recallingTasks), tapeRecallStatus)
-            server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
-                                  logger=self.logger)
-            for recallingTask in recallingTasks:
-                taskName = recallingTask['tm_taskname']
-                self.logger.info("Working on task %s", taskName)
+        if not recallingTasks:
+            self.logger.info("No %s task retrieved.", tapeRecallStatus)
+            return
 
-                reqId = recallingTask['tm_DDM_reqid']
-                if not reqId:
-                    self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", taskName)
-                    continue
-                else:
-                    msg = "The DDM request (ID: %d) has been rejected because DDM is DRAINING for migration to Rucio" % reqId
+        self.logger.info("Retrieved a total of %d %s tasks", len(recallingTasks), tapeRecallStatus)
+        ##SBserver = HTTPRequests(config.TaskWorker.restHost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
+        ##SB                      logger=self.logger)
+        server = mw.server
+        resturi = mw.restURInoAPI + '/info'
+        for recallingTask in recallingTasks:
+            taskName = recallingTask['tm_taskname']
+            self.logger.info("Working on task %s", taskName)
+
+            reqId = recallingTask['tm_DDM_reqid']
+            if not reqId:
+                self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping such task", taskName)
+                continue
+            else:
+                msg = "Task points to Rucio RuleId:  %s " % reqId
+                self.logger.info(msg)
+
+            if (time.time() - getTimeFromTaskname(str(taskName))) > MAX_DAYS_FOR_TAPERECALL*24*60*60:
+                self.logger.info("Task %s is older than %d days, setting its status to FAILED", taskName, MAX_DAYS_FOR_TAPERECALL)
+                msg = "The disk replica request (ID: %d) for the input dataset did not complete in %d days." % (reqId, MAX_DAYS_FOR_TAPERECALL)
+                failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
+                continue
+
+            mpl = MyProxyLogon(config=config, server=server, resturi=resturi, myproxylen=self.pollingTime)
+            user_proxy = True
+            try:
+                mpl.execute(task=recallingTask) # this adds 'user_proxy' to recallingTask
+            except TaskWorkerException as twe:
+                user_proxy = False
+                self.logger.exception(twe)
+
+            # Make sure the task sandbox in the crabcache is not deleted until the tape recall is completed
+            if user_proxy:
+                self.refreshSandbox(recallingTask)
+
+
+            # Retrieve status of recall request
+            if not self.rucioClient:
+                self.rucioClient = getNativeRucioClient(config=config, logger=self.logger)
+            try:
+                ddmRequest = self.rucioClient.get_replication_rule(reqId)
+            except RuleNotFound:
+                msg = "Rucio rule id %s not found. Please report to experts" % reqId
+                self.logger.info(msg)
+                if user_proxy: mpl.uploadWarning(msg, recallingTask['user_proxy'], taskName)
+            if ddmRequest['state'] == 'OK':
+                self.logger.info("Request %d is completed, setting status of task %s to NEW", reqId, taskName)
+                mw.updateWork(taskName, recallingTask['tm_task_command'], 'NEW')
+                # Delete all task warnings (the tapeRecallStatus added a dataset warning which is no longer valid now)
+                if user_proxy: mpl.deleteWarnings(recallingTask['user_proxy'], taskName)
+            """
+            # these lines where relevant for Dynamo. Is anything like this still useful in Rucio land ?
+            if ddmRequest["message"] == "Request found":
+                status = ddmRequest["data"][0]["status"]
+                if status == "completed": # possible values: new, activated, updated, completed, rejected, cancelled
+                    self.logger.info("Request %d is completed, setting status of task %s to NEW", reqId, taskName)
+                    mw.updateWork(taskName, recallingTask['tm_task_command'], 'NEW')
+                    # Delete all task warnings (the tapeRecallStatus added a dataset warning which is no longer valid now)
+                    if user_proxy: mpl.deleteWarnings(recallingTask['user_proxy'], taskName)
+                elif status == "rejected":
+                    msg = "The DDM request (ID: %d) has been rejected with this reason: %s" % (reqId, ddmRequest["data"][0]["reason"])
                     msg1 = "\nSetting status of task %s to FAILED" % taskName
                     self.logger.info(msg + msg1)
                     failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
-                    continue
+            """
 
-                if (time.time() - getTimeFromTaskname(str(taskName))) > MAX_DAYS_FOR_TAPERECALL*24*60*60:
-                    self.logger.info("Task %s is older than %d days, setting its status to FAILED", taskName, MAX_DAYS_FOR_TAPERECALL)
-                    msg = "The disk replica request (ID: %d) for the input dataset did not complete in %d days." % (reqId, MAX_DAYS_FOR_TAPERECALL)
-                    failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
-                    continue
-
-                mpl = MyProxyLogon(config=config, server=server, resturi=resturi, myproxylen=self.pollingTime)
-                user_proxy = True
-                try:
-                    mpl.execute(task=recallingTask) # this adds 'user_proxy' to recallingTask
-                except TaskWorkerException as twe:
-                    user_proxy = False
-                    self.logger.exception(twe)
-
-                # Make sure the task sandbox in the crabcache is not deleted until the tape recall is completed
-                if user_proxy:
-                    from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
-                    ufc = UserFileCache({'cert': recallingTask['user_proxy'], 'key': recallingTask['user_proxy'], 'endpoint': recallingTask['tm_cache_url'], "pycurl": True})
-                    sandbox = recallingTask['tm_user_sandbox'].replace(".tar.gz", "")
-                    debugFiles = recallingTask['tm_debug_files'].replace(".tar.gz", "")
-                    sandboxPath = os.path.join("/tmp", sandbox)
-                    debugFilesPath = os.path.join("/tmp", debugFiles)
-                    try:
-                        ufc.download(sandbox, sandboxPath, recallingTask['tm_username'])
-                        ufc.download(debugFiles, debugFilesPath, recallingTask['tm_username'])
-                        self.logger.info("Successfully touched input and debug sandboxes (%s and %s) of task %s (frontend: %s) using the '%s' username (request_id = %d).",
-                                         sandbox, debugFiles, taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId)
-                    except Exception as ex:
-                        msg = "The CRAB3 server backend could not download the input and/or debug sandbox (%s and/or %s) " % (sandbox, debugFiles)
-                        msg += "of task %s from the frontend (%s) using the '%s' username (request_id = %d). " % \
-                               (taskName, recallingTask['tm_cache_url'], recallingTask['tm_username'], reqId)
-                        msg += "\nThis could be a temporary glitch, will try again in next occurrence of the recurring action."
-                        msg += "Error reason:\n%s" % str(ex)
-                        self.logger.info(msg)
-                    finally:
-                        if os.path.exists(sandboxPath): os.remove(sandboxPath)
-                        if os.path.exists(debugFilesPath): os.remove(debugFilesPath)
-                ddmRequest = statusRequest(reqId, config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, verbose=False)
-                # The query above returns a JSON with a format {"result": "OK", "message": "Request found", "data": [{"request_id": 14, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:25:41", "last_request": "2018-02-26 23:25:41", "request_count": 1}]}                
-                self.logger.info("Contacted %s using %s and %s for request_id = %d, got:\n%s", config.TaskWorker.DDMServer, config.TaskWorker.cmscert, config.TaskWorker.cmskey, reqId, ddmRequest)
-
-                if ddmRequest["message"] == "Request found":
-                    status = ddmRequest["data"][0]["status"]
-                    if status == "completed": # possible values: new, activated, updated, completed, rejected, cancelled
-                        self.logger.info("Request %d is completed, setting status of task %s to NEW", reqId, taskName)
-                        mw.updateWork(taskName, recallingTask['tm_task_command'], 'NEW')
-                        # Delete all task warnings (the tapeRecallStatus added a dataset warning which is no longer valid now)
-                        if user_proxy: mpl.deleteWarnings(recallingTask['user_proxy'], taskName)
-                    elif status == "rejected":
-                        msg = "The DDM request (ID: %d) has been rejected with this reason: %s" % (reqId, ddmRequest["data"][0]["reason"])
-                        msg1 = "\nSetting status of task %s to FAILED" % taskName
-                        self.logger.info(msg + msg1)
-                        failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
-
-                else:
-                    msg = "DDM request_id %d not found. Please report to experts" % reqId
-                    self.logger.info(msg)
-                    if user_proxy: mpl.uploadWarning(msg, recallingTask['user_proxy'], taskName)
-
-        else:
-            self.logger.info("No %s task retrieved.", tapeRecallStatus)
 
 
 if __name__ == '__main__':
