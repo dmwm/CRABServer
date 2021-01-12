@@ -15,7 +15,8 @@ from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from TaskWorker.Actions.DDMRequests import blocksRequest
 from RucioUtils import getNativeRucioClient
 
-from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent)
+from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
+    InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage)
 
 class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service.
@@ -149,20 +150,20 @@ class DBSDataDiscovery(DataDiscovery):
                 self.logger.info("Will place all blocks at a single site")
 
             # create rule
-            RSE_EXPRESSION = 'ddm_quota>0&tier=2&rse_type=DISK'
-            RSE_EXPRESSION = 'T3_IT_Trieste' # for testing
+            RSE_EXPRESSION = 'ddm_quota>0&(tier=1|tier=2)&rse_type=DISK'
+            #RSE_EXPRESSION = 'T3_IT_Trieste' # for testing
             WEIGHT = 'ddm_quota'
-            WEIGHT = None # for testing
-            DAYS = 14 * 24 * 3600
+            #WEIGHT = None # for testing
+            LIFETIME = 14 * 24 * 3600  # 14 days
             ASK_APPROVAL = False
-            ASK_APPROVAL = True # for testing
+            #ASK_APPROVAL = True # for testing
             ACCOUNT = 'crab_tape_recall'
             copies = 1
             try:
                 ruleId = rucioClient.add_replication_rule(dids=[containerDid],
                                                   copies=copies, rse_expression=RSE_EXPRESSION,
                                                   grouping=grouping,
-                                                  weight=WEIGHT, lifetime=DAYS, account=ACCOUNT,
+                                                  weight=WEIGHT, lifetime=LIFETIME, account=ACCOUNT,
                                                   activity='Analysis Input',
                                                   comment='Staged from tape for %s' % self.username,
                                                   ask_approval=ASK_APPROVAL, asynchronous=True,
@@ -173,8 +174,11 @@ class DBSDataDiscovery(DataDiscovery):
                 self.logger.debug("A duplicate rule for this account, did, rse_expression, copies already exists. Use that")
                 # find the existing rule id
                 ruleId = rucioClient.list_did_rules(myScope, containerName)
+            except (InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage) as ex:
+                msg = "Not enough global quota to issue a tape recall request. Rucio exception:\n%s" % str(ex)
+                raise TaskWorkerException(msg)
             except Exception as ex:
-                msg += "Rucio exception creating rule: %s" %  (str(ex))
+                msg += "Rucio exception creating rule: %s" %  str(ex)
                 raise TaskWorkerException(msg)
             ruleId = str(ruleId[0])  # from list to singleId and remove unicode
 
@@ -182,7 +186,7 @@ class DBSDataDiscovery(DataDiscovery):
             msg += "\nyou can check progress via either of the following two commands:"
             msg += "\n rucio rule-info %s" % ruleId
             msg += "\n rucio list-rules %s:%s" % (myScope, containerName)
-            automaticTapeRecallIsImplemented = False
+            automaticTapeRecallIsImplemented = True
             if automaticTapeRecallIsImplemented:
                 tapeRecallStatus = 'TAPERECALL'
             else:
@@ -255,7 +259,7 @@ class DBSDataDiscovery(DataDiscovery):
                 self.logger.exception(hte)
                 msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (
                     self.config.TaskWorker.restHost, str(hte))
-                msg += "\nSetting %s status and DDM request ID (%d) failed for task %s" % (
+                msg += "\nSetting %s status and DDM request ID (%s) failed for task %s" % (
                     tapeRecallStatus, ddmReqId, self.taskName)
                 msg += "\nHTTP Headers are: %s" % hte.headers
                 raise TaskWorkerException(msg, retry=True)

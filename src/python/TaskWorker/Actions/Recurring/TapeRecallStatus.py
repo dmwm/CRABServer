@@ -4,6 +4,7 @@ import logging
 import sys
 import os
 import time
+import datetime
 
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 from TaskWorker.MasterWorker import MasterWorker
@@ -36,7 +37,7 @@ class TapeRecallStatus(BaseRecurringAction):
         except Exception as ex:
             msg = "The CRAB3 server backend could not download the input and/or debug sandbox (%s and/or %s) " % (
             sandbox, debugFiles)
-            msg += "of task %s from the frontend (%s) using the '%s' username (request_id = %d). " % \
+            msg += "of task %s from the frontend (%s) using the '%s' username (request_id = %s). " % \
                    (task['tm_taskname'], task['tm_cache_url'], task['tm_username'], task['tm_DDM_reqid'])
             msg += "\nThis could be a temporary glitch, will try again in next occurrence of the recurring action."
             msg += "Error reason:\n%s" % str(ex)
@@ -99,7 +100,7 @@ class TapeRecallStatus(BaseRecurringAction):
 
             if (time.time() - getTimeFromTaskname(str(taskName))) > MAX_DAYS_FOR_TAPERECALL*24*60*60:
                 self.logger.info("Task %s is older than %d days, setting its status to FAILED", taskName, MAX_DAYS_FOR_TAPERECALL)
-                msg = "The disk replica request (ID: %d) for the input dataset did not complete in %d days." % (reqId, MAX_DAYS_FOR_TAPERECALL)
+                msg = "The disk replica request (ID: %s) for the input dataset did not complete in %d days." % (reqId, MAX_DAYS_FOR_TAPERECALL)
                 failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
                 continue
 
@@ -123,13 +124,20 @@ class TapeRecallStatus(BaseRecurringAction):
                 ddmRequest = self.rucioClient.get_replication_rule(reqId)
             except RuleNotFound:
                 msg = "Rucio rule id %s not found. Please report to experts" % reqId
-                self.logger.info(msg)
+                self.logger.error(msg)
                 if user_proxy: mpl.uploadWarning(msg, recallingTask['user_proxy'], taskName)
             if ddmRequest['state'] == 'OK':
-                self.logger.info("Request %d is completed, setting status of task %s to NEW", reqId, taskName)
+                self.logger.info("Request %s is completed, setting status of task %s to NEW", reqId, taskName)
                 mw.updateWork(taskName, recallingTask['tm_task_command'], 'NEW')
                 # Delete all task warnings (the tapeRecallStatus added a dataset warning which is no longer valid now)
                 if user_proxy: mpl.deleteWarnings(recallingTask['user_proxy'], taskName)
+            else:
+                expiration = ddmRequest['expires_at'] # this is a datetime.datetime object
+                if expiration < datetime.datetime.now():
+                    # give up waiting
+                    msg = ("Replication request %s for task %s expired. Setting its status to FAILED" % (reqId, taskName))
+                    self.logger.info(msg)
+                    failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
             """
             # these lines where relevant for Dynamo. Is anything like this still useful in Rucio land ?
             if ddmRequest["message"] == "Request found":
