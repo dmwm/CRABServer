@@ -105,7 +105,7 @@ class DBSDataDiscovery(DataDiscovery):
             # need to use crab_tape_recall Rucio account to create containers and create rules
             tapeRecallConfig = copy.copy(self.config)
             tapeRecallConfig.Services.Rucio_account = 'crab_tape_recall'
-            rucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)
+            rucioClient = getNativeRucioClient(tapeRecallConfig, self.logger) # pylint: disable=redefined-outer-name
             # turn input CMS blocks into Rucio dids in cms scope
             dids = [{'scope': 'cms', 'name': block} for block in blockList]
             # prepare container /TapeRecall/taskname/USER in the service scope
@@ -300,7 +300,6 @@ class DBSDataDiscovery(DataDiscovery):
         self.logger.info("will connect to DBS at URL: %s", dbsurl)
         self.dbs = DBSReader(dbsurl)
         self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
-        isUserDataset = self.dbsInstance.split('/')[1] != 'global'
 
         self.taskName = kwargs['task']['tm_taskname']           # pylint: disable=W0201
         self.username = kwargs['task']['tm_username']           # pylint: disable=W0201
@@ -309,6 +308,10 @@ class DBSDataDiscovery(DataDiscovery):
 
         inputDataset = kwargs['task']['tm_input_dataset']
         secondaryDataset = kwargs['task'].get('tm_secondary_input_dataset', None)
+
+        # the isUserDataset flag is used to look for data location in DBS instead of Rucio
+        isUserDataset = (self.dbsInstance.split('/')[1] != 'global') and \
+                        (inputDataset.split('/')[-1] == 'USER')
 
         self.checkDatasetStatus(inputDataset, kwargs)
         if secondaryDataset:
@@ -332,7 +335,10 @@ class DBSDataDiscovery(DataDiscovery):
         ## {'/JetHT/Run2016B-PromptReco-v2/AOD#b10179dc-3723-11e6-9aa5-001e67abf228': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL'],
         ## '/JetHT/Run2016B-PromptReco-v2/AOD#89b03ca6-1dc9-11e6-b567-001e67ac06a0': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL']}
 
+        # remove following line when ready to allow user dataset to have locations tracked in Rucio
         useRucioForLocations = not isUserDataset
+        # uncomment followint line to look in Rucio first for any dataset, and fall back to DBS origin for USER ones
+        # useRucioForLocations = True
         locationsFoundWithRucio = False
 
         if not useRucioForLocations:
@@ -511,7 +517,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     from WMCore.Configuration import ConfigurationEx
     from ServerUtilities import newX509env
-    from RucioUtils import getNativeRucioClient
 
     config = ConfigurationEx()
     config.section_("Services")
