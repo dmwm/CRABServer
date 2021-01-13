@@ -62,7 +62,7 @@ def setSlaveLogger(name):
         can be retrieved with logging.getLogger(name) in other parts of the code
     """
     logger = logging.getLogger(name)
-    fileName = os.path.join('logs', 'processes', "proc.c3id_%s.pid_%s.txt" % (name, os.getpid()))
+    fileName = os.path.join('logs', 'processes', "proc.c3id_%s.txt" % name)
     #handler = TimedRotatingFileHandler(fileName, 'midnight', backupCount=30)
     # slaves are short lived, use one log file for each
     handler = FileHandler(fileName)
