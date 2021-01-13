@@ -344,6 +344,7 @@ class Master(object):
                     p = Process(target=self.startSlave, args=(task,))
                     p.start()
                     self.logger.info('Starting process %s  pid=%s', p, p.pid)
+                    self.logger.info('PID %s will work on task %s', p.pid, taskname)
                     processes.append(p)
                 if len(processes) == maxSlaves:
                     while len(processes) == maxSlaves:
