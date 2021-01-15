@@ -217,8 +217,8 @@ class DBSDataDiscovery(DataDiscovery):
             raise TaskWorkerException(msg)
 
         if system == 'None':
+            msg += '\nIt is not possible to request a recall from tape.'
             msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
-            msg += '\nPlease see this CRAB FAQ for possible actions: https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul'
             raise TaskWorkerException(msg)
 
         if system == 'Dynamo':
@@ -444,6 +444,7 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nN.B.: the input dataset is stored at %s, but those are TAPE locations." % ', '.join(sorted(self.tapeLocations))
                 # following function will always raise error and stop flow here, but will first
                 # try to trigger a tape recall and place the task in tapeRecall status
+                msg += "\nWill try to request a disk copy for you. See: https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
                 self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
 
         # will not need lumi info if user has asked for split by file with no run/lumi mask
