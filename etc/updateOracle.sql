@@ -114,4 +114,4 @@ ALTER TABLE tasks DROP COLUMN tm_totalunits;
 ALTER TABLE tasks RENAME COLUMN tm_totalunits_fraction TO tm_totalunits;
 
 --Add the column to store the DDM request ID
-ALTER TABLE tasks ADD tm_DDM_reqid NUMBER(38);
+ALTER TABLE tasks ADD tm_DDM_reqid VARCHAR(32);
