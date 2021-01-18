@@ -132,7 +132,7 @@ class MasterWorker(object):
             # this must only done for real Master, not when it is used by TapeRecallStatus
             logsDir = config.TaskWorker.logsDir
             if name == 'master':
-                    createAndCleanLogDirectories(logsDir)
+                createAndCleanLogDirectories(logsDir)
 
             if console:
                 logging.getLogger().addHandler(logging.StreamHandler())
