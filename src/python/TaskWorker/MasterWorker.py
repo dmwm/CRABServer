@@ -282,9 +282,8 @@ class MasterWorker(object):
 
 
     def restartQueuedTasks(self):
-        """ This method is used at the TW startup and it restarts QUEUED tasks that supposedly
-            could not communicate with the REST and update their status. The method put those
-            task back again to NEW.
+        """ This method is used at the TW startup and it restarts QUEUED tasks 
+            setting them  back again to NEW.
         """
         limit = self.slaves.nworkers * 2
         total = 0
@@ -292,7 +291,7 @@ class MasterWorker(object):
             pendingwork = self.getWork(limit=limit, getstatus='QUEUED')
             for task in pendingwork:
                 self.logger.debug("Restarting QUEUED task %s", task['tm_taskname'])
-                self.updateWork(task['tm_taskname'], task['tm_task_status'], 'NEW')
+                self.updateWork(task['tm_taskname'], task['tm_task_command'], 'NEW')
             if not len(pendingwork):
                 self.logger.info("Finished restarting QUEUED tasks (total %s)", total)
                 break #too bad "do..while" does not exist in python...
@@ -327,7 +326,7 @@ class MasterWorker(object):
         """I'm the intelligent guy taking care of getting the work
            and distributing it to the slave processes."""
 
-        self.logger.debug("Failing QUEUED tasks before startup.")
+        self.logger.debug("Restarting QUEUED tasks before startup.")
         self.restartQueuedTasks()
         self.logger.debug("Master Worker Starting Main Cycle.")
         while not self.STOP:
