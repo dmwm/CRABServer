@@ -115,30 +115,3 @@ class Create(DBCreator):
         CONSTRAINT ck_tm_nonvalid_input_dataset CHECK (tm_nonvalid_input_dataset IN ('T', 'F'))
         )
         """
-        self.create['c_jobgroups'] = """
-        CREATE TABLE jobgroups(
-        tm_jobgroups_id NUMBER(38) NOT NULL,
-        tm_taskname VARCHAR(255) NOT NULL,
-        panda_jobdef_id NUMBER(11),
-        panda_jobdef_status VARCHAR(255) NOT NULL,
-        tm_data_blocks CLOB,
-        panda_jobgroup_failure CLOB,
-        tm_user_dn VARCHAR(255) NOT NULL,
-        CONSTRAINT taskname_fk FOREIGN KEY(tm_taskname) references
-            tasks(tm_taskname)
-            ON DELETE CASCADE,
-        CONSTRAINT jobgroup_id_pk PRIMARY KEY(tm_jobgroups_id)
-        )
-        """
-        self.create['c_jobgroups_id_seq'] = """
-        CREATE SEQUENCE jobgroups_id_seq
-        START WITH 1
-        INCREMENT BY 1
-        NOMAXVALUE"""
-        self.create['c_jobgroups_id_trg'] =  """
-        CREATE TRIGGER jobgroups_id_trg
-        BEFORE INSERT ON jobgroups
-        FOR EACH ROW
-        BEGIN
-        SELECT jobgroups_id_seq.nextval INTO :new.tm_jobgroups_id FROM dual;
-        END;"""
