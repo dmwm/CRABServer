@@ -618,7 +618,8 @@ class DagmanCreator(TaskAction):
             tempDest = os.path.join(temp_dest, counter)
             directDest = os.path.join(dest, counter)
             if lastDirectDest != directDest:
-                lastDirectPfn = getWritePFN(self.rucioClient, task['tm_asyncdest'], directDest)
+                lastDirectPfn = getWritePFN(self.rucioClient, siteName=task['tm_asyncdest'], lfn=directDest,
+                                            logger=self.logger)
                 lastDirectDest = directDest
             pfns = ["log/cmsRun_{0}.log.tar.gz".format(count)] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
