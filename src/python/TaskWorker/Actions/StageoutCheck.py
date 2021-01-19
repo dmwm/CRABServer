@@ -93,13 +93,13 @@ class StageoutCheck(TaskAction):
             filename = re.sub("[:-_]", "", self.task['tm_taskname']) + '_crab3check.tmp'
             try:
                 lfn = os.path.join(self.task['tm_output_lfn'], filename)
-                pfn = getWritePFN(self.rucioClient, self.task['tm_asyncdest'], lfn)
+                pfn = getWritePFN(self.rucioClient, siteName=self.task['tm_asyncdest'], lfn=lfn, logger=self.logger)
                 cpCmd += append + os.path.abspath(filename) + " " + pfn
                 rmCmd += " " + pfn
                 createDummyFile(filename, self.logger)
                 self.logger.info("Executing cp command: %s ", cpCmd)
                 res = self.checkPermissions(cpCmd)
-                if res==0:
+                if res == 0:
                     self.logger.info("Executing rm command: %s ", rmCmd)
                     self.checkPermissions(rmCmd)
             except IOError as er:
