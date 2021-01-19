@@ -132,7 +132,7 @@ class MasterWorker(object):
             # this must only done for real Master, not when it is used by TapeRecallStatus
             logsDir = config.TaskWorker.logsDir
             if name == 'master':
-                    createAndCleanLogDirectories(logsDir)
+                createAndCleanLogDirectories(logsDir)
 
             if console:
                 logging.getLogger().addHandler(logging.StreamHandler())
@@ -281,29 +281,23 @@ class MasterWorker(object):
         return False #failure
 
 
-    def failQueuedTasks(self):
-        """ This method is used at the TW startup and it fails QUEUED tasks that supposedly
-            could not communicate with the REST and update their status. The method put those
-            task to SUBMITFAILED, KILLFAILED, RESUBMITFAILED depending on the value of
-            the command field.
+    def restartQueuedTasks(self):
+        """ This method is used at the TW startup and it restarts QUEUED tasks 
+            setting them  back again to NEW.
         """
         limit = self.slaves.nworkers * 2
         total = 0
         while True:
             pendingwork = self.getWork(limit=limit, getstatus='QUEUED')
             for task in pendingwork:
-                self.logger.debug("Failing QUEUED task %s", task['tm_taskname'])
-                if task['tm_task_command']:
-                    dummyWorktype, failstatus = STATE_ACTIONS_MAP[task['tm_task_command']]
-                else:
-                    failstatus = 'FAILED'
-                self.updateWork(task['tm_taskname'], task['tm_task_command'], failstatus)
+                self.logger.debug("Restarting QUEUED task %s", task['tm_taskname'])
+                self.updateWork(task['tm_taskname'], task['tm_task_command'], 'NEW')
             if not len(pendingwork):
-                self.logger.info("Finished failing QUEUED tasks (total %s)", total)
+                self.logger.info("Finished restarting QUEUED tasks (total %s)", total)
                 break #too bad "do..while" does not exist in python...
             else:
                 total += len(pendingwork)
-                self.logger.info("Failed %s tasks (limit %s), getting next chunk of tasks", len(pendingwork), limit)
+                self.logger.info("Restarted %s tasks (limit %s), getting next chunk of tasks", len(pendingwork), limit)
 
 
     def failBannedTask(self, task):
@@ -332,8 +326,8 @@ class MasterWorker(object):
         """I'm the intelligent guy taking care of getting the work
            and distributing it to the slave processes."""
 
-        self.logger.debug("Failing QUEUED tasks before startup.")
-        self.failQueuedTasks()
+        self.logger.debug("Restarting QUEUED tasks before startup.")
+        self.restartQueuedTasks()
         self.logger.debug("Master Worker Starting Main Cycle.")
         while not self.STOP:
             limit = self.slaves.queueableTasks()
