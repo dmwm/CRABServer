@@ -123,7 +123,7 @@ class HTTPRequests(dict):
         """
         data = data or {}
         headers = {
-            "User-agent": "CRABClient/%s" % self['version'],
+            "User-agent": "CRABServer/%s" % self['version'],
             "Accept": "*/*",
         }
 
