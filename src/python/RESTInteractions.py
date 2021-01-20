@@ -54,8 +54,9 @@ class HTTPRequests(dict):
         self.setdefault("content_type", 'application/x-www-form-urlencoded')
         self.setdefault("host", url)
         # setup port 8443 for cmsweb services
-        if self['host'].startswith("https://cmsweb"):
-            self['host'] = self['host'].replace('.cern.ch/', '.cern.ch:8443/', 1)
+        if self['host'].startswith("https://cmsweb") or \
+                self['host'].startswith("cmsweb"):
+            self['host'] = self['host'].replace(".cern.ch", ".cern.ch:8443", 1)
         self.setdefault("cert", localcert)
         self.setdefault("key", localkey)
         # get the URL opener
