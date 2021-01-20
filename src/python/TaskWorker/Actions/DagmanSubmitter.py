@@ -204,7 +204,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
             Raises TaskWorkerException in case of failure
         """
         task['tm_schedd'] = schedd
-        userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
+        #userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
+        userServer = self.server
         configreq = {'workflow':task['tm_taskname'],
                      'subresource':'updateschedd', 'scheddname':schedd}
         try:

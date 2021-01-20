@@ -12,7 +12,6 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
-from TaskWorker.Actions.DDMRequests import blocksRequest
 from RucioUtils import getNativeRucioClient
 
 from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
@@ -223,55 +222,6 @@ class DBSDataDiscovery(DataDiscovery):
 
         if system == 'Dynamo':
             raise NotImplementedError
-            # keep following old, unused, unreachable code around for a bit as reference, to be removed once all works
-            ddmServer = self.config.TaskWorker.DDMServer # pylint: disable=unreachable
-            ddmRequest = None
-            try:
-                ddmRequest = blocksRequest(blockList, ddmServer, self.config.TaskWorker.cmscert,
-                                           self.config.TaskWorker.cmskey, verbose=False)
-            except HTTPException as hte:
-                self.logger.exception(hte)
-                msg += "\nThe automatic stage-out failed, please try again later. If the error persists contact the experts and provide this error message:"
-                msg += "\nHTTP Error while contacting the DDM server %s:\n%s" % (ddmServer, str(hte))
-                msg += "\nHTTP Headers are: %s" % hte.headers
-                raise TaskWorkerException(msg, retry=True)
-
-            self.logger.info("Contacted %s using %s and %s, got:\n%s", self.config.TaskWorker.DDMServer,
-                             self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, ddmRequest)
-            # The query above returns a JSON with a format {"result": "OK", "message": "Copy requested", "data": [{"request_id": 18, "site": <site>, "item": [<list of blocks>], "group": "AnalysisOps", "n": 1, "status": "new", "first_request": "2018-02-26 23:57:37", "last_request": "2018-02-26 23:57:37", "request_count": 1}]}
-            ddmReqId = ddmRequest["data"][0]["request_id"]
-            if ddmRequest['result'] != 'OK':
-                msg += "\nThe disk replica request failed with this error:\n %s" % ddmRequest["message"]
-                raise TaskWorkerException(msg)
-            msg += "\nA disk replica has been requested on %s to Dynamo (request ID: %s)" % \
-                   (ddmRequest["data"][0]["first_request"], ddmReqId)
-            # set status to TAPERECALL
-            tapeRecallStatus = 'TAPERECALL'
-            ddmReqId = ddmRequest["data"][0]["request_id"]
-            configreq = {'workflow': self.taskName,
-                         'taskstatus': tapeRecallStatus,
-                         'ddmreqid': ddmReqId,
-                         'subresource': 'addddmreqid',
-                        }
-            try:
-                tapeRecallStatusSet = self.server.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
-            except HTTPException as hte:
-                self.logger.exception(hte)
-                msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (
-                    self.config.TaskWorker.restHost, str(hte))
-                msg += "\nSetting %s status and DDM request ID (%s) failed for task %s" % (
-                    tapeRecallStatus, ddmReqId, self.taskName)
-                msg += "\nHTTP Headers are: %s" % hte.headers
-                raise TaskWorkerException(msg, retry=True)
-            if tapeRecallStatusSet[2] == "OK":
-                self.logger.info("Status for task %s set to '%s'", self.taskName, tapeRecallStatus)
-                msg += "\nThis task will be automatically submitted as soon as the stage-out is completed."
-                self.uploadWarning(msg, self.userproxy, self.taskName)
-                raise TapeDatasetException(msg)
-            else:
-                msg += ", please try again in two days."
-                raise TaskWorkerException(msg)
-
 
 
     def execute(self, *args, **kwargs):

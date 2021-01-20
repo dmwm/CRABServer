@@ -201,7 +201,7 @@ def getProxiedWebDir(task, host, uri, cert, logFunction=print):
            }
     res = None
     try:
-        server = HTTPRequests(host, cert, cert, retry=2)
+        server = HTTPRequests(host, cert, cert, retry=2, userAgent='CRABClient')
         dictresult, _, _ = server.get(uri, data=data) #the second and third parameters are deprecated
         if dictresult.get('result'):
             res = dictresult['result'][0]

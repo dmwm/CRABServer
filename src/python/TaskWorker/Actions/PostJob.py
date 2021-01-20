@@ -336,7 +336,7 @@ class ASOServerJob(object):
                 self.couch_server = CMSCouch.CouchServer(dburl=self.aso_db_url, ckey=proxy, cert=proxy)
                 self.couch_database = self.couch_server.connectDatabase(self.aso_db_name, create=False)
             else:
-                self.server = HTTPRequests(self.rest_host, proxy, proxy, retry=2)
+                self.server = HTTPRequests(self.rest_host, proxy, proxy, retry=2, userAgent='CRABSchedd')
         except Exception as ex:
             msg = "Failed to connect to ASO database: %s" % (str(ex))
             self.logger.exception(msg)
@@ -2071,7 +2071,7 @@ class PostJob():
         self.server = HTTPRequests(self.rest_host, \
                                    os.environ['X509_USER_PROXY'], \
                                    os.environ['X509_USER_PROXY'], \
-                                   retry=2, logger=self.logger)
+                                   retry=2, logger=self.logger, userAgent='CRABSchedd')
 
         ## Upload the logs archive file metadata if it was not already done from the WN.
         if self.transfer_logs and first_pj_execution():

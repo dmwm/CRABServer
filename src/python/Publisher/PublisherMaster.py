@@ -193,7 +193,8 @@ class Master(object):
         self.crabServer = HTTPRequests(url=restHost,
                                        localcert=self.config.serviceCert,
                                        localkey=self.config.serviceKey,
-                                       retry=3)
+                                       retry=3,
+                                       userAgent='CRABPublisher')
         self.startTime = time.time()
 
         #try:

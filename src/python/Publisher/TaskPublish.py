@@ -500,7 +500,8 @@ def publishInDBS3(config, taskname, verbose):
     crabServer = HTTPRequests(url=restHost,
                               localcert=config.General.serviceCert,
                               localkey=config.General.serviceKey,
-                              retry=3)
+                              retry=3,
+                              userAgent='CRABPublisher')
 
 
     data = dict()
