@@ -26,8 +26,6 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from ApmonIf import ApmonIf
 
-from RESTInteractions import HTTPRequests
-
 # Bootstrap either the native module or the BossAir variant.
 try:
     import classad

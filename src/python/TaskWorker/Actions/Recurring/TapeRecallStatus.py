@@ -51,8 +51,8 @@ class TapeRecallStatus(BaseRecurringAction):
         # setup logger
         if not self.logger:
             self.logger = logging.getLogger(__name__)
-            handler = logging.StreamHandler(sys.stdout)
-            formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s")
+            handler = logging.StreamHandler(sys.stdout)  # pylint: disable=redefined-outer-name
+            formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s")  # pylint: disable=redefined-outer-name
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
             self.logger.setLevel(logging.DEBUG)
@@ -139,7 +139,8 @@ class TapeRecallStatus(BaseRecurringAction):
 
 
 if __name__ == '__main__':
-    """ Simple main to execute the action standalone. You just need to set the task worker environment and desired twconfig. """
+    # Simple main to execute the action standalone.
+    # You just need to set the task worker environment and desired twconfig.
 
     twconfig = '/data/srv/TaskManager/current/TaskWorkerConfig.py'
 
@@ -154,4 +155,4 @@ if __name__ == '__main__':
     cfg = loadConfigurationFile(twconfig)
 
     trs = TapeRecallStatus(cfg.TaskWorker.logsDir)
-    trs._execute(None, None, cfg, None)
+    trs._execute(None, None, cfg, None)  # pylint: disable=protected-access

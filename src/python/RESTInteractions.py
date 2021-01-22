@@ -11,7 +11,7 @@ import pycurl
 
 try:
     from TaskWorker import __version__ as TWversion
-except:
+except: # pylint: disable=bare-except
     TWversion = '0.0.0'
 
 from WMCore.Services.Requests import JSONRequests

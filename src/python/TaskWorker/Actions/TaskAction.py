@@ -6,7 +6,6 @@ from base64 import b64encode
 from httplib import HTTPException
 
 from ServerUtilities import truncateError
-from RESTInteractions import HTTPRequests
 
 class TaskAction(object):
     """The ABC of all actions"""
