@@ -11,6 +11,7 @@ from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 from RESTInteractions import HTTPRequests
 from RucioUtils import getNativeRucioClient
 
+from TaskWorker import __version__
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.DagmanKiller import DagmanKiller
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
@@ -151,7 +152,8 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the handler."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=logging.getLogger(str(procnum)))
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
+                          logger=logging.getLogger(str(procnum)), userAgent='CRABTaskWorker', version=__version__)
     handler = TaskHandler(task, procnum, server, config, 'handleNewTask', createTempDir=True)
     rucioClient = getNativeRucioClient(config=config, logger=handler.logger)
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
@@ -183,7 +185,8 @@ def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
     :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=logging.getLogger(str(procnum)))
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
+                          logger=logging.getLogger(str(procnum)), userAgent='CRABTaskWorker', version=__version__)
     handler = TaskHandler(task, procnum, server, config, 'handleResubmit')
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
     handler.addWork(DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
@@ -201,7 +204,8 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
     :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=logging.getLogger(str(procnum)))
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
+                          logger=logging.getLogger(str(procnum)), userAgent='CRABTaskWorker', version=__version__)
     handler = TaskHandler(task, procnum, server, config, 'handleKill')
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 5))
     handler.addWork(DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum))

@@ -50,7 +50,7 @@ def submit(trans_tuple, job_data, log, direct=False):
     log.info("Connection to %s with proxy in:\n %s" % (rest_filetransfers,proxy))
     oracleDB = HTTPRequests(rest_filetransfers,
                             proxy,
-                            proxy)
+                            proxy, userAgent='CRABSchedd')
                             #verbose=True)
 
     # mapping lfn <--> pfn

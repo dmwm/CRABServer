@@ -51,8 +51,8 @@ class TapeRecallStatus(BaseRecurringAction):
         # setup logger
         if not self.logger:
             self.logger = logging.getLogger(__name__)
-            handler = logging.StreamHandler(sys.stdout)
-            formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s")
+            handler = logging.StreamHandler(sys.stdout)  # pylint: disable=redefined-outer-name
+            formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s")  # pylint: disable=redefined-outer-name
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
             self.logger.setLevel(logging.DEBUG)
@@ -82,8 +82,6 @@ class TapeRecallStatus(BaseRecurringAction):
             return
 
         self.logger.info("Retrieved a total of %d %s tasks", len(recallingTasks), tapeRecallStatus)
-        ##SBserver = HTTPRequests(config.TaskWorker.restHost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
-        ##SB                      logger=self.logger)
         server = mw.server
         resturi = mw.restURInoAPI + '/info'
         for recallingTask in recallingTasks:
@@ -138,26 +136,11 @@ class TapeRecallStatus(BaseRecurringAction):
                     msg = ("Replication request %s for task %s expired. Setting its status to FAILED" % (reqId, taskName))
                     self.logger.info(msg)
                     failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
-            """
-            # these lines where relevant for Dynamo. Is anything like this still useful in Rucio land ?
-            if ddmRequest["message"] == "Request found":
-                status = ddmRequest["data"][0]["status"]
-                if status == "completed": # possible values: new, activated, updated, completed, rejected, cancelled
-                    self.logger.info("Request %d is completed, setting status of task %s to NEW", reqId, taskName)
-                    mw.updateWork(taskName, recallingTask['tm_task_command'], 'NEW')
-                    # Delete all task warnings (the tapeRecallStatus added a dataset warning which is no longer valid now)
-                    if user_proxy: mpl.deleteWarnings(recallingTask['user_proxy'], taskName)
-                elif status == "rejected":
-                    msg = "The DDM request (ID: %d) has been rejected with this reason: %s" % (reqId, ddmRequest["data"][0]["reason"])
-                    msg1 = "\nSetting status of task %s to FAILED" % taskName
-                    self.logger.info(msg + msg1)
-                    failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
-            """
-
 
 
 if __name__ == '__main__':
-    """ Simple main to execute the action standalone. You just need to set the task worker environment and desired twconfig. """
+    # Simple main to execute the action standalone.
+    # You just need to set the task worker environment and desired twconfig.
 
     twconfig = '/data/srv/TaskManager/current/TaskWorkerConfig.py'
 
@@ -172,4 +155,4 @@ if __name__ == '__main__':
     cfg = loadConfigurationFile(twconfig)
 
     trs = TapeRecallStatus(cfg.TaskWorker.logsDir)
-    trs._execute(None, None, cfg, None)
+    trs._execute(None, None, cfg, None)  # pylint: disable=protected-access

@@ -26,8 +26,6 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 
 from ApmonIf import ApmonIf
 
-from RESTInteractions import HTTPRequests
-
 # Bootstrap either the native module or the BossAir variant.
 try:
     import classad
@@ -204,7 +202,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
             Raises TaskWorkerException in case of failure
         """
         task['tm_schedd'] = schedd
-        userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
+        #userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
+        userServer = self.server
         configreq = {'workflow':task['tm_taskname'],
                      'subresource':'updateschedd', 'scheddname':schedd}
         try:

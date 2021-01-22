@@ -146,7 +146,7 @@ def monitor(user, taskname, log):
 
         oracleDB = HTTPRequests(rest_filetransfers,
                                 proxy,
-                                proxy)
+                                proxy, userAgent='CRABSchedd')
     except Exception:
         log.exception("Failed to set connection to oracleDB")
         return
