@@ -49,7 +49,7 @@ class HTTPRequests(dict):
     """
 
     def __init__(self, url='localhost', localcert=None, localkey=None, version=None,
-                 retry=0, logger=None, verbose=False, userAgent='CRABServer'):
+                 retry=0, logger=None, verbose=False, userAgent='CRAB?'):
         """
         Initialise an HTTP handler
         """
