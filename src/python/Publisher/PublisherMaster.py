@@ -16,7 +16,6 @@ import logging
 from logging import FileHandler
 from logging.handlers import TimedRotatingFileHandler
 import os
-import subprocess
 import traceback
 import sys
 import json
