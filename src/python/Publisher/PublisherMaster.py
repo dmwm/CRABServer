@@ -16,7 +16,6 @@ import logging
 from logging import FileHandler
 from logging.handlers import TimedRotatingFileHandler
 import os
-import subprocess
 import traceback
 import sys
 import json
@@ -30,7 +29,7 @@ from WMCore.Configuration import loadConfigurationFile
 #from WMCore.Services.pycurl_manager import RequestHandler
 #from retry import retry
 from RESTInteractions import HTTPRequests
-from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping
+from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping, executeCommand
 from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.WorkerExceptions import ConfigException
 
@@ -578,8 +577,12 @@ class Master(object):
                 if self.TPconfig.dryRun:
                     cmd += " --dry"
                 logger.info("Now execute: %s", cmd)
-                stdout = subprocess.check_output(cmd, shell=True)
-                logger.info('TaskPublishScript done : %s', stdout)
+                stdout, stderr, exitcode = executeCommand(cmd)
+                if exitcode != 0:
+                    errorMsg = 'Failed to execute command: %s.\n StdErr: %s.' % (cmd, stderr)
+                    raise Exception(errorMsg)
+                else:
+                    logger.info('TaskPublishScript done : %s', stdout)
 
                 jsonSummary = stdout.split()[-1]
                 with open(jsonSummary, 'r') as fd:
