@@ -861,6 +861,10 @@ class DagmanCreator(TaskAction):
             ## Apply the global site blacklist.
             availablesites = possiblesites - global_blacklist
 
+            # Special activities' white list overrides any other location
+            if kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere and siteWhitelist:
+                availablesites = siteWhitelist
+
             ## See https://github.com/dmwm/CRABServer/issues/5241
             ## for a discussion about blocksWithBannedLocations
             if not availablesites:
