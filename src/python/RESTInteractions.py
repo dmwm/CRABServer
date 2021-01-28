@@ -16,7 +16,7 @@ try:
     from TaskWorker import __version__
 except:  # pylint: disable=bare-except
     try:
-         from CRABClient import __version__
+        from CRABClient import __version__
     except:  # pylint: disable=bare-except
         __version__ = '0.0.0'
 
