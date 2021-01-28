@@ -9,13 +9,16 @@ import logging
 from httplib import HTTPException
 import pycurl
 
-try:
-    from TaskWorker import __version__ as TWversion
-except: # pylint: disable=bare-except
-    TWversion = '0.0.0'
-
 from WMCore.Services.Requests import JSONRequests
 from WMCore.Services.pycurl_manager import RequestHandler
+
+try:
+    from TaskWorker import __version__
+except:  # pylint: disable=bare-except
+    try:
+         from CRABClient import __version__
+    except:  # pylint: disable=bare-except
+        __version__ = '0.0.0'
 
 EnvironmentException = Exception
 
@@ -48,7 +51,7 @@ class HTTPRequests(dict):
     is used more in the client.
     """
 
-    def __init__(self, url='localhost', localcert=None, localkey=None, version=None,
+    def __init__(self, url='localhost', localcert=None, localkey=None, version=__version__,
                  retry=0, logger=None, verbose=False, userAgent='CRAB?'):
         """
         Initialise an HTTP handler
@@ -73,7 +76,7 @@ class HTTPRequests(dict):
         self.setdefault("key", localkey)
         # get the URL opener
         self.setdefault("conn", self.getUrlOpener())
-        self.setdefault("version", TWversion)
+        self.setdefault("version", version)
         self.setdefault("retry", retry)
         self.setdefault("verbose", verbose)
         self.setdefault("userAgent", userAgent)
