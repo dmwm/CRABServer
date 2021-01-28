@@ -25,8 +25,8 @@ $RELEASE/common/cmspkg -a $SCRAM_ARCH upgrade
 $RELEASE/common/cmspkg -a $SCRAM_ARCH update
 $RELEASE/common/cmspkg -a $SCRAM_ARCH install cms+crabtaskworker+$RELEASE
 
-cp $MYTESTAREA/$SCRAM_ARCH/cms/crabtaskworker/$RELEASE/data/script/Deployment/Publisher/{start.sh,env.sh,stop.sh} /data/srv/Publisher/
-cp $MYTESTAREA/$SCRAM_ARCH/cms/crabtaskworker/$RELEASE/data/script/Deployment/TaskWorker/{start.sh,env.sh,stop.sh} /data/srv/TaskManager/
+cp $MYTESTAREA/$SCRAM_ARCH/cms/crabtaskworker/$RELEASE/data/script/Deployment/Publisher/{start.sh,env.sh,stop.sh,updateTMRuntime.sh} /data/srv/Publisher/
+cp $MYTESTAREA/$SCRAM_ARCH/cms/crabtaskworker/$RELEASE/data/script/Deployment/TaskWorker/{start.sh,env.sh,stop.sh,} /data/srv/TaskManager/
 
 ln -s $RELEASE current
 ln -s /data/srv/TaskManager/current /data/srv/Publisher/current
