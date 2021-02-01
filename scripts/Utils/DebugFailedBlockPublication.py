@@ -19,13 +19,13 @@ def main():
     failedBlocksDir = '/data/srv/Publisher_files/FailedBlocks/'
     filePath = failedBlocksDir + fileName
     if not os.path.isfile(filePath):
-        print("File %s not found in %s" % (file, failedBlocksDir))
+        print("File %s not found in %s" % (fileName, failedBlocksDir))
         return
 
     # initialize DBS access
-    migUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSMigrate'
+    #migUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSMigrate'
     phy3Url = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSReader'
-    globUrl = 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'
+    #globUrl = 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'
     destUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter'
     #apiG = DbsApi(url=globUrl)
     apiP3 = DbsApi(url=phy3Url)
