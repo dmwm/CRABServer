@@ -23,6 +23,15 @@ def main():
         return
 
     # initialize DBS access
+    # if X509 vars are not defined, use default Publisher location
+    userProxy = os.getenv('X509_USER_PROXY')
+    if userProxy:
+        os.environ['X509_USER_CERT'] = userProxy
+        os.environ['X509_USER_KEY'] = userProxy
+    if not os.getenv('X509_USER_CERT'):
+        os.environ['X509_USER_CERT'] = '/data/cert/servicecert.pem'
+    if not os.getenv('X509_USER_KEY'):
+        os.environ['X509_USER_KEY'] = '/data/cert/servicekey.pem'
     #migUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSMigrate'
     phy3Url = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSReader'
     #globUrl = 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'
