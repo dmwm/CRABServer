@@ -43,7 +43,7 @@ def main():
 
     # look for files already present in DBS phys03
     alreadyPresentFile = False
-    lfns = [file['logical_file_name'] for file in block['files']]
+    lfns = [f['logical_file_name'] for f in block['files']]
     print('Block contains %d files' % len(lfns))
     numPresent = 0
     sameDSet = 0
