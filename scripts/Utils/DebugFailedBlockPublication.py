@@ -29,9 +29,9 @@ def main():
         os.environ['X509_USER_CERT'] = userProxy
         os.environ['X509_USER_KEY'] = userProxy
     if not os.getenv('X509_USER_CERT'):
-        os.environ['X509_USER_CERT'] = '/data/cert/servicecert.pem'
+        os.environ['X509_USER_CERT'] = '/data/certs/servicecert.pem'
     if not os.getenv('X509_USER_KEY'):
-        os.environ['X509_USER_KEY'] = '/data/cert/servicekey.pem'
+        os.environ['X509_USER_KEY'] = '/data/certs/servicekey.pem'
     #migUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSMigrate'
     phy3Url = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSReader'
     #globUrl = 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'
