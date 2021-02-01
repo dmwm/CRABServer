@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
+from __future__ import division
 from __future__  import print_function
 import os
 import argparse
@@ -12,11 +13,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--file', help='file containing the dump of the block', default=None, required=True)
     args = parser.parse_args()
-    file = args.file
-    #file = 'failed-block-at-1611258668.34.txt' # just an example
+    fileName = args.file
+    #fileName = 'failed-block-at-1611258668.34.txt' # just an example
 
     failedBlocksDir = '/data/srv/Publisher_files/FailedBlocks/'
-    filePath = failedBlocksDir + file
+    filePath = failedBlocksDir + fileName
     if not os.path.isfile(filePath):
         print("File %s not found in %s" % (file, failedBlocksDir))
         return
@@ -26,14 +27,15 @@ def main():
     phy3Url = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSReader'
     globUrl = 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'
     destUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter'
-    apiG = DbsApi(url=globUrl)
+    #apiG = DbsApi(url=globUrl)
     apiP3 = DbsApi(url=phy3Url)
-    apiMig = DbsApi(url=migUrl)
+    #apiMig = DbsApi(url=migUrl)
     apiDest = DbsApi(url=destUrl)
 
     with open(filePath) as fp:
         blockData = fp.read()
-    block = eval(blockData)  # from pprint.pprint format to a dictionary (takes a while)
+    # from pprint.pprint format to a dictionary (slow, unsafe, but handy)
+    block = eval(blockData)  # pylint: disable=eval-used
 
     targetDataset = block['dataset']['dataset']
 
