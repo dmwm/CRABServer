@@ -21,7 +21,8 @@ from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 
 # WMCore Utils module
-from Utils.Throttled import global_user_throttle
+from Utils.Throttled import UserThrottle
+throttle = UserThrottle(limit=3)
 
 from CRABInterface.Utils import conn_handler
 from ServerUtilities import FEEDBACKMAIL, PUBLICATIONDB_STATES, isCouchDBURL, getEpochFromDBTime
@@ -173,7 +174,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         yield res
 
-    @global_user_throttle.make_throttled()
+    @throttle.make_throttled()
     @conn_handler(services=['centralconfig', 'servercert'])
     def status(self, workflow, userdn, userproxy=None):
         """Retrieve the status of the workflow.
