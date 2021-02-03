@@ -3,6 +3,9 @@
 # 
 # This script bootstraps the WMCore environment
 #
+# wrap the whole script in {} in order to redirect stdout/err to a file
+# trick from https://stackoverflow.com/a/315113
+{
 set -x
 echo "Beginning dag_bootstrap.sh (stdout)"
 echo "Beginning dag_bootstrap.sh (stderr)" 1>&2
@@ -106,3 +109,4 @@ if [ "X$_CONDOR_JOB_AD" != "X" ]; then
 fi
 echo "Now running the job in `pwd`..."
 exec nice -n 19 python -m TaskWorker.TaskManagerBootstrap "$@"
+} > dag_bootstrap.out 2>&1
