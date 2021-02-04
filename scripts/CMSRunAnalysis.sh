@@ -27,114 +27,88 @@ sigterm() {
   fi
 }
 
-# should be a bit nicer than before
+#
 echo "======== CMSRunAnalysis.sh STARTING at $(TZ=GMT date) ========"
 echo "Local time : $(date)"
 echo "Current system : $(uname -a)"
 echo "Current processor: $(cat /proc/cpuinfo |grep name|sort|uniq)"
-### source the CMSSW stuff using either OSG or LCG style entry env. variables
-###    (incantations per oli's instructions)
-#   LCG style --
-echo "==== CMSSW pre-execution environment bootstrap STARTING ===="
-set -x
+
+### source the CMSSW stuff using either OSG or LCG style entry env. or CVMFS
+echo "======== CMS environment load starting at $(TZ=GMT date) ========"
 if [ -f "$VO_CMS_SW_DIR"/cmsset_default.sh ]
-then
-    echo 'LCG style'
-    set +x
-    .  $VO_CMS_SW_DIR/cmsset_default.sh
-    rc=$?
-    set -x
-    declare -a VERSIONS
-    VERSIONS=($(ls $VO_CMS_SW_DIR/$SCRAM_ARCH/external/python | egrep '2.[67]'))
-    PY_PATH=$VO_CMS_SW_DIR/$SCRAM_ARCH/external/python
-    echo 'python version: ' $VERSIONS
-#   OSG style --
-elif [ -f "$OSG_APP"/cmssoft/cms/cmsset_default.sh ]
-then
-    echo 'OSG style'
-    set +x
-    . $OSG_APP/cmssoft/cms/cmsset_default.sh
-    rc=$?
-    if [[ $rc != 0 ]]
-    then
-        echo "==== Sourcing cmsset_default.sh failed at $(TZ=GMT date). ===="
-        tar xmf CMSRunAnalysis.tar.gz || exit 10042
-        DashboardFailure 10032
-    fi
-    set -x
-    declare -a VERSIONS
-    VERSIONS=($(ls $OSG_APP/cmssoft/cms/$SCRAM_ARCH/external/python | egrep '2.[67]'))
-    PY_PATH=$OSG_APP/cmssoft/cms/$SCRAM_ARCH/external/python 
-    echo 'python version: ' $VERSIONS
-elif [ -f /cvmfs/cms.cern.ch/cmsset_default.sh ]
-then
-    echo 'CVMFS style'
-    export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
-    set +x
+then  #   LCG style --
+    echo "WN with a LCG style environment, thus using VO_CMS_SW_DIR=$VO_CMS_SW_DIR"
     . $VO_CMS_SW_DIR/cmsset_default.sh
-    rc=$?
-    set -x
-    declare -a VERSIONS
-    VERSIONS=($(ls /cvmfs/cms.cern.ch/$SCRAM_ARCH/external/python | egrep '2.[67]'))
-    PY_PATH=/cvmfs/cms.cern.ch/$SCRAM_ARCH/external/python
-    echo 'python version: ' $VERSIONS
-else
-    echo "Error: neither OSG_APP, CVMFS, nor VO_CMS_SW_DIR environment variables were set" >&2
-    echo "Error: Because of this, we can't load CMSSW. Not good." >&2
-    tar xmf CMSRunAnalysis.tar.gz || exit 10042
-    DashboardFailure 10031
-fi
-set +x
-if [[ $rc != 0 ]]
+elif [ -f "$OSG_APP"/cmssoft/cms/cmsset_default.sh ]
+then  #   OSG style --
+    echo "WN with an OSG style environment, thus using OSG_APP=$OSG_APP"
+    . $OSG_APP/cmssoft/cms/cmsset_default.sh CMSSW_3_3_2
+elif [ -f "$CVMFS"/cms.cern.ch/cmsset_default.sh ]
 then
-    echo "==== Sourcing cmsset_default.sh failed at $(TZ=GMT date). ===="
-    tar xmf CMSRunAnalysis.tar.gz || exit 10042
-    DashboardFailure 10032
+    echo "WN with CVMFS environment, thus using CVMFS=$CVMFS"
+    . $CVMFS/cms.cern.ch/cmsset_default.sh
+elif [ -f /cvmfs/cms.cern.ch/cmsset_default.sh ]
+then  # ok, lets call it CVMFS then
+    export CVMFS=/cvmfs/cms.cern.ch
+    echo "WN missing VO_CMS_SW_DIR/OSG_APP/CVMFS environment variable, forcing it to CVMFS=$CVMFS"
+    . $CVMFS/cmsset_default.sh
 else
-    echo "==== CMSSW pre-execution environment bootstrap FINISHING at $(TZ=GMT date) ===="
+    echo "Error during job bootstrap: VO_CMS_SW_DIR, OSG_APP, CVMFS or /cvmfs were not found." >&2
+    echo "  Because of this, we can't load CMSSW. Not good." >&2
+    exit 11003
 fi
+echo -e "========  CMS environment load finished at $(TZ=GMT date) ========\n"
 
 echo "==== Python discovery STARTING ===="
-# check for Python installation 
-N_PYTHON26=${#VERSIONS[*]}
-if [ $N_PYTHON26 -lt 1 ]; then
-    echo "Error: Unable to find a CMS version of python."
-    echo "CRAB3 requires the CMS version of python to function."
-    DashboardFailure 10034
+# Python library required for Python2/Python3 compatibility through "future"
+PY_FUTURE_VERSION=0.18.2
+# First, decide which COMP ScramArch to use based on the required OS
+if [ "$REQUIRED_OS" = "rhel7" ];
+then
+    WMA_SCRAM_ARCH=slc7_amd64_gcc630
 else
-    VERSION=${VERSIONS[0]}
-    echo "Python found in $PY_PATH/$VERSION";
-    PYTHON26=$PY_PATH/$VERSION
-    # Initialize CMS Python
-    set +x
-    source $PY_PATH/$VERSION/etc/profile.d/init.sh
-    if [[ $? != 0 ]]
-    then
-        echo "Error: Unable to source python environment setup."
-        DashboardFailure 10043
-    fi
+    WMA_SCRAM_ARCH=slc6_amd64_gcc493
+fi
+echo "Job requires OS: $REQUIRED_OS, thus setting ScramArch to: $WMA_SCRAM_ARCH"
+
+suffix=etc/profile.d/init.sh
+if [ -d "$VO_CMS_SW_DIR"/COMP/"$WMA_SCRAM_ARCH"/external/python ]
+then
+    prefix="$VO_CMS_SW_DIR"/COMP/"$WMA_SCRAM_ARCH"/external/python
+elif [ -d "$OSG_APP"/cmssoft/cms/COMP/"$WMA_SCRAM_ARCH"/external/python ]
+then
+    prefix="$OSG_APP"/cmssoft/cms/COMP/"$WMA_SCRAM_ARCH"/external/python
+elif [ -d "$CVMFS"/COMP/"$WMA_SCRAM_ARCH"/external/python ]
+then
+    prefix="$CVMFS"/COMP/"$WMA_SCRAM_ARCH"/external/python
+else
+    echo "Error during job bootstrap: job environment does not contain the init.sh script." >&2
+    echo "  Because of this, we can't load CMSSW. Not good." >&2
+    exit 11004
 fi
 
-command -v python > /dev/null
+compPythonPath=`echo $prefix | sed 's|/python||'`
+echo "WMAgent bootstrap: COMP Python path is: $compPythonPath"
+latestPythonVersion=`ls -t "$prefix"/*/"$suffix" | head -n1 | sed 's|.*/external/python/||' | cut -d '/' -f1`
+pythonMajorVersion=`echo $latestPythonVersion | cut -d '.' -f1`
+pythonCommand="python"${pythonMajorVersion}
+echo "WMAgent bootstrap: latest python release is: $latestPythonVersion"
+source "$prefix/$latestPythonVersion/$suffix"
+source "$compPythonPath/py2-future/$PY_FUTURE_VERSION/$suffix"
+
+command -v $pythonCommand > /dev/null
 rc=$?
 if [[ $rc != 0 ]]
 then
-    echo "Error: Python wasn't found on this worker node after source CMS version." >&2
-    echo "Error: job execution REQUIRES a working python" >&2
-    DashboardFailure 10043
+    echo "Error during job bootstrap: python isn't available on the worker node." >&2
+    echo "  WMCore/WMAgent REQUIRES at least python2" >&2
+    exit 11005
 else
-    echo "I found python at.."
-    echo `which python`
-fi
-python -c ''
-rc=$?
-if [[ $rc != 0 ]]
-then
-    echo "Error: python is not functional."
-    DashboardFailure 10043
+    echo "WMAgent bootstrap: found $pythonCommand at.."
+    echo `which $pythonCommand`
 fi
 
-echo "==== Python discovery FINISHING at $(TZ=GMT date) ===="
+echo "==== Python discovery FINISHED at $(TZ=GMT date) ===="
 
 echo "======== Current environment dump STARTING ========"
 for i in `env`; do
