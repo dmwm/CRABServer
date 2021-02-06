@@ -634,7 +634,7 @@ def publishInDBS3(config, taskname, verbose):
     published = []
 
     dataset = toPublish[0]['outdataset']
-    # Find all (valid) files already published in this dataset.
+    # Find all files already published in this dataset.
     try:
         existingDBSFiles = destReadApi.listFiles(dataset=dataset, detail=True)
         existingFiles = [f['logical_file_name'] for f in existingDBSFiles]
@@ -657,7 +657,7 @@ def publishInDBS3(config, taskname, verbose):
 
     for fileTo in toPublish:
         #print(existingFilesValid)
-        if fileTo['lfn'] not in existingFilesValid:
+        if fileTo['lfn'] not in existingFiles:
             workToDo = True
             break
 
