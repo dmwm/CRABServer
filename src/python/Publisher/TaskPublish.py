@@ -637,6 +637,7 @@ def publishInDBS3(config, taskname, verbose):
     published = []
 
     #dataset = toPublish[0]['outdataset']
+
     # Find all files already published in this dataset.
     try:
         existingDBSFiles = destReadApi.listFiles(dataset=dataset, detail=True)

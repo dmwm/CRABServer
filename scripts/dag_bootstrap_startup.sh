@@ -11,9 +11,8 @@ for FILE in $1.dagman.out RunJobs.dag.dagman.out dbs_discovery.err dbs_discovery
     touch $FILE
 done
 
-export PATH="/data/srv/glidecondor/bin:/data/srv/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
-export PYTHONPATH=/data/srv/glidecondor/lib/python:$PYTHONPATH
-export LD_LIBRARY_PATH=/data/srv/glidecondor/lib:/data/srv/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
+export PATH="/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
+export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
 
 os_ver=$(source /etc/os-release;echo $VERSION_ID)
 curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"

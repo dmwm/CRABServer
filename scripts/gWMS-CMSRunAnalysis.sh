@@ -89,8 +89,10 @@ END
 }
 
 echo "======== gWMS-CMSRunAnalysis.sh STARTING at $(TZ=GMT date) on $(hostname) ========"
-echo "Local time : $(date)"
-echo "Current system : $(uname -a)"
+echo "User id:    $(id)"
+echo "Local time: $(date)"
+echo "Hostname:   $(hostname -f)"
+echo "System:     $(uname -a)"
 echo "Arguments are $@"
 
 exec 2>&1
@@ -167,65 +169,83 @@ then
   exit $EXIT_STATUS
 fi
 
-
-
-echo "======== python2.6 bootstrap for stageout at $(TZ=GMT date) STARTING ========"
-set -x
-### Need python2.6 for stageout also
-## CMS_PATH env is needed for WMCore stageout plugins.
+echo "======== User application running completed. Prepare env. for stageout ==="
+echo "======== WMAgent CMS environment load starting at $(TZ=GMT date) ========"
 if [ -f "$VO_CMS_SW_DIR"/cmsset_default.sh ]
-then
-    set +x
-    export CMS_PATH=$VO_CMS_SW_DIR
+then  #   LCG style --
+    echo "WN with a LCG style environment, thus using VO_CMS_SW_DIR=$VO_CMS_SW_DIR"
     . $VO_CMS_SW_DIR/cmsset_default.sh
-    set -x
 elif [ -f "$OSG_APP"/cmssoft/cms/cmsset_default.sh ]
-then
-    set +x
-    export CMS_PATH=$OSG_APP/cmssoft/cms/
+then  #   OSG style --
+    echo "WN with an OSG style environment, thus using OSG_APP=$OSG_APP"
     . $OSG_APP/cmssoft/cms/cmsset_default.sh CMSSW_3_3_2
-    set -x
-elif [ -f /cvmfs/cms.cern.ch/cmsset_default.sh ]
+elif [ -f "$CVMFS"/cms.cern.ch/cmsset_default.sh ]
 then
-    export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
-    export CMS_PATH=$VO_CMS_SW_DIR
-    set +x
-    . $VO_CMS_SW_DIR/cmsset_default.sh
-    set -x
+    echo "WN with CVMFS environment, thus using CVMFS=$CVMFS"
+    . $CVMFS/cms.cern.ch/cmsset_default.sh
+elif [ -f /cvmfs/cms.cern.ch/cmsset_default.sh ]
+then  # ok, lets call it CVMFS then
+    export CVMFS=/cvmfs/cms.cern.ch
+    echo "WN missing VO_CMS_SW_DIR/OSG_APP/CVMFS environment variable, forcing it to CVMFS=$CVMFS"
+    . $CVMFS/cmsset_default.sh
 else
-	echo "Error: OSG_APP nor VO_CMS_SW_DIR environment variables were set" >&2
-	echo "Error: CVMFS is not present" >&2
-	echo "Error: Because of this, we can't bootstrap to attempt stageout." >&2
-	exit 2
+    echo "Error during job bootstrap: VO_CMS_SW_DIR, OSG_APP, CVMFS or /cvmfs were not found." >&2
+    echo "  Because of this, we can't load CMSSW. Not good." >&2
+    exit 11003
+fi
+echo "WMAgent bootstrap: WMAgent thinks it found the correct CMSSW setup script"
+echo -e "======== WMAgent CMS environment load finished at $(TZ=GMT date) ========\n"
+
+echo "======== python bootstrap for stageout at $(TZ=GMT date) STARTING ========"
+# use python from COMP
+# Python library required for Python2/Python3 compatibility through "future"
+PY_FUTURE_VERSION=0.18.2
+# First, decide which COMP ScramArch to use based on the required OS
+if [ "$REQUIRED_OS" = "rhel7" ];
+then
+    WMA_SCRAM_ARCH=slc7_amd64_gcc630
+else
+    WMA_SCRAM_ARCH=slc6_amd64_gcc493
+fi
+echo "Job requires OS: $REQUIRED_OS, thus setting ScramArch to: $WMA_SCRAM_ARCH"
+
+suffix=etc/profile.d/init.sh
+if [ -d "$VO_CMS_SW_DIR"/COMP/"$WMA_SCRAM_ARCH"/external/python ]
+then
+    prefix="$VO_CMS_SW_DIR"/COMP/"$WMA_SCRAM_ARCH"/external/python
+elif [ -d "$OSG_APP"/cmssoft/cms/COMP/"$WMA_SCRAM_ARCH"/external/python ]
+then
+    prefix="$OSG_APP"/cmssoft/cms/COMP/"$WMA_SCRAM_ARCH"/external/python
+elif [ -d "$CVMFS"/COMP/"$WMA_SCRAM_ARCH"/external/python ]
+then
+    prefix="$CVMFS"/COMP/"$WMA_SCRAM_ARCH"/external/python
+else
+    echo "Error during job bootstrap: job environment does not contain the init.sh script." >&2
+    echo "  Because of this, we can't load CMSSW. Not good." >&2
+    exit 11004
 fi
 
-if [ -e $VO_CMS_SW_DIR/COMP/slc6_amd64_gcc493/external/python/2.7.6/etc/profile.d/init.sh ]
-then
-    set +x
-	. $VO_CMS_SW_DIR/COMP/slc6_amd64_gcc493/external/python/2.7.6/etc/profile.d/init.sh
-	#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$VO_CMS_SW_DIR/COMP/slc6_amd64_gcc481/external/openssl/1.0.1p/lib:$VO_CMS_SW_DIR/COMP/slc6_amd64_gcc481/external/bz2lib/1.0.6/lib
-    set -x
-elif [ -e $OSG_APP/cmssoft/cms/COMP/slc6_amd64_gcc493/external/python/2.7.6/etc/profile.d/init.sh ]
-then
-    set +x
-	. $OSG_APP/cmssoft/cms/COMP/slc6_amd64_gcc493/external/python/2.7.6/etc/profile.d/init.sh
-    #export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$OSG_APP/cmssoft/cms/COMP/slc6_amd64_gcc481/external/openssl/1.0.1p/lib:$OSG_APP/cmssoft/cms/COMP/slc6_amd64_gcc481/external/bz2lib/1.0.6/lib
-    set -x
-fi
-command -v python2.7 > /dev/null
+compPythonPath=`echo $prefix | sed 's|/python||'`
+echo "WMAgent bootstrap: COMP Python path is: $compPythonPath"
+latestPythonVersion=`ls -t "$prefix"/*/"$suffix" | head -n1 | sed 's|.*/external/python/||' | cut -d '/' -f1`
+pythonMajorVersion=`echo $latestPythonVersion | cut -d '.' -f1`
+pythonCommand="python"${pythonMajorVersion}
+echo "WMAgent bootstrap: latest python release is: $latestPythonVersion"
+source "$prefix/$latestPythonVersion/$suffix"
+source "$compPythonPath/py2-future/$PY_FUTURE_VERSION/$suffix"
+
+command -v $pythonCommand > /dev/null
 rc=$?
-set +x
 if [[ $rc != 0 ]]
 then
-    echo "Error: Python2.7 isn't available on this worker node." >&2
-    echo "Error: execution of job stageout wrapper REQUIRES python2.6" >&2
-    EXIT_STATUS=10043
-    DashboardFailure $EXIT_STATUS
+    echo "Error during job bootstrap: python isn't available on the worker node." >&2
+    echo "  WMCore/WMAgent REQUIRES at least python2" >&2
+    exit 11005
 else
-    echo "Found python2.7 at:"
-    echo `which python2.7`
+    echo "WMAgent bootstrap: found $pythonCommand at.."
+    echo `which $pythonCommand`
 fi
-echo "======== python2.7 bootstrap for stageout at $(TZ=GMT date) FINISHING ========"
+echo "======== python bootstrap for stageout at $(TZ=GMT date) FINISHED ========"
 
 #echo "======== Attempting to notify HTCondor of file stageout ========"
 # wrong syntax for chirping, also needs a proper classAd name. Keep commented line for a future fix
