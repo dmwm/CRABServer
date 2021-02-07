@@ -271,7 +271,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
     try:
         result = migrateApi.submitMigration(data)
     except Exception as ex:
-        if "is already at destination" in ex:
+        if "is already at destination" in str(ex):
             msg = "Block is already at destination."
             logger.info(msg)
             atDestination = True
@@ -441,7 +441,7 @@ def publishInDBS3(config, taskname, verbose):
     if verbose:
         logger.setLevel(logging.DEBUG)
 
-    logger.info("Start new iteration. Get files to publish")
+    logger.info("Start new iteration on taskname:  %s\nGet files to publish", taskname)
 
     # prepare a dummy summary JSON file in case there's nothing to do
     nothingToDo = {}
@@ -467,6 +467,9 @@ def publishInDBS3(config, taskname, verbose):
         return summaryFileName
 
     pnn = toPublish[0]["Destination"]
+    dataset = toPublish[0]['outdataset']
+    logger.info("Will publish user files in %s", dataset)
+
 
     # CRABServer REST API's (see CRABInterface)
     try:
@@ -511,7 +514,7 @@ def publishInDBS3(config, taskname, verbose):
     try:
         results = crabServer.get(REST_task, data=encodeRequest(data))
     except Exception as ex:
-        logger.error("Failed to get acquired publications from oracleDB for %s: %s", taskname, ex)
+        logger.error("Failed to get acquired publications from oracleDB: %s", ex)
         nothingToDo['result'] = 'FAIL'
         nothingToDo['reason'] = 'Error contacting CRAB REST'
         summaryFileName = saveSummaryJson(logdir, nothingToDo)
@@ -619,7 +622,7 @@ def publishInDBS3(config, taskname, verbose):
     _, primName, procName, tier = toPublish[0]['outdataset'].split('/')
 
     primds_config = {'primary_ds_name': primName, 'primary_ds_type': primary_ds_type}
-    msg = "About to insert primary dataset: %s" % (str(primds_config))
+    msg = "About to insert primary dataset"
     logger.debug(msg)
     if dryRun:
         logger.info("DryRun: skip insertPrimaryDataset")
@@ -633,7 +636,8 @@ def publishInDBS3(config, taskname, verbose):
     publish_in_next_iteration = []
     published = []
 
-    dataset = toPublish[0]['outdataset']
+    #dataset = toPublish[0]['outdataset']
+
     # Find all files already published in this dataset.
     try:
         existingDBSFiles = destReadApi.listFiles(dataset=dataset, detail=True)
@@ -662,7 +666,7 @@ def publishInDBS3(config, taskname, verbose):
             break
 
     if not workToDo:
-        msg = "Nothing uploaded, %s has these files already." % (dataset)
+        msg = "Nothing uploaded, output dataset has these files already."
         logger.info(msg)
         logger.info('Make sure those files are marked as Done')
         # docId is the has of the source LFN i.e. the file in the tmp area at the running site
@@ -679,8 +683,6 @@ def publishInDBS3(config, taskname, verbose):
                      'output_module_label': 'o',
                      'global_tag': global_tag,
                     }
-    msg = "Published output config."
-    logger.info(msg)
 
     dataset_config = {'dataset': dataset,
                       'processed_ds_name': procName,
@@ -689,8 +691,8 @@ def publishInDBS3(config, taskname, verbose):
                       'physics_group_name': 'CRAB3',
                       'last_modification_date': int(time.time()),
                      }
-    msg = "About to insert dataset: %s" % (str(dataset_config))
-    logger.info(msg)
+
+    logger.info("Output dataset config: %s", str(dataset_config))
 
     # List of all files that must (and can) be published.
     dbsFiles = []
@@ -863,7 +865,7 @@ def publishInDBS3(config, taskname, verbose):
     final['files'] = len(dbsFiles) - len(failed) - len(publish_in_next_iteration)
     final['blocks'] = block_count
     # Print a publication status summary for this dataset.
-    msg = "End of publication status for dataset %s:" % (dataset)
+    msg = "End of publication status:"
     msg += " failed %s" % len(failed)
     if verbose:
         msg += ": %s" % failed
