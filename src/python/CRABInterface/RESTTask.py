@@ -3,8 +3,7 @@ from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_ustr, validate_ustrlist, validate_num
 from WMCore.REST.Error import InvalidParameter, ExecutionError
 
-from CRABInterface.Utils import conn_handler
-from CRABInterface.Utils import getDBinstance
+from CRABInterface.Utilities import conn_handler, getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
 from CRABInterface.Regexps import RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL,\
     RX_RUNS, RX_OUT_DATASET, RX_URL, RX_OUT_DATASET, RX_SCHEDD_NAME, RX_RUCIORULE

@@ -24,7 +24,7 @@ from WMCore.REST.Error import ExecutionError, InvalidParameter
 from Utils.Throttled import UserThrottle
 throttle = UserThrottle(limit=3)
 
-from CRABInterface.Utils import conn_handler
+from CRABInterface.Utilities import conn_handler
 from ServerUtilities import FEEDBACKMAIL, PUBLICATIONDB_STATES, isCouchDBURL, getEpochFromDBTime
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 

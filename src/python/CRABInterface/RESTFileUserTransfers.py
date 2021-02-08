@@ -6,7 +6,7 @@ from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_ustr, validate_num, validate_ustrlist
 from WMCore.REST.Error import InvalidParameter, UnsupportedMethod
 
-from CRABInterface.Utils import getDBinstance
+from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import RX_USERNAME, RX_TASKNAME, RX_SUBGETUSERTRANSFER, RX_SUBPOSTUSERTRANSFER, RX_JOBID, RX_ANYTHING
 

@@ -6,7 +6,7 @@ from WMCore.REST.Validation import validate_ustr, validate_ustrlist, validate_nu
 from WMCore.REST.Error import InvalidParameter
 
 from ServerUtilities import getEpochFromDBTime
-from CRABInterface.Utils import getDBinstance
+from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import (RX_TASKNAME, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_SUBPOSTWORKER,
                                   RX_SUBGETWORKER, RX_JOBID)

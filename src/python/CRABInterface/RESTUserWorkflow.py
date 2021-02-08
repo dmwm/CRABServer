@@ -21,7 +21,7 @@ from CRABInterface.Regexps import (RX_TASKNAME, RX_ACTIVITY, RX_JOBTYPE, RX_GENE
     RX_CMSSITE, RX_SPLIT, RX_CACHENAME, RX_CACHEURL, RX_LFN, RX_USERFILE, RX_VOPARAMS, RX_DBSURL, RX_LFNPRIMDS, RX_OUTFILES,
     RX_RUNS, RX_LUMIRANGE, RX_ASOURL, RX_ASODB, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT, RX_JOBID, RX_ADDFILE,
     RX_ANYTHING, RX_USERNAME, RX_DATE, RX_TEXT_FAIL)
-from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
+from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance
 from ServerUtilities import checkOutLFN, generateTaskName
 
 

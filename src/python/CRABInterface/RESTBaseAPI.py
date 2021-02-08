@@ -10,7 +10,7 @@ from WMCore.REST.Format import JSONFormat
 from WMCore.REST.Error import ExecutionError
 
 # CRABServer dependecies here
-from . import Utils
+from CRABInterface.Utilities import ConfigCache, globalinit, getCentralConfig
 from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTTask import RESTTask
 from CRABInterface.RESTServerInfo import RESTServerInfo
@@ -40,7 +40,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         if status is not 0:
             raise ExecutionError("Internal issue when retrieving crabserver service DN.")
 
-        extconfig = Utils.ConfigCache(centralconfig=Utils.getCentralConfig(extconfigurl=config.extconfigurl, mode=config.mode),
+        extconfig = ConfigCache(centralconfig=getCentralConfig(extconfigurl=config.extconfigurl, mode=config.mode),
                                       cachetime=mktime(gmtime()))
 
         #Global initialization of Data objects. Parameters coming from the config should go here
@@ -48,7 +48,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         DataWorkflow.globalinit(dbapi=self, credpath=config.credpath, centralcfg=extconfig, config=config)
         DataFileMetadata.globalinit(dbapi=self, config=config)
         RESTTask.globalinit(centralcfg=extconfig)
-        Utils.globalinit(config.serverhostkey, config.serverhostcert, serverdn, config.credpath)
+        globalinit(config.serverhostkey, config.serverhostcert, serverdn, config.credpath)
 
         ## TODO need a check to verify the format depending on the resource
         ##      the RESTFileMetadata has the specifc requirement of getting xml reports
