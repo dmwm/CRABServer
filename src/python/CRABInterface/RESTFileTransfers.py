@@ -1,5 +1,6 @@
 from __future__ import print_function
 # WMCore dependecies here
+from Utils.Utilities import makeList
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_ustr, validate_num, validate_ustrlist
 from WMCore.REST.Error import InvalidParameter, UnsupportedMethod
@@ -148,12 +149,12 @@ class RESTFileTransfers(RESTEntity):
             # TODO: fix case: if 'fts_instance' in kwargs
             if kwargs['list_of_fts_instance']:
                 #del errorMsg
-                ids = (kwargs['list_of_ids'].translate(None,"[ ]'")).split(",")
-                states = (kwargs['list_of_transfer_state'].translate(None,"[ ]'")).split(",")
+                ids = makeList(kwargs['list_of_ids'])
+                states = makeList(kwargs['list_of_transfer_state'])
                 retry = [0 for x in states]
                 reasons = ["" for x in states]
-                instances = (str(kwargs['list_of_fts_instance'].translate(None,"[ ]'"))).split(",")
-                fts_id = (str(kwargs['list_of_fts_id'].translate(None,"[ ]'"))).split(",")
+                instances = makeList(str(kwargs['list_of_fts_instance']))
+                fts_id = makeList(str(kwargs['list_of_fts_id']))
 
                 for num in range(len(ids)):
                     binds['id'] = [ids[num]]
@@ -164,13 +165,13 @@ class RESTFileTransfers(RESTEntity):
                     binds['retry_value'] = [int(retry[num])]
                     self.api.modifynocheck(self.transferDB.UpdateTransfers_sql, **binds)
             else:
-                ids = (kwargs['list_of_ids'].translate(None,"[ ]'")).split(",")
-                states = (kwargs['list_of_transfer_state'].translate(None,"[ ]'")).split(",")
+                ids = makeList(kwargs['list_of_ids'])
+                states = makeList(kwargs['list_of_transfer_state'])
                 retry = [0 for x in states]
                 reasons = ["" for x in states]
                 if kwargs['list_of_retry_value'] is not None:
-                    reasons = (kwargs['list_of_failure_reason'].translate(None,"[]'")).split(",")
-                    retry = (kwargs['list_of_retry_value'].translate(None,"[ ]'")).split(",")
+                    reasons = makeList(kwargs['list_of_failure_reason'])
+                    retry = makeList(kwargs['list_of_retry_value'])
                 for num in range(len(ids)):
                     binds['id'] = [ids[num]]
                     binds['transfer_state'] = [TRANSFERDB_STATUSES[states[num]]]
@@ -199,13 +200,13 @@ class RESTFileTransfers(RESTEntity):
             #compareOut, errorMsg = self.compareLen(kwargs, ['list_of_ids', 'list_of_publication_state'])
             #if compareOut:
             #    del errorMsg
-            ids = (kwargs['list_of_ids'].translate(None,"[ ]'")).split(",")
-            states = (kwargs['list_of_publication_state'].translate(None,"[ ]'")).split(",")
+            ids = makeList(kwargs['list_of_ids'])
+            states = makeList(kwargs['list_of_publication_state'])
             retry = [0 for x in states]
             reasons = ["" for x in states]
             if kwargs['list_of_retry_value'] is not None:
-                reasons = (kwargs['list_of_failure_reason'].translate(None,"[]'")).split(",")
-                retry = (kwargs['list_of_retry_value'].translate(None,"[ ]'")).split(",")
+                reasons = makeList(kwargs['list_of_failure_reason'])
+                retry = makeList(kwargs['list_of_retry_value'])
             for num in range(len(ids)):
                 binds['publication_state'] = [PUBLICATIONDB_STATUSES[states[num]]]
                 binds['id'] = [ids[num]]
