@@ -93,7 +93,7 @@ class RESTTask(RESTEntity):
             #TODO move the function in ServerUtils and use it when required (e.g.: mysql LONGTEXT does not need read())
             try:
                 return str(col)
-            except Exception as ex:
+            except Exception as ex:  # pylint: disable=unused-variable
                 return col.read()
         return [getval(col) for col in row]
 
