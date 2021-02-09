@@ -1,10 +1,11 @@
 from __future__ import print_function
 # WMCore dependecies here
+from Utils.Utilities import makeList
 from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_str, validate_num, validate_strlist
+from WMCore.REST.Validation import validate_ustr, validate_num, validate_ustrlist
 from WMCore.REST.Error import InvalidParameter, UnsupportedMethod
 
-from CRABInterface.Utils import getDBinstance
+from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_operator_without_raise
 from CRABInterface.Regexps import RX_USERNAME, RX_VOPARAMS, RX_TASKNAME, RX_SUBGETTRANSFER, RX_SUBPOSTTRANSFER, \
                                   RX_USERGROUP, RX_USERROLE, RX_CMSSITE, RX_ASO_WORKERNAME, RX_ANYTHING
@@ -38,28 +39,28 @@ class RESTFileTransfers(RESTEntity):
             # POST is for update, so we should allow anyone anything?
             # Of Course no, but there are multiple combinations, so we are not validating here
             # and all validation is in post function
-            validate_str("subresource", param, safe, RX_SUBPOSTTRANSFER, optional=False)
-            validate_str("asoworker", param, safe, RX_ASO_WORKERNAME, optional=False)
-            validate_str("username", param, safe, RX_USERNAME, optional=True)
-            validate_str("list_of_ids", param, safe, RX_ANYTHING, optional=True)
-            validate_str("list_of_transfer_state", param, safe, RX_ANYTHING, optional=True)
-            validate_str("list_of_failure_reason", param, safe, RX_ANYTHING, optional=True)
-            validate_str("list_of_retry_value", param, safe, RX_ANYTHING, optional=True)
-            validate_str("list_of_fts_instance", param, safe, RX_ANYTHING, optional=True)
-            validate_str("list_of_fts_id", param, safe, RX_ANYTHING, optional=True)
-            validate_str("list_of_publication_state", param, safe, RX_ANYTHING, optional=True)
+            validate_ustr("subresource", param, safe, RX_SUBPOSTTRANSFER, optional=False)
+            validate_ustr("asoworker", param, safe, RX_ASO_WORKERNAME, optional=False)
+            validate_ustr("username", param, safe, RX_USERNAME, optional=True)
+            validate_ustr("list_of_ids", param, safe, RX_ANYTHING, optional=True)
+            validate_ustr("list_of_transfer_state", param, safe, RX_ANYTHING, optional=True)
+            validate_ustr("list_of_failure_reason", param, safe, RX_ANYTHING, optional=True)
+            validate_ustr("list_of_retry_value", param, safe, RX_ANYTHING, optional=True)
+            validate_ustr("list_of_fts_instance", param, safe, RX_ANYTHING, optional=True)
+            validate_ustr("list_of_fts_id", param, safe, RX_ANYTHING, optional=True)
+            validate_ustr("list_of_publication_state", param, safe, RX_ANYTHING, optional=True)
             validate_num("time_to", param, safe, optional=True)
             validate_num("publish_flag", param, safe, optional=True)
 
         elif method in ['GET']:
-            validate_str("subresource", param, safe, RX_SUBGETTRANSFER, optional=False)
-            validate_str("username", param, safe, RX_USERNAME, optional=True)
-            validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
-            validate_str("vorole", param, safe, RX_VOPARAMS, optional=True)
-            validate_str("taskname", param, safe, RX_TASKNAME, optional=True)
-            validate_str("destination", param, safe, RX_CMSSITE, optional=True)
-            validate_str("source", param, safe, RX_CMSSITE, optional=True)
-            validate_str("asoworker", param, safe, RX_ASO_WORKERNAME, optional=True)
+            validate_ustr("subresource", param, safe, RX_SUBGETTRANSFER, optional=False)
+            validate_ustr("username", param, safe, RX_USERNAME, optional=True)
+            validate_ustr("vogroup", param, safe, RX_VOPARAMS, optional=True)
+            validate_ustr("vorole", param, safe, RX_VOPARAMS, optional=True)
+            validate_ustr("taskname", param, safe, RX_TASKNAME, optional=True)
+            validate_ustr("destination", param, safe, RX_CMSSITE, optional=True)
+            validate_ustr("source", param, safe, RX_CMSSITE, optional=True)
+            validate_ustr("asoworker", param, safe, RX_ASO_WORKERNAME, optional=True)
             validate_num("grouping", param, safe, optional=False)
             validate_num("limit", param, safe, optional=True)
         elif method in ['DELETE']:
@@ -148,12 +149,12 @@ class RESTFileTransfers(RESTEntity):
             # TODO: fix case: if 'fts_instance' in kwargs
             if kwargs['list_of_fts_instance']:
                 #del errorMsg
-                ids = (kwargs['list_of_ids'].translate(None,"[ ]'")).split(",")
-                states = (kwargs['list_of_transfer_state'].translate(None,"[ ]'")).split(",")
+                ids = makeList(kwargs['list_of_ids'])
+                states = makeList(kwargs['list_of_transfer_state'])
                 retry = [0 for x in states]
                 reasons = ["" for x in states]
-                instances = (str(kwargs['list_of_fts_instance'].translate(None,"[ ]'"))).split(",")
-                fts_id = (str(kwargs['list_of_fts_id'].translate(None,"[ ]'"))).split(",")
+                instances = makeList(str(kwargs['list_of_fts_instance']))
+                fts_id = makeList(str(kwargs['list_of_fts_id']))
 
                 for num in range(len(ids)):
                     binds['id'] = [ids[num]]
@@ -164,13 +165,13 @@ class RESTFileTransfers(RESTEntity):
                     binds['retry_value'] = [int(retry[num])]
                     self.api.modifynocheck(self.transferDB.UpdateTransfers_sql, **binds)
             else:
-                ids = (kwargs['list_of_ids'].translate(None,"[ ]'")).split(",")
-                states = (kwargs['list_of_transfer_state'].translate(None,"[ ]'")).split(",")
+                ids = makeList(kwargs['list_of_ids'])
+                states = makeList(kwargs['list_of_transfer_state'])
                 retry = [0 for x in states]
                 reasons = ["" for x in states]
                 if kwargs['list_of_retry_value'] is not None:
-                    reasons = (kwargs['list_of_failure_reason'].translate(None,"[]'")).split(",")
-                    retry = (kwargs['list_of_retry_value'].translate(None,"[ ]'")).split(",")
+                    reasons = makeList(kwargs['list_of_failure_reason'])
+                    retry = makeList(kwargs['list_of_retry_value'])
                 for num in range(len(ids)):
                     binds['id'] = [ids[num]]
                     binds['transfer_state'] = [TRANSFERDB_STATUSES[states[num]]]
@@ -199,13 +200,13 @@ class RESTFileTransfers(RESTEntity):
             #compareOut, errorMsg = self.compareLen(kwargs, ['list_of_ids', 'list_of_publication_state'])
             #if compareOut:
             #    del errorMsg
-            ids = (kwargs['list_of_ids'].translate(None,"[ ]'")).split(",")
-            states = (kwargs['list_of_publication_state'].translate(None,"[ ]'")).split(",")
+            ids = makeList(kwargs['list_of_ids'])
+            states = makeList(kwargs['list_of_publication_state'])
             retry = [0 for x in states]
             reasons = ["" for x in states]
             if kwargs['list_of_retry_value'] is not None:
-                reasons = (kwargs['list_of_failure_reason'].translate(None,"[]'")).split(",")
-                retry = (kwargs['list_of_retry_value'].translate(None,"[ ]'")).split(",")
+                reasons = makeList(kwargs['list_of_failure_reason'])
+                retry = makeList(kwargs['list_of_retry_value'])
             for num in range(len(ids)):
                 binds['publication_state'] = [PUBLICATIONDB_STATUSES[states[num]]]
                 binds['id'] = [ids[num]]

@@ -347,10 +347,10 @@ def publishInDBS3(config, taskname, verbose):
             docId = getHashLfn(source_lfn)
             data['asoworker'] = config.General.asoworker
             data['subresource'] = 'updatePublication'
-            data['list_of_ids'] = docId
-            data['list_of_publication_state'] = 'DONE'
-            data['list_of_retry_value'] = 1
-            data['list_of_failure_reason'] = ''
+            data['list_of_ids'] = [docId]
+            data['list_of_publication_state'] = ['DONE']
+            data['list_of_retry_value'] = [1]
+            data['list_of_failure_reason'] = ['']
 
             try:
                 result = crabServer.post(REST_filetransfers, data=encodeRequest(data))
@@ -380,10 +380,10 @@ def publishInDBS3(config, taskname, verbose):
             data = dict()
             data['asoworker'] = config.General.asoworker
             data['subresource'] = 'updatePublication'
-            data['list_of_ids'] = docId
-            data['list_of_publication_state'] = 'FAILED'
-            data['list_of_retry_value'] = 1
-            data['list_of_failure_reason'] = failure_reason
+            data['list_of_ids'] = [docId]
+            data['list_of_publication_state'] = ['FAILED']
+            data['list_of_retry_value'] = [1]
+            data['list_of_failure_reason'] = [failure_reason]
 
             logger.debug("data: %s ", data)
             try:

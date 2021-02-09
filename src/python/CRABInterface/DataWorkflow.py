@@ -14,7 +14,7 @@ from ServerUtilities import PUBLICATIONDB_STATUSES
 from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
 from ServerUtilities import isCouchDBURL, getEpochFromDBTime
 
-from CRABInterface.Utils import CMSSitesCache, conn_handler, getDBinstance
+from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance
 
 
 class DataWorkflow(object):
