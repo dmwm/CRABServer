@@ -1,7 +1,7 @@
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
-from WMCore.REST.Error import InvalidParameter, ExecutionError
+from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
 
 from CRABInterface.Utils import conn_handler
 from CRABInterface.Utils import getDBinstance
@@ -236,7 +236,7 @@ class RESTTask(RESTEntity):
             self.logger.info("Warning message already present in the task database. Will not add it again.")
             return []
         if len(warnings)>10:
-            raise ExecutionError("You cannot add more than 10 warnings to a task")
+            raise NotAcceptable("You cannot add more than 10 warnings to a task")
         warnings.append(warning)
 
         self.api.modify(self.Task.SetWarnings_sql, warnings=[str(warnings)], workflow=[workflow])
