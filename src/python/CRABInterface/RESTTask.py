@@ -6,7 +6,8 @@ from WMCore.REST.Error import InvalidParameter, ExecutionError
 from CRABInterface.Utils import conn_handler
 from CRABInterface.Utils import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
-from CRABInterface.Regexps import RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL, RX_RUNS, RX_OUT_DATASET, RX_URL, RX_OUT_DATASET, RX_SCHEDD_NAME
+from CRABInterface.Regexps import RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL,\
+    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_OUT_DATASET, RX_SCHEDD_NAME, RX_RUCIORULE
 
 # external dependecies here
 import re
@@ -39,7 +40,7 @@ class RESTTask(RESTEntity):
             validate_str("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
             validate_strlist("outputdatasets", param, safe, RX_OUT_DATASET)
             validate_str("taskstatus", param, safe, RX_STATUS, optional=True)
-            validate_num("ddmreqid", param, safe, optional=True)
+            validate_str("ddmreqid", param, safe, RX_RUCIORULE, optional=True)
         elif method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
             validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
@@ -346,7 +347,7 @@ class RESTTask(RESTEntity):
     def addddmreqid(self, **kwargs):
         """ Add DDM request ID to DDM_reqid column in the database. Can be tested with:
             curl -X POST https://balcas-crab.cern.ch/crabserver/dev/task -k --key $X509_USER_PROXY --cert $X509_USER_PROXY \
-                    -d 'subresource=addddmreqid&workflow=?&taskstatus=TAPERECALL&ddmreqid=12345' -v
+                    -d 'subresource=addddmreqid&workflow=?&taskstatus=TAPERECALL&ddmreqid=d2b715f526e14f91b0c299abb560d5d7' -v
         """
         #check if the parameters are there
         if 'ddmreqid' not in kwargs or not kwargs['ddmreqid']:

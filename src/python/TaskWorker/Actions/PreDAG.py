@@ -39,6 +39,7 @@ from ast import literal_eval
 from WMCore.DataStructs.LumiList import LumiList
 
 from ServerUtilities import getLock, newX509env, MAX_IDLE_JOBS, MAX_POST_JOBS
+from RucioUtils import getNativeRucioClient
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.WorkerExceptions import TaskWorkerException
@@ -261,7 +262,8 @@ class PreDAG(object):
             return 1
         try:
             parent = self.prefix if self.stage == 'tail' else None
-            creator = DagmanCreator(config, server=None, resturi='')
+            rucioClient = getNativeRucioClient(config=config, logger=self.logger)
+            creator = DagmanCreator(config, server=None, resturi='', rucioClient=rucioClient)
             with config.TaskWorker.envForCMSWEB:
                 creator.createSubdag(split_result.result, task=task, parent=parent, stage=self.stage)
             self.submitSubdag('RunJobs{0}.subdag'.format(self.prefix), getattr(config.TaskWorker, 'maxIdle', MAX_IDLE_JOBS), getattr(config.TaskWorker, 'maxPost', MAX_POST_JOBS), self.stage)

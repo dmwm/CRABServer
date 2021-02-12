@@ -6,6 +6,7 @@ from __future__ import print_function
 from __future__ import division
 
 import json
+
 from socket import gethostname
 import requests
 
@@ -97,7 +98,6 @@ results = getData('groupedPublishStatistics')
 printData(results, ('Row', 'aso_worker', 'nt', 'publication_state'))
 print("PUBLICATIONDB_STATES={0: 'NEW', 1: 'ACQUIRED', 2: 'FAILED', 3: 'DONE', 4: 'RETRY', 5: 'NOT_REQUIRED'}")
 fillData(results, 'publications', 'schedd', 'publication_state', inputDoc)
-
 
 print("Filled json doc with   where aso_worker=asoless")
 print("-"*70)

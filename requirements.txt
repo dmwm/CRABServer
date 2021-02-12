@@ -3,4 +3,4 @@
 # Format:
 # Dependency==version          
 
-wmcver==1.3.6.crab5
+wmcver==1.3.6.crab6

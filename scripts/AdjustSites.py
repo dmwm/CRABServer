@@ -13,14 +13,15 @@ import time
 import glob
 import shutil
 import urllib
-import classad
-import htcondor
 import traceback
 from datetime import datetime
 from httplib import HTTPException
 
+import classad
+import htcondor
+
 from RESTInteractions import HTTPRequests
-from ServerUtilities import getProxiedWebDir
+from ServerUtilities import getProxiedWebDir, getColumn
 
 
 def printLog(msg):
@@ -255,21 +256,18 @@ def makeWebDir(ad):
     ad['CRAB_localWebDirURL'] = storage_re.sub(sinfo[1], path)
 
 
-def updateWebDir(ad):
+def updateWebDir(RESTServer, ad):
     """
     Need a doc string here.
     """
     data = {'subresource': 'addwebdir'}
-    host = ad['CRAB_RestHost']
     uri = ad['CRAB_RestURInoAPI'] + '/task'
     data['workflow'] = ad['CRAB_ReqName']
     data['webdirurl'] = ad['CRAB_localWebDirURL']
-    cert = ad['X509UserProxy']
 
     try:
-        printLog("Uploading webdir %s to %s" % (data['webdirurl'], host))
-        server = HTTPRequests(host, cert, cert)
-        server.post(uri, data=urllib.urlencode(data))
+        printLog("Uploading webdir %s to the REST" % data['webdirurl'])
+        RESTServer.post(uri, data=urllib.urlencode(data))
         return 0
     except HTTPException as hte:
         printLog(traceback.format_exc())
@@ -278,7 +276,7 @@ def updateWebDir(ad):
         return 1
 
 
-def saveProxiedWebdir(ad):
+def saveProxiedWebdir(RESTServer, ad):
     """ The function queries the REST interface to get the proxied webdir and sets
         a classad so that we report this to the dashboard instead of the regular URL.
 
@@ -290,12 +288,10 @@ def saveProxiedWebdir(ad):
     """
     # Get the proxied webdir from the REST itnerface
     task = ad['CRAB_ReqName']
-    host = ad['CRAB_RestHost']
-    uri = ad['CRAB_RestURInoAPI'] + '/task'
-    cert = ad['X509UserProxy']
+    uriNoApi = ad['CRAB_RestURInoAPI']
     webDir_adName = 'CRAB_WebDirURL'
     ad[webDir_adName] = ad['CRAB_localWebDirURL']
-    proxied_webDir = getProxiedWebDir(task, host, uri, cert, logFunction=printLog)
+    proxied_webDir = getProxiedWebDir(RESTServer=RESTServer, task=task, uriNoApi=uriNoApi, logFunction=printLog)
     if proxied_webDir: # Prefer the proxied webDir to the non-proxied one
         ad[webDir_adName] = str(proxied_webDir)
 
@@ -343,6 +339,40 @@ def setupLog():
     os.close(logfd)
 
 
+def checkTaskInfo(RESTServer, ad):
+    """
+    Function checks that given task is registered in the database with status SUBMITTED and with the
+    same clusterId and schedd name in the database as in the condor ads where it is currently running.
+    In case above condition is not met, script immediately terminates
+    """
+
+    task = ad['CRAB_ReqName']
+    uri = ad['CRAB_RestURInoAPI'] + '/task'
+    clusterIdOnSchedd = ad['ClusterId']
+    data = {'subresource': 'search', 'workflow': task}
+
+    try:
+        dictresult, _, _ = RESTServer.get(uri, data=data)
+    except HTTPException as hte:
+        printLog(traceback.format_exc())
+        printLog(hte.headers)
+        printLog(hte.result)
+        sys.exit(2)
+
+    taskStatusOnDB = getColumn(dictresult, 'tm_task_status')
+    clusteridOnDB = getColumn(dictresult, 'clusterid')
+    scheddOnDB = getColumn(dictresult, 'tm_schedd')
+
+    scheddName = os.environ['schedd_name']
+
+    printLog('Task status on DB: %s, clusterID on DB: %s, schedd name on DB: %s; \nclusterID on condor ads: %s, schedd name on condor ads: %s '
+             % (taskStatusOnDB, clusteridOnDB, scheddOnDB, clusterIdOnSchedd, scheddName))
+
+    if not (taskStatusOnDB == 'SUBMITTED' and scheddOnDB == scheddName and clusteridOnDB == str(clusterIdOnSchedd)):
+        printLog('Exiting AdjustSites because this dagman does not match task information in TASKS DB')
+        sys.exit(3)
+
+
 def main():
     """
     Need a doc string here.
@@ -359,6 +389,13 @@ def main():
         ad = classad.parseOne(fd)
     printLog("Parsed ad: %s" % ad)
 
+
+    # instantiate a server object to talk with CRABServer
+    host = ad['CRAB_RestHost']
+    cert = ad['X509UserProxy']
+    RESTServer = HTTPRequests(host, cert, cert, retry=3, userAgent='CRABSchedd')
+
+    checkTaskInfo(RESTServer, ad)
     makeWebDir(ad)
 
     printLog("Webdir has been set up. Uploading the webdir URL to the REST")
@@ -367,7 +404,7 @@ def main():
     exitCode = 1
     maxRetries = 3
     while retries < maxRetries and exitCode != 0:
-        exitCode = updateWebDir(ad)
+        exitCode = updateWebDir(RESTServer, ad)
         if exitCode != 0:
             time.sleep(retries * 20)
         retries += 1
@@ -378,7 +415,7 @@ def main():
 
     printLog("Webdir URL has been uploaded, exit code is %s. Setting the classad for the proxied webdir" % exitCode)
 
-    saveProxiedWebdir(ad)
+    saveProxiedWebdir(RESTServer, ad)
 
     printLog("Proxied webdir saved. Clearing the automatic blacklist and handling RunJobs.dag.nodes.log for resubmissions")
 

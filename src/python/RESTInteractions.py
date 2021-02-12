@@ -5,14 +5,21 @@ Handles client interactions with remote REST interface
 import os
 import time
 import urllib
-import pycurl
 import logging
 from httplib import HTTPException
+import pycurl
 
 from WMCore.Services.Requests import JSONRequests
 from WMCore.Services.pycurl_manager import RequestHandler
 
-__version__= '0.0.0'
+try:
+    from TaskWorker import __version__
+except:  # pylint: disable=bare-except
+    try:
+        from CRABClient import __version__
+    except:  # pylint: disable=bare-except
+        __version__ = '0.0.0'
+
 EnvironmentException = Exception
 
 
@@ -24,7 +31,7 @@ def retriableError(ex):
         #502 CMSWEB frontend answers with this when the CMSWEB backends are overloaded
         #503 Usually that's the DatabaseUnavailable error
         return ex.status in [500, 502, 503]
-    elif isinstance(ex, pycurl.error):
+    if isinstance(ex, pycurl.error):
         #28 is 'Operation timed out...'
         #35,is 'Unknown SSL protocol error', see https://github.com/dmwm/CRABServer/issues/5102
         return ex[0] in [28, 35]
@@ -44,7 +51,8 @@ class HTTPRequests(dict):
     is used more in the client.
     """
 
-    def __init__(self, url='localhost', localcert=None, localkey=None, version=None, retry=0, logger=None, verbose=False):
+    def __init__(self, url='localhost', localcert=None, localkey=None, version=__version__,
+                 retry=0, logger=None, verbose=False, userAgent='CRAB?'):
         """
         Initialise an HTTP handler
         """
@@ -53,15 +61,25 @@ class HTTPRequests(dict):
         self.setdefault("accept_type", 'text/html')
         self.setdefault("content_type", 'application/x-www-form-urlencoded')
         self.setdefault("host", url)
+        # setup port 8443 for cmsweb services (leave them alone things like personal private VM's)
+        if self['host'].startswith("https://cmsweb") or self['host'].startswith("cmsweb"):
+            if self['host'].endswith(':8443'):
+                # good to go
+                pass
+            elif ':' in self['host']:
+                # if there is a port number already, trust it
+                pass
+            else:
+                # add port 8443
+                self['host'] = self['host'].replace(".cern.ch", ".cern.ch:8443", 1)
         self.setdefault("cert", localcert)
         self.setdefault("key", localkey)
         # get the URL opener
         self.setdefault("conn", self.getUrlOpener())
-        if not version:
-            version = __version__
         self.setdefault("version", version)
         self.setdefault("retry", retry)
         self.setdefault("verbose", verbose)
+        self.setdefault("userAgent", userAgent)
         self.logger = logger if logger else logging.getLogger()
 
     def getUrlOpener(self):
@@ -72,31 +90,31 @@ class HTTPRequests(dict):
         """
         return RequestHandler(config={'timeout': 300, 'connecttimeout' : 300})
 
-    def get(self, uri = None, data = None):
+    def get(self, uri=None, data=None):
         """
         GET some data
         """
-        return self.makeRequest(uri = uri, data = data, verb = 'GET')
+        return self.makeRequest(uri=uri, data=data, verb='GET')
 
-    def post(self, uri = None, data = None):
+    def post(self, uri=None, data=None):
         """
         POST some data
         """
-        return self.makeRequest(uri = uri, data = data, verb = 'POST')
+        return self.makeRequest(uri=uri, data=data, verb='POST')
 
-    def put(self, uri = None, data = None):
+    def put(self, uri=None, data=None):
         """
         PUT some data
         """
-        return self.makeRequest(uri = uri, data = data, verb = 'PUT')
+        return self.makeRequest(uri=uri, data=data, verb='PUT')
 
-    def delete(self, uri = None, data = None):
+    def delete(self, uri=None, data=None):
         """
         DELETE some data
         """
-        return self.makeRequest(uri = uri, data = data, verb = 'DELETE')
+        return self.makeRequest(uri=uri, data=data, verb='DELETE')
 
-    def makeRequest(self, uri = None, data = None, verb = 'GET'):
+    def makeRequest(self, uri=None, data=None, verb='GET'):
         """
         Make a request to the remote database. for a give URI. The type of
         request will determine the action take by the server (be careful with
@@ -112,9 +130,9 @@ class HTTPRequests(dict):
         """
         data = data or {}
         headers = {
-                   "User-agent": "CRABClient/%s" % self['version'],
-                   "Accept": "*/*",
-                  }
+            "User-agent": "%s/%s" % (self['userAgent'], self['version']),
+            "Accept": "*/*",
+        }
 
         #Quoting the uri since it can contain the request name, and therefore spaces (see #2557)
         uri = urllib.quote(uri)
@@ -124,7 +142,7 @@ class HTTPRequests(dict):
         #retries this up to self['retry'] times a range of exit codes
         for i in range(self['retry'] + 1):
             try:
-                response, datares = self['conn'].request(url, data, encode=True, headers=headers, verb=verb, doseq = True,
+                response, datares = self['conn'].request(url, data, encode=True, headers=headers, verb=verb, doseq=True,
                                                          ckey=self['key'], cert=self['cert'], capath=caCertPath,
                                                          verbose=self['verbose'])
             except Exception as ex:
@@ -160,8 +178,7 @@ class HTTPRequests(dict):
         caDefault = '/etc/grid-security/certificates/'
         if "X509_CERT_DIR" in os.environ:
             return os.environ["X509_CERT_DIR"]
-        elif os.path.isdir(caDefault):
+        if os.path.isdir(caDefault):
             return caDefault
-        else:
-            raise EnvironmentException("The X509_CERT_DIR variable is not set and the %s directory cannot be found.\n" % caDefault +
-                                        "Cannot find the CA certificate path to ahuthenticate the server.")
+        raise EnvironmentException("The X509_CERT_DIR variable is not set and the %s directory cannot be found.\n" % caDefault +
+                                   "Cannot find the CA certificate path to authenticate the server.")

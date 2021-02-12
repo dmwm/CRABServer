@@ -105,7 +105,8 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsD
             msg += "\n" + str(traceback.format_exc())
         finally:
             if msg:
-                server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey, retry = 20, logger = logger)
+                server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey,
+                                      retry=20, logger=logger, userAgent='CRABTaskWorker')
                 failTask(task['tm_taskname'], server, resturi, msg, logger, failstatus)
         t1 = time.time()
         workType = task.get('tm_task_command', 'RECURRING')

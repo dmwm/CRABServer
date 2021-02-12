@@ -9,7 +9,9 @@ from httplib import HTTPException
 from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 
 from RESTInteractions import HTTPRequests
+from RucioUtils import getNativeRucioClient
 
+from TaskWorker import __version__
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.DagmanKiller import DagmanKiller
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
@@ -150,19 +152,21 @@ def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
     :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the handler."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=logging.getLogger(str(procnum)))
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
+                          logger=logging.getLogger(str(procnum)), userAgent='CRABTaskWorker', version=__version__)
     handler = TaskHandler(task, procnum, server, config, 'handleNewTask', createTempDir=True)
+    rucioClient = getNativeRucioClient(config=config, logger=handler.logger)
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
-    handler.addWork(StageoutCheck(config=config, server=server, resturi=resturi, procnum=procnum))
+    handler.addWork(StageoutCheck(config=config, server=server, resturi=resturi, procnum=procnum, rucioClient=rucioClient))
     if task['tm_job_type'] == 'Analysis':
         if task.get('tm_user_files'):
             handler.addWork(UserDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum))
         else:
-            handler.addWork(DBSDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum))
+            handler.addWork(DBSDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum, rucioClient=rucioClient))
     elif task['tm_job_type'] == 'PrivateMC':
         handler.addWork(MakeFakeFileSet(config=config, server=server, resturi=resturi, procnum=procnum))
     handler.addWork(Splitter(config=config, server=server, resturi=resturi, procnum=procnum))
-    handler.addWork(DagmanCreator(config=config, server=server, resturi=resturi, procnum=procnum))
+    handler.addWork(DagmanCreator(config=config, server=server, resturi=resturi, procnum=procnum, rucioClient=rucioClient))
     if task['tm_dry_run'] == 'T':
         handler.addWork(DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum))
     else:
@@ -181,7 +185,8 @@ def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
     :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=logging.getLogger(str(procnum)))
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
+                          logger=logging.getLogger(str(procnum)), userAgent='CRABTaskWorker', version=__version__)
     handler = TaskHandler(task, procnum, server, config, 'handleResubmit')
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
     handler.addWork(DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
@@ -199,7 +204,8 @@ def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
     :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20, logger=logging.getLogger(str(procnum)))
+    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
+                          logger=logging.getLogger(str(procnum)), userAgent='CRABTaskWorker', version=__version__)
     handler = TaskHandler(task, procnum, server, config, 'handleKill')
     handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 5))
     handler.addWork(DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum))

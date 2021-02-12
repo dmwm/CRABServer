@@ -45,6 +45,12 @@ do
   check_link "${name}" || ln -s "${links[$name]}" "$name"
 done
 
+# if GH repositories location is not already defined, set a default
+if ! [ -v GHrepoDir ]
+then
+  GHrepoDir='/data/hostdisk/repos'
+fi
+
 __strip_pythonpath(){
 # this function is used to strip the taskworker lines from $PYTHONPATH
 # in order for the debug |private calls to be able to add theirs
@@ -57,23 +63,23 @@ for i in $ppath_init
 do
     [[ $i =~ $strip_reg ]] || ppath_stripped="${ppath_stripped}${i}"
 done
-# echo -e "brfore strip: \n$ppath_init" |sed -e 's/\:/\:\n/g'
+# echo -e "before strip: \n$ppath_init" |sed -e 's/\:/\:\n/g'
 # echo -e "after strip: \n$ppath_stripped" |sed -e 's/\:/\:\n/g'
 export PYTHONPATH=$ppath_stripped
 }
 
 case $1 in
   debug)
-    # use private instance from /data/user in pdb mode via SequentialWorker
+    # use private instance from ${GHrepoDir} in pdb mode via SequentialWorker
     __strip_pythonpath
-    export PYTHONPATH=/data/user/CRABServer/src/python:/data/user/WMCore/src/python:$PYTHONPATH
-    python -m pdb /data/user/CRABServer/src/python/Publisher/SequentialPublisher.py --config $PUBLISHER_HOME/PublisherConfig.py --debug
+    export PYTHONPATH=${GHrepoDir}/CRABServer/src/python:${GHrepoDir}/WMCore/src/python:$PYTHONPATH
+    python -m pdb ${GHrepoDir}/CRABServer/src/python/Publisher/SequentialPublisher.py --config $PUBLISHER_HOME/PublisherConfig.py --debug
 	;;
   private)
-    # run private instance from /data/user
+    # run private instance from ${GHrepoDir}
     __strip_pythonpath
-    export PYTHONPATH=/data/user/CRABServer/src/python:/data/user/WMCore/src/python:$PYTHONPATH
-    nohup python /data/user/CRABServer/src/python/Publisher/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
+    export PYTHONPATH=${GHrepoDir}/CRABServer/src/python:${GHrepoDir}/WMCore/src/python:$PYTHONPATH
+    nohup python ${GHrepoDir}/CRABServer/src/python/Publisher/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
 	;;
   test)
     # use current instance in pdb mode  via SequentialWorker
@@ -82,7 +88,7 @@ case $1 in
   help)
     echo "There are 4 ways to run start.sh:"
     echo "  start.sh             without any argument starts current instance"
-    echo "  start.sh private     starts the instance from /data/user/CRABServer"
+    echo "  start.sh private     starts the instance from ${GHrepoDir}/CRABServer"
     echo "  start.sh debug       runs private instance in debub mode. For hacking"
     echo "  start.sh test        runs current instance in debug mode. For finding out"
     echo "BEWARE: a misspelled argument is interpreted like no argument"

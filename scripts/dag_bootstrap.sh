@@ -3,6 +3,9 @@
 # 
 # This script bootstraps the WMCore environment
 #
+# wrap the whole script in {} in order to redirect stdout/err to a file
+# trick from https://stackoverflow.com/a/315113
+{
 set -x
 echo "Beginning dag_bootstrap.sh (stdout)"
 echo "Beginning dag_bootstrap.sh (stderr)" 1>&2
@@ -84,9 +87,8 @@ then
 fi
 
 
-export PATH="/data/srv/glidecondor/bin:/data/srv/glidecondor/sbin:/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
-export PYTHONPATH=/data/srv/glidecondor/lib/python:$PYTHONPATH
-export LD_LIBRARY_PATH=/data/srv/glidecondor/lib:/data/srv/glidecondor/lib/condor:.:$LD_LIBRARY_PATH
+export PATH="usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
+export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
 
 os_ver=$(source /etc/os-release;echo $VERSION_ID)
 curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"
@@ -106,3 +108,4 @@ if [ "X$_CONDOR_JOB_AD" != "X" ]; then
 fi
 echo "Now running the job in `pwd`..."
 exec nice -n 19 python -m TaskWorker.TaskManagerBootstrap "$@"
+} > dag_bootstrap.out 2>&1

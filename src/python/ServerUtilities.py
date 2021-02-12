@@ -29,10 +29,8 @@ FILE_MEMORY_LIMIT = 512*1024
 
 # these are known, pre-defined nickames for "CRAB configuration" at large
 # which correspond to a well known and specified REST host name and DataBase instance
-SERVICE_INSTANCES = {'prod': {'restHost':'cmsweb-k8s-prod.cern.ch', 'dbInstance':'prod'},
+SERVICE_INSTANCES = {'prod': {'restHost':'cmsweb.cern.ch', 'dbInstance':'prod'},
                      'preprod': {'restHost':'cmsweb-testbed.cern.ch', 'dbInstance':'preprod'},
-                     'k8sprod': {'restHost':'cmsweb-k8s-prod.cern.ch', 'dbInstance':'prod'},
-                     'k8s': {'restHost':'cmsweb-k8s-prod.cern.ch', 'dbInstance':'prod'},
                      'k8spreprod': {'restHost':'cmsweb-k8s-testbed.cern.ch', 'dbInstance':'preprod'},
                      'auth' : {'restHost':'cmsweb-auth.cern.ch', 'dbInstance':'preprod'},
                      'test1': {'restHost':'cmsweb-test1.cern.ch', 'dbInstance':'dev'},
@@ -67,7 +65,7 @@ TASKLIFETIME = 30*24*60*60
 ## Number of days where the resubmission is not possible if the task is expiring
 NUM_DAYS_FOR_RESUBMITDRAIN = 7
 ## Maximum number of days a task can stay in TAPERECALL status for
-MAX_DAYS_FOR_TAPERECALL = 30
+MAX_DAYS_FOR_TAPERECALL = 14
 
 ## These are all possible statuses of a task in the TaskDB.
 TASKDBSTATUSES_TMP = ['NEW', 'HOLDING', 'QUEUED']
@@ -187,22 +185,18 @@ def checkOutLFN(lfn, username):
     return True
 
 
-def getProxiedWebDir(task, host, uri, cert, logFunction=print):
+def getProxiedWebDir(RESTServer=None, uriNoApi=None, task=None, logFunction=print):
     """ The function simply queries the REST interface specified to get the proxied webdir to use
         for the task. Returns None in case the API could not find the url (either an error or the schedd
         is not configured)
     """
-    #This import is here because SeverUtilities is also used on the worker nodes,
-    #and I want to avoid the dependency to pycurl right now. We should actually add it one day
-    #so that other code in cmscp that uses Requests.py from WMCore can be migrated to RESTInteractions
-    from RESTInteractions import HTTPRequests
     data = {'subresource': 'webdirprx',
             'workflow': task,
            }
     res = None
+    uri = uriNoApi + '/task'
     try:
-        server = HTTPRequests(host, cert, cert, retry=2)
-        dictresult, _, _ = server.get(uri, data=data) #the second and third parameters are deprecated
+        dictresult, _, _ = RESTServer.get(uri, data=data) #the second and third parameters are deprecated
         if dictresult.get('result'):
             res = dictresult['result'][0]
     except HTTPException as hte:
