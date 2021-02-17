@@ -441,10 +441,6 @@ class DagmanCreator(TaskAction):
         # From here on out, we convert from tm_* names to the DataWorkflow names
         info = dict(task)
 
-        if info['resthost'] == 'cmsweb-k8s-prod.cern.ch':
-            info['resthost'] = 'cmsweb.cern.ch'
-            self.logger.info('resthost for Jobs changed from k8s to cmsweb.cern.ch')
-
         info['workflow'] = task['tm_taskname']
         info['jobtype'] = 'Analysis'
         info['jobsw'] = info['tm_job_sw']
