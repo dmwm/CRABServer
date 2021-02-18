@@ -130,27 +130,9 @@ if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]; then
     export TASKWORKER_ENV="1"
 fi
 
-# Decide if this task will use K8s server as REST host
-# Do it here so that decision stays for task lifetime, even if schedd configuratoion
-# is changed at some point
-if [ -f /etc/use_k8s ] ;
-then
-    echo "==================================================================="
-    echo "Set this task to use cmsweb-k8s-prod.cern.ch as REST API"
-    touch USE_K8s
-    # cannot overwrite $_CONDOR_JOB_AD since it is owned by user condor, make a local variant
-    cp $_CONDOR_JOB_AD  ./JobAdForK8s
-    export _CONDOR_JOB_AD=`pwd -P`/JobAdForK8s
-    echo "_CONDOR_JOB_AD" set to $_CONDOR_JOB_AD
-    #  change  CRAB_RestHost ad in all files which refer to it
-    filesToChange="JobAdForK8s Job.submit subdag.ad"
-    for file in $filesToChange
-    do
-      sed -i 's/CRAB_RestHost = "cmsweb.cern.ch"/CRAB_RestHost = "cmsweb-k8s-prod.cern.ch"/' $file
-      sed -i 's/CRAB_RestHost = "cmsweb-testbed.cern.ch"/CRAB_RestHost = "cmsweb-k8s-prod.cern.ch"/' $file
-    done
-    echo "==================================================================="
-fi
+# make a local copy of classAds, so that we can re-run this later
+# if needed to facilitate debugging
+cp $_CONDOR_JOB_AD  ./_CONDOR_JOB_AD
 
 # Recalculate the black / whitelist
 if [ -e AdjustSites.py ]; then
