@@ -1,5 +1,6 @@
-Branch history:
-3.0 - WMAgent
-3.1 - WMAgent on cmsweb
-3.2 - Panda
-3.3 - Dagman
+As of Feb 2021 only Master and pythonMigration branches are in use.
+
+Tags in master: v3.YYMMDD. Tags in pythonMigration: v3.YYMMDD.py3
+
+Note: **dash is not allowed in branch or tag name** 
+
