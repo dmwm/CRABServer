@@ -5,7 +5,7 @@ unset X509_USER_CERT
 unset X509_USER_KEY
 
 # if $SERVICE is defined, I am running in a container
-if [ container ]; then
+if [ -v SERVICE ]; then
   # ensure container has needed mounts
   check_link(){
   # function checks if symbolic links required to start service exists and if they are not broken
