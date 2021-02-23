@@ -53,5 +53,12 @@ then
   GHrepoDir='/data/hostdisk/repos'
 fi
 
+# cd to the SERVICE directory
+if [[ $SERVICE == TaskWorker ]]; then
+  cd /data/srv/TaskManager
+elif [[ $SERVICE == Publisher* ]]; then
+  cd /data/srv/Publisher
+fi
+
 # run current instance
 sh start.sh -c
