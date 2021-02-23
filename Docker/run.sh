@@ -8,11 +8,6 @@
 # The script expects to be run in the /data/srv/$SERVICE directory and to find there the start.sh
 # script appropriate for the $SERVICE being run. This is done via the -w <dir> option to docker run
 
-# cleanup environment
-unset X509_USER_PROXY
-unset X509_USER_CERT
-unset X509_USER_KEY
-
 # ensure container has needed mounts
 check_link(){
 # function checks if symbolic links required to start service exists and if they are not broken
