@@ -26,4 +26,4 @@ COPY --chown=${USER}:${USER} install.sh monitor.sh ./
 RUN echo "Y" > yes.repo && sh install.sh < yes.repo
 
 # run the service
-CMD sh start.sh && sh /data/monitor.sh && while true; do sleep 60;done
+CMD sh run.sh && sh /data/monitor.sh && while true; do sleep 60;done
