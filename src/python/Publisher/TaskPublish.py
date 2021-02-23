@@ -467,6 +467,8 @@ def publishInDBS3(config, taskname, verbose):
         return summaryFileName
 
     pnn = toPublish[0]["Destination"]
+    dataset = toPublish[0]['outdataset']
+    logger.info("Will publish user files in %s", dataset)
 
     # CRABServer REST API's (see CRABInterface)
     try:
@@ -633,7 +635,6 @@ def publishInDBS3(config, taskname, verbose):
     publish_in_next_iteration = []
     published = []
 
-    dataset = toPublish[0]['outdataset']
     # Find all files already published in this dataset.
     try:
         existingDBSFiles = destReadApi.listFiles(dataset=dataset, detail=True)
