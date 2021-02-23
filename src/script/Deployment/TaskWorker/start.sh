@@ -61,17 +61,17 @@ case $MODE in
     __strip_pythonpath
     export PYTHONPATH=${GHrepoDir}/CRABServer/src/python:${GHrepoDir}/WMCore/src/python:$PYTHONPATH
     if [ "$debug" = true ]; then
-      python -m pdb ${GHrepoDir}/CRABServer/src/python/TaskWorker/SequentialWorker.py $MYTESTAREA/TaskWorkerConfig.py --logDebug
+      python -m pdb ${GHrepoDir}/CRABServer/src/python/TaskWorker/SequentialWorker.py $TASKWORKER_HOME/current/TaskWorkerConfig.py --logDebug
     else
-      nohup python ${GHrepoDir}/CRABServer/src/python/TaskWorker/MasterWorker.py --config $MYTESTAREA/TaskWorkerConfig.py --logDebug &
+      nohup python ${GHrepoDir}/CRABServer/src/python/TaskWorker/MasterWorker.py --config $TASKWORKER_HOME/current/TaskWorkerConfig.py --logDebug &
     fi
   ;;
   current)
   # current mode: run current instance
   if [ "$debug" = true ]; then
-    python $MYTESTAREA/${scram_arch}/cms/crabtaskworker/*/lib/python2.7/site-packages/TaskWorker/SequentialWorker.py  $MYTESTAREA/TaskWorkerConfig.py --logDebug
+    python $CRABTASKWORKER_ROOT/lib/python2.7/site-packages/TaskWorker/SequentialWorker.py  $TASKWORKER_HOME/current/TaskWorkerConfig.py --logDebug
   else
-    nohup python $MYTESTAREA/${scram_arch}/cms/crabtaskworker/*/lib/python2.7/site-packages/TaskWorker/MasterWorker.py --config $MYTESTAREA/TaskWorkerConfig.py --logDebug &
+    nohup python $CRABTASKWORKER_ROOT/lib/python2.7/site-packages/TaskWorker/MasterWorker.py --config $TASKWORKER_HOME/current/TaskWorkerConfig.py --logDebug &
   fi
 esac
 
