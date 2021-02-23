@@ -5,8 +5,8 @@
 
 # This script is meant to be called in the Dockerfile CMD, and whoever issues the docker run command
 # must pass the SERVICE name as an environmental variable  via the '-e SERVICE=name' option
-# The script expects to be run in the /data/srv/$SERVICE directory and to in find there the start.sh
-# script appropriate for the $SERVICE being run
+# The script expects to be run in the /data/srv/$SERVICE directory and to find there the start.sh
+# script appropriate for the $SERVICE being run. This is done via the -w <dir> option to docker run
 
 # cleanup environment
 unset X509_USER_PROXY
@@ -51,13 +51,6 @@ done
 if ! [ -v GHrepoDir ]
 then
   GHrepoDir='/data/hostdisk/repos'
-fi
-
-# cd to the SERVICE directory
-if [[ $SERVICE == TaskWorker ]]; then
-  cd /data/srv/TaskManager
-elif [[ $SERVICE == Publisher* ]]; then
-  cd /data/srv/Publisher
 fi
 
 # run current instance
