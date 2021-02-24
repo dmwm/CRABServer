@@ -3,10 +3,19 @@
 # TaskWorker container image and runs it
 # Currently those services include TaskWorker and Publisher_*
 
-# This script is meant to be called in the Dockerfile CMD, and whoever issues the docker run command
-# must pass the SERVICE name as an environmental variable  via the '-e SERVICE=name' option
-# The script expects to be run in the /data/srv/$SERVICE directory and to find there the start.sh
-# script appropriate for the $SERVICE being run. This is done via the -w <dir> option to docker run
+# This script is meant to be called in the Dockerfile CMD
+# whoever issues the docker run command MUST :
+# 1. pass two enviromental variables via the '-e ' option of 'docker run'
+#   $SERVICE      : the name of the service to be run: TaskWorker, Publisher_schedd, Publisher_rucio etc.
+#   $SERVICE_DIR  : the absolute path to the home directory of the service, where the proper
+#                   scripts and configurations will be found, e.g. /data/srv/TaksManager
+# 2. set the default current work directory at image start via the '-w' option of 'docker run'
+#      so that the image starts in $SERVICE_DIR
+# example (see also https://github.com/dmwm/CRABServer/blob/master/src/script/Container/runContainer.sh ) :
+#   SERVICE=Publisher_schedd; DIR=Publisher
+#   DOCKER_OPT="-e SERVICE=$SERVICE -e SERVICE_DIR=/data/srv/$DIR --w /data/srv/$DIR "
+#   docker run  --name Publisher_schedd -d -ti  $DOCKER_OPT
+#
 
 # ensure container has needed mounts
 check_link(){
