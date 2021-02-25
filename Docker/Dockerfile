@@ -23,8 +23,7 @@ WORKDIR ${WDIR}
 
 # install
 COPY --chown=${USER}:${USER} install.sh addGH.sh monitor.sh ./
-RUN echo "Y" > yes.repo && sh install.sh < yes.repo
-RUN rm yes.repo
+RUN echo "Y" > yes.repo && sh install.sh < yes.repo && rm yes.repo
 
 # add GitHub repositories
 RUN ./addGH.sh
