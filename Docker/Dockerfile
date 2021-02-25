@@ -22,8 +22,11 @@ RUN mkdir -p /data/srv/tmp && mkdir -p /data/srv/Publisher && mkdir -p /data/srv
 WORKDIR ${WDIR}
 
 # install
-COPY --chown=${USER}:${USER} install.sh monitor.sh ./
-RUN echo "Y" > yes.repo && sh install.sh < yes.repo
+COPY --chown=${USER}:${USER} install.sh addGH.sh monitor.sh ./
+RUN echo "Y" > yes.repo && sh install.sh < yes.repo && rm yes.repo
+
+# add GitHub repositories
+RUN ./addGH.sh
 
 # run the service
 CMD sh start.sh && sh /data/monitor.sh && while true; do sleep 60;done
