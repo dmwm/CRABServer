@@ -4,7 +4,7 @@
 # TW_VERSION is set by Dockerfile
 CRABServerTag=$TW_VERSION
 
-# 0. locate the crabserver directory
+# 0. locate the crabserver directory created by install.sh
 CRABServerDir=`realpath /data/srv/TaskManager/current/*/cms/crabtaskworker`
 
 # 1. find out which WMCore tag was installed

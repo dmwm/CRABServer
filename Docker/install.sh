@@ -1,5 +1,9 @@
 #!/bin/bash
+# This scripts installs in the container a TaskWorker image from rpm repositories
+# the same image can be used to run different services which use the same code bas
+# Currently those services include TaskWorker and Publisher_*
 
+# The script is meant to be used inside the file CRABServer/Docker/Dockerfile
 env
 set -x
 echo starting

@@ -1,5 +1,6 @@
 #!/bin/bash
 
+#==== PARSE ARGUMENTS
 helpFunction(){
   echo -e "\nUsage example: ./start.sh -c | -g [-d]"
   echo -e "\t-c start current Publisher instance"
@@ -23,18 +24,7 @@ if ! [ -v MODE ]; then
   echo "Please set how you want to start Publisher (add -c or -g option)." && helpFunction
 fi
 
-unset X509_USER_PROXY
-unset X509_USER_CERT
-unset X509_USER_KEY
-
-rm -f nohup.out
-
-# if GH repositories location is not already defined, set a default
-if ! [ -v GHrepoDir ]
-then
-  GHrepoDir='/data/hostdisk/repos'
-fi
-
+#==== DEFINE AN UTILITY FUNCTION
 __strip_pythonpath(){
   # this function is used to strip the taskworker lines from $PYTHONPATH
   # in order for the debug |private calls to be able to add theirs
@@ -51,7 +41,7 @@ __strip_pythonpath(){
   # echo -e "after strip: \n$ppath_stripped" |sed -e 's/\:/\:\n/g'
   export PYTHONPATH=$ppath_stripped
 }
-
+#==== SETUP ENVIRONMENT
 # if PUBLISHER_HOME is already defined, use it
 if [ -v PUBLISHER_HOME ]
 then
@@ -63,26 +53,36 @@ else
   echo "Define environment for Publisher in $PUBLISHER_HOME"
 fi
 
+# the env.sh script will define  $PUBLISHER_ROOT and $PUBLISHER_VERSION
 source ${PUBLISHER_HOME}/env.sh
+
+#==== CLEANUP OLD LOGS
+rm -f nohup.out
 ln -s /data/hostdisk/${SERVICE}/nohup.out nohup.out
 
+#==== START THE SERVICE
+
 case $MODE in
+  current)
+  # current mode: run current instance
+    COMMAND_DIR=${PUBLISHER_ROOT}/lib/python2.7/site-packages/Publisher/
+    CONFIG=${PUBLISHER_HOME}/PublisherConfig.py
+    if [ "$debug" = true ]; then
+      python ${COMMAND_DIR}/SequentialPublisher.py --config ${CONFIG} --debug
+    else
+      nohup python ${COMMAND_DIR}/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
+    fi
+  ;;
   private)
     # private mode: run private instance from ${GHrepoDir}
     __strip_pythonpath
     export PYTHONPATH=${GHrepoDir}/CRABServer/src/python:${GHrepoDir}/WMCore/src/python:$PYTHONPATH
+    COMMAND_DIR=${GHrepoDir}/CRABServer/src/python/Publisher/
+    CONFIG=$PUBLISHER_HOME/PublisherConfig.py
     if [ "$debug" = true ]; then
-      python -m pdb ${GHrepoDir}/CRABServer/src/python/Publisher/SequentialPublisher.py --config $PUBLISHER_HOME/PublisherConfig.py --debug
+      python ${COMMAND_DIR}/SequentialPublisher.py --config  ${CONFIG} --debug
     else
-      nohup python ${GHrepoDir}/CRABServer/src/python/Publisher/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
-    fi
-  ;;
-  current)
-  # current mode: run current instance
-    if [ "$debug" = true ]; then
-      python $PUBLISHER_ROOT/lib/python2.7/site-packages/Publisher/SequentialPublisher.py --config $PUBLISHER_HOME/PublisherConfig.py --debug
-    else
-      nohup python $PUBLISHER_ROOT/lib/python2.7/site-packages/Publisher/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
+      nohup python ${COMMAND_DIR}/PublisherMaster.py --config ${CONFIG} &
     fi
 esac
 

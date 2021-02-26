@@ -9,11 +9,21 @@ else
   echo "Define environment for Publisher in $PUBLISHER_HOME"
 fi
 
-# we only run from 'current' which points to current taskworker installation
+# if GH repositories location is not already defined, set a default
+if ! [ -v GHrepoDir ]
+then
+  export GHrepoDir='/data/repos'
+fi
 
+# cleanup the environment (needed in some cases when running interactively)
+unset X509_USER_PROXY
+unset X509_USER_CERT
+unset X509_USER_KEY
+
+# we only run from 'current' which points to current taskworker installation
+# the following init.sh defines ${CRABTASKWORKER_ROOT} and ${CRABTASKWORKER_VERSION}
 source ${PUBLISHER_HOME}/current/*/cms/crabtaskworker/*/etc/profile.d/init.sh
 
 export PUBLISHER_ROOT=${CRABTASKWORKER_ROOT}
-export PUBLISHER_VERSION=${CRABTASKWORKER_VERSION} 
-
+export PUBLISHER_VERSION=${CRABTASKWORKER_VERSION}
 export CONDOR_CONFIG=/data/srv/condor_config
