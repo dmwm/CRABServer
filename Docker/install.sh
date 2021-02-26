@@ -10,8 +10,9 @@ export RELEASE=$TW_VERSION
 
 export MYTESTAREA=/data/srv/TaskManager/$RELEASE
 export SCRAM_ARCH=slc7_amd64_gcc630
-     
-export REPO=comp.crab3
+
+# string after the underscore (_) tells which branch was used to build rpms
+export REPO=comp.crab_master
 
 export verbose=true
 echo 'Installation'
