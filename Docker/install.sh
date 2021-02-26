@@ -24,7 +24,7 @@ sh $MYTESTAREA/bootstrap.sh -architecture $SCRAM_ARCH -path $MYTESTAREA -reposit
 cd /data/srv/TaskManager
 $RELEASE/common/cmspkg -a $SCRAM_ARCH upgrade
 $RELEASE/common/cmspkg -a $SCRAM_ARCH update
-$RELEASE/common/cmspkg -a $SCRAM_ARCH install cms+crabtaskworker+$RELEASE || echo "Incorrect tag was given as an input. Please double check if $TW_VERSION RPMs are available in $REPO." && exit 1
+$RELEASE/common/cmspkg -a $SCRAM_ARCH install cms+crabtaskworker+$RELEASE || echo "Installation failed. Please check log lines above for details" && exit 1
 
 cp $MYTESTAREA/$SCRAM_ARCH/cms/crabtaskworker/$RELEASE/data/script/Deployment/Publisher/{start.sh,env.sh,stop.sh,} /data/srv/Publisher/
 cp $MYTESTAREA/$SCRAM_ARCH/cms/crabtaskworker/$RELEASE/data/script/Deployment/TaskWorker/{start.sh,env.sh,stop.sh,updateTMRuntime.sh} /data/srv/TaskManager/
