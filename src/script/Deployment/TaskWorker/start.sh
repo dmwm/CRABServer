@@ -41,7 +41,7 @@ __strip_pythonpath(){
   # echo -e "after strip: \n$ppath_stripped" |sed -e 's/\:/\:\n/g'
   export PYTHONPATH=$ppath_stripped
 }
-==== SETUP ENVIRONMENT
+#==== SETUP ENVIRONMENT
 # if TASKWORKER_HOME is already defined, use it
 if [ -v TASKWORKER_HOME ]
 then
