@@ -22,9 +22,11 @@ RUN mkdir -p /data/srv/tmp && mkdir -p /data/srv/Publisher && mkdir -p /data/srv
 WORKDIR ${WDIR}
 
 # install
-COPY --chown=${USER}:${USER} install.sh addGH.sh monitor.sh run.sh ./
+COPY --chown=${USER}:${USER} install.sh ./
 RUN echo "Y" > yes.repo && sh install.sh < yes.repo && rm yes.repo
 
+# add needed script (in a different line to avoid full rpm install when they change)
+COPY --chown=${USER}:${USER} addGH.sh monitor.sh run.sh ./
 # add GitHub repositories
 RUN ./addGH.sh
 

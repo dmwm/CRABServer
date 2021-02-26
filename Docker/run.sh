@@ -5,17 +5,20 @@
 
 # This script is meant to be called in the Dockerfile CMD and must be run with the current
 # working directory set to the home directory of the service, i.e. where the start.sh command is
-# whoever issues the docker run command MUST :
-# 1. pass two enviromental variables via the '-e ' option of 'docker run'
-#   $SERVICE      : the name of the service to be run: TaskWorker, Publisher_schedd, Publisher_rucio etc.
-#   $SERVICE_DIR  : the absolute path to the home directory of the service, where the proper
-#                   scripts and configurations will be found, e.g. /data/srv/TaksManager
-# 2. set the default current work directory at image start via the '-w' option of 'docker run'
-#      so that the image starts in $SERVICE_DIR
+
+# Whoever issues the docker run command MUST define the name of the service to be run
+#  AND the work directory where it must be run. E.g. via the two env. variables:
+#    $SERVICE   : the name of the service to be run: TaskWorker, Publisher_schedd, Publisher_rucio etc.
+#    $DIRECTORY : the name of the current work directory where the image will start and where
+#                  the proper scripts and configurations will be found, e.g. /data/srv/TaksManager
+# which can be used as:
+# 1. pass this enviromental variable via the '-e ' option of 'docker run'
+# 2. set the default current work directory via the '-w ' option of 'docker run'
+#
 # example (see also https://github.com/dmwm/CRABServer/blob/master/src/script/Container/runContainer.sh ) :
-#   SERVICE=Publisher_schedd; DIR=Publisher
-#   DOCKER_OPT="-e SERVICE=$SERVICE -e SERVICE_DIR=/data/srv/$DIR --w /data/srv/$DIR "
-#   docker run  --name Publisher_schedd -d -ti  $DOCKER_OPT
+#   SERVICE=Publisher_schedd; DIRECTORY=/data/srv/Publisher
+#   DOCKER_OPT="-e SERVICE=$SERVICE -w $DIRECTORY"
+#   docker run  --name ${SERVICE} ${DOCKER_OPT} ... other options
 #
 
 # ensure container has needed mounts
@@ -55,7 +58,7 @@ done
 # if GH repositories location is not already defined, set a default
 if ! [ -v GHrepoDir ]
 then
-  GHrepoDir='/data/hostdisk/repos'
+  export GHrepoDir='/data/repos'
 fi
 
 # run current instance
