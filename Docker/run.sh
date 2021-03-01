@@ -55,11 +55,5 @@ do
   check_link "${name}" || ln -s "${links[$name]}" "$name"
 done
 
-# if GH repositories location is not already defined, set a default
-if ! [ -v GHrepoDir ]
-then
-  export GHrepoDir='/data/repos'
-fi
-
 # run current instance
 sh start.sh -c
