@@ -25,5 +25,6 @@ unset X509_USER_KEY
 source ${TASKWORKER_HOME}/current/*/cms/crabtaskworker/*/etc/profile.d/init.sh
 
 export TASKWORKER_ROOT=${CRABTASKWORKER_ROOT}
+export CRABTASKWORKER_ROOT
 export TASKWORKER_VERSION=${CRABTASKWORKER_VERSION}
 export CONDOR_CONFIG=/data/srv/condor_config
