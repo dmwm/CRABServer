@@ -7,7 +7,7 @@ import json
 import logging
 from ast import literal_eval
 
-from CRABInterface.Utils import getDBinstance
+from CRABInterface.Utilities import getDBinstance
 
 class DataFileMetadata(object):
     """ DataFileMetadata class
