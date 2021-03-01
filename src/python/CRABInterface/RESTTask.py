@@ -1,12 +1,12 @@
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_ustr, validate_ustrlist, validate_num
-from WMCore.REST.Error import InvalidParameter, ExecutionError
+from WMCore.REST.Validation import validate_ustr, validate_ustrlist
+from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
 
 from CRABInterface.Utilities import conn_handler, getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
 from CRABInterface.Regexps import RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL,\
-    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_OUT_DATASET, RX_SCHEDD_NAME, RX_RUCIORULE
+    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE
 
 # external dependecies here
 import re
@@ -92,7 +92,7 @@ class RESTTask(RESTEntity):
             #TODO move the function in ServerUtils and use it when required (e.g.: mysql LONGTEXT does not need read())
             try:
                 return str(col)
-            except:
+            except Exception as ex:  # pylint: disable=unused-variable
                 return col.read()
         return [getval(col) for col in row]
 
@@ -235,7 +235,7 @@ class RESTTask(RESTEntity):
             self.logger.info("Warning message already present in the task database. Will not add it again.")
             return []
         if len(warnings)>10:
-            raise ExecutionError("You cannot add more than 10 warnings to a task")
+            raise NotAcceptable("You cannot add more than 10 warnings to a task")
         warnings.append(warning)
 
         self.api.modify(self.Task.SetWarnings_sql, warnings=[str(warnings)], workflow=[workflow])
