@@ -470,7 +470,6 @@ def publishInDBS3(config, taskname, verbose):
     dataset = toPublish[0]['outdataset']
     logger.info("Will publish user files in %s", dataset)
 
-
     # CRABServer REST API's (see CRABInterface)
     try:
         instance = config.General.instance

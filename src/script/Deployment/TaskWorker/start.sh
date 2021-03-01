@@ -1,87 +1,88 @@
 #!/bin/bash
 
-unset X509_USER_PROXY
-unset X509_USER_CERT
-unset X509_USER_KEY
-source /data/srv/TaskManager/env.sh
+#==== PARSE ARGUMENTS
+helpFunction(){
+  echo -e "\nUsage example: ./start.sh -c | -g [-d]"
+  echo -e "\t-c start current TW instance"
+  echo -e "\t-g start TW instance from GitHub repo"
+  echo -e "\t-d start TW in debug mode. Option can be combined with -c or -g"
+  exit 1
+  }
 
-rm -f /data/hostdisk/${SERVICE}/nohup.out
-
-check_link(){
-# function checks if symbolic links required to start service exists and if they are not broken
-
-  if [ -L $1 ] ; then
-    if [ -e $1 ] ; then
-       return 0
-    else
-       unlink $1
-       return 1
-    fi
-  else
-    return 1
-  fi
-}
-
-#directories/files that should be created before starting the container (SERVICE will be set to 'TaskWorker'):
-# -/data/hostdisk/${SERVICE}/cfg/TaskWorkerConfig.py
-# -/data/hostdisk/${SERVICE}/logs
-declare -A links=( ["current/TaskWorkerConfig.py"]="/data/hostdisk/${SERVICE}/cfg/TaskWorkerConfig.py" ["logs"]="/data/hostdisk/${SERVICE}/logs" ["nohup.out"]="/data/hostdisk/${SERVICE}/nohup.out")
-
-for name in "${!links[@]}";
+while getopts ":dDcCgGhH" opt
 do
-  check_link "${name}" || ln -s "${links[$name]}" "$name"
+    case "$opt" in
+      h|H) helpFunction ;;
+      g|G) MODE="private" ;;
+      c|C) MODE="current" ;;
+      d|D) debug=true ;;
+      * ) echo "Unimplemented option: -$OPTARG"; helpFunction ;;
+    esac
 done
 
-# if GH repositories location is not already defined, set a default
-if ! [ -v GHrepoDir ]
-then
-  GHrepoDir='/data/hostdisk/repos'
+if ! [ -v MODE ]; then
+  echo "Please set how you want to start TW (add -c or -g option)." && helpFunction
 fi
 
+#==== DEFINE AN UTILITY FUNCTION
 __strip_pythonpath(){
-# this function is used to strip the taskworker lines from $PYTHONPATH
-# in order for the debug |private calls to be able to add theirs
+  # this function is used to strip the taskworker lines from $PYTHONPATH
+  # in order for the debug | private calls to be able to add theirs
 
-local strip_reg=".*crabtaskworker.*"
-local ppath_init=${PYTHONPATH//:/: }
-local ppath_stripped=""
+  local strip_reg=".*CRABTASKWORKER.*"
+  local ppath_init=${PYTHONPATH//:/: }
+  local ppath_stripped=""
 
-for i in $ppath_init
-do
-    [[ $i =~ $strip_reg ]] || ppath_stripped="${ppath_stripped}${i}"
-done
-# echo -e "before strip: \n$ppath_init" |sed -e 's/\:/\:\n/g'
-# echo -e "after strip: \n$ppath_stripped" |sed -e 's/\:/\:\n/g'
-export PYTHONPATH=$ppath_stripped
+  for i in $ppath_init
+  do
+      [[ $i =~ $strip_reg ]] || ppath_stripped="${ppath_stripped}${i}"
+  done
+  # echo -e "before strip: \n$ppath_init" |sed -e 's/\:/\:\n/g'
+  # echo -e "after strip: \n$ppath_stripped" |sed -e 's/\:/\:\n/g'
+  export PYTHONPATH=$ppath_stripped
 }
+#==== SETUP ENVIRONMENT
+# if TASKWORKER_HOME is already defined, use it
+if [ -v TASKWORKER_HOME ]
+then
+  echo "TASKWORKER_HOME already set to $TASKWORKER_HOME. Will use that"
+else
+  thisScript=`realpath $0`
+  myDir=`dirname ${thisScript}`
+  export TASKWORKER_HOME=${myDir}  # where we run the TASKWORKER and where Config is
+  echo "Define environment for TASKWORKER in $TASKWORKER_HOME"
+fi
 
-case $1 in
-  debug)
-    # use private instance from ${GHrepoDir} in pdb mode via SequentialWorker
-    __strip_pythonpath
-    export PYTHONPATH=${GHrepoDir}/CRABServer/src/python:${GHrepoDir}/WMCore/src/python:$PYTHONPATH
-    python -m pdb ${GHrepoDir}/CRABServer/src/python/TaskWorker/SequentialWorker.py $MYTESTAREA/TaskWorkerConfig.py --logDebug
-	;;
+# the env.sh script will define $CRABTASKWORKER_ROOT and $CRABTASKWORKER_VERSION
+source ${TASKWORKER_HOME}/env.sh
+
+#==== CLEANUP OLD LOGS
+rm -f nohup.out
+ln -s /data/hostdisk/${SERVICE}/nohup.out nohup.out
+
+#==== START THE SERVICE
+
+case $MODE in
+    current)
+    # current mode: run current instance
+    COMMAND_DIR=${TASKWORKER_ROOT}/lib/python2.7/site-packages/TaskWorker/
+    CONFIG=${TASKWORKER_HOME}/current/TaskWorkerConfig.py
+    if [ "$debug" = true ]; then
+      python ${COMMAND_DIR}/SequentialWorker.py  $CONFIG --logDebug
+    else
+      nohup python ${COMMAND_DIR}/MasterWorker.py --config ${CONFIG} --logDebug &
+    fi
+  ;;
   private)
-    # run private instance from ${GHrepoDir}
+    # private mode: run private instance from ${GHrepoDir}
     __strip_pythonpath
     export PYTHONPATH=${GHrepoDir}/CRABServer/src/python:${GHrepoDir}/WMCore/src/python:$PYTHONPATH
-    nohup python ${GHrepoDir}/CRABServer/src/python/TaskWorker/MasterWorker.py --config $MYTESTAREA/TaskWorkerConfig.py --logDebug &
-	;;
-  test)
-    # use current instance in pdb mode  via SequentialWorker
-    python $MYTESTAREA/${scram_arch}/cms/crabtaskworker/*/lib/python2.7/site-packages/TaskWorker/SequentialWorker.py  $MYTESTAREA/TaskWorkerConfig.py --logDebug
-  ;;
-  help)
-    echo "There are 4 ways to run start.sh:"
-    echo "  start.sh             without any argument starts current instance"
-    echo "  start.sh private     starts the instance from ${GHrepoDir}/CRABServer"
-    echo "  start.sh debug       runs private instance in debub mode. For hacking"
-    echo "  start.sh test        runs current instance in debug mode. For finding out"
-    echo "BEWARE: a misspelled argument is interpreted like no argument"
-  ;;
-  *)
-  # DEFAULT mode: run current instance
-	nohup python $MYTESTAREA/${scram_arch}/cms/crabtaskworker/*/lib/python2.7/site-packages/TaskWorker/MasterWorker.py --config $MYTESTAREA/TaskWorkerConfig.py --logDebug &
-	;;
+    COMMAND_DIR=${GHrepoDir}/CRABServer/src/python/TaskWorker
+    CONFIG=$TASKWORKER_HOME/current/TaskWorkerConfig.py
+    if [ "$debug" = true ]; then
+      python -m pdb ${COMMAND_DIR}/SequentialWorker.py ${CONFIG} --logDebug
+    else
+      nohup python ${COMMAND_DIR}/MasterWorker.py --config ${CONFIG} --logDebug &
+    fi
 esac
+
