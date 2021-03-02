@@ -381,7 +381,7 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
                             break
         except Exception as ex:
             logging.error("Failed to map lfns to pfns: %s", ex)
-            mark_failed(ids, ["Failed to map lfn to pfn: " + str(ex) for _ in ids])
+            mark_failed(ids, ["Failed to map lfn to pfn: " + str(ex) for _ in ids], crabserver)
 
         source_pfns = sorted_source_pfns
         dest_pfns = sorted_dest_pfns
