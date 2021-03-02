@@ -441,7 +441,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, c
             jobids = submit(rucioClient, ftsContext, transfers, crabserver)
 
             for jobid in jobids:
-                logging.info("Monitor link: " + FTS_MONITORING + "fts3/ftsmon/#/job/%s", jobid)
+                logging.info("Monitor link: " + FTS_MONITORING + "fts3/ftsmon/#/job/%s", jobid)  # pylint: disable=logging-not-lazy
 
             # TODO: send to dashboard
 
