@@ -3,7 +3,8 @@
 """
 
 """
-from __future__ import division, print_function
+from __future__ import division
+from __future__ import print_function
 import json
 import logging
 import threading
@@ -333,10 +334,6 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
     threads = []
     jobids = []
     to_update = []
-
-    oracleDB = HTTPRequests(url=rest_filetransfers,
-                            localcert=proxy, localkey=proxy,
-                            userAgent='CRABSchedd')
 
     sources = list(set([x[3] for x in toTrans]))
 
