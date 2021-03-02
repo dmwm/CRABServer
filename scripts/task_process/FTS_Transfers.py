@@ -3,7 +3,8 @@
 """
 
 """
-from __future__ import division, print_function
+from __future__ import division
+from __future__ import print_function
 import json
 import logging
 import threading
@@ -60,7 +61,7 @@ def mark_transferred(ids):
     try:
         oracleDB = HTTPRequests(rest_filetransfers,
                                 proxy,
-                                proxy)
+                                proxy, userAgent='CRABSchedd')
         logging.debug("Marking done %s", ids)
 
         data = dict()
@@ -88,7 +89,7 @@ def mark_failed(ids, failures_reasons):
     try:
         oracleDB = HTTPRequests(rest_filetransfers,
                                 proxy,
-                                proxy)
+                                proxy, userAgent='CRABSchedd')
         data = dict()
         data['asoworker'] = asoworker
         data['subresource'] = 'updateTransfers'
@@ -339,7 +340,7 @@ def submit(rucioClient, ftsContext, toTrans):
 
     oracleDB = HTTPRequests(rest_filetransfers,
                             proxy,
-                            proxy)
+                            proxy, userAgent='CRABSchedd')
 
     sources = list(set([x[3] for x in toTrans]))
 
