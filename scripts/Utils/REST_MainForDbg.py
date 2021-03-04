@@ -410,20 +410,24 @@ class RESTDaemon(RESTMain):
             os.setsid()
 
             # Second fork. The child does the work, discard the second parent.
-             pid = os.fork()
-             if pid > 0:
-                 os._exit(0)
+            pid = os.fork()
+            if pid > 0:
+                os._exit(0)
 
-             # Save process group id to pid file, then run real worker.
-             with open(self.pidfile, "w") as pidObj:
-                 pidObj.write("%d\n" % os.getpgid(0))
+            # Save process group id to pid file, then run real worker.
+            with open(self.pidfile, "w") as pidObj:
+                pidObj.write("%d\n" % os.getpgid(0))
 
-        os.chdir(self.statedir)        error = False
+        os.chdir(self.statedir)
+        error = False
         try:
             self.run()
         except Exception as e:
             error = True
-            trace = StringIO()
+            if sys.version_info[0] == 2:
+                trace = BytesIO()
+            else:
+                trace = StringIO()
             traceback.print_exc(file=trace)
             cherrypy.log("ERROR: terminating due to error: %s" % trace.getvalue())
 
