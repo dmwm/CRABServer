@@ -385,45 +385,49 @@ class RESTDaemon(RESTMain):
         demonize = os.getenv('DONT_DEMONIZE_REST','False') == 'True'
 
         if demonize:
-             # Redirect all output to the logging daemon.
-             devnull = open(os.devnull, "w")
-             if isinstance(self.logfile, list):
-                 subproc = Popen(self.logfile, stdin=PIPE, stdout=devnull, stderr=devnull,
-                                 bufsize=0, close_fds=True, shell=False)
-                 logger = subproc.stdin
-             elif isinstance(self.logfile, str):
-                 logger = open(self.logfile, "a+", 0)
-             else:
-                 raise TypeError("'logfile' must be a string or array")
-             os.dup2(logger.fileno(), sys.stdout.fileno())
-             os.dup2(logger.fileno(), sys.stderr.fileno())
-             os.dup2(devnull.fileno(), sys.stdin.fileno())
-             logger.close()
-             devnull.close()
+            # Redirect all output to the logging daemon.
+            devnull = open(os.devnull, "w")
+            if isinstance(self.logfile, list):
+                subproc = Popen(self.logfile, stdin=PIPE, stdout=devnull, stderr=devnull,
+                                bufsize=0, close_fds=True, shell=False)
+                logger = subproc.stdin
+            elif isinstance(self.logfile, str):
+                logger = open(self.logfile, "a+", 0)
+            else:
+                raise TypeError("'logfile' must be a string or array")
+            os.dup2(logger.fileno(), sys.stdout.fileno())
+            os.dup2(logger.fileno(), sys.stderr.fileno())
+            os.dup2(devnull.fileno(), sys.stdin.fileno())
+            logger.close()
+            devnull.close()
 
-             # First fork. Discard the parent.
-             pid = os.fork()
-             if pid > 0:
-                 os._exit(0)
+            # First fork. Discard the parent.
+            pid = os.fork()
+            if pid > 0:
+                os._exit(0)
 
             # Establish as a daemon, set process group / session id.
             os.setsid()
 
             # Second fork. The child does the work, discard the second parent.
-             pid = os.fork()
-             if pid > 0:
-                 os._exit(0)
+            pid = os.fork()
+            if pid > 0:
+                os._exit(0)
 
-             # Save process group id to pid file, then run real worker.
-             with open(self.pidfile, "w") as pidObj:
-                 pidObj.write("%d\n" % os.getpgid(0))
+            # Save process group id to pid file, then run real worker.
+            with open(self.pidfile, "w") as pidObj:
+                pidObj.write("%d\n" % os.getpgid(0))
 
-        os.chdir(self.statedir)        error = False
+        os.chdir(self.statedir)
+        error = False
         try:
             self.run()
         except Exception as e:
             error = True
-            trace = StringIO()
+            if sys.version_info[0] == 2:
+                trace = BytesIO()
+            else:
+                trace = StringIO()
             traceback.print_exc(file=trace)
             cherrypy.log("ERROR: terminating due to error: %s" % trace.getvalue())
 
