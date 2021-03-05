@@ -382,9 +382,12 @@ class RESTDaemon(RESTMain):
 
     def start_daemon(self):
         """Start the deamon."""
-        demonize = os.getenv('DONT_DEMONIZE_REST','False') == 'True'
+        # REST can be run in the frontend i.e. interactively e.g. to use pdb
+        # by setting the env. var.: DONT_DAEMONIZE_REST=True
+        # if the variable is missing or se to any other value, start noramlly as a daemon
+        daemonize = os.getenv('DONT_DAEMONIZE_REST','False') != 'True'
 
-        if demonize:
+        if daemonize:
             # Redirect all output to the logging daemon.
             devnull = open(os.devnull, "w")
             if isinstance(self.logfile, list):
@@ -446,8 +449,8 @@ class RESTDaemon(RESTMain):
         # to run the server proper.  The parent monitors the child, and if
         # it exits abnormally, restarts it, otherwise exits completely with
         # the child's exit code.
-        demonize = os.getenv('DONT_DEMONIZE_REST','False') == 'True'
-        if demonize:
+        daemonize = os.getenv('DONT_DAEMONIZE_REST','False') != 'True'
+        if daemonize:
             cherrypy.log("WATCHDOG: starting server daemon (pid %d)" % os.getpid())
             while True:
                 serverpid = os.fork()
