@@ -6,7 +6,12 @@
 Manages a web server application. Loads configuration and all views, starting
 up an appropriately configured CherryPy instance. Views are loaded dynamically
 and can be turned on/off via configuration file."""
+
 from __future__ import print_function
+from builtins import object
+from future.utils import viewitems
+from future import standard_library
+standard_library.install_aliases()
 
 import errno
 import logging
@@ -16,7 +21,7 @@ import re
 import signal
 import socket
 import sys
-import thread
+import _thread
 import time
 import traceback
 from argparse import ArgumentParser
@@ -210,7 +215,7 @@ class RESTMain(object):
         cpconfig.update({'engine.autoreload.on': False})
         cpconfig.update({'request.show_tracebacks': False})
         cpconfig.update({'request.methods_with_bodies': ("POST", "PUT", "DELETE")})
-        thread.stack_size(getattr(self.srvconfig, 'thread_stack_size', 128 * 1024))
+        _thread.stack_size(getattr(self.srvconfig, 'thread_stack_size', 128 * 1024))
         sys.setcheckinterval(getattr(self.srvconfig, 'sys_check_interval', 10000))
         self.silent = getattr(self.srvconfig, 'silent', False)
 
@@ -219,9 +224,9 @@ class RESTMain(object):
                         'server', 'tools', 'wsgi', 'checker'):
             if not hasattr(self.srvconfig, section):
                 continue
-            for opt, value in getattr(self.srvconfig, section).dictionary_().iteritems():
+            for opt, value in viewitems(getattr(self.srvconfig, section).dictionary_()):
                 if isinstance(value, ConfigSection):
-                    for xopt, xvalue in value.dictionary_().iteritems():
+                    for xopt, xvalue in viewitems(value.dictionary_()):
                         cpconfig.update({"%s.%s.%s" % (section, opt, xopt): xvalue})
                 elif isinstance(value, str) or isinstance(value, int):
                     cpconfig.update({"%s.%s" % (section, opt): value})
@@ -382,10 +387,12 @@ class RESTDaemon(RESTMain):
 
     def start_daemon(self):
         """Start the deamon."""
-        # REST can be run in the frontend i.e. interactively e.g. to use pdb
-        # by setting the env. var.: DONT_DAEMONIZE_REST=True
-        # if the variable is missing or se to any other value, start noramlly as a daemon
-        daemonize = os.getenv('DONT_DAEMONIZE_REST','False') != 'True'
+        # This REST server can be run in the frontend i.e. interactively (e.g. to use pdb)
+        # by setting an env. var. via: export DONT_DAEMONIZE_REST=True
+        # if the variable is missing or set to any other value, code starts normally as a daemon
+        daemonize = os.getenv('DONT_DAEMONIZE_REST', 'False') != 'True'
+
+        os.chdir(self.statedir)
 
         if daemonize:
             # Redirect all output to the logging daemon.
@@ -421,7 +428,7 @@ class RESTDaemon(RESTMain):
             with open(self.pidfile, "w") as pidObj:
                 pidObj.write("%d\n" % os.getpgid(0))
 
-        os.chdir(self.statedir)
+        # following code is executed both in daemon and not daemon mode
         error = False
         try:
             self.run()
@@ -449,7 +456,7 @@ class RESTDaemon(RESTMain):
         # to run the server proper.  The parent monitors the child, and if
         # it exits abnormally, restarts it, otherwise exits completely with
         # the child's exit code.
-        daemonize = os.getenv('DONT_DAEMONIZE_REST','False') != 'True'
+        daemonize = os.getenv('DONT_DAEMONIZE_REST', 'False') != 'True'
         if daemonize:
             cherrypy.log("WATCHDOG: starting server daemon (pid %d)" % os.getpid())
             while True:
