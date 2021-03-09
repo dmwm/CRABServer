@@ -1,3 +1,5 @@
+from __future__ import division
+from __future__ import print_function
 import logging
 import os
 from collections import namedtuple
@@ -8,7 +10,6 @@ import cherrypy
 import pycurl
 import StringIO
 import json
-import threading
 
 from WMCore.WMFactory import WMFactory
 from WMCore.REST.Error import ExecutionError, InvalidParameter
@@ -43,7 +44,7 @@ def getDBinstance(config, namespace, name):
     return factory.loadObject( name )
 
 def globalinit(serverkey, servercert, serverdn, credpath):
-    global serverCert, serverKey, serverDN, credServerPath
+    global serverCert, serverKey, serverDN, credServerPath  # pylint: disable=global-statement
     serverCert, serverKey, serverDN, credServerPath = servercert, serverkey, serverdn, credpath
 
 def execute_command(command, logger, timeout):
@@ -51,6 +52,8 @@ def execute_command(command, logger, timeout):
     _execute_command_
     Funtion to manage commands.
     """
+    import subprocess
+    import time
 
     stdout, stderr, rc = None, None, 99999
     proc = subprocess.Popen(
@@ -89,7 +92,7 @@ def getCentralConfig(extconfigurl, mode):
     arg str mode: also known as the variant of the rest (prod, preprod, dev, private)
     return: the dictionary containing the external configuration for the selected mode."""
 
-    global centralCfgFallback
+    global centralCfgFallback  # pylint: disable=global-statement
 
     def retrieveConfig(externalLink):
 
@@ -183,13 +186,11 @@ def retrieveUserCert(func):
     def wrapped_func(*args, **kwargs):
         logger = logging.getLogger("CRABLogger.Utils")
         myproxyserver = "myproxy.cern.ch"
-        userdn = kwargs['userdn']
         defaultDelegation = {'logger': logger,
                              'proxyValidity': '192:00',
                              'min_time_left': 36000,
                              'server_key': serverKey,
                              'server_cert': serverCert,}
-        timeleftthreshold = 60 * 60 * 24
         mypclient = SimpleMyProxy(defaultDelegation)
         userproxy = None
         userhash  = sha1(kwargs['userdn']).hexdigest()

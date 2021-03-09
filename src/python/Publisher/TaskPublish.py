@@ -534,6 +534,7 @@ def publishInDBS3(config, taskname, verbose):
             sourceURL += "/DBSReader"
     except Exception:
         logger.exception("ERROR")
+
     # When looking up parents may need to look in global DBS as well.
     globalURL = sourceURL
     globalURL = globalURL.replace('phys01', 'global')
@@ -541,10 +542,17 @@ def publishInDBS3(config, taskname, verbose):
     globalURL = globalURL.replace('phys03', 'global')
     globalURL = globalURL.replace('caf', 'global')
 
+    # allow to use a DBS REST host different from cmsweb.cern.ch (which is the
+    # default inserted by CRAB Client)
+    sourceURL = sourceURL.replace('cmsweb.cern.ch', config.TaskPublisher.DBShost)
+    globalURL = globalURL.replace('cmsweb.cern.ch', config.TaskPublisher.DBShost)
+    publish_dbs_url = publish_dbs_url.replace('cmsweb.cern.ch', config.TaskPublisher.DBShost)
+
     # DBS client relies on X509 env. vars
     os.environ['X509_USER_CERT'] = config.General.serviceCert
     os.environ['X509_USER_KEY'] = config.General.serviceKey
 
+    # create DBS API objects
     logger.info("DBS Source API URL: %s", sourceURL)
     sourceApi = dbsClient.DbsApi(url=sourceURL)
     logger.info("DBS Global API URL: %s", globalURL)
@@ -557,7 +565,6 @@ def publishInDBS3(config, taskname, verbose):
         publish_migrate_url = publish_dbs_url + '/DBSMigrate'
         publish_read_url = publish_dbs_url + '/DBSReader'
         publish_dbs_url += '/DBSWriter'
-
     try:
         logger.info("DBS Destination API URL: %s", publish_dbs_url)
         destApi = dbsClient.DbsApi(url=publish_dbs_url)
@@ -575,7 +582,6 @@ def publishInDBS3(config, taskname, verbose):
     logger.info("inputDataset: %s", inputDataset)
     noInput = len(inputDataset.split("/")) <= 3
 
-    # TODO: fix dbs dep
     if not noInput:
         try:
             existing_datasets = sourceApi.listDatasets(dataset=inputDataset, detail=True, dataset_access_type='*')
