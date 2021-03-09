@@ -297,29 +297,37 @@ def storeNodesInfoInFile():
     :return: nothing
     """
     jobLogCheckpoint = None
-    try:
-        if os.path.exists(STATUS_CACHE_FILE) and os.stat(STATUS_CACHE_FILE).st_size > 0:
-            logging.debug("cache file found, opening and reading")
+    if os.path.exists(STATUS_CACHE_FILE) and os.stat(STATUS_CACHE_FILE).st_size > 0:
+        logging.debug("cache file found, opening")
+        try:
             nodesStorage = open(STATUS_CACHE_FILE, "r")
-
             jobLogCheckpoint = nodesStorage.readline().strip()
-            fjrParseResCheckpoint = int(nodesStorage.readline())
-            nodes = ast.literal_eval(nodesStorage.readline())
-            nodeMap = ast.literal_eval(nodesStorage.readline())
-            nodesStorage.close()
-        else:
-            logging.debug("cache file not found, creating")
+            if jobLogCheckpoint.startswith('#') :
+                logging.debug("cache file contains initial comments, skipping")
+                # comment line indicates a place-holder file created at DAG bootstrap time
+                jobLogCheckpoint = None
+            else:
+                logging.debug("reading cache file")
+                fjrParseResCheckpoint = int(nodesStorage.readline())
+                nodes = ast.literal_eval(nodesStorage.readline())
+                nodeMap = ast.literal_eval(nodesStorage.readline())
+                nodesStorage.close()
+        except Exception:
+            logging.exception("error during status_cache handling")
             jobLogCheckpoint = None
-            fjrParseResCheckpoint = 0
-            nodes = {}
-            nodeMap = {}
-    except Exception:
-        logging.exception("error during status_cache handling")
+
+    if not jobLogCheckpoint:
+        logging.debug("no usable cache file found, creating")
+        fjrParseResCheckpoint = 0
+        nodes = {}
+        nodeMap = {}
 
     if jobLogCheckpoint:
+        # resume log parsing where we left
         with open((LOG_PARSING_POINTERS_DIR+jobLogCheckpoint), 'r') as f:
             jel = pickle.load(f)
     else:
+        # parse log from beginning
         jel = htcondor.JobEventLog('job_log')
     #jobsLog = open("job_log", "r")
     #jobsLog.seek(jobLogCheckpoint)
