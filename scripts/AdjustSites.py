@@ -235,6 +235,9 @@ def makeWebDir(ad):
         os.symlink(os.path.abspath(os.path.join(".", "site.ad")), os.path.join(path, "site_ad.txt"))
         os.symlink(os.path.abspath(os.path.join(".", ".job.ad")), os.path.join(path, "job_ad.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "task_process/status_cache.txt")), os.path.join(path, "status_cache"))
+        startInfo = "# Task bootstrapped at " + datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC") + "\n"
+        with open(os.path.abspath(os.path.join(".", "task_process/status_cache.txt")), 'w') as fd:
+            fd.write(startInfo)
         os.symlink(os.path.abspath(os.path.join(".", "prejob_logs/predag.0.txt")), os.path.join(path, "AutomaticSplitting_Log0.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "prejob_logs/predag.0.txt")), os.path.join(path, "AutomaticSplitting/DagLog0.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "prejob_logs/predag.1.txt")), os.path.join(path, "AutomaticSplitting/DagLog1.txt"))
@@ -250,13 +253,13 @@ def makeWebDir(ad):
     try:
         storage_rules = htcondor.param['CRAB_StorageRules']
     except KeyError:
-        storage_rules = "^/home/remoteGlidein,http://submit-5.t2.ucsd.edu/CSstoragePath"
+        printLog("CRAB_StorageRules param missing in HTCondor config. Can't create webdir URL")
     sinfo = storage_rules.split(",")
     storage_re = re.compile(sinfo[0])
     ad['CRAB_localWebDirURL'] = storage_re.sub(sinfo[1], path)
 
 
-def updateWebDir(RESTServer, ad):
+def uploadWebDir(RESTServer, ad):
     """
     Need a doc string here.
     """
@@ -396,15 +399,17 @@ def main():
     RESTServer = HTTPRequests(host, cert, cert, retry=3, userAgent='CRABSchedd')
 
     checkTaskInfo(RESTServer, ad)
-    makeWebDir(ad)
 
-    printLog("Webdir has been set up. Uploading the webdir URL to the REST")
+    # is this the first time this script runs for this task ? (it runs at each resubmit as well !)
+    if not os.path.exists('WEB_DIR'):
+        makeWebDir(ad)
+        printLog("Webdir has been set up. Uploading the webdir URL to the REST")
 
     retries = 0
     exitCode = 1
     maxRetries = 3
     while retries < maxRetries and exitCode != 0:
-        exitCode = updateWebDir(RESTServer, ad)
+        exitCode = uploadWebDir(RESTServer, ad)
         if exitCode != 0:
             time.sleep(retries * 20)
         retries += 1
@@ -420,6 +425,8 @@ def main():
     printLog("Proxied webdir saved. Clearing the automatic blacklist and handling RunJobs.dag.nodes.log for resubmissions")
 
     clearAutomaticBlacklist()
+
+
 
     resubmitJobIds = []
     if 'CRAB_ResubmitList' in ad:
