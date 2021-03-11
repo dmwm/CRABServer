@@ -253,6 +253,7 @@ def makeWebDir(ad):
     except Exception as ex: #pylint: disable=broad-except
         #Should we just catch OSError and IOError? Is that enough?
         printLog("Failed to copy/symlink files in the user web directory: %s" % str(ex))
+    printLog("WEB_DIR created, sym links in place and status_cache initialized")
 
     try:
         storage_rules = htcondor.param['CRAB_StorageRules']
