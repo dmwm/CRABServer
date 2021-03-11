@@ -52,16 +52,14 @@ def chunks(l, n):
         yield l[i:i + n]
 
 
-def mark_transferred(ids):
+def mark_transferred(ids, crabserver):
     """
     Mark the list of files as tranferred
     :param ids: list of Oracle file ids to update
+    :param crabserver: an HTTPRequest object for doing POST to CRAB server REST
     :return: 0 success, 1 failure
     """
     try:
-        oracleDB = HTTPRequests(rest_filetransfers,
-                                proxy,
-                                proxy, userAgent='CRABSchedd')
         logging.debug("Marking done %s", ids)
 
         data = dict()
@@ -70,7 +68,7 @@ def mark_transferred(ids):
         data['list_of_ids'] = ids
         data['list_of_transfer_state'] = ["DONE" for _ in ids]
 
-        oracleDB.post('/filetransfers',
+        crabserver.post('/filetransfers',
                       data=encodeRequest(data))
         logging.info("Marked good %s", ids)
     except Exception:
@@ -79,17 +77,15 @@ def mark_transferred(ids):
     return 0
 
 
-def mark_failed(ids, failures_reasons):
+def mark_failed(ids, failures_reasons, crabserver):
     """
     Mark the list of files as failed
     :param ids: list of Oracle file ids to update
     :param failures_reasons: list of strings with transfer failure messages
+    :param crabserver: an HTTPRequest object for doing POST to CRAB server REST
     :return: 0 success, 1 failure
     """
     try:
-        oracleDB = HTTPRequests(rest_filetransfers,
-                                proxy,
-                                proxy, userAgent='CRABSchedd')
         data = dict()
         data['asoworker'] = asoworker
         data['subresource'] = 'updateTransfers'
@@ -98,7 +94,7 @@ def mark_failed(ids, failures_reasons):
         data['list_of_failure_reason'] = failures_reasons
         data['list_of_retry_value'] = [0 for _ in ids]
 
-        oracleDB.post('/filetransfers',
+        crabserver.post('/filetransfers',
                       data=encodeRequest(data))
         logging.info("Marked failed %s", ids)
     except Exception:
@@ -314,7 +310,7 @@ class submit_thread(threading.Thread):
         self.threadLock.release()
 
 
-def submit(rucioClient, ftsContext, toTrans):
+def submit(rucioClient, ftsContext, toTrans, crabserver):
     """
     submit tranfer jobs
 
@@ -331,16 +327,13 @@ def submit(rucioClient, ftsContext, toTrans):
                       username,
                       taskname,
                       filesize, checksum],....]
+    :param crabserver: an HTTPRequest object for doing POST to CRAB server REST
     :return: list of jobids submitted
     """
     threadLock = threading.Lock()
     threads = []
     jobids = []
     to_update = []
-
-    oracleDB = HTTPRequests(rest_filetransfers,
-                            proxy,
-                            proxy, userAgent='CRABSchedd')
 
     sources = list(set([x[3] for x in toTrans]))
 
@@ -388,7 +381,7 @@ def submit(rucioClient, ftsContext, toTrans):
                             break
         except Exception as ex:
             logging.error("Failed to map lfns to pfns: %s", ex)
-            mark_failed(ids, ["Failed to map lfn to pfn: " + str(ex) for _ in ids])
+            mark_failed(ids, ["Failed to map lfn to pfn: " + str(ex) for _ in ids], crabserver)
 
         source_pfns = sorted_source_pfns
         dest_pfns = sorted_dest_pfns
@@ -404,14 +397,14 @@ def submit(rucioClient, ftsContext, toTrans):
         t.join()
 
     for fileDoc in to_update:
-        _ = oracleDB.post('/filetransfers',
+        _ = crabserver.post('/filetransfers',
                           data=encodeRequest(fileDoc))
         logging.info("Marked submitted %s files", fileDoc['list_of_ids'])
 
     return jobids
 
 
-def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient):
+def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, crabserver):
     """
     get transfers and update last read line number
 
@@ -445,10 +438,10 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient):
 
         jobids = []
         if len(transfers) > 0:
-            jobids = submit(rucioClient, ftsContext, transfers)
+            jobids = submit(rucioClient, ftsContext, transfers, crabserver)
 
             for jobid in jobids:
-                logging.info("Monitor link: " + FTS_MONITORING + "fts3/ftsmon/#/job/%s", jobid)
+                logging.info("Monitor link: " + FTS_MONITORING + "fts3/ftsmon/#/job/%s", jobid)  # pylint: disable=logging-not-lazy
 
             # TODO: send to dashboard
 
@@ -457,7 +450,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient):
     return transfers, jobids
 
 
-def state_manager(fts):
+def state_manager(fts, crabserver):
     """
 
     """
@@ -491,11 +484,11 @@ def state_manager(fts):
                 logging.info('Marking job %s files done and %s files failed for job %s', len(done_id[jobID]), len(failed_id[jobID]), jobID)
 
                 if len(done_id[jobID]) > 0:
-                    doneReady = mark_transferred(done_id[jobID])
+                    doneReady = mark_transferred(done_id[jobID], crabserver)
                 else:
                     doneReady = 0
                 if len(failed_id[jobID]) > 0:
-                    failedReady = mark_failed(failed_id[jobID], failed_reasons[jobID])
+                    failedReady = mark_failed(failed_id[jobID], failed_reasons[jobID], crabserver)
                 else:
                     failedReady = 0
 
@@ -519,7 +512,7 @@ def state_manager(fts):
     return jobs_ongoing
 
 
-def submission_manager(rucioClient, ftsContext):
+def submission_manager(rucioClient, ftsContext, crabserver):
     """
 
     """
@@ -533,7 +526,7 @@ def submission_manager(rucioClient, ftsContext):
 
     # TODO: if the following fails check not to leave a corrupted file
     with open("task_process/transfers/last_transfer_new.txt", "w+") as _last:
-        _, jobids = perform_transfers("task_process/transfers.txt", last_line, _last, ftsContext, rucioClient)
+        _, jobids = perform_transfers("task_process/transfers.txt", last_line, _last, ftsContext, rucioClient, crabserver)
         _last.close()
         os.rename("task_process/transfers/last_transfer_new.txt", "task_process/transfers/last_transfer.txt")
 
@@ -561,9 +554,8 @@ def algorithm():
     """
 
     # TODO: pass by configuration
-    fts = HTTPRequests(FTS_ENDPOINT.split("https://")[1],
-                       proxy,
-                       proxy)
+    fts = HTTPRequests(url=FTS_ENDPOINT.split("https://")[1],
+                       localcert=proxy, localkey=proxy)
 
     logging.info("using user's proxy from %s", proxy)
     ftsContext = fts3.Context(FTS_ENDPOINT, proxy, proxy, verify=True)
@@ -571,6 +563,12 @@ def algorithm():
     delegationId = fts3.delegate(ftsContext, lifetime=timedelta(hours=48), delegate_when_lifetime_lt=timedelta(hours=24), force=False)
     delegationStatus = fts.get("delegation/"+delegationId)
     logging.info("Delegated proxy valid until %s", delegationStatus[0]['termination_time'])
+
+    # instantiate an object to talk with CRAB REST server
+    crabserver = HTTPRequests(url=rest_filetransfers,
+                            localcert=proxy, localkey=proxy,
+                            userAgent='CRABSchedd')
+
 
     with open("task_process/transfers.txt") as _list:
         _data = _list.readlines()[0]
@@ -598,8 +596,8 @@ def algorithm():
         logging.warn(msg)
         raise exc
 
-    jobs_ongoing = state_manager(fts)
-    new_jobs = submission_manager(rucioClient, ftsContext)
+    jobs_ongoing = state_manager(fts, crabserver)
+    new_jobs = submission_manager(rucioClient, ftsContext, crabserver)
 
     logging.info("Transfer jobs ongoing: %s, new: %s ", jobs_ongoing, new_jobs)
 
