@@ -108,4 +108,4 @@ if [ "X$_CONDOR_JOB_AD" != "X" ]; then
 fi
 echo "Now running the job in `pwd`..."
 exec nice -n 19 python -m TaskWorker.TaskManagerBootstrap "$@"
-} > dag_bootstrap.out 2>&1
+} | tee dag_bootstrap.out 2>&1
