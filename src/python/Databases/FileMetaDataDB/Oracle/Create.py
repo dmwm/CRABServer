@@ -27,7 +27,7 @@ class Create(DBCreator):
         self.create['b_filemetadata'] = """
             CREATE TABLE filemetadata (
               tm_taskname VARCHAR(255) NOT NULL,
-              panda_job_id NUMBER(11),
+              panda_job_id NUMBER(11) DEFAULT NULL,
               job_id VARCHAR(20),
               fmd_outdataset VARCHAR(500) NOT NULL,
               fmd_acq_era VARCHAR(255) NOT NULL,

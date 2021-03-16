@@ -50,7 +50,7 @@ class Create(DBCreator):
         tm_site_blacklist VARCHAR(4000),
         tm_split_algo VARCHAR(255) NOT NULL,
         tm_split_args CLOB NOT NULL,
-        tm_totalunits NUMBER(38),
+        tm_totalunits NUMBER(38,6),
         tm_user_sandbox VARCHAR(255) NOT NULL,
         tm_cache_url VARCHAR(255) NOT NULL,
         tm_username VARCHAR(255) NOT NULL,
@@ -103,7 +103,7 @@ class Create(DBCreator):
         tm_asodb VARCHAR(20),
         tm_ignore_global_blacklist VARCHAR(1),
         tm_submitter_ip_addr VARCHAR(45),
-        tm_DDM_reqid NUMBER(38),
+        tm_DDM_reqid VARCHAR(32),
         CONSTRAINT taskname_pk PRIMARY KEY(tm_taskname),
         CONSTRAINT check_tm_publication CHECK (tm_publication IN ('T', 'F')),
         CONSTRAINT check_tm_publish_groupname CHECK (tm_publish_groupname IN ('T', 'F')),
@@ -115,30 +115,3 @@ class Create(DBCreator):
         CONSTRAINT ck_tm_nonvalid_input_dataset CHECK (tm_nonvalid_input_dataset IN ('T', 'F'))
         )
         """
-        self.create['c_jobgroups'] = """
-        CREATE TABLE jobgroups(
-        tm_jobgroups_id NUMBER(38) NOT NULL,
-        tm_taskname VARCHAR(255) NOT NULL,
-        panda_jobdef_id NUMBER(11),
-        panda_jobdef_status VARCHAR(255) NOT NULL,
-        tm_data_blocks CLOB,
-        panda_jobgroup_failure CLOB,
-        tm_user_dn VARCHAR(255) NOT NULL,
-        CONSTRAINT taskname_fk FOREIGN KEY(tm_taskname) references
-            tasks(tm_taskname)
-            ON DELETE CASCADE,
-        CONSTRAINT jobgroup_id_pk PRIMARY KEY(tm_jobgroups_id)
-        )
-        """
-        self.create['c_jobgroups_id_seq'] = """
-        CREATE SEQUENCE jobgroups_id_seq
-        START WITH 1
-        INCREMENT BY 1
-        NOMAXVALUE"""
-        self.create['c_jobgroups_id_trg'] =  """
-        CREATE TRIGGER jobgroups_id_trg
-        BEFORE INSERT ON jobgroups
-        FOR EACH ROW
-        BEGIN
-        SELECT jobgroups_id_seq.nextval INTO :new.tm_jobgroups_id FROM dual;
-        END;"""
