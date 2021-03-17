@@ -14,7 +14,7 @@ for (( i=0; i<$checkTimes; ++i)); do
   aliveSlaves=`pgrep -P $TaskMasterPid | tr '\n' ' '`
 
   if [ -n "$aliveSlaves" ]; then
-    echo "($aliveSlaves) slave(s) are still running, sleeping for $timeout seconds. ($((i+1)) of $checkTimes try)"
+    echo "slave(s) PID [ ($aliveSlaves) ] are still running, sleeping for $timeout seconds. ($((i+1)) of $checkTimes try)"
     sleep $timeout
   else
     echo "Slaves gracefully stopped after $((i * timeout)) seconds."
