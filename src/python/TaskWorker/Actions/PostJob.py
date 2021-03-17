@@ -902,8 +902,8 @@ class ASOServerJob(object):
                 # Previous post resets asoworker to NULL. This is not good, so we set it again
                 # using a different API to update the transfersDB record
                 updateDoc = {}
-                updateDoc['list_of_ids'] = [doc['id']]
-                updateDoc['list_of_transfer_state'] = ['NEW']
+                updateDoc['list_of_ids'] = [newDoc['id']]
+                updateDoc['list_of_transfer_state'] = [newDoc['transfer_state']]
                 updateDoc['subresource'] = 'updateTransfers'
                 if os.path.exists('USE_NEW_PUBLISHER'):
                     self.logger.info("USE_NEW_PUBLISHER: set asoworker=schedd in transferdb")
