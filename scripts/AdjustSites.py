@@ -410,28 +410,25 @@ def main():
         makeWebDir(ad)
         printLog("Webdir has been set up. Uploading the webdir URL to the REST")
 
-    retries = 0
-    exitCode = 1
-    maxRetries = 3
-    while retries < maxRetries and exitCode != 0:
-        exitCode = uploadWebDir(RESTServer, ad)
+        retries = 0
+        exitCode = 1
+        maxRetries = 3
+        while retries < maxRetries and exitCode != 0:
+            exitCode = uploadWebDir(RESTServer, ad)
+            if exitCode != 0:
+                time.sleep(retries * 20)
+            retries += 1
         if exitCode != 0:
-            time.sleep(retries * 20)
-        retries += 1
+            printLog("Exiting AdjustSites because the webdir upload failed %d times." % maxRetries)
+            sys.exit(1)
+        printLog("Webdir URL has been uploaded, exit code is %s. Setting the classad for the proxied webdir" % exitCode)
 
-    if exitCode != 0:
-        printLog("Exiting AdjustSites because the webdir upload failed %d times." % maxRetries)
-        sys.exit(1)
+        saveProxiedWebdir(RESTServer, ad)
+        printLog("Proxied webdir saved")
 
-    printLog("Webdir URL has been uploaded, exit code is %s. Setting the classad for the proxied webdir" % exitCode)
-
-    saveProxiedWebdir(RESTServer, ad)
-
-    printLog("Proxied webdir saved. Clearing the automatic blacklist and handling RunJobs.dag.nodes.log for resubmissions")
+    printLog("Clearing the automatic blacklist and handling RunJobs.dag.nodes.log for resubmissions")
 
     clearAutomaticBlacklist()
-
-
 
     resubmitJobIds = []
     if 'CRAB_ResubmitList' in ad:
