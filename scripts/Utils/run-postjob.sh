@@ -63,8 +63,7 @@ export X509_USER_PROXY=`pwd`/`ls|egrep  [a-z,0-9]{40}`
 PJargs=`cat RunJobs*.*dag | grep "POST Job${jobId}" | awk 'BEGIN { FS="MAX_RETRIES" }; {print $2}'`
 
 # find the condor clusterId for the job
-jobClusterId=`ls -l finished_jobs/job.${jobId}.${jobRetry} | awk '{print $NF}'|cut -d. -f2-3`
-
+jobClusterId=`grep '^ClusterId' finished_jobs/job.${jobId}.${jobRetry} | awk '{print $NF}'`
 # reset PJ count
 echo '{"pre": 1, "post": 0}' > retry_info/job.${jobId}.txt
 rm defer_info/defer_num.${jobId}.0.txt
