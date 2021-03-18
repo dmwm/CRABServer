@@ -10,8 +10,8 @@ from base64 import b64decode
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.REST.Validation import validate str, validate_strlist, validate_ustr, validate_ustrlist,\
-                                    validate_num, validate_real
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_ustr, validate_ustrlist,\
+    validate_num, validate_real
 from WMCore.Services.TagCollector.TagCollector import TagCollector
 from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
 
