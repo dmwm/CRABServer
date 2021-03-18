@@ -320,7 +320,7 @@ class RESTTask(RESTEntity):
         workflow = kwargs['workflow']
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
 
-        self.api.modify(self.Task.UpdateWebUrl_sql, webdirurl=[str(kwargs['webdirurl'])], workflow=[workflow])
+        self.api.modify(self.Task.UpdateWebUrl_sql, webdirurl=[kwargs['webdirurl']], workflow=[workflow])
 
         return []
 
