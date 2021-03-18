@@ -67,7 +67,7 @@ class DataFileMetadata(object):
         bindnames = set(kwargs.keys()) - set(['outfileruns', 'outfilelumis'])
         binds = {}
         for name in bindnames:
-            binds[name] = [str(kwargs[name])]
+            binds[name] = [kwargs[name]]
 
         # Modify all incoming metadata to have the structure 'lumi1:events1,lumi2:events2..'
         # instead of 'lumi1,lumi2,lumi3...' if necessary.
