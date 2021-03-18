@@ -47,7 +47,7 @@ class RESTFileMetadata(RESTEntity):
             validate_str("appver", param, safe, RX_CMSSW, optional=False)
             validate_str("outtype", param, safe, RX_OUTTYPES, optional=False)
             validate_str("checksummd5", param, safe, RX_CHECKSUM, optional=False)
-            validate_str("checksumcksum", param, safe, RX_CHECKSUM, optional=False)
+            validate_num("checksumcksum", param, safe, optional=False)
             validate_str("checksumadler32", param, safe, RX_CHECKSUM, optional=False)
             validate_str("outlocation", param, safe, RX_CMSSITE, optional=False)
             validate_str("outtmplocation", param, safe, RX_CMSSITE, optional=False)
