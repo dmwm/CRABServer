@@ -32,6 +32,8 @@ class RESTFileMetadata(RESTEntity):
             if len(safe.kwargs["outfileruns"]) != len(safe.kwargs["outfilelumis"]):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
             validate_strlist("inparentlfns", param, safe, RX_PARENTLFN)
+            # inparentlfns will be inserted in Oracle as CLOB, so it must be a string
+            safe.kwargs['inparentlfns'] = str(safe.kwargs['inparentlfns'])
             validate_str("globalTag", param, safe, RX_GLOBALTAG, optional=True)
             validate_str("jobid", param, safe, RX_JOBID, optional=True)
             #TODO: for backward compatibility. Get rid of the pandajobid once all jobs using it are done (one month after this gets released)
