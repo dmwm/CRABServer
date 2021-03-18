@@ -285,7 +285,7 @@ class RESTTask(RESTEntity):
         workflow = kwargs['workflow']
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
 
-        self.api.modify(self.Task.UpdateSchedd_sql, scheddname=[str(kwargs['scheddname'])], workflow=[workflow])
+        self.api.modify(self.Task.UpdateSchedd_sql, scheddname=[kwargs['scheddname']], workflow=[workflow])
 
         return []
 
