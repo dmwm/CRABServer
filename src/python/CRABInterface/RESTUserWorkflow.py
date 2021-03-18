@@ -451,7 +451,8 @@ class RESTUserWorkflow(RESTEntity):
 
             validate_num("nonvaliddata", param, safe, optional=True)
             #if one and only one between outputDatasetTag and publishDbsUrl is set raise an error (we need both or none of them)
-            validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
+            # asyncdest needs to be cast to unicode for later use in self._checkASODestination
+            validate_ustr("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkASODestination(safe.kwargs['asyncdest'])
             # We no longer use this attribute, but keep it around for older client compatibility
             validate_num("blacklistT1", param, safe, optional=True)
