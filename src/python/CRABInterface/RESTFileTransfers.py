@@ -153,8 +153,8 @@ class RESTFileTransfers(RESTEntity):
                 states = makeList(kwargs['list_of_transfer_state'])
                 retry = [0 for x in states]
                 reasons = ["" for x in states]
-                instances = makeList(str(kwargs['list_of_fts_instance']))
-                fts_id = makeList(str(kwargs['list_of_fts_id']))
+                instances = makeList(kwargs['list_of_fts_instance'])
+                fts_id = makeList(kwargs['list_of_fts_id'])
 
                 for num in range(len(ids)):
                     binds['id'] = [ids[num]]
