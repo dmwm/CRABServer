@@ -2,7 +2,7 @@ from __future__ import print_function
 # WMCore dependecies here
 from Utils.Utilities import makeList
 from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_ustr, validate_num, validate_ustrlist
+from WMCore.REST.Validation import validate_str, validate_num
 from WMCore.REST.Error import InvalidParameter, UnsupportedMethod
 
 from CRABInterface.Utilities import getDBinstance
@@ -39,28 +39,28 @@ class RESTFileTransfers(RESTEntity):
             # POST is for update, so we should allow anyone anything?
             # Of Course no, but there are multiple combinations, so we are not validating here
             # and all validation is in post function
-            validate_ustr("subresource", param, safe, RX_SUBPOSTTRANSFER, optional=False)
-            validate_ustr("asoworker", param, safe, RX_ASO_WORKERNAME, optional=False)
-            validate_ustr("username", param, safe, RX_USERNAME, optional=True)
-            validate_ustr("list_of_ids", param, safe, RX_ANYTHING, optional=True)
-            validate_ustr("list_of_transfer_state", param, safe, RX_ANYTHING, optional=True)
-            validate_ustr("list_of_failure_reason", param, safe, RX_ANYTHING, optional=True)
-            validate_ustr("list_of_retry_value", param, safe, RX_ANYTHING, optional=True)
-            validate_ustr("list_of_fts_instance", param, safe, RX_ANYTHING, optional=True)
-            validate_ustr("list_of_fts_id", param, safe, RX_ANYTHING, optional=True)
-            validate_ustr("list_of_publication_state", param, safe, RX_ANYTHING, optional=True)
+            validate_str("subresource", param, safe, RX_SUBPOSTTRANSFER, optional=False)
+            validate_str("asoworker", param, safe, RX_ASO_WORKERNAME, optional=False)
+            validate_str("username", param, safe, RX_USERNAME, optional=True)
+            validate_str("list_of_ids", param, safe, RX_ANYTHING, optional=True)
+            validate_str("list_of_transfer_state", param, safe, RX_ANYTHING, optional=True)
+            validate_str("list_of_failure_reason", param, safe, RX_ANYTHING, optional=True)
+            validate_str("list_of_retry_value", param, safe, RX_ANYTHING, optional=True)
+            validate_str("list_of_fts_instance", param, safe, RX_ANYTHING, optional=True)
+            validate_str("list_of_fts_id", param, safe, RX_ANYTHING, optional=True)
+            validate_str("list_of_publication_state", param, safe, RX_ANYTHING, optional=True)
             validate_num("time_to", param, safe, optional=True)
             validate_num("publish_flag", param, safe, optional=True)
 
         elif method in ['GET']:
-            validate_ustr("subresource", param, safe, RX_SUBGETTRANSFER, optional=False)
-            validate_ustr("username", param, safe, RX_USERNAME, optional=True)
-            validate_ustr("vogroup", param, safe, RX_VOPARAMS, optional=True)
-            validate_ustr("vorole", param, safe, RX_VOPARAMS, optional=True)
-            validate_ustr("taskname", param, safe, RX_TASKNAME, optional=True)
-            validate_ustr("destination", param, safe, RX_CMSSITE, optional=True)
-            validate_ustr("source", param, safe, RX_CMSSITE, optional=True)
-            validate_ustr("asoworker", param, safe, RX_ASO_WORKERNAME, optional=True)
+            validate_str("subresource", param, safe, RX_SUBGETTRANSFER, optional=False)
+            validate_str("username", param, safe, RX_USERNAME, optional=True)
+            validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
+            validate_str("vorole", param, safe, RX_VOPARAMS, optional=True)
+            validate_str("taskname", param, safe, RX_TASKNAME, optional=True)
+            validate_str("destination", param, safe, RX_CMSSITE, optional=True)
+            validate_str("source", param, safe, RX_CMSSITE, optional=True)
+            validate_str("asoworker", param, safe, RX_ASO_WORKERNAME, optional=True)
             validate_num("grouping", param, safe, optional=False)
             validate_num("limit", param, safe, optional=True)
         elif method in ['DELETE']:
