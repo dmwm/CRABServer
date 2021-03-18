@@ -3,7 +3,7 @@
 from __future__ import print_function
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_ustr, validate_num, validate_ustrlist
+from WMCore.REST.Validation import validate_str, validate_num, validate_strlist
 from WMCore.REST.Error import InvalidParameter, UnsupportedMethod
 
 from CRABInterface.Utilities import getDBinstance
@@ -37,54 +37,54 @@ class RESTFileUserTransfers(RESTEntity):
             # And all put are prepared by us in JOB wrappers, so it should already be correct.
             # P.S. Validation is done in function and it double check if all required keys are available
             print (param, safe)
-            validate_ustr("id", param, safe, RX_ANYTHING, optional=False)
-            validate_ustr("username", param, safe, RX_ANYTHING, optional=False)
-            validate_ustr("taskname", param, safe, RX_ANYTHING, optional=False)
-            validate_ustr("destination", param, safe, RX_ANYTHING, optional=False)
-            validate_ustr("destination_lfn", param, safe, RX_ANYTHING, optional=False)
-            validate_ustr("source", param, safe, RX_ANYTHING, optional=False)
-            validate_ustr("source_lfn", param, safe, RX_ANYTHING, optional=False)
+            validate_str("id", param, safe, RX_ANYTHING, optional=False)
+            validate_str("username", param, safe, RX_ANYTHING, optional=False)
+            validate_str("taskname", param, safe, RX_ANYTHING, optional=False)
+            validate_str("destination", param, safe, RX_ANYTHING, optional=False)
+            validate_str("destination_lfn", param, safe, RX_ANYTHING, optional=False)
+            validate_str("source", param, safe, RX_ANYTHING, optional=False)
+            validate_str("source_lfn", param, safe, RX_ANYTHING, optional=False)
             validate_num("filesize", param, safe, optional=False)
             validate_num("publish", param, safe, optional=False)
-            validate_ustr("job_id", param, safe, RX_JOBID, optional=False)
+            validate_str("job_id", param, safe, RX_JOBID, optional=False)
             validate_num("job_retry_count", param, safe, optional=False)
-            validate_ustr("type", param, safe, RX_ANYTHING, optional=False)
-            validate_ustr("asoworker", param, safe, RX_ANYTHING, optional=True)
+            validate_str("type", param, safe, RX_ANYTHING, optional=False)
+            validate_str("asoworker", param, safe, RX_ANYTHING, optional=True)
             validate_num("transfer_retry_count", param, safe, optional=True)
             validate_num("transfer_max_retry_count", param, safe, optional=True)
             validate_num("publication_retry_count", param, safe, optional=True)
             validate_num("publication_max_retry_count", param, safe, optional=True)
             validate_num("start_time", param, safe, optional=False)
-            validate_ustr("rest_host", param, safe, RX_ANYTHING, optional=False)
-            validate_ustr("rest_uri", param, safe, RX_ANYTHING, optional=False)
-            validate_ustr("transfer_state", param, safe, RX_ANYTHING, optional=False)
-            validate_ustr("publication_state", param, safe, RX_ANYTHING, optional=False)
-            validate_ustr("fts_id", param, safe, RX_ANYTHING, optional=True)
-            validate_ustr("fts_instance", param, safe, RX_ANYTHING, optional=True)
+            validate_str("rest_host", param, safe, RX_ANYTHING, optional=False)
+            validate_str("rest_uri", param, safe, RX_ANYTHING, optional=False)
+            validate_str("transfer_state", param, safe, RX_ANYTHING, optional=False)
+            validate_str("publication_state", param, safe, RX_ANYTHING, optional=False)
+            validate_str("fts_id", param, safe, RX_ANYTHING, optional=True)
+            validate_str("fts_instance", param, safe, RX_ANYTHING, optional=True)
         if method in ['POST']:
             # POST is for update, so we should allow anyone anything?
             # Of Course no, but there are multiple combinations, so we are not validating here
             # and all validation is in post function
-            validate_ustr("subresource", param, safe, RX_SUBPOSTUSERTRANSFER, optional=False)
-            validate_ustr("id", param, safe, RX_ANYTHING, optional=True)
-            validate_ustr("username", param, safe, RX_USERNAME, optional=True)
-            validate_ustr("taskname", param, safe, RX_TASKNAME, optional=True)
+            validate_str("subresource", param, safe, RX_SUBPOSTUSERTRANSFER, optional=False)
+            validate_str("id", param, safe, RX_ANYTHING, optional=True)
+            validate_str("username", param, safe, RX_USERNAME, optional=True)
+            validate_str("taskname", param, safe, RX_TASKNAME, optional=True)
             validate_num("start_time", param, safe, optional=True)
-            validate_ustr("source", param, safe, RX_ANYTHING, optional=True)
-            validate_ustr("source_lfn", param, safe, RX_ANYTHING, optional=True)
+            validate_str("source", param, safe, RX_ANYTHING, optional=True)
+            validate_str("source_lfn", param, safe, RX_ANYTHING, optional=True)
             validate_num("filesize", param, safe, optional=True)
-            validate_ustr("transfer_state", param, safe, RX_ANYTHING, optional=True)
+            validate_str("transfer_state", param, safe, RX_ANYTHING, optional=True)
             validate_num("transfer_retry_count", param, safe, optional=True)
             validate_num("publish", param, safe, optional=False)
-            validate_ustr("publication_state", param, safe, RX_ANYTHING, optional=True)
-            validate_ustr("job_id", param, safe, RX_JOBID, optional=True)
+            validate_str("publication_state", param, safe, RX_ANYTHING, optional=True)
+            validate_str("job_id", param, safe, RX_JOBID, optional=True)
             validate_num("job_retry_count", param, safe, optional=True)
-            validate_ustrlist("listOfIds", param, safe, RX_ANYTHING)  # Interesting... TODO. Have optional in strlist
+            validate_strlist("listOfIds", param, safe, RX_ANYTHING)  # Interesting... TODO. Have optional in strlist
         elif method in ['GET']:
-            validate_ustr("subresource", param, safe, RX_SUBGETUSERTRANSFER, optional=False)
-            validate_ustr("id", param, safe, RX_TASKNAME, optional=True)
-            validate_ustr("username", param, safe, RX_USERNAME, optional=True)
-            validate_ustr("taskname", param, safe, RX_TASKNAME, optional=True)
+            validate_str("subresource", param, safe, RX_SUBGETUSERTRANSFER, optional=False)
+            validate_str("id", param, safe, RX_TASKNAME, optional=True)
+            validate_str("username", param, safe, RX_USERNAME, optional=True)
+            validate_str("taskname", param, safe, RX_TASKNAME, optional=True)
         elif method in ['DELETE']:
             raise UnsupportedMethod('This method is not supported in this API!')
 
