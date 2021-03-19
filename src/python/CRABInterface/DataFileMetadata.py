@@ -84,12 +84,12 @@ class DataFileMetadata(object):
         # By their index, run numbers correspond to the lumi info strings
         # which is why we can use zip when creating the dict.
         lumiEventList = []
-        for lumis in map(str, outfilelumis):
+        for lumis in outfilelumis:
             lumiDict = dict((lumiEvents.split(":")) for lumiEvents in lumis.split(","))
             lumiEventList.append(lumiDict)
-        # Convert runs to strings to keep it consistent
-        strOutFileRuns = map(str, kwargs['outfileruns'])
-        binds['runlumi'] = [str(dict(zip(strOutFileRuns, lumiEventList)))]
+        runList = kwargs['outfileruns']
+        # fmd_runlumi column in FILEMETADATA table is CLOB, so need to cast into a string here
+        binds['runlumi'] = [str(dict(zip(runList, lumiEventList)))]
 
         #Changed to Select if exist, update, else insert
         binds['outtmplfn'] = binds['outlfn']

@@ -28,7 +28,7 @@ class RESTFileMetadata(RESTEntity):
             #TODO check all the regexp
             validate_str("taskname", param, safe, RX_TASKNAME, optional=False)
             validate_strlist("outfilelumis", param, safe, RX_LUMILIST)
-            validate_numlist("outfileruns", param, safe)
+            validate_strlist("outfileruns", param, safe, RX_RUNS)
             if len(safe.kwargs["outfileruns"]) != len(safe.kwargs["outfilelumis"]):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
             validate_strlist("inparentlfns", param, safe, RX_PARENTLFN)
