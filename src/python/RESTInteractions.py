@@ -4,6 +4,7 @@ Handles client interactions with remote REST interface
 
 import os
 import time
+import random
 import urllib
 import logging
 from httplib import HTTPException
@@ -27,10 +28,11 @@ def retriableError(ex):
     """ Return True if the error can be retried
     """
     if isinstance(ex, HTTPException):
+        #429 Too Many Requests. When client hits the throttling limit
         #500 Internal sever error. For some errors retries it helps
         #502 CMSWEB frontend answers with this when the CMSWEB backends are overloaded
         #503 Usually that's the DatabaseUnavailable error
-        return ex.status in [500, 502, 503]
+        return ex.status in [429, 500, 502, 503]
     if isinstance(ex, pycurl.error):
         #28 is 'Operation timed out...'
         #35,is 'Unknown SSL protocol error', see https://github.com/dmwm/CRABServer/issues/5102
@@ -151,7 +153,7 @@ class HTTPRequests(dict):
                     msg = "Fatal error trying to connect to %s using %s" % (url, data)
                     self.logger.error(msg)
                     raise #really exit and raise exception if this was the last retry or the exit code is not among the list of the one we retry
-                sleeptime = 20 * (i + 1)
+                sleeptime = 20 * (i + 1) + random.randint(-10,10)
                 msg = "Sleeping %s seconds after HTTP error. Error details:  " % sleeptime
                 if hasattr(ex, 'headers'):
                     msg += str(ex.headers)
