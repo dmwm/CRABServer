@@ -287,7 +287,7 @@ class Master(object):
             # res is a 3-plu: (result, exit code, status)
             res = res[0]
         except Exception as ex:
-            logger.error("Error during metadata retrieving from %s: %s", uri, ex)
+            logger.error("Error during metadata retrieving from %s:\n%s", uri, ex)
             return out
 
         metadataList = [json.loads(md) for md in res['result']]  # CRAB REST returns a list of JSON objects
@@ -402,7 +402,7 @@ class Master(object):
             try:
                 res = self.crabServer.get(uri=uri, data=data)
             except Exception as ex:
-                logger.warn('Error retrieving status from %s for %s.', uri, workflow)
+                logger.warn('Error retrieving status from %s for %s:\n%s', uri, workflow, str(ex))
                 return 0
 
             try:
@@ -442,7 +442,7 @@ class Master(object):
                     logger.debug("task: %s ", str(result[0]))
                     last_publication_time = getColumn(result[0], 'tm_last_publication')
                 except Exception as ex:
-                    logger.error("Error during task doc retrieving: %s", ex)
+                    logger.error("Error during task doc retrieving:\n%s", ex)
                 if last_publication_time:
                     date = last_publication_time # datetime in Oracle format
                     timetuple = datetime.strptime(date, "%Y-%m-%d %H:%M:%S.%f").timetuple()  # convert to time tuple
