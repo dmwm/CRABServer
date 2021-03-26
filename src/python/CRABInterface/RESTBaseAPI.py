@@ -18,6 +18,7 @@ from CRABInterface.RESTFileMetadata import RESTFileMetadata
 from CRABInterface.RESTFileTransfers import RESTFileTransfers
 from CRABInterface.RESTFileUserTransfers import RESTFileUserTransfers
 from CRABInterface.RESTWorkerWorkflow import RESTWorkerWorkflow
+from CRABInterface.RESTCache import RESTCache
 from CRABInterface.DataFileMetadata import DataFileMetadata
 from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
@@ -57,6 +58,7 @@ class RESTBaseAPI(DatabaseRESTApi):
                     'filemetadata': RESTFileMetadata(app, self, config, mount),
                     'workflowdb': RESTWorkerWorkflow(app, self, config, mount),
                     'task': RESTTask(app, self, config, mount),
+                    'cache': RESTCache(app, self, config, mount),
                     'filetransfers': RESTFileTransfers(app, self, config, mount),
                     'fileusertransfers': RESTFileUserTransfers(app, self, config, mount),
                    })
