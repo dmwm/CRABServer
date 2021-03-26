@@ -112,8 +112,7 @@ class RESTCache(RESTEntity):
             try:
                 self.s3_client.download_file(self.s3_bucket, objectName, tempFile)
             except ClientError as e:
-                print("S3 error: %s", str(e))
-                raise ExecutionError("Connection to s3.cern.ch failed")
+                raise ExecutionError("Connection to s3.cern.ch failed:\n%s" % str(e))
             with open(tempFile) as f:
                 txt = f.read()
             os.remove(tempFile)
