@@ -2,7 +2,7 @@
 """
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_ustr, validate_ustrlist, validate_num
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 from WMCore.REST.Error import InvalidParameter
 
 from ServerUtilities import getEpochFromDBTime
@@ -31,14 +31,14 @@ class RESTWorkerWorkflow(RESTEntity):
                             #      Actually, maybe something even more strict is necessary (only the prod TW machine can access this resource)
 
         if method in ['POST']:
-            validate_ustr("workflow", param, safe, RX_TASKNAME, optional=True)
-            validate_ustr("status", param, safe, RX_STATUS, optional=True)
-            validate_ustr("command", param, safe, RX_STATUS, optional=True)
-            validate_ustr("getstatus", param, safe, RX_STATUS, optional=True)
-            validate_ustr("failure", param, safe, RX_TEXT_FAIL, optional=True)
-            validate_ustrlist("resubmittedjobs", param, safe, RX_JOBID)
-            validate_ustr("workername", param, safe, RX_WORKER_NAME, optional=True)
-            validate_ustr("subresource", param, safe, RX_SUBPOSTWORKER, optional=True)
+            validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
+            validate_str("status", param, safe, RX_STATUS, optional=True)
+            validate_str("command", param, safe, RX_STATUS, optional=True)
+            validate_str("getstatus", param, safe, RX_STATUS, optional=True)
+            validate_str("failure", param, safe, RX_TEXT_FAIL, optional=True)
+            validate_strlist("resubmittedjobs", param, safe, RX_JOBID)
+            validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
+            validate_str("subresource", param, safe, RX_SUBPOSTWORKER, optional=True)
             validate_num("limit", param, safe, optional=True)
             validate_num("clusterid", param, safe, optional=True) #clusterid of the dag
             # possible combinations to check
@@ -49,10 +49,10 @@ class RESTWorkerWorkflow(RESTEntity):
             # 5)            status + limit + getstatus + workername
             # 6) taskname + runs + lumis
         elif method in ['GET']:
-            validate_ustr("workername", param, safe, RX_WORKER_NAME, optional=True)
-            validate_ustr("getstatus", param, safe, RX_STATUS, optional=True)
+            validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
+            validate_str("getstatus", param, safe, RX_STATUS, optional=True)
             validate_num("limit", param, safe, optional=True)
-            validate_ustr("subresource", param, safe, RX_SUBGETWORKER, optional=True)
+            validate_str("subresource", param, safe, RX_SUBGETWORKER, optional=True)
             # possible combinations to check
             # 1) workername + getstatus + limit
             # 2) subresource + subjobdef + subuser

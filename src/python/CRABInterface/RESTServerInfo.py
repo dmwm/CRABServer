@@ -2,7 +2,7 @@ import logging
 
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_ustr
+from WMCore.REST.Validation import validate_str
 from WMCore.REST.Error import ExecutionError
 
 # CRABServer dependecies here
@@ -27,8 +27,8 @@ class RESTServerInfo(RESTEntity):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid()
         if method in ['GET']:
-            validate_ustr('subresource', param, safe, RX_SUBRES_SI, optional=True)
-            validate_ustr('workflow', param, safe, RX_TASKNAME, optional=True)
+            validate_str('subresource', param, safe, RX_SUBRES_SI, optional=True)
+            validate_str('workflow', param, safe, RX_TASKNAME, optional=True)
 
     @restcall
     def get(self, subresource , **kwargs):

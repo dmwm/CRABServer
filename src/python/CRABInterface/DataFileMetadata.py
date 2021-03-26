@@ -67,7 +67,7 @@ class DataFileMetadata(object):
         bindnames = set(kwargs.keys()) - set(['outfileruns', 'outfilelumis'])
         binds = {}
         for name in bindnames:
-            binds[name] = [str(kwargs[name])]
+            binds[name] = [kwargs[name]]
 
         # Modify all incoming metadata to have the structure 'lumi1:events1,lumi2:events2..'
         # instead of 'lumi1,lumi2,lumi3...' if necessary.
@@ -84,12 +84,12 @@ class DataFileMetadata(object):
         # By their index, run numbers correspond to the lumi info strings
         # which is why we can use zip when creating the dict.
         lumiEventList = []
-        for lumis in map(str, outfilelumis):
+        for lumis in outfilelumis:
             lumiDict = dict((lumiEvents.split(":")) for lumiEvents in lumis.split(","))
             lumiEventList.append(lumiDict)
-        # Convert runs to strings to keep it consistent
-        strOutFileRuns = map(str, kwargs['outfileruns'])
-        binds['runlumi'] = [str(dict(zip(strOutFileRuns, lumiEventList)))]
+        runList = kwargs['outfileruns']
+        # fmd_runlumi column in FILEMETADATA table is CLOB, so need to cast into a string here
+        binds['runlumi'] = [str(dict(zip(runList, lumiEventList)))]
 
         #Changed to Select if exist, update, else insert
         binds['outtmplfn'] = binds['outlfn']
