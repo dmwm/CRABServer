@@ -377,6 +377,30 @@ def generateTaskName(username, requestname, timestamp=None):
     taskname = "%s:%s_%s" % (timestamp, username, requestname)
     return taskname
 
+def getUsernameFromTaskname (taskname):
+    """
+    extract username from a taskname constructed as in generateTaskName above
+    :param taskname:
+    :return: username
+    """
+    username = taskname.split(':')[1].split('_')[0]
+    return username
+
+def getTimeFromTaskname(taskname):
+    """ Get the submission time from the taskname and return the seconds since epoch
+        corresponding to it. The function is not currently used.
+    """
+
+    #validate taskname. In principle not necessary, but..
+    if not isinstance(taskname, str):
+        raise TypeError('In ServerUtilities.getTimeFromTaskname: "taskname" parameter must be a string')
+    stime = taskname.split(':')[0] #s stands for string
+    stimePattern = '^\d{6}_\d{6}$'
+    if not re.match(stimePattern, stime):
+        raise ValueError('In ServerUtilities.getTimeFromTaskname: "taskname" parameter must match %s' % stimePattern)
+    #convert the time
+    dtime = time.strptime(stime, '%y%m%d_%H%M%S') #d stands for data structured
+    return calendar.timegm(dtime)
 
 # TODO: Remove this from CRABClient. This is kind of common for WMCore not only for CRAB. Maybe better place to have this in WMCore?
 def encodeRequest(configreq, listParams=None):
@@ -427,23 +451,6 @@ def oracleOutputMapping(result, key=None):
         else:
             outputDict.append(docOut)
     return outputDict
-
-
-def getTimeFromTaskname(taskname):
-    """ Get the submission time from the taskname and return the seconds since epoch
-        corresponding to it. The function is not currently used.
-    """
-
-    #validate taskname. In principle not necessary, but..
-    if not isinstance(taskname, str):
-        raise TypeError('In ServerUtilities.getTimeFromTaskname: "taskname" parameter must be a string')
-    stime = taskname.split(':')[0] #s stands for string
-    stimePattern = '^\d{6}_\d{6}$'
-    if not re.match(stimePattern, stime):
-        raise ValueError('In ServerUtilities.getTimeFromTaskname: "taskname" parameter must match %s' % stimePattern)
-    #convert the time
-    dtime = time.strptime(stime, '%y%m%d_%H%M%S') #d stands for data structured
-    return calendar.timegm(dtime)
 
 def checkTaskLifetime(submissionTime):
     """ Verify that at least 7 days are left before the task periodic remove expression
@@ -583,3 +590,125 @@ class tempSetLogLevel():
         self.logger.setLevel(self.newLogLevel)
     def __exit__(self,a,b,c):
         self.logger.setLevel(self.previousLogLevel)
+
+def uploadToS3 (restServer=None, instance='prod', filepath=None, object=None,
+                taskname=None, bucket='CRABCache', logger=None):
+    """
+    one call to make a 2-step operation:
+    obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
+    :param restServer: an RESTInteraction/HTTRequest object : points to CRAB Server to use
+    :param instance: string : the DB instance for the REST server: prod|preprod|dev
+    :param filepath: string : the full path of the file to upload
+    :param object: string : the kind of object to upload: clientlog|twlog|sandbox|debugfiles
+    :param taskname: string : the task this object belongs to
+    :param bucket: string : the name of the bucket in s3.cern.ch where to upload
+    :return: nothing. Raises an exception in case of error
+    """
+    bucket = 'bucket1' # for initial testing
+    uriNoApi = '/crabserver/' + instance + '/'
+    api = 'cache'
+    uri = uriNoApi + api
+    dataDict = {'subresource':'upload',
+                'object':object,
+                'taskname':taskname}
+    data = encodeRequest(dataDict)
+    try:
+        # calls to restServer alway return a 3-ple ({'result':'string'}, HTTPcode, HTTPreason)
+        # this returns in result.value a 2-element list (url, dictionay)
+        res = restServer.get(uri, data)
+        result = res[0]['result']
+    except Exception as e:
+        raise Exception('Failed to get PreSignedURL from CRAB Server:\n%s' % str(e))
+    # prepare a single dictionary with curl arguments for the actual upload
+    url = result[0]
+    fields = result[1]
+    preSignedUrl = {'url':url}
+    preSignedUrl.update(fields)
+    try:
+        uploadToS3ViaPSU(filepath=filepath, preSignedUrlFields=preSignedUrl, logger=logger)
+    except Exception as e:
+        raise Exception('Upload to S3 failed\n%s', str(e))
+    logger.info('%s %s successully uploaded to S3', object, filepath)
+    return
+
+
+
+def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
+    """
+    uploads a file to s3.cern.ch usign PreSigned URLs obtained e.g. from a call to
+    crabserver RESTCache API /crabserver/prod/cache?subresource=upload
+    this implemntation uses a plain curl command to do it
+    :param filepath: string : the full path to a file to upload
+    :param preSignedUrlFields: dictionary: a dictionary with the needed fields as
+             returned from boto3 client when generating preSignedUrls:
+             dictionary keys are: AWSAccessKeyId, policy, signature, key, url
+             see e.g. https://boto3.amazonaws.com/v1/documentation/api/1.9.185/guide/s3-presigned-urls.html
+             and https://gist.github.com/henriquemenezes/61ab0a0e5b54d309194c
+    :return: nothing. Raises an exception in case of error
+    """
+
+    # validate args
+    if not filepath :
+        raise Exception("mandatory filepath argument missing")
+    if not os.path.exists(filepath) :
+        raise Exception("filepath argument points to non existing file")
+    if not preSignedUrlFields :
+        raise Exception("mandatory preSignedUrlFields argument missing")
+
+    # parse field disctionary into a list of arguments for curl
+    AWSAccessKeyId = preSignedUrlFields['AWSAccessKeyId']
+    signature = preSignedUrlFields['signature']
+    policy = preSignedUrlFields['policy']
+    key = preSignedUrlFields['key']
+    url = preSignedUrlFields['url']   # N.B. this contains the bucket name e.g. https://s3.cern.ch/bucket1
+
+
+    urlToUpload = url
+    userAgent = 'CRAB'
+
+    uploadCommand = 'curl -v -X POST '
+    uploadCommand += ' -H "User-Agent: %s"' % userAgent
+    uploadCommand += ' -F "key=%s"' % key
+    uploadCommand += ' -F "AWSAccessKeyId=%s"' % AWSAccessKeyId
+    uploadCommand += ' -F "policy=%s"' % policy
+    uploadCommand += ' -F "signature=%s"' % signature
+    uploadCommand += ' -F "file=@%s"' % filepath
+    uploadCommand += ' "%s"' % url
+    logger.debug('Will execute:\n%s', uploadCommand)
+    uploadProcess = subprocess.Popen(uploadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    stdout, stderr = uploadProcess.communicate()
+    exitcode = uploadProcess.returncode
+    logger.debug('exitcode: %s\nstdout: %s\nstderr: %s', exitcode, stdout, stderr)
+
+    if exitcode != 0:
+        raise Exception('Failed to upload file. Stderr is:\n%s' % stderr)
+    return
+
+def retrieveFromS3 (restServer=None, instance='prod', object=None,
+                taskname=None, bucket='CRABCache', logger=None):
+    """
+    obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
+    :param restServer: an RESTInteraction/HTTRequest object : points to CRAB Server to use
+    :param instance: string : the DB instance for the REST server: prod|preprod|dev
+    :param object: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
+    :param taskname: string : the task this object belongs to
+    :param bucket: string : the name of the bucket in s3.cern.ch where to look
+    :return: the content of the S3 object as a string object
+    """
+    bucket = 'bucket1' # for initial testing
+    uriNoApi = '/crabserver/' + instance + '/'
+    api = 'cache'
+    uri = uriNoApi + api
+    dataDict = {'subresource':'retrieve',
+                'object':object,
+                'taskname':taskname}
+    data = encodeRequest(dataDict)
+    try:
+        # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)
+        res = restServer.get(uri, data)
+        result = res[0]['result'][0]
+    except Exception as e:
+        raise Exception('Failed to get PreSignedURL from CRAB Server:\n%s' % str(e))
+    logger.info("%s retrieved OK", object)
+
+    return result
