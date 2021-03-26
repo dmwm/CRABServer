@@ -708,7 +708,7 @@ def retrieveFromS3 (restServer=None, instance='prod', object=None,
         res = restServer.get(uri, data)
         result = res[0]['result'][0]
     except Exception as e:
-        raise Exception('Failed to get PreSignedURL from CRAB Server:\n%s' % str(e))
+        raise Exception('Failed to retrieve S3 file content via CRABServer:\n%s' % str(e))
     logger.info("%s retrieved OK", object)
 
     return result
