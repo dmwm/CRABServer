@@ -1,6 +1,6 @@
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_ustr, validate_ustrlist
+from WMCore.REST.Validation import validate_str, validate_strlist
 from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
 
 from CRABInterface.Utilities import conn_handler, getDBinstance
@@ -32,20 +32,20 @@ class RESTTask(RESTEntity):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid()
         if method in ['POST']:
-            validate_ustr('subresource', param, safe, RX_SUBRES_TASK, optional=False)
-            validate_ustr("workflow", param, safe, RX_TASKNAME, optional=True)
-            validate_ustr("warning", param, safe, RX_TEXT_FAIL, optional=True)
-            validate_ustr("webdirurl", param, safe, RX_URL, optional=True)
-            validate_ustr("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
-            validate_ustrlist("outputdatasets", param, safe, RX_OUT_DATASET)
-            validate_ustr("taskstatus", param, safe, RX_STATUS, optional=True)
-            validate_ustr("ddmreqid", param, safe, RX_RUCIORULE, optional=True)
+            validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
+            validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
+            validate_str("warning", param, safe, RX_TEXT_FAIL, optional=True)
+            validate_str("webdirurl", param, safe, RX_URL, optional=True)
+            validate_str("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
+            validate_strlist("outputdatasets", param, safe, RX_OUT_DATASET)
+            validate_str("taskstatus", param, safe, RX_STATUS, optional=True)
+            validate_str("ddmreqid", param, safe, RX_RUCIORULE, optional=True)
         elif method in ['GET']:
-            validate_ustr('subresource', param, safe, RX_SUBRES_TASK, optional=False)
-            validate_ustr("workflow", param, safe, RX_TASKNAME, optional=True)
-            validate_ustr('taskstatus', param, safe, RX_STATUS, optional=True)
-            validate_ustr('username', param, safe, RX_USERNAME, optional=True)
-            validate_ustr('minutes', param, safe, RX_RUNS, optional=True)
+            validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
+            validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
+            validate_str('taskstatus', param, safe, RX_STATUS, optional=True)
+            validate_str('username', param, safe, RX_USERNAME, optional=True)
+            validate_str('minutes', param, safe, RX_RUNS, optional=True)
 
     @restcall
     def get(self, subresource, **kwargs):
@@ -285,7 +285,7 @@ class RESTTask(RESTEntity):
         workflow = kwargs['workflow']
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
 
-        self.api.modify(self.Task.UpdateSchedd_sql, scheddname=[str(kwargs['scheddname'])], workflow=[workflow])
+        self.api.modify(self.Task.UpdateSchedd_sql, scheddname=[kwargs['scheddname']], workflow=[workflow])
 
         return []
 
@@ -320,7 +320,7 @@ class RESTTask(RESTEntity):
         workflow = kwargs['workflow']
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
 
-        self.api.modify(self.Task.UpdateWebUrl_sql, webdirurl=[str(kwargs['webdirurl'])], workflow=[workflow])
+        self.api.modify(self.Task.UpdateWebUrl_sql, webdirurl=[kwargs['webdirurl']], workflow=[workflow])
 
         return []
 

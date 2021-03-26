@@ -10,7 +10,8 @@ from base64 import b64decode
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.REST.Validation import validate_ustr, validate_ustrlist, validate_num, validate_real
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_ustr, validate_ustrlist,\
+    validate_num, validate_real
 from WMCore.Services.TagCollector.TagCollector import TagCollector
 from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
 
@@ -43,6 +44,7 @@ class RESTUserWorkflow(RESTEntity):
     def _expandSites(self, sites, pnn=False):
         """Check if there are sites cotaining the '*' wildcard and convert them in the corresponding list
            Raise exception if any wildcard site does expand to an empty list
+           note that all*names.sites come from an HTTP query to CRIC which returns JSON and thus are unicode
         """
         res = set()
         for site in sites:
@@ -333,37 +335,38 @@ class RESTUserWorkflow(RESTEntity):
             username = cherrypy.request.user['login'] # username registered in CMS WEB frontend
             requestname = param.kwargs['workflow']
             param.kwargs['workflow'] = generateTaskName(username, requestname)
-            validate_ustr("workflow", param, safe, RX_TASKNAME, optional=False)
-            validate_ustr("activity", param, safe, RX_ACTIVITY, optional=True)
-            validate_ustr("jobtype", param, safe, RX_JOBTYPE, optional=False)
+            validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
+            validate_str("activity", param, safe, RX_ACTIVITY, optional=True)
+            validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
             # TODO this should be changed to be non-optional
-            validate_ustr("generator", param, safe, RX_GENERATOR, optional=True)
-            validate_ustr("eventsperlumi", param, safe, RX_LUMIEVENTS, optional=True)
-            validate_ustr("jobsw", param, safe, RX_CMSSW, optional=False)
+            validate_str("generator", param, safe, RX_GENERATOR, optional=True)
+            validate_str("eventsperlumi", param, safe, RX_LUMIEVENTS, optional=True)
+            validate_str("jobsw", param, safe, RX_CMSSW, optional=False)
             validate_num("nonprodsw", param, safe, optional=False)
-            validate_ustr("jobarch", param, safe, RX_ARCH, optional=False)
+            validate_str("jobarch", param, safe, RX_ARCH, optional=False)
             if not safe.kwargs["nonprodsw"]: #if the user wants to allow non-production releases
                 self._checkReleases(safe.kwargs['jobarch'], safe.kwargs['jobsw'])
             validate_num("useparent", param, safe, optional=True)
-            validate_ustr("secondarydata", param, safe, RX_DATASET, optional=True)
+            validate_str("secondarydata", param, safe, RX_DATASET, optional=True)
+            # site black/white list needs to be cast to unicode for later use in self._expandSites
             validate_ustrlist("siteblacklist", param, safe, RX_CMSSITE)
             safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
             validate_ustrlist("sitewhitelist", param, safe, RX_CMSSITE)
             safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
-            validate_ustr("splitalgo", param, safe, RX_SPLIT, optional=False)
+            validate_str("splitalgo", param, safe, RX_SPLIT, optional=False)
             validate_num("algoargs", param, safe, optional=False)
             try:
                 validate_num("totalunits", param, safe, optional=True)
             except InvalidParameter:
                 validate_real("totalunits", param, safe, optional=True)
-            validate_ustr("cachefilename", param, safe, RX_CACHENAME, optional=False)
-            validate_ustr("debugfilename", param, safe, RX_CACHENAME, optional=True)
-            validate_ustr("cacheurl", param, safe, RX_CACHEURL, optional=False)
-            validate_ustr("lfn", param, safe, RX_LFN, optional=True)
+            validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
+            validate_str("debugfilename", param, safe, RX_CACHENAME, optional=True)
+            validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
+            validate_str("lfn", param, safe, RX_LFN, optional=True)
             self._checkOutLFN(safe.kwargs, username)
-            validate_ustrlist("addoutputfiles", param, safe, RX_ADDFILE, custom_err="Incorrect 'JobType.outputFiles' parameter. " \
+            validate_strlist("addoutputfiles", param, safe, RX_ADDFILE, custom_err="Incorrect 'JobType.outputFiles' parameter. " \
                     "Allowed regexp for each filename: '%s'." % RX_ADDFILE.pattern)
-            validate_ustrlist("userfiles", param, safe, RX_USERFILE, custom_err="Incorrect 'Data.userInputFiles' parameter. " \
+            validate_strlist("userfiles", param, safe, RX_USERFILE, custom_err="Incorrect 'Data.userInputFiles' parameter. " \
                     "Allowed regexp for each filename: '%s'." % RX_USERFILE.pattern)
             validate_num("savelogsflag", param, safe, optional=False)
             validate_num("saveoutput", param, safe, optional=True)
@@ -371,10 +374,10 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("ignorelocality", param, safe, optional=True)
             if safe.kwargs['ignorelocality'] and self.centralcfg.centralconfig.get('ign-locality-blacklist', []):
                 safe.kwargs['siteblacklist'] += self._expandSites(self.centralcfg.centralconfig['ign-locality-blacklist'])
-            validate_ustr("vorole", param, safe, RX_VOPARAMS, optional=True)
-            validate_ustr("vogroup", param, safe, RX_VOPARAMS, optional=True)
+            validate_str("vorole", param, safe, RX_VOPARAMS, optional=True)
+            validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
             validate_num("publication", param, safe, optional=False)
-            validate_ustr("publishdbsurl", param, safe, RX_DBSURL, optional=(not bool(safe.kwargs['publication'])))
+            validate_str("publishdbsurl", param, safe, RX_DBSURL, optional=(not bool(safe.kwargs['publication'])))
 
             ## We might want to remove publishname once the backward compatibility
             ## wont be needed anymore. Then we can just keep publishname2
@@ -383,14 +386,14 @@ class RESTUserWorkflow(RESTEntity):
             ## The following two lines will be removed in the future once we will
             ## not need backward compatibility anymore
             self._checkPublishDataName(param.kwargs, safe.kwargs['lfn'], requestname, username)
-            validate_ustr('publishname', param, safe, RX_ANYTHING, optional=True)
+            validate_str('publishname', param, safe, RX_ANYTHING, optional=True)
 
             ##And this if as well, just do self._checkPublishDataName2(param.kwargs, safe.kwargs['lfn'], requestname, username)
             if not safe.kwargs["publishname"]: #new clients won't define this anymore
                 ## The (user specified part of the) publication dataset name must be
                 ## specified and must pass DBS validation. Since this is the correct
                 ## validation function, it must be done before the
-                ## validate_ustr("publishname", ...) we have below.
+                ## validate_str("publishname", ...) we have below.
                 self._checkPublishDataName2(param.kwargs, safe.kwargs['lfn'], requestname, username)
             else:
                 param.kwargs["publishname2"] = safe.kwargs["publishname"]
@@ -398,7 +401,7 @@ class RESTUserWorkflow(RESTEntity):
             ## 'publishname' was already validated above in _checkPublishDataName().
             ## Calling validate_ustr with a fake regexp to move the param to the
             ## list of validated inputs
-            validate_ustr("publishname2", param, safe, RX_ANYTHING, optional=True)
+            validate_str("publishname2", param, safe, RX_ANYTHING, optional=True)
 
             validate_num("publishgroupname", param, safe, optional=True)
 
@@ -421,11 +424,11 @@ class RESTUserWorkflow(RESTEntity):
             ## an input dataset is defined (scriptExe may not define an input).
             ## Once we don't care anymore about backward compatibility with client < 3.3.1511,
             ## we can uncomment the 1st line below and delete the next 4 lines.
-            #validate_ustr("inputdata", param, safe, RX_DATASET, optional=True)
+            #validate_str("inputdata", param, safe, RX_DATASET, optional=True)
             if safe.kwargs['jobtype'] == 'Analysis' and not safe.kwargs['userfiles'] and 'inputdata' in param.kwargs:
-                validate_ustr("inputdata", param, safe, RX_DATASET, optional=True)
+                validate_str("inputdata", param, safe, RX_DATASET, optional=True)
             else:
-                validate_ustr("inputdata", param, safe, RX_ANYTHING, optional=True)
+                validate_str("inputdata", param, safe, RX_ANYTHING, optional=True)
 
             ## The client is not forced to define the primary dataset. So make sure to have
             ## defaults or take it from the input dataset. The primary dataset is needed for
@@ -444,10 +447,11 @@ class RESTUserWorkflow(RESTEntity):
             ## because in the future we may want to give the possibility to users to publish
             ## a posteriori.
             self._checkPrimaryDataset(param.kwargs, optional=False)
-            validate_ustr("primarydataset", param, safe, RX_LFNPRIMDS, optional=False)
+            validate_str("primarydataset", param, safe, RX_LFNPRIMDS, optional=False)
 
             validate_num("nonvaliddata", param, safe, optional=True)
             #if one and only one between outputDatasetTag and publishDbsUrl is set raise an error (we need both or none of them)
+            # asyncdest needs to be cast to unicode for later use in self._checkASODestination
             validate_ustr("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkASODestination(safe.kwargs['asyncdest'])
             # We no longer use this attribute, but keep it around for older client compatibility
@@ -457,31 +461,31 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("maxjobruntime", param, safe, optional=True)
             validate_num("numcores", param, safe, optional=True)
             validate_num("maxmemory", param, safe, optional=True)
-            validate_ustr("dbsurl", param, safe, RX_DBSURL, optional=False)
-            validate_ustrlist("tfileoutfiles", param, safe, RX_OUTFILES, custom_err="Incorrect tfileoutfiles parameter (TFileService). " \
+            validate_str("dbsurl", param, safe, RX_DBSURL, optional=False)
+            validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES, custom_err="Incorrect tfileoutfiles parameter (TFileService). " \
                     "Allowed regexp: '%s'." % RX_OUTFILES.pattern)
-            validate_ustrlist("edmoutfiles", param, safe, RX_OUTFILES, custom_err="Incorrect edmoutfiles parameter (PoolOutputModule). " \
+            validate_strlist("edmoutfiles", param, safe, RX_OUTFILES, custom_err="Incorrect edmoutfiles parameter (PoolOutputModule). " \
                     "Allowed regexp: '%s'." % RX_OUTFILES.pattern)
-            validate_ustrlist("runs", param, safe, RX_RUNS)
-            validate_ustrlist("lumis", param, safe, RX_LUMIRANGE)
+            validate_strlist("runs", param, safe, RX_RUNS)
+            validate_strlist("lumis", param, safe, RX_LUMIRANGE)
             if len(safe.kwargs["runs"]) != len(safe.kwargs["lumis"]):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
-            validate_ustrlist("adduserfiles", param, safe, RX_ADDFILE)
-            validate_ustr("asourl", param, safe, RX_ASOURL, optional=True)
-            validate_ustr("asodb", param, safe, RX_ASODB, optional=True)
+            validate_strlist("adduserfiles", param, safe, RX_ADDFILE)
+            validate_str("asourl", param, safe, RX_ASOURL, optional=True)
+            validate_str("asodb", param, safe, RX_ASODB, optional=True)
             safe.kwargs["asourl"], safe.kwargs["asodb"] = self._getAsoConfig(safe.kwargs["asourl"], safe.kwargs["asodb"])
-            validate_ustr("scriptexe", param, safe, RX_ADDFILE, optional=True)
-            validate_ustrlist("scriptargs", param, safe, RX_SCRIPTARGS)
-            validate_ustr("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
-            validate_ustr("collector", param, safe, RX_COLLECTOR, optional=True)
-            validate_ustrlist("extrajdl", param, safe, RX_SCRIPTARGS)
+            validate_str("scriptexe", param, safe, RX_ADDFILE, optional=True)
+            validate_strlist("scriptargs", param, safe, RX_SCRIPTARGS)
+            validate_str("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
+            validate_str("collector", param, safe, RX_COLLECTOR, optional=True)
+            validate_strlist("extrajdl", param, safe, RX_SCRIPTARGS)
             validate_num("dryrun", param, safe, optional=True)
             validate_num("ignoreglobalblacklist", param, safe, optional=True)
 
         elif method in ['POST']:
-            validate_ustr("workflow", param, safe, RX_TASKNAME, optional=False)
-            validate_ustr("subresource", param, safe, RX_SUBRESTAT, optional=True)
-            validate_ustrlist('jobids', param, safe, RX_JOBID)
+            validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
+            validate_str("subresource", param, safe, RX_SUBRESTAT, optional=True)
+            validate_strlist('jobids', param, safe, RX_JOBID)
             ## In a resubmission, the site black- and whitelists need to be interpreted
             ## differently than in an initial task submission. If there is no site black-
             ## or whitelist, set it to None and DataWorkflow will use the corresponding
@@ -512,10 +516,10 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("publication", param, safe, optional=True)
 
         elif method in ['GET']:
-            validate_ustr("workflow", param, safe, RX_TASKNAME, optional=True)
-            validate_ustr('subresource', param, safe, RX_SUBRESTAT, optional=True)
-            validate_ustr('username', param, safe, RX_USERNAME, optional=True)
-            validate_ustr('timestamp', param, safe, RX_DATE, optional=True) ## inserted by eric
+            validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
+            validate_str('subresource', param, safe, RX_SUBRESTAT, optional=True)
+            validate_str('username', param, safe, RX_USERNAME, optional=True)
+            validate_str('timestamp', param, safe, RX_DATE, optional=True) ## inserted by eric
 
             ## Used to determine how much information to return to the client for status.
             ## also used by report to determine if it has to check job states
@@ -524,14 +528,14 @@ class RESTUserWorkflow(RESTEntity):
             ## used by get log, get data
             validate_num('limit', param, safe, optional=True)
             validate_num('exitcode', param, safe, optional=True)
-            validate_ustrlist('jobids', param, safe, RX_JOBID)
+            validate_strlist('jobids', param, safe, RX_JOBID)
 
             ## used by errors and report (short format in report means we do not query DBS)
             validate_num('shortformat', param, safe, optional=True)
 
             # used by publicationStatus
-            validate_ustr("asourl", param, safe, RX_ASOURL, optional=True)
-            validate_ustr("asodb", param, safe, RX_ASODB, optional=True)
+            validate_str("asourl", param, safe, RX_ASOURL, optional=True)
+            validate_str("asodb", param, safe, RX_ASODB, optional=True)
 
             ## validation parameters
             if not safe.kwargs['workflow'] and safe.kwargs['subresource']:
@@ -540,9 +544,9 @@ class RESTUserWorkflow(RESTEntity):
                 raise InvalidParameter("You need to specify the number of jobs to retrieve or their ids.")
 
         elif method in ['DELETE']:
-            validate_ustr("workflow", param, safe, RX_TASKNAME, optional=False)
+            validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_num("force", param, safe, optional=True)
-            validate_ustr("killwarning", param, safe, RX_TEXT_FAIL, optional=True)
+            validate_str("killwarning", param, safe, RX_TEXT_FAIL, optional=True)
             #decode killwarning message if present
             if safe.kwargs['killwarning']:
                 try:
