@@ -591,7 +591,7 @@ class tempSetLogLevel():
     def __exit__(self,a,b,c):
         self.logger.setLevel(self.previousLogLevel)
 
-def uploadToS3 (restServer=None, instance='prod', filepath=None, object=None,
+def uploadToS3 (restServer=None, instance='prod', filepath=None, object=None,  # pylint: disable=redefined-builtin
                 taskname=None, bucket='CRABCache', logger=None):
     """
     one call to make a 2-step operation:
@@ -662,8 +662,6 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
     key = preSignedUrlFields['key']
     url = preSignedUrlFields['url']   # N.B. this contains the bucket name e.g. https://s3.cern.ch/bucket1
 
-
-    urlToUpload = url
     userAgent = 'CRAB'
 
     uploadCommand = 'curl -v -X POST '
@@ -684,7 +682,7 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
         raise Exception('Failed to upload file. Stderr is:\n%s' % stderr)
     return
 
-def retrieveFromS3 (restServer=None, instance='prod', object=None,
+def retrieveFromS3 (restServer=None, instance='prod', object=None,  # pylint: disable=redefined-builtin
                 taskname=None, bucket='CRABCache', logger=None):
     """
     obtains a preSignedUrl from crabserver RESTCache and use it to upload a file

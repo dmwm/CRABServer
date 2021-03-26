@@ -7,7 +7,7 @@ from botocore.exceptions import ClientError
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str
-from WMCore.REST.Error import MissingParameter, ExecutionError, InvalidParameter
+from WMCore.REST.Error import MissingParameter, ExecutionError
 
 # CRABServer dependecies here
 from CRABInterface.RESTExtensions import authz_login_valid
@@ -62,7 +62,7 @@ class RESTCache(RESTEntity):
             validate_str('username', param, safe, RX_USERNAME, optional=True)
 
     @restcall
-    def get(self, subresource, object, taskname, username):
+    def get(self, subresource, object, taskname, username):  # pylint: disable=redefined-builtin
         """Retrieves the server information, like delegateDN, filecacheurls ...
            :arg str subresource: the specific server information to be accessed;
         """
