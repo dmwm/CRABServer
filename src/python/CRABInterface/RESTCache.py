@@ -170,7 +170,7 @@ class RESTCache(RESTEntity):
             return fileNames
 
         if subresource == 'used':
-            # return spare used by username, in MBytes (rounded to integer)
+            # return space used by username, in MBytes (rounded to integer)
             if not username:
                 raise MissingParameter('username is missing')
             paginator = self.s3_client.get_paginator('list_objects_v2')
@@ -184,5 +184,6 @@ class RESTCache(RESTEntity):
             for page in page_iterator:
                 for item in page['Contents']:
                     usedBytes += item['Size']
-            usedMBytes = usedBytes / 1024 / 1024
-            return usedMBytes
+            usedMBytes = usedBytes // 1024 // 1024
+            # WMCore REST wants to return lists
+            return [usedMBytes]
