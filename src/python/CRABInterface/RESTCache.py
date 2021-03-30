@@ -15,6 +15,17 @@ from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import RX_SUBRES_CACHE, RX_CACHE_OBJECT, RX_TASKNAME, RX_USERNAME, RX_CACHENAME
 from ServerUtilities import getUsernameFromTaskname
 
+
+def fromNewBytesToString(inString):
+    # since taskname and object come from WMCore validate_str they are newbytes objects
+    # and type(objectPath) is <class 'future.types.newbytes.newbytes'> which breaks
+    # python2 S3 transfer code with a keyError
+    # here's an awful hack to turn those newbytes into an old-fashioned py2 string
+    outString = ''  # a string
+    for i in inString:  # subscripting a newbytes string gets tha ASCII value of the char !
+        outString += chr(i)  # from ASCII numerical value to python2 string
+    return outString
+
 class RESTCache(RESTEntity):
     """
     REST entity for accessing CRAB Cache on S3
@@ -116,13 +127,7 @@ class RESTCache(RESTEntity):
             ownerName = getUsernameFromTaskname(taskname)
             # TODO insert here code to check if username is authorized to read this object
             objectPath = ownerName + '/' + taskname + '/' + object
-            # since taskname and object come from WMCore validate_str they are newbytes objects
-            # and type(objectPath) is <class 'future.types.newbytes.newbytes'> which breaks
-            # python2 S3 transfer code with a keyError
-            # here's an awful hack to turn those newbytes into an old-fashioned py2 string
-            objectName = ''  # a string
-            for i in objectPath:  # subscripting a newbytes string gets tha ASCII value of the char !
-                objectName += chr(i)  # from ASCII numerical value to python2 string
+            objectName = fromNewBytesToString(objectPath)
 
             # download from S3 into a temporary file, read it, and return content to caller
             tempFile = '/tmp/boto.' + uuid.uuid4().hex
@@ -152,11 +157,12 @@ class RESTCache(RESTEntity):
             #
             fileNames = []
             paginator = self.s3_client.get_paginator('list_objects_v2')
+            user = fromNewBytesToString(username)
             operation_parameters = {'Bucket': self.s3_bucket,
-                                    'Prefix': username}
+                                    'Prefix': user}
             page_iterator = paginator.paginate(**operation_parameters)
             for page in page_iterator:
-                namesInPage = [item['Key'].lstrip(username+'/') for item in page['Contents']]
+                namesInPage = [item['Key'].lstrip(user+'/') for item in page['Contents']]
                 fileNames += namesInPage
             if object:
                 filteredFileNames = [f for f in fileNames if object in f]
@@ -168,8 +174,9 @@ class RESTCache(RESTEntity):
             if not username:
                 raise MissingParameter('username is missing')
             paginator = self.s3_client.get_paginator('list_objects_v2')
+            user = fromNewBytesToString(username)
             operation_parameters = {'Bucket': self.s3_bucket,
-                                    'Prefix': username}
+                                    'Prefix': user}
             page_iterator = paginator.paginate(**operation_parameters)
             # S3 records object size in bytes, see:
             # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects_v2
