@@ -1,6 +1,8 @@
 """
 This contains some utility methods to share between the server and the client, or by the server components themself
 """
+# this is a weird and unclear message from pylint, better to ignore it
+# pylint: disable=W0715
 
 from __future__ import print_function
 from __future__ import division
@@ -593,7 +595,7 @@ class tempSetLogLevel():
         self.logger.setLevel(self.previousLogLevel)
 
 def uploadToS3 (restServer=None, instance='prod', filepath=None, object=None,  # pylint: disable=redefined-builtin
-                taskname=None, bucket='CRABCache', logger=None):
+                taskname=None, cachename=None, bucket='CRABCache', logger=None):
     """
     one call to make a 2-step operation:
     obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
@@ -602,6 +604,7 @@ def uploadToS3 (restServer=None, instance='prod', filepath=None, object=None,  #
     :param filepath: string : the full path of the file to upload
     :param object: string : the kind of object to upload: clientlog|twlog|sandbox|debugfiles
     :param taskname: string : the task this object belongs to
+    :param cachename: string : when uploading sandbox taskname is not used but cachename is needed
     :param bucket: string : the name of the bucket in s3.cern.ch where to upload
     :return: nothing. Raises an exception in case of error
     """
@@ -611,7 +614,8 @@ def uploadToS3 (restServer=None, instance='prod', filepath=None, object=None,  #
     uri = uriNoApi + api
     dataDict = {'subresource':'upload',
                 'object':object,
-                'taskname':taskname}
+                'taskname':taskname,
+                'cachename':cachename}
     data = encodeRequest(dataDict)
     try:
         # calls to restServer alway return a 3-ple ({'result':'string'}, HTTPcode, HTTPreason)
