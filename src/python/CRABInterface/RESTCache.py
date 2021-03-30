@@ -58,6 +58,7 @@ class RESTCache(RESTEntity):
         endpoint = 'https://s3.cern.ch'
         self.s3_client = boto3.client('s3', endpoint_url=endpoint, aws_access_key_id=access_key,
                                       aws_secret_access_key=secret_key, verify=False)
+        # TODO need a way to identify if I am instance prod/preprod/dev and set proper bucket
         self.s3_bucket = 'bucket1'
 
     def validate(self, apiobj, method, api, param, safe):
@@ -65,7 +66,7 @@ class RESTCache(RESTEntity):
         authz_login_valid()
         if method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_CACHE, optional=False)
-            validate_str('object', param, safe, RX_CACHE_OBJECT, optional=False)
+            validate_str('object', param, safe, RX_CACHE_OBJECT, optional=True)
             validate_str('taskname', param, safe, RX_TASKNAME, optional=True)
             validate_str('username', param, safe, RX_USERNAME, optional=True)
             validate_str('cachename', param, safe, RX_CACHENAME, optional=True)
