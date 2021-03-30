@@ -12,7 +12,7 @@ from WMCore.REST.Error import MissingParameter, ExecutionError
 
 # CRABServer dependecies here
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_SUBRES_CACHE, RX_CACHE_OBJECT, RX_TASKNAME, RX_USERNAME
+from CRABInterface.Regexps import RX_SUBRES_CACHE, RX_CACHE_OBJECT, RX_TASKNAME, RX_USERNAME, RX_CACHENAME
 from ServerUtilities import getUsernameFromTaskname
 
 class RESTCache(RESTEntity):
@@ -20,11 +20,18 @@ class RESTCache(RESTEntity):
     REST entity for accessing CRAB Cache on S3
     Supports only GET method
 
+    As per the S3 buckt structure in https://github.com/dmwm/CRABServer/wiki/CRABCache-replacement-with-S3
+    objects in S3 are always under a <username> prefix. The there is a <taskname> level and for each
+    task we write a unique clientlog, taskworkerlog, debugfiles tarball, which gets overwritten whenever e.g.
+    log is updated.
+    Instead sandboxes get their own directory and the usual hash as a name, so that they can be
+    identified and reused across tasks
+
     These return a presigned URL for uploading files:
     GET: /crabserver/prod/cache?subresource=upload&object=clientlog&taskname=<task>
     GET: /crabserver/prod/cache?subresource=upload&object=twlog&taskname=<task>
-    GET: /crabserver/prod/cache?subresource=upload&object=sandbox&taskname=<task>
     GET: /crabserver/prod/cache?subresource=upload&object=debugfiles&taskname=<task>
+    GET: /crabserver/prod/cache?subresource=upload&object=sandbox&cachename=<hash>
     Same URL's with subresource=retrieve instead of subresource=upload return the actual object
     e.g.
     GET: /crabserver/prod/cache?subresource=retrieve&object=clientlog&taskname=<task>
@@ -61,6 +68,7 @@ class RESTCache(RESTEntity):
             validate_str('object', param, safe, RX_CACHE_OBJECT, optional=True)
             validate_str('taskname', param, safe, RX_TASKNAME, optional=True)
             validate_str('username', param, safe, RX_USERNAME, optional=True)
+            validate_str('cachename',param, safe, RX_CACHENAME, optional=True)
 
     @restcall
     def get(self, subresource, object, taskname, username):  # pylint: disable=redefined-builtin
@@ -75,9 +83,13 @@ class RESTCache(RESTEntity):
                 raise MissingParameter("object to upload is missing")
             if not taskname:
                 raise MissingParameter("takskname is missing")
+            if object == 'sandbox' and not cachename:
+                raise MissingParameter("cachename is missing")
             ownerName = getUsernameFromTaskname(taskname)
             # TODO add code here to check that username has authorization
             objectPath = ownerName + '/' + taskname + '/' + object
+            if object == 'sandbox':
+                objectPath += '/' + cachename
             expiration = 3600  # 1 hour is good for testing
             try:
                 response = self.s3_client.generate_presigned_post(
