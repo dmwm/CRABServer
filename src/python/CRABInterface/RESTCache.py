@@ -68,7 +68,7 @@ class RESTCache(RESTEntity):
             validate_str('object', param, safe, RX_CACHE_OBJECT, optional=False)
             validate_str('taskname', param, safe, RX_TASKNAME, optional=True)
             validate_str('username', param, safe, RX_USERNAME, optional=True)
-            validate_str('cachename',param, safe, RX_CACHENAME, optional=True)
+            validate_str('cachename', param, safe, RX_CACHENAME, optional=True)
 
     @restcall
     def get(self, subresource, object, taskname, username, cachename):  # pylint: disable=redefined-builtin
