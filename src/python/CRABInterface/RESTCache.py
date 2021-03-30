@@ -65,13 +65,13 @@ class RESTCache(RESTEntity):
         authz_login_valid()
         if method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_CACHE, optional=False)
-            validate_str('object', param, safe, RX_CACHE_OBJECT, optional=True)
+            validate_str('object', param, safe, RX_CACHE_OBJECT, optional=False)
             validate_str('taskname', param, safe, RX_TASKNAME, optional=True)
             validate_str('username', param, safe, RX_USERNAME, optional=True)
             validate_str('cachename',param, safe, RX_CACHENAME, optional=True)
 
     @restcall
-    def get(self, subresource, object, taskname, username):  # pylint: disable=redefined-builtin
+    def get(self, subresource, object, taskname, username, cachename):  # pylint: disable=redefined-builtin
         """
            :arg str subresource: the specific information to be accessed;
         """
