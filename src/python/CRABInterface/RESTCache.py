@@ -30,13 +30,13 @@ class RESTCache(RESTEntity):
     GET: /crabserver/prod/cache?subresource=retrieve&object=clientlog&taskname=<task>
 
     These retun information about usage
-    GET: /crabserver/prod/cache?subresource=list&username=<username>
+    GET: /crabserver/prod/cache?subresource=list&username=<username>&object=<object>
     GET: /crabserver/prod/cache?subresource=used&username=<username>
 
     AUTHORIZATION
-    users will only be able to get an upload PS URL for their tasks
-    retieve of sandbox will be restricted to owners
-    retrieve of logs and debut files will be free
+    users will only be able to get an upload PreSigned URL for their tasks
+    retrieve of sandbox will be restricted to owners
+    retrieve of logs and debug files will be free
     CRAB operators will have full access
     """
 
@@ -45,12 +45,12 @@ class RESTCache(RESTEntity):
         self.logger = logging.getLogger("CRABLogger:RESTCache")
 
         # TODO: read these from secret file
-        access_key="5d4270f1e022442783646c34cf552d55"
-        secret_key="310e1af0fe7a43f1a2477fb77e3a5101"
+        access_key = "5d4270f1e022442783646c34cf552d55"
+        secret_key = "310e1af0fe7a43f1a2477fb77e3a5101"
         # TODO take this from rest config json file ? worry about transition from old to new !
         endpoint = 'https://s3.cern.ch'
         self.s3_client = boto3.client('s3', endpoint_url=endpoint, aws_access_key_id=access_key,
-                                 aws_secret_access_key=secret_key, verify=False)
+                                      aws_secret_access_key=secret_key, verify=False)
         self.s3_bucket = 'bucket1'
 
     def validate(self, apiobj, method, api, param, safe):
@@ -64,11 +64,13 @@ class RESTCache(RESTEntity):
 
     @restcall
     def get(self, subresource, object, taskname, username):  # pylint: disable=redefined-builtin
-        """Retrieves the server information, like delegateDN, filecacheurls ...
-           :arg str subresource: the specific server information to be accessed;
+        """
+           :arg str subresource: the specific information to be accessed;
         """
 
         if subresource == 'upload':
+            # returns a dictionary with the information to upload a file with a POST
+            # via a "PreSigned URL"
             if not object:
                 raise MissingParameter("object to upload is missing")
             if not taskname:
@@ -76,7 +78,7 @@ class RESTCache(RESTEntity):
             ownerName = getUsernameFromTaskname(taskname)
             # TODO add code here to check that username has authorization
             objectPath = ownerName + '/' + taskname + '/' + object
-            expiration = 3600
+            expiration = 3600  # 1 hour is good for testing
             try:
                 response = self.s3_client.generate_presigned_post(
                     self.s3_bucket, objectPath, ExpiresIn=expiration)
@@ -93,6 +95,7 @@ class RESTCache(RESTEntity):
             return [preSignedUrl['url'], preSignedUrl['fields']]
 
         if subresource == 'retrieve':
+            # downloads a file from S3 to /tmp and serves it to the client
             if not object:
                 raise MissingParameter("object to upload is missing")
             if not taskname:
@@ -121,14 +124,45 @@ class RESTCache(RESTEntity):
             return txt
 
         if subresource == 'list':
+            # list all files (aka objects, aka keys in S3 lingo) for a given usermame
+            # if arg object is present, returns only the file names for that object
             if not username:
                 raise MissingParameter('username is missing')
-            response = self.s3_client.list_objects(Bucket=self.s3_bucket)
-            fullList = [object['Key'] for object in response['Contents']]
-            return fullList
+            # In S3 we always need to retrieve all keys even if some filtering/compression
+            # will be applied before reporting, since there is a limit of 1K key per call,
+            # multiple calls will be needed, S3 paginators make that easy
+            # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/paginators.html
+            # We use S3 prefix to limit retrieved list to a user, since in our buckets
+            # file keys always have the form <username>/... see:
+            # https://github.com/dmwm/CRABServer/wiki/CRABCache-replacement-with-S3#bucket-organization  and
+            # https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-prefixes.html
+            #
+            fileNames = []
+            paginator = self.s3_client.get_paginator('list_objects_v2')
+            operation_parameters = {'Bucket': self.s3_bucket,
+                                    'Prefix': username}
+            page_iterator = paginator.paginate(**operation_parameters)
+            for page in page_iterator:
+                namesInPage = [item['Key'].lstrip(username+'/') for item in page['Contents']]
+                fileNames += namesInPage
+            if object:
+                filteredFileNames = [f for f in fileNames if object in f]
+                fileNames = filteredFileNames
+            return fileNames
 
         if subresource == 'used':
+            # return spare used by username, in MBytes (rounded to integer)
             if not username:
                 raise MissingParameter('username is missing')
-            usedSpace = '218 MBytes'
-            return usedSpace
+            paginator = self.s3_client.get_paginator('list_objects_v2')
+            operation_parameters = {'Bucket': self.s3_bucket,
+                                    'Prefix': username}
+            page_iterator = paginator.paginate(**operation_parameters)
+            # S3 records object size in bytes, see:
+            # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects_v2
+            usedBytes = 0
+            for page in page_iterator:
+                for item in page['Contents']:
+                    usedBytes += item['Size']
+            usedMBytes = usedBytes / 1024 / 1024
+            return usedMBytes
