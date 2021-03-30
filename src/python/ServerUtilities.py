@@ -1,6 +1,8 @@
 """
 This contains some utility methods to share between the server and the client, or by the server components themself
 """
+# this is a weird and unclear message from pylint, better to ignore it
+# pylint: disable=W0715
 
 from __future__ import print_function
 from __future__ import division
