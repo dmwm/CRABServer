@@ -15,7 +15,7 @@ from ServerUtilities import encodeRequest, oracleOutputMapping
 from ServerUtilities import TRANSFERDB_STATES, PUBLICATIONDB_STATES
 
 MONIT = 'http://monit-metrics:10012/'
-CMSWEB = 'cmsweb.cern.ch'
+CMSWEB = 'cmsweb.cern.ch:8443'
 CERTIFICATE = '/data/certs/servicecert.pem'
 KEY = '/data/certs/servicekey.pem'
 DATA_SOURCE_URL = '/crabserver/prod/filetransfers'
