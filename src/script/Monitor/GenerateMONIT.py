@@ -121,7 +121,7 @@ class CRAB3CreateJson(object):
         self.resthost = resthost
         self.pool = ''
         self.schedds = []
-        self.resthost = "cmsweb.cern.ch"
+        self.resthost = "cmsweb.cern.ch:8443"
         # use child collector on port 9620 to get schedd attributes
         collName = "cmsgwms-collector-global.cern.ch:9620,cmsgwms-collector-global.fnal.gov:9620"
         self.coll = htcondor.Collector(collName)
