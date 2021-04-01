@@ -71,14 +71,9 @@ class RESTCache(RESTEntity):
         modname, item = config.s3.rsplit(".", 1)
         module = __import__(modname, globals(), locals(), [item])
         s3Dict = getattr(module, item)
-        #import pprint
-        #pprint.pprint(s3Dict)
-        #import pdb; pdb.set_trace()
         access_key = s3Dict['access_key']
         secret_key = s3Dict['secret_key']
 
-        #access_key = "5d4270f1e022442783646c34cf552d55"
-        #secret_key = "310e1af0fe7a43f1a2477fb77e3a5101"
         # TODO take these two from rest config json file
         endpoint = 'https://s3.cern.ch'
         self.s3_bucket = 'bucket1'
