@@ -61,16 +61,30 @@ class RESTCache(RESTEntity):
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
         self.logger = logging.getLogger("CRABLogger:RESTCache")
+        # get S3 connection secrets from the CRABServerAuth file in the same way
+        # as done for DB connection secrets. That file needs to contain an "s3"
+        # dictionary with keys: access_key, secret_key
+        # and config.py file for crabserver needs to point to it via the line
+        # data.s3 = 'CRABServerAuth.s3'
+        # following lines are copied from
+        # https://github.com/dmwm/WMCore/blob/77a1ae719757a1eef766f8fb0c9f29ce6fcd2275/src/python/WMCore/REST/Server.py#L1735
+        modname, item = config.s3.rsplit(".", 1)
+        module = __import__(modname, globals(), locals(), [item])
+        s3Dict = getattr(module, item)
+        #import pprint
+        #pprint.pprint(s3Dict)
+        #import pdb; pdb.set_trace()
+        access_key = s3Dict['access_key']
+        secret_key = s3Dict['secret_key']
 
-        # TODO: read these from secret file
-        access_key = "5d4270f1e022442783646c34cf552d55"
-        secret_key = "310e1af0fe7a43f1a2477fb77e3a5101"
-        # TODO take this from rest config json file ? worry about transition from old to new !
+        #access_key = "5d4270f1e022442783646c34cf552d55"
+        #secret_key = "310e1af0fe7a43f1a2477fb77e3a5101"
+        # TODO take these two from rest config json file
         endpoint = 'https://s3.cern.ch'
+        self.s3_bucket = 'bucket1'
+
         self.s3_client = boto3.client('s3', endpoint_url=endpoint, aws_access_key_id=access_key,
                                       aws_secret_access_key=secret_key, verify=False)
-        # TODO need a way to identify if I am instance prod/preprod/dev and set proper bucket
-        self.s3_bucket = 'bucket1'
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
