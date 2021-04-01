@@ -626,6 +626,10 @@ def uploadToS3 (restServer=None, instance='prod', filepath=None, object=None,  #
         raise Exception('Failed to get PreSignedURL from CRAB Server:\n%s' % str(e))
     # prepare a single dictionary with curl arguments for the actual upload
     url = result[0]
+    if not url and object == 'sandbox':
+        # in this case a null string as url indicates that sandbox with this name is there already
+        logger.info("%s %s is already in the S3 store, do not upload again", object, cachename)
+        return
     fields = result[1]
     preSignedUrl = {'url':url}
     preSignedUrl.update(fields)
