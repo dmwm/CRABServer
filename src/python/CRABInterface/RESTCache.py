@@ -90,7 +90,9 @@ class RESTCache(RESTEntity):
 
         if subresource == 'upload':
             # returns a dictionary with the information to upload a file with a POST
-            # via a "PreSigned URL"
+            # via a "PreSigned URL". It can return  an empty string '' as URL to indicate that
+            # a sandbox upload request refers to an existing object with same name
+            # WMCore REST does not allow to return None
             if not object:
                 raise MissingParameter("object to upload is missing")
             if not taskname:
@@ -100,8 +102,19 @@ class RESTCache(RESTEntity):
             ownerName = getUsernameFromTaskname(taskname)
             # TODO add code here to check that username has authorization
             objectPath = ownerName + '/' + taskname + '/' + object
+            objectName = fromNewBytesToString(objectPath)
             if object == 'sandbox':
-                objectPath += '/' + cachename
+                objectName += '/' + fromNewBytesToString(cachename)
+                alreadyThere = False
+                try:
+                    # from https://stackoverflow.com/a/38376288
+                    self.s3_client.head_object(Bucket=self.s3_bucket, Key=objectName)
+                    alreadyThere = True
+                except ClientError:
+                    pass
+                if alreadyThere:
+                    # tell client not to upload since same name sandbox is there already
+                    return ["", {}]
             expiration = 3600  # 1 hour is good for testing
             try:
                 response = self.s3_client.generate_presigned_post(
