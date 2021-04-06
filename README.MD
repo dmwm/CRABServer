@@ -6,7 +6,7 @@
 
 ##### 2. Building Docker images
 
-* If RPMs build job was successful, [Jenkins job](https://cmssdt.cern.ch/dmwm-jenkins/job/CRABServer_BuildOnRelease/) that builds Docker images is triggered.  
+* If RPMs build job was successful, [Jenkins job](https://cmssdt.cern.ch/dmwm-jenkins/job/CRABServer_BuildImage/) that builds Docker images is triggered.  
 * Built images are stored in `cmssw/[crabcache|crabserver|crabtaskworker]` Docker Hub repository.
 * After build is done, email notification is sent confirming that overall build process is done with indication whether build failed or succeed. Log is attached to the email for investigation.
 
