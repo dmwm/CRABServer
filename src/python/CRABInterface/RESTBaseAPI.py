@@ -58,7 +58,7 @@ class RESTBaseAPI(DatabaseRESTApi):
                     'filemetadata': RESTFileMetadata(app, self, config, mount),
                     'workflowdb': RESTWorkerWorkflow(app, self, config, mount),
                     'task': RESTTask(app, self, config, mount),
-                    'cache': RESTCache(app, self, config, mount),
+                    'cache': RESTCache(app, self, config, mount, extconfig),
                     'filetransfers': RESTFileTransfers(app, self, config, mount),
                     'fileusertransfers': RESTFileUserTransfers(app, self, config, mount),
                    })

@@ -595,7 +595,7 @@ class tempSetLogLevel():
         self.logger.setLevel(self.previousLogLevel)
 
 def uploadToS3 (restServer=None, instance='prod', filepath=None, object=None,  # pylint: disable=redefined-builtin
-                taskname=None, cachename=None, bucket='CRABCache', logger=None):
+                taskname=None, cachename=None, logger=None):
     """
     one call to make a 2-step operation:
     obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
@@ -605,10 +605,8 @@ def uploadToS3 (restServer=None, instance='prod', filepath=None, object=None,  #
     :param object: string : the kind of object to upload: clientlog|twlog|sandbox|debugfiles
     :param taskname: string : the task this object belongs to
     :param cachename: string : when uploading sandbox taskname is not used but cachename is needed
-    :param bucket: string : the name of the bucket in s3.cern.ch where to upload
     :return: nothing. Raises an exception in case of error
     """
-    bucket = 'bucket1' # for initial testing
     uriNoApi = '/crabserver/' + instance + '/'
     api = 'cache'
     uri = uriNoApi + api
@@ -692,17 +690,15 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
     return
 
 def retrieveFromS3 (restServer=None, instance='prod', object=None,  # pylint: disable=redefined-builtin
-                taskname=None, bucket='CRABCache', logger=None):
+                taskname=None, logger=None):
     """
     obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
     :param restServer: an RESTInteraction/HTTRequest object : points to CRAB Server to use
     :param instance: string : the DB instance for the REST server: prod|preprod|dev
     :param object: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
     :param taskname: string : the task this object belongs to
-    :param bucket: string : the name of the bucket in s3.cern.ch where to look
     :return: the content of the S3 object as a string object
     """
-    bucket = 'bucket1' # for initial testing
     uriNoApi = '/crabserver/' + instance + '/'
     api = 'cache'
     uri = uriNoApi + api
