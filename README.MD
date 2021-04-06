@@ -11,7 +11,7 @@
 * After build is done, email notification is sent confirming that overall build process is done with indication whether build failed or succeed. Log is attached to the email for investigation.
 
 ##### 3. Deploying crabserver
-* crabserver can be deployed to given environment by entering needed parameters in this [Jenkins job](https://cmssdt.cern.ch/dmwm-jenkins/job/CRABServer_Deploy/build?delay=0sec).
+* crabserver can be deployed to given environment by entering needed parameters in this [Jenkins job](https://cmssdt.cern.ch/dmwm-jenkins/job/CRABServer_Deploy_Server/build?delay=0sec).
 * Two parameters should be provided before starting the build job: `DOCKER_IMAGE_TAG` and `ENVIRONMENT`.
 * `DOCKER_IMAGE_TAG` requires to enter image tag that should be deployed.
 * `ENVIRONMENT` requires to enter `k8s` host name where provided tag should be deployed. Default value points to `cmsweb-testbed.cern.ch`.
