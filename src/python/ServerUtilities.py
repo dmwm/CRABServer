@@ -671,7 +671,8 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
 
     userAgent = 'CRAB'
 
-    uploadCommand = 'curl -v -X POST '
+    # curl: -f flag makes it fail if server return HTTP error
+    uploadCommand = 'curl -f -v -X POST '
     uploadCommand += ' -H "User-Agent: %s"' % userAgent
     uploadCommand += ' -F "key=%s"' % key
     uploadCommand += ' -F "AWSAccessKeyId=%s"' % AWSAccessKeyId
