@@ -58,7 +58,7 @@ class RESTBaseAPI(DatabaseRESTApi):
                     'filemetadata': RESTFileMetadata(app, self, config, mount),
                     'workflowdb': RESTWorkerWorkflow(app, self, config, mount),
                     'task': RESTTask(app, self, config, mount),
-                    'cache': RESTCache(app, self, config, mount),
+                    'cache': RESTCache(app, self, config, mount, extconfig),
                     'filetransfers': RESTFileTransfers(app, self, config, mount),
                     'fileusertransfers': RESTFileUserTransfers(app, self, config, mount),
                    })
@@ -80,7 +80,7 @@ class RESTBaseAPI(DatabaseRESTApi):
             kwbinds = self.bindmap(**kwbinds)
             c, _ = self.executemany(sql, kwbinds, *binds)
         trace = cherrypy.request.db["handle"]["trace"]
-        trace and cherrypy.log("%s commit" % trace)
+        trace and cherrypy.log("%s commit" % trace)  # pylint: disable=expression-not-assigned
         cherrypy.request.db["handle"]["connection"].commit()
         return rows([{ "modified": c.rowcount }])
 
