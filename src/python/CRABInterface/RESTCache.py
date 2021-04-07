@@ -74,17 +74,14 @@ class RESTCache(RESTEntity):
         access_key = s3Dict['access_key']
         secret_key = s3Dict['secret_key']
 
-        # TODO take these two from rest config json file
         # in order to use S3 based CRABCache the cacheSSL config. param in rest external config
         # must be set to "endpoint/bucket" e.g. https://s3.cern.ch/<bucketname>
         cacheSSL = extconfig.centralconfig['backend-urls']['cacheSSL']
-        if not 's3' in cacheSSL:
-            raise ExecutionError ("cacheSSL does not contain an S3 endpoint")
+        # make sure any trailing '/' in the cacheSSL url does not end in the bucket name
+        cacheSSL = cacheSSL.rstrip('/')
         bucket = cacheSSL.split('/')[-1]
         endpoint = cacheSSL.rstrip(bucket).rstrip('/')
         self.s3_bucket = bucket
-        #self.s3_bucket = 'bucket1'
-
         self.s3_client = boto3.client('s3', endpoint_url=endpoint, aws_access_key_id=access_key,
                                       aws_secret_access_key=secret_key, verify=False)
 
