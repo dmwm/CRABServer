@@ -1,3 +1,4 @@
+from __future__ import division
 import cx_Oracle as DB
 import socket
 fqdn = socket.getfqdn().lower()
