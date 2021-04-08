@@ -53,7 +53,7 @@ class HTTPRequests(dict):
     is used more in the client.
     """
 
-    def __init__(self, url='localhost', localcert=None, localkey=None, version=__version__,
+    def __init__(self, hostname='localhost', localcert=None, localkey=None, version=__version__,
                  retry=0, logger=None, verbose=False, userAgent='CRAB?'):
         """
         Initialise an HTTP handler
@@ -62,7 +62,7 @@ class HTTPRequests(dict):
         #set up defaults
         self.setdefault("accept_type", 'text/html')
         self.setdefault("content_type", 'application/x-www-form-urlencoded')
-        self.setdefault("host", url)
+        self.setdefault("host", hostname)
         # setup port 8443 for cmsweb services (leave them alone things like personal private VM's)
         if self['host'].startswith("https://cmsweb") or self['host'].startswith("cmsweb"):
             if self['host'].endswith(':8443'):

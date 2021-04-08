@@ -499,7 +499,7 @@ def publishInDBS3(config, taskname, verbose):
     # CRAB REST API's
     REST_filetransfers = restURInoAPI + '/filetransfers'
     REST_task = restURInoAPI + '/task'
-    crabServer = HTTPRequests(url=restHost,
+    crabServer = HTTPRequests(hostname=restHost,
                               localcert=config.General.serviceCert,
                               localkey=config.General.serviceKey,
                               retry=3,

@@ -189,7 +189,7 @@ class Master(object):
         self.REST_workflow = restURInoAPI + '/workflow'
         self.REST_task = restURInoAPI + '/task'
         self.max_files_per_block = self.config.max_files_per_block
-        self.crabServer = HTTPRequests(url=restHost,
+        self.crabServer = HTTPRequests(hostname=restHost,
                                        localcert=self.config.serviceCert,
                                        localkey=self.config.serviceKey,
                                        retry=3,
