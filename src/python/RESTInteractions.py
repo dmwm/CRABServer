@@ -185,7 +185,7 @@ class HTTPRequests(dict):
         raise EnvironmentException("The X509_CERT_DIR variable is not set and the %s directory cannot be found.\n" % caDefault +
                                    "Cannot find the CA certificate path to authenticate the server.")
 
-class CRABRest(dict):
+class CRABRest:
     """
     A convenience class to communicate with CRABServer REST
     Encapsulates an HTTPRequest object (which can be used also with other HTTP servers)
