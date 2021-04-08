@@ -62,7 +62,7 @@ class RESTBaseAPI(DatabaseRESTApi):
                     'fileusertransfers': RESTFileUserTransfers(app, self, config, mount),
                    })
         cacheSSL = extconfig.centralconfig['backend-urls']['cacheSSL']
-        if 's3' in cacheSSL:
+        if 'S3' in cacheSSL.upper():
             self._add({'cache': RESTCache(app, self, config, mount, extconfig)})
 
         self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None) )
