@@ -184,3 +184,41 @@ class HTTPRequests(dict):
             return caDefault
         raise EnvironmentException("The X509_CERT_DIR variable is not set and the %s directory cannot be found.\n" % caDefault +
                                    "Cannot find the CA certificate path to authenticate the server.")
+
+class CRABRest:
+    """
+    A convenience class to communicate with CRABServer REST
+    Encapsulates an HTTPRequest object (which can be used also with other HTTP servers)
+    together with the CRAB DB instance and allows to specify simply the CRAB Server API in
+    the various HTTP methods.
+
+    Add two methods to set and get the DB instance
+    """
+    def __init__(self, hostname='localhost', localcert=None, localkey=None, version=__version__,
+                 retry=0, logger=None, verbose=False, userAgent='CRAB?'):
+        self.server = HTTPRequests(hostname, localcert, localkey, version,
+                                   retry, logger, verbose, userAgent)
+        instance = 'prod'
+        self.uriNoApi = '/crabserver/' + instance + '/'
+
+    def setDbInstance(self, dbInstance='prod'):
+        self.uriNoApi = '/crabserver/' + dbInstance + '/'
+
+    def getDbInstance(self):
+        return self.uriNoApi.rstrip('/').split('/')[-1]
+
+    def get(self, api=None, data=None):
+        uri = self.uriNoApi + api
+        return self.server.get(uri, data)
+
+    def post(self, api=None, data=None):
+        uri = self.uriNoApi + api
+        return self.server.post(uri, data)
+
+    def put(self, api=None, data=None):
+        uri = self.uriNoApi + api
+        return self.server.put(uri, data)
+
+    def delete(self, api=None, data=None):
+        uri = self.uriNoApi + api
+        return self.server.delete(uri, data)
