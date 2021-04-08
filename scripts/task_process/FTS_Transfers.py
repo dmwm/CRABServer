@@ -554,7 +554,7 @@ def algorithm():
     """
 
     # TODO: pass by configuration
-    fts = HTTPRequests(url=FTS_ENDPOINT.split("https://")[1],
+    fts = HTTPRequests(hostname=FTS_ENDPOINT.split("https://")[1],
                        localcert=proxy, localkey=proxy)
 
     logging.info("using user's proxy from %s", proxy)
@@ -565,7 +565,7 @@ def algorithm():
     logging.info("Delegated proxy valid until %s", delegationStatus[0]['termination_time'])
 
     # instantiate an object to talk with CRAB REST server
-    crabserver = HTTPRequests(url=rest_filetransfers,
+    crabserver = HTTPRequests(hostname=rest_filetransfers,
                             localcert=proxy, localkey=proxy,
                             userAgent='CRABSchedd')
 
