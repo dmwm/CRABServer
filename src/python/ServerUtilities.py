@@ -188,7 +188,7 @@ def checkOutLFN(lfn, username):
     return True
 
 
-def getProxiedWebDir(RESTServer=None, uriNoApi=None, task=None, logFunction=print):
+def getProxiedWebDir(crabserver=None, task=None, logFunction=print):
     """ The function simply queries the REST interface specified to get the proxied webdir to use
         for the task. Returns None in case the API could not find the url (either an error or the schedd
         is not configured)
@@ -197,9 +197,8 @@ def getProxiedWebDir(RESTServer=None, uriNoApi=None, task=None, logFunction=prin
             'workflow': task,
            }
     res = None
-    uri = uriNoApi + '/task'
     try:
-        dictresult, _, _ = RESTServer.get(uri, data=data) #the second and third parameters are deprecated
+        dictresult, _, _ = crabserver.get(api='task', data=data)  # the second and third parameters are deprecated
         if dictresult.get('result'):
             res = dictresult['result'][0]
     except HTTPException as hte:
