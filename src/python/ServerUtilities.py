@@ -188,7 +188,7 @@ def checkOutLFN(lfn, username):
     return True
 
 
-def getProxiedWebDir(RESTServer=None, uriNoApi=None, task=None, logFunction=print):
+def getProxiedWebDir(crabserver=None, task=None, logFunction=print):
     """ The function simply queries the REST interface specified to get the proxied webdir to use
         for the task. Returns None in case the API could not find the url (either an error or the schedd
         is not configured)
@@ -197,9 +197,8 @@ def getProxiedWebDir(RESTServer=None, uriNoApi=None, task=None, logFunction=prin
             'workflow': task,
            }
     res = None
-    uri = uriNoApi + '/task'
     try:
-        dictresult, _, _ = RESTServer.get(uri, data=data) #the second and third parameters are deprecated
+        dictresult, _, _ = crabserver.get(api='task', data=data)  # the second and third parameters are deprecated
         if dictresult.get('result'):
             res = dictresult['result'][0]
     except HTTPException as hte:
@@ -594,22 +593,19 @@ class tempSetLogLevel():
     def __exit__(self,a,b,c):
         self.logger.setLevel(self.previousLogLevel)
 
-def uploadToS3 (restServer=None, instance='prod', filepath=None, object=None,  # pylint: disable=redefined-builtin
+def uploadToS3 (crabserver=None, filepath=None, object=None,  # pylint: disable=redefined-builtin
                 taskname=None, cachename=None, logger=None):
     """
     one call to make a 2-step operation:
     obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
-    :param restServer: an RESTInteraction/HTTRequest object : points to CRAB Server to use
-    :param instance: string : the DB instance for the REST server: prod|preprod|dev
+    :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
     :param filepath: string : the full path of the file to upload
     :param object: string : the kind of object to upload: clientlog|twlog|sandbox|debugfiles
     :param taskname: string : the task this object belongs to
     :param cachename: string : when uploading sandbox taskname is not used but cachename is needed
     :return: nothing. Raises an exception in case of error
     """
-    uriNoApi = '/crabserver/' + instance + '/'
     api = 'cache'
-    uri = uriNoApi + api
     dataDict = {'subresource':'upload',
                 'object':object,
                 'taskname':taskname,
@@ -618,7 +614,7 @@ def uploadToS3 (restServer=None, instance='prod', filepath=None, object=None,  #
     try:
         # calls to restServer alway return a 3-ple ({'result':'string'}, HTTPcode, HTTPreason)
         # this returns in result.value a 2-element list (url, dictionay)
-        res = restServer.get(uri, data)
+        res = crabserver.get(api, data)
         result = res[0]['result']
     except Exception as e:
         raise Exception('Failed to get PreSignedURL from CRAB Server:\n%s' % str(e))
@@ -690,26 +686,23 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
         raise Exception('Failed to upload file. Stderr is:\n%s' % stderr)
     return
 
-def retrieveFromS3 (restServer=None, instance='prod', object=None,  # pylint: disable=redefined-builtin
+def retrieveFromS3 (crabserver=None, object=None,  # pylint: disable=redefined-builtin
                 taskname=None, logger=None):
     """
     obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
-    :param restServer: an RESTInteraction/HTTRequest object : points to CRAB Server to use
-    :param instance: string : the DB instance for the REST server: prod|preprod|dev
+    :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
     :param object: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
     :param taskname: string : the task this object belongs to
     :return: the content of the S3 object as a string object
     """
-    uriNoApi = '/crabserver/' + instance + '/'
     api = 'cache'
-    uri = uriNoApi + api
     dataDict = {'subresource':'retrieve',
                 'object':object,
                 'taskname':taskname}
     data = encodeRequest(dataDict)
     try:
         # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)
-        res = restServer.get(uri, data)
+        res = crabserver.get(api, data)
         result = res[0]['result'][0]
     except Exception as e:
         raise Exception('Failed to retrieve S3 file content via CRABServer:\n%s' % str(e))
