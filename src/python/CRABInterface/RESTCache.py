@@ -114,10 +114,15 @@ class RESTCache(RESTEntity):
                 raise MissingParameter("cachename is missing")
             ownerName = getUsernameFromTaskname(taskname)
             # TODO add code here to check that username has authorization
-            objectPath = ownerName + '/' + taskname + '/' + object
+            if object == 'sandbox':
+                # sandbox goes in bucket/username/sandboxes/
+                objectPath = ownerName + '/sandboxes/' + cachename
+            else:
+                # task related files go in bucher/username/taskname/
+                objectPath = ownerName + '/' + taskname + '/' + object
             objectName = fromNewBytesToString(objectPath)
             if object == 'sandbox':
-                objectName += '/' + fromNewBytesToString(cachename)
+                # we only upload same sandbox once
                 alreadyThere = False
                 try:
                     # from https://stackoverflow.com/a/38376288
@@ -126,7 +131,7 @@ class RESTCache(RESTEntity):
                 except ClientError:
                     pass
                 if alreadyThere:
-                    # tell client not to upload since same name sandbox is there already
+                    # tell client not to upload
                     return ["", {}]
             expiration = 3600  # 1 hour is good for testing
             try:
@@ -150,9 +155,16 @@ class RESTCache(RESTEntity):
                 raise MissingParameter("object to upload is missing")
             if not taskname:
                 raise MissingParameter("takskname is missing")
+            if object == 'sandbox' and not cachename:
+                raise MissingParameter("cachename is missing")
             ownerName = getUsernameFromTaskname(taskname)
             # TODO insert here code to check if username is authorized to read this object
-            objectPath = ownerName + '/' + taskname + '/' + object
+            if object == 'sandbox':
+                # sandboxesa are in bucket/username/sandboxes/
+                objectPath = ownerName + '/sandboxes/' + cachename
+            else:
+                # task related files are in bucket/username/taskname/
+                objectPath = ownerName + '/' + taskname + '/' + object
             objectName = fromNewBytesToString(objectPath)
 
             # download from S3 into a temporary file, read it, and return content to caller
