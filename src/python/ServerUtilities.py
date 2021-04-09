@@ -593,12 +593,12 @@ class tempSetLogLevel():
     def __exit__(self,a,b,c):
         self.logger.setLevel(self.previousLogLevel)
 
-def uploadToS3 (CRABRest=None, filepath=None, object=None,  # pylint: disable=redefined-builtin
+def uploadToS3 (crabserver=None, filepath=None, object=None,  # pylint: disable=redefined-builtin
                 taskname=None, cachename=None, logger=None):
     """
     one call to make a 2-step operation:
     obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
-    :param CRABRest: a RESTInteraction/CRABRest object : points to CRAB Server to use
+    :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
     :param filepath: string : the full path of the file to upload
     :param object: string : the kind of object to upload: clientlog|twlog|sandbox|debugfiles
     :param taskname: string : the task this object belongs to
@@ -614,7 +614,7 @@ def uploadToS3 (CRABRest=None, filepath=None, object=None,  # pylint: disable=re
     try:
         # calls to restServer alway return a 3-ple ({'result':'string'}, HTTPcode, HTTPreason)
         # this returns in result.value a 2-element list (url, dictionay)
-        res = CRABRest.get(api, data)
+        res = crabserver.get(api, data)
         result = res[0]['result']
     except Exception as e:
         raise Exception('Failed to get PreSignedURL from CRAB Server:\n%s' % str(e))
@@ -686,11 +686,11 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
         raise Exception('Failed to upload file. Stderr is:\n%s' % stderr)
     return
 
-def retrieveFromS3 (CRABRest=None, object=None,  # pylint: disable=redefined-builtin
+def retrieveFromS3 (crabserver=None, object=None,  # pylint: disable=redefined-builtin
                 taskname=None, logger=None):
     """
     obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
-    :param CRABRest: a RESTInteraction/CRABRest object : points to CRAB Server to use
+    :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
     :param object: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
     :param taskname: string : the task this object belongs to
     :return: the content of the S3 object as a string object
@@ -702,7 +702,7 @@ def retrieveFromS3 (CRABRest=None, object=None,  # pylint: disable=redefined-bui
     data = encodeRequest(dataDict)
     try:
         # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)
-        res = CRABRest.get(api, data)
+        res = crabserver.get(api, data)
         result = res[0]['result'][0]
     except Exception as e:
         raise Exception('Failed to retrieve S3 file content via CRABServer:\n%s' % str(e))
