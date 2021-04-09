@@ -43,6 +43,9 @@ class RESTCache(RESTEntity):
     GET: /crabserver/prod/cache?subresource=upload&object=twlog&taskname=<task>
     GET: /crabserver/prod/cache?subresource=upload&object=debugfiles&taskname=<task>
     GET: /crabserver/prod/cache?subresource=upload&object=sandbox&cachename=<hash>
+    Same URL's with subresource=download instead of subresource=upload return a presigned URL to download files
+    e.g.
+    GET: /crabserver/prod/cache?subresource=download&object=sandbox&cachename=<hash>
     Same URL's with subresource=retrieve instead of subresource=upload return the actual object
     e.g.
     GET: /crabserver/prod/cache?subresource=retrieve&object=clientlog&taskname=<task>
@@ -100,27 +103,30 @@ class RESTCache(RESTEntity):
         """
            :arg str subresource: the specific information to be accessed;
         """
-
-        if subresource == 'upload':
-            # returns a dictionary with the information to upload a file with a POST
-            # via a "PreSigned URL". It can return  an empty string '' as URL to indicate that
-            # a sandbox upload request refers to an existing object with same name
-            # WMCore REST does not allow to return None
+        # a bit of code common to 3 API's
+        if subresource in ['upload', 'retrieve', 'download']:
+            # validate args
             if not object:
-                raise MissingParameter("object to upload is missing")
+                raise MissingParameter("object is missing")
             if not taskname:
                 raise MissingParameter("takskname is missing")
-            if object == 'sandbox' and not cachename:
-                raise MissingParameter("cachename is missing")
             ownerName = getUsernameFromTaskname(taskname)
-            # TODO add code here to check that username has authorization
+            # prepare the objectName (key) inside the bucket
             if object == 'sandbox':
+                if not cachename:
+                    raise MissingParameter("cachename is missing")
                 # sandbox goes in bucket/username/sandboxes/
                 objectPath = ownerName + '/sandboxes/' + cachename
             else:
                 # task related files go in bucher/username/taskname/
                 objectPath = ownerName + '/' + taskname + '/' + object
             objectName = fromNewBytesToString(objectPath)
+
+        if subresource == 'upload':
+            # returns a dictionary with the information to upload a file with a POST
+            # via a "PreSigned URL". It can return  an empty string '' as URL to indicate that
+            # a sandbox upload request refers to an existing object with same name
+            # WMCore REST does not allow to return None
             if object == 'sandbox':
                 # we only upload same sandbox once
                 alreadyThere = False
@@ -131,12 +137,11 @@ class RESTCache(RESTEntity):
                 except ClientError:
                     pass
                 if alreadyThere:
-                    # tell client not to upload
-                    return ["", {}]
-            expiration = 3600  # 1 hour is good for testing
+                    return ["", {}]  # this tells client not to upload
+            expiration = 60 * 60  # 1 hour is good for retries and debugging
             try:
                 response = self.s3_client.generate_presigned_post(
-                    self.s3_bucket, objectPath, ExpiresIn=expiration)
+                    self.s3_bucket, objectName, ExpiresIn=expiration)
                 # this returns a dictionary like:
                 # {'url': u'https://s3.cern.ch/bucket1',
                 # 'fields': {'policy': u'eyJjb ... jEzWiJ9', # policy is a 164-char-long string
@@ -144,29 +149,28 @@ class RESTCache(RESTEntity):
                 # 'key': objectPath, 'signature': u'pm58cUqxNQHBZXS1B/Er6P89IhU='}}
                 # need to build a single URL string to return
                 preSignedUrl = response
-            except:
-                raise ExecutionError("Connection to s3.cern.ch failed")
+            except ClientError as e:
+                raise ExecutionError("Connection to s3.cern.ch failed:\n%s" % str(e))
             # somehow it does not work to return preSignedUrl as a single object
             return [preSignedUrl['url'], preSignedUrl['fields']]
 
+        if subresource == 'download':
+            # returns a PreSignedUrl to download the file within the expiration time
+            expiration = 60 * 60  # 1 hour default is good for retries and debugging
+            if object in ['debugfiles', 'clientlog', 'twlog']:
+                expiration = 60*60 * 24 * 30 # for logs make url valid as long as we keep files (1 month)
+            try:
+                response = self.s3_client.generate_presigned_url('get_object',
+                                            Params={'Bucket': self.s3_bucket, 'Key': objectName},
+                                            ExpiresIn=expiration)
+                preSignedUrl = response
+            except ClientError as e:
+                raise ExecutionError("Connection to s3.cern.ch failed:\n%s" % str(e))
+            return preSignedUrl
+
         if subresource == 'retrieve':
             # downloads a file from S3 to /tmp and serves it to the client
-            if not object:
-                raise MissingParameter("object to upload is missing")
-            if not taskname:
-                raise MissingParameter("takskname is missing")
-            if object == 'sandbox' and not cachename:
-                raise MissingParameter("cachename is missing")
-            ownerName = getUsernameFromTaskname(taskname)
             # TODO insert here code to check if username is authorized to read this object
-            if object == 'sandbox':
-                # sandboxesa are in bucket/username/sandboxes/
-                objectPath = ownerName + '/sandboxes/' + cachename
-            else:
-                # task related files are in bucket/username/taskname/
-                objectPath = ownerName + '/' + taskname + '/' + object
-            objectName = fromNewBytesToString(objectPath)
-
             # download from S3 into a temporary file, read it, and return content to caller
             tempFile = '/tmp/boto.' + uuid.uuid4().hex
             try:
@@ -176,7 +180,6 @@ class RESTCache(RESTEntity):
             with open(tempFile) as f:
                 txt = f.read()
             os.remove(tempFile)
-
             return txt
 
         if subresource == 'list':

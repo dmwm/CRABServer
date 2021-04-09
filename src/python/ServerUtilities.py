@@ -687,18 +687,46 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
     return
 
 def retrieveFromS3 (crabserver=None, object=None,  # pylint: disable=redefined-builtin
-                taskname=None, logger=None):
+                taskname=None, cachename=None, logger=None):
     """
-    obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
+    obtains a preSignedUrl from crabserver RESTCache and use it to retrieve a file
     :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
     :param object: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
     :param taskname: string : the task this object belongs to
+    :param cachename: string : when retrieving sandbox taskname is not used but cachename is needed
     :return: the content of the S3 object as a string object
     """
     api = 'cache'
     dataDict = {'subresource':'retrieve',
                 'object':object,
-                'taskname':taskname}
+                'taskname':taskname,
+                'cachename':cachename}
+    data = encodeRequest(dataDict)
+    try:
+        # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)
+        res = crabserver.get(api, data)
+        result = res[0]['result'][0]
+    except Exception as e:
+        raise Exception('Failed to retrieve S3 file content via CRABServer:\n%s' % str(e))
+    logger.info("%s retrieved OK", object)
+
+    return result
+
+def getDonwloadUrlFromS3 (crabserver=None, object=None,  # pylint: disable=redefined-builtin
+                taskname=None, cachename=None, logger=None):
+    """
+    obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
+    :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
+    :param object: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
+    :param taskname: string : the task this object belongs to
+    :param cachename: string : when downloading sandbox taskname is not used but cachename is needed
+    :return: a (short lived) pre-signed URL to use e.g. in a wget
+    """
+    api = 'cache'
+    dataDict = {'subresource':'download',
+                'object':object,
+                'taskname':taskname,
+                'cachename':cachename}
     data = encodeRequest(dataDict)
     try:
         # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)

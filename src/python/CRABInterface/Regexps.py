@@ -82,7 +82,7 @@ RX_SUBRES_SI = re.compile(r"^delegatedn|backendurls|version|bannedoutdest|schedd
 RX_SUBRES_TASK = re.compile(r"^allinfo|allusers|summary|search|taskbystatus|getpublishurl|addwarning|deletewarnings|addwebdir|addoutputdatasets|addddmreqid|webdir|counttasksbystatus|lastfailures|updateschedd|updatepublicationtime$")
 
 #subresources of Cache resource
-RX_SUBRES_CACHE = re.compile(r"^upload|retrieve|list|used$")
+RX_SUBRES_CACHE = re.compile(r"^upload|download|retrieve|list|used$")
 RX_CACHE_OBJECT = re.compile(r"^clientlog|twlog|sandbox|debugfiles")
 
 #worker workflow
