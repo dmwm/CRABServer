@@ -2,6 +2,7 @@ from __future__ import division
 import os
 import uuid
 import logging
+import cherrypy
 import boto3
 from botocore.exceptions import ClientError
 
@@ -11,7 +12,7 @@ from WMCore.REST.Validation import validate_str
 from WMCore.REST.Error import MissingParameter, ExecutionError
 
 # CRABServer dependecies here
-from CRABInterface.RESTExtensions import authz_login_valid
+from CRABInterface.RESTExtensions import authz_login_valid, authz_operator, authz_user_action
 from CRABInterface.Regexps import RX_SUBRES_CACHE, RX_CACHE_OBJECTTYPE, RX_TASKNAME, RX_USERNAME, RX_TARBALLNAME
 from ServerUtilities import getUsernameFromTaskname
 
@@ -55,10 +56,11 @@ class RESTCache(RESTEntity):
     GET: /crabserver/prod/cache?subresource=used&username=<username>
 
     AUTHORIZATION
-    users will only be able to get an upload PreSigned URL for their tasks
-    retrieve of sandbox will be restricted to owners
-    retrieve of logs and debug files will be free
-    CRAB operators will have full access
+    Users will only be able to get an upload PreSigned URL for their tasks.
+    Retrieve and donwload will be restricted to owners and CRAB operators.
+    In cases where logs or debug files need to be shared, the caller
+    can share the PreSignedUrl obtained via the download subresource.
+    Information about usage will be available to any authenticated user.
     """
 
     def __init__(self, app, api, config, mount, extconfig):
@@ -103,36 +105,37 @@ class RESTCache(RESTEntity):
         """
            :arg str subresource: the specific information to be accessed;
         """
-        # a bit of code common to 3 API's
+        authenticatedUserName = cherrypy.request.user['login']  # the username of who's calling
+        # a bit of code common to 3 subresource's: validate args and prepare the s3_objectKey inside the bucket
         if subresource in ['upload', 'retrieve', 'download']:
-            # validate args
             if not objecttype:
                 raise MissingParameter("objecttype is missing")
-            if not taskname:
-                raise MissingParameter("takskname is missing")
-            ownerName = getUsernameFromTaskname(taskname)
-            # prepare the objectName (key) inside the bucket
             if objecttype == 'sandbox':
+                ownerName = authenticatedUserName
                 if not tarballname:
                     raise MissingParameter("tarballname is missing")
                 # sandbox goes in bucket/username/sandboxes/
                 objectPath = ownerName + '/sandboxes/' + tarballname
             else:
+                if not taskname:
+                    raise MissingParameter("takskname is missing")
+                ownerName = getUsernameFromTaskname(taskname)
                 # task related files go in bucher/username/taskname/
                 objectPath = ownerName + '/' + taskname + '/' + objecttype
-            objectName = fromNewBytesToString(objectPath)
+            s3_objectKey = fromNewBytesToString(objectPath)
 
         if subresource == 'upload':
             # returns a dictionary with the information to upload a file with a POST
             # via a "PreSigned URL". It can return  an empty string '' as URL to indicate that
             # a sandbox upload request refers to an existing object with same name
             # WMCore REST does not allow to return None
+            authz_user_action(username=ownerName)
             if objecttype == 'sandbox':
                 # we only upload same sandbox once
                 alreadyThere = False
                 try:
                     # from https://stackoverflow.com/a/38376288
-                    self.s3_client.head_object(Bucket=self.s3_bucket, Key=objectName)
+                    self.s3_client.head_object(Bucket=self.s3_bucket, Key=s3_objectKey)
                     alreadyThere = True
                 except ClientError:
                     pass
@@ -141,7 +144,7 @@ class RESTCache(RESTEntity):
             expiration = 60 * 60  # 1 hour is good for retries and debugging
             try:
                 response = self.s3_client.generate_presigned_post(
-                    self.s3_bucket, objectName, ExpiresIn=expiration)
+                    self.s3_bucket, s3_objectKey, ExpiresIn=expiration)
                 # this returns a dictionary like:
                 # {'url': u'https://s3.cern.ch/bucket1',
                 # 'fields': {'policy': u'eyJjb ... jEzWiJ9', # policy is a 164-char-long string
@@ -155,13 +158,14 @@ class RESTCache(RESTEntity):
             return [preSignedUrl['url'], preSignedUrl['fields']]
 
         if subresource == 'download':
+            authz_operator(username=ownerName, group='crab3', role='operator')
             # returns a PreSignedUrl to download the file within the expiration time
             expiration = 60 * 60  # 1 hour default is good for retries and debugging
             if objecttype in ['debugfiles', 'clientlog', 'twlog']:
                 expiration = 60*60 * 24 * 30 # for logs make url valid as long as we keep files (1 month)
             try:
                 response = self.s3_client.generate_presigned_url('get_object',
-                                            Params={'Bucket': self.s3_bucket, 'Key': objectName},
+                                            Params={'Bucket': self.s3_bucket, 'Key': s3_objectKey},
                                             ExpiresIn=expiration)
                 preSignedUrl = response
             except ClientError as e:
@@ -169,12 +173,11 @@ class RESTCache(RESTEntity):
             return preSignedUrl
 
         if subresource == 'retrieve':
-            # downloads a file from S3 to /tmp and serves it to the client
-            # TODO insert here code to check if username is authorized to read this object
             # download from S3 into a temporary file, read it, and return content to caller
+            authz_operator(username=ownerName, group='crab3', role='operator')
             tempFile = '/tmp/boto.' + uuid.uuid4().hex
             try:
-                self.s3_client.download_file(self.s3_bucket, objectName, tempFile)
+                self.s3_client.download_file(self.s3_bucket, s3_objectKey, tempFile)
             except ClientError as e:
                 raise ExecutionError("Connection to s3.cern.ch failed:\n%s" % str(e))
             with open(tempFile) as f:
