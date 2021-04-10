@@ -12,13 +12,13 @@ from WMCore.REST.Error import MissingParameter, ExecutionError
 
 # CRABServer dependecies here
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_SUBRES_CACHE, RX_CACHE_OBJECT, RX_TASKNAME, RX_USERNAME, RX_CACHENAME
+from CRABInterface.Regexps import RX_SUBRES_CACHE, RX_CACHE_OBJECTTYPE, RX_TASKNAME, RX_USERNAME, RX_TARBALLNAME
 from ServerUtilities import getUsernameFromTaskname
 
 
 def fromNewBytesToString(inString):
-    # since taskname and object come from WMCore validate_str they are newbytes objects
-    # and type(objectPath) is <class 'future.types.newbytes.newbytes'> which breaks
+    # since taskname and objecttype come from WMCore validate_str they are newbytes objects
+    # of type <class 'future.types.newbytes.newbytes'> which breaks
     # python2 S3 transfer code with a keyError
     # here's an awful hack to turn those newbytes into an old-fashioned py2 string
     outString = ''  # a string
@@ -39,19 +39,19 @@ class RESTCache(RESTEntity):
     identified and reused across tasks
 
     These return a presigned URL for uploading files:
-    GET: /crabserver/prod/cache?subresource=upload&object=clientlog&taskname=<task>
-    GET: /crabserver/prod/cache?subresource=upload&object=twlog&taskname=<task>
-    GET: /crabserver/prod/cache?subresource=upload&object=debugfiles&taskname=<task>
-    GET: /crabserver/prod/cache?subresource=upload&object=sandbox&cachename=<hash>
+    GET: /crabserver/prod/cache?subresource=upload&objecttype=clientlog&taskname=<task>
+    GET: /crabserver/prod/cache?subresource=upload&objecttype=twlog&taskname=<task>
+    GET: /crabserver/prod/cache?subresource=upload&objecttype=debugfiles&taskname=<task>
+    GET: /crabserver/prod/cache?subresource=upload&objecttype=sandbox&tarballname=<hash>
     Same URL's with subresource=download instead of subresource=upload return a presigned URL to download files
     e.g.
-    GET: /crabserver/prod/cache?subresource=download&object=sandbox&cachename=<hash>
+    GET: /crabserver/prod/cache?subresource=download&objecttype=sandbox&tarballname=<hash>
     Same URL's with subresource=retrieve instead of subresource=upload return the actual object
     e.g.
-    GET: /crabserver/prod/cache?subresource=retrieve&object=clientlog&taskname=<task>
+    GET: /crabserver/prod/cache?subresource=retrieve&objecttype=clientlog&taskname=<task>
 
     These retun information about usage
-    GET: /crabserver/prod/cache?subresource=list&username=<username>&object=<object>
+    GET: /crabserver/prod/cache?subresource=list&username=<username>&objecttype=<objecttype>
     GET: /crabserver/prod/cache?subresource=used&username=<username>
 
     AUTHORIZATION
@@ -93,33 +93,33 @@ class RESTCache(RESTEntity):
         authz_login_valid()
         if method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_CACHE, optional=False)
-            validate_str('object', param, safe, RX_CACHE_OBJECT, optional=True)
+            validate_str('objecttype', param, safe, RX_CACHE_OBJECTTYPE, optional=True)
             validate_str('taskname', param, safe, RX_TASKNAME, optional=True)
             validate_str('username', param, safe, RX_USERNAME, optional=True)
-            validate_str('cachename', param, safe, RX_CACHENAME, optional=True)
+            validate_str('tarballname', param, safe, RX_TARBALLNAME, optional=True)
 
     @restcall
-    def get(self, subresource, object, taskname, username, cachename):  # pylint: disable=redefined-builtin
+    def get(self, subresource, objecttype, taskname, username, tarballname):  # pylint: disable=redefined-builtin
         """
            :arg str subresource: the specific information to be accessed;
         """
         # a bit of code common to 3 API's
         if subresource in ['upload', 'retrieve', 'download']:
             # validate args
-            if not object:
-                raise MissingParameter("object is missing")
+            if not objecttype:
+                raise MissingParameter("objecttype is missing")
             if not taskname:
                 raise MissingParameter("takskname is missing")
             ownerName = getUsernameFromTaskname(taskname)
             # prepare the objectName (key) inside the bucket
-            if object == 'sandbox':
-                if not cachename:
-                    raise MissingParameter("cachename is missing")
+            if objecttype == 'sandbox':
+                if not tarballname:
+                    raise MissingParameter("tarballname is missing")
                 # sandbox goes in bucket/username/sandboxes/
-                objectPath = ownerName + '/sandboxes/' + cachename
+                objectPath = ownerName + '/sandboxes/' + tarballname
             else:
                 # task related files go in bucher/username/taskname/
-                objectPath = ownerName + '/' + taskname + '/' + object
+                objectPath = ownerName + '/' + taskname + '/' + objecttype
             objectName = fromNewBytesToString(objectPath)
 
         if subresource == 'upload':
@@ -127,7 +127,7 @@ class RESTCache(RESTEntity):
             # via a "PreSigned URL". It can return  an empty string '' as URL to indicate that
             # a sandbox upload request refers to an existing object with same name
             # WMCore REST does not allow to return None
-            if object == 'sandbox':
+            if objecttype == 'sandbox':
                 # we only upload same sandbox once
                 alreadyThere = False
                 try:
@@ -157,7 +157,7 @@ class RESTCache(RESTEntity):
         if subresource == 'download':
             # returns a PreSignedUrl to download the file within the expiration time
             expiration = 60 * 60  # 1 hour default is good for retries and debugging
-            if object in ['debugfiles', 'clientlog', 'twlog']:
+            if objecttype in ['debugfiles', 'clientlog', 'twlog']:
                 expiration = 60*60 * 24 * 30 # for logs make url valid as long as we keep files (1 month)
             try:
                 response = self.s3_client.generate_presigned_url('get_object',
@@ -184,7 +184,7 @@ class RESTCache(RESTEntity):
 
         if subresource == 'list':
             # list all files (aka objects, aka keys in S3 lingo) for a given usermame
-            # if arg object is present, returns only the file names for that object
+            # if arg objecttype is present, returns only the file names for that objecttype
             if not username:
                 raise MissingParameter('username is missing')
             # In S3 we always need to retrieve all keys even if some filtering/compression
@@ -205,8 +205,8 @@ class RESTCache(RESTEntity):
             for page in page_iterator:
                 namesInPage = [item['Key'].lstrip(user+'/') for item in page['Contents']]
                 fileNames += namesInPage
-            if object:
-                filteredFileNames = [f for f in fileNames if object in f]
+            if objecttype:
+                filteredFileNames = [f for f in fileNames if objecttype in f]
                 fileNames = filteredFileNames
             return fileNames
 

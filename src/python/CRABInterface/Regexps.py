@@ -44,6 +44,7 @@ RX_ADDFILE   = re.compile(r"^(?=.{0,255}$)([a-zA-Z0-9\-\._]+)$")
 # Can be a LFN or PFN (anything CMSSW accepts is fine here)
 RX_USERFILE  = re.compile(r"^(?=.{0,255}$)([a-zA-Z0-9\-._:?/=]+)$")
 RX_CACHENAME = RX_USERFILE
+RX_TARBALLNAME = RX_USERFILE
 RX_CMSSITE   = re.compile(r"^(?=.{0,255}$)T[0-3](_[A-Z]{2}((_[A-Za-z0-9]+)|_?\*$)+|_?\*)$")
 RX_DBSURL    = re.compile(r"^(?=.{0,255}$)https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
 RX_PUBLICATION = re.compile(r"^[TF]")
@@ -83,7 +84,7 @@ RX_SUBRES_TASK = re.compile(r"^allinfo|allusers|summary|search|taskbystatus|getp
 
 #subresources of Cache resource
 RX_SUBRES_CACHE = re.compile(r"^upload|download|retrieve|list|used$")
-RX_CACHE_OBJECT = re.compile(r"^clientlog|twlog|sandbox|debugfiles")
+RX_CACHE_OBJECTTYPE = re.compile(r"^clientlog|twlog|sandbox|debugfiles")
 
 #worker workflow
 RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._%]{1,100}$")
