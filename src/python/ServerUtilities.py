@@ -593,23 +593,23 @@ class tempSetLogLevel():
     def __exit__(self,a,b,c):
         self.logger.setLevel(self.previousLogLevel)
 
-def uploadToS3 (crabserver=None, filepath=None, object=None,  # pylint: disable=redefined-builtin
-                taskname=None, cachename=None, logger=None):
+def uploadToS3 (crabserver=None, filepath=None, objecttype=None,  # pylint: disable=redefined-builtin
+                taskname=None, tarballname=None, logger=None):
     """
     one call to make a 2-step operation:
     obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
     :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
     :param filepath: string : the full path of the file to upload
-    :param object: string : the kind of object to upload: clientlog|twlog|sandbox|debugfiles
+    :param objecttype: string : the kind of object to upload: clientlog|twlog|sandbox|debugfiles
     :param taskname: string : the task this object belongs to
-    :param cachename: string : when uploading sandbox taskname is not used but cachename is needed
+    :param tarballname: string : when uploading sandbox, taskname is not used but tarballname is needed
     :return: nothing. Raises an exception in case of error
     """
     api = 'cache'
     dataDict = {'subresource':'upload',
-                'object':object,
+                'objecttype':objecttype,
                 'taskname':taskname,
-                'cachename':cachename}
+                'tarballname':tarballname}
     data = encodeRequest(dataDict)
     try:
         # calls to restServer alway return a 3-ple ({'result':'string'}, HTTPcode, HTTPreason)
@@ -620,9 +620,9 @@ def uploadToS3 (crabserver=None, filepath=None, object=None,  # pylint: disable=
         raise Exception('Failed to get PreSignedURL from CRAB Server:\n%s' % str(e))
     # prepare a single dictionary with curl arguments for the actual upload
     url = result[0]
-    if not url and object == 'sandbox':
+    if not url and objecttype == 'sandbox':
         # in this case a null string as url indicates that sandbox with this name is there already
-        logger.info("%s %s is already in the S3 store, will not upload again", object, cachename)
+        logger.info("%s %s is already in the S3 store, will not upload again", objecttype, tarballname)
         return
     fields = result[1]
     preSignedUrl = {'url':url}
@@ -631,7 +631,7 @@ def uploadToS3 (crabserver=None, filepath=None, object=None,  # pylint: disable=
         uploadToS3ViaPSU(filepath=filepath, preSignedUrlFields=preSignedUrl, logger=logger)
     except Exception as e:
         raise Exception('Upload to S3 failed\n%s', str(e))
-    logger.info('%s %s successully uploaded to S3', object, filepath)
+    logger.info('%s %s successully uploaded to S3', objecttype, filepath)
     return
 
 
@@ -686,21 +686,21 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
         raise Exception('Failed to upload file. Stderr is:\n%s' % stderr)
     return
 
-def retrieveFromS3 (crabserver=None, object=None,  # pylint: disable=redefined-builtin
-                taskname=None, cachename=None, logger=None):
+def retrieveFromS3 (crabserver=None, objecttype=None,  # pylint: disable=redefined-builtin
+                taskname=None, tarballname=None, logger=None):
     """
     obtains a preSignedUrl from crabserver RESTCache and use it to retrieve a file
     :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
-    :param object: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
+    :param objecttype: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
     :param taskname: string : the task this object belongs to
-    :param cachename: string : when retrieving sandbox taskname is not used but cachename is needed
+    :param tarballname: string : when retrieving sandbox taskname is not used but tarballname is needed
     :return: the content of the S3 object as a string object
     """
     api = 'cache'
     dataDict = {'subresource':'retrieve',
-                'object':object,
+                'objecttype':objecttype,
                 'taskname':taskname,
-                'cachename':cachename}
+                'tarballname':tarballname}
     data = encodeRequest(dataDict)
     try:
         # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)
@@ -708,25 +708,25 @@ def retrieveFromS3 (crabserver=None, object=None,  # pylint: disable=redefined-b
         result = res[0]['result'][0]
     except Exception as e:
         raise Exception('Failed to retrieve S3 file content via CRABServer:\n%s' % str(e))
-    logger.info("%s retrieved OK", object)
+    logger.info("%s retrieved OK", objecttype)
 
     return result
 
-def getDonwloadUrlFromS3 (crabserver=None, object=None,  # pylint: disable=redefined-builtin
-                taskname=None, cachename=None, logger=None):
+def getDonwloadUrlFromS3 (crabserver=None, objecttype=None,  # pylint: disable=redefined-builtin
+                taskname=None, tarballname=None, logger=None):
     """
     obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
     :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
-    :param object: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
+    :param objecttype: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
     :param taskname: string : the task this object belongs to
-    :param cachename: string : when downloading sandbox taskname is not used but cachename is needed
+    :param tarballname: string : when downloading sandbox taskname is not used but tarballname is needed
     :return: a (short lived) pre-signed URL to use e.g. in a wget
     """
     api = 'cache'
     dataDict = {'subresource':'download',
-                'object':object,
+                'objecttype':objecttype,
                 'taskname':taskname,
-                'cachename':cachename}
+                'tarballname':tarballname}
     data = encodeRequest(dataDict)
     try:
         # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)
@@ -734,6 +734,6 @@ def getDonwloadUrlFromS3 (crabserver=None, object=None,  # pylint: disable=redef
         result = res[0]['result'][0]
     except Exception as e:
         raise Exception('Failed to retrieve S3 file content via CRABServer:\n%s' % str(e))
-    logger.info("%s retrieved OK", object)
+    logger.info("%s retrieved OK", objecttype)
 
     return result
