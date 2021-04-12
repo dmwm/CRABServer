@@ -786,7 +786,7 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
     if not preSignedUrl :
         raise Exception("mandatory preSignedUrl argument missing")
 
-    downloadCommand = 'wget -Sq'
+    downloadCommand = 'wget -Sq -O %s ' % filepath
     downloadCommand += ' "%s"' % preSignedUrl
     downloadProcess = subprocess.Popen(downloadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     stdout, stderr = downloadProcess.communicate()
