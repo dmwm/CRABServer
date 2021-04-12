@@ -593,15 +593,74 @@ class tempSetLogLevel():
     def __exit__(self,a,b,c):
         self.logger.setLevel(self.previousLogLevel)
 
-def uploadToS3 (crabserver=None, filepath=None, objecttype=None,  # pylint: disable=redefined-builtin
-                taskname=None, tarballname=None, logger=None):
+####################################################################
+# Below a few convenience functions to access the S3 implementation of crabcache
+# Clients are expected to use the following functions which all have the same signature:
+#  downloadFromS3        to retrieve an object into a file
+#  retrieveFromSe        to retrieve an object as JSON to use in the code
+#  uploadToS3            to upload a file into an S3 object
+#  getDonwloadUrlFromS3  to obtain a PreSigned URL to access an existing object in S3
+#    this can be used e.g. to share access to logs
+# Common signature is: (crabserver, filepath, objecttype, taskname, username, tarballname, logger)
+#  see the individual functions for more details
+#
+# Other functions are uploadToS3viaPSU and downloadFromS3viaPSU are for internal use.
+####################################################################
+def downloadFromS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
+                    username=None, tarballname=None, logger=None):
+    """
+    one call to make a 2-step operation:
+    obtains a preSignedUrl from crabserver RESTCache and use it to download a file
+    :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
+    :param filepath: string : the full path of the file to create with the downloaded content
+        if file exists already, it is silently overwritten
+    :param objecttype: string : the kind of object to dowbload: clientlog|twlog|sandbox|debugfiles
+    :param taskname: string : the task this object belongs to, if applicable
+    :param username: string : the username this sandbox belongs to, in case objecttype=sandbox
+    :param tarballname: string : for sandbox, taskname is not used but tarballname is needed
+    :return: nothing. Raises an exception in case of error
+    """
+    preSignedUrl = getDonwloadUrlFromS3 (crabserver=crabserver, objecttype=objecttype,
+            taskname=taskname, username=username, tarballname=tarballname, logger=logger)
+    downloadFromS3ViaPSU(filepath=filepath, preSignedUrl=preSignedUrl, logger=logger)
+    return
+
+def retrieveFromS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
+                   username=None, tarballname=None, logger=None):
+    """
+    obtains a preSignedUrl from crabserver RESTCache and use it to retrieve a file
+    :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
+    :param objecttype: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
+    :param taskname: string : the task this object belongs to, if applicable
+    :param username: string : the username this sandbox belongs to, in case objecttype=sandbox
+    :param tarballname: string : when retrieving sandbox taskname is not used but tarballname is needed
+    :return: the content of the S3 object as a string object
+    """
+    api = 'cache'
+    dataDict = {'subresource':'retrieve',
+                'objecttype':objecttype,
+                'taskname':taskname,
+                'tarballname':tarballname}
+    data = encodeRequest(dataDict)
+    try:
+        # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)
+        res = crabserver.get(api, data)
+        result = res[0]['result'][0]
+    except Exception as e:
+        raise Exception('Failed to retrieve S3 file content via CRABServer:\n%s' % str(e))
+    logger.debug("%s retrieved OK", objecttype)
+    return result
+
+def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
+               username=None, tarballname=None, logger=None):
     """
     one call to make a 2-step operation:
     obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
     :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
-    :param filepath: string : the full path of the file to upload
+    :param filepath: string : the full path of the file to upload, if applicable
     :param objecttype: string : the kind of object to upload: clientlog|twlog|sandbox|debugfiles
-    :param taskname: string : the task this object belongs to
+    :param username: string : the username this sandbox belongs to, in case objecttype=sandbox
+      username is not needed for upload, it is here to have same signature as other methods
     :param tarballname: string : when uploading sandbox, taskname is not used but tarballname is needed
     :return: nothing. Raises an exception in case of error
     """
@@ -622,7 +681,7 @@ def uploadToS3 (crabserver=None, filepath=None, objecttype=None,  # pylint: disa
     url = result[0]
     if not url and objecttype == 'sandbox':
         # in this case a null string as url indicates that sandbox with this name is there already
-        logger.info("%s %s is already in the S3 store, will not upload again", objecttype, tarballname)
+        logger.debug("%s %s is already in the S3 store, will not upload again", objecttype, tarballname)
         return
     fields = result[1]
     preSignedUrl = {'url':url}
@@ -631,10 +690,33 @@ def uploadToS3 (crabserver=None, filepath=None, objecttype=None,  # pylint: disa
         uploadToS3ViaPSU(filepath=filepath, preSignedUrlFields=preSignedUrl, logger=logger)
     except Exception as e:
         raise Exception('Upload to S3 failed\n%s', str(e))
-    logger.info('%s %s successully uploaded to S3', objecttype, filepath)
+    logger.debug('%s %s successully uploaded to S3', objecttype, filepath)
     return
-
-
+def getDonwloadUrlFromS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
+                         username=None, tarballname=None, logger=None):
+    """
+    obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
+    :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
+    :param objecttype: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
+    :param taskname: string : the task this object belongs to, if applicable
+    :param username: string : the username this sandbox belongs to, in case objecttype=sandbox
+    :param tarballname: string : for sandbox, taskname is not used but tarballname is needed
+    :return: a (short lived) pre-signed URL to use e.g. in a wget
+    """
+    api = 'cache'
+    dataDict = {'subresource':'download',
+                'objecttype':objecttype,
+                'taskname':taskname,
+                'tarballname':tarballname}
+    data = encodeRequest(dataDict)
+    try:
+        # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)
+        res = crabserver.get(api, data)
+        result = res[0]['result'][0]
+    except Exception as e:
+        raise Exception('Failed to retrieve S3 preSignedUrl via CRABServer:\n%s' % str(e))
+    logger.debug("PreSignedUrl to download %s received OK", objecttype)
+    return result
 
 def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
     """
@@ -686,54 +768,35 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
         raise Exception('Failed to upload file. Stderr is:\n%s' % stderr)
     return
 
-def retrieveFromS3 (crabserver=None, objecttype=None,  # pylint: disable=redefined-builtin
-                taskname=None, tarballname=None, logger=None):
+def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
     """
-    obtains a preSignedUrl from crabserver RESTCache and use it to retrieve a file
-    :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
-    :param objecttype: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
-    :param taskname: string : the task this object belongs to
-    :param tarballname: string : when retrieving sandbox taskname is not used but tarballname is needed
-    :return: the content of the S3 object as a string object
+    More generic than the name implies:
+    downloads a file usign PreSigned URLs obtained e.g. from a call to
+    crabserver RESTCache API /crabserver/prod/cache?subresource=download
+    this implemntation uses a plain wget command to do it (simplest way!)
+    :param filepath: string : the full path to the file to be created
+        if the file exists already, it will be silently overwritten
+    :param preSignedUrl: string : the URL to use (includes the host name)
+    :return: nothing. Raises an exception in case of error
     """
-    api = 'cache'
-    dataDict = {'subresource':'retrieve',
-                'objecttype':objecttype,
-                'taskname':taskname,
-                'tarballname':tarballname}
-    data = encodeRequest(dataDict)
-    try:
-        # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)
-        res = crabserver.get(api, data)
-        result = res[0]['result'][0]
-    except Exception as e:
-        raise Exception('Failed to retrieve S3 file content via CRABServer:\n%s' % str(e))
-    logger.info("%s retrieved OK", objecttype)
 
-    return result
+    # validate args
+    if not filepath :
+        raise Exception("mandatory filepath argument missing")
+    if not preSignedUrl :
+        raise Exception("mandatory preSignedUrl argument missing")
 
-def getDonwloadUrlFromS3 (crabserver=None, objecttype=None,  # pylint: disable=redefined-builtin
-                taskname=None, tarballname=None, logger=None):
-    """
-    obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
-    :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
-    :param objecttype: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
-    :param taskname: string : the task this object belongs to
-    :param tarballname: string : when downloading sandbox taskname is not used but tarballname is needed
-    :return: a (short lived) pre-signed URL to use e.g. in a wget
-    """
-    api = 'cache'
-    dataDict = {'subresource':'download',
-                'objecttype':objecttype,
-                'taskname':taskname,
-                'tarballname':tarballname}
-    data = encodeRequest(dataDict)
-    try:
-        # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)
-        res = crabserver.get(api, data)
-        result = res[0]['result'][0]
-    except Exception as e:
-        raise Exception('Failed to retrieve S3 file content via CRABServer:\n%s' % str(e))
-    logger.info("%s retrieved OK", objecttype)
+    downloadCommand = 'wget -Sq -O %s ' % filepath
+    downloadCommand += ' "%s"' % preSignedUrl
+    downloadProcess = subprocess.Popen(downloadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    logger.debug("Will execute:\n%s", downloadCommand)
+    stdout, stderr = downloadProcess.communicate()
+    exitcode = downloadProcess.returncode
+    logger.debug('exitcode: %s\nstdout: %s\nstderr: %s', exitcode, stdout, stderr)
 
-    return result
+    if exitcode != 0:
+        raise Exception('Download command failed. Stderr is:\n%s' % stderr)
+    if not os.path.exists(filepath) :
+        raise Exception("Download failure. File %s was not created", filepath)
+
+    return
