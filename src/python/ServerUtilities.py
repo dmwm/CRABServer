@@ -637,10 +637,13 @@ def retrieveFromS3(crabserver=None, filepath=None, objecttype=None, taskname=Non
     :return: the content of the S3 object as a string object
     """
     api = 'cache'
-    dataDict = {'subresource':'retrieve',
-                'objecttype':objecttype,
-                'taskname':taskname,
-                'tarballname':tarballname}
+    dataDict = {'subresource':'retrieve', 'objecttype':objecttype}
+    if taskname:
+        dataDict['taskname'] = taskname
+    if username:
+        dataDict['username'] = username
+    if tarballname:
+        dataDict['tarballname'] = tarballname
     data = encodeRequest(dataDict)
     try:
         # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)
@@ -665,10 +668,13 @@ def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
     :return: nothing. Raises an exception in case of error
     """
     api = 'cache'
-    dataDict = {'subresource':'upload',
-                'objecttype':objecttype,
-                'taskname':taskname,
-                'tarballname':tarballname}
+    dataDict = {'subresource':'upload', 'objecttype':objecttype}
+    if taskname:
+        dataDict['taskname'] = taskname
+    if username:
+        dataDict['username'] = username
+    if tarballname:
+        dataDict['tarballname'] = tarballname
     data = encodeRequest(dataDict)
     try:
         # calls to restServer alway return a 3-ple ({'result':'string'}, HTTPcode, HTTPreason)
@@ -704,10 +710,13 @@ def getDonwloadUrlFromS3(crabserver=None, filepath=None, objecttype=None, taskna
     :return: a (short lived) pre-signed URL to use e.g. in a wget
     """
     api = 'cache'
-    dataDict = {'subresource':'download',
-                'objecttype':objecttype,
-                'taskname':taskname,
-                'tarballname':tarballname}
+    dataDict = {'subresource':'download', 'objecttype':objecttype}
+    if taskname:
+        dataDict['taskname'] = taskname
+    if username:
+        dataDict['username'] = username
+    if tarballname:
+        dataDict['tarballname'] = tarballname
     data = encodeRequest(dataDict)
     try:
         # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)
