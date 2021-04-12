@@ -44,12 +44,19 @@ class RESTCache(RESTEntity):
     GET: /crabserver/prod/cache?subresource=upload&objecttype=twlog&taskname=<task>
     GET: /crabserver/prod/cache?subresource=upload&objecttype=debugfiles&taskname=<task>
     GET: /crabserver/prod/cache?subresource=upload&objecttype=sandbox&tarballname=<hash>
-    Same URL's with subresource=download instead of subresource=upload return a presigned URL to download files
+
+    For objects other than sandbox, the same URL's with subresource=download instead of subresource=upload
+    returns a presigned URL to download files, and with subresource=retrieve returns the actual object
     e.g.
-    GET: /crabserver/prod/cache?subresource=download&objecttype=sandbox&tarballname=<hash>
-    Same URL's with subresource=retrieve instead of subresource=upload return the actual object
-    e.g.
+    GET: /crabserver/prod/cache?subresource=download&objecttype=twlog&taskname=<task>
     GET: /crabserver/prod/cache?subresource=retrieve&objecttype=clientlog&taskname=<task>
+
+    Behavior is different for sandboxes since those are uploaded before taskname is knwon
+    and therefore must be located via username+tarballname.
+    GET: /crabserver/prod/cache?subresource=download&objecttype=sandboxg&username=<user>&tarballname=<name>
+    Same for subresource=retreive, but using retrieve makes little sense for sandboxes
+    The tarballname is created during crab submit and stored in DB TASKS table in columns
+     tm_user_sandbox or tm_debug_files
 
     These retun information about usage
     GET: /crabserver/prod/cache?subresource=list&username=<username>&objecttype=<objecttype>
@@ -111,16 +118,16 @@ class RESTCache(RESTEntity):
             if not objecttype:
                 raise MissingParameter("objecttype is missing")
             if objecttype == 'sandbox':
-                ownerName = authenticatedUserName
                 if not tarballname:
                     raise MissingParameter("tarballname is missing")
+                ownerName = authenticatedUserName if subresource=='upload' else username
                 # sandbox goes in bucket/username/sandboxes/
                 objectPath = ownerName + '/sandboxes/' + tarballname
             else:
                 if not taskname:
                     raise MissingParameter("takskname is missing")
                 ownerName = getUsernameFromTaskname(taskname)
-                # task related files go in bucher/username/taskname/
+                # task related files go in bucket/username/taskname/
                 objectPath = ownerName + '/' + taskname + '/' + objecttype
             s3_objectKey = fromNewBytesToString(objectPath)
 
@@ -159,6 +166,8 @@ class RESTCache(RESTEntity):
 
         if subresource == 'download':
             authz_operator(username=ownerName, group='crab3', role='operator')
+            if subresource=='sandbox' and not username:
+                raise MissingParameter("username is missing")
             # returns a PreSignedUrl to download the file within the expiration time
             expiration = 60 * 60  # 1 hour default is good for retries and debugging
             if objecttype in ['debugfiles', 'clientlog', 'twlog']:
