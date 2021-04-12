@@ -648,7 +648,7 @@ def retrieveFromS3(crabserver=None, filepath=None, objecttype=None, taskname=Non
         result = res[0]['result'][0]
     except Exception as e:
         raise Exception('Failed to retrieve S3 file content via CRABServer:\n%s' % str(e))
-    logger.info("%s retrieved OK", objecttype)
+    logger.debug("%s retrieved OK", objecttype)
     return result
 
 def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
@@ -681,7 +681,7 @@ def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
     url = result[0]
     if not url and objecttype == 'sandbox':
         # in this case a null string as url indicates that sandbox with this name is there already
-        logger.info("%s %s is already in the S3 store, will not upload again", objecttype, tarballname)
+        logger.debug("%s %s is already in the S3 store, will not upload again", objecttype, tarballname)
         return
     fields = result[1]
     preSignedUrl = {'url':url}
@@ -690,7 +690,7 @@ def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
         uploadToS3ViaPSU(filepath=filepath, preSignedUrlFields=preSignedUrl, logger=logger)
     except Exception as e:
         raise Exception('Upload to S3 failed\n%s', str(e))
-    logger.info('%s %s successully uploaded to S3', objecttype, filepath)
+    logger.debug('%s %s successully uploaded to S3', objecttype, filepath)
     return
 def getDonwloadUrlFromS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
                          username=None, tarballname=None, logger=None):
@@ -715,7 +715,7 @@ def getDonwloadUrlFromS3(crabserver=None, filepath=None, objecttype=None, taskna
         result = res[0]['result'][0]
     except Exception as e:
         raise Exception('Failed to retrieve S3 preSignedUrl via CRABServer:\n%s' % str(e))
-    logger.info("PreSignedUrl to download %s received OK", objecttype)
+    logger.debug("PreSignedUrl to download %s received OK", objecttype)
     return result
 
 def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
