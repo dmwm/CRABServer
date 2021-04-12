@@ -44,7 +44,7 @@ NODE_STATUS_FILE node_state{nodestate} 30 ALWAYS-UPDATE
 
 # NOTE: a file must be present, but 'noop' makes it not be read.
 #FINAL FinalCleanup Job.1.submit NOOP
-#SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT {resthost} {resturiwfdb}
+#SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT {resthost}
 
 """
 
@@ -332,8 +332,8 @@ class DagmanCreator(TaskAction):
     into HTCondor
     """
 
-    def __init__(self, config, server, resturi, procnum=-1, rucioClient=None):
-        TaskAction.__init__(self, config, server, resturi, procnum)
+    def __init__(self, config, crabserver, procnum=-1, rucioClient=None):
+        TaskAction.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
 
     def buildDashboardInfo(self, task):
@@ -934,8 +934,7 @@ class DagmanCreator(TaskAction):
             self.logger.info('resthost for DAG Header changed from k8s to cmsweb.cern.ch')
 
         dag = DAG_HEADER.format(nodestate='.{0}'.format(parent) if parent else ('.0' if stage == 'processing' else ''),
-                                resthost=restHostForSchedd,
-                                resturiwfdb=kwargs['task']['resturinoapi'] + '/workflowdb')
+                                resthost=restHostForSchedd)
         if stage == 'probe':
             dagSpecs = dagSpecs[:getattr(self.config.TaskWorker, 'numAutomaticProbes', 5)]
         for dagSpec in dagSpecs:
@@ -1178,9 +1177,9 @@ class DagmanCreator(TaskAction):
         task_runtime = getLocation('TaskManagerRun.tar.gz', 'CRABServer/')
         shutil.copy(task_runtime, '.')
 
-        kw['task']['resthost'] = self.server['host']
-        kw['task']['resturinoapi'] = self.restURInoAPI
-
+        kw['task']['resthost'] = self.crabserver['host']
+        #kw['task']['resturinoapi'] = self.restURInoAPI
+        kw['task']['resturinoapi'] = '/crabserver/' + self.crabserver.getDbIstance()
         params = {}
         if kw['task']['tm_dry_run'] == 'F':
             params = self.sendDashboardTask(kw['task'])

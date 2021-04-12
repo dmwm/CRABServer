@@ -16,8 +16,8 @@ class StageoutCheck(TaskAction):
     if stageout output and logs is false or
     if dryrun option True
     """
-    def __init__(self, config, server, resturi, procnum=-1, rucioClient=None):
-        TaskAction.__init__(self, config, server, resturi, procnum)
+    def __init__(self, config, crabserver, procnum=-1, rucioClient=None):
+        TaskAction.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
         self.task = None
         self.proxy = None

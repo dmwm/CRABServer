@@ -203,11 +203,11 @@ class DagmanSubmitter(TaskAction.TaskAction):
         """
         task['tm_schedd'] = schedd
         #userServer = HTTPRequests(self.server['host'], task['user_proxy'], task['user_proxy'], retry=20, logger=self.logger)
-        userServer = self.server
+        #userServer = self.server
         configreq = {'workflow':task['tm_taskname'],
                      'subresource':'updateschedd', 'scheddname':schedd}
         try:
-            userServer.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
+            self.crabserver.post(api='task', data=urllib.urlencode(configreq))
         except HTTPException as hte:
             msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
             self.logger.warning(msg)
@@ -369,7 +369,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                     }
         self.logger.warning("Task %s already submitted to HTCondor; pushing information centrally: %s", workflow, str(configreq))
         data = urllib.urlencode(configreq)
-        self.server.post(self.resturi, data=data)
+        self.crabserver.post(api='workflowdb', data=data)
 
         # Note that we don't re-send Dashboard jobs; we assume this is a rare occurrance and
         # don't want to upset any info already in the Dashboard.
@@ -397,7 +397,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         arg = "RunJobs.dag"
 
         info['resthost'] = '"%s"' % (self.server['host'])
-        info['resturinoapi'] = '"%s"' % (self.restURInoAPI)
+        restURInoAPI = 'crabserver/' + 'dbInstance'
+        info['resturinoapi'] = '"%s"' % (restURInoAPI)
 
         try:
             info['remote_condor_setup'] = ''
@@ -460,7 +461,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                      'clusterid' : self.clusterId} #that's the condor cluster id of the dag_bootstrap.sh
         self.logger.debug("Pushing information centrally %s", configreq)
         data = urllib.urlencode(configreq)
-        self.server.post(self.resturi, data=data)
+        self.crabserver.post(api='workflowdb', data=data)
 
         self.sendDashboardJobs(dashboardParams, info['apmon'])
 

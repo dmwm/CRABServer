@@ -8,7 +8,7 @@ from httplib import HTTPException
 
 from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 
-from RESTInteractions import HTTPRequests
+from RESTInteractions import CRABRest, HTTPRequests
 from RucioUtils import getNativeRucioClient
 
 from TaskWorker import __version__
@@ -142,72 +142,75 @@ class TaskHandler(object):
         return output
 
 
-def handleNewTask(resthost, resturi, config, task, procnum, *args, **kwargs):
+def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
     """Performs the injection of a new task
 
     :arg str resthost: the hostname where the rest interface is running
-    :arg str resturi: the rest base url to contact
+    :arg str dbInstance: the rest base url to contact
     :arg WMCore.Configuration config: input configuration
     :arg TaskWorker.DataObjects.Task task: the task to work on
     :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the handler."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
+    crabserver = CRABRest(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
                           logger=logging.getLogger(str(procnum)), userAgent='CRABTaskWorker', version=__version__)
-    handler = TaskHandler(task, procnum, server, config, 'handleNewTask', createTempDir=True)
+    crabserver.setDbInstance(dbInstance)
+    handler = TaskHandler(task, procnum, crabserver, config, 'handleNewTask', createTempDir=True)
     rucioClient = getNativeRucioClient(config=config, logger=handler.logger)
-    handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
-    handler.addWork(StageoutCheck(config=config, server=server, resturi=resturi, procnum=procnum, rucioClient=rucioClient))
+    handler.addWork(MyProxyLogon(config=config, crabserver=crabserver, procnum=procnum, myproxylen=60 * 60 * 24))
+    handler.addWork(StageoutCheck(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
     if task['tm_job_type'] == 'Analysis':
         if task.get('tm_user_files'):
-            handler.addWork(UserDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum))
+            handler.addWork(UserDataDiscovery(config=config, crabserver=crabserver, procnum=procnum))
         else:
-            handler.addWork(DBSDataDiscovery(config=config, server=server, resturi=resturi, procnum=procnum, rucioClient=rucioClient))
+            handler.addWork(DBSDataDiscovery(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
     elif task['tm_job_type'] == 'PrivateMC':
-        handler.addWork(MakeFakeFileSet(config=config, server=server, resturi=resturi, procnum=procnum))
-    handler.addWork(Splitter(config=config, server=server, resturi=resturi, procnum=procnum))
-    handler.addWork(DagmanCreator(config=config, server=server, resturi=resturi, procnum=procnum, rucioClient=rucioClient))
+        handler.addWork(MakeFakeFileSet(config=config, crabserver=crabserver, procnum=procnum))
+    handler.addWork(Splitter(config=config, crabserver=crabserver, procnum=procnum))
+    handler.addWork(DagmanCreator(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
     if task['tm_dry_run'] == 'T':
-        handler.addWork(DryRunUploader(config=config, server=server, resturi=resturi, procnum=procnum))
+        handler.addWork(DryRunUploader(config=config, crabserver=crabserver, procnum=procnum))
     else:
-        handler.addWork(DagmanSubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
+        handler.addWork(DagmanSubmitter(config=config, crabserver=crabserver, procnum=procnum))
 
     return handler.actionWork(args, kwargs)
 
 
-def handleResubmit(resthost, resturi, config, task, procnum, *args, **kwargs):
+def handleResubmit(resthost, dbInstance, config, task, procnum, *args, **kwargs):
     """Performs the re-injection of failed jobs
 
     :arg str resthost: the hostname where the rest interface is running
-    :arg str resturi: the rest base url to contact
+    :arg str dbInstance: the rest base url to contact
     :arg WMCore.Configuration config: input configuration
     :arg TaskWorker.DataObjects.Task task: the task to work on
     :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
+    crabserver = CRABRest(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
                           logger=logging.getLogger(str(procnum)), userAgent='CRABTaskWorker', version=__version__)
-    handler = TaskHandler(task, procnum, server, config, 'handleResubmit')
-    handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 60 * 24))
-    handler.addWork(DagmanResubmitter(config=config, server=server, resturi=resturi, procnum=procnum))
+    crabserver.setDbInstance(dbInstance)
+    handler = TaskHandler(task, procnum, crabserver, config, 'handleResubmit')
+    handler.addWork(MyProxyLogon(config=config, crabserver=crabserver, procnum=procnum, myproxylen=60 * 60 * 24))
+    handler.addWork(DagmanResubmitter(config=config, crabserver=crabserver, procnum=procnum))
 
     return handler.actionWork(args, kwargs)
 
 
-def handleKill(resthost, resturi, config, task, procnum, *args, **kwargs):
+def handleKill(resthost, dbInstance, config, task, procnum, *args, **kwargs):
     """Asks to kill jobs
 
     :arg str resthost: the hostname where the rest interface is running
-    :arg str resturi: the rest base url to contact
+    :arg str dbInstance: the rest base url to contact
     :arg WMCore.Configuration config: input configuration
     :arg TaskWorker.DataObjects.Task task: the task to work on
     :arg int procnum: the process number taking care of the work
     :*args and *kwargs: extra parameters currently not defined
     :return: the result of the handler operation."""
-    server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
+    crabserver = CRABRest(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry=20,
                           logger=logging.getLogger(str(procnum)), userAgent='CRABTaskWorker', version=__version__)
-    handler = TaskHandler(task, procnum, server, config, 'handleKill')
-    handler.addWork(MyProxyLogon(config=config, server=server, resturi=resturi, procnum=procnum, myproxylen=60 * 5))
-    handler.addWork(DagmanKiller(config=config, server=server, resturi=resturi, procnum=procnum))
+    crabserver.setDbInstance(dbInstance)
+    handler = TaskHandler(task, procnum, crabserver, config, 'handleKill')
+    handler.addWork(MyProxyLogon(config=config, crabserver=crabserver, procnum=procnum, myproxylen=60 * 5))
+    handler.addWork(DagmanKiller(config=config, crabserver=crabserver, procnum=procnum))
 
     return handler.actionWork(args, kwargs)

@@ -183,7 +183,7 @@ class DagmanResubmitter(TaskAction):
                          'workflow': kwargs['task']['tm_taskname'],
                          'status': 'SUBMITTED'}
             self.logger.debug("Setting the task as successfully resubmitted with %s", str(configreq))
-            self.server.post(self.resturi, data=urllib.urlencode(configreq))
+            self.crabserver.post(api='workflowdb', data=urllib.urlencode(configreq))
         except HTTPException as hte:
             self.logger.error(hte.headers)
             msg  = "The CRAB server successfully resubmitted the task to the Grid scheduler,"

@@ -149,7 +149,7 @@ class DagmanKiller(TaskAction):
                              'workflow': kwargs['task']['tm_taskname'],
                              'status': 'KILLED'}
                 self.logger.debug("Setting the task as successfully killed with %s" % (str(configreq)))
-                self.server.post(self.resturi, data = urllib.urlencode(configreq))
+                self.crabserver.post(api='workflowdb', data = urllib.urlencode(configreq))
             except HTTPException as hte:
                 self.logger.error(hte.headers)
                 msg  = "The CRAB server successfully killed the task,"
