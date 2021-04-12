@@ -789,10 +789,14 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
     downloadCommand = 'wget -Sq -O %s ' % filepath
     downloadCommand += ' "%s"' % preSignedUrl
     downloadProcess = subprocess.Popen(downloadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    logger.debug("Will execute:\n%s", downloadCommand)
     stdout, stderr = downloadProcess.communicate()
     exitcode = downloadProcess.returncode
     logger.debug('exitcode: %s\nstdout: %s\nstderr: %s', exitcode, stdout, stderr)
 
     if exitcode != 0:
-        raise Exception('Failed to download file. Stderr is:\n%s' % stderr)
+        raise Exception('Download command failed. Stderr is:\n%s' % stderr)
+    if not os.path.exists(filepath) :
+        raise Exception("Download failure. File %s was not created", filepath)
+
     return
