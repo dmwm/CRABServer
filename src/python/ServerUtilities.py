@@ -597,7 +597,7 @@ class tempSetLogLevel():
 # Below a few convenience functions to access the S3 implementation of crabcache
 # Clients are expected to use the following functions which all have the same signature:
 #  downloadFromS3        to retrieve an object into a file
-#  retrieveFromSe        to retrieve an object as JSON to use in the code
+#  retrieveFromS3        to retrieve an object as JSON to use in the code
 #  uploadToS3            to upload a file into an S3 object
 #  getDonwloadUrlFromS3  to obtain a PreSigned URL to access an existing object in S3
 #    this can be used e.g. to share access to logs
