@@ -33,7 +33,7 @@ class RESTCache(RESTEntity):
     Supports only GET method
 
     As per the S3 buckt structure in https://github.com/dmwm/CRABServer/wiki/CRABCache-replacement-with-S3
-    objects in S3 are always under a <username> prefix. The there is a <taskname> level and for each
+    objects in S3 are always under a <username> prefix. Then there is a <taskname> level and for each
     task we write a unique clientlog, taskworkerlog, debugfiles tarball, which gets overwritten whenever e.g.
     log is updated.
     Instead sandboxes get their own directory and the usual hash as a name, so that they can be
@@ -54,11 +54,11 @@ class RESTCache(RESTEntity):
     Behavior is different for sandboxes since those are uploaded before taskname is knwon
     and therefore must be located via username+tarballname.
     GET: /crabserver/prod/cache?subresource=download&objecttype=sandboxg&username=<user>&tarballname=<name>
-    Same for subresource=retreive, but using retrieve makes little sense for sandboxes
+    Same for subresource=retreive, but using retrieve makes little sense for sandboxes.
     The tarballname is created during crab submit and stored in DB TASKS table in columns
      tm_user_sandbox or tm_debug_files
 
-    These retun information about usage
+    These retun information about usage:
     GET: /crabserver/prod/cache?subresource=list&username=<username>&objecttype=<objecttype>
     GET: /crabserver/prod/cache?subresource=used&username=<username>
 
