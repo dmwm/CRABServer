@@ -91,7 +91,7 @@ JOB_SUBMIT = \
 +CRAB_RetryOnASOFailures = %(retry_aso)s
 +CRAB_ASOTimeout = %(aso_timeout)s
 +CRAB_RestHost = %(resthost)s
-+CRAB_RestURInoAPI = %(resturinoapi)s
++CRAB_DbInstance = %(dbinstance)s
 +CRAB_NumAutomJobRetries = %(numautomjobretries)s
 CRAB_Attempt = %(attempt)d
 CRAB_ISB = %(cacheurl_flatten)s
@@ -259,7 +259,7 @@ def transform_strings(data):
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
                'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', 'cms_type', \
-               'desired_arch', 'resthost', 'resturinoapi', 'submitter_ip_addr', \
+               'desired_arch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
         val = data.get(var, None)
         if val == None:
@@ -927,12 +927,7 @@ class DagmanCreator(TaskAction):
             self.logger.warning(msg)
 
         ## Write down the DAG as needed by DAGMan.
-        # temporary for K8s transition, allow TW to use cmsweb-k8s-prod while keeping schedd traffic on cmsweb (VM)
         restHostForSchedd = kwargs['task']['resthost']
-        if restHostForSchedd == 'cmsweb-k8s-prod.cern.ch':
-            restHostForSchedd = 'cmsweb.cern.ch'
-            self.logger.info('resthost for DAG Header changed from k8s to cmsweb.cern.ch')
-
         dag = DAG_HEADER.format(nodestate='.{0}'.format(parent) if parent else ('.0' if stage == 'processing' else ''),
                                 resthost=restHostForSchedd)
         if stage == 'probe':
@@ -1177,9 +1172,8 @@ class DagmanCreator(TaskAction):
         task_runtime = getLocation('TaskManagerRun.tar.gz', 'CRABServer/')
         shutil.copy(task_runtime, '.')
 
-        kw['task']['resthost'] = self.crabserver['host']
-        #kw['task']['resturinoapi'] = self.restURInoAPI
-        kw['task']['resturinoapi'] = '/crabserver/' + self.crabserver.getDbIstance()
+        kw['task']['resthost'] = self.crabserver.server['host']
+        kw['task']['dbinstance'] = self.crabserver.getDbInstance()
         params = {}
         if kw['task']['tm_dry_run'] == 'F':
             params = self.sendDashboardTask(kw['task'])

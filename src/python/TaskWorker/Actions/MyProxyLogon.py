@@ -82,7 +82,7 @@ class MyProxyLogon(TaskAction):
                 self.logger.error("proxy retrieval from %s failed with DN hash as credential name.",
                                   proxycfg['myProxySvr'])
                 self.logger.error("will try with old-style DN hash adding REST host name")
-                proxycfg['myproxyAccount'] = self.crabserver['host']
+                proxycfg['myproxyAccount'] = self.crabserver.server['host']
                 (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
         #  minimal sanity check. Submission will fail if there's no group
         if not usergroups:

@@ -67,7 +67,7 @@ SUBMIT_INFO = [ \
     ('CRAB_RetryOnASOFailures', 'retry_aso'),
     ('CRAB_ASOTimeout', 'aso_timeout'),
     ('CRAB_RestHost', 'resthost'),
-    ('CRAB_RestURInoAPI', 'resturinoapi'),
+    ('CRAB_DbInstance', 'dbinstance'),
     ('CRAB_NumAutomJobRetries', 'numautomjobretries'),
     ('CRAB_SplitAlgo', 'splitalgo'),
     ('CRAB_AlgoArgs', 'algoargs'),
@@ -396,9 +396,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         info['outputFilesString'] = ", ".join(outputFiles)
         arg = "RunJobs.dag"
 
-        info['resthost'] = '"%s"' % (self.server['host'])
-        restURInoAPI = 'crabserver/' + 'dbInstance'
-        info['resturinoapi'] = '"%s"' % (restURInoAPI)
+        info['resthost'] = '"%s"' % (self.crabserver.server['host'])
+        info['dbinstance'] = '"%s"' % (self.crabserver.getDbInstance())
 
         try:
             info['remote_condor_setup'] = ''

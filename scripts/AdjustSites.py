@@ -20,7 +20,7 @@ from httplib import HTTPException
 import classad
 import htcondor
 
-from RESTInteractions import HTTPRequests
+from RESTInteractions import CRABRest, HTTPRequests
 from ServerUtilities import getProxiedWebDir, getColumn
 
 
@@ -265,18 +265,17 @@ def makeWebDir(ad):
     ad['CRAB_localWebDirURL'] = storage_re.sub(sinfo[1], path)
 
 
-def uploadWebDir(RESTServer, ad):
+def uploadWebDir(crabserver, ad):
     """
     Need a doc string here.
     """
     data = {'subresource': 'addwebdir'}
-    uri = ad['CRAB_RestURInoAPI'] + '/task'
     data['workflow'] = ad['CRAB_ReqName']
     data['webdirurl'] = ad['CRAB_localWebDirURL']
 
     try:
         printLog("Uploading webdir %s to the REST" % data['webdirurl'])
-        RESTServer.post(uri, data=urllib.urlencode(data))
+        crabserver.post(api='task', data=urllib.urlencode(data))
         return 0
     except HTTPException as hte:
         printLog(traceback.format_exc())
@@ -285,7 +284,7 @@ def uploadWebDir(RESTServer, ad):
         return 1
 
 
-def saveProxiedWebdir(RESTServer, ad):
+def saveProxiedWebdir(crabserver, ad):
     """ The function queries the REST interface to get the proxied webdir and sets
         a classad so that we report this to the dashboard instead of the regular URL.
 
@@ -297,10 +296,9 @@ def saveProxiedWebdir(RESTServer, ad):
     """
     # Get the proxied webdir from the REST itnerface
     task = ad['CRAB_ReqName']
-    uriNoApi = ad['CRAB_RestURInoAPI']
     webDir_adName = 'CRAB_WebDirURL'
     ad[webDir_adName] = ad['CRAB_localWebDirURL']
-    proxied_webDir = getProxiedWebDir(RESTServer=RESTServer, task=task, uriNoApi=uriNoApi, logFunction=printLog)
+    proxied_webDir = getProxiedWebDir(crabserver=crabserver, task=task, logFunction=printLog)
     if proxied_webDir: # Prefer the proxied webDir to the non-proxied one
         ad[webDir_adName] = str(proxied_webDir)
 
@@ -348,7 +346,7 @@ def setupLog():
     os.close(logfd)
 
 
-def checkTaskInfo(RESTServer, ad):
+def checkTaskInfo(crabserver, ad):
     """
     Function checks that given task is registered in the database with status SUBMITTED and with the
     same clusterId and schedd name in the database as in the condor ads where it is currently running.
@@ -356,12 +354,11 @@ def checkTaskInfo(RESTServer, ad):
     """
 
     task = ad['CRAB_ReqName']
-    uri = ad['CRAB_RestURInoAPI'] + '/task'
     clusterIdOnSchedd = ad['ClusterId']
     data = {'subresource': 'search', 'workflow': task}
 
     try:
-        dictresult, _, _ = RESTServer.get(uri, data=data)
+        dictresult, _, _ = crabserver.get(api='task', data=data)
     except HTTPException as hte:
         printLog(traceback.format_exc())
         printLog(hte.headers)
@@ -399,12 +396,15 @@ def main():
     printLog("Parsed ad: %s" % ad)
 
 
-    # instantiate a server object to talk with CRABServer
+    # instantiate a server object to talk with crabserver
     host = ad['CRAB_RestHost']
+    dbInstance = ad['CRAB_DbInstance']
     cert = ad['X509UserProxy']
-    RESTServer = HTTPRequests(host, cert, cert, retry=3, userAgent='CRABSchedd')
+    #RESTServer = HTTPRequests(host, cert, cert, retry=3, userAgent='CRABSchedd')
+    crabserver = CRABRest(host, cert, cert, retry=3, userAgent='CRABSchedd')
+    crabserver.setDbInstance(dbInstance)
 
-    checkTaskInfo(RESTServer, ad)
+    checkTaskInfo(crabserver, ad)
 
     # is this the first time this script runs for this task ? (it runs at each resubmit as well !)
     if not os.path.exists('WEB_DIR'):
@@ -415,7 +415,7 @@ def main():
         exitCode = 1
         maxRetries = 3
         while retries < maxRetries and exitCode != 0:
-            exitCode = uploadWebDir(RESTServer, ad)
+            exitCode = uploadWebDir(crabserver, ad)
             if exitCode != 0:
                 time.sleep(retries * 20)
             retries += 1
@@ -424,7 +424,7 @@ def main():
             sys.exit(1)
         printLog("Webdir URL has been uploaded, exit code is %s. Setting the classad for the proxied webdir" % exitCode)
 
-        saveProxiedWebdir(RESTServer, ad)
+        saveProxiedWebdir(crabserver, ad)
         printLog("Proxied webdir saved")
 
     printLog("Clearing the automatic blacklist and handling RunJobs.dag.nodes.log for resubmissions")
