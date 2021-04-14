@@ -868,7 +868,7 @@ class ASOServerJob(object):
                     self.logger.info("OLD Publisher: set asoworker=asoless in transferdb")
                     updateDoc['asoworker'] = 'asoless'
                 try:
-                    self.crabserver.post(api='fileusertransfers', data=encodeRequest(updateDoc))
+                    self.crabserver.post(api='filetransfers', data=encodeRequest(updateDoc))
                 except HTTPException as hte:
                     msg = "Error uploading document to database."
                     msg += " Transfer submission failed."
@@ -910,7 +910,7 @@ class ASOServerJob(object):
                     self.logger.info("OLD Publisher: set asoworker=asoless in transferdb")
                     updateDoc['asoworker'] = 'asoless'
                 try:
-                    self.crabserver.post(api='fileusertransfers', data=encodeRequest(updateDoc))
+                    self.crabserver.post(api='filetransfers', data=encodeRequest(updateDoc))
                 except HTTPException as hte:
                     msg = "Error uploading document to database."
                     msg += " Transfer submission failed."
