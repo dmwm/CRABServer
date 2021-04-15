@@ -8,7 +8,7 @@ from httplib import HTTPException
 
 from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 
-from RESTInteractions import CRABRest, HTTPRequests
+from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
 
 from TaskWorker import __version__
@@ -131,8 +131,7 @@ class TaskHandler(object):
             #log entry below is used for logs parsing, therefore, changing it might require to update logstash configuration
             self.logger.info("Finished %s on %s in %d seconds", str(action), self._task['tm_taskname'], t1 - t0)
 
-            #XXX MM - Not really sure what this is and why it's here, but I hate this..
-            #XXX SB - if there is a next action to dot, the result field of the Result object returned by this action (!)
+            # if there is a next action to do, the result field of the Result object returned by this action (!)
             # will contain the needed input for the next action. I also hate this, but could not find a better way
             try:
                 nextinput = output.result

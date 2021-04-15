@@ -15,22 +15,20 @@ import hashlib
 import tempfile
 from ast import literal_eval
 
+from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
 from ServerUtilities import getLock
-from ServerUtilities import TASKLIFETIME
 
 import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
-from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS
 from RucioUtils import getWritePFN
 from CMSGroupMapper import get_egroup_users
 
-import WMCore.WMSpec.WMTask
-from WMCore.Services.CRIC.CRIC import CRIC
-
 import classad
 
+import WMCore.WMSpec.WMTask
+from WMCore.Services.CRIC.CRIC import CRIC
 try:
     from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 except ImportError:

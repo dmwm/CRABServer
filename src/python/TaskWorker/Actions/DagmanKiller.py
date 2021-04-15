@@ -1,22 +1,16 @@
 import re
-import time
 import socket
 import urllib
-import datetime
-import traceback
-
-import classad
-import htcondor
 
 from httplib import HTTPException
 
-from ServerUtilities import FEEDBACKMAIL
-import TaskWorker.WorkerExceptions
+import htcondor
+
+from ServerUtilities import FEEDBACKMAIL, insertJobIdSid
+
+import TaskWorker.DataObjects.Result as Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
-import TaskWorker.DataObjects.Result as Result
-
-from ServerUtilities import insertJobIdSid
 
 import HTCondorLocator
 import HTCondorUtils
@@ -32,21 +26,21 @@ class DagmanKiller(TaskAction):
     We do not actually "kill" the task off, but put the DAG on hold.
     """
 
-    def executeInternal(self, apmon, *args, **kwargs):
+    def executeInternal(self, apmon, *args, **kwargs):  # pylint: disable=unused-argument
         #Marco: I guess these value errors only happens for development instances
         if 'task' not in kwargs:
             raise ValueError("No task specified.")
-        self.task = kwargs['task']
+        self.task = kwargs['task']  # pylint: disable=attribute-defined-outside-init
         if 'tm_taskname' not in self.task:
             raise ValueError("No taskname specified")
-        self.workflow = self.task['tm_taskname']
+        self.workflow = self.task['tm_taskname']  # pylint: disable=attribute-defined-outside-init
         if 'user_proxy' not in self.task:
             raise ValueError("No proxy provided")
-        self.proxy = self.task['user_proxy']
+        self.proxy = self.task['user_proxy']  # pylint: disable=attribute-defined-outside-init
 
-        self.logger.info("About to kill workflow: %s." % self.workflow)
+        self.logger.info("About to kill workflow: %s.", self.workflow)
 
-        self.workflow = str(self.workflow)
+        self.workflow = str(self.workflow)  # pylint: disable=attribute-defined-outside-init
         if not WORKFLOW_RE.match(self.workflow):
             raise Exception("Invalid workflow name.")
 
@@ -55,20 +49,19 @@ class DagmanKiller(TaskAction):
             self.backendurls['htcondorPool'] = self.task['tm_collector']
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
 
-        address = ""
         try:
-            self.schedd, address = loc.getScheddObjNew(self.task['tm_schedd'])
+            self.schedd, _ = loc.getScheddObjNew(self.task['tm_schedd'])  # pylint: disable=attribute-defined-outside-init
         except Exception as exp:
-            msg  = "The CRAB server backend was not able to contact the Grid scheduler."
+            msg = "The CRAB server backend was not able to contact the Grid scheduler."
             msg += " Please try again later."
             msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
             msg += " Message from the scheduler: %s" % (str(exp))
-            self.logger.exception("%s: %s" % (self.workflow, msg))
+            self.logger.exception("%s: %s", self.workflow, msg)
             raise TaskWorkerException(msg)
 
         try:
             hostname = socket.getfqdn()
-        except:
+        except Exception:
             hostname = ''
 
         const = 'CRAB_ReqName =?= %s && TaskType=?="Job"' % HTCondorUtils.quote(self.workflow)
@@ -83,9 +76,9 @@ class DagmanKiller(TaskAction):
                          'StatusValue': 'killed',
                         }
                 insertJobIdSid(jinfo, jobid, self.workflow, jobretry)
-                self.logger.info("Sending kill info to Dashboard: %s" % str(jinfo))
+                self.logger.info("Sending kill info to Dashboard: %s", str(jinfo))
                 apmon.sendToML(jinfo)
-        except:
+        except Exception:
             self.logger.exception("Failed to notify Dashboard of job kills") #warning
 
         # Note that we can not send kills for jobs not in queue at this time; we'll need the
@@ -119,7 +112,7 @@ class DagmanKiller(TaskAction):
                     self.schedd.act(htcondor.JobAction.Remove, jobConst)
         results = rpipe.read()
         if results != "OK":
-            msg  = "The CRAB server backend was not able to kill the task,"
+            msg = "The CRAB server backend was not able to kill the task,"
             msg += " because the Grid scheduler answered with an error."
             msg += " This is probably a temporary glitch. Please try again later."
             msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
@@ -148,11 +141,11 @@ class DagmanKiller(TaskAction):
                 configreq = {'subresource': 'state',
                              'workflow': kwargs['task']['tm_taskname'],
                              'status': 'KILLED'}
-                self.logger.debug("Setting the task as successfully killed with %s" % (str(configreq)))
-                self.crabserver.post(api='workflowdb', data = urllib.urlencode(configreq))
+                self.logger.debug("Setting the task as successfully killed with %s", str(configreq))
+                self.crabserver.post(api='workflowdb', data=urllib.urlencode(configreq))
             except HTTPException as hte:
                 self.logger.error(hte.headers)
-                msg  = "The CRAB server successfully killed the task,"
+                msg = "The CRAB server successfully killed the task,"
                 msg += " but was unable to update the task status to %s in the database." % (configreq['status'])
                 msg += " This should be a harmless (temporary) error."
                 raise TaskWorkerException(msg)

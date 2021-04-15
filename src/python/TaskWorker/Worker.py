@@ -11,7 +11,7 @@ from logging import FileHandler
 from httplib import HTTPException
 from logging.handlers import TimedRotatingFileHandler
 
-from RESTInteractions import CRABRest, HTTPRequests
+from RESTInteractions import CRABRest
 from TaskWorker.DataObjects.Result import Result
 from ServerUtilities import truncateError, executeCommand
 from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException
@@ -105,8 +105,6 @@ def processWorkerLoop(inputs, results, resthost, dbInstance, procnum, logger, lo
             msg += "\n" + str(traceback.format_exc())
         finally:
             if msg:
-                #server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey,
-                #                      retry=20, logger=logger, userAgent='CRABTaskWorker')
                 crabserver = CRABRest(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey,
                                       retry=20, logger=logger, userAgent='CRABTaskWorker')
                 crabserver.setDbInstance(dbInstance)

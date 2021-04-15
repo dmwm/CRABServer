@@ -14,7 +14,7 @@ from httplib import HTTPException
 from WMCore.Configuration import loadConfigurationFile
 
 #CAFUtilities dependencies
-from RESTInteractions import CRABRest, HTTPRequests
+from RESTInteractions import CRABRest
 
 import HTCondorLocator
 from ServerUtilities import newX509env
@@ -189,8 +189,6 @@ class MasterWorker(object):
         
         #Let's increase the server's retries for recoverable errors in the MasterWorker
         #60 means we'll keep retrying for 1 hour basically (we retry at 20*NUMRETRY seconds, so at: 20s, 60s, 120s, 200s, 300s ...)
-        #self.server = HTTPRequests(self.restHost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry=20,
-        #                           logger=self.logger, userAgent='CRABTaskWorker')
         self.crabserver = CRABRest(self.restHost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry=20,
                                    logger=self.logger, userAgent='CRABTaskWorker')
         self.crabserver.setDbInstance(self.dbInstance)

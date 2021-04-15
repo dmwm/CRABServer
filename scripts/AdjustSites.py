@@ -20,7 +20,7 @@ from httplib import HTTPException
 import classad
 import htcondor
 
-from RESTInteractions import CRABRest, HTTPRequests
+from RESTInteractions import CRABRest
 from ServerUtilities import getProxiedWebDir, getColumn
 
 
@@ -400,7 +400,6 @@ def main():
     host = ad['CRAB_RestHost']
     dbInstance = ad['CRAB_DbInstance']
     cert = ad['X509UserProxy']
-    #RESTServer = HTTPRequests(host, cert, cert, retry=3, userAgent='CRABSchedd')
     crabserver = CRABRest(host, cert, cert, retry=3, userAgent='CRABSchedd')
     crabserver.setDbInstance(dbInstance)
 
