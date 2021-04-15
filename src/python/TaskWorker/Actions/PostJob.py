@@ -101,9 +101,7 @@ from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, isCouchDBURL, oracleOutputMapping
 from ServerUtilities import getLock
-from RESTInteractions import HTTPRequests ## Why not to use from WMCore.Services.Requests import Requests
-
-
+from RESTInteractions import CRABRest
 
 ASO_JOB = None
 G_JOB_REPORT_NAME = None
@@ -289,7 +287,7 @@ class ASOServerJob(object):
     def __init__(self, logger, aso_start_time, aso_start_timestamp, dest_site, source_dir,
                  dest_dir, source_sites, job_id, filenames, reqname, log_size,
                  log_needs_transfer, job_report_output, job_ad, crab_retry, retry_timeout, \
-                 job_failed, transfer_logs, transfer_outputs, rest_host, rest_uri_no_api, pubname):
+                 job_failed, transfer_logs, transfer_outputs, rest_host, db_instance, pubname):
         """
         ASOServerJob constructor.
         """
@@ -321,9 +319,8 @@ class ASOServerJob(object):
         self.proxy = proxy
         self.aso_db_url = self.job_ad['CRAB_ASOURL']
         self.rest_host = rest_host
-        self.rest_uri_no_api = rest_uri_no_api
-        self.rest_uri_file_user_transfers = rest_uri_no_api + "/fileusertransfers"
-        self.rest_uri_file_transfers = rest_uri_no_api + "/filetransfers"
+        self.db_instance = db_instance
+        self.rest_url = rest_host + '/crabserver/' + db_instance + '/'  # used in logging
         self.found_doc_in_db = False
         #I don't think it is necessary to default to asynctransfer here, we are taking care of it
         #in dagman creator and if CRAB_ASODB is not there it means it's old task executing old code
@@ -336,9 +333,10 @@ class ASOServerJob(object):
                 self.couch_server = CMSCouch.CouchServer(dburl=self.aso_db_url, ckey=proxy, cert=proxy)
                 self.couch_database = self.couch_server.connectDatabase(self.aso_db_name, create=False)
             else:
-                self.server = HTTPRequests(self.rest_host, proxy, proxy, retry=2, userAgent='CRABSchedd')
+                self.crabserver = CRABRest(self.rest_host, proxy, proxy, retry=2, userAgent='CRABSchedd')
+                self.crabserver.setDbInstance(self.db_instance)
         except Exception as ex:
-            msg = "Failed to connect to ASO database: %s" % (str(ex))
+            msg = "Failed to connect to ASO database via CRABRest: %s" % (str(ex))
             self.logger.exception(msg)
             raise RuntimeError(msg)
 
@@ -740,7 +738,7 @@ class ASOServerJob(object):
                     doc = {'_id': doc_id,
                            'inputdataset': input_dataset_or_primary_dataset,
                            'rest_host': str(self.job_ad['CRAB_RestHost']),
-                           'rest_uri': str(self.job_ad['CRAB_RestURInoAPI']),
+                           'rest_uri': str('/crabserver/'+self.job_ad['CRAB_DbInstance']),
                            'lfn': source_lfn,
                            'source_lfn': source_lfn,
                            'destination_lfn': dest_lfn,
@@ -802,7 +800,7 @@ class ASOServerJob(object):
 
     def getDocByID(self, doc_id):
         if not isCouchDBURL(self.aso_db_url):
-            docInfo = self.server.get(self.rest_uri_file_user_transfers, data=encodeRequest({'subresource': 'getById', "id": doc_id}))
+            docInfo = self.crabserver.get(api='fileusertransfers', data=encodeRequest({'subresource': 'getById', "id": doc_id}))
             if docInfo and len(docInfo[0]['result']) == 1:
                 # Means that we have already a document in database!
                 docInfo = oracleOutputMapping(docInfo)
@@ -848,7 +846,7 @@ class ASOServerJob(object):
                           'rest_host': doc['rest_host'],
                           'rest_uri': doc['rest_uri']}
                 try:
-                    self.server.put(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc))
+                    self.crabserver.put(api='fileusertransfers', data=encodeRequest(newDoc))
                 except HTTPException as hte:
                     msg = "Error uploading document to database."
                     msg += " Transfer submission failed."
@@ -870,7 +868,7 @@ class ASOServerJob(object):
                     self.logger.info("OLD Publisher: set asoworker=asoless in transferdb")
                     updateDoc['asoworker'] = 'asoless'
                 try:
-                    self.server.post(self.rest_uri_file_transfers, data=encodeRequest(updateDoc))
+                    self.crabserver.post(api='filetransfers', data=encodeRequest(updateDoc))
                 except HTTPException as hte:
                     msg = "Error uploading document to database."
                     msg += " Transfer submission failed."
@@ -893,7 +891,7 @@ class ASOServerJob(object):
                           'transfer_retry_count': 0,
                           'subresource': 'updateDoc'}
                 try:
-                    self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc))
+                    self.crabserver.post(api='fileusertransfers', data=encodeRequest(newDoc))
                 except HTTPException as hte:
                     msg = "Error updating document in database."
                     msg += " Transfer submission failed."
@@ -912,7 +910,7 @@ class ASOServerJob(object):
                     self.logger.info("OLD Publisher: set asoworker=asoless in transferdb")
                     updateDoc['asoworker'] = 'asoless'
                 try:
-                    self.server.post(self.rest_uri_file_transfers, data=encodeRequest(updateDoc))
+                    self.crabserver.post(api='filetransfers', data=encodeRequest(updateDoc))
                 except HTTPException as hte:
                     msg = "Error uploading document to database."
                     msg += " Transfer submission failed."
@@ -932,7 +930,7 @@ class ASOServerJob(object):
                     transfers_file.write(transfer_dump+"\n")
                 if not os.path.exists('task_process/rest_filetransfers.txt'):
                     with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
-                        rest_file.write(self.rest_host + self.rest_uri_no_api + '\n')
+                        rest_file.write(self.rest_url + '\n')
                         rest_file.write(self.proxy)
             else:
                 if not 'publishname' in newDoc:
@@ -948,7 +946,7 @@ class ASOServerJob(object):
                     transfers_file.write(transfer_dump+"\n")
                 if not os.path.exists('task_process/rest_filetransfers.txt'):
                     with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
-                        rest_file.write(self.rest_host + self.rest_uri_no_api + '\n')
+                        rest_file.write(self.rest_host + self.rest_url + '\n')
                         rest_file.write(self.proxy)
         else:
             returnMsg = self.couch_database.commitOne(doc)[0]
@@ -1082,7 +1080,7 @@ class ASOServerJob(object):
             if query_view:
                 self.logger.debug("Querying ASO RDBMS database.")
                 try:
-                    view_results = self.server.get(self.rest_uri_file_user_transfers, data=encodeRequest({'subresource': 'getTransferStatus',
+                    view_results = self.crabserver.get(api='fileusertransfers', data=encodeRequest({'subresource': 'getTransferStatus',
                                                                                                           'username': str(self.job_ad['CRAB_UserHN']),
                                                                                                           'taskname': self.reqname}))
                     view_results_dict = oracleOutputMapping(view_results, 'id')
@@ -1247,7 +1245,7 @@ class ASOServerJob(object):
                           'username': username,
                           'subresource': 'killTransfersById'}
                 try:
-                    killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds']))
+                    killedFiles = self.crabserver.post(api='fileusertransfers', data=encodeRequest(newDoc, ['listOfIds']))
                     not_cancelled = killedFiles[0]['result'][0]['failedKill']
                     cancelled = killedFiles[0]['result'][0]['killed']
                     break  # no need to retry
@@ -1281,7 +1279,7 @@ class ASOServerJob(object):
                 try:
                     doc_out = self.getDocByID(docIdKill)
                     if doc_out['transfer_state'] not in ['kill', 'killed']:
-                        killedFiles = self.server.post(self.rest_uri_file_user_transfers, data=encodeRequest(newDoc, ['listOfIds']))
+                        killedFiles = self.crabserver.post(api='fileusertransfers', data=encodeRequest(newDoc, ['listOfIds']))
                         failedFiles = killedFiles[0]['result'][0]['failedKill']
                         notfailedFiles = killedFiles[0]['result'][0]['killed']
                         if failedFiles:
@@ -1351,7 +1349,8 @@ class PostJob():
         self.job_sw              = None
         self.publish_name        = None
         self.rest_host           = None
-        self.rest_uri_no_api     = None
+        self.db_instance         = None
+        self.rest_url            = None
         self.retry_timeout       = None
         self.transfer_logs       = None
         self.transfer_outputs    = None
@@ -1366,7 +1365,7 @@ class PostJob():
         self.output_files_info   = []
         ## Object we will use for making requests to the CRAB REST interface (uploading
         ## logs archive and output files matadata).
-        self.server              = None
+        self.crabserver          = None
         ## Path to the task web directory.
         self.logpath             = None
         ## Time-stamps of when transfer documents were inserted into ASO database.
@@ -1579,7 +1578,7 @@ class PostJob():
         ## CRAB_EDMOutputFiles, CRAB_TFileOutputFiles and CRAB_AdditionalOutputFiles.
         ## (We only need to add the job_id in the file names).
         self.output_files_names  = []
-        for i in xrange(10, len(args)):
+        for i in range(10, len(args)):
             self.output_files_names.append(args[i])
 
         ## Get the DAG cluster ID. Needed to know whether the job has run or not.
@@ -2068,10 +2067,11 @@ class PostJob():
             self.transfer_outputs = 0
 
         ## Initialize the object we will use for making requests to the REST interface.
-        self.server = HTTPRequests(self.rest_host, \
+        self.crabserver = CRABRest(self.rest_host, \
                                    os.environ['X509_USER_PROXY'], \
                                    os.environ['X509_USER_PROXY'], \
                                    retry=2, logger=self.logger, userAgent='CRABSchedd')
+        self.crabserver.setDbInstance(self.db_instance)
 
         ## Upload the logs archive file metadata if it was not already done from the WN.
         if self.transfer_logs and first_pj_execution():
@@ -2172,7 +2172,7 @@ class PostJob():
                             'asoworker' : '%'
                         }
                         try:
-                            self.server.post(self.rest_uri_no_api + "/filetransfers", data=encodeRequest(newDoc))
+                            self.crabserver.post(api="filetransfers", data=encodeRequest(newDoc))
                         except Exception as ex:
                             retmsg = "Fatal error uploading  publication flags of transfered files: %s" % (str(ex))
                             self.logger.exception(retmsg)
@@ -2243,7 +2243,7 @@ class PostJob():
                                self.job_ad, self.crab_retry, \
                                self.retry_timeout, self.job_failed, \
                                self.transfer_logs, self.transfer_outputs,
-                               self.rest_host, self.rest_uri_no_api, self.publish_name)
+                               self.rest_host, self.db_instance, self.publish_name)
         if first_pj_execution():
             aso_job_retval = ASO_JOB.run()
         else:
@@ -2359,13 +2359,11 @@ class PostJob():
                      'directstageout'  : int(self.job_report.get('direct_stageout', 0))
                     }
         rest_api = 'filemetadata'
-        rest_uri = self.rest_uri_no_api + '/' + rest_api
-        rest_url = self.rest_host + rest_uri
         msg = "Uploading file metadata for %s to https://%s: %s"
-        msg = msg % (self.logs_arch_file_name, rest_url, configreq)
+        msg = msg % (self.logs_arch_file_name, self.rest_url+rest_api, configreq)
         self.logger.debug(msg)
         try:
-            self.server.put(rest_uri, data=encodeRequest(configreq))
+            self.crabserver.put(api=rest_api, data=encodeRequest(configreq))
         except HTTPException as hte:
             msg = "Error uploading logs file metadata: %s" % (str(hte.headers))
             self.logger.error(msg)
@@ -2429,12 +2427,10 @@ class PostJob():
                 configreq.append(("outfilelumis", lumis))
 
             rest_api = 'filemetadata'
-            rest_uri = self.rest_uri_no_api + '/' + rest_api
-            rest_url = self.rest_host + rest_uri
-            msg = "Uploading input metadata for %s to https://%s: %s" % (lfn, rest_url, configreq)
+            msg = "Uploading input metadata for %s to https://%s: %s" % (lfn, self.rest_url+rest_api, configreq)
             self.logger.debug(msg)
             try:
-                self.server.put(rest_uri, data=encodeRequest(configreq))
+                self.crabserver.put(api=rest_api, data=encodeRequest(configreq))
             except HTTPException as hte:
                 msg = "Error uploading input file metadata: %s" % (str(hte.headers))
                 self.logger.error(msg)
@@ -2508,12 +2504,10 @@ class PostJob():
                         configreq.append(("inparentlfns", lfn))
             filename = file_info['pfn'].split('/')[-1]
             rest_api = 'filemetadata'
-            rest_uri = self.rest_uri_no_api + '/' + rest_api
-            rest_url = self.rest_host + rest_uri
-            msg = "Uploading output metadata for %s to https://%s: %s" % (filename, rest_url, configreq)
+            msg = "Uploading output metadata for %s to https://%s: %s" % (filename, self.rest_url+rest_api, configreq)
             self.logger.debug(msg)
             try:
-                self.server.put(rest_uri, data=encodeRequest(configreq))
+                self.crabserver.put(api=rest_api, data=encodeRequest(configreq))
             except HTTPException as hte:
                 ## BrianB. Suppressing this exception is a tough decision.
                 ## If the file made it back alright, I suppose we can proceed.
@@ -2527,12 +2521,10 @@ class PostJob():
             for dset in output_datasets:
                 configreq.append(('outputdatasets', dset))
             rest_api = 'task'
-            rest_uri = self.rest_uri_no_api + '/' + rest_api
-            rest_url = self.rest_host + rest_uri
-            msg = "Uploading output datasets to https://%s: %s" % (rest_url, configreq)
+            msg = "Uploading output datasets to https://%s: %s" % (self.rest_url+rest_api, configreq)
             self.logger.debug(msg)
             try:
-                self.server.post(rest_uri, data=encodeRequest(configreq))
+                self.crabserver.post(api=rest_api, data=encodeRequest(configreq))
                 with open('output_datasets', 'w') as f:
                     f.write(' '.join(output_datasets))
             except HTTPException as hte:
@@ -2568,7 +2560,8 @@ class PostJob():
         self.job_sw           = str(self.job_ad['CRAB_JobSW'])
         self.publish_name     = str(self.job_ad['CRAB_PublishName'])
         self.rest_host        = str(self.job_ad['CRAB_RestHost'])
-        self.rest_uri_no_api  = str(self.job_ad['CRAB_RestURInoAPI'])
+        self.db_instance      = str(self.job_ad['CRAB_DbInstance'])
+        self.rest_url = self.rest_host + '/crabserver/' + self.db_instance + '/'  # used in logging
         if 'CRAB_SaveLogsFlag' not in self.job_ad:
             msg = "Job's HTCondor ClassAd is missing attribute CRAB_SaveLogsFlag."
             msg += " Will assume CRAB_SaveLogsFlag = False."
@@ -2612,7 +2605,7 @@ class PostJob():
                                  'CRAB_PublishName': {'allowUndefined': False},
                                  'CRAB_PrimaryDataset': {'allowUndefined': False},
                                  'CRAB_RestHost': {'allowUndefined': False},
-                                 'CRAB_RestURInoAPI': {'allowUndefined': False},
+                                 'CRAB_DbInstance': {'allowUndefined': False},
                                  'CRAB_RetryOnASOFailures': {'allowUndefined': False},
                                  'CRAB_SaveLogsFlag': {'allowUndefined': False},
                                  'CRAB_TransferOutputs': {'allowUndefined': False},

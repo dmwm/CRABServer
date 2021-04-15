@@ -4,10 +4,10 @@ class TestWorker(object):
         multiple threads.
     """
 
-    def __init__(self, config, resthost, resturi):
+    def __init__(self, config, resthost, dbInstance):
         self.config = config
         self.resthost = resthost
-        self.resturi = resturi
+        self.dbInstance = dbInstance
         self.nworkers = 3
 
     def pendingTasks(self):
@@ -29,8 +29,8 @@ class TestWorker(object):
         if works:
             func, task, _, args = works[0]
             try:
-                func(self.resthost, self.resturi, self.config, task, 0, args)
-            except:
+                func(self.resthost, self.dbInstance, self.config, task, 0, args)
+            except Exception:
                 pass
     def checkFinished(self):
         return []

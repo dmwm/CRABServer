@@ -23,8 +23,8 @@ class DBSDataDiscovery(DataDiscovery):
 
     # disable pylint warning in next line since they refer to conflict with the main()
     # at the bottom of this file which is only used for testing
-    def __init__(self, config, server='', resturi='', procnum=-1, rucioClient=None): # pylint: disable=redefined-outer-name
-        DataDiscovery.__init__(self, config, server, resturi, procnum)
+    def __init__(self, config, crabserver='', procnum=-1, rucioClient=None): # pylint: disable=redefined-outer-name
+        DataDiscovery.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
 
     def checkDatasetStatus(self, dataset, kwargs):
@@ -196,7 +196,7 @@ class DBSDataDiscovery(DataDiscovery):
                          'subresource': 'addddmreqid',
                          }
             try:
-                tapeRecallStatusSet = self.server.post(self.restURInoAPI + '/task', data=urllib.urlencode(configreq))
+                tapeRecallStatusSet = self.crabserver.post(api='task', data=urllib.urlencode(configreq))
             except HTTPException as hte:
                 self.logger.exception(hte)
                 msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (
@@ -486,11 +486,7 @@ if __name__ == '__main__':
     config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
                                                 X509_USER_KEY=config.TaskWorker.cmskey)
 
-    #config.TaskWorker.DDMServer = 'dynamo.mit.edu'
     config.TaskWorker.instance = 'prod'
-    #config.TaskWorker.restHost = 'cmsweb.cern.ch'
-    # The second word identifies the DB instance defined in CRABServerAuth.py on the REST
-    #config.TaskWorker.restURInoAPI = '/crabserver/prod/'
 
     config.Services.Rucio_host = 'https://cms-rucio.cern.ch'
     config.Services.Rucio_account = 'crab_server'

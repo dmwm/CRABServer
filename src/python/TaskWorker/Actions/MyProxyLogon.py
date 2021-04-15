@@ -14,8 +14,8 @@ class MyProxyLogon(TaskAction):
     """ Retrieves the user proxy from myproxy
     """
 
-    def __init__(self, config, server, resturi, procnum=-1, myproxylen=MINPROXYLENGTH):
-        TaskAction.__init__(self, config, server, resturi, procnum)
+    def __init__(self, config, crabserver, procnum=-1, myproxylen=MINPROXYLENGTH):
+        TaskAction.__init__(self, config, crabserver, procnum)
         self.myproxylen = myproxylen
 
     def tryProxyLogon(self, proxycfg=None):
@@ -82,7 +82,7 @@ class MyProxyLogon(TaskAction):
                 self.logger.error("proxy retrieval from %s failed with DN hash as credential name.",
                                   proxycfg['myProxySvr'])
                 self.logger.error("will try with old-style DN hash adding REST host name")
-                proxycfg['myproxyAccount'] = self.server['host']
+                proxycfg['myproxyAccount'] = self.crabserver.server['host']
                 (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
         #  minimal sanity check. Submission will fail if there's no group
         if not usergroups:

@@ -14,7 +14,7 @@ from httplib import HTTPException
 from WMCore.Configuration import loadConfigurationFile
 
 #CAFUtilities dependencies
-from RESTInteractions import HTTPRequests
+from RESTInteractions import CRABRest
 
 import HTCondorLocator
 from ServerUtilities import newX509env
@@ -182,14 +182,16 @@ class MasterWorker(object):
             except:
                 msg = "Need to specify config.TaskWorker.restHost and dbInstance in the configuration"
                 raise ConfigException(msg)
-        self.restURInoAPI = '/crabserver/' + dbInstance
+        self.dbInstance = dbInstance
+        #self.restURInoAPI = '/crabserver/' + dbInstance
 
-        self.logger.info('Will connect via URL: https://%s/%s', self.restHost, self.restURInoAPI)
+        self.logger.info('Will connect via URL: https://%s/%s', self.restHost, self.dbInstance)
         
         #Let's increase the server's retries for recoverable errors in the MasterWorker
         #60 means we'll keep retrying for 1 hour basically (we retry at 20*NUMRETRY seconds, so at: 20s, 60s, 120s, 200s, 300s ...)
-        self.server = HTTPRequests(self.restHost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry=20,
+        self.crabserver = CRABRest(self.restHost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry=20,
                                    logger=self.logger, userAgent='CRABTaskWorker')
+        self.crabserver.setDbInstance(self.dbInstance)
         self.logger.debug("Hostcert: %s, hostkey: %s", str(self.config.TaskWorker.cmscert), str(self.config.TaskWorker.cmskey))
         # Retries for any failures
         if not hasattr(self.config.TaskWorker, 'max_retry'):
@@ -204,9 +206,9 @@ class MasterWorker(object):
                                                          X509_USER_KEY=self.config.TaskWorker.cmskey)
 
         if self.TEST:
-            self.slaves = TestWorker(self.config, self.restHost, self.restURInoAPI + '/workflowdb')
+            self.slaves = TestWorker(self.config, self.restHost, self.dbInstance)
         else:
-            self.slaves = Worker(self.config, self.restHost, self.restURInoAPI + '/workflowdb')
+            self.slaves = Worker(self.config, self.restHost, self.dbInstance)
         self.slaves.begin()
         recurringActionsNames = getattr(self.config.TaskWorker, 'recurringActions', [])
         self.recurringActions = [self.getRecurringActionInst(name) for name in recurringActionsNames]
@@ -227,7 +229,8 @@ class MasterWorker(object):
 
         configreq = {'subresource': 'process', 'workername': self.config.TaskWorker.name, 'getstatus': getstatus, 'limit': limit, 'status': setstatus}
         try:
-            self.server.post(self.restURInoAPI + '/workflowdb', data=urllib.urlencode(configreq))
+            #self.server.post(self.restURInoAPI + '/workflowdb', data=urllib.urlencode(configreq))
+            self.crabserver.post(api='workflowdb', data=urllib.urlencode(configreq))
         except HTTPException as hte:
             msg = "HTTP Error during _lockWork: %s\n" % str(hte)
             msg += "HTTP Headers are %s: " % hte.headers
@@ -247,7 +250,8 @@ class MasterWorker(object):
 
         pendingwork = []
         try:
-            pendingwork = self.server.get(self.restURInoAPI + '/workflowdb', data=configreq)[0]['result']
+            #pendingwork = self.server.get(self.restURInoAPI + '/workflowdb', data=configreq)[0]['result']
+            pendingwork = self.crabserver.get(api='workflowdb', data=configreq)[0]['result']
         except HTTPException as hte:
             msg = "HTTP Error during getWork: %s\n" % str(hte)
             msg += "HTTP Headers are %s: " % hte.headers
@@ -269,7 +273,8 @@ class MasterWorker(object):
 
         configreq = {'workflow': taskname, 'command': command, 'status': status, 'subresource': 'state'}
         try:
-            self.server.post(self.restURInoAPI + '/workflowdb', data=urllib.urlencode(configreq))
+            #self.server.post(self.restURInoAPI + '/workflowdb', data=urllib.urlencode(configreq))
+            self.crabserver.post(api='workflowdb', data=urllib.urlencode(configreq))
         except HTTPException as hte:
             msg = "HTTP Error during updateWork: %s\n" % str(hte)
             msg += "HTTP Headers are %s: " % hte.headers

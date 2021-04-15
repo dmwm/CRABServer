@@ -11,7 +11,7 @@ from logging import FileHandler
 from httplib import HTTPException
 from logging.handlers import TimedRotatingFileHandler
 
-from RESTInteractions import HTTPRequests
+from RESTInteractions import CRABRest
 from TaskWorker.DataObjects.Result import Result
 from ServerUtilities import truncateError, executeCommand
 from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException
@@ -40,7 +40,7 @@ def addTaskLogHandler(logger, username, taskname, logsDir):
     return taskhandler
 
 
-def failTask(taskName, HTTPServer, resturi, msg, log, failstatus='FAILED'):
+def failTask(taskName, crabserver, msg, log, failstatus='FAILED'):
     try:
         log.info("Uploading failure message to the REST:\n%s", msg)
         truncMsg = truncateError(msg)
@@ -49,7 +49,7 @@ def failTask(taskName, HTTPServer, resturi, msg, log, failstatus='FAILED'):
                      'subresource': 'failure',
                      # Limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
                      'failure': b64encode(truncMsg)}
-        HTTPServer.post(resturi, data = urllib.urlencode(configreq))
+        crabserver.post(api='workflowdb', data = urllib.urlencode(configreq))
         log.info("Failure message successfully uploaded to the REST")
     except HTTPException as hte:
         log.warning("Cannot upload failure message to the REST for task %s. HTTP exception headers follows:", taskName)
@@ -65,7 +65,7 @@ def removeTaskLogHandler(logger, taskhandler):
     logger.removeHandler(taskhandler)
 
 
-def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsDir):
+def processWorkerLoop(inputs, results, resthost, dbInstance, procnum, logger, logsDir):
     procName = "Process-%s" % procnum
     while True:
         try:
@@ -91,7 +91,7 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsD
         logger.debug("%s: Starting %s on %s", procName, str(work), task['tm_taskname'])
         try:
             msg = None
-            outputs = work(resthost, resturi, WORKER_CONFIG, task, procnum, inputargs)
+            outputs = work(resthost, dbInstance, WORKER_CONFIG, task, procnum, inputargs)
         except TapeDatasetException as tde:
             outputs = Result(task=task, err=str(tde))
         except WorkerHandlerException as we:
@@ -105,9 +105,10 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsD
             msg += "\n" + str(traceback.format_exc())
         finally:
             if msg:
-                server = HTTPRequests(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey,
+                crabserver = CRABRest(resthost, WORKER_CONFIG.TaskWorker.cmscert, WORKER_CONFIG.TaskWorker.cmskey,
                                       retry=20, logger=logger, userAgent='CRABTaskWorker')
-                failTask(task['tm_taskname'], server, resturi, msg, logger, failstatus)
+                crabserver.setDbInstance(dbInstance)
+                failTask(task['tm_taskname'], crabserver, msg, logger, failstatus)
         t1 = time.time()
         workType = task.get('tm_task_command', 'RECURRING')
         #log entry below is used for logs parsing, therefore, changing it might require to update logstash configuration
@@ -128,7 +129,7 @@ def processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsD
                     })
 
 
-def processWorker(inputs, results, resthost, resturi, logsDir, procnum):
+def processWorker(inputs, results, resthost, dbInstance, logsDir, procnum):
     """Wait for an reference to appear in the input queue, call the referenced object
        and write the output in the output queue.
 
@@ -138,7 +139,7 @@ def processWorker(inputs, results, resthost, resturi, logsDir, procnum):
     logger = setProcessLogger(str(procnum), logsDir)
     logger.info("Process %s is starting. PID %s", procnum, os.getpid())
     try:
-        processWorkerLoop(inputs, results, resthost, resturi, procnum, logger, logsDir)
+        processWorkerLoop(inputs, results, resthost, dbInstance, procnum, logger, logsDir)
     except: #pylint: disable=bare-except
         #if enything happen put the log inside process logfiles instead of nohup.log
         logger.exception("Unexpected error in process worker!")
@@ -163,12 +164,12 @@ class Worker(object):
     """Worker class providing all the functionalities to manage all the slaves
        and distribute the work"""
 
-    def __init__(self, config, resthost, resturi):
+    def __init__(self, config, resthost, dbInstance):
         """Initializer
 
         :arg WMCore.Configuration config: input TaskWorker configuration
         :arg str instance: the hostname where the rest interface is running
-        :arg str resturi: the rest base url to contact."""
+        :arg str dbInstance: the DB instance to use"""
         self.logger = logging.getLogger("master")
         global WORKER_CONFIG
         WORKER_CONFIG = config
@@ -181,7 +182,7 @@ class Worker(object):
         self.results = multiprocessing.Queue()
         self.working = {}
         self.resthost = resthost
-        self.resturi = resturi
+        self.dbInstance = dbInstance
 
     def begin(self):
         """Starting up all the slaves"""
@@ -189,7 +190,7 @@ class Worker(object):
             # Starting things up
             for x in xrange(1, self.nworkers + 1):
                 self.logger.debug("Starting process %i", x)
-                p = multiprocessing.Process(target = processWorker, args = (self.inputs, self.results, self.resthost, self.resturi, WORKER_CONFIG.TaskWorker.logsDir, x))
+                p = multiprocessing.Process(target = processWorker, args = (self.inputs, self.results, self.resthost, self.dbInstance, WORKER_CONFIG.TaskWorker.logsDir, x))
                 p.start()
                 self.pool.append(p)
         self.logger.info("Started %d slaves", len(self.pool))
