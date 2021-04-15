@@ -1,4 +1,4 @@
-### CRAB CI/CD flow
+### CRAB CI/CD flow with [Jenkins](https://cmssdt.cern.ch/dmwm-jenkins/)
 ##### 1. Building RPMs
 * Each new release created in CRABServer repository triggers [Jenkins job](https://cmssdt.cern.ch/dmwm-jenkins/job/CRABServer_BuildOnRelease) that builds RPMs and docker image for crabcache, crabserver, crabtaskworker. 
 * In `master` branch agreed naming convention for tagging new releases should follow this logic: `v3.YYMMDD`. Note: **dash is not allowed in branch or tag name.** 
