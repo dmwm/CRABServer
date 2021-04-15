@@ -249,7 +249,7 @@ class PreDAG(object):
             config.TaskWorker.numAutomJobRetries = 0
 
         try:
-            splitter = Splitter(config, server=None, resturi='')
+            splitter = Splitter(config, crabserver=None)
             split_result = splitter.execute(dataset, task=splitTask)
             self.logger.info("Splitting results:")
             for g in split_result.result[0]:
@@ -263,7 +263,7 @@ class PreDAG(object):
         try:
             parent = self.prefix if self.stage == 'tail' else None
             rucioClient = getNativeRucioClient(config=config, logger=self.logger)
-            creator = DagmanCreator(config, server=None, resturi='', rucioClient=rucioClient)
+            creator = DagmanCreator(config, crabserver=None, rucioClient=rucioClient)
             with config.TaskWorker.envForCMSWEB:
                 creator.createSubdag(split_result.result, task=task, parent=parent, stage=self.stage)
             self.submitSubdag('RunJobs{0}.subdag'.format(self.prefix), getattr(config.TaskWorker, 'maxIdle', MAX_IDLE_JOBS), getattr(config.TaskWorker, 'maxPost', MAX_POST_JOBS), self.stage)
