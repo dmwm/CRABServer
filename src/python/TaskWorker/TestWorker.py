@@ -30,7 +30,7 @@ class TestWorker(object):
             func, task, _, args = works[0]
             try:
                 func(self.resthost, self.dbInstance, self.config, task, 0, args)
-            except Exception as e:
+            except Exception:
                 pass
     def checkFinished(self):
         return []
