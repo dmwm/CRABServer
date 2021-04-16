@@ -16,7 +16,7 @@ import tempfile
 from ast import literal_eval
 
 from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import getLock
+from ServerUtilities import getLock, downloadFromS3
 
 import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
@@ -1145,24 +1145,47 @@ class DagmanCreator(TaskAction):
         shutil.copy(bootstrap_location, '.')
         shutil.copy(adjust_location, '.')
 
+        # amke sure we have InputSandBox and debug files
+        sandboxTarBall = 'sandbox.tar.gz'
+        debugTarBall = 'debug_files.tar.gz'
+
         # Bootstrap the ISB if we are using UFC
         if UserFileCache and kw['task']['tm_cache_url'].find('/crabcache') != -1:
             ufc = UserFileCache(mydict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint' : kw['task']['tm_cache_url']})
             try:
-                ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output="sandbox.tar.gz")
+                ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output=sandboxTarBall)
             except Exception as ex:
                 self.logger.exception(ex)
                 raise TaskWorkerException("The CRAB3 server backend could not download the input sandbox with your code "+\
                                     "from the frontend (crabcache component).\nThis could be a temporary glitch; please try to submit a new task later "+\
                                     "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO url!?
-            kw['task']['tm_user_sandbox'] = 'sandbox.tar.gz'
+            kw['task']['tm_user_sandbox'] = sandboxTarBall
 
             # For an older client (<3.3.1607) this field will be empty and the file will not exist.
             if kw['task']['tm_debug_files']:
                 try:
-                    ufc.download(hashkey=kw['task']['tm_debug_files'].split(".")[0], output="debug_files.tar.gz")
+                    ufc.download(hashkey=kw['task']['tm_debug_files'].split(".")[0], output=debugTarBall)
                 except Exception as ex:
                     self.logger.exception(ex)
+
+        # Bootstrap the ISB if we are using S3 and running in the TW
+        if self.crabserver and 'S3' in kw['task']['tm_cache_url'].upper():
+            username = kw['task']['tm_username']
+            sandboxName = kw['task']['tm_user_sandbox']
+            dbgFilesName = kw['task']['tm_debug_files']
+            try:
+                downloadFromS3(crabserver=self.crabserver, objecttype='sandbox', username=username,
+                               tarballname=sandboxName, filepath=sandboxTarBall, logger=self.logger)
+                kw['task']['tm_user_sandbox'] = sandboxTarBall
+            except Exception as ex:
+                raise TaskWorkerException("The CRAB server backend could not download the input sandbox with your code " + \
+                                  "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
+                                  "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex))
+            try:
+                downloadFromS3(crabserver=self.crabserver, objecttype='sandbox', username=username,
+                               tarballname=dbgFilesName, filepath=debugTarBall, logger=self.logger)
+            except Exception as ex:
+                self.logger.exception(ex)
 
         # Bootstrap the runtime if it is available.
         job_runtime = getLocation('CMSRunAnalysis.tar.gz', 'CRABServer/')
@@ -1209,4 +1232,3 @@ class DagmanCreator(TaskAction):
             return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(info, params, inputFiles, splitterResult))
         finally:
             os.chdir(cwd)
-
