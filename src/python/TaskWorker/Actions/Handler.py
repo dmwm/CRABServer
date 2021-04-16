@@ -95,7 +95,7 @@ class TaskHandler(object):
             logpath = self.config.TaskWorker.logsDir+'/tasks/%s/%s.log' % (self._task['tm_username'], self.taskname)
             if os.path.isfile(logpath) and 'user_proxy' in self._task: #the user proxy might not be there if myproxy retrieval failed
                 cacheurldict = {'endpoint':self._task['tm_cache_url'], 'cert':self._task['user_proxy'], 'key':self._task['user_proxy']}
-                if 'S3' in self._task['tm_cache_url']:
+                if 'S3' in self._task['tm_cache_url'].upper():
                     # use S3
                     try:
                         uploadToS3(crabserver=self.crabserver, objecttype='twlog', filepath=logpath,
