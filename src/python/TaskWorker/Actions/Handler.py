@@ -25,22 +25,25 @@ from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
 from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException, TaskWorkerException
 
+from ServerUtilities import uploadToS3
+
 
 class TaskHandler(object):
     """Handling the set of operations to be performed."""
 
 
-    def __init__(self, task, procnum, server, config, workFunction, createTempDir=False):
+    def __init__(self, task, procnum, crabserver, config, workFunction, createTempDir=False):
         """Initializer
 
         :arg TaskWorker.DataObjects.Task task: the task to work on."""
         self.logger = logging.getLogger(str(procnum))
         self.procnum = procnum
-        self.server = server
+        self.crabserver = crabserver
         self.config = config
         self.workFunction = workFunction
         self._work = []
         self._task = task
+        self.taskname = task['tm_taskname']
         self.tempDir = None
         if createTempDir:
             self.tempDir = self.createTempDir()
@@ -49,7 +52,7 @@ class TaskHandler(object):
 
     def createTempDir(self):
         if hasattr(self.config, 'TaskWorker') and hasattr(self.config.TaskWorker, 'scratchDir'):
-            tempDir = tempfile.mkdtemp(prefix='_' + self._task['tm_taskname'], dir=self.config.TaskWorker.scratchDir)
+            tempDir = tempfile.mkdtemp(prefix='_' + self.taskname, dir=self.config.TaskWorker.scratchDir)
         else:
             msg = "The 'scratchDir' parameter is not set in the config.TaskWorker section of the CRAB server backend configuration file."
             raise Exception(msg)
@@ -81,27 +84,38 @@ class TaskHandler(object):
             raise TapeDatasetException(str(tde))
         except TaskWorkerException as twe:
             self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
-            raise WorkerHandlerException(str(twe), retry = twe.retry) #TaskWorker error, do not add traceback to the error propagated to the REST
+            raise WorkerHandlerException(str(twe), retry=twe.retry) #TaskWorker error, do not add traceback to the error propagated to the REST
         except Exception as exc:
-            msg = "Problem handling %s because of %s failure, traceback follows\n" % (self._task['tm_taskname'], str(exc))
+            msg = "Problem handling %s because of %s failure, traceback follows\n" % (self.taskname, str(exc))
             msg += str(traceback.format_exc())
             self.logger.error(msg)
             raise WorkerHandlerException(msg) #Errors not foreseen. Print everything!
         finally:
             #TODO: we need to do that also in Worker.py otherwise some messages might only be in the TW file but not in the crabcache.
-            logpath = self.config.TaskWorker.logsDir+'/tasks/%s/%s.log' % (self._task['tm_username'], self._task['tm_taskname'])
+            logpath = self.config.TaskWorker.logsDir+'/tasks/%s/%s.log' % (self._task['tm_username'], self.taskname)
             if os.path.isfile(logpath) and 'user_proxy' in self._task: #the user proxy might not be there if myproxy retrieval failed
                 cacheurldict = {'endpoint':self._task['tm_cache_url'], 'cert':self._task['user_proxy'], 'key':self._task['user_proxy']}
-                try:
-                    ufc = UserFileCache(cacheurldict)
-                    logfilename = self._task['tm_taskname'] + '_TaskWorker.log'
-                    ufc.uploadLog(logpath, logfilename)
-                except HTTPException as hte:
-                    msg = "Failed to upload the logfile to %s for task %s. More details in the http headers and body:\n%s\n%s" % (self._task['tm_cache_url'], self._task['tm_taskname'], hte.headers, hte.result)
-                    self.logger.error(msg)
-                except Exception: #pylint: disable=broad-except
-                    msg = "Unknown error while uploading the logfile for task %s" % self._task['tm_taskname']
-                    self.logger.exception(msg) #upload logfile of the task to the crabcache
+                if 'S3' in self._task['tm_cache_url']:
+                    # use S3
+                    try:
+                        uploadToS3(crabserver=self.crabserver, objecttype='twlog', filepath=logpath,
+                                   taskname=self.taskname, logger=self.logger)
+                    except Exception as e:
+                        msg = 'Failed to upload logfile to S3 for task %s. ' % self.taskname
+                        msg += 'Details:\n%s' % str(e)
+                        self.logger.error(msg)
+                else:
+                    # use old crabcache
+                    try:
+                        ufc = UserFileCache(cacheurldict)
+                        logfilename = self.taskname + '_TaskWorker.log'
+                        ufc.uploadLog(logpath, logfilename)
+                    except HTTPException as hte:
+                        msg = "Failed to upload the logfile to %s for task %s. More details in the http headers and body:\n%s\n%s" % (self._task['tm_cache_url'], self.taskname, hte.headers, hte.result)
+                        self.logger.error(msg)
+                    except Exception: #pylint: disable=broad-except
+                        msg = "Unknown error while uploading the logfile for task %s" % self.taskname
+                        self.logger.exception(msg) #upload logfile of the task to the crabcache
 
         return output
 
@@ -112,7 +126,7 @@ class TaskHandler(object):
 
         #Loop that iterates over the actions to be performed
         for action in self.getWorks():
-            self.logger.debug("Starting %s on %s", str(action), self._task['tm_taskname'])
+            self.logger.debug("Starting %s on %s", str(action), self.taskname)
             t0 = time.time()
             retryCount = 0
             #execute the current action dealing with retriesz
@@ -129,7 +143,7 @@ class TaskHandler(object):
                     break
             t1 = time.time()
             #log entry below is used for logs parsing, therefore, changing it might require to update logstash configuration
-            self.logger.info("Finished %s on %s in %d seconds", str(action), self._task['tm_taskname'], t1 - t0)
+            self.logger.info("Finished %s on %s in %d seconds", str(action), self.taskname, t1 - t0)
 
             # if there is a next action to do, the result field of the Result object returned by this action (!)
             # will contain the needed input for the next action. I also hate this, but could not find a better way
