@@ -1171,8 +1171,8 @@ class DagmanCreator(TaskAction):
         # Bootstrap the ISB if we are using S3 and running in the TW
         if self.crabserver and 'S3' in kw['task']['tm_cache_url'].upper():
             username = kw['task']['tm_username']
-            sandboxName = kw['task']['tm_user_sandbox'].replace('tar.gz','tgz')  # horrible temporary hack
-            dbgFilesName = kw['task']['tm_debug_files'].replace('tar.gz','tgz')  # horrible temporary hack
+            sandboxName = kw['task']['tm_user_sandbox']
+            dbgFilesName = kw['task']['tm_debug_files']
             try:
                 downloadFromS3(crabserver=self.crabserver, objecttype='sandbox', username=username,
                                tarballname=sandboxName, filepath=sandboxTarBall, logger=self.logger)

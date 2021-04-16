@@ -64,6 +64,7 @@ class RESTCache(RESTEntity):
 
     AUTHORIZATION
     Users will only be able to get an upload PreSigned URL for their tasks.
+    CRAB operators (TaskWorker e.g.!) will be able to upload anything
     Retrieve and donwload will be restricted to owners and CRAB operators.
     In cases where logs or debug files need to be shared, the caller
     can share the PreSignedUrl obtained via the download subresource.
@@ -136,7 +137,7 @@ class RESTCache(RESTEntity):
             # via a "PreSigned URL". It can return  an empty string '' as URL to indicate that
             # a sandbox upload request refers to an existing object with same name
             # WMCore REST does not allow to return None
-            authz_user_action(username=ownerName)
+            authz_operator(username=ownerName, group='crab3', role='operator')
             if objecttype == 'sandbox':
                 # we only upload same sandbox once
                 alreadyThere = False
