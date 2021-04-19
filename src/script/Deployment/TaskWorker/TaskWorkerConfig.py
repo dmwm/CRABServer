@@ -92,8 +92,6 @@ config.TaskWorker.maxPost = 20
 
 config.TaskWorker.scheddPickerFunction = HTCondorLocator.capacityMetricsChoicesHybrid
 
-config.TaskWorker.DDMServer = 'dynamo.mit.edu'
-
 config.section_("Sites")
 config.Sites.DashboardURL = "https://cmssst.web.cern.ch/cmssst/analysis/usableSites.json"
 
