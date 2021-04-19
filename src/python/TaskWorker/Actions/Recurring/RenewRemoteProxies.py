@@ -10,15 +10,15 @@ import htcondor
 
 import HTCondorUtils
 from WMCore.Credential.Proxy import Proxy
-from RESTInteractions import HTTPRequests
+from RESTInteractions import CRABRest
 from ServerUtilities import tempSetLogLevel
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
 class RenewRemoteProxies(BaseRecurringAction):
     pollingTime = 60 * 12 #minutes
 
-    def _execute(self, resthost, resturi, config, task):
-        renewer = CRAB3ProxyRenewer(config, resthost, resturi.replace("workflowdb", "info"), self.logger)
+    def _execute(self, config, task):  # pylint: disable=unused-argument
+        renewer = CRAB3ProxyRenewer(config, self.logger)
         renewer.execute()
 
 MINPROXYLENGTH = 60 * 60 * 24
@@ -26,7 +26,7 @@ QUERY_ATTRS = ['x509userproxyexpiration', 'CRAB_ReqName', 'ClusterId', 'ProcId',
 
 class CRAB3ProxyRenewer(object):
 
-    def __init__(self, config, resthost, resturi, logger=None):
+    def __init__(self, config, logger=None):
         if not logger:
             self.logger = logging.getLogger(__name__)
             handler = logging.StreamHandler(sys.stdout)
@@ -41,15 +41,13 @@ class CRAB3ProxyRenewer(object):
             logDir = config.TaskWorker.logsDir + '/tasks/recurring/'
             if not os.path.exists(logDir):
                 os.makedirs(logDir)
-            timeStamp = time.strftime('%y%m%d-%H%M',time.localtime())
+            timeStamp = time.strftime('%y%m%d-%H%M', time.localtime())
             logFile = 'RenewRemoveProxies_' + timeStamp + '.log'
             handler = logging.FileHandler(logDir + logFile)
             formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
 
-        self.resturi = resturi
-        self.resthost = resthost
         self.config = config
         self.pool = ''
         self.schedds = []
@@ -59,10 +57,12 @@ class CRAB3ProxyRenewer(object):
             htcondor.enable_debug()
 
     def get_backendurls(self):
-        self.logger.info("Querying server %s for HTCondor schedds and pool names.", self.resturi)
-        server = HTTPRequests(self.resthost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey,
-                              retry = 2, userAgent='CRABTaskWorker')
-        result = server.get(self.resturi, data={'subresource':'backendurls'})[0]['result'][0]
+        restHost = self.config.TaskWorker.restHost
+        self.logger.info("Querying server %s for HTCondor schedds and pool names.", restHost)
+        crabserver = CRABRest(restHost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey,
+                              retry=2, userAgent='CRABTaskWorker')
+        crabserver.setDbInstance(self.config.TaskWorker.dbInstance)
+        result = crabserver.get(api='info', data={'subresource':'backendurls'})[0]['result'][0]
         self.pool = str(result['htcondorPool'])
         self.schedds = [str(i) for i in result['htcondorSchedds']]
         self.logger.info("Resulting pool %s; schedds %s", self.pool, ",".join(self.schedds))
@@ -81,9 +81,8 @@ class CRAB3ProxyRenewer(object):
         proxycfg = {'vo': vo,
                     'logger': self.logger,
                     'myProxySvr': self.config.Services.MyProxy,
-                    'myproxyAccount': self.resthost,
                     'proxyValidity' : '144:0',
-                    'min_time_left' : MINPROXYLENGTH, ## do we need this ? or should we use self.myproxylen? 
+                    'min_time_left' : MINPROXYLENGTH, ## do we need this ? or should we use self.myproxylen?
                     'userDN' : ad['CRAB_UserDN'],
                     'userName' : username + '_CRAB',
                     'group' : group,
@@ -109,9 +108,9 @@ class CRAB3ProxyRenewer(object):
                 proxy.logonRenewMyProxy()
                 timeleft = proxy.getTimeLeft(userproxy)
         if timeleft is None or timeleft <= 0:
-            self.logger.error("Impossible to retrieve proxy from %s for %s.", proxycfg['myProxySvr'], proxycfg['userDN'] )
+            self.logger.error("Impossible to retrieve proxy from %s for %s.", proxycfg['myProxySvr'], proxycfg['userDN'])
             self.logger.error("repeat the command in verbose mode")
-            proxycfg['userName'] = username + '_CRAB',
+            proxycfg['userName'] = username + '_CRAB'
             proxy = Proxy(proxycfg)
             proxy.logonRenewMyProxy()
             raise Exception("Failed to retrieve proxy.")
@@ -201,13 +200,9 @@ class CRAB3ProxyRenewer(object):
 def main():
     """ Simple main to execute the action standalon. You just need to set the task worker environment.
         The main is set up to work with the production task worker. If you want to use it on your own
-        instance you need to change resthost, resturi, and twconfig. For example:
-            resthost = 'mmascher-dev6.cern.ch'
-            resturi = '/crabserver/dev/info'
+        instance you need to point to a modified dtwconfig. Default is:
             twconfig = '/data/srv/TaskManager/TaskWorkerConfig.py'
     """
-    resthost = 'cmsweb.cern.ch'
-    resturi = '/crabserver/prod/info'
     twconfig = '/data/srv/TaskManager/current/TaskWorkerConfig.py'
 
     logger = logging.getLogger()
@@ -220,7 +215,7 @@ def main():
     from WMCore.Configuration import loadConfigurationFile
     config = loadConfigurationFile(twconfig)
 
-    pr = CRAB3ProxyRenewer(config, resthost, resturi, logger)
+    pr = CRAB3ProxyRenewer(config, logger)
     pr.execute()
 
 if __name__ == '__main__':
