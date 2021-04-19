@@ -14,7 +14,7 @@ DAYS = SECONDS_IN_HOUR * 12
 class RemovetmpDir(BaseRecurringAction):
     pollingTime = 60*24 #minutes
 
-    def _execute(self, resthost, resturi, config, task):
+    def _execute(self, config, task):
         self.logger.info('Checking for directory older than %s days..' % (DAYS/SECONDS_IN_DAY))
         now = time.time()
         for dirpath, dirnames, filenames in os.walk(config.TaskWorker.scratchDir):
