@@ -46,7 +46,7 @@ class TapeRecallStatus(BaseRecurringAction):
             if os.path.exists(sandboxPath): os.remove(sandboxPath)
             if os.path.exists(debugFilesPath): os.remove(debugFilesPath)
 
-    def _execute(self, resthost, resturi, config, task):
+    def _execute(self, config, task):
 
         # setup logger
         if not self.logger:
@@ -82,8 +82,7 @@ class TapeRecallStatus(BaseRecurringAction):
             return
 
         self.logger.info("Retrieved a total of %d %s tasks", len(recallingTasks), tapeRecallStatus)
-        server = mw.server
-        resturi = mw.restURInoAPI + '/info'
+        crabserver = mw.crabserver
         for recallingTask in recallingTasks:
             taskName = recallingTask['tm_taskname']
             self.logger.info("Working on task %s", taskName)
@@ -99,10 +98,10 @@ class TapeRecallStatus(BaseRecurringAction):
             if (time.time() - getTimeFromTaskname(str(taskName))) > MAX_DAYS_FOR_TAPERECALL*24*60*60:
                 self.logger.info("Task %s is older than %d days, setting its status to FAILED", taskName, MAX_DAYS_FOR_TAPERECALL)
                 msg = "The disk replica request (ID: %s) for the input dataset did not complete in %d days." % (reqId, MAX_DAYS_FOR_TAPERECALL)
-                failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
+                failTask(taskName, crabserver, msg, self.logger, 'FAILED')
                 continue
 
-            mpl = MyProxyLogon(config=config, server=server, resturi=resturi, myproxylen=self.pollingTime)
+            mpl = MyProxyLogon(config=config, crabserver=crabserver, myproxylen=self.pollingTime)
             user_proxy = True
             try:
                 mpl.execute(task=recallingTask) # this adds 'user_proxy' to recallingTask
@@ -135,7 +134,7 @@ class TapeRecallStatus(BaseRecurringAction):
                     # give up waiting
                     msg = ("Replication request %s for task %s expired. Setting its status to FAILED" % (reqId, taskName))
                     self.logger.info(msg)
-                    failTask(taskName, server, resturi, msg, self.logger, 'FAILED')
+                    failTask(taskName, crabserver, msg, self.logger, 'FAILED')
 
 
 if __name__ == '__main__':
@@ -155,4 +154,4 @@ if __name__ == '__main__':
     cfg = loadConfigurationFile(twconfig)
 
     trs = TapeRecallStatus(cfg.TaskWorker.logsDir)
-    trs._execute(None, None, cfg, None)  # pylint: disable=protected-access
+    trs._execute(cfg, None)  # pylint: disable=protected-access
