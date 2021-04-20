@@ -42,6 +42,7 @@ class RESTCache(RESTEntity):
     These return a presigned URL for uploading files:
     GET: /crabserver/prod/cache?subresource=upload&objecttype=clientlog&taskname=<task>
     GET: /crabserver/prod/cache?subresource=upload&objecttype=twlog&taskname=<task>
+    GET: /crabserver/prod/cache?subresource=upload&objecttype=runtimefiles&taskname=<task>
     GET: /crabserver/prod/cache?subresource=upload&objecttype=debugfiles&taskname=<task>
     GET: /crabserver/prod/cache?subresource=upload&objecttype=sandbox&tarballname=<hash>
 
@@ -49,6 +50,7 @@ class RESTCache(RESTEntity):
     returns a presigned URL to download files, and with subresource=retrieve returns the actual object
     e.g.
     GET: /crabserver/prod/cache?subresource=download&objecttype=twlog&taskname=<task>
+    GET: /crabserver/prod/cache?subresource=download&objecttype=runtimefiles&taskname=<task>
     GET: /crabserver/prod/cache?subresource=retrieve&objecttype=clientlog&taskname=<task>
 
     Behavior is different for sandboxes since those are uploaded before taskname is knwon
