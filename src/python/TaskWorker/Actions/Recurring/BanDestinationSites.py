@@ -1,3 +1,4 @@
+# pylint: disable=redefined-outer-name
 import os
 import sys
 import json
@@ -35,7 +36,7 @@ class CRAB3BanDestinationSites(object):
         tmpLocation = saveLocation + ".tmp"
         with open(tmpLocation, 'w') as fd:
             json.dump(bannedSites, fd)
-        shutil.move(tmpLocation, saveLocation) 
+        shutil.move(tmpLocation, saveLocation)
 
     def execute(self):
         blacklistedSites = []
@@ -50,7 +51,7 @@ class CRAB3BanDestinationSites(object):
         try:
             usableSitesList = json.loads(usableSites)
         except ValueError as e:
-            self.logger.error("Can not load usableSites json. Output %s Error %s", bannedSites, str(e))
+            self.logger.error("Can not load usableSites json. Error %s", str(e))
             return
         for row in usableSitesList:
             if 'value' in row and row['value'] == 'not_usable':
@@ -78,4 +79,3 @@ if __name__ == '__main__':
 
     pr = CRAB3BanDestinationSites(config, logger)
     pr.execute()
-
