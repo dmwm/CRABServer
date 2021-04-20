@@ -31,7 +31,7 @@ class BaseRecurringAction:
 
     def execute(self, resthost, dbinstance, config, task, procnum):
         try:
-            self.logger.info("Executing %s" % task)
+            self.logger.info("Executing %s", task)
             self._execute(config, task)
             return Result(task=task['tm_taskname'], result="OK")
         except Exception as ex:
