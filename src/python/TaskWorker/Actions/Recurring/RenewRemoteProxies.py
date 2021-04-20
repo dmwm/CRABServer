@@ -12,6 +12,7 @@ import HTCondorUtils
 from WMCore.Credential.Proxy import Proxy
 from RESTInteractions import CRABRest
 from ServerUtilities import SERVICE_INSTANCES, tempSetLogLevel
+from TaskWorker.WorkerExceptions import ConfigException
 
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
@@ -52,6 +53,8 @@ class CRAB3ProxyRenewer(object):
         self.config = config
         self.pool = ''
         self.schedds = []
+        self.restHost = None
+        self.dbInstance = None
 
         htcondor.param['TOOL_DEBUG'] = 'D_FULLDEBUG D_SECURITY'
         if 'CRAB3_DEBUG' in os.environ and hasattr(htcondor, 'enable_debug'):
@@ -68,22 +71,19 @@ class CRAB3ProxyRenewer(object):
         if instance in SERVICE_INSTANCES:
             self.logger.info('Will connect to CRAB service: %s', instance)
             self.restHost = SERVICE_INSTANCES[instance]['restHost']
-            dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
+            self.dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
         else:
             msg = "Invalid instance value '%s'" % instance
             raise ConfigException(msg)
-        if instance is 'other':
+        if instance == 'other':
             self.logger.info('Will use restHost and dbInstance from config file')
             try:
                 self.restHost = self.config.TaskWorker.restHost
-                dbInstance = self.config.TaskWorker.dbInstance
+                self.dbInstance = self.config.TaskWorker.dbInstance
             except:
                 msg = "Need to specify config.TaskWorker.restHost and dbInstance in the configuration"
                 raise ConfigException(msg)
-        self.dbInstance = dbInstance
 
-
-        restHost = self.config.TaskWorker.restHost
         self.logger.info("Querying server %s for HTCondor schedds and pool names.", self.restHost)
         crabserver = CRABRest(self.restHost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey,
                               retry=2, userAgent='CRABTaskWorker')
