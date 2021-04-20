@@ -12,6 +12,7 @@ from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
+from ServerUtilities import uploadToS3
 
 class DryRunUploader(TaskAction):
     """
@@ -21,7 +22,7 @@ class DryRunUploader(TaskAction):
     def packSandbox(self, inputFiles):
         dryRunSandbox = tarfile.open('dry-run-sandbox.tar.gz', 'w:gz')
         for f in inputFiles:
-            self.logger.debug('Adding %s to dry run tarball' % f)
+            self.logger.debug('Adding %s to dry run tarball', f)
             dryRunSandbox.add(f, recursive=True)
 
         dryRunSandbox.close()
@@ -43,16 +44,21 @@ class DryRunUploader(TaskAction):
             self.packSandbox(inputFiles)
 
             self.logger.info('Uploading dry run tarball to the user file cache')
-            ufc = UserFileCache(mydict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint': kw['task']['tm_cache_url']})
-            result = ufc.uploadLog('dry-run-sandbox.tar.gz')
-            os.remove('dry-run-sandbox.tar.gz')
+            if 'S3' in kw['task']['tm_cache_url'].upper():
+                uploadToS3(crabserver=self.crabserver, filepath='dry-run-sandbox.tar.gz',
+                           objecttype='runtimefiles', taskname=kw['task']['tm_taskname'], logger=self.logger)
+                result = {'hashkey':'ok'}  # a dummy one to keep same semantics as when using UserFileCache
+                os.remove('dry-run-sandbox.tar.gz')
+            else:
+                ufc = UserFileCache(mydict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint': kw['task']['tm_cache_url']})
+                result = ufc.uploadLog('dry-run-sandbox.tar.gz')
+                os.remove('dry-run-sandbox.tar.gz')
             if 'hashkey' not in result:
                 raise TaskWorkerException('Failed to upload dry-run-sandbox.tar.gz to the user file cache: ' + str(result))
-            else:
-                self.logger.info('Uploaded dry run tarball to the user file cache: ' + str(result))
-                update = {'workflow': kw['task']['tm_taskname'], 'subresource': 'state', 'status': 'UPLOADED'}
-                self.logger.debug('Updating task status: %s' % str(update))
-                self.server.post(self.resturi, data=urllib.urlencode(update))
+            self.logger.info('Uploaded dry run tarball to the user file cache: ' + str(result))
+            update = {'workflow': kw['task']['tm_taskname'], 'subresource': 'state', 'status': 'UPLOADED'}
+            self.logger.debug('Updating task status: %s', str(update))
+            self.crabserver.post(api='workflowdb', data=urllib.urlencode(update))
 
         finally:
             os.chdir(cwd)
