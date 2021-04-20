@@ -614,7 +614,7 @@ def downloadFromS3(crabserver=None, filepath=None, objecttype=None, taskname=Non
     :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
     :param filepath: string : the full path of the file to create with the downloaded content
         if file exists already, it is silently overwritten
-    :param objecttype: string : the kind of object to dowbload: clientlog|twlog|sandbox|debugfiles
+    :param objecttype: string : the kind of object to dowbload: clientlog|twlog|sandbox|debugfiles|runtimefiles
     :param taskname: string : the task this object belongs to, if applicable
     :param username: string : the username this sandbox belongs to, in case objecttype=sandbox
     :param tarballname: string : for sandbox, taskname is not used but tarballname is needed
@@ -630,7 +630,7 @@ def retrieveFromS3(crabserver=None, filepath=None, objecttype=None, taskname=Non
     """
     obtains a preSignedUrl from crabserver RESTCache and use it to retrieve a file
     :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
-    :param objecttype: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
+    :param objecttype: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles|runtimefiles
     :param taskname: string : the task this object belongs to, if applicable
     :param username: string : the username this sandbox belongs to, in case objecttype=sandbox
     :param tarballname: string : when retrieving sandbox taskname is not used but tarballname is needed
@@ -661,7 +661,7 @@ def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
     obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
     :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
     :param filepath: string : the full path of the file to upload, if applicable
-    :param objecttype: string : the kind of object to upload: clientlog|twlog|sandbox|debugfiles
+    :param objecttype: string : the kind of object to upload: clientlog|twlog|sandbox|debugfiles|runtimefiles
     :param username: string : the username this sandbox belongs to, in case objecttype=sandbox
       username is not needed for upload, it is here to have same signature as other methods
     :param tarballname: string : when uploading sandbox, taskname is not used but tarballname is needed
@@ -703,7 +703,7 @@ def getDonwloadUrlFromS3(crabserver=None, filepath=None, objecttype=None, taskna
     """
     obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
     :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
-    :param objecttype: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles
+    :param objecttype: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles|runtimefiles
     :param taskname: string : the task this object belongs to, if applicable
     :param username: string : the username this sandbox belongs to, in case objecttype=sandbox
     :param tarballname: string : for sandbox, taskname is not used but tarballname is needed
