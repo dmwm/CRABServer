@@ -15,15 +15,15 @@ class RemovetmpDir(BaseRecurringAction):
     pollingTime = 60*24 #minutes
 
     def _execute(self, config, task):
-        self.logger.info('Checking for directory older than %s days..' % (DAYS/SECONDS_IN_DAY))
+        self.logger.info('Checking for directory older than %s days..', (DAYS/SECONDS_IN_DAY))
         now = time.time()
-        for dirpath, dirnames, filenames in os.walk(config.TaskWorker.scratchDir):
-            for dir in dirnames:
-                timestamp = os.path.getmtime(os.path.join(dirpath, dir))
+        for dirpath, dirnames, _ in os.walk(config.TaskWorker.scratchDir):
+            for dirname in dirnames:
+                timestamp = os.path.getmtime(os.path.join(dirpath, dirname))
                 if now - DAYS > timestamp:
                     try:
-                        self.logger.info('Removing: %s' % os.path.join(dirpath, dir))
-                        shutil.rmtree(os.path.join(dirpath, dir))
+                        self.logger.info('Removing: %s', os.path.join(dirpath, dirname))
+                        shutil.rmtree(os.path.join(dirpath, dirname))
                     except Exception as e:
                         self.logger.exception(e)
                     else:
@@ -48,4 +48,4 @@ if __name__ == '__main__':
     cfg = loadConfigurationFile(twconfig)
 
     rd = RemovetmpDir(cfg.TaskWorker.logsDir)
-    rd._execute(None, None, cfg, None)
+    rd._execute(cfg, None)  # pylint: disable=protected-access
