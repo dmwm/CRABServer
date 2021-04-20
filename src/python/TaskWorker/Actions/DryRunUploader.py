@@ -55,7 +55,7 @@ class DryRunUploader(TaskAction):
                 os.remove('dry-run-sandbox.tar.gz')
             if 'hashkey' not in result:
                 raise TaskWorkerException('Failed to upload dry-run-sandbox.tar.gz to the user file cache: ' + str(result))
-            self.logger.info('Uploaded dry run tarball to the user file cache: ' + str(result))
+            self.logger.info('Uploaded dry run tarball to the user file cache: %s', str(result))
             update = {'workflow': kw['task']['tm_taskname'], 'subresource': 'state', 'status': 'UPLOADED'}
             self.logger.debug('Updating task status: %s', str(update))
             self.crabserver.post(api='workflowdb', data=urllib.urlencode(update))
