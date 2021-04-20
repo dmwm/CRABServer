@@ -1,3 +1,4 @@
+# pylint: disable=pointless-string-statement
 import os
 import sys
 import time
@@ -15,7 +16,7 @@ class RemovetmpDir(BaseRecurringAction):
     pollingTime = 60*24 #minutes
 
     def _execute(self, config, task):
-        self.logger.info('Checking for directory older than %s days..', (DAYS/SECONDS_IN_DAY))
+        self.logger.info('Checking for dirname older than %s days..', (DAYS/SECONDS_IN_DAY))
         now = time.time()
         for dirpath, dirnames, _ in os.walk(config.TaskWorker.scratchDir):
             for dirname in dirnames:
