@@ -87,7 +87,7 @@ class CRAB3ProxyRenewer(object):
         self.logger.info("Querying server %s for HTCondor schedds and pool names.", self.restHost)
         crabserver = CRABRest(self.restHost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey,
                               retry=2, userAgent='CRABTaskWorker')
-        crabserver.setDbInstance(self.config.TaskWorker.dbInstance)
+        crabserver.setDbInstance(self.dbInstance)
         result = crabserver.get(api='info', data={'subresource':'backendurls'})[0]['result'][0]
         self.pool = str(result['htcondorPool'])
         self.schedds = [str(i) for i in result['htcondorSchedds']]
