@@ -1,7 +1,5 @@
 import os
-import re
 import sys
-import time
 import json
 import shutil
 import urllib2
@@ -11,7 +9,7 @@ import traceback
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
 class BanDestinationSites(BaseRecurringAction):
-    pollingTime = 15 #minutes
+    pollingTime = 15  # minutes
 
     def _execute(self, config, task):
         renewer = CRAB3BanDestinationSites(config, self.logger)
@@ -45,14 +43,14 @@ class CRAB3BanDestinationSites(object):
             usableSites = urllib2.urlopen(self.config.Sites.DashboardURL).read()
         except Exception as e:
             # If exception is got, don`t change anything and previous data will be used
-            self.logger.error("Got exception in retrieving usable sites list from %s. Exception: %s" \
-                              % (self.config.Sites.DashboardURL, traceback.format_exc()))
+            self.logger.error("Got exception in retrieving usable sites list from %s. Exception: %s",
+                              self.config.Sites.DashboardURL, traceback.format_exc())
             return
         usableSitesList = []
         try:
             usableSitesList = json.loads(usableSites)
         except ValueError as e:
-            self.logger.error("Can not load usableSites json. Output %s Error %s" %(bannedSites, e))
+            self.logger.error("Can not load usableSites json. Output %s Error %s", bannedSites, str(e))
             return
         for row in usableSitesList:
             if 'value' in row and row['value'] == 'not_usable':
