@@ -930,9 +930,9 @@ class DagmanCreator(TaskAction):
             msg += " List is: %s.\n" % (sorted(list(blocksWithBannedLocations)))
             msg += getBlacklistMsg()
         if blocksWithNoLocations or blocksWithBannedLocations:
-            msg += (" Dataset processing will be incomplete because %s (out of %s) blocks")
-            msg += (" are only present at blacklisted and/or not whitelisted site(s)" %
-                   (len(blocksWithNoLocations)+len(blocksWithBannedLocations), len(allblocks)))
+            msg += " Dataset processing will be incomplete because %s (out of %s) blocks" %\
+                   (len(blocksWithNoLocations) + len(blocksWithBannedLocations), len(allblocks))
+            msg += " are only present at blacklisted and/or not whitelisted site(s)"
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
 
