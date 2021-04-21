@@ -871,9 +871,18 @@ class DagmanCreator(TaskAction):
             if siteWhitelist:
                 available &= siteWhitelist
                 if not available:
+                    msg = 'block(s) %s present at %s will be skipped because those sites are not in user white list'
+                    msg = msg % (jgblocks, list(availablesites))
+                    self.logger.warning(msg)
+                    self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
                     blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
+                    continue
             available -= (siteBlacklist - siteWhitelist)
             if not available:
+                msg = 'block(s) %s present at %s will be skipped because those sites are in user black list'
+                msg = msg % (jgblocks, list(availablesites))
+                self.logger.warning(msg)
+                self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
                 blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
                 continue
 
