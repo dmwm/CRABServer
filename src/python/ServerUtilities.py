@@ -599,7 +599,7 @@ class tempSetLogLevel():
 #  downloadFromS3        to retrieve an object into a file
 #  retrieveFromS3        to retrieve an object as JSON to use in the code
 #  uploadToS3            to upload a file into an S3 object
-#  getDonwloadUrlFromS3  to obtain a PreSigned URL to access an existing object in S3
+#  getDownloadUrlFromS3  to obtain a PreSigned URL to access an existing object in S3
 #    this can be used e.g. to share access to logs
 # Common signature is: (crabserver, filepath, objecttype, taskname, username, tarballname, logger)
 #  see the individual functions for more details
@@ -620,7 +620,7 @@ def downloadFromS3(crabserver=None, filepath=None, objecttype=None, taskname=Non
     :param tarballname: string : for sandbox, taskname is not used but tarballname is needed
     :return: nothing. Raises an exception in case of error
     """
-    preSignedUrl = getDonwloadUrlFromS3 (crabserver=crabserver, objecttype=objecttype,
+    preSignedUrl = getDownloadUrlFromS3 (crabserver=crabserver, objecttype=objecttype,
             taskname=taskname, username=username, tarballname=tarballname, logger=logger)
     downloadFromS3ViaPSU(filepath=filepath, preSignedUrl=preSignedUrl, logger=logger)
     return
@@ -698,10 +698,11 @@ def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
         raise Exception('Upload to S3 failed\n%s', str(e))
     logger.debug('%s %s successully uploaded to S3', objecttype, filepath)
     return
-def getDonwloadUrlFromS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
+
+def getDownloadUrlFromS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
                          username=None, tarballname=None, logger=None):
     """
-    obtains a preSignedUrl from crabserver RESTCache and use it to upload a file
+    obtains a PreSigned URL to access an existing object in S3
     :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
     :param objecttype: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles|runtimefiles
     :param taskname: string : the task this object belongs to, if applicable
