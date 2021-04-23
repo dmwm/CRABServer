@@ -186,7 +186,7 @@ class PreDAG(object):
         if not os.path.exists(config.TaskWorker.scratchDir):
             os.makedirs(config.TaskWorker.scratchDir)
         from TaskWorker.Actions.Recurring.BanDestinationSites import CRAB3BanDestinationSites
-        banSites = CRAB3BanDestinationSites(config, 'dummy', 'dummy', self.logger)
+        banSites = CRAB3BanDestinationSites(config, self.logger)
         with config.TaskWorker.envForCMSWEB:
             banSites.execute()
 
