@@ -21,12 +21,19 @@ def monitor(user, taskname, log):
     os.environ["X509_CERT_DIR"] = os.getcwd()
 
     proxy = None
-    if os.path.exists('task_process/rest_filetransfers.txt'): 
-        with open("task_process/rest_filetransfers.txt", "r") as _rest:
-            rest_filetransfers = _rest.readline().split('\n')[0]
-            proxy = os.getcwd() + "/" + _rest.readline()
+    if os.path.exists('task_process/RestInfoForFileTransfers.json'):
+        with open('task_process/RestInfoForFileTransfers.json') as fp:
+            restInfo = json.load(fp)
+            proxy = os.getcwd() + "/" + restInfo['proxy']
+            rest_filetransfers = restInfo['host'] + '/crabserver/' + restInfo['dbInstance']
             log.info("Proxy: %s", proxy)
             os.environ["X509_USER_PROXY"] = proxy
+    #if os.path.exists('task_process/rest_filetransfers.txt'):
+    #    with open("task_process/rest_filetransfers.txt", "r") as _rest:
+    #        rest_filetransfers = _rest.readline().split('\n')[0]
+    #        proxy = os.getcwd() + "/" + _rest.readline()
+    #        log.info("Proxy: %s", proxy)
+    #       os.environ["X509_USER_PROXY"] = proxy
 
     if not proxy:
         log.info('No proxy available yet - waiting for first post-job')

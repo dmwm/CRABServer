@@ -48,11 +48,17 @@ def perform_transfers(inputFile, lastLine, direct=False):
 
     # Get proxy and rest endpoint information
     proxy = None
-    if os.path.exists('task_process/rest_filetransfers.txt'):
-        with open("task_process/rest_filetransfers.txt", "r") as _rest:
-            rest_filetransfers = _rest.readline().split('\n')[0]
-            proxy = os.getcwd() + "/" + _rest.readline()
-            logging.info("Proxy: %s", proxy)
+    #if os.path.exists('task_process/rest_filetransfers.txt'):
+    #    with open("task_process/rest_filetransfers.txt", "r") as _rest:
+    #        rest_filetransfers = _rest.readline().split('\n')[0]
+    #        proxy = os.getcwd() + "/" + _rest.readline()
+    #        logging.info("Proxy: %s", proxy)
+    #        os.environ["X509_USER_PROXY"] = proxy
+    if os.path.exists('task_process/RestInfoForFileTransfers.json'):
+        with open('task_process/RestInfoForFileTransfers.json') as fp:
+            restInfo = json.load(fp)
+            proxy = os.getcwd() + "/" + restInfo['proxy']
+            rest_filetransfers = restInfo['host'] + '/crabserver/' + restInfo['dbInstance']
             os.environ["X509_USER_PROXY"] = proxy
 
     # If there are no user proxy yet, just wait for the first pj of the task to finish
@@ -165,10 +171,16 @@ def monitor_manager(user, taskname):
 
     # Get proxy and rest endpoint information
     proxy = None
-    if os.path.exists('task_process/rest_filetransfers.txt'):
-        with open("task_process/rest_filetransfers.txt", "r") as _rest:
-            proxy = os.getcwd() + "/" + _rest.readline()
-            logging.info("Proxy: %s", proxy)
+#    if os.path.exists('task_process/rest_filetransfers.txt'):
+#        with open("task_process/rest_filetransfers.txt", "r") as _rest:
+#            proxy = os.getcwd() + "/" + _rest.readline()
+#            logging.info("Proxy: %s", proxy)
+#            os.environ["X509_USER_PROXY"] = proxy
+
+    if os.path.exists('task_process/RestInfoForFileTransfers.json'):
+        with open('task_process/RestInfoForFileTransfers.json') as fp:
+            restInfo = json.load(fp)
+            proxy = os.getcwd() + "/" + restInfo['proxy']
             os.environ["X509_USER_PROXY"] = proxy
 
     # Same as submission process

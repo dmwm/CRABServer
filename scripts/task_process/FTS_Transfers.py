@@ -30,11 +30,18 @@ logging.basicConfig(
     format='%(asctime)s[%(relativeCreated)6d]%(threadName)s: %(message)s'
 )
 
-if os.path.exists('task_process/rest_filetransfers.txt'):
-    with open("task_process/rest_filetransfers.txt", "r") as _rest:
-        rest_filetransfers = _rest.readline().split('\n')[0]
-        proxy = os.getcwd() + "/" + _rest.readline()
-        print("Proxy: %s" % proxy)
+if os.path.exists('task_process/RestInfoForFileTransfers.json'):
+    with open('task_process/RestInfoForFileTransfers.json') as fp:
+        restInfo = json.load(fp)
+        proxy = os.getcwd() + "/" + restInfo['proxy']
+        rest_filetransfers = restInfo['host'] + '/crabserver/' + restInfo['dbInstance']
+        os.environ["X509_USER_PROXY"] = proxy
+
+#if os.path.exists('task_process/rest_filetransfers.txt'):
+#    with open("task_process/rest_filetransfers.txt", "r") as _rest:
+#        rest_filetransfers = _rest.readline().split('\n')[0]
+#        proxy = os.getcwd() + "/" + _rest.readline()
+#        print("Proxy: %s" % proxy)
 
 if os.path.exists('USE_NEW_PUBLISHER'):
     asoworker = 'schedd'
