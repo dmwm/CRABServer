@@ -928,10 +928,16 @@ class ASOServerJob(object):
                 with open('task_process/transfers.txt', 'a+') as transfers_file:
                     transfer_dump = json.dumps(newDoc)
                     transfers_file.write(transfer_dump+"\n")
-                if not os.path.exists('task_process/rest_filetransfers.txt'):
-                    with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
-                        rest_file.write(self.rest_url + '\n')
-                        rest_file.write(self.proxy)
+                if not os.path.exists('task_process/RestInfoForFileTransfers.json'):
+                #if not os.path.exists('task_process/rest_filetransfers.txt'):
+                    restInfo = {'host':self.rest_host,
+                                'dbInstance': self.db_instance,
+                                'proxyfile': self.proxy}
+                    with open('task_process/RestInfoForFileTransfers.json') as fp:
+                        json.dump(restInfo, fp)
+                    #with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
+                    #    rest_file.write(self.rest_url + '\n')
+                    #    rest_file.write(self.proxy)
             else:
                 if not 'publishname' in newDoc:
                     newDoc['publishname'] = self.publishname
@@ -944,10 +950,16 @@ class ASOServerJob(object):
                 with open('task_process/transfers_direct.txt', 'a+') as transfers_file:
                     transfer_dump = json.dumps(newDoc)
                     transfers_file.write(transfer_dump+"\n")
-                if not os.path.exists('task_process/rest_filetransfers.txt'):
-                    with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
-                        rest_file.write(self.rest_host + self.rest_url + '\n')
-                        rest_file.write(self.proxy)
+                if not os.path.exists('task_process/RestInfoForFileTransfers.json'):
+                #if not os.path.exists('task_process/rest_filetransfers.txt'):
+                    restInfo = {'host':self.rest_host,
+                                'dbInstance': self.db_instance,
+                                'proxyfile': self.proxy}
+                    with open('task_process/RestInfoForFileTransfers.json') as fp:
+                        json.dump(restInfo, fp)
+                    #with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
+                    #    rest_file.write(self.rest_host + self.rest_url + '\n')
+                    #    rest_file.write(self.proxy)
         else:
             returnMsg = self.couch_database.commitOne(doc)[0]
         return returnMsg
