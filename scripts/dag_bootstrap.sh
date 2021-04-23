@@ -5,6 +5,10 @@
 #
 # wrap the whole script in {} in order to redirect stdout/err to a file
 # trick from https://stackoverflow.com/a/315113
+# and set the exit status $? to the exit code of the last command to exit non-zero
+# taken from https://unix.stackexchange.com/a/73180
+
+set -o pipefail
 {
 set -x
 echo "Beginning dag_bootstrap.sh (stdout)"
@@ -108,4 +112,4 @@ if [ "X$_CONDOR_JOB_AD" != "X" ]; then
 fi
 echo "Now running the job in `pwd`..."
 exec nice -n 19 python -m TaskWorker.TaskManagerBootstrap "$@"
-} > dag_bootstrap.out 2>&1
+} 2>&1 | tee dag_bootstrap.out
