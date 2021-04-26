@@ -2,7 +2,7 @@
 import os
 import json
 from rucio.common.exception import ReplicaNotFound
-from RESTInteractions import HTTPRequests
+from RESTInteractions import CRABRest
 from ServerUtilities import encodeRequest
 from TransferInterface import mark_failed, mark_transferred, CRABDataInjector
 
@@ -24,16 +24,9 @@ def monitor(user, taskname, log):
     if os.path.exists('task_process/RestInfoForFileTransfers.json'):
         with open('task_process/RestInfoForFileTransfers.json') as fp:
             restInfo = json.load(fp)
-            proxy = os.getcwd() + "/" + restInfo['proxy']
-            rest_filetransfers = restInfo['host'] + '/crabserver/' + restInfo['dbInstance']
+            proxy = os.getcwd() + "/" + restInfo['proxyfile']
             log.info("Proxy: %s", proxy)
             os.environ["X509_USER_PROXY"] = proxy
-    #if os.path.exists('task_process/rest_filetransfers.txt'):
-    #    with open("task_process/rest_filetransfers.txt", "r") as _rest:
-    #        rest_filetransfers = _rest.readline().split('\n')[0]
-    #        proxy = os.getcwd() + "/" + _rest.readline()
-    #        log.info("Proxy: %s", proxy)
-    #       os.environ["X509_USER_PROXY"] = proxy
 
     if not proxy:
         log.info('No proxy available yet - waiting for first post-job')
@@ -150,12 +143,11 @@ def monitor(user, taskname, log):
             log.debug("{0} files to be marked as failed.".format(str(len(list_failed))))
 
     try:
-
-        oracleDB = HTTPRequests(rest_filetransfers,
-                                proxy,
-                                proxy, userAgent='CRABSchedd')
+        crabserver = CRABRest(restInfo['host'], localcert=proxy, localkey=proxy,
+                              userAgent='CRABSchedd')
+        crabserver.setDbInstance(restInfo['dbInstamce'])
     except Exception:
-        log.exception("Failed to set connection to oracleDB")
+        log.exception("Failed to set connection to crabserver")
         return
 
     # Mark FAILED files on the DB and remove them from dataset and rucio replicas
@@ -169,10 +161,10 @@ def monitor(user, taskname, log):
                 to_delete = [x for x in list_failed_name if source_rse[x['name']] == source]
                 log.debug("Deleting %s from %s" % (to_delete, source))
                 crabInj.delete_replicas(source, to_delete)
-            mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], oracleDB)
+            mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], crabserver)
     except ReplicaNotFound:
         try:
-            mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], oracleDB)
+            mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], crabserver)
         except Exception:
             log.exception("Failed to update status for failed files")
     except Exception:
@@ -189,10 +181,10 @@ def monitor(user, taskname, log):
                 to_delete = [x for x in list_stuck_name if source_rse[x['name']] == source]
                 log.debug("Deleting %s from %s" % (to_delete, source))
                 crabInj.delete_replicas(source, to_delete)
-            mark_failed([id_map[x[0]] for x in list_stuck], [x[1] for x in list_stuck], oracleDB)
+            mark_failed([id_map[x[0]] for x in list_stuck], [x[1] for x in list_stuck], crabserver)
     except ReplicaNotFound:
         try:
-            mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], oracleDB)
+            mark_failed([id_map[x[0]] for x in list_failed], [x[1] for x in list_failed], crabserver)
         except Exception:
             log.exception("Failed to update status for failed files")
     except Exception:
@@ -200,7 +192,7 @@ def monitor(user, taskname, log):
 
     # Mark successful transfers as done on oracle DB
     try:
-        mark_transferred([id_map[x] for x in list_good], oracleDB)
+        mark_transferred([id_map[x] for x in list_good], crabserver)
     except Exception:
         log.exception("Failed to update status for transferred files")
 
@@ -226,7 +218,7 @@ def monitor(user, taskname, log):
             fileDoc['list_of_transfer_state'] = ["SUBMITTED" for _ in list_update]
             fileDoc['list_of_fts_instance'] = ['https://fts3-cms.cern.ch:8446/' for _ in list_update]
             fileDoc['list_of_fts_id'] = [x[1] for x in list_update]
-            oracleDB.post('/filetransfers',
+            crabserver.post(api='filetransfers',
                             data=encodeRequest(fileDoc))
             log.debug("Marked submitted %s" % [id_map[x[0]] for x in list_update])
 

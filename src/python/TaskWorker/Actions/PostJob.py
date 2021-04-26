@@ -933,7 +933,7 @@ class ASOServerJob(object):
                     restInfo = {'host':self.rest_host,
                                 'dbInstance': self.db_instance,
                                 'proxyfile': self.proxy}
-                    with open('task_process/RestInfoForFileTransfers.json') as fp:
+                    with open('task_process/RestInfoForFileTransfers.json', 'w') as fp:
                         json.dump(restInfo, fp)
                     #with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
                     #    rest_file.write(self.rest_url + '\n')
@@ -955,7 +955,7 @@ class ASOServerJob(object):
                     restInfo = {'host':self.rest_host,
                                 'dbInstance': self.db_instance,
                                 'proxyfile': self.proxy}
-                    with open('task_process/RestInfoForFileTransfers.json') as fp:
+                    with open('task_process/RestInfoForFileTransfers.json','w') as fp:
                         json.dump(restInfo, fp)
                     #with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
                     #    rest_file.write(self.rest_host + self.rest_url + '\n')
