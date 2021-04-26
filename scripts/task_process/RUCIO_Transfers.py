@@ -181,7 +181,6 @@ def monitor_manager(user, taskname):
         with open('task_process/RestInfoForFileTransfers.json') as fp:
             restInfo = json.load(fp)
             proxy = os.getcwd() + "/" + restInfo['proxy']
-            rest_filetransfers = restInfo['host'] + '/crabserver/' + restInfo['dbInstance']
             os.environ["X509_USER_PROXY"] = proxy
 
     # Same as submission process
