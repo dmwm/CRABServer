@@ -1,6 +1,6 @@
 
 import os
-from RESTInteractions import HTTPRequests
+#from RESTInteractions import HTTPRequests
 from ServerUtilities import encodeRequest
 from TransferInterface import chunks, mark_failed, CRABDataInjector
 import threading
@@ -25,7 +25,8 @@ def submit(trans_tuple, job_data, log, direct=False):
     toTrans = trans_tuple[0]
     columns = trans_tuple[1]
     proxy = job_data['proxy']
-    rest_filetransfers = job_data['rest']
+    #rest_filetransfers = job_data['rest']
+    crabserver = job_data['crabserver']
     user = job_data['username']
     destination = job_data['destination']
     taskname = job_data['taskname']
@@ -47,11 +48,11 @@ def submit(trans_tuple, job_data, log, direct=False):
     sources = list(set([x[columns.index('source')] for x in toTrans]))
 
     os.environ["X509_CERT_DIR"] = os.getcwd()
-    log.info("Connection to %s with proxy in:\n %s" % (rest_filetransfers,proxy))
-    oracleDB = HTTPRequests(rest_filetransfers,
-                            proxy,
-                            proxy, userAgent='CRABSchedd')
-                            #verbose=True)
+    #log.info("Connection to %s with proxy in:\n %s" % (rest_filetransfers,proxy))
+    #oracleDB = HTTPRequests(rest_filetransfers,
+    #                        proxy,
+    #                        proxy, userAgent='CRABSchedd')
+    #                        #verbose=True)
 
     # mapping lfn <--> pfn
     for source in sources:
@@ -87,7 +88,7 @@ def submit(trans_tuple, job_data, log, direct=False):
 
         except Exception as ex:
             log.error("Failed to map lfns to pfns: %s", ex)
-            mark_failed(ids, ["Failed to map lfn to pfn: " + str(ex) for _ in ids], oracleDB)
+            mark_failed(ids, ["Failed to map lfn to pfn: " + str(ex) for _ in ids], crabserver)
 
         source_pfns = sorted_source_pfns
         dest_lfns = sorted_dest_lfns
@@ -143,8 +144,8 @@ def submit(trans_tuple, job_data, log, direct=False):
     for fileDoc in to_update:
         try:
             #TODO: split submitted from submitted failed!
-            log.debug("%s/filetransfers?%s" % (rest_filetransfers, encodeRequest(fileDoc)))
-            oracleDB.post('/filetransfers', data=encodeRequest(fileDoc))
+            log.debug("POSTing to crabserver 'filetransfer' api:\n%s", encodeRequest(fileDoc))
+            crabserver.post('filetransfers', data=encodeRequest(fileDoc))
             log.info("Marked submitted %s files" % (fileDoc['list_of_ids']))
         except Exception:
             log.exception('Failed to mark files as submitted on DBs')
@@ -169,7 +170,7 @@ class submit_thread(threading.Thread):
         :type job_column: list
         :param proxy: path to user proxy
         :type proxy: str
-        :param toUpdate: list of file with status update required on oracleDB 
+        :param toUpdate: list of file with status update required on crabserver
         :type toUpdate: list
         :param direct: job output stored on temp or directly, defaults to False
         :param direct: bool, optional
@@ -257,7 +258,7 @@ class submit_thread(threading.Thread):
                         fileDoc = dict()
                         fileDoc['asoworker'] = 'rucio'
                         fileDoc['subresource'] = 'updateTransfers'
-                        fileDoc['list_of_ids'] = ids 
+                        fileDoc['list_of_ids'] = ids
                         fileDoc['list_of_transfer_state'] = ["FAILED" for _ in ids]
                         fileDoc['list_of_failure_reason'] = [str(ex) for _ in ids]
                         fileDoc['list_of_retry_value'] = [0 for _ in ids]

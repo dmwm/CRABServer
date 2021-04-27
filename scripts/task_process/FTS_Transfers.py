@@ -13,7 +13,7 @@ import subprocess
 
 import fts3.rest.client.easy as fts3
 from datetime import timedelta
-from RESTInteractions import HTTPRequests
+from RESTInteractions import HTTPRequests, CRABRest
 from httplib import HTTPException
 from ServerUtilities import encodeRequest
 from TransferInterface import CRABDataInjector
@@ -33,8 +33,8 @@ logging.basicConfig(
 if os.path.exists('task_process/RestInfoForFileTransfers.json'):
     with open('task_process/RestInfoForFileTransfers.json') as fp:
         restInfo = json.load(fp)
-        proxy = os.getcwd() + "/" + restInfo['proxy']
-        rest_filetransfers = restInfo['host'] + '/crabserver/' + restInfo['dbInstance']
+        proxy = os.getcwd() + "/" + str(restInfo['proxyfile'])  # make sure no to unicode to FTS clients
+        #rest_filetransfers = restInfo['host'] + '/crabserver/' + restInfo['dbInstance']
         os.environ["X509_USER_PROXY"] = proxy
 
 #if os.path.exists('task_process/rest_filetransfers.txt'):
@@ -572,10 +572,14 @@ def algorithm():
     logging.info("Delegated proxy valid until %s", delegationStatus[0]['termination_time'])
 
     # instantiate an object to talk with CRAB REST server
-    crabserver = HTTPRequests(hostname=rest_filetransfers,
-                            localcert=proxy, localkey=proxy,
-                            userAgent='CRABSchedd')
 
+    try:
+        crabserver = CRABRest(restInfo['host'], localcert=proxy, localkey=proxy,
+                              userAgent='CRABSchedd')
+        crabserver.setDbInstance(restInfo['dbInstance'])
+    except Exception:
+        logging.exception("Failed to set connection to crabserver")
+        return
 
     with open("task_process/transfers.txt") as _list:
         _data = _list.readlines()[0]

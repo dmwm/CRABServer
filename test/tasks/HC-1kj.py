@@ -3,9 +3,9 @@ from WMCore.Configuration import Configuration
 config = Configuration()
 
 config.section_("General")
-config.General.instance = 'other'
-config.General.restHost = 'cmsweb-test2.cern.ch'
-config.General.dbInstance = 'dev'
+config.General.instance = 'test2'
+config.General.restHost = ''
+config.General.dbInstance = ''
 
 
 config.section_("JobType")
@@ -28,6 +28,7 @@ config.section_("User")
 
 config.section_("Site")
 config.Site.whitelist = ['T1_*','T2_US_*','T2_IT_*','T2_DE_*','T2_ES_*','T2_FR_*','T2_UK_*']
+config.Site.blacklist = ['T2_ES_IFCA']
 
 config.Site.storageSite = 'T2_CH_CERN'
  
