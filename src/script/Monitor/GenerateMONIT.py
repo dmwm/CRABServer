@@ -10,20 +10,20 @@ import subprocess
 import errno
 import signal
 
+from socket import gethostname
+from pprint import pprint
+import json
+import requests
+from RESTInteractions import CRABRest
+
 hostname = os.uname()[1]
 hostAllowRun = 'crab-prod-tw01.cern.ch'
 if hostname != hostAllowRun:
     sys.exit(0)
-
-from socket import gethostname
-from pprint import pprint
-import requests
-from RESTInteractions import HTTPRequests
-import json
-
+    
 fmt = "%Y-%m-%dT%H:%M:%S%z"
 workdir = '/home/crab3/'
-logdir  = '/home/crab3/logs/'
+logdir = '/home/crab3/logs/'
 now = time.localtime()
 logfile = 'GenMonit-%s%s.log' % (now.tm_year, now.tm_mon)
 
@@ -45,7 +45,7 @@ def send_and_check(document, should_fail=False):
     response = send(document)
     assert ((response.status_code in [200]) != should_fail), \
         'With document: {0}. Status code: {1}. Message: {2}'.format(document, response.status_code, response.text)
-    
+
 def isRunningTooLong(pid):
     """
     checks if previous process is not running longer than the allowedTime
@@ -122,22 +122,22 @@ class CRAB3CreateJson(object):
         self.pool = ''
         self.schedds = []
         self.resthost = "cmsweb.cern.ch:8443"
+        self.crabserver = CRABRest(hostname=resthost, localcert='/data/certs/servicecert.pem',
+                                   localkey='"/data/certs/servicekey.pem', retry=10,
+                                   userAgent='CRABTaskWorker')
+        self.crabserver.setDbInstance(dbInstance='prod')
         # use child collector on port 9620 to get schedd attributes
         collName = "cmsgwms-collector-global.cern.ch:9620,cmsgwms-collector-global.fnal.gov:9620"
         self.coll = htcondor.Collector(collName)
 
     def getCountTasksByStatus(self):
         try:
-            resturi = "/crabserver/prod/task"
             configreq = {'minutes': "120", 'subresource': "counttasksbystatus"}
-            server = HTTPRequests(self.resthost,
-                                  "/data/certs/servicecert.pem",
-                                  "/data/certs/servicekey.pem", retry = 3)
-            result = server.get(resturi, data = configreq)
+            result = self.crabserver.get(api='task', data=configreq)
             return dict(result[0]['result'])
         except Exception:
             e = sys.exc_info()
-            if hasattr(e,"headers"):
+            if hasattr(e, "headers"):
                 self.logger.error(str(e.headers))
             self.logger.debug("Error in getCountTasksByStatus:\n%s", e)
             pprint(e[1])
@@ -146,15 +146,12 @@ class CRAB3CreateJson(object):
 
     def getCountTasksByStatusAbs(self):
         try:
-            resturi = "/crabserver/prod/task"
-            #configreq = {'minutes': "1000000000", 'subresource': "counttasksbystatus"}
             configreq = {'minutes': "144000", 'subresource': "counttasksbystatus"} # query last 100 days only
-            server = HTTPRequests(self.resthost, "/data/certs/servicecert.pem", "/data/certs/servicekey.pem", retry=10)
-            result = server.get(resturi, data=configreq)
+            result = self.crabserver.get(api='task', data=configreq)
             return dict(result[0]['result'])
         except Exception:
             e = sys.exc_info()
-            if hasattr(e,"headers"):
+            if hasattr(e, "headers"):
                 self.logger.error(str(e.headers))
             self.logger.exception("Error in getCountTasksByStatusAbs:\n%s", e)
             pprint(e[1])
@@ -188,10 +185,11 @@ class CRAB3CreateJson(object):
     def execute(self):
         subprocesses_config = 6
         # In this case 5 + 1 MasterWorker process
-        sub_grep_command="ps -ef | grep MasterWorker | grep -v 'grep' | wc -l"
+        sub_grep_command = "ps -ef | grep MasterWorker | grep -v 'grep' | wc -l"
         # If any subprocess is dead or not working, modify percentage of availability
         # If subprocesses are not working - service availability 0%
-        process_count = int(subprocess.Popen(sub_grep_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout.read())
+        process_count = int(subprocess.Popen(sub_grep_command, shell=True, stdout=subprocess.PIPE,
+                                             stderr=subprocess.STDOUT).stdout.read())
 
         if subprocesses_config == process_count:
             # This means that everything is fine
@@ -237,12 +235,12 @@ class CRAB3CreateJson(object):
                 # see https://github.com/dmwm/CRABServer/pull/6017  But they are irrelevant
                 # as long as MONIT entry point data are sent to is an Elastic Search one. See comments
                 # above in "send" function
-                influxDb_measures = dict(shadows = int(oneSchedd[1]),
-                                         running_schedulers = int(oneSchedd[2]),
-                                         idle_jobs = int(oneSchedd[3]),
-                                         running_jobs = int(oneSchedd[4]),
-                                         held_jobs = int(oneSchedd[5]),
-                                         all_jobs = int(oneSchedd[6]),
+                influxDb_measures = dict(shadows=int(oneSchedd[1]),
+                                         running_schedulers=int(oneSchedd[2]),
+                                         idle_jobs=int(oneSchedd[3]),
+                                         running_jobs=int(oneSchedd[4]),
+                                         held_jobs=int(oneSchedd[5]),
+                                         all_jobs=int(oneSchedd[6]),
                                         )
                 jsonDocSchedd = dict(
                                 producer='crab',
@@ -322,7 +320,7 @@ def main():
     pr = CRAB3CreateJson(resthost, jsonDoc, logger)
 
     lockFile = workdir + 'CRAB3_SCHEDD_JSON.Lock'
-    
+
     # Check if lockfile already exists and if it does, check if process is running
     if os.path.isfile(lockFile):
         skip = False
@@ -356,17 +354,17 @@ def main():
         else:
             logger.info("Removing old lockfile.")
             os.remove(lockFile)
-    
+
 
     # Put PID in the lockfile
     currentPid = str(os.getpid())
     with open(lockFile, 'w') as lf:
         lf.write(currentPid)
-    
-    logger.info('Lock created. Start data collection')            
+
+    logger.info('Lock created. Start data collection')
     metrics = pr.execute()
     logger.info('Metrics collected. Send to MONIT.')
-    
+
     #print metrics
     try:
         send_and_check([metrics])
