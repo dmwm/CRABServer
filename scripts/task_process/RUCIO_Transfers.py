@@ -15,6 +15,8 @@ import json
 import logging
 import os
 
+from RESTInteractions import CRABRest
+
 from TransferInterface.RegisterFiles import submit
 from TransferInterface.MonitorTransfers import monitor
 
@@ -48,17 +50,31 @@ def perform_transfers(inputFile, lastLine, direct=False):
 
     # Get proxy and rest endpoint information
     proxy = None
-    if os.path.exists('task_process/rest_filetransfers.txt'):
-        with open("task_process/rest_filetransfers.txt", "r") as _rest:
-            rest_filetransfers = _rest.readline().split('\n')[0]
-            proxy = os.getcwd() + "/" + _rest.readline()
-            logging.info("Proxy: %s", proxy)
+    #if os.path.exists('task_process/rest_filetransfers.txt'):
+    #    with open("task_process/rest_filetransfers.txt", "r") as _rest:
+    #        rest_filetransfers = _rest.readline().split('\n')[0]
+    #        proxy = os.getcwd() + "/" + _rest.readline()
+    #        logging.info("Proxy: %s", proxy)
+    #        os.environ["X509_USER_PROXY"] = proxy
+    if os.path.exists('task_process/RestInfoForFileTransfers.json'):
+        with open('task_process/RestInfoForFileTransfers.json') as fp:
+            restInfo = json.load(fp)
+            proxy = os.getcwd() + "/" + restInfo['proxyfile']
+            #rest_filetransfers = restInfo['host'] + '/crabserver/' + restInfo['dbInstance']
             os.environ["X509_USER_PROXY"] = proxy
 
     # If there are no user proxy yet, just wait for the first pj of the task to finish
     if not proxy:
         logging.info('No proxy available yet - waiting for first post-job')
         return None
+
+    try:
+        crabserver = CRABRest(restInfo['host'], localcert=proxy, localkey=proxy,
+                              userAgent='CRABSchedd')
+        crabserver.setDbInstance(restInfo['dbInstamce'])
+    except Exception:
+        logging.exception("Failed to set connection to crabserver")
+        return
 
     logging.info("starting from line: %s", lastLine)
 
@@ -117,7 +133,7 @@ def perform_transfers(inputFile, lastLine, direct=False):
                     'username': user,
                     'destination': destination,
                     'proxy': proxy,
-                    'rest': rest_filetransfers}
+                    'crabserver': crabserver}
         # Split the processing for the directly staged files
         if not direct:
             try:
@@ -163,12 +179,18 @@ def monitor_manager(user, taskname):
     :rtype: int
     """
 
-    # Get proxy and rest endpoint information
+    # Get proxy for talking to Rucio
     proxy = None
-    if os.path.exists('task_process/rest_filetransfers.txt'):
-        with open("task_process/rest_filetransfers.txt", "r") as _rest:
-            proxy = os.getcwd() + "/" + _rest.readline()
-            logging.info("Proxy: %s", proxy)
+#    if os.path.exists('task_process/rest_filetransfers.txt'):
+#        with open("task_process/rest_filetransfers.txt", "r") as _rest:
+#            proxy = os.getcwd() + "/" + _rest.readline()
+#            logging.info("Proxy: %s", proxy)
+#            os.environ["X509_USER_PROXY"] = proxy
+
+    if os.path.exists('task_process/RestInfoForFileTransfers.json'):
+        with open('task_process/RestInfoForFileTransfers.json') as fp:
+            restInfo = json.load(fp)
+            proxy = os.getcwd() + "/" + restInfo['proxyfile']
             os.environ["X509_USER_PROXY"] = proxy
 
     # Same as submission process
