@@ -10,22 +10,24 @@ import json
 from socket import gethostname
 import requests
 
-from RESTInteractions import HTTPRequests
+from RESTInteractions import CRABRest
 from ServerUtilities import encodeRequest, oracleOutputMapping
 from ServerUtilities import TRANSFERDB_STATES, PUBLICATIONDB_STATES
 
 MONIT = 'http://monit-metrics:10012/'
-CMSWEB = 'cmsweb.cern.ch:8443'
+CMSWEB = 'cmsweb.cern.ch'
+DBINSTANCE = 'prod'
 CERTIFICATE = '/data/certs/servicecert.pem'
 KEY = '/data/certs/servicekey.pem'
-DATA_SOURCE_URL = '/crabserver/prod/filetransfers'
 
 #======================================================================================================================================
 def getData(subresource):
     """This function will fetch data from Oracle table"""
 
-    server = HTTPRequests(CMSWEB, CERTIFICATE, KEY)
-    result = server.get(DATA_SOURCE_URL, data=encodeRequest({'subresource': subresource, 'grouping': 0}))
+    crabserver = CRABRest(hostname=CMSWEB, localcert=CERTIFICATE,
+                          localkey=KEY, retry=3, userAgent='CRABTaskWorker')
+    crabserver.setDbInstance(dbInstance=DBINSTANCE)
+    result = crabserver.get(api='filetransfers', data=encodeRequest({'subresource': subresource, 'grouping': 0}))
 
     return oracleOutputMapping(result)
 
@@ -71,14 +73,14 @@ inputDoc = {
     'type': 'asoless',
     'hostname': gethostname(),
     'transfers':{
-        'NEW':{'count':0, 'size':0}, 
-        'ACQUIRED':{'count':0, 'size':0}, 
-        'FAILED':{'count':0, 'size':0}, 
-        'DONE':{'count':0, 'size':0}, 
-        'RETRY':{'count':0, 'size':0}, 
-        'SUBMITTED':{'count':0, 'size':0}, 
-        'KILL':{'count':0, 'size':0}, 
-        'KILLED':{'count':0, 'size':0} 
+        'NEW':{'count':0, 'size':0},
+        'ACQUIRED':{'count':0, 'size':0},
+        'FAILED':{'count':0, 'size':0},
+        'DONE':{'count':0, 'size':0},
+        'RETRY':{'count':0, 'size':0},
+        'SUBMITTED':{'count':0, 'size':0},
+        'KILL':{'count':0, 'size':0},
+        'KILLED':{'count':0, 'size':0}
         },
     'publications':{
         'NEW':{'count':0},
@@ -101,11 +103,10 @@ fillData(results, 'publications', 'schedd', 'publication_state', inputDoc)
 
 print("Filled json doc with   where aso_worker=asoless")
 print("-"*70)
-print (json.dumps([inputDoc]))
+print(json.dumps([inputDoc]))
 
 print("="*70)
 if sendDocument([inputDoc]) == 200:
     print('successfully uploaded')
 else:
     print('errors in  uploaded')
-    
