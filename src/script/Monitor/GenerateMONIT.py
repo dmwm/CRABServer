@@ -20,7 +20,7 @@ hostname = os.uname()[1]
 hostAllowRun = 'crab-prod-tw01.cern.ch'
 if hostname != hostAllowRun:
     sys.exit(0)
-    
+
 fmt = "%Y-%m-%dT%H:%M:%S%z"
 workdir = '/home/crab3/'
 logdir = '/home/crab3/logs/'
