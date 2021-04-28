@@ -86,12 +86,12 @@ def main():
     instance = args.i
     ids = all_ids[0:n]
 
-    print("test: %s on db %s" % (hostname, instance)
+    print("test: %s on db %s" % (hostname, instance))
     print("test with %d ids" % n)
     crabserver = CRABRest(hostname=hostname, localcert=proxy, localkey=proxy, userAgent='CRABtestSB')
     crabserver.setDbInstance(dbInstance=instance)
     elapsed = mark_transferred(ids, crabserver)
-    print ("elapsed time: %d sec" % elapsed)
+    print("elapsed time: %d sec" % elapsed)
     return
 
 
