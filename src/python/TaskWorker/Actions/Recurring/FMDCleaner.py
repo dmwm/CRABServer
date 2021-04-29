@@ -1,3 +1,4 @@
+#pylint: disable= W0621, W0105, W0212
 """
 This module is obsolete since we now cleanup FileMetaData and Transfersds tables
 via periodical partition dropping, but is kept as reference of how to use
