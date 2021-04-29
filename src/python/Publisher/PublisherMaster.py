@@ -181,8 +181,8 @@ class Master(object):
 
         # CRAB REST API's
         self.max_files_per_block = self.config.max_files_per_block
-        self.crabServer = CRABRest(hostname=restHost, localcert=config.serviceCert,
-                              localkey=config.serviceKey, retry=3,
+        self.crabServer = CRABRest(hostname=restHost, localcert=self.config.serviceCert,
+                              localkey=self.config.serviceKey, retry=3,
                               userAgent='CRABPublisher')
         self.crabServer.setDbInstance(dbInstance=dbInstance)
         self.startTime = time.time()
