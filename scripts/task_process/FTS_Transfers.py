@@ -286,9 +286,9 @@ class submit_thread(threading.Thread):
                            bring_online=None,
                            source_spacetoken=None,
                            spacetoken=None,
-                           # max time for job in the fts queue in seconds.
-                           # Usually, it should take O(s) for healthy situations
-                           max_time_in_queue=600,
+                           # max time for job in the fts queue in hours.
+                           # Usually, it should take O(minutes) for healthy situations
+                           max_time_in_queue=6,
                            retry=3,
                            # seconds after which the transfer is retried
                            # reduced under FTS suggestion w.r.t. the 3hrs of asov1
