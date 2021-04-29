@@ -1,26 +1,26 @@
-import os
+"""
+This module is obsolete since we now cleanup FileMetaData and Transfersds tables
+via periodical partition dropping, but is kept as reference of how to use
+the filemetadata delete API
+"""
 import sys
 import urllib
 import logging
-from datetime import date
 from httplib import HTTPException
 
-from RESTInteractions import HTTPRequests
+from RESTInteractions import CRABRest
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
 class FMDCleaner(BaseRecurringAction):
     pollingTime = 60*24 #minutes
 
-    def _execute(self, resthost, resturi, config, task):
+    def _execute(self, crabserver):
         self.logger.info('Cleaning filemetadata older than 30 days..')
-        server = HTTPRequests(resthost, config.TaskWorker.cmscert, config.TaskWorker.cmskey, retry = 2,
-                              logger = self.logger)
         ONE_MONTH = 24 * 30
         try:
-            instance = resturi.split('/')[2]
-            server.delete('/crabserver/%s/filemetadata' % instance, data=urllib.urlencode({'hours': ONE_MONTH}))
-#TODO return fro the server a value (e.g.: ["ok"]) to see if everything is ok
-#            result = server.delete('/crabserver/dev/filemetadata', data=urllib.urlencode({'hours': ONE_MONTH}))[0]['result'][0]
+            crabserver.delete(api='filemetadata', data=urllib.urlencode({'hours': ONE_MONTH}))
+#TODO return from the server a value (e.g.: ["ok"]) to see if everything is ok
+#            result = crabserver.delete(api='filemetadata', data=urllib.urlencode({'hours': ONE_MONTH}))[0]['result'][0]
 #            self.logger.info('FMDCleaner, got %s' % result)
         except HTTPException as hte:
             self.logger.error(hte.headers)
@@ -32,7 +32,7 @@ if __name__ == '__main__':
         instance you need to change resthost, resturi, and twconfig.
     """
     resthost = 'cmsweb.cern.ch'
-    resturi = '/crabserver/prod/filemetadata'
+    dbinstance = 'prod'
     twconfig = '/data/srv/TaskManager/current/TaskWorkerConfig.py'
 
     logger = logging.getLogger()
@@ -45,7 +45,11 @@ if __name__ == '__main__':
     from WMCore.Configuration import loadConfigurationFile
     cfg = loadConfigurationFile(twconfig)
 
-    resthost = 'mmascher-dev6.cern.ch'
-    resturi = '/crabserver/dev/filemetadata'
+    resthost = 'cmsweb-testbed.cern.ch'
+    dbinstance = 'dev'
     fmdc = FMDCleaner(cfg.TaskWorker.logsDir)
-    fmdc._execute(resthost, resturi, cfg, None)
+    crabserver = CRABRest(hostname=resthost, localcert=cfg.TaskWorker.cmscert,
+                          localkey=cfg.TaskWorker.cmskey, retry=2,
+                          logger=logger)
+    crabserver.setDbInstance(dbInstance=dbinstance)
+    fmdc._execute(crabserver)
