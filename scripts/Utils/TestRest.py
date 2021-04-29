@@ -11,21 +11,18 @@ source /data/srv/TaskManager/env.sh (or equivalent)
 """
 from __future__ import division
 from __future__ import print_function
-import json
 import os
 import time
-import subprocess
 import argparse
 
-from RESTInteractions import HTTPRequests
-from httplib import HTTPException
+from RESTInteractions import CRABRest
 from ServerUtilities import encodeRequest
 
 
-#rest_filetransfers = 'cmsweb-testbed.cern.ch:8443/crabserver/preprod'
-#rest_filetransfers = 'cmsweb-test2.cern.ch:8443/crabserver/preprod'
-#rest_filetransfers = 'cmsweb.cern.ch:8443/crabserver/preprod'
-
+#instance = preprod
+#hostname = cmsweb-testbed.cern.ch
+#hostname = cmsweb-test2.cern.ch
+#hostname = cmsweb.cern.ch
 
 proxy = os.environ['X509_USER_PROXY']
 print("Proxy: %s" % proxy)
@@ -49,16 +46,14 @@ all_ids = [
     '27a55051fb800140dec4020b31570b6e683694bd7ec5d95ec0734b51b5',
 ]
 
-def mark_transferred(ids, rest_filetransfers):
+def mark_transferred(ids, server):
     """
     Mark the list of files as tranferred
     :param ids: list of Oracle file ids to update
     :return: 0 success, 1 failure
     """
     try:
-        server = HTTPRequests(rest_filetransfers,
-                                proxy,
-                                proxy, userAgent='CRABtestSB')
+
         print("Marking done %d files" % len(ids))
 
         data = dict()
@@ -68,8 +63,7 @@ def mark_transferred(ids, rest_filetransfers):
         data['list_of_transfer_state'] = ["DONE" for _ in ids]
 
         t1 = time.time()
-        server.post('/filetransfers',
-                      data=encodeRequest(data))
+        server.post(api='filetransfers', data=encodeRequest(data))
         t2 = time.time()
         print("Marked good")
         elapsed = int(t2 - t1)
@@ -90,13 +84,14 @@ def main():
     n = int(args.n)
     hostname = args.r
     instance = args.i
-    rest_filetransfers = hostname + '.cern.ch:8443/crabserver/' + instance
     ids = all_ids[0:n]
 
-    print("test URI: %s" % rest_filetransfers)
+    print("test: %s on db %s" % (hostname, instance))
     print("test with %d ids" % n)
-    elapsed = mark_transferred(ids, rest_filetransfers)
-    print ("elapsed time: %d sec" % elapsed)
+    crabserver = CRABRest(hostname=hostname, localcert=proxy, localkey=proxy, userAgent='CRABtestSB')
+    crabserver.setDbInstance(dbInstance=instance)
+    elapsed = mark_transferred(ids, crabserver)
+    print("elapsed time: %d sec" % elapsed)
     return
 
 

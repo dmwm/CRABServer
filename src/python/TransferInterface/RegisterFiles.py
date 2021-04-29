@@ -1,6 +1,5 @@
 
 import os
-#from RESTInteractions import HTTPRequests
 from ServerUtilities import encodeRequest
 from TransferInterface import chunks, mark_failed, CRABDataInjector
 import threading
@@ -48,11 +47,6 @@ def submit(trans_tuple, job_data, log, direct=False):
     sources = list(set([x[columns.index('source')] for x in toTrans]))
 
     os.environ["X509_CERT_DIR"] = os.getcwd()
-    #log.info("Connection to %s with proxy in:\n %s" % (rest_filetransfers,proxy))
-    #oracleDB = HTTPRequests(rest_filetransfers,
-    #                        proxy,
-    #                        proxy, userAgent='CRABSchedd')
-    #                        #verbose=True)
 
     # mapping lfn <--> pfn
     for source in sources:

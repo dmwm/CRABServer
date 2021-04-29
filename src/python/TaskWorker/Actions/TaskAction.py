@@ -49,7 +49,6 @@ class TaskAction(object):
             return
 
         truncWarning = truncateError(warning)
-        #userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2, logger=self.logger)
         configreq = {'subresource': 'addwarning',
                      'workflow': taskname,
                      'warning': b64encode(truncWarning)}
@@ -61,7 +60,6 @@ class TaskAction(object):
 
 
     def deleteWarnings(self, userProxy, taskname):
-        #userServer = HTTPRequests(self.server['host'], userProxy, userProxy, retry=2, logger=self.logger)
         configreq = {'subresource': 'deletewarnings', 'workflow': taskname}
         try:
             self.crabserver.post(api='task', data=urllib.urlencode(configreq))

@@ -28,7 +28,7 @@ from MultiProcessingLog import MultiProcessingLog
 from WMCore.Configuration import loadConfigurationFile
 #from WMCore.Services.pycurl_manager import RequestHandler
 #from retry import retry
-from RESTInteractions import HTTPRequests
+from RESTInteractions import CRABRest
 from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping, executeCommand
 from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.WorkerExceptions import ConfigException
@@ -155,8 +155,6 @@ class Master(object):
         with tempSetLogLevel(self.logger, logging.ERROR):
             self.myDN = proxy.getSubjectFromCert(certFile=self.config.serviceCert)
 
-
-        # CRABServer REST API's (see CRABInterface)
         try:
             instance = self.config.instance
         except:
@@ -179,21 +177,14 @@ class Master(object):
                 msg = "Need to specify config.General.restHost and dbInstance in the configuration"
                 raise ConfigException(msg)
 
-        restURInoAPI = '/crabserver/' + dbInstance
-        self.logger.info('Will connect to CRAB Data Base via URL: https://%s/%s', restHost, restURInoAPI)
+        self.logger.info('Will connect to CRAB Data Base %s instance via URL: https://%s', dbInstance, restHost)
 
         # CRAB REST API's
-        self.REST_filetransfers = restURInoAPI + '/filetransfers'
-        #self.REST_usertransfers = restURInoAPI +  '/fileusertransfers'
-        self.REST_filemetadata = restURInoAPI + '/filemetadata'
-        self.REST_workflow = restURInoAPI + '/workflow'
-        self.REST_task = restURInoAPI + '/task'
         self.max_files_per_block = self.config.max_files_per_block
-        self.crabServer = HTTPRequests(hostname=restHost,
-                                       localcert=self.config.serviceCert,
-                                       localkey=self.config.serviceKey,
-                                       retry=3,
-                                       userAgent='CRABPublisher')
+        self.crabServer = CRABRest(hostname=restHost, localcert=self.config.serviceCert,
+                              localkey=self.config.serviceKey, retry=3,
+                              userAgent='CRABPublisher')
+        self.crabServer.setDbInstance(dbInstance=dbInstance)
         self.startTime = time.time()
 
         #try:
@@ -204,9 +195,9 @@ class Master(object):
         #    msg += str(traceback.format_exc())
         #    self.logger.debug(msg)
 
-    def active_tasks(self, db):
+    def active_tasks(self, crabserver):
         """
-        :param db: HTTPRequest object to access proper REST as createdin __init__ method
+        :param crabserver: CRABRest object to access proper REST as createdin __init__ method
         TODO  detail here the strucutre it returns
         :return: a list tuples [(task,info)]. One element for each task which has jobs to be published
                  each list element has the format (task, info) where task and info are lists
@@ -221,7 +212,6 @@ class Master(object):
 
         self.logger.debug("Retrieving publications from oracleDB")
         filesToPublish = []
-        uri = self.REST_filetransfers
         asoworkers = self.config.asoworker
         # asoworkers can be a string or a list of strings
         # but if it is a string, do not turn it into a list of chars !
@@ -233,9 +223,9 @@ class Master(object):
             fileDoc['subresource'] = 'acquirePublication'
             data = encodeRequest(fileDoc)
             try:
-                result = db.post(uri=uri, data=data)  # pylint: disable=unused-variable
+                result = crabserver.post(api='filetransfers', data=data)  # pylint: disable=unused-variable
             except Exception as ex:
-                self.logger.error("Failed to acquire publications from %s: %s", uri, ex)
+                self.logger.error("Failed to acquire publications from crabserver: %s", ex)
                 return []
 
             self.logger.debug("Retrieving max.100000 acquired publications from oracleDB")
@@ -244,12 +234,11 @@ class Master(object):
             fileDoc['subresource'] = 'acquiredPublication'
             fileDoc['grouping'] = 0
             fileDoc['limit'] = 100000
-            uri = self.REST_filetransfers
             data = encodeRequest(fileDoc)
             try:
-                results = db.get(uri=uri, data=data)
+                results = crabserver.get(api='filetransfers', data=data)
             except Exception as ex:
-                self.logger.error("Failed to acquire publications from %s: %s", uri, ex)
+                self.logger.error("Failed to acquire publications from crabserver: %s", ex)
                 return []
             files = oracleOutputMapping(results)
             self.logger.info("%s acquired publications retrieved for asoworker %s", len(files), asoworker)
@@ -277,17 +266,16 @@ class Master(object):
         """
         out = []
 
-        uri = self.REST_filemetadata
         dataDict = {}
         dataDict['taskname'] = workflow
         dataDict['filetype'] = 'EDM'
         data = encodeRequest(dataDict)
         try:
-            res = self.crabServer.get(uri=uri, data=data)
+            res = self.crabServer.get(api='filemetadata', data=data)
             # res is a 3-plu: (result, exit code, status)
             res = res[0]
         except Exception as ex:
-            logger.error("Error during metadata retrieving from %s:\n%s", uri, ex)
+            logger.error("Error during metadata retrieving from crabserver:\n%s", ex)
             return out
 
         metadataList = [json.loads(md) for md in res['result']]  # CRAB REST returns a list of JSON objects
@@ -397,12 +385,11 @@ class Master(object):
             workflow_status = ''
             msg = "Retrieving status"
             logger.info(msg)
-            uri = self.REST_workflow
             data = encodeRequest({'workflow': workflow})
             try:
-                res = self.crabServer.get(uri=uri, data=data)
+                res = self.crabServer.get(api='workflow', data=data)
             except Exception as ex:
-                logger.warn('Error retrieving status from %s for %s:\n%s', uri, workflow, str(ex))
+                logger.warn('Error retrieving status from crabserver for %s:\n%s', workflow, str(ex))
                 return 0
 
             try:
@@ -438,7 +425,7 @@ class Master(object):
                 last_publication_time = None
                 data = encodeRequest({'workflow':workflow, 'subresource':'search'})
                 try:
-                    result = self.crabServer.get(self.REST_task, data)
+                    result = self.crabServer.get(api='task', data=data)
                     logger.debug("task: %s ", str(result[0]))
                     last_publication_time = getColumn(result[0], 'tm_last_publication')
                 except Exception as ex:
@@ -558,7 +545,7 @@ class Master(object):
                         data['list_of_retry_value'] = 1
                         data['list_of_failure_reason'] = 'File type not EDM or metadata not found'
                         try:
-                            result = self.crabServer.post(self.REST_filetransfers, data=encodeRequest(data))
+                            result = self.crabServer.post(api='filetransfers', data=encodeRequest(data))
                             #logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
                         except Exception as ex:
                             logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)

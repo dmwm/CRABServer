@@ -233,7 +233,7 @@ class DagmanResubmitter(TaskAction):
 if __name__ == "__main__":
     import os
     import logging
-    from RESTInteractions import HTTPRequests
+    from RESTInteractions import CRABRest
     from WMCore.Configuration import Configuration
 
     logging.basicConfig(level=logging.DEBUG)
@@ -244,8 +244,9 @@ if __name__ == "__main__":
     config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
     config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
 
-    server_ = HTTPRequests('vmatanasi2.cern.ch', config.TaskWorker.cmscert, config.TaskWorker.cmskey)
-    resubmitter = DagmanResubmitter(config, server_, '/crabserver/dev/workflowdb')
+    server_ = CRABRest('cmsweb-testbed.cern.ch', config.TaskWorker.cmscert, config.TaskWorker.cmskey)
+    server_.setDbInstance('dev')
+    resubmitter = DagmanResubmitter(config, server_)
     resubmitter.execute(task={'tm_taskname':'141129_110306_crab3test-5:atanasi_crab_test_resubmit', 'user_proxy' : os.environ["X509_USER_PROXY"],
                               'resubmit_site_whitelist' : ['T2_IT_Bari'], 'resubmit_site_blacklist' : ['T2_IT_Legnaro'], 'resubmit_priority' : 2,
                               'resubmit_numcores' : 1, 'resubmit_maxjobruntime' : 1000, 'resubmit_maxmemory' : 1000

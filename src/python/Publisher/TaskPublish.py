@@ -20,7 +20,7 @@ import dbs.apis.dbsClient as dbsClient
 from ServerUtilities import getHashLfn, encodeRequest
 from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.WorkerExceptions import ConfigException
-from RESTInteractions import HTTPRequests
+from RESTInteractions import CRABRest
 from WMCore.Configuration import loadConfigurationFile
 
 def format_file_3(file_):
@@ -353,7 +353,7 @@ def publishInDBS3(config, taskname, verbose):
             data['list_of_failure_reason'] = ['']
 
             try:
-                result = crabServer.post(REST_filetransfers, data=encodeRequest(data))
+                result = crabServer.post(api='filetransfers', data=encodeRequest(data))
                 logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
             except Exception as ex:
                 logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
@@ -387,7 +387,7 @@ def publishInDBS3(config, taskname, verbose):
 
             logger.debug("data: %s ", data)
             try:
-                result = crabServer.post(REST_filetransfers, data=encodeRequest(data))
+                result = crabServer.post(api='filetransfers', data=encodeRequest(data))
                 logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
             except Exception as ex:
                 logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
@@ -497,21 +497,17 @@ def publishInDBS3(config, taskname, verbose):
     logger.info('Will connect to CRAB Data Base via URL: https://%s/%s', restHost, restURInoAPI)
 
     # CRAB REST API's
-    REST_filetransfers = restURInoAPI + '/filetransfers'
-    REST_task = restURInoAPI + '/task'
-    crabServer = HTTPRequests(hostname=restHost,
-                              localcert=config.General.serviceCert,
-                              localkey=config.General.serviceKey,
-                              retry=3,
-                              userAgent='CRABPublisher')
-
+    crabServer = CRABRest(hostname=restHost, localcert=config.General.serviceCert,
+                          localkey=config.General.serviceKey, retry=3,
+                          userAgent='CRABPublisher')
+    crabServer.setDbInstance(dbInstance=dbInstance)
 
     data = dict()
     data['subresource'] = 'search'
     data['workflow'] = taskname
 
     try:
-        results = crabServer.get(REST_task, data=encodeRequest(data))
+        results = crabServer.get(api='task', data=encodeRequest(data))
     except Exception as ex:
         logger.error("Failed to get acquired publications from oracleDB: %s", ex)
         nothingToDo['result'] = 'FAIL'
@@ -886,7 +882,7 @@ def publishInDBS3(config, taskname, verbose):
             mark_good(published, crabServer, logger)
             data['workflow'] = taskname
             data['subresource'] = 'updatepublicationtime'
-            crabServer.post(REST_task, data=encodeRequest(data))
+            crabServer.post(api='task', data=encodeRequest(data))
         if failed:
             logger.debug("Failed files: %s ", failed)
             mark_failed(failed, crabServer, logger, failure_reason)
