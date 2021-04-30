@@ -123,7 +123,7 @@ class CRAB3CreateJson(object):
         self.schedds = []
         self.resthost = "cmsweb.cern.ch:8443"
         self.crabserver = CRABRest(hostname=resthost, localcert='/data/certs/servicecert.pem',
-                                   localkey='"/data/certs/servicekey.pem', retry=10,
+                                   localkey='/data/certs/servicekey.pem', retry=10,
                                    userAgent='CRABTaskWorker')
         self.crabserver.setDbInstance(dbInstance='prod')
         # use child collector on port 9620 to get schedd attributes
