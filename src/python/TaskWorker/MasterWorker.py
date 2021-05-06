@@ -1,6 +1,8 @@
 #!/usr/bin/tenv python
 #external dependencies
 from __future__ import print_function
+
+import json
 import os
 import shutil
 import sys
@@ -21,6 +23,7 @@ from ServerUtilities import newX509env
 from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.TestWorker import TestWorker
 from MultiProcessingLog import MultiProcessingLog
+from TaskWorker import __version__
 from TaskWorker.Worker import Worker, setProcessLogger
 from TaskWorker.WorkerExceptions import ConfigException
 from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
@@ -116,7 +119,6 @@ class MasterWorker(object):
             myDir = currentProcessesDir + 'LatestLogs-' + YYMMDD_HHMMSS
             createLogdir(myDir)
 
-
         def setRootLogger(logWarning, logDebug, console, name):
             """Sets the root logger with the desired verbosity level
                The root logger logs to logsDir/twlog.txt and every single
@@ -149,10 +151,32 @@ class MasterWorker(object):
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
             logger = setProcessLogger(name, logsDir)
-            logger.debug("PID %s.", os.getpid())
-            logger.debug("Logging level initialized to %s.", loglevel)
+            logger.info("PID %s.", os.getpid())
+            logger.info("Logging level initialized to %s.", loglevel)
             return logger
 
+        def logVersionAndConfig(config=None, logger=None):
+            """
+            log version number and major config. parameters
+            args: config : a configuration object loaded from file
+            args: logger : the logger instance to use
+            """
+            twstartDict = {}
+            twstartDict['version'] = __version__
+            twstartDict['DBSHostName'] = config.Services.DBSHostName
+            twstartDict['name'] = config.TaskWorker.name
+            twstartDict['instance'] = config.TaskWorker.instance
+            if config.TaskWorker.instance == 'other':
+                twstartDict['restHost'] = config.TaskWorker.restHost
+                twstartDict['dbInstance'] = config.TaskWorker.dbInstance
+            twstartDict['nslaves'] = config.TaskWorker.nslaves
+            twstartDict['recurringActions'] = config.TaskWorker.recurringActions
+            # one line for automatic parsing
+            logger.info('TWSTART: %s', json.dumps(twstartDict))
+            # multiple lines for humans to read
+            for k,v in twstartDict.items():
+                logger.info('%s: %s', k, v)
+            return
 
         self.STOP = False
         self.TEST = sequential
@@ -160,6 +184,8 @@ class MasterWorker(object):
         self.config = config
         self.restHost = None
         dbInstance = None
+
+        logVersionAndConfig(self.config, self.logger)
 
         try:
             instance = self.config.TaskWorker.instance
@@ -183,7 +209,6 @@ class MasterWorker(object):
                 msg = "Need to specify config.TaskWorker.restHost and dbInstance in the configuration"
                 raise ConfigException(msg)
         self.dbInstance = dbInstance
-        #self.restURInoAPI = '/crabserver/' + dbInstance
 
         self.logger.info('Will connect via URL: https://%s/%s', self.restHost, self.dbInstance)
         
