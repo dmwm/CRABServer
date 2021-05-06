@@ -1,6 +1,8 @@
 #!/usr/bin/tenv python
 #external dependencies
 from __future__ import print_function
+
+import json
 import os
 import shutil
 import sys
@@ -9,18 +11,18 @@ import urllib
 import signal
 import logging
 from httplib import HTTPException
+from MultiProcessingLog import MultiProcessingLog
 
 #WMcore dependencies
 from WMCore.Configuration import loadConfigurationFile
 
-#CAFUtilities dependencies
+#CRAB dependencies
 from RESTInteractions import CRABRest
-
 import HTCondorLocator
 from ServerUtilities import newX509env
 from ServerUtilities import SERVICE_INSTANCES
+from TaskWorker import __version__
 from TaskWorker.TestWorker import TestWorker
-from MultiProcessingLog import MultiProcessingLog
 from TaskWorker.Worker import Worker, setProcessLogger
 from TaskWorker.WorkerExceptions import ConfigException
 from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
@@ -100,7 +102,7 @@ class MasterWorker(object):
                     break
             if files and latestLogDir:
                 # rename from Latest to Old
-                oldLogsDir = latestLogDir.replace('Latest','Old')
+                oldLogsDir = latestLogDir.replace('Latest', 'Old')
                 shutil.move(latestLogDir, oldLogsDir)
             else:
                 print("LatestLogDir not found in logs/processes, create a dummy dir to store old files")
@@ -112,10 +114,9 @@ class MasterWorker(object):
                     shutil.move(currentProcessesDir + f, oldLogsDir)
 
             # create a new LateastLogs directory where to store logs from this TaskWorker
-            YYMMDD_HHMMSS= time.strftime('%y%m%d_%H%M%S', time.localtime())
+            YYMMDD_HHMMSS = time.strftime('%y%m%d_%H%M%S', time.localtime())
             myDir = currentProcessesDir + 'LatestLogs-' + YYMMDD_HHMMSS
             createLogdir(myDir)
-
 
         def setRootLogger(logWarning, logDebug, console, name):
             """Sets the root logger with the desired verbosity level
@@ -149,10 +150,32 @@ class MasterWorker(object):
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
             logger = setProcessLogger(name, logsDir)
-            logger.debug("PID %s.", os.getpid())
-            logger.debug("Logging level initialized to %s.", loglevel)
+            logger.info("PID %s.", os.getpid())
+            logger.info("Logging level initialized to %s.", loglevel)
             return logger
 
+        def logVersionAndConfig(config=None, logger=None):
+            """
+            log version number and major config. parameters
+            args: config : a configuration object loaded from file
+            args: logger : the logger instance to use
+            """
+            twstartDict = {}
+            twstartDict['version'] = __version__
+            twstartDict['DBSHostName'] = config.Services.DBSHostName
+            twstartDict['name'] = config.TaskWorker.name
+            twstartDict['instance'] = config.TaskWorker.instance
+            if config.TaskWorker.instance == 'other':
+                twstartDict['restHost'] = config.TaskWorker.restHost
+                twstartDict['dbInstance'] = config.TaskWorker.dbInstance
+            twstartDict['nslaves'] = config.TaskWorker.nslaves
+            twstartDict['recurringActions'] = config.TaskWorker.recurringActions
+            # one line for automatic parsing
+            logger.info('TWSTART: %s', json.dumps(twstartDict))
+            # multiple lines for humans to read
+            for k, v in twstartDict.items():
+                logger.info('%s: %s', k, v)
+            return
 
         self.STOP = False
         self.TEST = sequential
@@ -160,6 +183,8 @@ class MasterWorker(object):
         self.config = config
         self.restHost = None
         dbInstance = None
+
+        logVersionAndConfig(self.config, self.logger)
 
         try:
             instance = self.config.TaskWorker.instance
@@ -174,7 +199,7 @@ class MasterWorker(object):
         else:
             msg = "Invalid instance value '%s'" % instance
             raise ConfigException(msg)
-        if instance is 'other':
+        if instance == 'other':
             self.logger.info('Will use restHost and dbInstance from config file')
             try:
                 self.restHost = self.config.TaskWorker.restHost
@@ -183,10 +208,9 @@ class MasterWorker(object):
                 msg = "Need to specify config.TaskWorker.restHost and dbInstance in the configuration"
                 raise ConfigException(msg)
         self.dbInstance = dbInstance
-        #self.restURInoAPI = '/crabserver/' + dbInstance
 
         self.logger.info('Will connect via URL: https://%s/%s', self.restHost, self.dbInstance)
-        
+
         #Let's increase the server's retries for recoverable errors in the MasterWorker
         #60 means we'll keep retrying for 1 hour basically (we retry at 20*NUMRETRY seconds, so at: 20s, 60s, 120s, 200s, 300s ...)
         self.crabserver = CRABRest(self.restHost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry=20,
@@ -287,7 +311,7 @@ class MasterWorker(object):
 
 
     def restartQueuedTasks(self):
-        """ This method is used at the TW startup and it restarts QUEUED tasks 
+        """ This method is used at the TW startup and it restarts QUEUED tasks
             setting them  back again to NEW.
         """
         limit = self.slaves.nworkers * 2
@@ -297,7 +321,7 @@ class MasterWorker(object):
             for task in pendingwork:
                 self.logger.debug("Restarting QUEUED task %s", task['tm_taskname'])
                 self.updateWork(task['tm_taskname'], task['tm_task_command'], 'NEW')
-            if not len(pendingwork):
+            if not pendingwork:
                 self.logger.info("Finished restarting QUEUED tasks (total %s)", total)
                 break #too bad "do..while" does not exist in python...
             else:
@@ -342,7 +366,7 @@ class MasterWorker(object):
 
             pendingwork = self.getWork(limit=limit, getstatus='HOLDING')
 
-            if len(pendingwork) > 0:
+            if pendingwork:
                 keys = ['tm_task_command', 'tm_taskname']
                 tasksInfo = [{k:v for k, v in task.items() if k in keys} for task in pendingwork]
                 self.logger.info("Retrieved a total of %d works", len(pendingwork))

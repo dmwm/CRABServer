@@ -22,15 +22,14 @@ import json
 from datetime import datetime
 import time
 from multiprocessing import Process
-
 from MultiProcessingLog import MultiProcessingLog
 
 from WMCore.Configuration import loadConfigurationFile
-#from WMCore.Services.pycurl_manager import RequestHandler
-#from retry import retry
+
 from RESTInteractions import CRABRest
 from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping, executeCommand
 from ServerUtilities import SERVICE_INSTANCES
+from TaskWorker import __version__
 from TaskWorker.WorkerExceptions import ConfigException
 
 
@@ -96,23 +95,6 @@ class Master(object):
                     print("The Publisher Worker needs to access the '%s' directory" % dirname)
                     sys.exit(1)
 
-        self.configurationFile = confFile         # remember this, will have to pass it to TaskPublish
-        config = loadConfigurationFile(confFile)
-        self.config = config.General
-        self.TPconfig = config.TaskPublisher
-
-        # these are used for talking to DBS
-        os.putenv('X509_USER_CERT', self.config.serviceCert)
-        os.putenv('X509_USER_KEY', self.config.serviceKey)
-        self.block_publication_timeout = self.config.block_closure_timeout
-        self.lfn_map = {}
-        self.force_publication = False
-        self.force_failure = False
-        self.TestMode = testMode
-        self.taskFilesDir = self.config.taskFilesDir
-        createLogdir(self.taskFilesDir)
-        createLogdir(os.path.join(self.taskFilesDir, 'FailedBlocks'))
-
         def setRootLogger(logsDir, quiet=False, debug=True, console=False):
             """Sets the root logger with the desired verbosity level
                The root logger logs to logs/log.txt and every single
@@ -146,8 +128,50 @@ class Master(object):
             logger.debug("PID %s.", os.getpid())
             logger.debug("Logging level initialized to %s.", loglevel)
             return logger
+        
+        def logVersionAndConfig(config=None, logger=None):
+            """
+            log version number and major config. parameters
+            args: config : a configuration object loaded from file
+            args: logger : the logger instance to use
+            """
+            pubstartDict = {}
+            pubstartDict['version'] = __version__
+            pubstartDict['asoworker'] = config.General.asoworker
+            pubstartDict['instance'] = config.General.instance
+            if config.General.instance == 'other':
+                pubstartDict['restHost'] = config.General.restHost
+                pubstartDict['dbInstance'] = config.General.dbInstance
+            pubstartDict['max_slaves'] = config.General.max_slaves
+            pubstartDict['DBShost'] = config.TaskPublisher.DBShost
+            pubstartDict['dryRun'] = config.TaskPublisher.dryRun
+            # one line for automatic parsing
+            logger.info('PUBSTART: %s', json.dumps(pubstartDict))
+            # multiple lines for humans to read
+            for k, v in pubstartDict.items():
+                logger.info('%s: %s', k, v)
+            return
+
+        self.configurationFile = confFile         # remember this, will have to pass it to TaskPublish
+        config = loadConfigurationFile(confFile)
+        self.config = config.General
+        self.TPconfig = config.TaskPublisher
+
+        # these are used for talking to DBS
+        os.putenv('X509_USER_CERT', self.config.serviceCert)
+        os.putenv('X509_USER_KEY', self.config.serviceKey)
+        self.block_publication_timeout = self.config.block_closure_timeout
+        self.lfn_map = {}
+        self.force_publication = False
+        self.force_failure = False
+        self.TestMode = testMode
+        self.taskFilesDir = self.config.taskFilesDir
+        createLogdir(self.taskFilesDir)
+        createLogdir(os.path.join(self.taskFilesDir, 'FailedBlocks'))
 
         self.logger = setRootLogger(self.config.logsDir, quiet=quiet, debug=debug, console=self.TestMode)
+
+        logVersionAndConfig(config, self.logger)
 
         from WMCore.Credential.Proxy import Proxy
         proxy = Proxy({'logger':self.logger})
@@ -186,14 +210,6 @@ class Master(object):
                               userAgent='CRABPublisher')
         self.crabServer.setDbInstance(dbInstance=dbInstance)
         self.startTime = time.time()
-
-        #try:
-        #    self.connection = RequestHandler(config={'timeout': 900, 'connecttimeout' : 900})
-        #except Exception as ex:
-        #    msg = "Error initializing the connection handler"
-        #    msg += str(ex)
-        #    msg += str(traceback.format_exc())
-        #    self.logger.debug(msg)
 
     def active_tasks(self, crabserver):
         """
