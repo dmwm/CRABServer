@@ -7,7 +7,7 @@ import time
 import random
 import urllib
 import logging
-from httplib import HTTPException
+from http.client import HTTPException
 import pycurl
 
 from WMCore.Services.Requests import JSONRequests
