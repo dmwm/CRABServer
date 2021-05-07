@@ -19,7 +19,7 @@ import datetime
 import traceback
 import subprocess
 import contextlib
-from httplib import HTTPException
+from http.client import HTTPException
 
 BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
