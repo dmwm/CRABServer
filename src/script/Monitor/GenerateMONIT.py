@@ -128,8 +128,6 @@ class CRAB3CreateJson(object):
         self.crabserver.setDbInstance(dbInstance='prod')
         # use child collector on port 9620 to get schedd attributes
         collName = "cmsgwms-collector-global.cern.ch:9620,cmsgwms-collector-global.fnal.gov:9620"
-        # 28 Apr 2021: temporarely remove FNAL's collector since DNS is not working there atm
-        collName = "cmsgwms-collector-global.cern.ch:9620"
         self.coll = htcondor.Collector(collName)
 
     def getCountTasksByStatus(self):
