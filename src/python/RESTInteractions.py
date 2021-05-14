@@ -5,9 +5,14 @@ Handles client interactions with remote REST interface
 import os
 import time
 import random
-import urllib
+#import urllib
+try:
+    from urllib import quote as urllibQuote  # Python 2.X
+except ImportError:
+    from urllib.parse import quote as urllibQuote  # Python 3+
+
 import logging
-from httplib import HTTPException
+from http.client import HTTPException
 import pycurl
 
 from WMCore.Services.Requests import JSONRequests
@@ -137,7 +142,7 @@ class HTTPRequests(dict):
         }
 
         #Quoting the uri since it can contain the request name, and therefore spaces (see #2557)
-        uri = urllib.quote(uri)
+        uri = urllibQuote(uri)
         caCertPath = self.getCACertPath()
         url = 'https://' + self['host'] + uri
 
