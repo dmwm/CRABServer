@@ -110,10 +110,8 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow, howmany = howmany)
 
-        rows = filter(lambda row: ((row[GetFromTaskAndType.JOBID] in jobids) or (str(row[GetFromTaskAndType.PANDAID])) in jobids), rows)
-
         for row in rows:
-            yield {'jobid': row[GetFromTaskAndType.JOBID] or str(row[GetFromTaskAndType.PANDAID]),
+            yield {'jobid': row[GetFromTaskAndType.JOBID],
                    'lfn': row[GetFromTaskAndType.LFN],
                    'site': row[GetFromTaskAndType.LOCATION],
                    'tmplfn': row[GetFromTaskAndType.TMPLFN],
@@ -157,7 +155,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         # Return only the info relevant to the client.
         res['runsAndLumis'] = {}
         for row in rows:
-            jobidstr = row[GetFromTaskAndType.JOBID] or str(row[GetFromTaskAndType.PANDAID])
+            jobidstr = row[GetFromTaskAndType.JOBID]
             retRow = {'parents': row[GetFromTaskAndType.PARENTS].read(),
                       'runlumi': row[GetFromTaskAndType.RUNLUMI].read(),
                       'events': row[GetFromTaskAndType.INEVENTS],
