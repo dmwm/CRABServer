@@ -243,6 +243,11 @@ def validateLFNs(path, outputFiles):
         else:
             fileName = "%s_%s" % (origFile, jobId)
         testLfn = os.path.join(path, dirCounter, fileName)
+        if len(testLfn) > 495 :  # max LNF length is 500, allow for addition of '/temp' for local stageout
+            msg = "\nYour task speficies an output LFN %d-char long " % len(testLfn)
+            msg += "\n which exceeds maximum length of 495"
+            msg += "\n and therefore can not be published in DBS"
+            raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
         Lexicon.lfn(testLfn)  # will raise if testLfn is not a valid lfn
     return
 
