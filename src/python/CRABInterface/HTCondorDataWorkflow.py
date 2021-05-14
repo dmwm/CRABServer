@@ -110,10 +110,6 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow, howmany = howmany)
 
-        # Convert integer jobId lists to string because the JobIds
-        # coming from the database after automatic splitting changes are strings
-        # (can look like '2-1').
-        jobids = [str(intJobId) for intJobId in jobids]
         rows = filter(lambda row: ((row[GetFromTaskAndType.JOBID] in jobids) or (str(row[GetFromTaskAndType.PANDAID])) in jobids), rows)
 
         for row in rows:
