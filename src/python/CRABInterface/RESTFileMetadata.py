@@ -33,6 +33,7 @@ class RESTFileMetadata(RESTEntity):
             safe.kwargs['inparentlfns'] = str(safe.kwargs['inparentlfns'])
             validate_str("globalTag", param, safe, RX_GLOBALTAG, optional=True)
             validate_str("jobid", param, safe, RX_JOBID, optional=True)
+            safe.kwargs["pandajobid"] = 0
             validate_num("outsize", param, safe, optional=False)
             validate_str("publishdataname", param, safe, RX_PUBLISH, optional=False)
             validate_str("appver", param, safe, RX_CMSSW, optional=False)
@@ -44,7 +45,8 @@ class RESTFileMetadata(RESTEntity):
             validate_str("outtmplocation", param, safe, RX_CMSSITE, optional=False)
             validate_str("acquisitionera", param, safe, RX_TASKNAME, optional=False)
             validate_str("outdatasetname", param, safe, RX_OUTDSLFN, optional=False)
-            validate_str("outlfn", param, safe, RX_LFN, optional=False)
+            # need to use RX_PARENTLFN becasue same API is also used for input metadata
+            validate_str("outlfn", param, safe, RX_PARENTLFN, optional=False)
             validate_str("outtmplfn", param, safe, RX_LFN, optional=True)
             validate_num("events", param, safe, optional=False)
             validate_str("filestate", param, safe, RX_FILESTATE, optional=True)
