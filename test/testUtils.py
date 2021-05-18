@@ -1,3 +1,6 @@
+from __future__ import division
+from __future__ import print_function
+
 def writePset():
     psetFileContent = """
     import FWCore.ParameterSet.Config as cms

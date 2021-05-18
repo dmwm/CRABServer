@@ -1,3 +1,6 @@
+from __future__ import division
+from __future__ import print_function
+
 """
 An almost standalone python script which creates a set of files for CRAB validation
 Requires the testUtils.py file to be placed in same directory
