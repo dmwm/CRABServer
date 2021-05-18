@@ -35,7 +35,7 @@ def changeInConf(configuration=None, paramName=None, paramValue=None, configSect
         configuration = configuration.replace(cfgSectionHeader, newCfgLines)
     return configuration
 
-def writeConfigFile(testName=None, listOfDicts=[]):
+def writeConfigFile(testName=None, listOfDicts=None):
     standardConfig = """
 # a simple configuration which is customized for each test
 #

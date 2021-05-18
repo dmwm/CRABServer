@@ -19,7 +19,7 @@ The script output is a set of files written to current directory
      bash -x <scriptName> <taskName>
 
 """
-from testUtils import writePset, changeInConf, writeConfigFile, writeValidationScript
+from testUtils import writePset, writeConfigFile, writeValidationScript
 
 writePset()
 
