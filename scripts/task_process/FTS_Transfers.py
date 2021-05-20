@@ -286,12 +286,32 @@ class submit_thread(threading.Thread):
                            bring_online=None,
                            source_spacetoken=None,
                            spacetoken=None,
-                           # max time for job in the fts queue in hours.
-                           # Usually, it should take O(minutes) for healthy situations
-                           max_time_in_queue=6,
+                           # max time for job in the FTS queue in hours. From FTS experts in
+                           # https://cern.service-now.com/service-portal?id=ticket&table=incident&n=INC2776329
+                           # The max_time_in_queue applies per job, not per retry.
+                           # The max_time_in_queue is a timeout for how much the job can stay in
+                           # a SUBMITTED, ACTIVE or STAGING state.
+                           # When a job's max_time_in_queue is reached, the job and all of its
+                           # transfers not yet in a terminal state are marked as CANCELED
+                           # StefanoB: I see that we hit this at times with 6h, causing job resubmissions,
+                           # so will try to make it longer to give FTS maximum chances within our
+                           # 24h overall limit (which takes care also of non-FTS related issues !)
+                           # ASO transfers never require STAGING so jobs can spend max_time_in_queue only
+                           # as SUBMITTED (aka queued) or ACTIVE (at least one transfer has been activated)
+                           max_time_in_queue=10,
+                           # from same cern.service-now.com ticket as above:
+                           # The number of retries applies to each transfer within that job.
+                           # A transfer is granted the first execution + number_of_retries.
+                           # E.g.: retry=3 --> first execution + 3 retries
+                           # so retry=3 means each transfer has 4 chances at most during the 6h
+                           # max_time_in_queue
                            retry=3,
+                           reuse=False,
                            # seconds after which the transfer is retried
+                           # this is a transfer that fails, gets put to SUBMITTED right away,
+                           # but the scheduler will avoid it until NOW() > last_retry_finish_time + retry_delay
                            # reduced under FTS suggestion w.r.t. the 3hrs of asov1
+                           # StefanoB: indeed 10 minutes makes much more sense for storage server glitches
                            retry_delay=600
                            # timeout on the single transfer process
                            # TODO: not clear if we may need it
