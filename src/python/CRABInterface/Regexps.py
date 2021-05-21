@@ -22,8 +22,8 @@ lfnParts.update( {'publishname' : pNameRE,
 ## 232 to not break backward compatibility.
 RX_TASKNAME_LEN = 232
 RX_TASKNAME  = re.compile(r"^[a-zA-Z0-9\-_:]{1,%s}$" % RX_TASKNAME_LEN)
-#analysis-crab3=prod jobs; analysistest=preprod jobs; analysis-crab3-hc=special HC tests (CSA14, AAA, ...); hctest=site readiness; test=middlewere validation
-RX_ACTIVITY  = re.compile(r'^(analysis(test|-crab3(-hc)?)|hc(test|xrootd)|test|integration)$')
+#activity defaults to "None". Use cases: analysis*=for use in case of need;  hctest*=site readiness; test*=middlewere validation
+RX_ACTIVITY  = re.compile(r'^(?=.{0,100}$)(analysis|hctest|test)[a-zA-Z0-9\-\._]*$')
 RX_PUBLISH   = re.compile('^'+pNameRE+'$')
 #RX_LFN       = re.compile(r'^(?=.{0,500}$)/store/(temp/)?(user|group)/%(hnName)s/%(primDS)s/%(publishname)s/%(psethash)s/%(counter)s/(log/)?%(filename)s+$' % lfnParts)
 RX_LFN       = re.compile(r'^(?=[a-zA-Z0-9\-\._/]{0,500}$)/store/(temp/)?(user/%(hnName)s|group|local|test)/?' % lfnParts)
