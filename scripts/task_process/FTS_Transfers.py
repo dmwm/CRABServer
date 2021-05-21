@@ -306,7 +306,7 @@ class submit_thread(threading.Thread):
                            # so retry=3 means each transfer has 4 chances at most during the 6h
                            # max_time_in_queue
                            retry=3,
-                           reuse=False,
+                           reuse=True,
                            # seconds after which the transfer is retried
                            # this is a transfer that fails, gets put to SUBMITTED right away,
                            # but the scheduler will avoid it until NOW() > last_retry_finish_time + retry_delay
@@ -415,7 +415,7 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
 
         tx_from_source = [[x[0], x[1], x[2], source, username, taskname, x[3], x[4]['adler32'].rjust(8,'0')] for x in zip(source_pfns, dest_pfns, ids, sizes, checksums)]
 
-        for files in chunks(tx_from_source, 200):
+        for files in chunks(tx_from_source, 50):
             thread = submit_thread(threadLock, logging, ftsContext, files, source, jobids, to_update)
             thread.start()
             threads.append(thread)
