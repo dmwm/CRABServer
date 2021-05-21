@@ -165,7 +165,7 @@ class HTTPRequests(dict):
                 else:
                     msg += str(ex)
                 self.logger.debug(msg)
-                time.sleep(sleeptime) #sleeps 20s the first time, 40s the second time and so on
+                time.sleep(sleeptime)
             else:
                 break
         try:
