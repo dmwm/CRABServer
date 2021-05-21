@@ -146,26 +146,30 @@ class HTTPRequests(dict):
         caCertPath = self.getCACertPath()
         url = 'https://' + self['host'] + uri
 
-        #retries this up to self['retry'] times a range of exit codes
-        for i in range(self['retry'] + 1):
+        #retries this up at least 3 times, or up to self['retry'] times for range of exit codes
+        nRetries = max(3, self['retry'])
+        for i in range(nRetries):
             try:
                 response, datares = self['conn'].request(url, data, encode=True, headers=headers, verb=verb, doseq=True,
                                                          ckey=self['key'], cert=self['cert'], capath=caCertPath,
                                                          verbose=self['verbose'])
             except Exception as ex:
                 #add here other temporary errors we need to retry
-                if (not retriableError(ex)) or (i == self['retry']):
-                    msg = "Fatal error trying to connect to %s using %s" % (url, data)
+                if (i < 3) or (retriableError(ex) and (i < self['retry'])):
+                    sleeptime = 20 * (i + 1) + random.randint(-10, 10)
+                    msg = "Sleeping %s seconds after HTTP error. Error details:  " % sleeptime
+                    if hasattr(ex, 'headers'):
+                        msg += str(ex.headers)
+                    else:
+                        msg += str(ex)
+                    self.logger.debug(msg)
+                    time.sleep(sleeptime)
+                else:
+                    msg = "Fatal error trying to connect to %s using %s. Error details: " % (url, data)
+                    msg = msg+str(ex.headers) if hasattr(ex, 'headers') else msg+str(ex)
                     self.logger.error(msg)
                     raise #really exit and raise exception if this was the last retry or the exit code is not among the list of the one we retry
-                sleeptime = 20 * (i + 1) + random.randint(-10,10)
-                msg = "Sleeping %s seconds after HTTP error. Error details:  " % sleeptime
-                if hasattr(ex, 'headers'):
-                    msg += str(ex.headers)
-                else:
-                    msg += str(ex)
-                self.logger.debug(msg)
-                time.sleep(sleeptime)
+
             else:
                 break
         try:
