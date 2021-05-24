@@ -169,7 +169,6 @@ function crabCommand() {
   return 0
 }
 
-function
 taskName="$1"
 """
     with open(testName + '.sh', 'w') as fp:
