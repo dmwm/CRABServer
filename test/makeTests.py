@@ -1,15 +1,23 @@
 """
 An almost standalone python script which creates a set of files for CRAB validation
 Requires the testUtils.py file to be placed in same directory
-The script output is a set of files written to current directory
- A simple PSET.py file to be used in all tests
- A list of crab configuration files, one for each test, named: <testName>.py
- A list of checking script to be executed to validate each test, named:  <testName>.sh
+The script creates three files for each test, named as the name of
+the configuration parameter they aim to checkout as per
+https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3ConfigurationFile
+The three files are:
+ <testName>.py is the configuration file to be used in crab submit
+ <testName>-submit.sh is a script to perform crab submit and some immediate check on
+    submission output and/or files created in the work directory
+ <testName>-check.sh is a script to executed independently AFTER the previous one
+    succeeded (typically 30min or 1h later), and possibily executed again until
+    the submitted task has reached the required status (SUBMITTED or COMPLETED)
 
  Tasks needs to be submitted from the directory where they have been
   created, since they may need additional external files created by this script.
-
- Checking scripts take a task name as only argument, and exit with code
+ *-sumit.sh script takes no argument and exit with code
+    0 if all OK
+    1 if fail
+ *-check scripts take a task name as only argument, and exit with code
     0 if all OK
     1 if FAIL
     2 to main "wait and run me again later"
@@ -65,12 +73,12 @@ writeValidationScript(testName=name, validationScript=validationScript)
 #=============================
 
 # inputFiles
-#TODO to be filled
 name = 'inputFiles'
 inFile1 = '/etc/hosts'
 inFile2 = '/etc/os-release'
 changeDict = {'param': name, 'section': 'JobType', 'value': [inFile1, inFile2]}
 confChangesList = [changeDict]
+#TODO following script uses crab remake to create a new workDir, but input files are missing there !
 validationScript = """
 checkStatus ${taskName} SUBMITTED
 lookInTarFor "^hosts" ${workDir}/inputs/*default.tgz
