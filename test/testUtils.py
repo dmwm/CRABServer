@@ -21,6 +21,27 @@ process.out = cms.EndPath(process.output)
         fp.write(psetFileContent)
     return
 
+def writePset8cores():
+    psetFileContent = """
+import FWCore.ParameterSet.Config as cms
+
+process = cms.Process('NoSplit')
+
+process.source = cms.Source("PoolSource", fileNames = cms.untracked.vstring('root://cms-xrd-global.cern.ch///store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0010/00CE4E7C-DAAD-E111-BA36-0025B32034EA.root'))
+process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(10))
+process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(True))
+process.options.numberOfThreads = cms.untracked.int32(8)
+process.output = cms.OutputModule("PoolOutputModule",
+    outputCommands = cms.untracked.vstring("drop *", "keep recoTracks_globalMuons_*_*"),
+    fileName = cms.untracked.string('output.root'),
+)
+process.out = cms.EndPath(process.output)
+"""
+
+    with open('PSET-8cores.py', 'w') as fp:
+        fp.write(psetFileContent)
+    return
+
 def changeInConf(configuration=None, paramName=None, paramValue=None, configSection=None):
     newParamLine = 'config.%s.%s = %s\n' % (configSection, paramName, paramValue)
     # is this param already present in the configuration ?
@@ -125,6 +146,15 @@ function lookFor {
   local string="$1"
   local file="$2"
   grep -q "${string}" ${file}
+  [ $? -ne 0 ] && exit 2
+  return 0
+}
+
+function lookInTarFor {
+  # looks for file in tarball. Fail test if not found
+  local file="$1"
+  local tarball="$2"
+  tar tf ${tarball} | grep -q ${file}
   [ $? -ne 0 ] && exit 2
   return 0
 }
