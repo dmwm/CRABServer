@@ -71,9 +71,10 @@ inFile1 = '/etc/hosts'
 inFile2 = '/etc/os-release'
 changeDict = {'param': name, 'section': 'JobType', 'value': [inFile1, inFile2]}
 confChangesList = [changeDict]
-#TODO need a way to check sandbox content
 validationScript = """
 checkStatus ${taskName} SUBMITTED
+lookInTarFor "^hosts" ${workDir}/inputs/*default.tgz
+lookInTarFor "^os-release" ${workDir}/inputs/*default.tgz
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeValidationScript(testName=name, validationScript=validationScript)
@@ -144,7 +145,18 @@ writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # numCores
-#TODO to be filled
+name = 'numCores'
+confChangesList = []
+changeDict = {'param': name, 'value': '8', 'section': 'JobType'}
+confChangesList.append(changeDict)
+changeDict = {'param': psetName, 'value': 'PSET-8cores.py', 'section': 'JobType'}
+confChangesList.append(changeDict)
+validationScript = """
+checkStatus ${taskName} COMPLETED
+crabCommand getlog "--short --jobids=1"
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt
+lookFor "JOB AD:  RequestCPUs = 8" ${workDir}/results/job_out.1.*.txt
+"""
 
 # scriptExe
 #TODO to be filled
@@ -156,9 +168,9 @@ writeValidationScript(testName=name, validationScript=validationScript)
 name = 'sendPythonFolder'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
-#TODO need a way to check sandbox content
 validationScript = """
 checkStatus ${taskName} SUBMITTED
+lookInTarFor "^python/" ${workDir}/inputs/*default.tgz
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeValidationScript(testName=name, validationScript=validationScript)
@@ -168,9 +180,9 @@ writeValidationScript(testName=name, validationScript=validationScript)
 name = 'sendExternalFolder'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
-#TODO need a way to check sandbox content
 validationScript = """
 checkStatus ${taskName} SUBMITTED
+lookInTarFor "^external/" ${workDir}/inputs/*default.tgz
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeValidationScript(testName=name, validationScript=validationScript)
@@ -190,7 +202,7 @@ writeValidationScript(testName=name, validationScript=validationScript)
 #=============================
 
 # extraJDL
-# to be filled
+#TODO to be filled
 
 # scheddName
 name = 'scheddName'
