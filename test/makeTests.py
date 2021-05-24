@@ -149,7 +149,7 @@ name = 'numCores'
 confChangesList = []
 changeDict = {'param': name, 'value': '8', 'section': 'JobType'}
 confChangesList.append(changeDict)
-changeDict = {'param': psetName, 'value': 'PSET-8cores.py', 'section': 'JobType'}
+changeDict = {'param': 'psetName', 'value': 'PSET-8cores.py', 'section': 'JobType'}
 confChangesList.append(changeDict)
 validationScript = """
 checkStatus ${taskName} COMPLETED
