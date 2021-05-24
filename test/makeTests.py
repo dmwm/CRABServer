@@ -11,6 +11,7 @@ The three files are:
  <testName>-check.sh is a script to executed independently AFTER the previous one
     succeeded (typically 30min or 1h later), and possibily executed again until
     the submitted task has reached the required status (SUBMITTED or COMPLETED)
+    This script relies on crab remake to create a new work directory
 
  Tasks needs to be submitted from the directory where they have been
   created, since they may need additional external files created by this script.
