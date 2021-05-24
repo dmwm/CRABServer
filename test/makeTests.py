@@ -65,7 +65,18 @@ writeValidationScript(testName=name, validationScript=validationScript)
 #=============================
 
 # inputFiles
-# to be filled
+#TODO to be filled
+name = 'inputFiles'
+inFile1 = '/etc/hosts'
+inFile2 = '/etc/os-release'
+changeDict = {'param': name, 'section': 'JobType', 'value': [inFile1, inFile2]}
+confChangesList = [changeDict]
+#TODO need a way to check sandbox content
+validationScript = """
+checkStatus ${taskName} SUBMITTED
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeValidationScript(testName=name, validationScript=validationScript)
 
 # disableAutomaticOutputCollection
 name = 'disableAutomaticOutputCollection'
@@ -133,13 +144,13 @@ writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # numCores
-# to be filled
+#TODO to be filled
 
 # scriptExe
-# to be filled
+#TODO to be filled
 
 # scriptArgs
-# to be filled (used ony with scriptExe)
+#TODO to be filled (used ony with scriptExe)
 
 # sendPythonFolder
 name = 'sendPythonFolder'
