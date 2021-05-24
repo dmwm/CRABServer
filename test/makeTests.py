@@ -44,7 +44,7 @@ writePset()
 #=============================
 
 # transferOutputs
-name ='transferOutputs'
+name = 'transferOutputs'
 changeDict = {'param': name, 'value': 'False', 'section': 'General'}
 confChangesList = [changeDict]
 validationScript = """
@@ -57,7 +57,7 @@ writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # transferLogs
-name ='transferLogs'
+name = 'transferLogs'
 changeDict = {'param': name, 'value': 'False', 'section': 'General'}
 confChangesList = [changeDict]
 validationScript = """
@@ -102,7 +102,7 @@ writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # outputFiles
-name ='outputFiles'
+name = 'outputFiles'
 confChangesList = []
 changeDict = {'param': 'disableAutomaticOutputCollection', 'value': 'True', 'section': 'JobType'}
 confChangesList.append(changeDict)
@@ -117,7 +117,7 @@ writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # allowUndistributedCMSSW
-name ='allowUndistributedCMSSW'
+name = 'allowUndistributedCMSSW'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
 validationScript = """
@@ -237,4 +237,3 @@ checkStatus ${taskName} SUBMITTED
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeValidationScript(testName=name, validationScript=validationScript)
-

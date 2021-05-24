@@ -1,6 +1,7 @@
 from __future__ import division
 from __future__ import print_function
 
+global commonBashFunctions
 commonBashFunctions = """#!/bin/bash
 # a few utility functions for submission and check scripts
 function checkStatus {
@@ -67,6 +68,7 @@ function crabCommand() {
 }
 """
 
+global standardConfig
 standardConfig = """
 # a simple configuration which is customized for each test
 #
@@ -137,7 +139,7 @@ def changeInConf(configuration=None, paramName=None, paramValue=None, configSect
     if paramName in configuration:
         # override:
         for line in configuration.split('\n'):
-            if paramName in line :
+            if paramName in line:
                 existingLine = line
                 break
         configuration = configuration.replace(existingLine, newParamLine)
