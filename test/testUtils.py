@@ -1,111 +1,8 @@
 from __future__ import division
 from __future__ import print_function
 
-def writePset():
-    psetFileContent = """
-import FWCore.ParameterSet.Config as cms
-
-process = cms.Process('NoSplit')
-
-process.source = cms.Source("PoolSource", fileNames = cms.untracked.vstring('root://cms-xrd-global.cern.ch///store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0010/00CE4E7C-DAAD-E111-BA36-0025B32034EA.root'))
-process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(10))
-process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(True))
-process.output = cms.OutputModule("PoolOutputModule",
-    outputCommands = cms.untracked.vstring("drop *", "keep recoTracks_globalMuons_*_*"),
-    fileName = cms.untracked.string('output.root'),
-)
-process.out = cms.EndPath(process.output)
-"""
-
-    with open('PSET.py', 'w') as fp:
-        fp.write(psetFileContent)
-    return
-
-def writePset8cores():
-    psetFileContent = """
-import FWCore.ParameterSet.Config as cms
-
-process = cms.Process('NoSplit')
-
-process.source = cms.Source("PoolSource", fileNames = cms.untracked.vstring('root://cms-xrd-global.cern.ch///store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0010/00CE4E7C-DAAD-E111-BA36-0025B32034EA.root'))
-process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(10))
-process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(True))
-process.options.numberOfThreads = cms.untracked.int32(8)
-process.output = cms.OutputModule("PoolOutputModule",
-    outputCommands = cms.untracked.vstring("drop *", "keep recoTracks_globalMuons_*_*"),
-    fileName = cms.untracked.string('output.root'),
-)
-process.out = cms.EndPath(process.output)
-"""
-
-    with open('PSET-8cores.py', 'w') as fp:
-        fp.write(psetFileContent)
-    return
-
-def changeInConf(configuration=None, paramName=None, paramValue=None, configSection=None):
-    newParamLine = 'config.%s.%s = %s\n' % (configSection, paramName, paramValue)
-    # is this param already present in the configuration ?
-    if paramName in configuration:
-        # override:
-        for line in configuration.split('\n'):
-            if paramName in line :
-                existingLine = line
-                break
-        configuration = configuration.replace(existingLine, newParamLine)
-    else:
-        # add below section header
-        cfgSectionHeader = "config.section_('%s')\n" % configSection
-        newCfgLines = cfgSectionHeader + newParamLine
-        configuration = configuration.replace(cfgSectionHeader, newCfgLines)
-    return configuration
-
-def writeConfigFile(testName=None, listOfDicts=None):
-    standardConfig = """
-# a simple configuration which is customized for each test
-#
-import time
-from WMCore.Configuration import Configuration
-config = Configuration()
-
-config.section_('General')
-config.General.instance = 'prod'
-config.General.workArea = '/tmp/crabTestConfig'
-config.General.requestName = REQUESTNAME
-
-config.section_('JobType')
-config.JobType.pluginName = 'Analysis'
-config.JobType.psetName = 'PSET.py'
-config.JobType.maxJobRuntimeMin = 60
-
-config.section_('Data')
-config.Data.inputDataset = '/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM'
-config.Data.splitting = 'LumiBased'
-config.Data.unitsPerJob = 1
-config.Data.totalUnits = 1
-config.Data.publication = False
-config.Data.outputDatasetTag = 'CrabAutoTest_' + config.General.requestName
-
-config.section_('User')
-
-config.section_('Site')
-config.Site.storageSite = 'T2_CH_CERN'
-
-config.section_('Debug')
-"""
-    conf = standardConfig
-    for d in listOfDicts:
-        param = d['param']
-        value = d['value']
-        section = d['section']
-        conf = changeInConf(configuration=conf, paramName=param, paramValue=value, configSection=section)
-    # also set the requestName (do it now to avoid confusing changeInConf)
-    conf = conf.replace('REQUESTNAME', '"'+testName+'"')
-    with open(testName + '.py', 'w') as fp:
-        fp.write(conf)
-    return
-
-def writeValidationScript(testName=None, validationScript=None):
-    validationScriptHeader = """#!/bin/bash
+commonBashFunctions = """#!/bin/bash
+# a few utility functions for submission and check scripts
 function checkStatus {
   # check that taskName has reached targetStatus and writes statusLog.txt
   # if target = SUBMITTED, accepts status COMPLETED as well
@@ -168,10 +65,111 @@ function crabCommand() {
   [ $? -ne 0 ] && exit 2
   return 0
 }
-
-taskName="$1"
 """
-    with open(testName + '.sh', 'w') as fp:
-        fp.write(validationScriptHeader)
+
+standardConfig = """
+# a simple configuration which is customized for each test
+#
+import time
+from WMCore.Configuration import Configuration
+config = Configuration()
+
+config.section_('General')
+config.General.instance = 'prod'
+config.General.workArea = '/tmp/crabTestConfig'
+config.General.requestName = REQUESTNAME
+
+config.section_('JobType')
+config.JobType.pluginName = 'Analysis'
+config.JobType.psetName = 'PSET.py'
+config.JobType.maxJobRuntimeMin = 60
+
+config.section_('Data')
+config.Data.inputDataset = '/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM'
+config.Data.splitting = 'LumiBased'
+config.Data.unitsPerJob = 1
+config.Data.totalUnits = 1
+config.Data.publication = False
+config.Data.outputDatasetTag = 'CrabAutoTest_' + config.General.requestName
+
+config.section_('User')
+
+config.section_('Site')
+config.Site.storageSite = 'T2_CH_CERN'
+
+config.section_('Debug')
+"""
+
+psetFileContent = """
+# a minimal PSET for quick execution
+import FWCore.ParameterSet.Config as cms
+
+process = cms.Process('NoSplit')
+process.source = cms.Source("PoolSource", fileNames = cms.untracked.vstring('root://cms-xrd-global.cern.ch///store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0010/00CE4E7C-DAAD-E111-BA36-0025B32034EA.root'))
+process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(10))
+process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(True))
+process.output = cms.OutputModule("PoolOutputModule",
+    outputCommands = cms.untracked.vstring("drop *", "keep recoTracks_globalMuons_*_*"),
+    fileName = cms.untracked.string('output.root'),
+)
+process.out = cms.EndPath(process.output)
+"""
+
+def writePset():
+    with open('PSET.py', 'w') as fp:
+        fp.write(psetFileContent)
+    return
+
+def writePset8cores():
+    newLine = "\nprocess.options.numberOfThreads = cms.untracked.int32(8)\n"
+    for line in psetFileContent.split('/n'):
+        if line.startswith('process.options'):
+            existingLine = line
+            break
+    psetFileContent = psetFileContent.replace(existingLine, existingLine+newLine)
+    with open('PSET-8cores.py', 'w') as fp:
+        fp.write(psetFileContent)
+    return
+
+def changeInConf(configuration=None, paramName=None, paramValue=None, configSection=None):
+    newParamLine = 'config.%s.%s = %s\n' % (configSection, paramName, paramValue)
+    # is this param already present in the configuration ?
+    if paramName in configuration:
+        # override:
+        for line in configuration.split('\n'):
+            if paramName in line :
+                existingLine = line
+                break
+        configuration = configuration.replace(existingLine, newParamLine)
+    else:
+        # add below section header
+        cfgSectionHeader = "config.section_('%s')\n" % configSection
+        newCfgLines = cfgSectionHeader + newParamLine
+        configuration = configuration.replace(cfgSectionHeader, newCfgLines)
+    return configuration
+
+def writeConfigFile(testName=None, listOfDicts=None):
+    conf = standardConfig
+    for d in listOfDicts:
+        param = d['param']
+        value = d['value']
+        section = d['section']
+        conf = changeInConf(configuration=conf, paramName=param, paramValue=value, configSection=section)
+    # also set the requestName (do it now to avoid confusing changeInConf)
+    conf = conf.replace('REQUESTNAME', '"'+testName+'"')
+    with open(testName + '.py', 'w') as fp:
+        fp.write(conf)
+    return
+
+def writeValidationScript(testName=None, validationScript=None):
+    with open(testName + '-submit.sh', 'w') as fp:
+        fp.write(commonBashFunctions)
+        fp.write('taskName = "$1"\n\n')
         fp.write(validationScript)
+    return
+
+def writeSubmissionScript(testName=None, submissionScript=None):
+    with open(testName + '-submit.sh', 'w') as fp:
+        fp.write(commonBashFunctions)
+        fp.write(submissionScript)
     return

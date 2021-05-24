@@ -15,10 +15,10 @@ The three files are:
 
  Tasks needs to be submitted from the directory where they have been
   created, since they may need additional external files created by this script.
- *-sumit.sh script takes no argument and exit with code
+  *-sumit.sh script takes no argument and exit with code
     0 if all OK
     1 if fail
- *-check scripts take a task name as only argument, and exit with code
+  *-check scripts take a task name as only argument, and exit with code
     0 if all OK
     1 if FAIL
     2 to main "wait and run me again later"
@@ -31,7 +31,7 @@ The three files are:
 from __future__ import division
 from __future__ import print_function
 
-from testUtils import writePset, writeConfigFile, writeValidationScript
+from testUtils import writePset, writeConfigFile, writeSubmissionScript, writeValidationScript
 
 writePset()
 
