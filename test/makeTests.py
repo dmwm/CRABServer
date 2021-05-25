@@ -32,9 +32,10 @@ The three files are:
 from __future__ import division
 from __future__ import print_function
 
-#from testUtils import writePset, writePset8cores, writeConfigFile, writeTestSubmitScript, writeValidationScript
+from testUtils import writePset, writePset8cores, writeScriptExe,\
+    writeConfigFile, writeTestSubmitScript, writeValidationScript
 
-from testUtils import *
+#from testUtils import *
 
 writePset()
 writePset8cores()
@@ -164,7 +165,7 @@ writeValidationScript(testName=name, validationScript=validationScript)
 # maxMemoryMB
 name = 'maxMemoryMB'
 changeDict = {'param': name, 'value': '2500', 'section': 'JobType'} # default is 2000
-confChangesList=[changeDict]
+confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
