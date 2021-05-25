@@ -37,8 +37,9 @@ from __future__ import print_function
 from testUtils import *
 
 writePset()
-
 writePset8cores()
+#writeScriptExe()
+
 
 dummyTestScript = "\nexit 0\n"  #  a test which always returns success
 #
@@ -264,9 +265,8 @@ writeValidationScript(testName=name, validationScript=validationScript)
 
 # scheddName
 name = 'scheddName'
-confChangesList = []
 changeDict = {'param': name, 'value': '"crab3@vocms059.cern.ch"', 'section': 'Debug'}
-confChangesList.append(changeDict)
+confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} SUBMITTED
@@ -286,6 +286,22 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} SUBMITTED
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
+# extraJDL
+name = 'extraJDL'
+changeDict = {'param': name, 'value': "['+CMS_ALLOW_OVERFLOW=False', '+CRAB_StageoutPolicy=\"remote\"']", 'section': 'Debug'}
+confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
+validationScript = """
+checkStatus ${taskName} COMPLETED
+crabCommand getlog "--short --jobids=1"
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt
+lookFor "JOB AD: CMS_ALLOW_OVERFLOW = false" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: CRAB_StageoutPolicy = \\"remote\\"" ${workDir}/results/job_out.1.*.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
