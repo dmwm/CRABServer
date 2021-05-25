@@ -48,6 +48,11 @@ if os.path.exists('USE_NEW_PUBLISHER'):
 else:
     asoworker = 'asoless'
 
+if os.path.exists('USE_FTS_REUSE'):
+    ftsReuse = True
+else:
+    ftsReuse = False
+
 def chunks(l, n):
     """
     Yield successive n-sized chunks from l.
@@ -286,12 +291,32 @@ class submit_thread(threading.Thread):
                            bring_online=None,
                            source_spacetoken=None,
                            spacetoken=None,
-                           # max time for job in the fts queue in hours.
-                           # Usually, it should take O(minutes) for healthy situations
-                           max_time_in_queue=6,
+                           # max time for job in the FTS queue in hours. From FTS experts in
+                           # https://cern.service-now.com/service-portal?id=ticket&table=incident&n=INC2776329
+                           # The max_time_in_queue applies per job, not per retry.
+                           # The max_time_in_queue is a timeout for how much the job can stay in
+                           # a SUBMITTED, ACTIVE or STAGING state.
+                           # When a job's max_time_in_queue is reached, the job and all of its
+                           # transfers not yet in a terminal state are marked as CANCELED
+                           # StefanoB: I see that we hit this at times with 6h, causing job resubmissions,
+                           # so will try to make it longer to give FTS maximum chances within our
+                           # 24h overall limit (which takes care also of non-FTS related issues !)
+                           # ASO transfers never require STAGING so jobs can spend max_time_in_queue only
+                           # as SUBMITTED (aka queued) or ACTIVE (at least one transfer has been activated)
+                           max_time_in_queue=10,
+                           # from same cern.service-now.com ticket as above:
+                           # The number of retries applies to each transfer within that job.
+                           # A transfer is granted the first execution + number_of_retries.
+                           # E.g.: retry=3 --> first execution + 3 retries
+                           # so retry=3 means each transfer has 4 chances at most during the 6h
+                           # max_time_in_queue
                            retry=3,
+                           reuse=ftsReuse,
                            # seconds after which the transfer is retried
+                           # this is a transfer that fails, gets put to SUBMITTED right away,
+                           # but the scheduler will avoid it until NOW() > last_retry_finish_time + retry_delay
                            # reduced under FTS suggestion w.r.t. the 3hrs of asov1
+                           # StefanoB: indeed 10 minutes makes much more sense for storage server glitches
                            retry_delay=600
                            # timeout on the single transfer process
                            # TODO: not clear if we may need it
@@ -395,7 +420,8 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
 
         tx_from_source = [[x[0], x[1], x[2], source, username, taskname, x[3], x[4]['adler32'].rjust(8,'0')] for x in zip(source_pfns, dest_pfns, ids, sizes, checksums)]
 
-        for files in chunks(tx_from_source, 200):
+        xfersPerFTSJob = 50 if ftsReuse else 200
+        for files in chunks(tx_from_source, xfersPerFTSJob):
             thread = submit_thread(threadLock, logging, ftsContext, files, source, jobids, to_update)
             thread.start()
             threads.append(thread)
