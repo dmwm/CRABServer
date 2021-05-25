@@ -169,6 +169,15 @@ then
     touch USE_JEL
 fi
 
+# Decide if this task will use enable REUSE flag for FTS ASO jobs
+# Do it here so that decision stays for task lifetime, even if schedd configuratoion
+# is changed at some point
+if [ -f /etc/use_fts_reuse ] ;
+then
+    echo "Found file /etc/use_fts_reuse. Set this task to enable REUSE flag in FTS"
+    touch USE_FTS_REUSE
+fi
+
 # Decide if this task will use old ASO based DBSPublisher, or new standalone Publisher
 # Do it here so that decision stays for task lifetime, even if schedd configuratoion
 # is changed at some point
