@@ -204,7 +204,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD: RequestCPUs = 8" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: RequestCpus = 8" ${workDir}/results/job_out.1.*.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
