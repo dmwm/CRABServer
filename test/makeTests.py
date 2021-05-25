@@ -38,7 +38,7 @@ from testUtils import *
 
 writePset()
 writePset8cores()
-#writeScriptExe()
+writeScriptExe()
 
 
 dummyTestScript = "\nexit 0\n"  #  a test which always returns success
@@ -212,10 +212,45 @@ writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # scriptExe
-#TODO to be filled
+name = 'scriptExe'
+changeDict = {'param': name, 'value': '"SIMPLE-SCRIPT.sh"', 'section': 'JobType'}
+confChangesList = [changeDict]
+testSubmitScript = """
+lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz
+"""
+validationScript = """
+checkStatus ${taskName} COMPLETED
+crabCommand getlog "--short --jobids=1"
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt
+lookFor "SB CMSRUN starting" ${workDir}/results/job_out.1.*.txt
+lookFor "====== arg checking: \$1 = 1" ${workDir}/results/job_out.1.*.txt
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
 
 # scriptArgs
-#TODO to be filled (used ony with scriptExe)
+name = 'scriptArgs'
+confChangesList = []
+changeDict = {'param': 'scriptExe', 'value': '"SIMPLE-SCRIPT.sh"', 'section': 'JobType'}
+confChangesList.append(changeDict)
+changeDict = {'param': name, 'value': ['exitCode=666', 'gotArgs=Yes'], 'section': 'JobType'}
+confChangesList.append(changeDict)
+testSubmitScript = """
+lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz
+"""
+validationScript = """
+checkStatus ${taskName} COMPLETED
+crabCommand getlog "--short --jobids=1"
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt
+lookFor "SB CMSRUN starting" ${workDir}/results/job_out.1.*.txt
+lookFor "====== arg checking: \$1 = 1" ${workDir}/results/job_out.1.*.txt
+lookFor "====== arg checking: \$2 = exitCode=666" ${workDir}/results/job_out.1.*.txt
+lookFor "====== arg checking: \$3 = gotArgs=Yes" ${workDir}/results/job_out.1.*.txt
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
 
 # sendPythonFolder
 name = 'sendPythonFolder'
@@ -259,9 +294,6 @@ writeValidationScript(testName=name, validationScript=validationScript)
 #=============================
 # SECTION DEBUG
 #=============================
-
-# extraJDL
-#TODO to be filled
 
 # scheddName
 name = 'scheddName'

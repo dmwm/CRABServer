@@ -1,6 +1,8 @@
 from __future__ import division
 from __future__ import print_function
 
+import os
+
 commonBashFunctions = """#!/bin/bash
 # a few utility functions for submission and check scripts
 # exit status meaning:
@@ -118,6 +120,20 @@ process.output = cms.OutputModule("PoolOutputModule",
 process.out = cms.EndPath(process.output)
 """
 
+simpleScriptExe = """#!/bin/bash
+echo "============ SB CMSRUN starting =================" >> My_output.txt
+echo "====== arg checking: \$1 = $1" >> My_output.txt
+echo "====== arg checking: \$2 = $2" >> My_output.txt
+echo "====== arg checking: \$3 = $3" >> My_output.txt
+
+cmsRun -j FrameworkJobReport.xml -p PSet.py
+ExeExit=$?
+echo "============ SB CMSRUN finished =================" >> My_output.txt
+echo "============ SB CMSRUN exit code was: $ExeExit ==" >> My_output.txt
+echo "============ SB ALL DONE  =======================" >> My_output.txt
+cat My_output.txt
+"""
+
 def writePset():
     with open('PSET.py', 'w') as fp:
         fp.write(psetFileContent)
@@ -135,6 +151,11 @@ def writePset8cores():
     with open('PSET-8cores.py', 'w') as fp:
         fp.write(pset8c)
     return
+
+def writeScriptExe():
+    with open('SIMPLE-SCRIPT.sh', 'w') as fp:
+        fp.write(simpleScriptExe)
+    os.chmod('SIMPLE-SCRIPT.sh', 0o744)
 
 def changeInConf(configuration=None, paramName=None, paramValue=None, configSection=None):
     newParamLine = 'config.%s.%s = %s\n' % (configSection, paramName, paramValue)
