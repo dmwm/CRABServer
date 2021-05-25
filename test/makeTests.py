@@ -6,8 +6,9 @@ the configuration parameter they aim to checkout as per
 https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3ConfigurationFile
 The three files are:
  <testName>.py is the configuration file to be used in crab submit
- <testName>-submit.sh is a script to perform crab submit and some immediate check on
+ <testName>-testSubmit.sh is a script to execute an immediate check on
     submission output and/or files created in the work directory
+    (in most cases this is dummy, since "it was submitted" is good enough)
  <testName>-check.sh is a script to executed independently AFTER the previous one
     succeeded (typically 30min or 1h later), and possibily executed again until
     the submitted task has reached the required status (SUBMITTED or COMPLETED)
@@ -15,7 +16,7 @@ The three files are:
 
  Tasks needs to be submitted from the directory where they have been
   created, since they may need additional external files created by this script.
-  *-sumit.sh script takes no argument and exit with code
+  *-submit.sh script takes no argument and exit with code
     0 if all OK
     1 if fail
   *-check scripts take a task name as only argument, and exit with code
@@ -31,10 +32,15 @@ The three files are:
 from __future__ import division
 from __future__ import print_function
 
-from testUtils import writePset, writeConfigFile, writeSubmissionScript, writeValidationScript
+#from testUtils import writePset, writePset8cores, writeConfigFile, writeTestSubmitScript, writeValidationScript
+
+from testUtils import *
 
 writePset()
 
+writePset8cores()
+
+dummyTestScript = "\nexit 0\n"  #  a test which always returns success
 #
 # test CRAB Configuration file parameters
 #
@@ -45,28 +51,47 @@ writePset()
 
 # transferOutputs
 name = 'transferOutputs'
-changeDict = {'param': name, 'value': 'False', 'section': 'General'}
+changeDict = {'param': name, 'value': 'False', 'section': 'General'} # default is True
 confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "disabled" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: CRAB_TransferOutputs = 0" ${workDir}/results/job_out.1.*.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # transferLogs
 name = 'transferLogs'
-changeDict = {'param': name, 'value': 'False', 'section': 'General'}
+changeDict = {'param': name, 'value': 'True', 'section': 'General'} # default is False
 confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "disabled" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: CRAB_SaveLogs = 0" ${workDir}/results/job_out.1.*.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
+# activity
+name = 'activity'
+changeDict = {'param': name, 'value': '"hctestnew"', 'section': 'General'}
+confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
+#TODO this is not the correct check, need to dig into how activity is passed around
+validationScript = """
+checkStatus ${taskName} COMPLETED
+crabCommand getlog "--short --jobids=1"
+lookFor "JOB AD: CMS_Type = \\"Test\\"" ${workDir}/results/job_out.1.*.txt
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 #=============================
@@ -79,26 +104,30 @@ inFile1 = '/etc/hosts'
 inFile2 = '/etc/os-release'
 changeDict = {'param': name, 'section': 'JobType', 'value': [inFile1, inFile2]}
 confChangesList = [changeDict]
-#TODO following script uses crab remake to create a new workDir, but input files are missing there !
-validationScript = """
-checkStatus ${taskName} SUBMITTED
+testSubmitScript = """
 lookInTarFor "^hosts" ${workDir}/inputs/*default.tgz
 lookInTarFor "^os-release" ${workDir}/inputs/*default.tgz
 """
+validationScript = """
+checkStatus ${taskName} SUBMITTED
+"""
 writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # disableAutomaticOutputCollection
 name = 'disableAutomaticOutputCollection'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "^Output file : \$" ${workDir}/results/job_out.1.*.txt
+lookFor "^Output files.*: \$" ${workDir}/results/job_out.1.*.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # outputFiles
@@ -106,31 +135,36 @@ name = 'outputFiles'
 confChangesList = []
 changeDict = {'param': 'disableAutomaticOutputCollection', 'value': 'True', 'section': 'JobType'}
 confChangesList.append(changeDict)
-changeDict = {'param': 'outputFiles', 'value': '"output.root"', 'section': 'JobType'}
+changeDict = {'param': 'outputFiles', 'value': '["output.root"]', 'section': 'JobType'}
 confChangesList.append(changeDict)
+testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getoutput --jobids=1"
 lookFor "Success in retrieving output_1.root " commandLog.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # allowUndistributedCMSSW
 name = 'allowUndistributedCMSSW'
+#TODO need a real test here, e.g. using a non-prod version of CMSSW
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} SUBMITTED
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # maxMemoryMB
 name = 'maxMemoryMB'
-confChangesList = []
-changeDict = {'param': name, 'value': '2500', 'section': 'JobType'}
-confChangesList.append(changeDict)
+changeDict = {'param': name, 'value': '2500', 'section': 'JobType'} # default is 2000
+confChangesList=[changeDict]
+testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
@@ -138,12 +172,14 @@ lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: RequestMemory = 2500" ${workDir}/results/job_out.1.*.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # maxJobRuntimeMin
 name = 'maxJobRuntimeMin'
 changeDict = {'param': name, 'value': '100', 'section': 'JobType'}
 confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
@@ -151,6 +187,7 @@ lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: MaxWallTimeMins_RAW = 100" ${workDir}/results/job_out.1.*.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # numCores
@@ -158,14 +195,20 @@ name = 'numCores'
 confChangesList = []
 changeDict = {'param': name, 'value': '8', 'section': 'JobType'}
 confChangesList.append(changeDict)
-changeDict = {'param': 'psetName', 'value': 'PSET-8cores.py', 'section': 'JobType'}
+changeDict = {'param': 'psetName', 'value': '"PSET-8cores.py"', 'section': 'JobType'}
 confChangesList.append(changeDict)
+changeDict = {'param': 'maxMemoryMB', 'value': '4000', 'section': 'JobType'}
+confChangesList.append(changeDict)
+testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD:  RequestCPUs = 8" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: RequestCPUs = 8" ${workDir}/results/job_out.1.*.txt
 """
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
 
 # scriptExe
 #TODO to be filled
@@ -177,11 +220,14 @@ lookFor "JOB AD:  RequestCPUs = 8" ${workDir}/results/job_out.1.*.txt
 name = 'sendPythonFolder'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
-validationScript = """
-checkStatus ${taskName} SUBMITTED
+testSubmitScript = """
 lookInTarFor "^python/" ${workDir}/inputs/*default.tgz
 """
+validationScript = """
+checkStatus ${taskName} SUBMITTED
+"""
 writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 
@@ -189,11 +235,14 @@ writeValidationScript(testName=name, validationScript=validationScript)
 name = 'sendExternalFolder'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
-validationScript = """
-checkStatus ${taskName} SUBMITTED
+testSubmitScript = """
 lookInTarFor "^external/" ${workDir}/inputs/*default.tgz
 """
+validationScript = """
+checkStatus ${taskName} SUBMITTED
+"""
 writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 #=============================
@@ -218,11 +267,13 @@ name = 'scheddName'
 confChangesList = []
 changeDict = {'param': name, 'value': '"crab3@vocms059.cern.ch"', 'section': 'Debug'}
 confChangesList.append(changeDict)
+testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} SUBMITTED
 lookFor "crab3@vocms059.cern.ch" statusLog.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # collector
@@ -232,8 +283,10 @@ changeDict = {'param': name, 'value': '"cmsgwms-collector-itb.cern.ch"', 'sectio
 confChangesList.append(changeDict)
 changeDict = {'param': 'scheddName', 'value': '"crab3@vocms068.cern.ch"', 'section': 'Debug'}
 confChangesList.append(changeDict)
+testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} SUBMITTED
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)

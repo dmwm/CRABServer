@@ -1,9 +1,11 @@
 from __future__ import division
 from __future__ import print_function
 
-global commonBashFunctions
 commonBashFunctions = """#!/bin/bash
 # a few utility functions for submission and check scripts
+# exit status meaning:
+# 0: OK   1: FAIL   2: TRY AGAIN LATER
+
 function checkStatus {
   # check that taskName has reached targetStatus and writes statusLog.txt
   # if target = SUBMITTED, accepts status COMPLETED as well
@@ -30,11 +32,11 @@ function checkStatus {
       ;;
     SUBMITTED)
       # both SUBMITTED or COMPLETED are OK
-      [ ${isSub} -eq 0 ] && [ ${isDone} -eq 0 ] && exit 2
+      [ ${isSub} -eq 0 ] && [ ${isDone} -eq 0 ] && exit 1
       ;;
     COMPLETED)
-      [ ${isSub} -eq 1 ] && exit 1  # ask for a check later on
-      [ ${isDone} -eq 0 ] && exit 2
+      [ ${isSub} -eq 1 ] && exit 2  # ask for a check later on
+      [ ${isDone} -eq 0 ] && exit 1
   esac
   return 0
 }
@@ -44,7 +46,7 @@ function lookFor {
   local string="$1"
   local file="$2"
   grep -q "${string}" ${file}
-  [ $? -ne 0 ] && exit 2
+  [ $? -ne 0 ] && exit 1
   return 0
 }
 
@@ -53,7 +55,7 @@ function lookInTarFor {
   local file="$1"
   local tarball="$2"
   tar tf ${tarball} | grep -q ${file}
-  [ $? -ne 0 ] && exit 2
+  [ $? -ne 0 ] && exit 1
   return 0
 }
 
@@ -63,12 +65,11 @@ function crabCommand() {
   local cmd="$1"
   local params="$2"
   crab $cmd $params 2>&1 | tee commandLog.txt
-  [ $? -ne 0 ] && exit 2
+  [ $? -ne 0 ] && exit 1
   return 0
 }
 """
 
-global standardConfig
 standardConfig = """
 # a simple configuration which is customized for each test
 #
@@ -124,13 +125,15 @@ def writePset():
 
 def writePset8cores():
     newLine = "\nprocess.options.numberOfThreads = cms.untracked.int32(8)\n"
-    for line in psetFileContent.split('/n'):
+    existingLine = None
+    for line in psetFileContent.split('\n'):
         if line.startswith('process.options'):
             existingLine = line
             break
-    psetFileContent = psetFileContent.replace(existingLine, existingLine+newLine)
+    if existingLine:
+        pset8c = psetFileContent.replace(existingLine, existingLine+newLine)
     with open('PSET-8cores.py', 'w') as fp:
-        fp.write(psetFileContent)
+        fp.write(pset8c)
     return
 
 def changeInConf(configuration=None, paramName=None, paramValue=None, configSection=None):
@@ -164,14 +167,15 @@ def writeConfigFile(testName=None, listOfDicts=None):
     return
 
 def writeValidationScript(testName=None, validationScript=None):
-    with open(testName + '-submit.sh', 'w') as fp:
+    with open(testName + '-check.sh', 'w') as fp:
         fp.write(commonBashFunctions)
-        fp.write('taskName = "$1"\n\n')
+        fp.write('taskName="$1"\n\n')
         fp.write(validationScript)
     return
 
-def writeSubmissionScript(testName=None, submissionScript=None):
-    with open(testName + '-submit.sh', 'w') as fp:
+def writeTestSubmitScript(testName=None, testSubmitScript=None):
+    with open(testName + '-testSubmit.sh', 'w') as fp:
         fp.write(commonBashFunctions)
-        fp.write(submissionScript)
+        fp.write('workDir="$1"\n\n')
+        fp.write(testSubmitScript)
     return
