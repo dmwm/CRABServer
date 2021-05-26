@@ -411,7 +411,7 @@ class DagmanCreator(TaskAction):
                 taskType = 'script'
             else:
                 taskType = 'cmsRun'
-            return taskType
+        return taskType
 
     def setCMS_Type(self, task):
         if self.isHammerCloud(task):
