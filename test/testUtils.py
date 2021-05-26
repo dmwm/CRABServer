@@ -77,6 +77,8 @@ standardConfig = """
 #
 import time
 from WMCore.Configuration import Configuration
+from CRABClient.UserUtilities import getUsername
+
 config = Configuration()
 
 config.section_('General')
@@ -155,9 +157,20 @@ def writePset8cores():
 def writeScriptExe():
     with open('SIMPLE-SCRIPT.sh', 'w') as fp:
         fp.write(simpleScriptExe)
-    os.chmod('SIMPLE-SCRIPT.sh', 0o744)
+    os.chmod('SIMPLE-SCRIPT.sh', 0o744)  # script needs to be executable
+    return
+
+def writeLumiMask():
+    lumiMaskForMC = '{"1": [[1,10],[20,25]]}'
+    with open('lumiMask.json', 'w') as fp:
+        fp.write(lumiMaskForMC)
+    return
 
 def changeInConf(configuration=None, paramName=None, paramValue=None, configSection=None):
+    """
+    changes (or add if absent) one line in the configuration to set paramName to paramValue
+    if paramValue=='REMOVE' it removes an existing line with that parameter instead
+    """
     newParamLine = 'config.%s.%s = %s\n' % (configSection, paramName, paramValue)
     # is this param already present in the configuration ?
     if paramName in configuration:
@@ -166,7 +179,10 @@ def changeInConf(configuration=None, paramName=None, paramValue=None, configSect
             if paramName in line:
                 existingLine = line
                 break
-        configuration = configuration.replace(existingLine, newParamLine)
+        if paramValue == 'REMOVE':
+            configuration = configuration.replace(existingLine, '')
+        else:
+            configuration = configuration.replace(existingLine, newParamLine)
     else:
         # add below section header
         cfgSectionHeader = "config.section_('%s')\n" % configSection
@@ -175,6 +191,11 @@ def changeInConf(configuration=None, paramName=None, paramValue=None, configSect
     return configuration
 
 def writeConfigFile(testName=None, listOfDicts=None):
+    """
+    write the configuration file for test testName by applying the list of changes
+    indicated in listOfDicts. Each dict indicates section/paramName/paramValue for
+    a param change wrt to the standard config.
+    """
     conf = standardConfig
     for d in listOfDicts:
         param = d['param']
