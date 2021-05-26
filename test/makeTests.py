@@ -92,6 +92,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "JOB AD: CMS_Type = \\"Test\\"" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: CMS_TaskType = \\"hctestnew\\"" ${workDir}/results/job_out.1.*.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
