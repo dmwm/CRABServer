@@ -32,7 +32,7 @@ The three files are:
 from __future__ import division
 from __future__ import print_function
 
-from testUtils import writePset, writePset8cores, writeScriptExe,\
+from testUtils import writePset, writePset8cores, writeScriptExe, writeLumiMask, \
     writeConfigFile, writeTestSubmitScript, writeValidationScript
 
 #from testUtils import *
@@ -40,6 +40,7 @@ from testUtils import writePset, writePset8cores, writeScriptExe,\
 writePset()
 writePset8cores()
 writeScriptExe()
+writeLumiMask()
 
 
 dummyTestScript = "\nexit 0\n"  #  a test which always returns success
@@ -53,7 +54,7 @@ dummyTestScript = "\nexit 0\n"  #  a test which always returns success
 
 # transferOutputs
 name = 'transferOutputs'
-changeDict = {'param': name, 'value': 'False', 'section': 'General'} # default is True
+changeDict = {'param': name, 'value': 'False', 'section': 'General'}  # default is True
 confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
@@ -68,7 +69,7 @@ writeValidationScript(testName=name, validationScript=validationScript)
 
 # transferLogs
 name = 'transferLogs'
-changeDict = {'param': name, 'value': 'True', 'section': 'General'} # default is False
+changeDict = {'param': name, 'value': 'True', 'section': 'General'}  # default is False
 confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
@@ -286,11 +287,208 @@ writeValidationScript(testName=name, validationScript=validationScript)
 # SECTION DATA
 #=============================
 
+# inputDBS
+name = 'inputDBS'
+confChangesList = []
+changeDict = {'param': name, 'value': '"phys03"', 'section': 'Data'}
+confChangesList.append(changeDict)
+changeDict = {'param': 'inputDataset', 'section': 'Data',
+              'value': '"/GenericTTbar/belforte-Stefano-Test-bb695911428445ed11a1006c9940df69/USER"'}
+confChangesList.append(changeDict)
+testSubmitScript = dummyTestScript
+# data for that dataset are not on disk anymore, can't expect this task to complete
+# but if it was sumitted, it means that DBS lookup was OK
+validationScript = """
+checkStatus ${taskName} SUBMITTED
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
+# useParent
+name = 'useParent'
+changeDict = {'param': name, 'value': 'True', 'section': 'Data'}
+confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
+#TODO make sure that parents were really read in cmsRun
+validationScript = """
+checkStatus ${taskName} COMPLETED
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
+# secondaryInputDataset
+name = 'secondaryInputDataset'
+changeDict = {'param': name,  'section': 'Data',
+              'value': "'/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/GEN-SIM-RAW'"}
+confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
+#TODO make sure that the secondary dataset was really added in cmsRun
+validationScript = """
+checkStatus ${taskName} COMPLETED
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
+
+# lumiMask-File
+name = 'lumiMaskFile'
+changeDict = {'param': 'lumiMask', 'value': '"lumiMask.json"', 'section': 'Data'}
+confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
+#TODO make sure that the lumimask was really applied
+validationScript = """
+checkStatus ${taskName} COMPLETED
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
+# lumiMask-URL
+name = 'lumiMaskUrl'
+confChangesList = []
+changeDict = {'param': 'lumiMask', 'section': 'Data',
+              'value': '"https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions16/13TeV/ReReco/Final/Cert_271036-284044_13TeV_ReReco_07Aug2017_Collisions16_JSON.txt"'}
+confChangesList.append(changeDict)
+changeDict = {'param': 'inputDataset', 'section': 'Data',
+              'value': '"/MuonEG/Run2016B-23Sep2016-v3/MINIAOD"'}
+confChangesList.append(changeDict)
+testSubmitScript = dummyTestScript
+#TODO make sure that the lumimask was really applied
+validationScript = """
+checkStatus ${taskName} COMPLETED
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
+# runRange
+name = 'runRange'
+confChangesList = []
+changeDict = {'param': name, 'section': 'Data',
+              'value': "'273150-273300,273410-273420'"}
+confChangesList.append(changeDict)
+changeDict = {'param': 'inputDataset', 'section': 'Data',
+              'value': '"/MuonEG/Run2016B-23Sep2016-v3/MINIAOD"'}
+confChangesList.append(changeDict)
+testSubmitScript = dummyTestScript
+#TODO make sure that the run range was really applied
+validationScript = """
+checkStatus ${taskName} COMPLETED
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
+# outLFNDirBase
+name = 'outLFNDirBase'
+changeDict = {'param': name, 'value': "'/store/user/%s/OLFNtest/Adir'%getUsername()", 'section': 'Data'}
+confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
+validationScript = """
+checkStatus ${taskName} COMPLETED
+crabCommand getoutput "--dump --jobids=1"
+lookFor "OLFNtest/Adir" commandLog.txt
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
+# ignoreLocality
+name = 'ignoreLocality'
+confChangesList = []
+changeDict = {'param': name, 'section': 'Data', 'value': "True"}
+confChangesList.append(changeDict)
+# pick a dataset which is NOT at CERN
+changeDict = {'param': 'inputDataset', 'section': 'Data',
+              'value': '"/MuonEG/Run2016B-23Sep2016-v3/MINIAOD"'}
+confChangesList.append(changeDict)
+changeDict = {'param': 'whitelist', 'section': 'Site', 'value': "['T2_CH_CERN']"}
+confChangesList.append(changeDict)
+testSubmitScript = dummyTestScript
+validationScript = """
+checkStatus ${taskName} COMPLETED
+crabCommand status "--long"
+lookFor "T2_CH_CERN" commandLog.txt
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
+# userInputFiles
+name = 'userInputFiles'
+confChangesList = []
+changeDict = {'param': name, 'section': 'Data', 'value':
+    "['/store/mc/HC/GenericTTbar/AODSIM/CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/00000/00B29645-2B76-E711-8802-FA163EB9B8B4.root',"
+    "'/store/mc/HC/GenericTTbar/AODSIM/CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/00000/0EC77D94-0976-E711-8D8A-FA163E75A20F.root']"}
+confChangesList.append(changeDict)
+changeDict = {'param': 'inputDataset', 'section': 'Data', 'value': 'REMOVE'}
+confChangesList.append(changeDict)
+changeDict = {'param': 'splitting', 'section': 'Data', 'value': "'FileBased'"}
+confChangesList.append(changeDict)
+testSubmitScript = dummyTestScript
+validationScript = """
+checkStatus ${taskName} COMPLETED
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
 
 #=============================
 # SECTION SITE
 #=============================
 
+# whitelist
+name = 'whitelist'
+changeDict = {'param': name, 'section': 'Site', 'value': "['T2_DE_DESY']"}
+confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
+validationScript = """
+checkStatus ${taskName} COMPLETED
+crabCommand getlog "--short --jobids=1"
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt
+lookFor "JOB AD: DESIRED_SITES = \\"T2_DE_DESY\\"" ${workDir}/results/job_out.1.*.txt
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
+
+# blacklist
+name = 'blacklist'
+# blacklist all sites but T1_US_
+changeDict = {'param': name, 'section': 'Site',
+              'value': "['T1_IT*','T1_DE*','T1_ES*','T1_FR*','T1_RU*','T1_UK*','T2_*','T3_*']"}
+confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
+validationScript = """
+checkStatus ${taskName} COMPLETED
+crabCommand getlog "--short --jobids=1"
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt
+lookFor "JOB AD: JOB_CMSSite = \\"T1_US_FNAL\\"" ${workDir}/results/job_out.1.*.txt
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
+# ignoreGlobalBlacklist
+name = 'ignoreGlobalBlacklist'
+changeDict = {'param': name, 'value': 'True', 'section': 'Site'}
+confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
+# there is no good way to check that the central black list is ignored,
+# mostly because it is a list which continuously changes. Best way
+# is to check TW log, which is not (easily) accessible from client
+# let's simply make sure that task completes
+validationScript = """
+checkStatus ${taskName} COMPLETED
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
 
 #=============================
 # SECTION DEBUG
