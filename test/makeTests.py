@@ -33,7 +33,6 @@ The three files are:
 from __future__ import division
 from __future__ import print_function
 
-import os
 from testUtils import writePset, writePset8cores, writeScriptExe, writeLumiMask, \
     writeConfigFile, writeTestSubmitScript, writeValidationScript
 
