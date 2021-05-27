@@ -364,9 +364,12 @@ changeDict = {'param': 'inputDataset', 'section': 'Data',
               'value': '"/MuonEG/Run2016B-23Sep2016-v3/MINIAOD"'}
 confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
-#TODO make sure that the lumimask was really applied
+# make sure that the lumimask was really applied
 validationScript = """
 checkStatus ${taskName} COMPLETED
+crabCommand getlog "--short --jobids=1"
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt
+lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273158\\"" ${workDir}/results/job_out.1.*.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
