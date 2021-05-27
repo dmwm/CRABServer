@@ -322,7 +322,7 @@ writeValidationScript(testName=name, validationScript=validationScript)
 
 # secondaryInputDataset
 name = 'secondaryInputDataset'
-changeDict = {'param': name,  'section': 'Data',
+changeDict = {'param': name, 'section': 'Data',
               'value': "'/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/GEN-SIM-RAW'"}
 confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
