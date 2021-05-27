@@ -16,7 +16,7 @@ function checkStatus {
   local taskName="$1"
   local targetStatus="$2"
 
-  crab remake --task ${taskName} 2>&1 | tee remakeLog.txt 
+  crab remake --task ${taskName} --instance=prod 2>&1 | tee remakeLog.txt 
   [ $? -ne 0 ] && exit 1  # if remake fails, abort
   grep -q Success remakeLog.txt || exit 1  # if log does not contain "Success" string, abort
   workDir=`grep Success remakeLog.txt | awk '{print $NF}'`
