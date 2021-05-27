@@ -87,7 +87,6 @@ name = 'activity'
 changeDict = {'param': name, 'value': '"hctestnew"', 'section': 'General'}
 confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
-#TODO this is not the correct check, need to dig into how activity is passed around
 validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
