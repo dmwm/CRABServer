@@ -1,6 +1,7 @@
 """
 An almost standalone python script which creates a set of files for CRAB validation
 Requires the testUtils.py file to be placed in same directory
+Requires the REST_instance environment variable to be set to a known instance
 The script creates three files for each test, named as the name of
 the configuration parameter they aim to checkout as per
 https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3ConfigurationFile
@@ -34,8 +35,6 @@ from __future__ import print_function
 
 from testUtils import writePset, writePset8cores, writeScriptExe, writeLumiMask, \
     writeConfigFile, writeTestSubmitScript, writeValidationScript
-
-#from testUtils import *
 
 writePset()
 writePset8cores()
@@ -87,7 +86,6 @@ name = 'activity'
 changeDict = {'param': name, 'value': '"hctestnew"', 'section': 'General'}
 confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
-#TODO this is not the correct check, need to dig into how activity is passed around
 validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
@@ -311,9 +309,12 @@ name = 'useParent'
 changeDict = {'param': name, 'value': 'True', 'section': 'Data'}
 confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
-#TODO make sure that parents were really read in cmsRun
+# make sure that parents were really read by cmsRun
 validationScript = """
 checkStatus ${taskName} COMPLETED
+crabCommand getlog "--short --jobids=1"
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt
+lookFor "opened.*GenericTTbar/GEN-SIM-RAW" ${workDir}/results/job_out.1.*.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -325,9 +326,12 @@ changeDict = {'param': name,  'section': 'Data',
               'value': "'/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/GEN-SIM-RAW'"}
 confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
-#TODO make sure that the secondary dataset was really added in cmsRun
+# make sure that the secondary dataset was really used in cmsRun
 validationScript = """
 checkStatus ${taskName} COMPLETED
+crabCommand getlog "--short --jobids=1"
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt
+lookFor "opened.*GenericTTbar/GEN-SIM-RAW" ${workDir}/results/job_out.1.*.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)

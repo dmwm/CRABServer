@@ -16,7 +16,7 @@ function checkStatus {
   local taskName="$1"
   local targetStatus="$2"
 
-  crab remake --task ${taskName} --instance=prod 2>&1 | tee remakeLog.txt 
+  crab remake --task ${taskName} --instance=REST_Instance 2>&1 | tee remakeLog.txt 
   [ $? -ne 0 ] && exit 1  # if remake fails, abort
   grep -q Success remakeLog.txt || exit 1  # if log does not contain "Success" string, abort
   workDir=`grep Success remakeLog.txt | awk '{print $NF}'`
@@ -82,7 +82,7 @@ from CRABClient.UserUtilities import getUsername
 config = Configuration()
 
 config.section_('General')
-config.General.instance = 'prod'
+config.General.instance = 'REST_Instance'
 config.General.workArea = '/tmp/crabTestConfig'
 config.General.requestName = REQUESTNAME
 
@@ -135,6 +135,14 @@ echo "============ SB CMSRUN exit code was: $ExeExit ==" >> My_output.txt
 echo "============ SB ALL DONE  =======================" >> My_output.txt
 cat My_output.txt
 """
+
+if not os.getenv('REST_Instance'):
+    print("Please set REST_Instance env.var. before running")
+    exit(1)
+
+restInstance = os.getenv('REST_Instance')
+commonBashFunctions = commonBashFunctions.replace('REST_Instance', restInstance)
+standardConfig = standardConfig.replace('REST_Instance', restInstance)
 
 def writePset():
     with open('PSET.py', 'w') as fp:
