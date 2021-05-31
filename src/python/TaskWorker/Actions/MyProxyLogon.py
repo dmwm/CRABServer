@@ -78,9 +78,10 @@ class MyProxyLogon(TaskAction):
             del proxycfg['userName']
             try:
                 (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
-            except TaskWorkerException:
+            except TaskWorkerException as ex:
                 self.logger.error("proxy retrieval from %s failed with DN hash as credential name.",
                                   proxycfg['myProxySvr'])
+                raise TaskWorkerException(str(ex))
         #  minimal sanity check. Submission will fail if there's no group
         if not usergroups:
             raise TaskWorkerException('Could not retrieve VOMS groups list from %s' % userproxy)
