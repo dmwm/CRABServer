@@ -146,16 +146,17 @@ class HTTPRequests(dict):
         caCertPath = self.getCACertPath()
         url = 'https://' + self['host'] + uri
 
-        #retries this up at least 3 times, or up to self['retry'] times for range of exit codes
-        nRetries = max(3, self['retry'])
-        for i in range(nRetries):
+        # retries this up at least 3 times, or up to self['retry'] times for range of exit codes
+        # retries are counted AFTER 1st try, so call is made up to nRetries+1 times !
+        nRetries = max(2, self['retry'])
+        for i in range(nRetries +1):
             try:
                 response, datares = self['conn'].request(url, data, encode=True, headers=headers, verb=verb, doseq=True,
                                                          ckey=self['key'], cert=self['cert'], capath=caCertPath,
                                                          verbose=self['verbose'])
             except Exception as ex:
-                #add here other temporary errors we need to retry
-                if (i < 3) or (retriableError(ex) and (i < self['retry'])):
+                # add here other temporary errors we need to retry
+                if (i < 2) or (retriableError(ex) and (i < self['retry'])):
                     sleeptime = 20 * (i + 1) + random.randint(-10, 10)
                     msg = "Sleeping %s seconds after HTTP error. Error details:  " % sleeptime
                     if hasattr(ex, 'headers'):
@@ -165,10 +166,11 @@ class HTTPRequests(dict):
                     self.logger.debug(msg)
                     time.sleep(sleeptime)
                 else:
+                    # this was the last retry
                     msg = "Fatal error trying to connect to %s using %s. Error details: " % (url, data)
                     msg = msg+str(ex.headers) if hasattr(ex, 'headers') else msg+str(ex)
                     self.logger.error(msg)
-                    raise #really exit and raise exception if this was the last retry or the exit code is not among the list of the one we retry
+                    raise
 
             else:
                 break
