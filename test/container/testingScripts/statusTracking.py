@@ -1,15 +1,10 @@
 #! /usr/bin/env python
 
 import os
-import json
 from httplib import HTTPException
 from CRABAPI.RawCommand import crabCommand
 from CRABClient.ClientExceptions import ClientException
-# silencing the CRAB client
-from CRABClient.UserUtilities import setConsoleLogLevel, LOGLEVEL_MUTE
-
-#setConsoleLogLevel(LOGLEVEL_MUTE)
-
+from __future__ import division
 
 def crab_cmd(configuration):
 
@@ -17,10 +12,10 @@ def crab_cmd(configuration):
         output = crabCommand(configuration['cmd'], **configuration['args'])
         return output
     except HTTPException as hte:
-        print 'Failed', configuration['cmd'], 'of the task: %s' % (hte.headers)
+        print('Failed', configuration['cmd'], 'of the task: %s' % (hte.headers))
     except ClientException as cle:
-        print 'Failed', configuration['cmd'], 'of the task: %s' % (cle)
-
+        print('Failed', configuration['cmd'], 'of the task: %s' % (cle))
+        
 
 def parse_result(listOfTasks):
 
