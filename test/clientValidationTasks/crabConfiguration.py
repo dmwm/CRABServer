@@ -1,4 +1,4 @@
-from CRABClient.UserUtilities import config#, getUsernameFromSiteDB
+from CRABClient.UserUtilities import config
 config = config()
 
 config.section_("General")
@@ -17,7 +17,7 @@ config.Data.inputDBS = 'global'
 config.Data.splitting = 'FileBased'
 config.Data.unitsPerJob = 10
 config.Data.publication = True
-config.Data.outputDatasetTag = 'CRAB3_tutorial_May2015_MC_analysis'
+config.Data.outputDatasetTag = 'CRAB3_analysis'
 
 config.Site.storageSite = 'T2_CH_CERN'
 config.Debug.scheddName = 'crab3@vocms059.cern.ch'
