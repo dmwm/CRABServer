@@ -244,12 +244,11 @@ def validateLFNs(path, outputFiles):
             fileName = "%s_%s" % (origFile, jobId)
         testLfn = os.path.join(path, dirCounter, fileName)
         Lexicon.lfn(testLfn)  # will raise if testLfn is not a valid lfn
-        # since Lexicon does not have lenght check, do it manually here
-        # max LNF length is 500, allow for addition of '/temp' for local stageout
-        if len(testLfn) > 495 :
+        # since Lexicon does not have lenght check, do it manually here.
+        if len(testLfn) > 500:
             msg = "\nYour task speficies an output LFN %d-char long " % len(testLfn)
-            msg += "\n which exceeds maximum length of 495"
-            msg += "\n and therefore can not be published in DBS"
+            msg += "\n which exceeds maximum length of 500"
+            msg += "\n and therefore can not be handled in our DataBase"
             raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
     return
 
@@ -567,14 +566,14 @@ class DagmanCreator(TaskAction):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
-        if task['tm_publication'] == 'T':
-            try:
-                validateLFNs(dest, outfiles)
-            except AssertionError as ex:
-                msg = "\nYour task speficies an output LFN which fails validation in"
-                msg += "\n WMCore/Lexicon and therefore can not be published in DBS"
-                msg += "\nError detail: %s" % (str(ex))
-                raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+        try:
+            # use temp_dest since it the longest path and overall LFN has a length limit to fit in DataBase
+            validateLFNs(temp_dest, outfiles)
+        except AssertionError as ex:
+            msg = "\nYour task speficies an output LFN which fails validation in"
+            msg += "\n WMCore/Lexicon and therefore can not be handled in our DataBase"
+            msg += "\nError detail: %s" % (str(ex))
+            raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
         groupid = len(siteinfo['group_sites'])
         siteinfo['group_sites'][groupid] = list(availablesites)
         siteinfo['group_datasites'][groupid] = list(datasites)
