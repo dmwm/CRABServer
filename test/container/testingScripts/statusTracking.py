@@ -1,10 +1,11 @@
 #! /usr/bin/env python
 
+from __future__ import division
+
 import os
 from httplib import HTTPException
 from CRABAPI.RawCommand import crabCommand
 from CRABClient.ClientExceptions import ClientException
-from __future__ import division
 
 def crab_cmd(configuration):
 
