@@ -47,7 +47,7 @@ immediateCheck(){
 
 if [ "${Client_Validation_Suite}" = true ]; then
 	cd repos/CRABServer/test/clientValidationTasks/
-	filesToSubmit=`find ./files/ -type f -name '*.py' ! -name '*pset*'`
+	filesToSubmit=`find . -type f -name '*.py' ! -name '*pset*'`
 	submitTasks "${filesToSubmit}" "CV"
 	cd ${WORK_DIR}
 fi
