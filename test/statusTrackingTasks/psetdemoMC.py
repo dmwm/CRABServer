@@ -4,6 +4,7 @@
 # Source: /local/reps/CMSSW/CMSSW/Configuration/Applications/python/ConfigBuilder.py,v 
 # with command line options: MinBias_8TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 10 
 # --relval 9000,300 --eventcontent RAWSIM --io MinBias.io --python MinBias.py --no_exec --fileout minbias.root
+from __future__ import division
 
 import FWCore.ParameterSet.Config as cms
 

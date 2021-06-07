@@ -1,3 +1,4 @@
+from __future__ import division
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process('NoSplit')
