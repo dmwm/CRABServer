@@ -2,8 +2,7 @@
 
 
 {
-  #set -x
-
+  set +x
   # load the logging functions
   if [ -f /lib/lsb/init-functions ]; then
     . /lib/lsb/init-functions
@@ -17,9 +16,14 @@
   STORAGE_SITE="T2_CH_CERN"
   PROXY=$(voms-proxy-info -path 2>&1)
   OUTPUTDIR="$PWD/logdir"
-  WAIT_IF_NOT_RUNL=0
-  RETRIES=3
-  TASK_TO_SUBMIT="taskToSubmit.py"
+  TASK_TO_SUBMIT="crabConfiguration.py"
+  TASK_DIR="repos/CRABServer/test/clientValidationTasks"
+
+  #list of commands to execute for PR testing
+  PR_TEST=(submit createmyproxy checkusername checkwrite tasks status)  
+  #list of commands to execute for full testing
+  FULL_TEST=(createmyproxy checkusername checkwrite tasks preparelocal status report getlog getoutput)
+  TEST_TO_EXECUTE=${TEST_LIST}[@]
 
 
   function logMsg() {
@@ -57,21 +61,26 @@
   function checkThisCommand() {
     local cmd="$1"
     local parms="$2"
-    echo -ne "TEST_COMMAND: crab $cmd $parms \n"
-    crab $cmd $parms 2>&1 > $TMP_BUFFER
-    if [ $? != 0 ]; then
-      error=`cat $TMP_BUFFER`
-      if [[ $error == *"Cannot retrieve the status_cache file"* ]]; then
-        echo "TEST_RESULT: `logMsg warning`"
-      else
-        echo "TEST_RESULT: `logMsg failure`"
-      fi
+
+    if [[ ! " ${!TEST_TO_EXECUTE} " =~ " ${cmd} " ]]; then
+         :
     else
-      echo "TEST_RESULT: `logMsg success`"
-    fi
-    echo "TEST_MESSAGE:"
-    cat $TMP_BUFFER
-    echo -ne "\n\n\n"
+    	echo -ne "TEST_COMMAND: crab $cmd $parms \n"
+    	crab $cmd $parms 2>&1 > $TMP_BUFFER
+    	if [ $? != 0 ]; then
+      		error=`cat $TMP_BUFFER`
+      		if [[ $error == *"Cannot retrieve the status_cache file"* ]]; then
+        		echo "TEST_RESULT: `logMsg warning`"
+      		else
+        		echo "TEST_RESULT: `logMsg failure`"
+      		fi
+    	else
+      		echo "TEST_RESULT: `logMsg success`"
+    	fi
+    	echo "TEST_MESSAGE:"
+    	cat $TMP_BUFFER
+    	echo -ne "\n\n\n"
+     fi
   }
 
 
@@ -126,8 +135,20 @@
   # START CRABCLIENT VALIDATION
   ##################################################
 
-  echo $REST_Instance
-  echo $PROXY
+  ### 0. test crab submit -h, --proxy=PROXY
+  cd ${TASK_DIR}
+  sed -i -e "/config.General.instance*/c\config.General.instance = \"${REST_Instance}\"" ${TASK_TO_SUBMIT}
+  USETHISPARMS=()
+  INITPARMS="--config --proxy"
+  feedParms "$TASK_TO_SUBMIT $PROXY"
+  for parm in "${USETHISPARMS[@]}"; do
+      checkThisCommand submit "$parm"
+  done
+  SUBMITTED_TASK=`ls | grep crab_* | cut -d' ' -f10`
+  PR_PROJDIR="${TASK_DIR}/${SUBMITTED_TASK}"
+  cd ${WORK_DIR}
+  sleep 100
+
 
   ### 1. test crab createmyproxy -h, --proxy=PROXY, --days=100
   USETHISPARMS=()
@@ -174,8 +195,6 @@
 
   TASKTOTRACK=`cat /artifacts/submitted_tasks`
   PROJDIR=`crab remake --task=$TASKTOTRACK --instance=$REST_Instance | grep 'Finished remaking project directory' | awk '{print $6}'`
-  echo $PROJDIR
-
 
   ### 5. test crab preparelocal --proxy=PROXY --dir=PROJDIR
   USETHISPARMS=()
@@ -190,12 +209,12 @@
   USETHISPARMS=()
   INITPARMS="'--long|--verboseErrors|' --proxy --dir"
   for opt in 1 2 3 4; do
-    feedParms "$opt $PROXY $PROJDIR"
+    feedParms "$opt $PROXY ${PROJDIR:-$PR_PROJDIR}"
   done
   INITPARMS="--sort  --proxy --dir"
   SORTING=('state' 'site' 'runtime' 'memory' 'cpu' 'retries' 'waste' 'exitcode')
   for st in "${SORTING[@]}"; do
-    feedParms "$st $PROXY $PROJDIR"
+    feedParms "$st $PROXY ${PROJDIR:-$PR_PROJDIR}"
   done
   for param in "${USETHISPARMS[@]}"; do
     checkThisCommand status "$param"
@@ -242,6 +261,6 @@
     checkThisCommand getoutput "$param"
   done
 
-  #set +x
+  set -x
 } 2>&1 | tee /artifacts/client-validation-$(date "+%s").log
 

@@ -7,9 +7,10 @@
 #Variabiles ${REST_Instance}, ${Client_Validation_Suite}, ${Client_Configuration_Validation} and ${Task_Submission_Status_Tracking} comes from
 #the Jenkins CRABServer_ExecuteTests configuration.
 
+set -o
+
 #setup CRABClient
 source setupCRABClient.sh
-
 
 #submit tasks and based on the exit code add task name / file name respectively to submitted_tasks or failed_tasks file.
 submitTasks(){
@@ -37,7 +38,7 @@ immediateCheck(){
 	echo ${task}
 	test_to_execute=`echo "${task}" | grep -oP '(?<=_crab_).*(?=)'`
         task_dir=${project_dir}/${test_to_execute}
-	bash ${test_to_execute}-testSubmit.sh ${task_dir} && \
+	bash -x ${test_to_execute}-testSubmit.sh ${task_dir} && \
                                 echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> /artifacts/successful_tests || \
                                 echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> /artifacts/failed_tests	
   done
@@ -46,6 +47,7 @@ immediateCheck(){
 
 
 if [ "${Client_Validation_Suite}" = true ]; then
+	echo -e "Starting task submission for Client Validation testing.\n"
 	cd repos/CRABServer/test/clientValidationTasks/
 	filesToSubmit=`find . -type f -name '*.py' ! -name '*pset*'`
 	submitTasks "${filesToSubmit}" "CV"
@@ -53,6 +55,7 @@ if [ "${Client_Validation_Suite}" = true ]; then
 fi
 
 if [ "${Client_Configuration_Validation}" = true ]; then
+	echo -e "Starting task submission for Client Configuration Validation testing.\n"
 	mkdir -p tmpWorkDir
 	cd tmpWorkDir
 	python /data/CRABTesting/testingScripts/repos/CRABServer/test/makeTests.py 
@@ -64,6 +67,7 @@ if [ "${Client_Configuration_Validation}" = true ]; then
 fi
 
 if [ "${Task_Submission_Status_Tracking}" = true ]; then
+	echo -e "Starting task submission for Status Tracking testing.\n"
 	cd repos/CRABServer/test/statusTrackingTasks/
         filesToSubmit=`find . -type f -name '*.py' ! -name '*pset*'`
         submitTasks "${filesToSubmit}" "TS"
