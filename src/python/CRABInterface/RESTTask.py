@@ -336,7 +336,7 @@ class RESTTask(RESTEntity):
 
         row = self.Task.ID_tuple(*next(self.api.query(None, None, self.Task.ID_sql, taskname=workflow)))
         outputdatasets = literal_eval(row.output_dataset.read() if row.output_dataset else '[]')
-        outputdatasets = str(list(set(outputdatasets + kwargs['outputdatasets'])))
+        outputdatasets = str(list(set(outputdatasets + literal_eval(str(kwargs['outputdatasets'])))))
 
         self.api.modify(self.Task.SetUpdateOutDataset_sql, tm_output_dataset=[outputdatasets], tm_taskname=[workflow])
 
