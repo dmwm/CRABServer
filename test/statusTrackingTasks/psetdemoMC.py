@@ -1,3 +1,4 @@
+# pylint: disable=W0212
 # Auto generated configuration file
 # using: 
 # Revision: 1.19 
