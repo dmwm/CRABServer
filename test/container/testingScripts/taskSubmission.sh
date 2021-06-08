@@ -37,7 +37,7 @@ immediateCheck(){
 	echo ${task}
 	test_to_execute=`echo "${task}" | grep -oP '(?<=_crab_).*(?=)'`
         task_dir=${project_dir}/${test_to_execute}
-	bash ${test_to_execute}-testSubmit.sh ${task_dir} && \
+	bash -x ${test_to_execute}-testSubmit.sh ${task_dir} && \
                                 echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> /artifacts/successful_tests || \
                                 echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> /artifacts/failed_tests	
   done
