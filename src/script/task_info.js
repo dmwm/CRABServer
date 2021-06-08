@@ -179,7 +179,7 @@ $(document).ready(function() {
                         // ['/A/B/C']
                         re = /\['(.+)'\]/;
                         if (taskInfo.result[i] !== "None") {
-                            outputDataset = taskInfo.result[i].match(re)[1];
+                           outputDataset = taskInfo.result[i].replace('b\'','\'').match(re)[1];
                         }
                         break;
                     default:
