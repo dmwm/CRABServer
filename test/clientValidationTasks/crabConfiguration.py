@@ -5,7 +5,7 @@ config = config()
 
 config.section_("General")
 config.General.transferOutputs = True
-config.General.transferLogs = False
+config.General.transferLogs = True
 config.General.instance = 'test2'
 
 config.section_("JobType")
