@@ -305,6 +305,52 @@ def executeCommand(command):
     exitcode = process.returncode
     return out, err, exitcode
 
+def execute_command(command=None, logger=None, timeout=None, redirect=True):
+    """
+    execute command with optional logging and timeout.
+    Redirection of std* can be turned off if the command will need to interact with caller
+    writing messages and/or asking for input, like if needs to get a passphrase to access
+    usercert/key for (my)proxy creation as in
+    https://github.com/dmwm/WMCore/blob/75c5abd83738a6a3534027369cd6e109667de74e/src/python/WMCore/Credential/Proxy.py#L383-L385
+    Should eventually be used everywhere in place of executeCommand above
+    but to be safe let's avoid simply replacing the simpler executeCommand
+    Imported here from WMCore/Credential/Proxy.py
+    """
+
+    stdout, stderr, rc = None, None, 99999
+    if logger:
+        logger.debug('Executing command :\n %s' % command)
+    if redirect:
+        proc = subprocess.Popen(
+            command, shell=True, cwd=os.environ['PWD'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+        )
+    else:
+        proc = subprocess.Popen(command, shell=True, cwd=os.environ['PWD'])
+
+    t_beginning = time.time()
+    while True:
+        if proc.poll() is not None:
+            break
+        seconds_passed = time.time() - t_beginning
+        if timeout and seconds_passed > timeout:
+            proc.terminate()
+            logger.error('Timeout in %s execution.' % command)
+            return stdout, rc
+        time.sleep(0.1)
+
+    rc = proc.returncode
+    out, err = proc.communicate()
+    # for Py3 compatibility
+    stdout = out.decode(encoding='UTF-8') if out else ''
+    stderr = err.decode(encoding='UTF-8') if err else ''
+    if logger:
+        logger.debug('output : %s\n error: %s\n retcode : %s' % (stdout, stderr, rc))
+
+    return stdout, stderr, rc
+
 
 def isFailurePermanent(reason, gridJob=False):
     """ Method that decides whether a failure reason should be considered as a
