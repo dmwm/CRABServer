@@ -144,10 +144,17 @@
   for parm in "${USETHISPARMS[@]}"; do
       checkThisCommand submit "$parm"
   done
-  SUBMITTED_TASK=`ls | grep crab_* | cut -d' ' -f10`
-  PR_PROJDIR="${TASK_DIR}/${SUBMITTED_TASK}"
-  cd ${WORK_DIR}
-  sleep 100
+
+  #depending on which test should be executed, set PROJDIR value
+  if [ ${TEST_LIST} = "PR_TEST" ]; then
+	SUBMITTED_TASK=`ls | grep crab_* | cut -d' ' -f10`
+	PROJDIR="${TASK_DIR}/${SUBMITTED_TASK}"
+	cd ${WORK_DIR}
+	sleep 100
+  else
+  	TASKTOTRACK=`cat /artifacts/submitted_tasks`
+  	PROJDIR=`crab remake --task=$TASKTOTRACK --instance=$REST_Instance | grep 'Finished remaking project directory' | awk '{print $6}'`
+  fi
 
 
   ### 1. test crab createmyproxy -h, --proxy=PROXY, --days=100
@@ -193,8 +200,6 @@
   # START CHECKING SUBMITTED TASK'S STATUS
   ##################################################
 
-  TASKTOTRACK=`cat /artifacts/submitted_tasks`
-  PROJDIR=`crab remake --task=$TASKTOTRACK --instance=$REST_Instance | grep 'Finished remaking project directory' | awk '{print $6}'`
 
   ### 5. test crab preparelocal --proxy=PROXY --dir=PROJDIR
   USETHISPARMS=()
@@ -209,12 +214,12 @@
   USETHISPARMS=()
   INITPARMS="'--long|--verboseErrors|' --proxy --dir"
   for opt in 1 2 3 4; do
-    feedParms "$opt $PROXY ${PROJDIR:-$PR_PROJDIR}"
+    feedParms "$opt $PROXY ${PROJDIR}"
   done
   INITPARMS="--sort  --proxy --dir"
   SORTING=('state' 'site' 'runtime' 'memory' 'cpu' 'retries' 'waste' 'exitcode')
   for st in "${SORTING[@]}"; do
-    feedParms "$st $PROXY ${PROJDIR:-$PR_PROJDIR}"
+    feedParms "$st $PROXY ${PROJDIR}"
   done
   for param in "${USETHISPARMS[@]}"; do
     checkThisCommand status "$param"
