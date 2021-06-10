@@ -741,7 +741,7 @@ def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
     try:
         uploadToS3ViaPSU(filepath=filepath, preSignedUrlFields=preSignedUrl, logger=logger)
     except Exception as e:
-        raise Exception('Upload to S3 failed\n%s', str(e))
+        raise Exception('Upload to S3 failed\n%s' % str(e))
     logger.debug('%s %s successully uploaded to S3', objecttype, filepath)
     return
 
@@ -821,7 +821,7 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
     logger.debug('exitcode: %s\nstdout: %s\nstderr: %s', exitcode, stdout, stderr)
 
     if exitcode != 0:
-        raise Exception('Failed to upload file. Stderr is:\n%s' % stderr)
+        raise Exception('Failed to upload file with %s. stderr is:\n%s' % (uploadCommand, stderr))
     return
 
 def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
@@ -851,8 +851,8 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
     logger.debug('exitcode: %s\nstdout: %s\nstderr: %s', exitcode, stdout, stderr)
 
     if exitcode != 0:
-        raise Exception('Download command failed. Stderr is:\n%s' % stderr)
+        raise Exception('Download command %s failed. stderr is:\n%s' % (downloadCommand, stderr))
     if not os.path.exists(filepath) :
-        raise Exception("Download failure. File %s was not created", filepath)
+        raise Exception("Download failure with %s. File %s was not created" % (downloadCommand, filepath))
 
     return
