@@ -95,7 +95,7 @@ class RESTCache(RESTEntity):
         # make sure any trailing '/' in the cacheSSL url does not end in the bucket name
         cacheSSL = cacheSSL.rstrip('/')
         bucket = cacheSSL.split('/')[-1]
-        endpoint = cacheSSL.rstrip(bucket).rstrip('/')
+        endpoint = 'https://s3.cern.ch'  # hardcode this. In case it can be moved to the s3Dict in config
         self.s3_bucket = bucket
         self.s3_client = boto3.client('s3', endpoint_url=endpoint, aws_access_key_id=access_key,
                                       aws_secret_access_key=secret_key, verify=False)
