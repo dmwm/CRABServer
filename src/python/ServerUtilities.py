@@ -22,7 +22,7 @@ import subprocess
 import contextlib
 from http.client import HTTPException
 if sys.version_info >= (3, 0):
-    from urllib.parse import urlencode, quote
+    from urllib.parse import urlencode, quote  # pylint: disable=no-name-in-module
 if sys.version_info < (3, 0):
     from urllib import urlencode, quote
 
