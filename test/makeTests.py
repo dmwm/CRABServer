@@ -75,7 +75,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD: CRAB_SaveLogs = 0" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: CRAB_SaveLogsFlag = 1" ${workDir}/results/job_out.1.*.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -142,7 +142,7 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getoutput --jobids=1"
+crabCommand getoutput "--jobids=1"
 lookFor "Success in retrieving output_1.root " commandLog.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
@@ -348,7 +348,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "== JOB AD: CRAB_AlgoArgs.*\\"lumis\\": \\[\\"1,10\\"\\]" ${workDir}/results/job_out.1.*.txt
+lookFor "== JOB AD: CRAB_AlgoArgs.*\\"lumis\\": \\[\\"1,10" ${workDir}/results/job_out.1.*.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -473,10 +473,13 @@ writeValidationScript(testName=name, validationScript=validationScript)
 
 # blacklist
 name = 'blacklist'
-# blacklist all sites but T1_US_
+# blacklist all sites but T1_US_ and disable overflow !
+confChangesList = []
 changeDict = {'param': name, 'section': 'Site',
               'value': "['T1_IT*','T1_DE*','T1_ES*','T1_FR*','T1_RU*','T1_UK*','T2_*','T3_*']"}
-confChangesList = [changeDict]
+confChangesList.append(changeDict)
+changeDict = {'section':'Debug', 'param': 'extraJDL', 'value': "['+CMS_ALLOW_OVERFLOW=False']"}
+confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED

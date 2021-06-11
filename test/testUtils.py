@@ -10,7 +10,7 @@ commonBashFunctions = """#!/bin/bash
 
 function checkStatus {
   # check that taskName has reached targetStatus and writes statusLog.txt
-  # if target = SUBMITTED, accepts status COMPLETED as well
+  # if target = SUBMITTED, accepts status COMPLETED or FAILED as well
   # if target = COMPLETED and status is SUBMITTED, ask for retry after delay
   # Fail test if command fails or status is not good
   local taskName="$1"
@@ -25,16 +25,18 @@ function checkStatus {
 
   local isSub=0
   local isDone=0
+  local isFailed=0
   grep -q "Status on the scheduler:.*SUBMITTED" statusLog.txt 2>&1 && isSub=1
   grep -q "Status on the scheduler:.*COMPLETED" statusLog.txt 2>&1 && isDone=1
+  grep -q "Status on the scheduler:.*FAILED" statusLog.txt 2>&1 && isFailed=1
 
   case $targetStatus in
     NONE)
       # no check is needed
       ;;
     SUBMITTED)
-      # both SUBMITTED or COMPLETED are OK
-      [ ${isSub} -eq 0 ] && [ ${isDone} -eq 0 ] && exit 1
+      # any of SUBMITTED or COMPLETED or FAILED are OK
+      [ ${isSub} -eq 0 ] && [ ${isDone} -eq 0 ] && [ ${isFailed} -eq 0 ] && exit 1
       ;;
     COMPLETED)
       [ ${isSub} -eq 1 ] && exit 2  # ask for a check later on
