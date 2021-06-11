@@ -288,13 +288,25 @@ $(document).ready(function() {
             errHandler(new TaskInfoUndefinedError());
             return;
         }
-
-        var url = cacheUrl + "/logfile?name=" + inputTaskName + "_TaskWorker.log&username=" + username;
+        var S3,url;
+        if(cacheUrl.indexOf("S3")!=-1)
+            S3=true;
+        else
+            S3=false;
+        
+        if(S3==true)
+            url=cacheUrl.split("S3")[0]  + "crabserver/" + dbVersion + "/cache?subresource=retrieve&objecttype=twlog&taskname="+inputTaskName;
+        else
+            url = cacheUrl + "/logfile?name=" + inputTaskName + "_TaskWorker.log&username=" + username;
 
         function queryApi(url) {
             $.ajax(url)
                 .done(function(data) {
-                    $("#taskworker-log-paragraph").text(data);
+                    if(S3==true)
+                        $("#taskworker-log-paragraph").text(data.result);
+                    else
+                        $("#taskworker-log-paragraph").text(data);
+                
                 })
                 .fail(function(xhr) {
                     var headers = xhr.getAllResponseHeaders().toLowerCase();
