@@ -7,12 +7,13 @@ This contains some utility methods to share between the server and the client, o
 from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
+from past.builtins import basestring
 
 import os
+import sys
 import re
 import time
 import fcntl
-import urllib
 import hashlib
 import calendar
 import datetime
@@ -20,6 +21,10 @@ import traceback
 import subprocess
 import contextlib
 from http.client import HTTPException
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode, quote
+if sys.version_info < (3, 0):
+    from urllib import urlencode, quote
 
 BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
 FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
@@ -461,7 +466,7 @@ def encodeRequest(configreq, listParams=None):
     for lparam in listParams:
         if lparam in configreq:
             if len(configreq[lparam]) > 0:
-                encodedLists += ('&%s=' % lparam) + ('&%s=' % lparam).join(map(urllib.quote, configreq[lparam]))
+                encodedLists += ('&%s=' % lparam) + ('&%s=' % lparam).join(map(quote, configreq[lparam]))
             del configreq[lparam]
     if isinstance(configreq, dict):
         #Make sure parameters we encode are streing. Otherwise u'IamAstring' may become 'uIamAstring' in the DB
@@ -470,7 +475,7 @@ def encodeRequest(configreq, listParams=None):
                 configreq[k] = str(v)
             if isinstance(v, list):
                 configreq[k] = [str(x) if isinstance(x, basestring) else x for x in v]
-    encoded = urllib.urlencode(configreq) + encodedLists
+    encoded = urlencode(configreq) + encodedLists
     return str(encoded)
 
 
