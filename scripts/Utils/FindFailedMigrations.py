@@ -64,7 +64,7 @@ def main():
     args = parser.parse_args()
     logFile = os.path.abspath(args.file)
 
-    migUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSMigrate'
+    migUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'
     apiMig = DbsApi(url=migUrl)
 
     failedMigrations = readAndParse(logFile, apiMig)
