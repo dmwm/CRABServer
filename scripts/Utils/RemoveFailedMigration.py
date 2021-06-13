@@ -16,7 +16,7 @@ def main():
     args = parser.parse_args()
     migrationId = int(args.id)
 
-    migUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSMigrate'
+    migUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'
     apiMig = DbsApi(url=migUrl)
 
     status = apiMig.statusMigration(migration_rqst_id=migrationId)
@@ -57,8 +57,8 @@ def main():
     print("\n  ===============\n")
     print("import CRABClient")
     print("from dbs.apis.dbsClient import DbsApi")
-    print("globUrl='https://cmsweb.cern.ch/dbs/prod/global/DBSReader'")
-    print("migUrl='https://cmsweb.cern.ch/dbs/prod/phys03/DBSMigrate'")
+    print("globUrl='https://cmsweb-prod.cern.ch/dbs/prod/global/DBSReader'")
+    print("migUrl='https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'")
     print("apiMig = DbsApi(url=migUrl)")
     print("block='%s'" % block)
     print("data= {'migration_url': globUrl, 'migration_input': block}")
