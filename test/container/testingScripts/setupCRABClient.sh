@@ -30,7 +30,15 @@ case $CRABClient_version in
 	git clone https://github.com/dmwm/CRABClient
 	cp CRABServer/src/python/ServerUtilities.py CRABClient/src/python/
 	cp CRABServer/src/python/RESTInteractions.py CRABClient/src/python/
-
+	#$ghprbPullId is used for PR testing. If this variable is set, that means
+	#we need to run test agains specific commit
+	if [ ! -z "$ghprbPullId" ]; then
+		cd CRABClient
+		git fetch origin pull/${ghprbPullId}/merge:PR_MERGE
+		export COMMIT=`git rev-parse "PR_MERGE^{commit}"`
+		git checkout -f ${COMMIT}
+		cd ..
+	fi
 	git clone https://github.com/dmwm/WMCore
 	cd WMCore; git checkout ${WMCore_tag}; cd ..
 	git clone https://github.com/dmwm/DBS

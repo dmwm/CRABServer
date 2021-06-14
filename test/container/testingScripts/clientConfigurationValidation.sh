@@ -7,6 +7,8 @@
 # 3. failed_tests: tests that returned exit code not equal to 0 or 2, i.e. test failed.
 #Script is used in Jenkins job CRABServer_ClientConfigurationValidation.
 
+set -o
+
 #setup CRABClient
 source setupCRABClient.sh
 python /data/CRABTesting/testingScripts/repos/CRABServer/test/makeTests.py
