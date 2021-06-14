@@ -145,7 +145,7 @@
       checkThisCommand submit "$parm"
   done
 
-  #depending on which test should be executed, set PROJDIR value
+  #depending on which test should be executed (PR_TEST or FULL_TEST), set PROJDIR value
   if [ ${TEST_LIST} = "PR_TEST" ]; then
 	SUBMITTED_TASK=`ls | grep crab_* | cut -d' ' -f10`
 	PROJDIR="${TASK_DIR}/${SUBMITTED_TASK}"
