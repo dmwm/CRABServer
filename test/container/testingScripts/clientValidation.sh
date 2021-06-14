@@ -23,6 +23,7 @@
   PR_TEST=(submit createmyproxy checkusername checkwrite tasks status)  
   #list of commands to execute for full testing
   FULL_TEST=(createmyproxy checkusername checkwrite tasks preparelocal status report getlog getoutput)
+  #${TEST_LIST} comes from Jenkins and is used to specify which testing should be done: PR_TEST or FULL_TEST
   TEST_TO_EXECUTE=${TEST_LIST}[@]
 
 
