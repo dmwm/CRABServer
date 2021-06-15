@@ -812,9 +812,16 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
     url = preSignedUrlFields['url']   # N.B. this contains the bucket name e.g. https://s3.cern.ch/bucket1
 
     userAgent = 'CRAB'
+    uploadCommand = ''
+
+    # am I running in the CMSSW SCRAM environment (e.g. CRABClient) ?
+    arch = os.getenv('SCRAM_ARCH')
+    if arch and arch.startswith('slc6'):
+        # make sure to use latest curl version
+        uploadCommand += 'source /cvmfs/cms.cern.ch/slc6_amd64_gcc700/external/curl/7.59.0/etc/profile.d/init.sh; '
 
     # curl: -f flag makes it fail if server return HTTP error
-    uploadCommand = 'curl -f -v -X POST '
+    uploadCommand += 'curl -f -v -X POST '
     uploadCommand += ' -H "User-Agent: %s"' % userAgent
     uploadCommand += ' -F "key=%s"' % key
     uploadCommand += ' -F "AWSAccessKeyId=%s"' % AWSAccessKeyId
