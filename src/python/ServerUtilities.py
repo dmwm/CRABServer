@@ -7,7 +7,6 @@ This contains some utility methods to share between the server and the client, o
 from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
-from past.builtins import basestring
 
 import os
 import sys
@@ -20,9 +19,13 @@ import datetime
 import traceback
 import subprocess
 import contextlib
-from http.client import HTTPException
+try:
+    from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
+except:  # pylint: disable=bare-except
+    from httplib import HTTPException  # old Python 2 version in CMSSW_7
 if sys.version_info >= (3, 0):
     from urllib.parse import urlencode, quote  # pylint: disable=no-name-in-module
+    from past.builtins import basestring
 if sys.version_info < (3, 0):
     from urllib import urlencode, quote
 

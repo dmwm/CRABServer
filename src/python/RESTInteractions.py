@@ -5,14 +5,17 @@ Handles client interactions with remote REST interface
 import os
 import time
 import random
-#import urllib
+
 try:
     from urllib import quote as urllibQuote  # Python 2.X
 except ImportError:
     from urllib.parse import quote as urllibQuote  # Python 3+
 
 import logging
-from http.client import HTTPException
+try:
+    from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
+except:  # pylint: disable=bare-except
+    from httplib import HTTPException  # old Python 2 version in CMSSW_7
 import pycurl
 
 from WMCore.Services.Requests import JSONRequests
