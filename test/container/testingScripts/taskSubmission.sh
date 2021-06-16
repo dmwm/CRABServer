@@ -32,11 +32,12 @@ submitTasks(){
 #run immediate check on tasks submitted for Client_Configuration_Validation testing. 
 #Save results to failed_tests and successful_tests files.
 immediateCheck(){
+  project_dir="/tmp/crabTestConfig"
   for task in ${tasksToCheck};
   do
 	echo ${task}
 	test_to_execute=`echo "${task}" | grep -oP '(?<=_crab_).*(?=)'`
-	task_dir=`echo "${task}" | grep -oP '(?<=Project dir:\s).*(?=\sPlease)'`
+	task_dir=${project_dir}/crab_${test_to_execute}
 	bash -x ${test_to_execute}-testSubmit.sh ${task_dir} && \
 		echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> /artifacts/successful_tests || \
 		echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> /artifacts/failed_tests	
