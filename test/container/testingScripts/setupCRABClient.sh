@@ -15,6 +15,7 @@ source /cvmfs/cms-ib.cern.ch/latest/cmsset_default.sh
 scramv1 project ${CMSSW_release}
 cd ${CMSSW_release}/src
 eval `scramv1 runtime -sh`
+scram build
 
 cd ${WORK_DIR}/repos
 git clone https://github.com/dmwm/CRABServer
