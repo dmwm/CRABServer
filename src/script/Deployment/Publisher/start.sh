@@ -57,7 +57,7 @@ fi
 source ${PUBLISHER_HOME}/env.sh
 
 #==== CLEANUP OLD LOGS
-rm -f nohup.out
+rm `readlink nohup.out`
 ln -s /data/hostdisk/${SERVICE}/nohup.out nohup.out
 
 #==== START THE SERVICE
