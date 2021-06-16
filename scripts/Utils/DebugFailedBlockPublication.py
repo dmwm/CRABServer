@@ -98,6 +98,7 @@ def main():
         apiDest.insertBulkBlock(block)
     except Exception as ex:
         print("Publication failed with exception:\n%s" % str(ex))
+        return
     print("Block publication done OK")
 
     return
