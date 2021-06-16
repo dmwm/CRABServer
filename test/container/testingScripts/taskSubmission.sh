@@ -32,19 +32,16 @@ submitTasks(){
 #run immediate check on tasks submitted for Client_Configuration_Validation testing. 
 #Save results to failed_tests and successful_tests files.
 immediateCheck(){
-  project_dir="/tmp/crabTestConfig"
   for task in ${tasksToCheck};
   do
 	echo ${task}
 	test_to_execute=`echo "${task}" | grep -oP '(?<=_crab_).*(?=)'`
-        task_dir=${project_dir}/${test_to_execute}
+	task_dir=`echo "${task}" | grep -oP '(?<=Project dir:\s).*(?=\sPlease)'`
 	bash -x ${test_to_execute}-testSubmit.sh ${task_dir} && \
-                                echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> /artifacts/successful_tests || \
-                                echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> /artifacts/failed_tests	
+		echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> /artifacts/successful_tests || \
+		echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> /artifacts/failed_tests	
   done
 }
-
-
 
 if [ "${Client_Validation_Suite}" = true ]; then
 	echo -e "Starting task submission for Client Validation testing.\n"
@@ -73,5 +70,7 @@ if [ "${Task_Submission_Status_Tracking}" = true ]; then
         submitTasks "${filesToSubmit}" "TS"
 	cd ${WORK_DIR}
 fi
+
+
 
 
