@@ -63,6 +63,16 @@ function lookInTarFor {
   return 0
 }
 
+function lookInTaskSandboxFor {
+  # looks for file in Task input sandbox. Fail test if not found
+  local file="$1"
+  local workDir="$2"
+  tarball=`find ${workDir}/inputs -name '*default.tgz'`
+  tar tf ${tarball} | grep -q ${file}
+  [ $? -ne 0 ] && exit 1
+  return 0
+}
+
 function crabCommand() {
   # execute crab command and write commandLog.txt.
   # Fails test if command exit code is non 0

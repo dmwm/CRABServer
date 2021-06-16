@@ -107,8 +107,8 @@ inFile2 = '/etc/os-release'
 changeDict = {'param': name, 'section': 'JobType', 'value': [inFile1, inFile2]}
 confChangesList = [changeDict]
 testSubmitScript = """
-lookInTarFor "^hosts" ${workDir}/inputs/*default.tgz
-lookInTarFor "^os-release" ${workDir}/inputs/*default.tgz
+lookInTaskSandboxFor "^hosts" ${workDir}
+lookInTaskSandboxFor "^os-release" ${workDir}
 """
 validationScript = """
 checkStatus ${taskName} SUBMITTED
@@ -217,7 +217,7 @@ name = 'scriptExe'
 changeDict = {'param': name, 'value': '"SIMPLE-SCRIPT.sh"', 'section': 'JobType'}
 confChangesList = [changeDict]
 testSubmitScript = """
-lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz
+lookInTaskSandboxFor "^SIMPLE-SCRIPT.sh" ${workDir}
 """
 validationScript = """
 checkStatus ${taskName} COMPLETED
@@ -238,7 +238,7 @@ confChangesList.append(changeDict)
 changeDict = {'param': name, 'value': ['exitCode=666', 'gotArgs=Yes'], 'section': 'JobType'}
 confChangesList.append(changeDict)
 testSubmitScript = """
-lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz
+lookInTaskSandboxFor "^SIMPLE-SCRIPT.sh" ${workDir}
 """
 validationScript = """
 checkStatus ${taskName} COMPLETED
@@ -258,7 +258,7 @@ name = 'sendPythonFolder'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
 testSubmitScript = """
-lookInTarFor "^python/" ${workDir}/inputs/*default.tgz
+lookInTaskSandboxFor "^python/" ${workDir}
 """
 validationScript = """
 checkStatus ${taskName} SUBMITTED
@@ -273,7 +273,7 @@ name = 'sendExternalFolder'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
 testSubmitScript = """
-lookInTarFor "^external/" ${workDir}/inputs/*default.tgz
+lookInTaskSandboxFor "^external/" ${workDir}
 """
 validationScript = """
 checkStatus ${taskName} SUBMITTED
