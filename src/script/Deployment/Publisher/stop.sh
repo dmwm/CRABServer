@@ -44,4 +44,4 @@ do
 done
 echo ""
 echo "Publisher is in waiting now. Killing PublisherMaster"
-pkill -f PublishMaster
+pkill -f PublisherMaster
