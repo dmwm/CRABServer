@@ -372,6 +372,8 @@ class Master(object):
         self.logger.info("Algorithm iteration completed")
         self.logger.info("Wait %d sec for next cycle", self.pollInterval())
         newStartTime = time.strftime("%H:%M:%S", time.localtime(time.time()+self.pollInterval()))
+        # BEWARE: any change to message in next line needs to be synchronized with
+        # a change in Publisher/stop.sh otherwise that script will break
         self.logger.info("Next cycle will start at %s", newStartTime)
 
     def startSlave(self, task):
