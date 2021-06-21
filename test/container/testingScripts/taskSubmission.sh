@@ -4,8 +4,9 @@
 # 1. Client_Validation_Suite: tests different CRABClient commands;
 # 2. Client_Configuration_Validation: tests different CRABClient configurations;
 # 3. Task_Submission_Status_Tracking: checks if submitted tasks finished running.
-#Variabiles ${REST_Instance}, ${Client_Validation_Suite}, ${Client_Configuration_Validation} and ${Task_Submission_Status_Tracking} comes from
+#Variables ${REST_Instance}, ${Client_Validation_Suite}, ${Client_Configuration_Validation} and ${Task_Submission_Status_Tracking} comes from
 #the Jenkins CRABServer_ExecuteTests configuration.
+#In case at least one task submission failed, then all succesfully submitted tasks are killed.
 
 
 #setup CRABClient
@@ -74,11 +75,10 @@ fi
 
 
 #in case at least one task submission failed, kill all succesfully submitted tasks
-if [ -s "/artifacts/failed_tasks" ]; then 
+if [ -s "/artifacts/failed_tasks" ] && [ -s "/artifacts/project_directories" ]; then 
 	echo -e "\nSome task submission failed. Killing succesfully submitted tasks.\n"
 	while read task ; do
   		echo "Killing task: $task"
   		crab kill $task
 	done </artifacts/project_directories
 fi
-
