@@ -316,41 +316,40 @@ def executeCommand(command):
 def execute_command(command=None, logger=None, timeout=None, redirect=True):
     """
     execute command with optional logging and timeout.
+    Returns a 3-ple: stdout, stderr, rc
+      rc=0 means success.
+      rc=124 (SIGTERM) means that command timed out
     Redirection of std* can be turned off if the command will need to interact with caller
     writing messages and/or asking for input, like if needs to get a passphrase to access
     usercert/key for (my)proxy creation as in
     https://github.com/dmwm/WMCore/blob/75c5abd83738a6a3534027369cd6e109667de74e/src/python/WMCore/Credential/Proxy.py#L383-L385
-    Should eventually be used everywhere in place of executeCommand above
-    but to be safe let's avoid simply replacing the simpler executeCommand
-    Imported here from WMCore/Credential/Proxy.py
+    Should eventually replace executeCommand and be used everywhere.
+    Imported here from WMCore/Credential/Proxy.py and then adapted to avoid deadlocks
+    as per https://github.com/dmwm/CRABClient/issues/5026
     """
 
     stdout, stderr, rc = None, None, 99999
     if logger:
         logger.debug('Executing command :\n %s' % command)
+    if timeout:
+        if logger:
+            logger.debug('add timeout at %s seconds', timeout)
+        command = ('timeout %s ' % timeout ) + command
     if redirect:
         proc = subprocess.Popen(
-            command, shell=True, cwd=os.environ['PWD'],
+            command, shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             stdin=subprocess.PIPE,
         )
     else:
-        proc = subprocess.Popen(command, shell=True, cwd=os.environ['PWD'])
+        proc = subprocess.Popen(command, shell=True)
 
-    t_beginning = time.time()
-    while True:
-        if proc.poll() is not None:
-            break
-        seconds_passed = time.time() - t_beginning
-        if timeout and seconds_passed > timeout:
-            proc.terminate()
-            logger.error('Timeout in %s execution.' % command)
-            return stdout, rc
-        time.sleep(0.1)
-
-    rc = proc.returncode
     out, err = proc.communicate()
+    rc = proc.returncode
+    if rc == 124 and timeout:
+        if logger:
+            logger.error('ERROR: Timeout after %s seconds in executing:\n %s' % (timeout,command))
     # for Py3 compatibility
     stdout = out.decode(encoding='UTF-8') if out else ''
     stderr = err.decode(encoding='UTF-8') if err else ''
