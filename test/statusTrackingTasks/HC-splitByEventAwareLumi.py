@@ -7,7 +7,8 @@ config.section_("General")
 config.General.instance = 'test2'
 config.General.restHost = ''
 config.General.dbInstance = ''
-
+config.General.workArea = '/tmp/crabStatusTracking'
+config.General.requestName = 'HCsplitByEventAwareLumi'
 
 config.section_("JobType")
 config.JobType.pluginName = 'Analysis'
