@@ -295,7 +295,7 @@ $(document).ready(function() {
             S3=false;
         
         if(S3==true)
-            url=cacheUrl.split("S3")[0]  + "crabserver/" + dbVersion + "/cache?subresource=retrieve&objecttype=twlog&taskname="+inputTaskName;
+            url=cacheUrl.split("S3")[0]  + "crabserver/" + dbVersion + "/cache?subresource=download&objecttype=twlog&taskname="+inputTaskName;
         else
             url = cacheUrl + "/logfile?name=" + inputTaskName + "_TaskWorker.log&username=" + username;
 
@@ -303,7 +303,10 @@ $(document).ready(function() {
             $.ajax(url)
                 .done(function(data) {
                     if(S3==true)
-                        $("#taskworker-log-paragraph").text(data.result);
+                    {
+                        $("#taskworker-log-error-box").css("display", "inherit").text("Please click on below(TaskWorker log) link");
+                        $("#taskworker-log-link").attr("href", data.result);
+                    }
                     else
                         $("#taskworker-log-paragraph").text(data);
                 
@@ -327,13 +330,27 @@ $(document).ready(function() {
             errHandler(new TaskInfoUndefinedError());
             return;
         }
-
-        var url = cacheUrl + "/logfile?name=" + inputTaskName + ".log&username=" + username;
-
+        var S3,url;
+        if(cacheUrl.indexOf("S3")!=-1)
+             S3=true;
+        else
+            S3=false;
+        if(S3==true)
+            url=cacheUrl.split("S3")[0]  + "crabserver/" + dbVersion + "/cache?subresource=download&objecttype=clientlog&taskname="+inputTaskName;
+        else
+            url = cacheUrl + "/logfile?name=" + inputTaskName + ".log&username=" + username;
+    
         function queryApi(url) {
             $.ajax(url)
                 .done(function(data) {
+                if(S3==true)
+                {
+                    $("#upload-log-error-box").css("display", "inherit").text("Please click on below(Upload log) link");
+                    $("#upload-log-link").attr("href", data.result);
+                }
+                else
                     $("#upload-log-paragraph").text(data);
+                    
                 })
                 .fail(function(xhr) {
                     var headers = xhr.getAllResponseHeaders().toLowerCase();
