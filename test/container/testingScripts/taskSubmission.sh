@@ -19,7 +19,7 @@ submitTasks(){
         sed -i -e "/config.General.instance*/c\config.General.instance = \"${REST_Instance}\"" ${file_name}
         output=$(crab submit -c ${file_name} 2>&1)
         if [ $? != 0 ]; then
-                echo ${file_name} >> /artifacts/failed_tasks
+		echo ${file_name} >> /artifacts/failed_tasks
         else
 		echo ${output} | grep -oP '(?<=Task name:\s)[^\s]*(?=)' >> /artifacts/submitted_tasks_${2}
 		echo ${output} | grep -oP '(?<=Project dir:\s)[^\s]*(?=)' >> /artifacts/project_directories
@@ -67,8 +67,8 @@ fi
 if [ "${Task_Submission_Status_Tracking}" = true ]; then
 	echo -e "\nStarting task submission for Status Tracking testing.\n"
 	cd repos/CRABServer/test/statusTrackingTasks/
-        filesToSubmit=`find . -type f -name '*.py' ! -name '*pset*'`
-        submitTasks "${filesToSubmit}" "TS"
+	filesToSubmit=`find . -type f -name '*.py' ! -name '*pset*'`
+	submitTasks "${filesToSubmit}" "TS"
 	cd ${WORK_DIR}
 fi
 
