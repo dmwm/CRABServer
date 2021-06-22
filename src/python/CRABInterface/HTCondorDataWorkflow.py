@@ -52,15 +52,17 @@ class HTCondorDataWorkflow(DataWorkflow):
             # (if the task was submitted by specifying a different collector in the config, for example)
             backend_urls['htcondorPool'] = row.collector
 
-            self.logger.debug("Running condor query for task %s." % workflow)
+            # need to make sure to pass a simply quoted string, not a byte-array to HTCondor
+            taskName = str(workflow.decode("utf-8")) if isinstance(workflow, bytes) else workflow
+            self.logger.debug("Running condor query for task %s." % taskName)
             try:
                 locator = HTCondorLocator.HTCondorLocator(backend_urls)
                 schedd, _ = locator.getScheddObjNew(row.schedd)
-                results = self.getRootTasks(workflow, schedd)
+                results = self.getRootTasks(taskName, schedd)
             except Exception as exp: # Empty results are caught here, because getRootTasks raises InvalidParameter exception.
                 self.logger.exception("Exception while querying schedd")
                 msg = " Message from the scheduler: %s" % (str(exp))
-                self.logger.exception("%s: %s" % (workflow, msg))
+                self.logger.exception("%s: %s" % (taskName, msg))
 
             # Convert a classad list object into a dict that can be sent back to the client
             parsedRes = {}
