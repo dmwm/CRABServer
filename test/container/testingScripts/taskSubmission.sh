@@ -20,7 +20,8 @@ submitTasks(){
         sed -i -e "/config.General.instance*/c\config.General.instance = \"${REST_Instance}\"" ${file_name}
         output=$(crab submit -c ${file_name} 2>&1)
         if [ $? != 0 ]; then
-		echo ${file_name} >> /artifacts/failed_tasks
+		echo ${output} >> /artifacts/failed_task
+		exit 0
         else
 		echo ${output} | grep -oP '(?<=Task name:\s)[^\s]*(?=)' >> /artifacts/submitted_tasks_${2}
 		echo ${output} | grep -oP '(?<=Project dir:\s)[^\s]*(?=)' >> /artifacts/project_directories
@@ -75,7 +76,7 @@ fi
 
 
 #in case at least one task submission failed, kill all succesfully submitted tasks
-if [ -s "/artifacts/failed_tasks" ] && [ -s "/artifacts/project_directories" ]; then 
+if [ -s "/artifacts/failed_task" ] && [ -s "/artifacts/project_directories" ]; then 
 	echo -e "\nSome task submission failed. Killing succesfully submitted tasks.\n"
 	while read task ; do
   		echo "Killing task: $task"
