@@ -768,6 +768,13 @@ def publishInDBS3(config, taskname, verbose):
     msg = "Found %d files not already present in DBS which will be published." % (len(dbsFiles))
     logger.info(msg)
 
+    # compute size of this publication request to guide us on picking max_files_per_block
+    dbsFilesKBytes = len(json.dumps(dbsFiles)) // 1024
+    if dbsFilesKBytes > 1024:
+        dbsFilesSize = '%dMB' % (dbsFilesKBytes // 1024)
+    else:
+        dbsFilesSize = '%dKB' % dbsFilesKBytes
+
     # If there are no files to publish, continue with the next dataset.
     if not dbsFiles_f:
         msg = "No file to publish to do for this dataset."
@@ -810,13 +817,16 @@ def publishInDBS3(config, taskname, verbose):
     # begin with. If there are more than max_files_per_block files to publish,
     # publish as many blocks as possible and leave the tail of files for the next
     # PublisherWorker call, unless forced to published.
+    nIter = 0
     block_count = 0
     count = 0
     publishedBlocks = 0
     failedBlocks = 0
     max_files_per_block = config.General.max_files_per_block
+    #TODO here can tune max_file_per_block based on len(dbsFiles) and dbsFilesSize
     dumpList = []   # keep a list of files where blocks which fail publication are dumped
     while True:
+        nIter += 1
         block_name = "%s#%s" % (dataset, str(uuid.uuid4()))
         files_to_publish = dbsFiles[count:count+max_files_per_block]
         try:
@@ -829,14 +839,22 @@ def publishInDBS3(config, taskname, verbose):
                                         primds_config, dataset_config,
                                         acquisition_era_config, block_config, files_to_publish)
             #logger.debug("Block to insert: %s\n %s" % (blockDump, destApi.__dict__ ))
+            blockSizeKBytes = len(json.dumps(blockDump)) // 1024
+            if blockSizeKBytes > 1024:
+                blockSize = '%dMB' % (blockSizeKBytes // 1024)
+            else:
+                blockSize = '%dKB' % blockSizeKBytes
 
             if dryRun:
                 logger.info("DryRun: skip insertBulkBlock")
             else:
+                t1 = time.time()
                 destApi.insertBulkBlock(blockDump)
+                didPublish = 'OK'
             block_count += 1
             publishedBlocks += 1
         except Exception as ex:
+            didPublish = 'FAIL'
             #logger.error("Error for files: %s" % [f['SourceLFN'] for f in toPublish])
             logger.error("Error for files: %s", [f['lfn'] for f in toPublish])
             failed.extend([f['SourceLFN'] for f in toPublish])
@@ -853,6 +871,16 @@ def publishInDBS3(config, taskname, verbose):
             dumpList.append(fname)
             failedBlocks += 1
             logger.error("FAILING BLOCK DUE TO %s SAVED AS %s", str(ex), fname)
+        finally:
+            elapsed = int(time.time() - t1)
+            msg = 'PUBSTAT: Nfiles=%4d, filestructSize=%6s, iter=%2d, blockSize=%6s, time=%3ds, status=%s, task=%s' % \
+                  (len(dbsFiles), dbsFilesSize, nIter, blockSize, elapsed, didPublish, taskname)
+            logger.info(msg)
+            logsDir = config.General.logsDir
+            fname = os.path.join(logsDir, 'STATS.txt')
+            with open(fname, 'a+') as fd:
+                fd.write(str(msg+'\n'))
+
         count += max_files_per_block
         files_to_publish_next = dbsFiles_f[count:count+max_files_per_block]
         if len(files_to_publish_next) < max_files_per_block:
