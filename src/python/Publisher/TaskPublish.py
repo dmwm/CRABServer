@@ -771,7 +771,7 @@ def publishInDBS3(config, taskname, verbose):
     # compute size of this publication request to guide us on picking max_files_per_block
     dbsFilesKBytes = len(json.dumps(dbsFiles)) // 1024
     if dbsFilesKBytes > 1024:
-        dbsFilesSize = '%dMB' % (dbsFileKBytes // 1024)
+        dbsFilesSize = '%dMB' % (dbsFilesKBytes // 1024)
     else:
         dbsFilesSize = '%dKB' % dbsFilesKBytes
 
@@ -817,7 +817,7 @@ def publishInDBS3(config, taskname, verbose):
     # begin with. If there are more than max_files_per_block files to publish,
     # publish as many blocks as possible and leave the tail of files for the next
     # PublisherWorker call, unless forced to published.
-    iter = 0
+    nIter = 0
     block_count = 0
     count = 0
     publishedBlocks = 0
@@ -826,7 +826,7 @@ def publishInDBS3(config, taskname, verbose):
     #TODO here can tune max_file_per_block based on len(dbsFiles) and dbsFilesSize
     dumpList = []   # keep a list of files where blocks which fail publication are dumped
     while True:
-        iter += 1
+        nIter += 1
         block_name = "%s#%s" % (dataset, str(uuid.uuid4()))
         files_to_publish = dbsFiles[count:count+max_files_per_block]
         try:
@@ -874,7 +874,7 @@ def publishInDBS3(config, taskname, verbose):
         finally:
             elapsed = int(time.time() - t1)
             msg = 'PUBSTAT: Nfiles=%4d, filestructSize=%6s, iter=%2d, blockSize=%6s, time=%3ds, status=%s, task=%s' % \
-                  (len(dbsFiles), dbsFilesSize, iter, blockSize, elapsed, didPublish, taskname)
+                  (len(dbsFiles), dbsFilesSize, nIter, blockSize, elapsed, didPublish, taskname)
             logger.info(msg)
             logsDir = config.General.logsDir
             fname = os.path.join(logsDir, 'STATS.txt')
