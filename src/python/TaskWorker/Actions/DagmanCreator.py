@@ -252,6 +252,34 @@ def validateLFNs(path, outputFiles):
             raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
     return
 
+def validateUserLFNs(path, outputFiles):
+    """
+    validate against standard Lexicon a user-defined LFN which will not go in DBS, but still needs to be sane
+    :param path: string: the path part of the LFN's, w/o the directory counter
+    :param outputFiles: list of strings: the filenames to be published (w/o the jobId, i.e. out.root not out_1.root)
+    :return: nothing if all OK. If LFN is not valid Lexicon raises an AssertionError exception
+    """
+    from WMCore import Lexicon
+    # fake values to get proper LFN length, actual numbers chance job by job
+    jobId = '10000'       # current max is 10k jobs per task
+    dirCounter = '0001'   # need to be same length as 'counter' used later in makeDagSpecs
+
+    for origFile in outputFiles:
+        info = origFile.rsplit(".", 1)
+        if len(info) == 2:    # filename ends with .<something>, put jobId before the dot
+            fileName = "%s_%s.%s" % (info[0], jobId, info[1])
+        else:
+            fileName = "%s_%s" % (origFile, jobId)
+        testLfn = os.path.join(path, dirCounter, fileName)
+        Lexicon.userLfn(testLfn)  # will raise if testLfn is not a valid lfn
+        # since Lexicon does not have lenght check, do it manually here.
+        if len(testLfn) > 500:
+            msg = "\nYour task speficies an output LFN %d-char long " % len(testLfn)
+            msg += "\n which exceeds maximum length of 500"
+            msg += "\n and therefore can not be handled in our DataBase"
+            raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+    return
+
 def transform_strings(data):
     """
     Converts the arguments in the data dictionary to the arguments necessary
@@ -568,7 +596,10 @@ class DagmanCreator(TaskAction):
         temp_dest, dest = makeLFNPrefixes(task)
         try:
             # use temp_dest since it the longest path and overall LFN has a length limit to fit in DataBase
-            validateLFNs(temp_dest, outfiles)
+            if task['tm_publication'] == 'T':
+                validateLFNs(temp_dest, outfiles)
+            else:
+                validateUserLFNs(temp_dest, outfiles)
         except AssertionError as ex:
             msg = "\nYour task speficies an output LFN which fails validation in"
             msg += "\n WMCore/Lexicon and therefore can not be handled in our DataBase"
