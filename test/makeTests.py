@@ -134,16 +134,20 @@ writeValidationScript(testName=name, validationScript=validationScript)
 
 # outputFiles
 name = 'outputFiles'
+# use scriptExe to add a custom output file which is not .root
 confChangesList = []
+changeDict = {'param': 'scriptExe', 'value': '"SIMPLE-SCRIPT.sh"', 'section': 'JobType'}
+confChangesList.append(changeDict)
 changeDict = {'param': 'disableAutomaticOutputCollection', 'value': 'True', 'section': 'JobType'}
 confChangesList.append(changeDict)
-changeDict = {'param': 'outputFiles', 'value': '["output.root"]', 'section': 'JobType'}
+changeDict = {'param': 'outputFiles', 'value': '["output.root", "My_output.txt"]', 'section': 'JobType'}
 confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getoutput "--jobids=1"
 lookFor "Success in retrieving output_1.root " commandLog.txt
+lookFor "Success in retrieving My_output_1.txt " commandLog.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
