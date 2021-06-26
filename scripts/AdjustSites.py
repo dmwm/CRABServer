@@ -6,6 +6,8 @@
 """
 
 from __future__ import print_function
+
+import pickle
 import os
 import re
 import sys
@@ -235,6 +237,16 @@ def makeWebDir(ad):
         os.symlink(os.path.abspath(os.path.join(".", "site.ad")), os.path.join(path, "site_ad.txt"))
         os.symlink(os.path.abspath(os.path.join(".", ".job.ad")), os.path.join(path, "job_ad.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "task_process/status_cache.txt")), os.path.join(path, "status_cache"))
+        os.symlink(os.path.abspath(os.path.join(".", "task_process/status_cache.pkl")), os.path.join(path, "status_cache.pkl"))
+        # prepare a startup cache_info file with time info for client to have something useful to print
+        # in crab status while waiting for task_process to fill with actual jobs info. Do it in two ways
+        # new way: a pickle file for python3 compatibility
+        startInfo = {'bootstrapTime': {}}
+        startInfo['bootstrapTime']['date'] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        startInfo['bootstrapTime']['fromEpoch'] = int(time.time())
+        with open(os.path.abspath(os.path.join(".", "task_process/status_cache.pkl")), 'w') as fp:
+            pickle.dump(startInfo, fp)
+        # old way: a file with multiple lines and print-like output
         startInfo = "# Task bootstrapped at " + datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC") + "\n"
         startInfo += "%d\n" % (int(time.time()))  # machines will like seconds from Epoch more
         # prepare fake status_cache info to please current (v3.210127) CRAB Client
