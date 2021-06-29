@@ -91,6 +91,7 @@ config.TaskWorker.maxIdle = 1000
 config.TaskWorker.maxPost = 20
 
 config.TaskWorker.scheddPickerFunction = HTCondorLocator.capacityMetricsChoicesHybrid
+config.TaskWorker.tiersToRecall = ['AOD', 'AODSIM', 'MINIAOD', 'MINIAODSIM', 'NANOAOD', 'NANOAODSIM']
 
 config.section_("Sites")
 config.Sites.DashboardURL = "https://cmssst.web.cern.ch/cmssst/analysis/usableSites.json"
