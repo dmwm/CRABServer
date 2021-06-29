@@ -396,6 +396,10 @@ class DBSDataDiscovery(DataDiscovery):
                 # try to trigger a tape recall and place the task in tapeRecall status
                 msg += "\nWill try to request a disk copy for you. See: https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
                 self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
+        if set(locationsMap.keys()) != set(blocksWithLocation):
+            msg = "Task could not be submitted because not all block of dataset %s are on DISK" % inputDataset
+            msg += "\nWill try to request a disk copy for you. See: https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
+            self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
 
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
