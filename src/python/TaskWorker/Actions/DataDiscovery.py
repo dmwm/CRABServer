@@ -51,12 +51,9 @@ class DataDiscovery(TaskAction):
                     self.logger.warning("Skipping %s because its block (%s) has no locations", lfn, infos['BlockName'])
                     blocksWithNoLocations.add(infos['BlockName'])
                     continue
-
                 if task['tm_use_parent'] == 1 and len(infos['Parents']) == 0:
-                    raise TaskWorkerException(
-                            "The CRAB3 server backend refuses to submit jobs to the Grid scheduler\n" +
-                            "because you specified useParents=True but some your files have no" +
-                            "parents.\nExample: " + lfn)
+                    self.logger.warning("Skipping %s because it has no parents")
+                    continue
                 ## Create a WMCore File object.
                 try:
                     size = infos['FileSize']
