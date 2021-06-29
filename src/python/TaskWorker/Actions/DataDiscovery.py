@@ -11,10 +11,9 @@ from WMCore.Services.CRIC.CRIC import CRIC
 
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.DataObjects.Result import Result
-from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import tempSetLogLevel
 
-class DataDiscovery(TaskAction):
+class DataDiscovery(TaskAction):  # pylint: disable=abstract-method
     """
     I am the abstract class for the data discovery.
     Taking care of generalizing different data discovery
@@ -57,12 +56,13 @@ class DataDiscovery(TaskAction):
                 ## Create a WMCore File object.
                 size = infos['FileSize']
                 checksums = {'Checksum': infos['Checksum'], 'Adler32': infos['Adler32'], 'Md5': infos['Md5']}
-                wmfile = File(lfn = lfn, events = infos['NumberOfEvents'], size = size, checksums = checksums, parents = infos['Parents'])
+                wmfile = File(lfn=lfn, events=infos['NumberOfEvents'], size=size, checksums=checksums, parents=infos['Parents'])
                 wmfile['block'] = infos['BlockName']
                 try:
                     wmfile['locations'] = resourceCatalog.PNNstoPSNs(locations[wmfile['block']])
                 except Exception as ex:
-                    self.logger.error("Impossible translating %s to a CMS name through CMS Resource Catalog", locations[wmfile['block']] )
+                    self.logger.error("Impossible translating %s to a CMS name through CMS Resource Catalog",
+                                      locations[wmfile['block']])
                     self.logger.error("got this exception:\n %s", ex)
                     raise
                 wmfile['workflow'] = requestname
@@ -96,4 +96,4 @@ class DataDiscovery(TaskAction):
         with open(os.path.join(tempDir, "input_dataset_duplicate_lumis.json"), "w") as fd:
             json.dump(datasetDuplicateLumis, fd)
 
-        return Result(task = task, result = Fileset(name = 'FilesToSplit', files = set(wmfiles)))
+        return Result(task=task, result=Fileset(name='FilesToSplit', files=set(wmfiles)))
