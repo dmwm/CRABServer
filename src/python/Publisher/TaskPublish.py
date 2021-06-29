@@ -774,6 +774,9 @@ def publishInDBS3(config, taskname, verbose):
         dbsFilesSize = '%dMB' % (dbsFilesKBytes // 1024)
     else:
         dbsFilesSize = '%dKB' % dbsFilesKBytes
+    nLumis = 0
+    for file_ in dbsFiles:
+        nLumis += len(file_['file_lumi_list'])
 
     # If there are no files to publish, continue with the next dataset.
     if not dbsFiles_f:
@@ -873,8 +876,8 @@ def publishInDBS3(config, taskname, verbose):
             logger.error("FAILING BLOCK DUE TO %s SAVED AS %s", str(ex), fname)
         finally:
             elapsed = int(time.time() - t1)
-            msg = 'PUBSTAT: Nfiles=%4d, filestructSize=%6s, iter=%2d, blockSize=%6s, time=%3ds, status=%s, task=%s' % \
-                  (len(dbsFiles), dbsFilesSize, nIter, blockSize, elapsed, didPublish, taskname)
+            msg = 'PUBSTAT: Nfiles=%4d, filestructSize=%6s, lumis=%7d, iter=%2d, blockSize=%6s, time=%3ds, status=%s, task=%s' % \
+                  (len(dbsFiles), dbsFilesSize, nLumis, nIter, blockSize, elapsed, didPublish, taskname)
             logger.info(msg)
             logsDir = config.General.logsDir
             fname = os.path.join(logsDir, 'STATS.txt')
