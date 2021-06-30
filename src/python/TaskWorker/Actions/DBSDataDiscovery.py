@@ -12,6 +12,7 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
+from ServerUtilities import FEEDBACKMAIL
 from RucioUtils import getNativeRucioClient
 
 from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
@@ -396,6 +397,19 @@ class DBSDataDiscovery(DataDiscovery):
                 # try to trigger a tape recall and place the task in tapeRecall status
                 msg += "\nWill try to request a disk copy for you. See: https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
                 self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
+        if set(locationsMap.keys()) != set(blocksWithLocation):
+            dataTier = inputDataset.split('/')[3]
+            if dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []):
+                msg = "Task could not be submitted because not all blocks of dataset %s are on DISK" % inputDataset
+                msg += "\nWill try to request a full disk copy for you. See"
+                msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
+                self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
+            else:
+                msg = "Some blocks are on TAPE only and will not be processed."
+                msg += "\nThere is no automatic recall from tape for data tier %s" % dataTier
+                msg += '\nIf you need the full dataset, contact Data Transfer team via %s' % FEEDBACKMAIL
+                self.logger.warning(msg)
+                self.uploadWarning(msg, self.userproxy, self.taskName)
 
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']

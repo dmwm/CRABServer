@@ -11,10 +11,9 @@ from WMCore.Services.CRIC.CRIC import CRIC
 
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.DataObjects.Result import Result
-from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import tempSetLogLevel
 
-class DataDiscovery(TaskAction):
+class DataDiscovery(TaskAction):  # pylint: disable=abstract-method
     """
     I am the abstract class for the data discovery.
     Taking care of generalizing different data discovery
@@ -51,28 +50,19 @@ class DataDiscovery(TaskAction):
                     self.logger.warning("Skipping %s because its block (%s) has no locations", lfn, infos['BlockName'])
                     blocksWithNoLocations.add(infos['BlockName'])
                     continue
-
                 if task['tm_use_parent'] == 1 and len(infos['Parents']) == 0:
-                    raise TaskWorkerException(
-                            "The CRAB3 server backend refuses to submit jobs to the Grid scheduler\n" +
-                            "because you specified useParents=True but some your files have no" +
-                            "parents.\nExample: " + lfn)
+                    self.logger.warning("Skipping %s because it has no parents")
+                    continue
                 ## Create a WMCore File object.
-                try:
-                    size = infos['FileSize']
-                    checksums = {'Checksum': infos['Checksum'], 'Adler32': infos['Adler32'], 'Md5': infos['Md5']}
-                except:
-                    #This is so that the task worker does not crash if an old version of WMCore is used (the interface of an API suddenly changed).
-                    # We may want to remove the try/except and the following two lines eventually, but keeping them for the moment so other devels won't be affected
-                    #See this WMCore commit: https://github.com/dmwm/WMCore/commit/2afc01ae571390f5fa009dd258be757adac89c28#diff-374b7a6640288184175057234e393e1cL204
-                    size = infos['Size']
-                    checksums = infos['Checksums']
-                wmfile = File(lfn = lfn, events = infos['NumberOfEvents'], size = size, checksums = checksums, parents = infos['Parents'])
+                size = infos['FileSize']
+                checksums = {'Checksum': infos['Checksum'], 'Adler32': infos['Adler32'], 'Md5': infos['Md5']}
+                wmfile = File(lfn=lfn, events=infos['NumberOfEvents'], size=size, checksums=checksums, parents=infos['Parents'])
                 wmfile['block'] = infos['BlockName']
                 try:
                     wmfile['locations'] = resourceCatalog.PNNstoPSNs(locations[wmfile['block']])
                 except Exception as ex:
-                    self.logger.error("Impossible translating %s to a CMS name through CMS Resource Catalog", locations[wmfile['block']] )
+                    self.logger.error("Impossible translating %s to a CMS name through CMS Resource Catalog",
+                                      locations[wmfile['block']])
                     self.logger.error("got this exception:\n %s", ex)
                     raise
                 wmfile['workflow'] = requestname
@@ -106,4 +96,4 @@ class DataDiscovery(TaskAction):
         with open(os.path.join(tempDir, "input_dataset_duplicate_lumis.json"), "w") as fd:
             json.dump(datasetDuplicateLumis, fd)
 
-        return Result(task = task, result = Fileset(name = 'FilesToSplit', files = set(wmfiles)))
+        return Result(task=task, result=Fileset(name='FilesToSplit', files=set(wmfiles)))
