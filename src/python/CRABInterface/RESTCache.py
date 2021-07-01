@@ -218,7 +218,8 @@ class RESTCache(RESTEntity):
                                     'Prefix': user}
             page_iterator = paginator.paginate(**operation_parameters)
             for page in page_iterator:
-                namesInPage = [item['Key'].lstrip(user+'/') for item in page['Contents']]
+                # strip the initial "username/" from the S3 key name
+                namesInPage = [item['Key'].replace(user+'/', '', 1) for item in page['Contents']]
                 fileNames += namesInPage
             if objecttype:
                 filteredFileNames = [f for f in fileNames if objecttype in f]
