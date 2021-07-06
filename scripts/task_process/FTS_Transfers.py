@@ -10,11 +10,12 @@ import logging
 import threading
 import os
 import subprocess
+from datetime import timedelta
+from httplib import HTTPException
 
 import fts3.rest.client.easy as fts3
-from datetime import timedelta
-from RESTInteractions import HTTPRequests, CRABRest
-from httplib import HTTPException
+
+from RESTInteractions import CRABRest
 from ServerUtilities import encodeRequest
 from TransferInterface import CRABDataInjector
 
@@ -68,8 +69,8 @@ def mark_transferred(ids, crabserver):
     """
     Mark the list of files as tranferred
     :param ids: list of Oracle file ids to update
-    :param crabserver: an HTTPRequest object for doing POST to CRAB server REST
-    :return: 0 success, 1 failure
+    :param crabserver: a CRABRest object for doing POST to CRAB server REST
+    :return: True success, False failure
     """
     try:
         logging.debug("Marking done %s", ids)
@@ -80,13 +81,12 @@ def mark_transferred(ids, crabserver):
         data['list_of_ids'] = ids
         data['list_of_transfer_state'] = ["DONE" for _ in ids]
 
-        crabserver.post('/filetransfers',
-                      data=encodeRequest(data))
+        crabserver.post('/filetransfers', data=encodeRequest(data))
         logging.info("Marked good %s", ids)
     except Exception:
         logging.exception("Error updating documents")
-        return 1
-    return 0
+        return False
+    return True
 
 
 def mark_failed(ids, failures_reasons, crabserver):
@@ -94,8 +94,8 @@ def mark_failed(ids, failures_reasons, crabserver):
     Mark the list of files as failed
     :param ids: list of Oracle file ids to update
     :param failures_reasons: list of strings with transfer failure messages
-    :param crabserver: an HTTPRequest object for doing POST to CRAB server REST
-    :return: 0 success, 1 failure
+    :param crabserver: an CRABRest object for doing POST to CRAB server REST
+    :return: True success, False failure
     """
     try:
         data = dict()
@@ -106,13 +106,12 @@ def mark_failed(ids, failures_reasons, crabserver):
         data['list_of_failure_reason'] = failures_reasons
         data['list_of_retry_value'] = [0 for _ in ids]
 
-        crabserver.post('/filetransfers',
-                      data=encodeRequest(data))
+        crabserver.post('/filetransfers', data=encodeRequest(data))
         logging.info("Marked failed %s", ids)
     except Exception:
         logging.exception("Error updating documents")
-        return 1
-    return 0
+        return False
+    return True
 
 
 def remove_files_in_bkg(pfns, logFile, timeout=None):
@@ -142,21 +141,23 @@ class check_states_thread(threading.Thread):
     """
     get transfers state per jobid
     """
-    def __init__(self, threadLock, log, fts, jobid, jobs_ongoing, done_id, failed_id, failed_reasons):
+    def __init__(self, threadLock, log, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, failed_id, failed_reasons):
         """
 
         :param threadLock:
         :param log:
-        :param fts:
+        :param ftsContext:
         :param jobid:
+        :prarm jobsEnded:
         :param jobs_ongoing:
         :param done_id:
         :param failed_id:
         :param failed_reasons:
         """
         threading.Thread.__init__(self)
-        self.fts = fts
+        self.ftsContext = ftsContext
         self.jobid = jobid
+        self.jobsEnded = jobsEnded
         self.jobs_ongoing = jobs_ongoing
         self.log = log
         self.threadLock = threadLock
@@ -177,7 +178,7 @@ class check_states_thread(threading.Thread):
         self.jobs_ongoing.append(self.jobid)
 
         try:
-            status = self.fts.get("jobs/"+self.jobid)[0]
+            status = fts3.get_job_status(self.ftsContext, self.jobid, list_files=False)
         except HTTPException as hte:
             self.log.exception("failed to retrieve status for %s " % self.jobid)
             self.log.exception("httpExeption headers %s " % hte.headers)
@@ -192,10 +193,10 @@ class check_states_thread(threading.Thread):
 
         self.log.info("State of job %s: %s" % (self.jobid, status["job_state"]))
 
-        # TODO: if in final state get with list_files=True and the update_states
         if status["job_state"] in ['FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
-            file_statuses = self.fts.get("jobs/%s/files" % self.jobid)[0]
-
+            self.jobsEnded.append(self.jobid)
+        if status["job_state"] in ['ACTIVE', 'FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
+            file_statuses = fts3.get_job_status(self.ftsContext, self.jobid, list_files=True)['files']
             self.done_id[self.jobid] = []
             self.failed_id[self.jobid] = []
             self.failed_reasons[self.jobid] = []
@@ -205,9 +206,12 @@ class check_states_thread(threading.Thread):
                 _id = file_status['file_metadata']['oracleId']
                 tx_state = file_status['file_state']
 
+                # xfers have only 3 terminal states: FINISHED, FAILED, and CANCELED see
+                # https://fts3-docs.web.cern.ch/fts3-docs/docs/state_machine.html
                 if tx_state == 'FINISHED':
                     self.done_id[self.jobid].append(_id)
-                else:
+                    files_to_remove.append(file_status['source_surl'])
+                elif tx_state == 'FAILED' or tx_state == 'CANCELED':
                     self.failed_id[self.jobid].append(_id)
                     if file_status['reason']:
                         self.log.info('Failure reason: ' + file_status['reason'])
@@ -215,7 +219,21 @@ class check_states_thread(threading.Thread):
                     else:
                         self.log.exception('Failure reason not found')
                         self.failed_reasons[self.jobid].append('unable to get failure reason')
-                files_to_remove.append(file_status['source_surl'])
+                    files_to_remove.append(file_status['source_surl'])
+                else:
+                    # file transfer is not terminal:
+                    if status["job_state"] == 'ACTIVE':
+                        # if job is still ACTIVE file status will be updated in future run. See:
+                        # https://fts3-docs.web.cern.ch/fts3-docs/docs/state_machine.html
+                        pass
+                    else:
+                        # job status is terminal but file xfer status is not.
+                        # something went wrong inside FTS and a stuck transfers is waiting to be
+                        # removed by the reapStalledTransfers https://its.cern.ch/jira/browse/FTS-1714
+                        # mark as failed
+                        self.failed_id[self.jobid].append(_id)
+                        self.log.info('Failure reason: stuck inside FTS')
+                        self.failed_reasons[self.jobid].append(file_status['reason'])
             try:
                 list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
                 for f in files_to_remove:
@@ -359,7 +377,7 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
                       username,
                       taskname,
                       filesize, checksum],....]
-    :param crabserver: an HTTPRequest object for doing POST to CRAB server REST
+    :param crabserver: an CRABRest object for doing POST to CRAB server REST
     :return: list of jobids submitted
     """
     threadLock = threading.Lock()
@@ -418,7 +436,7 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
         source_pfns = sorted_source_pfns
         dest_pfns = sorted_dest_pfns
 
-        tx_from_source = [[x[0], x[1], x[2], source, username, taskname, x[3], x[4]['adler32'].rjust(8,'0')] for x in zip(source_pfns, dest_pfns, ids, sizes, checksums)]
+        tx_from_source = [[x[0], x[1], x[2], source, username, taskname, x[3], x[4]['adler32'].rjust(8, '0')] for x in zip(source_pfns, dest_pfns, ids, sizes, checksums)]
 
         xfersPerFTSJob = 50 if ftsReuse else 200
         for files in chunks(tx_from_source, xfersPerFTSJob):
@@ -430,8 +448,7 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
         t.join()
 
     for fileDoc in to_update:
-        _ = crabserver.post('/filetransfers',
-                          data=encodeRequest(fileDoc))
+        _ = crabserver.post('/filetransfers', data=encodeRequest(fileDoc))
         logging.info("Marked submitted %s files", fileDoc['list_of_ids'])
 
     return jobids
@@ -470,7 +487,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, c
                               doc["checksums"]])
 
         jobids = []
-        if len(transfers) > 0:
+        if transfers:
             jobids = submit(rucioClient, ftsContext, transfers, crabserver)
 
             for jobid in jobids:
@@ -483,7 +500,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, c
     return transfers, jobids
 
 
-def state_manager(fts, crabserver):
+def state_manager(ftsContext, crabserver):
     """
 
     """
@@ -491,6 +508,7 @@ def state_manager(fts, crabserver):
     threads = []
     jobs_done = []
     jobs_ongoing = []
+    jobsEnded = []
     failed_id = {}
     failed_reasons = {}
     done_id = {}
@@ -504,7 +522,7 @@ def state_manager(fts, crabserver):
                 if line:
                     jobid = line.split('\n')[0]
                 if jobid:
-                    thread = check_states_thread(threadLock, logging, fts, jobid, jobs_ongoing, done_id, failed_id, failed_reasons)
+                    thread = check_states_thread(threadLock, logging, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, failed_id, failed_reasons)
                     thread.start()
                     threads.append(thread)
             _jobids.close()
@@ -512,31 +530,41 @@ def state_manager(fts, crabserver):
         for t in threads:
             t.join()
 
+        # the threads above have filled:
+        # job_ongoing: list of FTS jobs processed
+        # done_id: a dictionary {jobId:[list_of_tnasfers_id_done in that job]}  the list may be empty
+        # failed_id, failed_reasons: dictionaries with same format as above containing list of failed xfers and reasons
+        # but at this point a given FTS job may be compelted, or still ACTIVE and only part of its transfers are
+        # reported as done/failed.
         try:
-            for jobID, _ in done_id.items():
+            # process all jobs for which some xfers have been reported as dobe
+            for jobID in done_id:
                 logging.info('Marking job %s files done and %s files failed for job %s', len(done_id[jobID]), len(failed_id[jobID]), jobID)
 
-                if len(done_id[jobID]) > 0:
-                    doneReady = mark_transferred(done_id[jobID], crabserver)
+                if done_id[jobID]:
+                    markDone = mark_transferred(done_id[jobID], crabserver)
                 else:
-                    doneReady = 0
-                if len(failed_id[jobID]) > 0:
-                    failedReady = mark_failed(failed_id[jobID], failed_reasons[jobID], crabserver)
+                    markDone = True
+                if failed_id[jobID]:
+                    markFailed = mark_failed(failed_id[jobID], failed_reasons[jobID], crabserver)
                 else:
-                    failedReady = 0
-
-                if doneReady == 0 and failedReady == 0:
-                    jobs_done.append(jobID)
-                    jobs_ongoing.remove(jobID)
+                    markFailed = True
+                if jobID in jobsEnded:
+                    # only remove a Terminated FTS job from the list of xfer marking was successful, otherwise will try again
+                    if markDone and markFailed:
+                        jobs_done.append(jobID)
+                        jobs_ongoing.remove(jobID)
+                    else:
+                        jobs_ongoing.append(jobID)   # SB is this necessary ? AFAIU check_states_thread has filled it
                 else:
-                    jobs_ongoing.append(jobID)
+                    jobs_ongoing.append(jobID)  # should not be necessary.. but for consistency with above
         except Exception:
             logging.exception('Failed to update states')
     else:
         logging.warning('No FTS job ID to monitor yet')
 
     with open("task_process/transfers/fts_jobids_new.txt", "w+") as _jobids:
-        for line in list(set(jobs_ongoing)):
+        for line in list(set(jobs_ongoing)):  # SB if we remove the un-necessary append above, non eed for a set here
             logging.info("Writing: %s", line)
             _jobids.write(line+"\n")
 
@@ -575,7 +603,7 @@ def algorithm():
     """
 
     script algorithm
-    - create fts REST HTTPRequest
+    - instantiates FTS3 python easy client
     - delegate user proxy to fts if needed
     - check for fts jobs to monitor and update states in oracle
     - get last line from last_transfer.txt
@@ -586,19 +614,17 @@ def algorithm():
     - append new fts job ids to fts_jobids.txt
     """
 
-    # TODO: pass by configuration
-    fts = HTTPRequests(hostname=FTS_ENDPOINT.split("https://")[1],
-                       localcert=proxy, localkey=proxy)
-
     logging.info("using user's proxy from %s", proxy)
     ftsContext = fts3.Context(FTS_ENDPOINT, proxy, proxy, verify=True)
     logging.info("Delegating proxy to FTS...")
-    delegationId = fts3.delegate(ftsContext, lifetime=timedelta(hours=48), delegate_when_lifetime_lt=timedelta(hours=24), force=False)
-    delegationStatus = fts.get("delegation/"+delegationId)
-    logging.info("Delegated proxy valid until %s", delegationStatus[0]['termination_time'])
+    delegationId = fts3.delegate(ftsContext, lifetime=timedelta(hours=48),  # pylint: disable=unused-variable
+                                 delegate_when_lifetime_lt=timedelta(hours=24), force=False)
+    # we never had problems with delegation since we put proper delegate_when in the above line
+    # but if need to check delegation arise, it can be done with a query like
+    # curl --cert proxy --key proxy https://fts3-cms.cern.ch:8446/delegation/<delegatinId>
+    # see: https://fts3-docs.web.cern.ch/fts3-docs/fts-rest/docs/api.html#get-delegationdlgid
 
     # instantiate an object to talk with CRAB REST server
-
     try:
         crabserver = CRABRest(restInfo['host'], localcert=proxy, localkey=proxy,
                               userAgent='CRABSchedd')
@@ -623,17 +649,14 @@ def algorithm():
         logging.info("Initializing Rucio client")
         os.environ["X509_USER_PROXY"] = proxy
         logging.info("Initializing Rucio client for %s", taskname)
-        rucioClient = CRABDataInjector(taskname,
-                                    destination,
-                                    account=username,
-                                    scope="user."+username,
-                                    auth_type='x509_proxy')
+        rucioClient = CRABDataInjector(taskname, destination, account=username,
+                                       scope="user."+username, auth_type='x509_proxy')
     except Exception as exc:
         msg = "Rucio initialization failed with\n%s" % str(exc)
         logging.warn(msg)
         raise exc
 
-    jobs_ongoing = state_manager(fts, crabserver)
+    jobs_ongoing = state_manager(ftsContext, crabserver)
     new_jobs = submission_manager(rucioClient, ftsContext, crabserver)
 
     logging.info("Transfer jobs ongoing: %s, new: %s ", jobs_ongoing, new_jobs)
@@ -647,4 +670,3 @@ if __name__ == "__main__":
     except Exception:
         logging.exception("error during main loop")
     logging.info("transfer_inject.py exiting")
-
