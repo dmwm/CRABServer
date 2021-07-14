@@ -125,6 +125,7 @@ class TapeRecallStatus(BaseRecurringAction):
                 msg = "Rucio rule id %s not found. Please report to experts" % reqId
                 self.logger.error(msg)
                 if user_proxy: mpl.uploadWarning(msg, recallingTask['user_proxy'], taskName)
+            self.logger.info("Rule %s is %s", reqId, ddmRequest['state'])
             if ddmRequest['state'] == 'OK':
                 self.logger.info("Request %s is completed, setting status of task %s to NEW", reqId, taskName)
                 mw.updateWork(taskName, recallingTask['tm_task_command'], 'NEW')
