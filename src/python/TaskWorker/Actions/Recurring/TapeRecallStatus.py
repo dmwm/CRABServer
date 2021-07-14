@@ -101,20 +101,20 @@ class TapeRecallStatus(BaseRecurringAction):
                 failTask(taskName, crabserver, msg, self.logger, 'FAILED')
                 continue
 
+            # Make sure there is a valid credential to talk to CRABServer
+            mpl = MyProxyLogon(config=config, crabserver=crabserver, myproxylen=self.pollingTime)
+            user_proxy = True
+            try:
+                mpl.execute(task=recallingTask)  # this adds 'user_proxy' to recallingTask
+            except TaskWorkerException as twe:
+                user_proxy = False
+                self.logger.exception(twe)
+
             if not 'S3' in recallingTask['tm_cache_url'].upper():
                 # when using old crabcache had to worry about sandbox purging after 3 days
-                mpl = MyProxyLogon(config=config, crabserver=crabserver, myproxylen=self.pollingTime)
-                user_proxy = True
-                try:
-                    mpl.execute(task=recallingTask) # this adds 'user_proxy' to recallingTask
-                except TaskWorkerException as twe:
-                    user_proxy = False
-                    self.logger.exception(twe)
-
                 # Make sure the task sandbox in the crabcache is not deleted until the tape recall is completed
                 if user_proxy:
                     self.refreshSandbox(recallingTask)
-
 
             # Retrieve status of recall request
             if not self.rucioClient:
@@ -125,6 +125,7 @@ class TapeRecallStatus(BaseRecurringAction):
                 msg = "Rucio rule id %s not found. Please report to experts" % reqId
                 self.logger.error(msg)
                 if user_proxy: mpl.uploadWarning(msg, recallingTask['user_proxy'], taskName)
+            self.logger.info("Rule %s is %s", reqId, ddmRequest['state'])
             if ddmRequest['state'] == 'OK':
                 self.logger.info("Request %s is completed, setting status of task %s to NEW", reqId, taskName)
                 mw.updateWork(taskName, recallingTask['tm_task_command'], 'NEW')
