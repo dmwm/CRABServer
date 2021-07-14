@@ -101,20 +101,20 @@ class TapeRecallStatus(BaseRecurringAction):
                 failTask(taskName, crabserver, msg, self.logger, 'FAILED')
                 continue
 
+            # Make sure there is a valid credential to talk to CRABServer
+            mpl = MyProxyLogon(config=config, crabserver=crabserver, myproxylen=self.pollingTime)
+            user_proxy = True
+            try:
+                mpl.execute(task=recallingTask)  # this adds 'user_proxy' to recallingTask
+            except TaskWorkerException as twe:
+                user_proxy = False
+                self.logger.exception(twe)
+
             if not 'S3' in recallingTask['tm_cache_url'].upper():
                 # when using old crabcache had to worry about sandbox purging after 3 days
-                mpl = MyProxyLogon(config=config, crabserver=crabserver, myproxylen=self.pollingTime)
-                user_proxy = True
-                try:
-                    mpl.execute(task=recallingTask) # this adds 'user_proxy' to recallingTask
-                except TaskWorkerException as twe:
-                    user_proxy = False
-                    self.logger.exception(twe)
-
                 # Make sure the task sandbox in the crabcache is not deleted until the tape recall is completed
                 if user_proxy:
                     self.refreshSandbox(recallingTask)
-
 
             # Retrieve status of recall request
             if not self.rucioClient:
