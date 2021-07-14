@@ -42,6 +42,12 @@ class Splitter(TaskAction):
                 numProbes = getattr(self.config.TaskWorker, 'numAutomaticProbes', 5)
                 splitparam['files_per_job'] = (len(data.getFiles()) + numProbes - 1) // numProbes
         elif kwargs['task']['tm_job_type'] == 'PrivateMC':
+            # sanity check
+            nJobs = kwargs['task']['tm_totalunits'] / splitparam['events_per_job']
+            if nJobs > maxJobs:
+                raise TaskWorkerException(
+                    "Your task would generate %s jobs. The maximum number of jobs in each task is %s" %
+                    (nJobs, maxJobs))
             if 'tm_events_per_lumi' in kwargs['task'] and kwargs['task']['tm_events_per_lumi']:
                 splitparam['events_per_lumi'] = kwargs['task']['tm_events_per_lumi']
             if 'tm_generator' in kwargs['task'] and kwargs['task']['tm_generator'] == 'lhe':
