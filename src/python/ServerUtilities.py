@@ -785,7 +785,8 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
     """
     uploads a file to s3.cern.ch usign PreSigned URLs obtained e.g. from a call to
     crabserver RESTCache API /crabserver/prod/cache?subresource=upload
-    this implemntation uses a plain curl command to do it
+    based on env.variable 'commandToUse' value, implementation can use plain curl
+    or gocurl to execute upload to S3 command
     :param filepath: string : the full path to a file to upload
     :param preSignedUrlFields: dictionary: a dictionary with the needed fields as
              returned from boto3 client when generating preSignedUrls:
@@ -812,22 +813,39 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
 
     userAgent = 'CRAB'
     uploadCommand = ''
+    
+    # This variable is used to set how upload to S3 command should be executed.
+    # If variable is set to 'useGOCurl' (i.e. export commandToUse=useGOCurl), then goCurl 
+    # is used for upload command execution: https://github.com/vkuznet/gocurl
+    commandToUse = os.getenv('commandToUse')
 
-    # am I running in the CMSSW SCRAM environment (e.g. CRABClient) ?
-    arch = os.getenv('SCRAM_ARCH')
-    if arch and arch.startswith('slc6'):
-        # make sure to use latest curl version
-        uploadCommand += 'source /cvmfs/cms.cern.ch/slc6_amd64_gcc700/external/curl/7.59.0/etc/profile.d/init.sh; '
+    if commandToUse == 'useGOCurl':
+        uploadCommand += '/afs/cern.ch/user/v/valya/public/gocurl -verbose 2 -method POST'
+        uploadCommand += ' -header "User-Agent:%s"' % userAgent
+        uploadCommand += ' -form "key=%s"' % key
+        uploadCommand += ' -form "AWSAccessKeyId=%s"' % AWSAccessKeyId
+        uploadCommand += ' -form "policy=%s"' % policy
+        uploadCommand += ' -form "signature=%s"' % signature
+        uploadCommand += ' -form "file=@%s"' % filepath
+        uploadCommand += ' -url "%s"' % url
+    else:
+        # am I running in the CMSSW SCRAM environment (e.g. CRABClient) ?
+        arch = os.getenv('SCRAM_ARCH')
+        if arch and arch.startswith('slc6'):
+            # make sure to use latest curl version
+            uploadCommand += 'source /cvmfs/cms.cern.ch/slc6_amd64_gcc700/external/curl/7.59.0/etc/profile.d/init.sh; '
 
-    # curl: -f flag makes it fail if server return HTTP error
-    uploadCommand += 'curl -f -v -X POST '
-    uploadCommand += ' -H "User-Agent: %s"' % userAgent
-    uploadCommand += ' -F "key=%s"' % key
-    uploadCommand += ' -F "AWSAccessKeyId=%s"' % AWSAccessKeyId
-    uploadCommand += ' -F "policy=%s"' % policy
-    uploadCommand += ' -F "signature=%s"' % signature
-    uploadCommand += ' -F "file=@%s"' % filepath
-    uploadCommand += ' "%s"' % url
+        # curl: -f flag makes it fail if server return HTTP error
+        uploadCommand += 'curl -f -v -X POST '
+        uploadCommand += ' -H "User-Agent: %s"' % userAgent
+        uploadCommand += ' -F "key=%s"' % key
+        uploadCommand += ' -F "AWSAccessKeyId=%s"' % AWSAccessKeyId
+        uploadCommand += ' -F "policy=%s"' % policy
+        uploadCommand += ' -F "signature=%s"' % signature
+        uploadCommand += ' -F "file=@%s"' % filepath
+        uploadCommand += ' "%s"' % url
+
+
     logger.debug('Will execute:\n%s', uploadCommand)
     uploadProcess = subprocess.Popen(uploadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     stdout, stderr = uploadProcess.communicate()
@@ -843,7 +861,8 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
     More generic than the name implies:
     downloads a file usign PreSigned URLs obtained e.g. from a call to
     crabserver RESTCache API /crabserver/prod/cache?subresource=download
-    this implemntation uses a plain wget command to do it (simplest way!)
+    based on env.variable 'commandToUse' value, implementation can use wget
+    or gocurl to execute download from S3 command
     :param filepath: string : the full path to the file to be created
         if the file exists already, it will be silently overwritten
     :param preSignedUrl: string : the URL to use (includes the host name)
@@ -855,9 +874,21 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
         raise Exception("mandatory filepath argument missing")
     if not preSignedUrl :
         raise Exception("mandatory preSignedUrl argument missing")
+        
+    # This variable is used to set how download from S3 command should be executed.
+    # If variable is set to 'useGOCurl' (i.e. export commandToUse=useGOCurl), then goCurl 
+    # is used for download command execution: https://github.com/vkuznet/gocurl
+    commandToUse = os.getenv('commandToUse')               
 
-    downloadCommand = 'wget -Sq -O %s ' % filepath
-    downloadCommand += ' "%s"' % preSignedUrl
+    downloadCommand = ''
+    if commandToUse == 'useGOCurl':
+        downloadCommand += '/afs/cern.ch/user/v/valya/public/gocurl -verbose 2 -method GET'
+        downloadCommand += ' -out "%s"' % filepath
+        downloadCommand += ' -url "%s"' % preSignedUrl
+    else:
+        downloadCommand += 'wget -Sq -O %s ' % filepath
+        downloadCommand += ' "%s"' % preSignedUrl
+
     downloadProcess = subprocess.Popen(downloadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     logger.debug("Will execute:\n%s", downloadCommand)
     stdout, stderr = downloadProcess.communicate()
