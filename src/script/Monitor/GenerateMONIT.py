@@ -213,8 +213,9 @@ class CRAB3CreateJson(object):
         states_filter = ['KILL', 'RESUBMIT', 'NEW', 'QUEUED', 'KILLFAILED', 'RESUBMITFAILED', 'SUBMITFAILED',
                          'UPLOADED', 'TAPERECALL']
         if len(twStatus) > 0:
-            for state in twStatus.keys():
-                if state in states_filter:
+            for state in states_filter:
+                self.jsonDoc['abs_task_states'].update({str(state): 0})
+                if state in twStatus.keys():
                     self.jsonDoc['abs_task_states'].update({str(state): int(twStatus[state])})
 
         # get the number of condor_shadow processes per schedd
