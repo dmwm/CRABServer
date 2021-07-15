@@ -60,7 +60,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD: CRAB_TransferOutputs = 0" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: CRAB_TransferOutputs = 0" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -75,7 +75,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD: CRAB_SaveLogsFlag = 1" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: CRAB_SaveLogsFlag = 1" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -89,8 +89,8 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
-lookFor "JOB AD: CMS_Type = \\"Test\\"" ${workDir}/results/job_out.1.*.txt
-lookFor "JOB AD: CMS_TaskType = \\"hctestnew\\"" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: CMS_Type = \\"Test\\"" "${workDir}/results/job_out.1.*.txt"
+lookFor "JOB AD: CMS_TaskType = \\"hctestnew\\"" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -126,7 +126,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "^Output files.*: \$" ${workDir}/results/job_out.1.*.txt
+lookFor "^Output files.*: \$" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -175,7 +175,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD: RequestMemory = 2500" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: RequestMemory = 2500" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -190,7 +190,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD: MaxWallTimeMins_RAW = 100" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: MaxWallTimeMins_RAW = 100" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -210,7 +210,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD: RequestCpus = 8" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: RequestCpus = 8" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -227,8 +227,8 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "SB CMSRUN starting" ${workDir}/results/job_out.1.*.txt
-lookFor "====== arg checking: \$1 = 1" ${workDir}/results/job_out.1.*.txt
+lookFor "SB CMSRUN starting" "${workDir}/results/job_out.1.*.txt"
+lookFor "====== arg checking: \$1 = 1" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -248,10 +248,10 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "SB CMSRUN starting" ${workDir}/results/job_out.1.*.txt
-lookFor "====== arg checking: \$1 = 1" ${workDir}/results/job_out.1.*.txt
-lookFor "====== arg checking: \$2 = exitCode=666" ${workDir}/results/job_out.1.*.txt
-lookFor "====== arg checking: \$3 = gotArgs=Yes" ${workDir}/results/job_out.1.*.txt
+lookFor "SB CMSRUN starting" "${workDir}/results/job_out.1.*.txt"
+lookFor "====== arg checking: \$1 = 1" "${workDir}/results/job_out.1.*.txt"
+lookFor "====== arg checking: \$2 = exitCode=666" "${workDir}/results/job_out.1.*.txt"
+lookFor "====== arg checking: \$3 = gotArgs=Yes" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -318,7 +318,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "opened.*GenericTTbar/GEN-SIM-RAW" ${workDir}/results/job_out.1.*.txt
+lookFor "opened.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -335,7 +335,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "opened.*GenericTTbar/GEN-SIM-RAW" ${workDir}/results/job_out.1.*.txt
+lookFor "opened.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -352,7 +352,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "== JOB AD: CRAB_AlgoArgs.*\\"lumis\\": \\[\\"1,10" ${workDir}/results/job_out.1.*.txt
+lookFor "== JOB AD: CRAB_AlgoArgs.*\\"lumis\\": \\[\\"1,10" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -373,7 +373,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273158\\"" ${workDir}/results/job_out.1.*.txt
+lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273158\\"" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -394,7 +394,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273150\\"" ${workDir}/results/job_out.1.*.txt
+lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273150\\"" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -468,7 +468,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD: DESIRED_SITES = \\"T2_DE_DESY\\"" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: DESIRED_SITES = \\"T2_DE_DESY\\"" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -489,7 +489,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD: JOB_CMSSite = \\"T1_US_FNAL\\"" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: JOB_CMSSite = \\"T1_US_FNAL\\"" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -524,9 +524,9 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD: CRAB_UserRole = \\"production\\"" ${workDir}/results/job_out.1.*.txt
-lookFor "JOB AD: x509UserProxyFirstFQAN = \\"/cms/Role=production/Capability=NULL\\"" ${workDir}/results/job_out.1.*.txt
-lookFor "attribute : /cms/Role=production/Capability=NULL" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: CRAB_UserRole = \\"production\\"" "${workDir}/results/job_out.1.*.txt"
+lookFor "JOB AD: x509UserProxyFirstFQAN = \\"/cms/Role=production/Capability=NULL\\"" "${workDir}/results/job_out.1.*.txt"
+lookFor "attribute : /cms/Role=production/Capability=NULL" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -573,8 +573,8 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD: CMS_ALLOW_OVERFLOW = false" ${workDir}/results/job_out.1.*.txt
-lookFor "JOB AD: CRAB_StageoutPolicy = \\"remote\\"" ${workDir}/results/job_out.1.*.txt
+lookFor "JOB AD: CMS_ALLOW_OVERFLOW = false" "${workDir}/results/job_out.1.*.txt"
+lookFor "JOB AD: CRAB_StageoutPolicy = \\"remote\\"" "${workDir}/results/job_out.1.*.txt"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
