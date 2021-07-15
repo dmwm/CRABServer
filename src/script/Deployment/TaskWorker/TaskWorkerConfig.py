@@ -39,7 +39,6 @@ config.TaskWorker.recurringActions = ['RemovetmpDir']
 ## Possible values for instance are:
 #   - preprod   : uses cmsweb-testbed RESt with preprod DB
 #   - prod      : uses cmsweb,cern.ch production REST with production DB
-#   - K8s       : uses cmsweb-k8s-testbed REST with preprod DB
 #   - other     : allows to use any restHost with andy dbInstance, those needs to be
 #                  specified in the two following parameters
 config.TaskWorker.instance = 'other'

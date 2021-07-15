@@ -42,7 +42,6 @@ FILE_MEMORY_LIMIT = 512*1024
 # which correspond to a well known and specified REST host name and DataBase instance
 SERVICE_INSTANCES = {'prod': {'restHost':'cmsweb.cern.ch', 'dbInstance':'prod'},
                      'preprod': {'restHost':'cmsweb-testbed.cern.ch', 'dbInstance':'preprod'},
-                     'k8spreprod': {'restHost':'cmsweb-k8s-testbed.cern.ch', 'dbInstance':'preprod'},
                      'auth' : {'restHost':'cmsweb-auth.cern.ch', 'dbInstance':'preprod'},
                      'test1': {'restHost':'cmsweb-test1.cern.ch', 'dbInstance':'dev'},
                      'test2': {'restHost':'cmsweb-test2.cern.ch', 'dbInstance':'dev'},

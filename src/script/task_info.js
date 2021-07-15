@@ -830,9 +830,6 @@ $(document).ready(function() {
             case "cmsweb.cern.ch":
                 $("#db-selector-box").val("prod");
                 break;
-            case "cmsweb-k8s-prod.cern.ch":
-                $("#db-selector-box").val("prod");
-                break;
             case "cmsweb-testbed.cern.ch":
                 $("#db-selector-box").val("preprod");
                 break;
