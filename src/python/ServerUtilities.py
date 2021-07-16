@@ -785,7 +785,7 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
     """
     uploads a file to s3.cern.ch usign PreSigned URLs obtained e.g. from a call to
     crabserver RESTCache API /crabserver/prod/cache?subresource=upload
-    based on env.variable 'commandToUse' value, implementation can use plain curl
+    based on env.variable 'CRAB_useGoCurl' presence, implementation can use plain curl
     or gocurl to execute upload to S3 command
     :param filepath: string : the full path to a file to upload
     :param preSignedUrlFields: dictionary: a dictionary with the needed fields as
@@ -813,13 +813,10 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
 
     userAgent = 'CRAB'
     uploadCommand = ''
-    
-    # This variable is used to set how upload to S3 command should be executed.
-    # If variable is set to 'useGOCurl' (i.e. export commandToUse=useGOCurl), then goCurl 
-    # is used for upload command execution: https://github.com/vkuznet/gocurl
-    commandToUse = os.getenv('commandToUse')
 
-    if commandToUse == 'useGOCurl':
+    # CRAB_useGoCurl env. variable is used to define how upload to S3 command should be executed.
+    # If variable is set, then goCurl is used for command execution: https://github.com/vkuznet/gocurl
+    if os.getenv('CRAB_useGoCurl'):
         uploadCommand += '/afs/cern.ch/user/v/valya/public/gocurl -verbose 2 -method POST'
         uploadCommand += ' -header "User-Agent:%s"' % userAgent
         uploadCommand += ' -form "key=%s"' % key
@@ -845,7 +842,6 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
         uploadCommand += ' -F "file=@%s"' % filepath
         uploadCommand += ' "%s"' % url
 
-
     logger.debug('Will execute:\n%s', uploadCommand)
     uploadProcess = subprocess.Popen(uploadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     stdout, stderr = uploadProcess.communicate()
@@ -861,7 +857,7 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
     More generic than the name implies:
     downloads a file usign PreSigned URLs obtained e.g. from a call to
     crabserver RESTCache API /crabserver/prod/cache?subresource=download
-    based on env.variable 'commandToUse' value, implementation can use wget
+    based on env.variable 'CRAB_useGoCurl' presence, implementation can use wget
     or gocurl to execute download from S3 command
     :param filepath: string : the full path to the file to be created
         if the file exists already, it will be silently overwritten
@@ -874,14 +870,12 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
         raise Exception("mandatory filepath argument missing")
     if not preSignedUrl :
         raise Exception("mandatory preSignedUrl argument missing")
-        
-    # This variable is used to set how download from S3 command should be executed.
-    # If variable is set to 'useGOCurl' (i.e. export commandToUse=useGOCurl), then goCurl 
-    # is used for download command execution: https://github.com/vkuznet/gocurl
-    commandToUse = os.getenv('commandToUse')               
 
     downloadCommand = ''
-    if commandToUse == 'useGOCurl':
+
+    # CRAB_useGoCurl env. variable is used to define how download from S3 command should be executed.
+    # If variable is set, then goCurl is used for command execution: https://github.com/vkuznet/gocurl
+    if os.getenv('CRAB_useGoCurl'):
         downloadCommand += '/afs/cern.ch/user/v/valya/public/gocurl -verbose 2 -method GET'
         downloadCommand += ' -out "%s"' % filepath
         downloadCommand += ' -url "%s"' % preSignedUrl
