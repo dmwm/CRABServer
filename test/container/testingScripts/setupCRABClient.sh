@@ -4,11 +4,11 @@
 # 1. dev - CRABClient from Intergration Build (IB);
 # 2. GH - CRABClient from CRABClient GH repository master branch. This option requires to set DBS, WMCore and CRABServer tags to use;
 # 3. prod - production CRABClient from cvmfs;
-#Variables ${CMSSW_release}, ${CRABServer_tag}, ${CRABClient_version}, ${WMCore_tag}, ${DBS_tag}
+#Variables ${SCRAM_ARCHITECTURE}, ${CMSSW_release}, ${CRABServer_tag}, ${CRABClient_version}, ${WMCore_tag}, ${DBS_tag}
 # comes from Jenkins job CRABServer_ExecuteTests configuration.
 
 export WORK_DIR=`pwd`
-export SCRAM_ARCH=slc7_amd64_gcc700
+export SCRAM_ARCH=${SCRAM_ARCHITECTURE}
 mkdir repos
 
 source /cvmfs/cms-ib.cern.ch/latest/cmsset_default.sh
@@ -32,7 +32,7 @@ case $CRABClient_version in
 	cp CRABServer/src/python/ServerUtilities.py CRABClient/src/python/
 	cp CRABServer/src/python/RESTInteractions.py CRABClient/src/python/
 	#$ghprbPullId is used for PR testing. If this variable is set, that means
-	#we need to run test agains specific commit
+	#we need to run test against specific commit
 	if [ ! -z "$ghprbPullId" ]; then
 		cd CRABClient
 		git fetch origin pull/${ghprbPullId}/merge:PR_MERGE
