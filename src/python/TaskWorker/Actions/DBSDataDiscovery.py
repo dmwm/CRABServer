@@ -133,7 +133,7 @@ class DBSDataDiscovery(DataDiscovery):
             # Compute size of recall request
             sizeToRecall = 0
             for block in blockList:
-                replicas = rucioClient.list_dataset_replicas('cms', block)
+                replicas = rucioClient.list_dataset_replicas(scope='cms', name=block, deep=True)
                 blockBytes = replicas.next()['bytes']  # pick first replica for each block, they better all have same size
                 sizeToRecall += blockBytes
             TBtoRecall = sizeToRecall // 1e12
@@ -310,7 +310,7 @@ class DBSDataDiscovery(DataDiscovery):
             try:
                 for blockName in list(blocks):
                     replicas = set()
-                    response = self.rucioClient.list_dataset_replicas(scope, blockName)
+                    response = self.rucioClient.list_dataset_replicas(scope=scope, name=blockName, deep=True)
                     for item in response:
                         # same as complete='y' used for PhEDEx
                         if item['state'].upper() == 'AVAILABLE':
@@ -365,7 +365,7 @@ class DBSDataDiscovery(DataDiscovery):
                 try:
                     for blockName in list(secondaryBlocks):
                         replicas = set()
-                        response = self.rucioClient.list_dataset_replicas(scope, blockName)
+                        response = self.rucioClient.list_dataset_replicas(scope=scope, name=blockName, deep=True)
                         for item in response:
                             # same as complete='y' used for PhEDEx
                             if item['state'].upper() == 'AVAILABLE':
