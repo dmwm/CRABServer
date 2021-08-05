@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 {
   set +x
   # load the logging functions
@@ -25,7 +24,6 @@
   FULL_TEST=(createmyproxy checkusername checkwrite tasks preparelocal status report getlog getoutput)
   #${TEST_LIST} comes from Jenkins and is used to specify which testing should be done: PR_TEST or FULL_TEST
   TEST_TO_EXECUTE=${TEST_LIST}[@]
-
 
   function logMsg() {
     local kind=$1
@@ -58,7 +56,6 @@
     esac
   }
 
-
   function checkThisCommand() {
     local cmd="$1"
     local parms="$2"
@@ -84,8 +81,6 @@
      fi
   }
 
-
-
   # check for a valid proxy
   function checkProxy(){
     noProxy=`echo "$PROXY" | grep 'Proxy not found'`
@@ -101,7 +96,6 @@
       exit
     fi
   }
-
 
   TMP_PARM1=("")
   function checkCmdParam() {
@@ -145,18 +139,9 @@
   for parm in "${USETHISPARMS[@]}"; do
       checkThisCommand submit "$parm"
   done
-
-  #depending on which test should be executed (PR_TEST or FULL_TEST), set PROJDIR value
-  if [ ${TEST_LIST} = "PR_TEST" ]; then
-	SUBMITTED_TASK=`ls | grep crab_* | cut -d' ' -f10`
-	PROJDIR="${TASK_DIR}/${SUBMITTED_TASK}"
-	cd ${WORK_DIR}
-	sleep 100
-  else
-  	TASKTOTRACK=`cat /artifacts/submitted_tasks`
-  	PROJDIR=`crab remake --task=$TASKTOTRACK --instance=$REST_Instance | grep 'Finished remaking project directory' | awk '{print $6}'`
-  fi
-
+  
+  TASKTOTRACK=`cat /artifacts/submitted_tasks`
+  PROJDIR=`crab remake --task=$TASKTOTRACK --instance=$REST_Instance | grep 'Finished remaking project directory' | awk '{print $6}'`
 
   ### 1. test crab createmyproxy -h, --proxy=PROXY, --days=100
   USETHISPARMS=()
