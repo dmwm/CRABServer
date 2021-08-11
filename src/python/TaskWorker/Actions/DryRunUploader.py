@@ -5,6 +5,7 @@ import os
 import json
 import urllib
 import tarfile
+import time
 
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
@@ -12,7 +13,7 @@ from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
-from ServerUtilities import uploadToS3
+from ServerUtilities import uploadToS3, downloadFromS3
 
 class DryRunUploader(TaskAction):
     """
@@ -44,6 +45,7 @@ class DryRunUploader(TaskAction):
             self.packSandbox(inputFiles)
 
             self.logger.info('Uploading dry run tarball to the user file cache')
+            t0 = time.time()
             if 'S3' in kw['task']['tm_cache_url'].upper():
                 uploadToS3(crabserver=self.crabserver, filepath='dry-run-sandbox.tar.gz',
                            objecttype='runtimefiles', taskname=kw['task']['tm_taskname'], logger=self.logger)
@@ -56,6 +58,25 @@ class DryRunUploader(TaskAction):
             if 'hashkey' not in result:
                 raise TaskWorkerException('Failed to upload dry-run-sandbox.tar.gz to the user file cache: ' + str(result))
             self.logger.info('Uploaded dry run tarball to the user file cache: %s', str(result))
+            # wait until tarball is available, S3 may take a few seconds for this (ref. issue #6706 )
+            t1 = time.time()
+            lt1 = time.strftime("%H:%M:%S", time.localtime(t1))
+            uploadTime = t1-t0
+            self.logger.debug('runtimefiles upload took %s secs and completed at %s', uploadTime, lt1)
+            self.logger.debug('check if tarball is available')
+            tarballOK = False
+            while not tarballOK:
+                try:
+                    self.logger.debug('download tarball to /dev/null')
+                    downloadFromS3(crabserver=self.crabserver, filepath='/dev/null', objecttype='runtimefiles',
+                                   taskname=kw['task']['tm_taskname'], logger=self.logger)
+                    self.logger.debug('OK, it worked')
+                    tarballOK = True
+                except Exception as e:
+                    self.logger.debug('runtimefiles tarball not ready yet')
+                    self.logger.debug('Exception was raised: %s', e)
+                    self.logger.debug('Sleep 5 sec')
+                    time.sleep(5)
             update = {'workflow': kw['task']['tm_taskname'], 'subresource': 'state', 'status': 'UPLOADED'}
             self.logger.debug('Updating task status: %s', str(update))
             self.crabserver.post(api='workflowdb', data=urllib.urlencode(update))
