@@ -28,5 +28,14 @@ git checkout $WMCoreTag
 git remote add stefano https://github.com/belforte/WMCore.git
 git remote add daina https://github.com/ddaina/WMCore.git
 
-# 4. all done, reset cwd and exit
+# 4. create .gitconfig
+cat > ~/.gitconfig << EOF
+[user]
+        email = nobody@nowhere
+        name = crab
+[core]
+        editor = vim
+EOF
+
+# 5. all done, reset cwd and exit
 popd
