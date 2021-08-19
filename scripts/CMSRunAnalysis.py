@@ -617,7 +617,7 @@ def getProv(filename, scram):
     output = scram.getStdout()
     return output
 
-def tweakPSet(opts):
+def tweakPSet(opts, scram):
 
     commandTemplate = 'python %s/TweakPSet.py --location=%s ' + '--inputFile=\'%s\' ' + '--runAndLumis=\'%s\' ' +\
                       '--firstEvent=%s ' + '--lastEvent=%s ' + '--firstLumi=%s ' + '--firstRun=%s ' +\
@@ -638,14 +638,21 @@ def tweakPSet(opts):
                                opts.maxRuntime)
 
     print('Executing %s' % command)
-    proc = subprocess.Popen(command, shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-    out, err = proc.communicate()
-    rc = proc.returncode
-    print(rc)
-    print(err)
-    print(out)
+    #proc = subprocess.Popen(command, shell=True,
+    #        stdout=subprocess.PIPE,
+    #        stderr=subprocess.PIPE)
+    #out, err = proc.communicate()
+    #rc = proc.returncode
+    #print(rc)
+    #print(err)
+    #print(out)
+    with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
+        ret = scram(command_, runtimeDir = os.getcwd())
+    if ret > 0:
+        msg =  'Error executing TweakPSet.\n\tScram Diagnostic %s' % scram.diagnostic()
+        handleException("FAILED", EC_CMSRunWrapper, msg)
+        mintime()
+        sys.exit(EC_CMSRunWrapper)
 
 def executeScriptExe(opts, scram):
     #make scriptexe executable
@@ -955,7 +962,7 @@ if __name__ == "__main__":
         extractUserSandbox(options.archiveJob, options.cmsswVersion)
 
         # tweaking of the PSet is needed both for CMSSWStack and ScriptEXE
-        tweakPSet(options)
+        tweakPSet(options, scr)
 
 
         try:
