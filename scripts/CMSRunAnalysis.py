@@ -647,7 +647,7 @@ def tweakPSet(opts, scram):
     #print(err)
     #print(out)
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
-        ret = scram(command_, runtimeDir = os.getcwd())
+        ret = scram(command, runtimeDir = os.getcwd())
     if ret > 0:
         msg =  'Error executing TweakPSet.\n\tScram Diagnostic %s' % scram.diagnostic()
         handleException("FAILED", EC_CMSRunWrapper, msg)
