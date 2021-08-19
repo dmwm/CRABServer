@@ -972,7 +972,7 @@ if __name__ == "__main__":
                 jobExitCode = executeCMSSWStack(options, scr)
             else:
                 print("==== ScriptEXE Execution started at %s ====" % time.asctime(time.gmtime()))
-                jobExitCode = executeScriptExe(options, scr
+                jobExitCode = executeScriptExe(options, scr)
         except:
             print("==== CMSSW Stack Execution FAILED at %s ====" % time.asctime(time.gmtime()))
             logCMSSW()
