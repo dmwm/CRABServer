@@ -539,9 +539,8 @@ def parseArgs():
 
 #TODO: MM I do not believe this is necessary at all
 def prepSandbox(opts):
-    return
-    """
     print("==== Sandbox preparation STARTING at %s ====" % time.asctime(time.gmtime()))
+    """
     os.environ['WMAGENTJOBDIR'] = os.getcwd()
     if opts.archiveJob and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         if os.path.exists(opts.archiveJob):
@@ -571,6 +570,7 @@ def prepSandbox(opts):
                     handleException("FAILED", EC_WGET, 'CMSRunAnalysisERROR: could not get jobO files from panda server')
                     sys.exit(EC_WGET)
                 time.sleep(30)
+    """
     #The user sandbox.tar.gz has to be unpacked no matter what (even in DEBUG mode)
     print(commands.getoutput('tar xfm %s' % opts.archiveJob))
     print("==== Sandbox preparation FINISHED at %s ====" % time.asctime(time.gmtime()))
@@ -589,7 +589,6 @@ def prepSandbox(opts):
         for myfile in opts.userFiles.split(','):
             os.rename(myfile, destDir + '/' + myfile)
     print("==== WMCore filesystem preparation FINISHED at %s ====" % time.asctime(time.gmtime()))
-    """
 
 def extractUserSandbox(archiveJob, cmsswVersion):
     # the user sandbox contains the user scram directory files and thus
@@ -911,7 +910,7 @@ if __name__ == "__main__":
     # Note that we may fail in the imports - hence we try to report to Dashboard first
     try:
         options = parseArgs()
-        #prepSandbox(options)  #SB as MM said, this is obsolete
+        prepSandbox(options)
         from WMCore.WMRuntime.Bootstrap import setupLogging
         from WMCore.FwkJobReport.Report import Report
         from WMCore.FwkJobReport.Report import FwkJobReportException
