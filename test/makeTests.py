@@ -33,6 +33,8 @@ The three files are:
 from __future__ import division
 from __future__ import print_function
 
+import os
+
 from testUtils import writePset, writePset8cores, writeScriptExe, writeLumiMask, \
     writeConfigFile, writeTestSubmitScript, writeValidationScript
 
@@ -516,21 +518,23 @@ writeValidationScript(testName=name, validationScript=validationScript)
 #=============================
 
 # voRole
-name = 'voRole'
-changeDict = {'param': name, 'value': '"production"', 'section': 'User'}
-confChangesList = [changeDict]
-testSubmitScript = dummyTestScript
-validationScript = """
-checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD: CRAB_UserRole = \\"production\\"" "${workDir}/results/job_out.1.*.txt"
-lookFor "JOB AD: x509UserProxyFirstFQAN = \\"/cms/Role=production/Capability=NULL\\"" "${workDir}/results/job_out.1.*.txt"
-lookFor "attribute : /cms/Role=production/Capability=NULL" "${workDir}/results/job_out.1.*.txt"
-"""
-writeConfigFile(testName=name, listOfDicts=confChangesList)
-writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
-writeValidationScript(testName=name, validationScript=validationScript)
+# this test can't work on current (Aug 20, 2021) crab-prod client
+if os.getenv('CRABClient_version') != 'prod':
+    name = 'voRole'
+    changeDict = {'param': name, 'value': '"production"', 'section': 'User'}
+    confChangesList = [changeDict]
+    testSubmitScript = dummyTestScript
+    validationScript = """
+    checkStatus ${taskName} COMPLETED
+    crabCommand getlog "--short --jobids=1"
+    lookFor "Retrieved job_out.1.*.txt" commandLog.txt
+    lookFor "JOB AD: CRAB_UserRole = \\"production\\"" "${workDir}/results/job_out.1.*.txt"
+    lookFor "JOB AD: x509UserProxyFirstFQAN = \\"/cms/Role=production/Capability=NULL\\"" "${workDir}/results/job_out.1.*.txt"
+    lookFor "attribute : /cms/Role=production/Capability=NULL" "${workDir}/results/job_out.1.*.txt"
+    """
+    writeConfigFile(testName=name, listOfDicts=confChangesList)
+    writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+    writeValidationScript(testName=name, validationScript=validationScript)
 
 #=============================
 # SECTION DEBUG
