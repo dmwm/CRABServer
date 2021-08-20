@@ -728,7 +728,7 @@ def executeCMSSWStack(opts, scram):
     print(scram.diagnostic())
 
     # real thing
-    command_ = 'pwd; cmsRun -p PSet.py -j jobReport.xml'
+    command_ = 'pwd; cmsRun -p PSet.py -j FrameworkJobReport.xml'
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
         ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
     if ret > 0:
