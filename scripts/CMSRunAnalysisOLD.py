@@ -18,7 +18,6 @@ import os.path
 import logging
 import commands
 import traceback
-import subprocess
 from ast import literal_eval
 from optparse import OptionParser, BadOptionError, AmbiguousOptionError
 
@@ -539,8 +538,6 @@ def parseArgs():
 
 #TODO: MM I do not believe this is necessary at all
 def prepSandbox(opts):
-    return
-    """
     print("==== Sandbox preparation STARTING at %s ====" % time.asctime(time.gmtime()))
     os.environ['WMAGENTJOBDIR'] = os.getcwd()
     if opts.archiveJob and not "CRAB3_RUNTIME_DEBUG" in os.environ:
@@ -589,17 +586,11 @@ def prepSandbox(opts):
         for myfile in opts.userFiles.split(','):
             os.rename(myfile, destDir + '/' + myfile)
     print("==== WMCore filesystem preparation FINISHED at %s ====" % time.asctime(time.gmtime()))
-    """
+
 
 def extractUserSandbox(archiveJob, cmsswVersion):
-    # the user sandbox contains the user scram directory files and thus
-    # is unpacked in the local CMSSW_X_Y_X dir, but the cmsRun command
-    # will be executed from the job working directory, so we copy "up"
-    # the PSet
     os.chdir(cmsswVersion)
     print(commands.getoutput('tar xfm %s ' % os.path.join('..', archiveJob)))
-    shutil.copy('PSet.py','..')
-    shutil.copy('PSet.pkl','..')
     os.chdir('..')
 
 def getProv(filename, scram):
@@ -617,47 +608,45 @@ def getProv(filename, scram):
     output = scram.getStdout()
     return output
 
-def tweakPSet(opts, scram):
-
-    commandTemplate = 'python %s/TweakPSet.py --location=%s ' + '--inputFile=\'%s\' ' + '--runAndLumis=\'%s\' ' +\
-                      '--firstEvent=%s ' + '--lastEvent=%s ' + '--firstLumi=%s ' + '--firstRun=%s ' +\
-                      '--seeding=%s ' + '--lheInputFiles=%s ' + '--oneEventMode=%s ' +\
-                      '--eventsPerLumi=%s ' + '--maxRuntime=%s'
-    command = commandTemplate %\
-                 (os.getcwd(), os.getcwd(),
-                               opts.inputFile,
-                               opts.runAndLumis,
-                               opts.firstEvent,
-                               opts.lastEvent,
-                               opts.firstLumi,
-                               opts.firstRun,
-                               opts.seeding,
-                               opts.lheInputFiles,
-                               opts.oneEventMode,
-                               opts.eventsPerLumi,
-                               opts.maxRuntime)
-
-    print('Executing %s' % command)
-    #proc = subprocess.Popen(command, shell=True,
-    #        stdout=subprocess.PIPE,
-    #        stderr=subprocess.PIPE)
-    #out, err = proc.communicate()
-    #rc = proc.returncode
-    #print(rc)
-    #print(err)
-    #print(out)
-    with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
-        ret = scram(command, runtimeDir = os.getcwd())
-    if ret > 0:
-        msg =  'Error executing TweakPSet.\n\tScram Diagnostic %s' % scram.diagnostic()
-        handleException("FAILED", EC_CMSRunWrapper, msg)
-        mintime()
-        sys.exit(EC_CMSRunWrapper)
 
 def executeScriptExe(opts, scram):
     #make scriptexe executable
     st = os.stat(opts.scriptExe)
     os.chmod(opts.scriptExe, st.st_mode | stat.S_IEXEC)
+
+    command_ = ('python %s/TweakPSet.py --location=%s '+
+                                                          '--inputFile=\'%s\' '+
+                                                          '--runAndLumis=\'%s\' '+
+                                                          '--firstEvent=%s '+
+                                                          '--lastEvent=%s '+
+                                                          '--firstLumi=%s '+
+                                                          '--firstRun=%s '+
+                                                          '--seeding=%s '+
+                                                          '--lheInputFiles=%s '+
+                                                          '--oneEventMode=%s ' +
+                                                          '--eventsPerLumi=%s ' +
+                                                          '--maxRuntime=%s') %\
+                                             (os.getcwd(), os.getcwd(),
+                                                           opts.inputFile,
+                                                           opts.runAndLumis,
+                                                           opts.firstEvent,
+                                                           opts.lastEvent,
+                                                           opts.firstLumi,
+                                                           opts.firstRun,
+                                                           opts.seeding,
+                                                           opts.lheInputFiles,
+                                                           opts.oneEventMode,
+                                                           opts.eventsPerLumi,
+                                                           opts.maxRuntime)
+
+    print ('Executing %s' % command_)
+    with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
+        ret = scram(command_, runtimeDir = os.getcwd())
+    if ret > 0:
+        msg =  'Error executing TweakPSet.\n\tScram Diagnostic %s' % scram.diagnostic()
+        handleException("FAILED", EC_CMSRunWrapper, msg)
+        mintime()
+        sys.exit(EC_CMSRunWrapper)
 
     command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
     print ('Exdcuting user script: %s' % command_)
@@ -677,7 +666,6 @@ def executeScriptExe(opts, scram):
 
 def executeCMSSWStack(opts, scram):
 
-    """"
     def getOutputModules():
         pythonScript = "from PSetTweaks.WMTweak import makeTweak;"+\
                        "config = __import__(\"WMTaskSpace.cmsRun.PSet\", globals(), locals(), [\"process\"], -1);"+\
@@ -704,13 +692,13 @@ def executeCMSSWStack(opts, scram):
     cmssw.step.application.setup.cmsswVersion = opts.cmsswVersion
     cmssw.step.application.configuration.section_("arguments")
     cmssw.step.application.configuration.arguments.globalTag = ""
-    #for output in getOutputModules():
-    #    cmssw.step.output.modules.section_(output)
-    #    getattr(cmssw.step.output.modules, output).primaryDataset   = ''
-    #    getattr(cmssw.step.output.modules, output).processedDataset = ''
-    #    getattr(cmssw.step.output.modules, output).dataTier         = ''
+    for output in getOutputModules():
+        cmssw.step.output.modules.section_(output)
+        getattr(cmssw.step.output.modules, output).primaryDataset   = ''
+        getattr(cmssw.step.output.modules, output).processedDataset = ''
+        getattr(cmssw.step.output.modules, output).dataTier         = ''
     #cmssw.step.application.command.arguments = '' #TODO
-    #cmssw.step.user.inputSandboxes = [opts.archiveJob]
+    cmssw.step.user.inputSandboxes = [opts.archiveJob]
     cmssw.step.user.userFiles = opts.userFiles or ''
     #Setting the following job attribute is required because in the CMSSW executor there is a call to analysisFileLFN to set up some attributes for TFiles.
     #Same for lfnbase. We actually don't use these information so I am setting these to dummy values. Next: fix and use this lfn or drop WMCore runtime..
@@ -721,29 +709,8 @@ def executeCMSSWStack(opts, scram):
     cmssw.step.runtime.invokeCommand = 'python'
     cmssw.step.runtime.scramPreDir = os.getcwd()
     cmssw.step.runtime.preScripts = []
-    """
 
-    # debugging sanity check
-    command_ = 'date; echo $CMSSW_BASE; which python; pwd; date'
-    ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
-    print(scram.diagnostic())
 
-    # real thing
-    command_ = 'pwd; cmsRun -p PSet.py -j jobReportXML'
-    with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
-        ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
-    if ret > 0:
-        with open('cmsRun-stdout.log','w') as fh:
-            fh.write(scram.diagnostic())
-        msg = 'Error executing scriptExe.\n\tSee stdout log'
-        handleException("FAILED", EC_CMSRunWrapper, msg)
-        mintime()
-        sys.exit(EC_CMSRunWrapper)
-    with open('cmsRun-stdout.log','w') as fh:
-        fh.write(scram.getStdout())
-    return ret
-
-    """
     cmssw.step.runtime.scramPreScripts = [('%s/TweakPSet.py --location=%s '+
                                                           '--inputFile=\'%s\' '+
                                                           '--runAndLumis=\'%s\' '+
@@ -768,11 +735,10 @@ def executeCMSSWStack(opts, scram):
                                                            opts.oneEventMode,
                                                            opts.eventsPerLumi,
                                                            opts.maxRuntime)]
-    """
-    #cmssw.step.section_("execution") #exitStatus of cmsRun is set here
-    #cmssw.report = Report("cmsRun") #report is loaded and put here
-    #cmssw.execute()
-    #return cmssw
+    cmssw.step.section_("execution") #exitStatus of cmsRun is set here
+    cmssw.report = Report("cmsRun") #report is loaded and put here
+    cmssw.execute()
+    return cmssw
 
 
 def AddChecksums(report):
@@ -911,7 +877,7 @@ if __name__ == "__main__":
     # Note that we may fail in the imports - hence we try to report to Dashboard first
     try:
         options = parseArgs()
-        #prepSandbox(options)  #SB as MM said, this is obsolete
+        prepSandbox(options)
         from WMCore.WMRuntime.Bootstrap import setupLogging
         from WMCore.FwkJobReport.Report import Report
         from WMCore.FwkJobReport.Report import FwkJobReportException
@@ -943,6 +909,14 @@ if __name__ == "__main__":
     try:
         setupLogging('.')
 
+        # following commented lines are not needed anymore with new scram() in WMCore 1.2+
+        # Also add stdout to the logging
+        #logHandler = logging.StreamHandler(sys.stdout)
+        #logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s:%(message)s")
+        #logging.Formatter.converter = time.gmtime
+        #logHandler.setFormatter(logFormatter)
+        #logging.getLogger().addHandler(logHandler)
+
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             startDashboardMonitoring(ad)
         print("==== CMSSW Stack Execution STARTING at %s ====" % time.asctime(time.gmtime()))
@@ -961,15 +935,12 @@ if __name__ == "__main__":
 
         extractUserSandbox(options.archiveJob, options.cmsswVersion)
 
-        # tweaking of the PSet is needed both for CMSSWStack and ScriptEXE
-        tweakPSet(options, scr)
-
-
         try:
             jobExitCode = None
             if options.scriptExe=='None':
                 print("==== CMSSW JOB Execution started at %s ====" % time.asctime(time.gmtime()))
-                jobExitCode = executeCMSSWStack(options, scr)
+                cmsswSt = executeCMSSWStack(options, scr)
+                jobExitCode = cmsswSt.step.execution.exitStatus
             else:
                 print("==== ScriptEXE Execution started at %s ====" % time.asctime(time.gmtime()))
                 jobExitCode = executeScriptExe(options, scr)
