@@ -910,7 +910,7 @@ if __name__ == "__main__":
     # Note that we may fail in the imports - hence we try to report to Dashboard first
     try:
         options = parseArgs()
-        prepSandbox(options)
+        #prepSandbox(options)  #SB as MM said, this is obsolete
         from WMCore.WMRuntime.Bootstrap import setupLogging
         from WMCore.FwkJobReport.Report import Report
         from WMCore.FwkJobReport.Report import FwkJobReportException
