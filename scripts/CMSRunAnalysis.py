@@ -526,7 +526,7 @@ def parseArgs():
         print("scriptArgs:    ", opts.scriptArgs)
         print("maxRuntime:    ", opts.maxRuntime)
         print("===================")
-    except:
+    except Exception:
         name, value, _ = sys.exc_info()
         print('ERROR: missing parameters: %s - %s' % (name, value))
         handleException("FAILED", EC_MissingArg, 'CMSRunAnalysisERROR: missing parameters: %s - %s' % (name, value))
@@ -791,7 +791,7 @@ if __name__ == "__main__":
         from WMCore.FwkJobReport.Report import FwkJobReportException
         from WMCore.WMSpec.Steps.WMExecutionFailure import WMExecutionFailure
         from Utils.FileTools import calculateChecksums
-        from WMCore.WMSpec.Steps.Executors.CMSSW import CMSSW
+        #from WMCore.WMSpec.Steps.Executors.CMSSW import CMSSW
         #from WMCore.WMSpec.WMStep import WMStep
         #from WMCore.WMSpec.WMTask import makeWMTask
         #from WMCore.WMSpec.WMWorkload import newWorkload
