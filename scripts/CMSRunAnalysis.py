@@ -18,7 +18,6 @@ import os.path
 import logging
 import commands
 import traceback
-import subprocess
 from ast import literal_eval
 from optparse import OptionParser, BadOptionError, AmbiguousOptionError
 
@@ -42,7 +41,7 @@ class tempSetLogLevel():
     def __enter__(self):
         self.previousLogLevel = self.logger.getEffectiveLevel()
         self.logger.setLevel(self.newLogLevel)
-    def __exit__(self,a,b,c):
+    def __exit__(self, a, b, c):
         self.logger.setLevel(self.previousLogLevel)
 
 
@@ -296,11 +295,11 @@ def stopDashboardMonitoring(myad):
     fjr = {}
     try:
         fjr = json.load(open("jobReport.json"))
-    except:
+    except Exception:
         print("WARNING: Unable to parse jobReport.json; Dashboard reporting will not be useful.\n", traceback.format_exc())
     try:
         addReportInfo(params, fjr)
-    except:
+    except Exception:
         if 'ExeExitCode' not in params:
             params['ExeExitCode'] = 50115
         if 'JobExitCode' not in params:
@@ -309,7 +308,7 @@ def stopDashboardMonitoring(myad):
     print("Dashboard end parameters: %s" % str(params))
     try:
         reportPopularity(params['MonitorID'], params['MonitorJobID'], myad, fjr)
-    except:
+    except Exception:
         print("ERROR: Failed to report popularity information to Dashboard.\n", traceback.format_exc())
     DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
     DashboardAPI.apmonFree()
@@ -321,7 +320,7 @@ def logCMSSW():
     limit each line to maxLineLen. These logs will be returned back to
     schedd and we don`t want to take a lot of space on it. Full log files
     will be returned back to user SE, if he set saveLogs flag in crab config."""
-    global logCMSSWSaved
+    global logCMSSWSaved  # pylint: disable=global-statement
     if logCMSSWSaved:
         return
     if not os.path.exists("cmsRun-stdout.log"):
@@ -354,14 +353,14 @@ def logCMSSW():
                 if nl < keepAtStart:
                     printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
                 if nl == keepAtStart + 1:
-                    print("== CMSSW: ")
-                    print("== CMSSW: [...BIG SNIP...]")
-                    print("== CMSSW: ")
+                    print(prefix)
+                    print(prefix + " [...BIG SNIP...]")
+                    print(prefix)
                 if numLines - nl <= keepAtEnd:
-                    printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
+                    printCMSSWLine("%s" % prefix+line, maxLineLen)
     else:
         for line in open(outfile):
-            printCMSSWLine("== CMSSW: %s " % line, maxLineLen)
+            printCMSSWLine("%s" % prefix+line, maxLineLen)
 
     print("======== CMSSW OUTPUT FINSHING ========")
     logCMSSWSaved = True
@@ -382,7 +381,7 @@ def handleException(exitAcronym, exitCode, exitMsg):
             report = json.load(open("jobReport.json"))
         else:
             print("WARNING: WMCore did not produce a jobReport.json; FJR will not be useful.")
-    except:
+    except Exception:
         print("WARNING: Unable to parse WMCore's jobReport.json; FJR will not be useful.\n", traceback.format_exc())
 
     if report.get('steps', {}).get('cmsRun', {}).get('errors'):
@@ -416,7 +415,7 @@ def handleException(exitAcronym, exitCode, exitMsg):
         sLCfg = SiteLocalConfig.loadSiteLocalConfig()
         report['executed_site'] = sLCfg.siteName
         print("== Execution site for failed job from site-local-config.xml: %s" % sLCfg.siteName)
-    except:
+    except Exception:
         print("ERROR: Failed to record execution site name in the FJR from the site-local-config.xml")
         print(traceback.format_exc())
 
@@ -501,7 +500,7 @@ def parseArgs():
                       type='string',
                       default=None)
 
-    (opts, args) = parser.parse_args(sys.argv[1:])
+    (opts, _) = parser.parse_args(sys.argv[1:])
 
     try:
         print("==== Parameters Dump at %s ===" % time.asctime(time.gmtime()))
@@ -528,7 +527,7 @@ def parseArgs():
         print("maxRuntime:    ", opts.maxRuntime)
         print("===================")
     except:
-        name, value, traceBack = sys.exc_info()
+        name, value, _ = sys.exc_info()
         print('ERROR: missing parameters: %s - %s' % (name, value))
         handleException("FAILED", EC_MissingArg, 'CMSRunAnalysisERROR: missing parameters: %s - %s' % (name, value))
         mintime()
@@ -608,7 +607,7 @@ def tweakPSet(opts, scram):
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
         ret = scram(command, runtimeDir = os.getcwd())
     if ret > 0:
-        msg =  'Error executing TweakPSet.\n\tScram Diagnostic %s' % scram.diagnostic()
+        msg = 'Error executing TweakPSet.\n\tScram Diagnostic %s' % scram.diagnostic()
         handleException("FAILED", EC_CMSRunWrapper, msg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
@@ -621,15 +620,15 @@ def executeScriptExe(opts, scram):
     command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
     print ('Exdcuting user script: %s' % command_)
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
-        ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
+        ret = scram(command_, runtimeDir=os.getcwd(), cleanEnv=False)
     if ret > 0:
-        with open('cmsRun-stdout.log','w') as fh:
+        with open('cmsRun-stdout.log', 'w') as fh:
             fh.write(scram.diagnostic())
         msg = 'Error executing scriptExe.\n\tSee stdout log'
         handleException("FAILED", EC_CMSRunWrapper, msg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
-    with open('cmsRun-stdout.log','w') as fh:
+    with open('cmsRun-stdout.log', 'w') as fh:
         fh.write(scram.getStdout())
     return ret
 
@@ -638,15 +637,15 @@ def executeCMSSWStack(opts, scram):
 
     command_ = 'pwd; cmsRun -p PSet.py -j FrameworkJobReport.xml'
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
-        ret = scram(command_, runtimeDir = os.getcwd(), cleanEnv = False)
+        ret = scram(command_, runtimeDir=os.getcwd(), cleanEnv=False)
     if ret > 0:
-        with open('cmsRun-stdout.log','w') as fh:
+        with open('cmsRun-stdout.log', 'w') as fh:
             fh.write(scram.diagnostic())
         msg = 'Error executing scriptExe.\n\tSee stdout log'
         handleException("FAILED", EC_CMSRunWrapper, msg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
-    with open('cmsRun-stdout.log','w') as fh:
+    with open('cmsRun-stdout.log', 'w') as fh:
         fh.write(scram.getStdout())
     return ret
 
@@ -666,13 +665,13 @@ def AddChecksums(report):
                 if 'fileName' in fileInfo:
                     fileInfo['pfn'] = fileInfo['fileName']
                 else:
-                    continue           
+                    continue
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
             print("==== Checksum computation STARTING at %s ====" % time.asctime(time.gmtime()))
             (adler32, cksum) = calculateChecksums(fileInfo['pfn'])
             print("==== Checksum FINISHED at %s ====" % time.asctime(time.gmtime()))
             print("== FileName: %s  -  FileAdler32: %s  - FileSize: %.3f MBytes" % \
-                 (fileInfo['pfn'], adler32, float(fileInfo['size'])/(1024*1024)) ) 
+                 (fileInfo['pfn'], adler32, float(fileInfo['size'])/(1024*1024)))
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
 
 
@@ -773,7 +772,7 @@ if __name__ == "__main__":
     ad = {}
     try:
         ad = parseAd()
-    except:
+    except Exception:
         print("==== FAILURE WHEN PARSING HTCONDOR CLASSAD AT %s ====" % time.asctime(time.gmtime()))
         print(traceback.format_exc())
         ad = {}
@@ -793,12 +792,12 @@ if __name__ == "__main__":
         from WMCore.WMSpec.Steps.WMExecutionFailure import WMExecutionFailure
         from Utils.FileTools import calculateChecksums
         from WMCore.WMSpec.Steps.Executors.CMSSW import CMSSW
-        from WMCore.WMSpec.WMStep import WMStep
-        from WMCore.WMSpec.WMTask import makeWMTask
-        from WMCore.WMSpec.WMWorkload import newWorkload
-        from WMCore.WMSpec.Steps.Templates.CMSSW import CMSSW as CMSSWTemplate
+        #from WMCore.WMSpec.WMStep import WMStep
+        #from WMCore.WMSpec.WMTask import makeWMTask
+        #from WMCore.WMSpec.WMWorkload import newWorkload
+        #from WMCore.WMSpec.Steps.Templates.CMSSW import CMSSW as CMSSWTemplate
         from WMCore.WMRuntime.Tools.Scram import Scram
-    except:
+    except Exception:
         # We may not even be able to create a FJR at this point.  Record
         # error and exit.
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
@@ -822,9 +821,9 @@ if __name__ == "__main__":
             startDashboardMonitoring(ad)
         print("==== CMSSW Stack Execution STARTING at %s ====" % time.asctime(time.gmtime()))
         scr = Scram(
-            version = options.cmsswVersion,
-            directory = os.getcwd(),
-            architecture = options.scramArch,
+            version=options.cmsswVersion,
+            directory=os.getcwd(),
+            architecture=options.scramArch,
             )
 
         print("==== SCRAM Obj CREATED at %s ====" % time.asctime(time.gmtime()))
@@ -843,7 +842,7 @@ if __name__ == "__main__":
 
         try:
             jobExitCode = None
-            if options.scriptExe=='None':
+            if options.scriptExe == 'None':
                 print("==== CMSSW JOB Execution started at %s ====" % time.asctime(time.gmtime()))
                 jobExitCode = executeCMSSWStack(options, scr)
             else:
@@ -853,7 +852,7 @@ if __name__ == "__main__":
             print("==== Execution FAILED at %s ====" % time.asctime(time.gmtime()))
             logCMSSW()
             raise
-        if options.scriptExe=='None':
+        if options.scriptExe == 'None':
             print("==== CMSSW JOB Execution completed at %s ====" % time.asctime(time.gmtime()))
         else:
             print("==== ScriptEXE Execution completed at %s ====" % time.asctime(time.gmtime()))
@@ -871,7 +870,7 @@ if __name__ == "__main__":
                 rep.parse('FrameworkJobReport.xml', "cmsRun")
                 try:
                     jobExitCode = rep.getExitCode()
-                except:
+                except Exception:
                     jobExitCode = WMex.code
                 rep = rep.__to_json__(None)
                 #save the virgin WMArchive report
@@ -881,7 +880,7 @@ if __name__ == "__main__":
                 rep['jobExitCode'] = jobExitCode
                 with open('jobReport.json', 'w') as of:
                     json.dump(rep, of)
-            except:
+            except Exception:
                 print("WARNING: Failure when trying to parse FJR XML after job failure.")
 
         handleException("FAILED", WMex.code, exmsg)
