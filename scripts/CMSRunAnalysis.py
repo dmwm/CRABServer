@@ -769,7 +769,7 @@ if __name__ == "__main__":
         from WMCore.WMRuntime.Bootstrap import setupLogging
         from WMCore.FwkJobReport.Report import Report
         from WMCore.FwkJobReport.Report import FwkJobReportException
-        from WMCore.WMSpec.Steps.WMExecutionFailure import WMExecutionFailure
+        #from WMCore.WMSpec.Steps.WMExecutionFailure import WMExecutionFailure
         from Utils.FileTools import calculateChecksums
         #from WMCore.WMSpec.Steps.Executors.CMSSW import CMSSW
         #from WMCore.WMSpec.WMStep import WMStep
@@ -825,16 +825,16 @@ if __name__ == "__main__":
         applicationName = 'CMSSW JOB' if options.scriptExe == 'None' else 'ScriptEXE'
         print("==== %s Execution started at %s ====" % (applicationName, time.asctime(time.gmtime())))
         if options.scriptExe == 'None':
-            command = 'cmsRun -p PSet.py -j FrameworkJobReport.xml'
+            cmd = 'cmsRun -p PSet.py -j FrameworkJobReport.xml'
         else:
             # make sure scriptexe is executable
-            st = os.stat(opts.scriptExe)
-            os.chmod(opts.scriptExe, st.st_mode | stat.S_IEXEC)
-            command = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
-        applicationExitCode = executeUserApplication(command, scr)
+            st = os.stat(options.scriptExe)
+            os.chmod(options.scriptExe, st.st_mode | stat.S_IEXEC)
+            cmd = os.getcwd() + "/%s %s %s" %\
+                  (options.scriptExe, options.jobNumber, " ".join(json.loads(options.scriptArgs)))
+        applicationExitCode = executeUserApplication(cmd, scr)
         if applicationExitCode:
             print("==== Execution FAILED at %s ====" % time.asctime(time.gmtime()))
-            #handleException("FAILED", applicationExitCode, 'user application failed')
         print("==== %s Execution completed at %s ====" % (applicationName, time.asctime(time.gmtime())))
         print("Application exit code: %s" % str(applicationExitCode))
         print("==== Execution FINISHED at %s ====" % time.asctime(time.gmtime()))
@@ -852,7 +852,7 @@ if __name__ == "__main__":
                 try:
                     jobExitCode = rep.getExitCode()
                 except Exception:
-                    jobExitCode = WMex.code
+                    jobExitCode = EC_CMSRunWrapper
                 rep = rep.__to_json__(None)
                 #save the virgin WMArchive report
                 with open('WMArchiveReport.json', 'w') as of:
