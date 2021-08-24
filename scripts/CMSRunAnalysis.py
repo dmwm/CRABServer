@@ -612,6 +612,23 @@ def tweakPSet(opts, scram):
         mintime()
         sys.exit(EC_CMSRunWrapper)
 
+def executeUserApplication(command, scram):
+    """
+    cmsRun failures will appear in FJR but do not raise exceptions
+    exception can only be raised by unexpected failures of the Scram wrapper itself
+    Scram() never raises and returns the exit code from executing 'command'
+    """
+    with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
+        ret = scram(command, runtimeDir=os.getcwd(), cleanEnv=False)
+    if ret > 0:
+        with open('cmsRun-stdout.log', 'w') as fh:
+            fh.write(scram.diagnostic())
+        print("Error executing application in CMSSW environment.\n\tSee stdout log")
+        return ret
+    with open('cmsRun-stdout.log', 'w') as fh:
+        fh.write(scram.getStdout())
+    return ret
+
 def executeScriptExe(opts, scram):
     #make scriptexe executable
     st = os.stat(opts.scriptExe)
@@ -841,28 +858,28 @@ if __name__ == "__main__":
         tweakPSet(options, scr)
         print("==== Tweak PSet Done ====")
 
-        try:
-            jobExitCode = None
-            if options.scriptExe == 'None':
-                print("==== CMSSW JOB Execution started at %s ====" % time.asctime(time.gmtime()))
-                jobExitCode = executeCMSSWStack(options, scr)
-            else:
-                print("==== ScriptEXE Execution started at %s ====" % time.asctime(time.gmtime()))
-                jobExitCode = executeScriptExe(options, scr)
-        except:
-            print("==== Execution FAILED at %s ====" % time.asctime(time.gmtime()))
-            logCMSSW()
-            raise
+        jobExitCode = None
+        applicationName = 'CMSSW JOB' if options.scriptExe == 'None' else 'ScriptEXE'
+        print("==== %s Execution started at %s ====" % (applicationName, time.asctime(time.gmtime())))
         if options.scriptExe == 'None':
-            print("==== CMSSW JOB Execution completed at %s ====" % time.asctime(time.gmtime()))
+            command = 'cmsRun -p PSet.py -j FrameworkJobReport.xml'
         else:
-            print("==== ScriptEXE Execution completed at %s ====" % time.asctime(time.gmtime()))
-        print("Job exit code: %s" % str(jobExitCode))
+            # make sure scriptexe is executable
+            st = os.stat(opts.scriptExe)
+            os.chmod(opts.scriptExe, st.st_mode | stat.S_IEXEC)
+            command = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
+        applicationExitCode = executeUserApplication(command, scr)
+        if applicationExitCode:
+            print("==== Execution FAILED at %s ====" % time.asctime(time.gmtime()))
+            #handleException("FAILED", applicationExitCode, 'user application failed')
+        print("==== %s Execution completed at %s ====" % (applicationName, time.asctime(time.gmtime())))
+        print("Application exit code: %s" % str(applicationExitCode))
         print("==== Execution FINISHED at %s ====" % time.asctime(time.gmtime()))
         logCMSSW()
-    except WMExecutionFailure as WMex:
-        print("ERROR: Caught WMExecutionFailure - code = %s - name = %s - detail = %s" % (WMex.code, WMex.name, WMex.detail))
-        exmsg = WMex.name
+    except Exception as ex:
+        print("ERROR: Caught Wrapper ExecutionFailure - detail =\n%s" % str(ex))
+        jobExitCode = EC_CMSRunWrapper
+        exmsg = str(ex)
 
         # Try to recover what we can from the FJR.  handleException will use this if possible.
         if os.path.exists('FrameworkJobReport.xml'):
@@ -884,12 +901,7 @@ if __name__ == "__main__":
             except Exception:
                 print("WARNING: Failure when trying to parse FJR XML after job failure.")
 
-        handleException("FAILED", WMex.code, exmsg)
-        mintime()
-        sys.exit(WMex.code)
-    except Exception as ex:
-        #print "jobExitCode = %s" % jobExitCode
-        handleException("FAILED", EC_CMSRunWrapper, "failed to generate cmsRun cfg file at runtime")
+        handleException("FAILED", EC_CMSRunWrapper, exmsg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
 
@@ -907,6 +919,7 @@ if __name__ == "__main__":
         # cmsRun failures from stageout failures.  The initial use case of this is to
         # allow us to use a different LFN on job failure.
         rep['jobExitCode'] = jobExitCode
+        print("==== Job Exit Code from FrameworkJobReport.xml: %s ====" % jobExitCode)
         AddChecksums(rep)
         try:
             AddPsetHash(rep, scr)
