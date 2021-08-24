@@ -624,46 +624,9 @@ def executeUserApplication(command, scram):
         with open('cmsRun-stdout.log', 'w') as fh:
             fh.write(scram.diagnostic())
         print("Error executing application in CMSSW environment.\n\tSee stdout log")
-        return ret
-    with open('cmsRun-stdout.log', 'w') as fh:
-        fh.write(scram.getStdout())
-    return ret
-
-def executeScriptExe(opts, scram):
-    #make scriptexe executable
-    st = os.stat(opts.scriptExe)
-    os.chmod(opts.scriptExe, st.st_mode | stat.S_IEXEC)
-
-    command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
-    print ('Executing user script: %s' % command_)
-    with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
-        ret = scram(command_, runtimeDir=os.getcwd(), cleanEnv=False)
-    if ret > 0:
+    else:
         with open('cmsRun-stdout.log', 'w') as fh:
-            fh.write(scram.diagnostic())
-        msg = 'Error executing scriptExe.\n\tSee stdout log'
-        handleException("FAILED", EC_CMSRunWrapper, msg)
-        mintime()
-        sys.exit(EC_CMSRunWrapper)
-    with open('cmsRun-stdout.log', 'w') as fh:
-        fh.write(scram.getStdout())
-    return ret
-
-
-def executeCMSSWStack(opts, scram):
-
-    command_ = 'pwd; cmsRun -p PSet.py -j FrameworkJobReport.xml'
-    with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
-        ret = scram(command_, runtimeDir=os.getcwd(), cleanEnv=False)
-    if ret > 0:
-        with open('cmsRun-stdout.log', 'w') as fh:
-            fh.write(scram.diagnostic())
-        msg = 'Error executing CMSSW (cmsRun).\n\tSee stdout log'
-        handleException("FAILED", EC_CMSRunWrapper, msg)
-        mintime()
-        sys.exit(EC_CMSRunWrapper)
-    with open('cmsRun-stdout.log', 'w') as fh:
-        fh.write(scram.getStdout())
+            fh.write(scram.getStdout())
     return ret
 
 def AddChecksums(report):
