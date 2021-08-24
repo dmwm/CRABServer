@@ -618,7 +618,7 @@ def executeScriptExe(opts, scram):
     os.chmod(opts.scriptExe, st.st_mode | stat.S_IEXEC)
 
     command_ = os.getcwd() + "/%s %s %s" % (opts.scriptExe, opts.jobNumber, " ".join(json.loads(opts.scriptArgs)))
-    print ('Exdcuting user script: %s' % command_)
+    print ('Executing user script: %s' % command_)
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
         ret = scram(command_, runtimeDir=os.getcwd(), cleanEnv=False)
     if ret > 0:
@@ -641,7 +641,7 @@ def executeCMSSWStack(opts, scram):
     if ret > 0:
         with open('cmsRun-stdout.log', 'w') as fh:
             fh.write(scram.diagnostic())
-        msg = 'Error executing scriptExe.\n\tSee stdout log'
+        msg = 'Error executing CMSSW (cmsRun).\n\tSee stdout log'
         handleException("FAILED", EC_CMSRunWrapper, msg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
@@ -839,6 +839,7 @@ if __name__ == "__main__":
         # tweaking of the PSet is needed both for CMSSWStack and ScriptEXE
         print("==== Tweak PSet ====")
         tweakPSet(options, scr)
+        print("==== Tweak PSet Done ====")
 
         try:
             jobExitCode = None
