@@ -135,8 +135,10 @@ tweak = PSetTweak()
 
 # add tweaks
 
+# inputFile will always be present
 tweak.addParameter("process.source.fileNames", "customTypeCms.untracked.vstring(%s)" % inputFile)
-#runAndLumis is tricky
+
+#TODO runAndLumis is tricky
 
 if opts.firstEvent and opts.firstEvent != 'None':
     tweak.addParameter("process.source.firstEvent", "customTypeCms.untracked.uint32(%s)" % opts.firstEvent)
@@ -147,20 +149,22 @@ if opts.firstLumi and opts.firstLumi != 'None':
 if opts.firstRun and opts.firstRun != 'None':
     tweak.addParameter("process.source.firstRun", "customTypeCms.untracked.uint32(%s)" % opts.firstRun)
 
+#TODO
 # always setup seeding since seeding is only and always set to 'AutomaticSeeding' in CRAB
 # (of course only if a RandomeNumberGeneratorService is present in the PSET)
-"""
- so should use this code from SetupCMSSWPset.py but need to figure out how to handle
- the if in the first line
-if hasattr(self.process, "RandomNumberGeneratorService"):
-    from IOMC.RandomEngine.RandomServiceHelper import RandomNumberServiceHelper
-    helper = RandomNumberServiceHelper(self.process.RandomNumberGeneratorService)
-    helper.populate()
-"""
+# so should use this code from SetupCMSSWPset.py
+# https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L254-L286
+# but looking at it, it seems that for "AutomaticSeeding" there is nothing to do,
+# maybe only make a call to cmssw_handle_random_seeds.py ?
+# Need expert advice !!
 
-# lheinputfiles
+
 if opts.lheInputFiles and opts.lheInputFiles != 'None':
-    # to be implemented
+    #TODO
+    # IIUC in this case we simply have to enable lazy download via this code
+    # https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L529-L542
+    # i.e. call to cmssw_enable_lazy_download.py
+    # Need expert advice !!
     pass
 
 # event limiter for testing
