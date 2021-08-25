@@ -769,13 +769,7 @@ if __name__ == "__main__":
         from WMCore.WMRuntime.Bootstrap import setupLogging
         from WMCore.FwkJobReport.Report import Report
         from WMCore.FwkJobReport.Report import FwkJobReportException
-        #from WMCore.WMSpec.Steps.WMExecutionFailure import WMExecutionFailure
         from Utils.FileTools import calculateChecksums
-        #from WMCore.WMSpec.Steps.Executors.CMSSW import CMSSW
-        #from WMCore.WMSpec.WMStep import WMStep
-        #from WMCore.WMSpec.WMTask import makeWMTask
-        #from WMCore.WMSpec.WMWorkload import newWorkload
-        #from WMCore.WMSpec.Steps.Templates.CMSSW import CMSSW as CMSSWTemplate
         from WMCore.WMRuntime.Tools.Scram import Scram
     except Exception:
         # We may not even be able to create a FJR at this point.  Record
