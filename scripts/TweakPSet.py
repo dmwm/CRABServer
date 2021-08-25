@@ -1,21 +1,22 @@
 """
+New implementation by SB in 2021 to make it properly separate WMCore and CMSSW environments
+Tweak PSet files in pickle format, as used by CRAB or WMA wrappers.
+It will only work with WMCore 4.9 or later as it imports some utilities classes from
+WMCore/src/python/PSetTweaks while not using anything from WMCore/src/python/WMCore
 It is possible to run this TweakPSet script standalone. These are the requirements:
 
-1) You need to set up the CMSSW environment (cmsenv)
-2) Due to a restriction in WMCore [1] the PSet file should be called PSet.py and should be placed in `pwd`/WMTaskSpace/cmsRun/PSet.py where `pwd` is the location where you are running TweakPSet
-    2a) If you are testing a CRAB3 PSet which .py version simply loads the PSet.pkl file [2] then you have to make sure that the PSet.pkl file is also located in `pwd`
-
-[1] https://github.com/dmwm/WMCore/blob/c7603bc0d243947e3a766bd2b38acb92e91dd767/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L226
-[2] https://github.com/dmwm/CRABClient/blob/3.3.1509.rc3/src/python/CRABClient/JobType/CMSSWConfig.py#L70-L91
-
-3) The output PSet.py and PSet.pkl are placed in the directory indicated by the --location param
+1) You need to set up the CMSSW environment (cmsenv) and add WMCore/src/python/PSetTweaks
+   to the pythonpath (full WMCore/src/python like in WMCore.zip used by CRAB wrapper will also do)
+2) the PSet file should be called PSet.pkl and should be placed in `pwd`/PSet.pkl where
+   `pwd` is the location where you are running TweakPSet
+2a) If you are testing a CRAB3 PSet which .py version simply loads the PSet.pkl file [2]
+    then you have to make sure that the PSet.pkl file is also located in `pwd`
+3) The input file is saved as PSet-In.pkl
+4) The new PSet is written both in PSet.pkl and PSet-Out.pkl (can drop the latter when fully debugged)
 
 Can be tested with something like:
-4) Set up the pythonpath correctly. You need to include the current working directory (before we go into WMTaskSpace/cmsRun in the next step)
-mkdir -p WMTaskSpace/cmsRun
-mv <path-to-pset>/PSet.p* WMTaskSpace/cmsRun
-cd  WMTaskSpace/cmsRun
-python <path-to-TweakPSet>/TweakPSet.py --location=<path-to-output> --inputFile='job_input_file_list_1.txt' --runAndLumis='job_lumis_1.json' --firstEvent=0 --lastEvent=-1 --firstLumi=None --firstRun=1 --seeding=None --lheInputFiles=False --oneEventMode=0
+
+python <path-to-TweakPSet>/TweakPSet.py --inputFile='job_input_file_list_1.txt' --runAndLumis='job_lumis_1.json' --firstEvent=0 --lastEvent=-1 --firstLumi=None --firstRun=1 --seeding=None --lheInputFiles=False --oneEventMode=0
 
 job_lumis_1.json content:
 {"1": [[669684, 669684]]}
@@ -25,116 +26,15 @@ On Worker nodes it has a tarball with all files. but for debugging purpose it is
 """
 from __future__ import print_function
 
-from optparse import OptionParser
-from WMCore.Configuration import Configuration, ConfigSection
-from WMCore.DataStructs.Mask import Mask
-from WMCore.WMRuntime.Scripts.SetupCMSSWPset import SetupCMSSWPset
-from WMCore.WMRuntime.ScriptInterface import ScriptInterface
-
-class jobDict(dict):
-    def __init__(self, lheInputFiles, seeding):
-        self.lheInputFiles = lheInputFiles
-        self.seeding = seeding
-    def getBaggage(self):
-        confSect = ConfigSection()
-        confSect.seeding = self.seeding
-        confSect.lheInputFiles = self.lheInputFiles
-        return confSect
-
-class StepConfiguration(Configuration):
-    def __init__(self, lfnBase, outputMods):
-        Configuration.__init__(self)
-        for out in outputMods:
-            setattr(self, out, ConfigSection("output"))
-            getattr(self, out)._internal_name = "output"
-            getattr(self, out).lfnBase = lfnBase #'/store/temp/user/mmascher/RelValProdTTbar/mc/v6'
-        StepConfiguration.outputMods = outputMods
-
-    def getTypeHelper(self):
-        return self
-    def listOutputModules(self):
-        om = StepConfiguration.outputMods
-        #like return {"output1" : self.output1, "output2" : self.output2 ...} for each output1, output2 ... in self.outputMods
-        return dict(list(zip(om, map( lambda out: getattr(self, out), om))))
-    def getOutputModule(self, name):
-        return getattr(self, name)
-
-
-class SetupCMSSWPsetCore(SetupCMSSWPset):
-    """
-    location:       the working directory. PSet.py must be located there. The output PSet.pkl is also put there.
-                    N.B.: this parameter must end with WMTaskSpace.cmsRun.PSet
-    inputFiles:     the input files of the job. This must be a list of dictionaries whose keys are "lfn" and "parents"
-                    or a list of filenames.
-
-                    For example a valid input for this parameter is [{"lfn": , "parents" : }, {"lfn": , "parents" : }]
-                    If the "lfn"s start with MCFakeFile then mask.FirstLumi is used to tweak process.source.firstLuminosityBlock
-                    If the len of the list is >1 then the "lfn" values are put in a list and used to tweak "process.source.fileNames"
-                        In that case the parents values are merged to a single list and used to tweak process.source.secondaryFileNames
-                    If no input files are used then the mask.FirstEvent parameter is used to tweak process.source.firstEvent (error otherwise)
-    mask:           the parameter is used to twek some parameters of the process. In particular:
-                        process.maxEvents.input:
-                        process.source.skipEvent:
-                        process.source.firstRun:
-                        process.source.lumisToProcess:
-    agentNumber:    together with lfnBase is used to create the path of the output lfn. This output lfn is the used to tweak process.OUTPUT.logicalFileName
-                    where OUTPUT is the name of the output module
-    lfnBase:        see above
-    outputMods:     a list of names of the output modules, e.g. ['OUTPUT']. Used to tweak process.OUTPUT.filename with OUTPUT.root
-    lheInputFiles:  if we have a MC task and this parameter is false it's used to tweak process.source.firstEvent
-    firstEvent:     see above. Number to use to tweak also other parameters
-    firstLumi:      used only if the task ia a MC. In this case it's a mandatory parameter. Used to tweak process.source.firstLuminosityBlock
-    lastEvent:      together with firstEvent used to tweak process.maxEvents.input
-    firstRun:       used to tweak process.source.firstRun. Set to 1 if it's None
-    seeding:        used in handleSeeding
-    oneEventMode:   toggles one event mode
-    eventsPerLumi:  start a new lumi section after the specified amount of events.  None disables this.
-    """
-    def __init__(self, location, inputFiles, runAndLumis, agentNumber, lfnBase, outputMods, firstEvent=0, lastEvent=-1, firstLumi=None,\
-                    firstRun=None, seeding=None, lheInputFiles=False, oneEventMode=False, eventsPerLumi=None, maxRuntime=None):
-        SetupCMSSWPset.__init__(self, crabPSet=True)
-        self.stepSpace = ConfigSection()
-        self.stepSpace.location = location
-        self.step = StepConfiguration(lfnBase, outputMods)
-        self.step.section_("data")
-        self.step.data._internal_name = "cmsRun"
-        self.step.data.section_("application")
-        self.step.data.application.section_("configuration")
-        self.step.data.application.section_("command")
-        self.step.data.application.section_("multicore")
-        self.step.data.application.command.configuration = "PSet.py"
-        self.step.data.application.command.oneEventMode = oneEventMode in ["1", "True", True]
-        self.step.data.application.command.memoryCheck = False
-        self.step.data.application.command.silentMemoryCheck = True
-#        self.step.data.application.configuration.pickledarguments.globalTag/globalTagTransaction
-        if eventsPerLumi:
-            self.step.data.application.configuration.eventsPerLumi = eventsPerLumi
-        if maxRuntime:
-            self.step.data.application.configuration.maxSecondsUntilRampdown = maxRuntime
-        self.step.data.section_("input")
-        self.job = jobDict(lheInputFiles, seeding)
-        self.job["input_files"] = []
-        for inputF in inputFiles:
-            if isinstance(inputF, basestring):
-                self.job["input_files"].append({"lfn" : inputF, "parents" : ""})
-            else:
-                self.job["input_files"].append(inputF)
-
-        self.job['mask'] = Mask()
-        self.job['mask']["FirstEvent"] = firstEvent
-        self.job['mask']["LastEvent"] = lastEvent
-        self.job['mask']["FirstRun"] = firstRun
-        self.job['mask']["FirstLumi"] = firstLumi
-        self.job['mask']["runAndLumis"] = runAndLumis
-
-        self.job['agentNumber'] = agentNumber
-        self.job['counter'] = 0
-
 import os
+import shutil
 import sys
-import json
+import subprocess
 import tarfile
 from ast import literal_eval
+from optparse import OptionParser
+
+from PSetTweaks.PSetTweak import PSetTweak
 
 def readFileFromTarball(file, tarball):
     content = '{}'
@@ -159,16 +59,48 @@ def readFileFromTarball(file, tarball):
     tar_file.close()
     return literal_eval(content)
 
+def applyPsetTweak(psetTweak, psPklIn, psPklOut, skipIfSet=False, allowFailedTweaks=False):
+    """
+    code borrowed from  https://github.com/dmwm/WMCore/blob/master/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L223-L251
+    Apply a tweak to a PSet.pkl file. The tweak is described in the psetTweak input object
+    which must be an instance of the PSetTweak class from WMcore/src/python/PSetTweaks/PSetTweak.py
+    https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/PSetTweak.py#L160
+    Arguments:
+        psetTweak: the tweak
+        psPklIn: the path to the input PSet.pkl file to change
+        psPklOut: the path to the new PSet.pkl file to create
+    Options:
+      skipIfSet: Do not apply a tweak to a parameter that has a value set already.
+      allowFailedTweaks: If the tweak of a parameter fails, do not abort and continue tweaking the rest.
+    """
+    procScript = "edm_pset_tweak.py"
+    psetTweakJson = "PSetTweak.json"
+    psetTweak.persist(psetTweakJson, formatting='simplejson')
+
+    cmd = "%s --input_pkl %s --output_pkl %s --json %s" % (
+        procScript, psPklIn, psPklOut, psetTweakJson)
+    if skipIfSet:
+        cmd += " --skip_if_set"
+    if allowFailedTweaks:
+        cmd += " --allow_failed_tweaks"
+
+    print("will execute:\n%s" % cmd)
+
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    out, err = process.communicate()
+    exitcode = process.returncode
+    # for Py3 compatibility
+    stdout = out.decode(encoding='UTF-8') if out else ''
+    stderr = err.decode(encoding='UTF-8') if err else ''
+    if exitcode:
+        print("Non zero exit code: %s" % exitcode)
+        print("Error while tweaking pset.\nStdout:\n%s\nStderr:\%s" % (stdout, stderr))
+    return exitcode
+
 print("Beginning TweakPSet")
 print(" arguments: %s" % sys.argv)
-agentNumber = 0
-#lfnBase = '/store/temp/user/mmascher/RelValProdTTbar/mc/v6' #TODO how is this built?
-lfnBase = None
-outputMods = [] #Don't need to tweak this as the client looks for the ouput names and pass them to the job wrapper which moves them
-
 
 parser = OptionParser()
-parser.add_option('--location', dest='location')
 parser.add_option('--inputFile', dest='inputFile')
 parser.add_option('--runAndLumis', dest='runAndLumis')
 parser.add_option('--firstEvent', dest='firstEvent')
@@ -178,9 +110,13 @@ parser.add_option('--firstRun', dest='firstRun')
 parser.add_option('--seeding', dest='seeding')
 parser.add_option('--lheInputFiles', dest='lheInputFiles')
 parser.add_option('--oneEventMode', dest='oneEventMode', default=False)
-parser.add_option('--eventsPerLumi', dest='eventsPerLumi', default=None)
-parser.add_option('--maxRuntime', dest='maxRuntime', default=None)
+parser.add_option('--eventsPerLumi', dest='eventsPerLumi')
+parser.add_option('--maxRuntime', dest='maxRuntime')
 opts, args = parser.parse_args()
+
+# Note about ops: default value is None for all, but if, like usually happens,
+# CRAB code calls this with inputs like --seeding=None
+# the opts variable is set to the string 'None', not to the python type None
 
 if opts.oneEventMode in ["1", "True", True] :
     print("One event mode disabled until we can put together a decent version of WMCore.")
@@ -192,9 +128,72 @@ if opts.runAndLumis:
 inputFile = {}
 if opts.inputFile:
     inputFile = readFileFromTarball(opts.inputFile, 'input_files.tar.gz')
-pset = SetupCMSSWPsetCore( opts.location, inputFile, runAndLumis, agentNumber, lfnBase, outputMods,\
-                           literal_eval(opts.firstEvent), literal_eval(opts.lastEvent), literal_eval(opts.firstLumi),\
-                           literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode, \
-                           literal_eval(opts.eventsPerLumi), literal_eval(opts.maxRuntime))
 
-pset()
+
+# build a tweak object with the needed changes to be applied to PSet
+tweak = PSetTweak()
+
+# add tweaks
+
+tweak.addParameter("process.source.fileNames", "customTypeCms.untracked.vstring(%s)" % inputFile)
+#runAndLumis is tricky
+
+if opts.firstEvent and opts.firstEvent != 'None':
+    tweak.addParameter("process.source.firstEvent", "customTypeCms.untracked.uint32(%s)" % opts.firstEvent)
+if opts.lastEvent and opts.lastEvent != 'None':
+    tweak.addParameter("process.source.lastEvent", "customTypeCms.untracked.uint32(%s)" % opts.lastEvent)
+if opts.firstLumi and opts.firstLumi != 'None':
+    tweak.addParameter("process.source.firstLuminosityBlock", "customTypeCms.untracked.uint32(%s)" % opts.firstLumi)
+if opts.firstRun and opts.firstRun != 'None':
+    tweak.addParameter("process.source.firstRun", "customTypeCms.untracked.uint32(%s)" % opts.firstRun)
+
+# always setup seeding since seeding is only and always set to 'AutomaticSeeding' in CRAB
+# (of course only if a RandomeNumberGeneratorService is present in the PSET)
+"""
+ so should use this code from SetupCMSSWPset.py but need to figure out how to handle
+ the if in the first line
+if hasattr(self.process, "RandomNumberGeneratorService"):
+    from IOMC.RandomEngine.RandomServiceHelper import RandomNumberServiceHelper
+    helper = RandomNumberServiceHelper(self.process.RandomNumberGeneratorService)
+    helper.populate()
+"""
+
+# lheinputfiles
+if opts.lheInputFiles and opts.lheInputFiles != 'None':
+    # to be implemented
+    pass
+
+# event limiter for testing
+if opts.oneEventMode in ["1", "True", True] :
+    tweak.addParameter("process.maxEvents.input", "customTypeCms.untracked.int32(1)")
+
+# Apply events per lumi section if available
+if opts.eventsPerLumi and opts.eventsPerLumi != 'None':
+    numberEventsInLuminosityBlock = "customTypeCms.untracked.uint32(%s)" % opts.eventsPerLumi
+    tweak.addParameter("process.source.numberEventsInLuminosityBlock", numberEventsInLuminosityBlock)
+
+# limit run time if desired - ON HOLD SINCE IT FAILS
+#if opts.maxRuntime and ops.maxRuntime != 'None':
+#    maxSecondsUntilRampdown = "customTypeCms.untracked.PSet(input=cms.untracked.int32(%s))" %opts.maxRuntime
+#   tweak.addParameter("process.maxSecondsUntilRampdown.input", maxSecondsUntilRampdown)
+
+# old code as reference
+#pset = SetupCMSSWPsetCore( opts.location, inputFile, runAndLumis, agentNumber, lfnBase, outputMods,\
+#                           literal_eval(opts.firstEvent), literal_eval(opts.lastEvent), literal_eval(opts.firstLumi),\
+#                           literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode, \
+#                           literal_eval(opts.eventsPerLumi), literal_eval(opts.maxRuntime))
+
+# save original PSet.pkl
+psPklIn =  "PSet-In.pkl"
+shutil.copy('PSet.pkl', psPklIn)
+
+# tweak !
+psPklOut = "PSet-Out.pkl"
+ret = applyPsetTweak(tweak, psPklIn, psPklOut)
+
+if ret:
+    print ("tweak failed, leave PSet.pkl unchanged")
+else:
+    print("PSetTweak successful, overwrite PSet.pkl")
+    shutil.copy(psPklOut, 'PSet.pkl')
+
