@@ -139,6 +139,10 @@ tweak = PSetTweak()
 tweak.addParameter("process.source.fileNames", "customTypeCms.untracked.vstring(%s)" % inputFile)
 
 #TODO runAndLumis is tricky
+# need to extract code
+# from https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/WMTweak.py#L403
+# and covert our runAdnLumis json to the proper set of tweaks
+
 
 if opts.firstEvent and opts.firstEvent != 'None':
     tweak.addParameter("process.source.firstEvent", "customTypeCms.untracked.uint32(%s)" % opts.firstEvent)
