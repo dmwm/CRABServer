@@ -136,22 +136,35 @@ tweak = PSetTweak()
 # add tweaks
 
 # inputFile will always be present
-tweak.addParameter("process.source.fileNames", "customTypeCms.untracked.vstring(%s)" % inputFile)
+tweak.addParameter("process.source.fileNames",
+                   "customTypeCms.untracked.vstring(%s)" % inputFile)
 
-#TODO runAndLumis is tricky
-# need to extract code
-# from https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/WMTweak.py#L403
-# and covert our runAdnLumis json to the proper set of tweaks
-
+# for rearranging runsAndLumis into the structure needed by CMSSW, reuse code taken from
+# https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/WMTweak.py#L482
+if runAndLumis:
+    lumisToProcess = []
+    for run in runAndLumis.keys():
+        lumiPairs = runAndLumis[run]
+        for lumiPair in lumiPairs:
+            if len(lumiPair) != 2:
+                # Do nothing
+                continue
+            lumisToProcess.append("%s:%s-%s:%s" % (run, lumiPair[0], run, lumiPair[1]))
+    tweak.addParameter("process.source.lumisToProcess",
+                       "customTypeCms.untracked.VLuminosityBlockRange(%s)" % lumisToProcess)
 
 if opts.firstEvent and opts.firstEvent != 'None':
-    tweak.addParameter("process.source.firstEvent", "customTypeCms.untracked.uint32(%s)" % opts.firstEvent)
+    tweak.addParameter("process.source.firstEvent",
+                       "customTypeCms.untracked.uint32(%s)" % opts.firstEvent)
 if opts.lastEvent and opts.lastEvent != 'None':
-    tweak.addParameter("process.source.lastEvent", "customTypeCms.untracked.uint32(%s)" % opts.lastEvent)
+    tweak.addParameter("process.source.lastEvent",
+                       "customTypeCms.untracked.uint32(%s)" % opts.lastEvent)
 if opts.firstLumi and opts.firstLumi != 'None':
-    tweak.addParameter("process.source.firstLuminosityBlock", "customTypeCms.untracked.uint32(%s)" % opts.firstLumi)
+    tweak.addParameter("process.source.firstLuminosityBlock",
+                       "customTypeCms.untracked.uint32(%s)" % opts.firstLumi)
 if opts.firstRun and opts.firstRun != 'None':
-    tweak.addParameter("process.source.firstRun", "customTypeCms.untracked.uint32(%s)" % opts.firstRun)
+    tweak.addParameter("process.source.firstRun",
+                       "customTypeCms.untracked.uint32(%s)" % opts.firstRun)
 
 #TODO
 # always setup seeding since seeding is only and always set to 'AutomaticSeeding' in CRAB
@@ -204,4 +217,3 @@ if ret:
 else:
     print("PSetTweak successful, overwrite PSet.pkl")
     shutil.copy(psPklOut, 'PSet.pkl')
-
