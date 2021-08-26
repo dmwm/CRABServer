@@ -156,18 +156,16 @@ tweak = PSetTweak()
 # add tweaks
 
 # inputFile will always be present
-#TODO properly deal with parents
 # inputFile is a list of dictionaries (one per file) with keys: 'lfn' and 'parents'
 # value for 'lfn' is a string, value for 'parents' is a list of {'lfn':lfn} dictionaries
 # [{'lfn':inputlfn, 'parents':[{'lfn':parentlfn1},{'lfn':parentlfn2}], ....]},...]
-
-# try to reuse code fom WMTweak.py
-# Input files and secondary input files.
+# to properly prepare the tweak we reuse code fom WMTweak.py:
+# https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/WMTweak.py#L415-L441
 primaryFiles = []
 secondaryFiles = []
 for inputFile in inputFiles:
+    #TODO this commented out part needs to be understood and modified.
     """
-    #this part needs to be understood and modified. I do not start from a mask object
     if inputFile["lfn"].startswith("MCFakeFile"):
         # If there is a preset lumi in the mask, use it as the first
         # luminosity setting
@@ -193,8 +191,6 @@ if len(primaryFiles) > 0:
     if len(secondaryFiles) > 0:
         tweak.addParameter("process.source.secondaryFileNames",
                            "customTypeCms.untracked.vstring(%s)" % secondaryFiles)
-
-
 
 # for rearranging runsAndLumis into the structure needed by CMSSW, reuse code taken from
 # https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/WMTweak.py#L482
@@ -255,12 +251,6 @@ if opts.maxRuntime and opts.maxRuntime != 'None':
     createUntrackedPsets = True
 else:
     createUntrackedPsets = False
-
-# old code as reference
-#pset = SetupCMSSWPsetCore( opts.location, inputFile, runAndLumis, agentNumber, lfnBase, outputMods,\
-#                           literal_eval(opts.firstEvent), literal_eval(opts.lastEvent), literal_eval(opts.firstLumi),\
-#                           literal_eval(opts.firstRun), opts.seeding, literal_eval(opts.lheInputFiles), opts.oneEventMode, \
-#                           literal_eval(opts.eventsPerLumi), literal_eval(opts.maxRuntime))
 
 # save original PSet.pkl
 psPklIn =  "PSet-In.pkl"
