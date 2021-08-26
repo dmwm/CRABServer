@@ -145,9 +145,9 @@ if opts.oneEventMode in ["1", "True", True] :
 runAndLumis = {}
 if opts.runAndLumis:
     runAndLumis = readFileFromTarball(opts.runAndLumis, 'run_and_lumis.tar.gz')
-inputFile = {}
+inputFiles = {}
 if opts.inputFile:
-    inputFile = readFileFromTarball(opts.inputFile, 'input_files.tar.gz')
+    inputFiles = readFileFromTarball(opts.inputFile, 'input_files.tar.gz')
 
 
 # build a tweak object with the needed changes to be applied to PSet
@@ -157,8 +157,44 @@ tweak = PSetTweak()
 
 # inputFile will always be present
 #TODO properly deal with parents
-tweak.addParameter("process.source.fileNames",
-                   "customTypeCms.untracked.vstring(%s)" % inputFile)
+# inputFile is a list of dictionaries (one per file) with keys: 'lfn' and 'parents'
+# value for 'lfn' is a string, value for 'parents' is a list of {'lfn':lfn} dictionaries
+# [{'lfn':inputlfn, 'parents':[{'lfn':parentlfn1},{'lfn':parentlfn2}], ....]},...]
+
+# try to reuse code fom WMTweak.py
+# Input files and secondary input files.
+primaryFiles = []
+secondaryFiles = []
+for inputFile in inputFiles:
+    """
+    #this part needs to be understood and modified. I do not start from a mask object
+    if inputFile["lfn"].startswith("MCFakeFile"):
+        # If there is a preset lumi in the mask, use it as the first
+        # luminosity setting
+        if job['mask'].get('FirstLumi', None) != None:
+            logging.info("Setting 'firstLuminosityBlock' attr to: %s", job['mask']['FirstLumi'])
+            result.addParameter("process.source.firstLuminosityBlock",
+                                "customTypeCms.untracked.uint32(%s)" % job['mask']['FirstLumi'])
+        else:
+            # We don't have lumi information in the mask, raise an exception
+            raise WMTweakMaskError(job['mask'],
+                                   "No first lumi information provided")
+        continue
+    """
+    primaryFiles.append(inputFile["lfn"])
+    for secondaryFile in inputFile["parents"]:
+        secondaryFiles.append(secondaryFile["lfn"])
+
+print("Adding %d files to 'fileNames' attr" % len(primaryFiles))
+print("Adding %d files to 'secondaryFileNames' attr" % len(secondaryFiles))
+if len(primaryFiles) > 0:
+    tweak.addParameter("process.source.fileNames",
+                       "customTypeCms.untracked.vstring(%s)" % primaryFiles)
+    if len(secondaryFiles) > 0:
+        tweak.addParameter("process.source.secondaryFileNames",
+                           "customTypeCms.untracked.vstring(%s)" % secondaryFiles)
+
+
 
 # for rearranging runsAndLumis into the structure needed by CMSSW, reuse code taken from
 # https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/WMTweak.py#L482
