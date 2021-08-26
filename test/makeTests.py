@@ -519,7 +519,7 @@ writeValidationScript(testName=name, validationScript=validationScript)
 
 # voRole
 # this test can't work on current (Aug 20, 2021) crab-prod client
-if os.getenv('CRABClient_version') != 'prod':
+if os.getenv('CRABClient_version') == 'GH':
     name = 'voRole'
     changeDict = {'param': name, 'value': '"production"', 'section': 'User'}
     confChangesList = [changeDict]
