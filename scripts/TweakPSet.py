@@ -59,7 +59,7 @@ def readFileFromTarball(file, tarball):
     tar_file.close()
     return literal_eval(content)
 
-def applyPsetTweak(psetTweak, psPklIn, psPklOut, skipIfSet=False, allowFailedTweaks=False):
+def applyPsetTweak(psetTweak, psPklIn, psPklOut, skipIfSet=False, allowFailedTweaks=False, createUntrackedPsets=False):
     """
     code borrowed from  https://github.com/dmwm/WMCore/blob/master/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L223-L251
     Apply a tweak to a PSet.pkl file. The tweak is described in the psetTweak input object
@@ -72,6 +72,7 @@ def applyPsetTweak(psetTweak, psPklIn, psPklOut, skipIfSet=False, allowFailedTwe
     Options:
       skipIfSet: Do not apply a tweak to a parameter that has a value set already.
       allowFailedTweaks: If the tweak of a parameter fails, do not abort and continue tweaking the rest.
+      createUntrackedPsets: It the tweak wants to add a new Pset
     """
     procScript = "edm_pset_tweak.py"
     psetTweakJson = "PSetTweak.json"
@@ -83,6 +84,8 @@ def applyPsetTweak(psetTweak, psPklIn, psPklOut, skipIfSet=False, allowFailedTwe
         cmd += " --skip_if_set"
     if allowFailedTweaks:
         cmd += " --allow_failed_tweaks"
+    if createUntrackedPsets:
+        cmd += " --create_untracked_psets"
 
     print("will execute:\n%s" % cmd)
 
@@ -136,6 +139,7 @@ tweak = PSetTweak()
 # add tweaks
 
 # inputFile will always be present
+#TODO properly deal with parents
 tweak.addParameter("process.source.fileNames",
                    "customTypeCms.untracked.vstring(%s)" % inputFile)
 
@@ -175,7 +179,6 @@ if opts.firstRun and opts.firstRun != 'None':
 # maybe only make a call to cmssw_handle_random_seeds.py ?
 # Need expert advice !!
 
-
 if opts.lheInputFiles and opts.lheInputFiles != 'None':
     #TODO
     # IIUC in this case we simply have to enable lazy download via this code
@@ -193,10 +196,12 @@ if opts.eventsPerLumi and opts.eventsPerLumi != 'None':
     numberEventsInLuminosityBlock = "customTypeCms.untracked.uint32(%s)" % opts.eventsPerLumi
     tweak.addParameter("process.source.numberEventsInLuminosityBlock", numberEventsInLuminosityBlock)
 
-# limit run time if desired - ON HOLD SINCE IT FAILS
-#if opts.maxRuntime and ops.maxRuntime != 'None':
-#    maxSecondsUntilRampdown = "customTypeCms.untracked.PSet(input=cms.untracked.int32(%s))" %opts.maxRuntime
-#   tweak.addParameter("process.maxSecondsUntilRampdown.input", maxSecondsUntilRampdown)
+if opts.maxRuntime and opts.maxRuntime != 'None':
+    maxSecondsUntilRampdown = "customTypeCms.untracked.int32(%s)" %opts.maxRuntime
+    tweak.addParameter("process.maxSecondsUntilRampdown.input", maxSecondsUntilRampdown)
+    createUntrackedPsets = True
+else:
+    createUntrackedPsets = False
 
 # old code as reference
 #pset = SetupCMSSWPsetCore( opts.location, inputFile, runAndLumis, agentNumber, lfnBase, outputMods,\
@@ -210,7 +215,7 @@ shutil.copy('PSet.pkl', psPklIn)
 
 # tweak !
 psPklOut = "PSet-Out.pkl"
-ret = applyPsetTweak(tweak, psPklIn, psPklOut)
+ret = applyPsetTweak(tweak, psPklIn, psPklOut, createUntrackedPsets=createUntrackedPsets)
 
 if ret:
     print ("tweak failed, leave PSet.pkl unchanged")
