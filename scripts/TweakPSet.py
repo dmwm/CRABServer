@@ -74,7 +74,24 @@ def applyPsetTweak(psetTweak, psPklIn, psPklOut, skipIfSet=False, allowFailedTwe
       allowFailedTweaks: If the tweak of a parameter fails, do not abort and continue tweaking the rest.
       createUntrackedPsets: It the tweak wants to add a new Pset
     """
+
     procScript = "edm_pset_tweak.py"
+
+    # temporary kludge to use latest edm_pset_tweak.py which is not in /cvmfs yet
+    cmd = "wget https://raw.githubusercontent.com/cms-sw/cmssw-wm-tools/master/bin/edm_pset_tweak.py"
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    out, err = process.communicate()
+    exitcode = process.returncode
+    if exitcode:
+        print("Non zero exit code from wget edm_pset_tweak.py: %s" % exitcode)
+        print("Error while preparing to tweak.\nStdout:\n%s\nStderr:\%s" % (stdout, stderr))
+        return exitcode
+    st = os.stat('./edm_pset_tweak.py')
+    import stat
+    os.chmod('./edm_pset_tweak.py', st.st_mode | stat.S_IEXEC)
+    procScript = "./edm_pset_tweak.py"
+    # end of temporary kludge
+
     psetTweakJson = "PSetTweak.json"
     psetTweak.persist(psetTweakJson, formatting='simplejson')
 
