@@ -615,6 +615,8 @@ def tweakPSet(opts, scram):
         handleException("FAILED", EC_CMSRunWrapper, msg)
         mintime()
         sys.exit(EC_CMSRunWrapper)
+    # debuggin help in initial developmenty, print TweakPSet output anyhow
+    print("TweakPSet output:\%s" % scram.diagnostic())
 
 def executeUserApplication(command, scram):
     """

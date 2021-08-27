@@ -182,11 +182,9 @@ for inputFile in inputFiles:
     # make sure input is always in format 3.
     if not isinstance(inputFile, dict):
         inputFile = {'lfn':inputFile, 'parents':[]}
-    #TODO this commented out part needs to be understood and modified
     if inputFile["lfn"].startswith("MCFakeFile"):
         # for MC which uses "EmptySource" there must be no inputFile and no lastEvent
         opts.lastEvent = 'None'
-        inputFile = {}
         continue
     primaryFiles.append(inputFile["lfn"])
     for secondaryFile in inputFile["parents"]:
@@ -260,6 +258,13 @@ if opts.maxRuntime and opts.maxRuntime != 'None':
     untrackedPsets = True
 else:
     untrackedPsets = False
+
+# make sure that FJR contains useful statistics, reuse code from
+# https://github.com/dmwm/WMCore/blob/c2fa70af3b4c5285d50e6a8bf48636232f738340/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L289-L307
+tweak.addParameter("process.CPU", "customTypeCms.Service('CPU')")
+tweak.addParameter("process.Timing", "customTypeCms.Service('Timing', summaryOnly=cms.untracked.bool(True))")
+tweak.addParameter("process.SimpleMemoryCheck",
+                   "customTypeCms.Service('SimpleMemoryCheck', jobReportOutputOnly=cms.untracked.bool(True))")
 
 # save original PSet.pkl
 psPklIn =  "PSet-In.pkl"
