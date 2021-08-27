@@ -120,6 +120,34 @@ def applyPsetTweak(psetTweak, psPklIn, psPklOut, skipIfSet=False, allowFailedTwe
 print("Beginning TweakPSet")
 print(" arguments: %s" % sys.argv)
 
+"""
+from old TweakPSet/SetupCMSSWPsetCore useful documentation of args
+inputFiles:     the input files of the job. This must be a list of dictionaries whose keys are "lfn" and "parents"
+                or a list of filenames.
+
+                For example a valid input for this parameter is [{"lfn": , "parents" : }, {"lfn": , "parents" : }]
+                If the "lfn"s start with MCFakeFile then mask.FirstLumi is used to tweak process.source.firstLuminosityBlock
+                If the len of the list is >1 then the "lfn" values are put in a list and used to tweak "process.source.fileNames"
+                    In that case the parents values are merged to a single list and used to tweak process.source.secondaryFileNames
+                If no input files are used then the mask.FirstEvent parameter is used to tweak process.source.firstEvent (error otherwise)
+mask:           the parameter is used to twek some parameters of the process. In particular:
+                    process.maxEvents.input:
+                    process.source.skipEvent:
+                    process.source.firstRun:
+                    process.source.lumisToProcess:
+agentNumber:    together with lfnBase is used to create the path of the output lfn. This output lfn is the used to tweak process.OUTPUT.logicalFileName
+                where OUTPUT is the name of the output module
+lfnBase:        see above
+outputMods:     a list of names of the output modules, e.g. ['OUTPUT']. Used to tweak process.OUTPUT.filename with OUTPUT.root
+lheInputFiles:  if we have a MC task and this parameter is false it's used to tweak process.source.firstEvent
+firstEvent:     see above. Number to use to tweak also other parameters
+firstLumi:      used only if the task ia a MC. In this case it's a mandatory parameter. Used to tweak process.source.firstLuminosityBlock
+lastEvent:      together with firstEvent used to tweak process.maxEvents.input
+firstRun:       used to tweak process.source.firstRun. Set to 1 if it's None
+seeding:        used in handleSeeding
+oneEventMode:   toggles one event mode
+eventsPerLumi:  start a new lumi section after the specified amount of events.  None disables this.
+"""
 parser = OptionParser()
 parser.add_option('--inputFile', dest='inputFile')
 parser.add_option('--runAndLumis', dest='runAndLumis')
@@ -170,21 +198,12 @@ for inputFile in inputFiles:
     # make sure input is always in format 3.
     if not isinstance(inputFile, dict):
         inputFile = {'lfn':inputFile, 'parents':[]}
-    #TODO this commented out part needs to be understood and modified.
-    """
+    #TODO this commented out part needs to be understood and modified
     if inputFile["lfn"].startswith("MCFakeFile"):
-        # If there is a preset lumi in the mask, use it as the first
-        # luminosity setting
-        if job['mask'].get('FirstLumi', None) != None:
-            logging.info("Setting 'firstLuminosityBlock' attr to: %s", job['mask']['FirstLumi'])
-            result.addParameter("process.source.firstLuminosityBlock",
-                                "customTypeCms.untracked.uint32(%s)" % job['mask']['FirstLumi'])
-        else:
-            # We don't have lumi information in the mask, raise an exception
-            raise WMTweakMaskError(job['mask'],
-                                   "No first lumi information provided")
+        # for MC which uses "EmptySource" there must be no inputFile and no lastEvent
+        opts.lastEvent = 'None'
+        inputFile = {}
         continue
-    """
     primaryFiles.append(inputFile["lfn"])
     for secondaryFile in inputFile["parents"]:
         secondaryFiles.append(secondaryFile["lfn"])
