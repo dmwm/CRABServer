@@ -23,105 +23,8 @@ job_lumis_1.json content:
 job_input_file_list_1.json content:
 ["1.root"]
 On Worker nodes it has a tarball with all files. but for debugging purpose it is also available to read directly from file
-"""
-from __future__ import print_function
 
-import os
-import shutil
-import sys
-import subprocess
-import tarfile
-from ast import literal_eval
-from optparse import OptionParser
-
-from PSetTweaks.PSetTweak import PSetTweak
-
-def readFileFromTarball(file, tarball):
-    content = '{}'
-    if os.path.isfile(file):
-        #This is only for Debugging
-        print('DEBUGGING MODE!')
-        with open(file, 'r') as f:
-            content = f.read()
-        return literal_eval(content)
-    elif not os.path.exists(tarball):
-        raise RuntimeError("Error getting %s file location" % tarball)
-    tar_file = tarfile.open(tarball)
-    for member in tar_file.getmembers():
-        try:
-            f = tar_file.extractfile(file)
-            content = f.read()
-            break
-        except KeyError as er:
-            #Don`t exit due to KeyError, print error. EventBased and FileBased does not have run and lumis
-            print('Failed to get information from tarball %s and file %s. Error : %s' %(tarball, file, er))
-            break
-    tar_file.close()
-    return literal_eval(content)
-
-def applyPsetTweak(psetTweak, psPklIn, psPklOut, skipIfSet=False, allowFailedTweaks=False, createUntrackedPsets=False):
-    """
-    code borrowed from  https://github.com/dmwm/WMCore/blob/master/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L223-L251
-    Apply a tweak to a PSet.pkl file. The tweak is described in the psetTweak input object
-    which must be an instance of the PSetTweak class from WMcore/src/python/PSetTweaks/PSetTweak.py
-    https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/PSetTweak.py#L160
-    Arguments:
-        psetTweak: the tweak
-        psPklIn: the path to the input PSet.pkl file to change
-        psPklOut: the path to the new PSet.pkl file to create
-    Options:
-      skipIfSet: Do not apply a tweak to a parameter that has a value set already.
-      allowFailedTweaks: If the tweak of a parameter fails, do not abort and continue tweaking the rest.
-      createUntrackedPsets: It the tweak wants to add a new Pset
-    """
-
-    procScript = "edm_pset_tweak.py"
-
-    # temporary kludge to use latest edm_pset_tweak.py which is not in /cvmfs yet
-    cmd = "wget https://raw.githubusercontent.com/cms-sw/cmssw-wm-tools/master/bin/edm_pset_tweak.py"
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    out, err = process.communicate()
-    exitcode = process.returncode
-    if exitcode:
-        print("Non zero exit code from wget edm_pset_tweak.py: %s" % exitcode)
-        print("Error while preparing to tweak.\nStdout:\n%s\nStderr:\%s" % (stdout, stderr))
-        return exitcode
-    st = os.stat('./edm_pset_tweak.py')
-    import stat
-    os.chmod('./edm_pset_tweak.py', st.st_mode | stat.S_IEXEC)
-    procScript = "./edm_pset_tweak.py"
-    # end of temporary kludge
-
-    psetTweakJson = "PSetTweak.json"
-    psetTweak.persist(psetTweakJson, formatting='simplejson')
-
-    cmd = "%s --input_pkl %s --output_pkl %s --json %s" % (
-        procScript, psPklIn, psPklOut, psetTweakJson)
-    if skipIfSet:
-        cmd += " --skip_if_set"
-    if allowFailedTweaks:
-        cmd += " --allow_failed_tweaks"
-    if createUntrackedPsets:
-        cmd += " --create_untracked_psets"
-
-    print("will execute:\n%s" % cmd)
-
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    out, err = process.communicate()
-    exitcode = process.returncode
-    # for Py3 compatibility
-    stdout = out.decode(encoding='UTF-8') if out else ''
-    stderr = err.decode(encoding='UTF-8') if err else ''
-    if exitcode:
-        print("Non zero exit code: %s" % exitcode)
-        print("Error while tweaking pset.\nStdout:\n%s\nStderr:\%s" % (stdout, stderr))
-    return exitcode
-
-print("Beginning TweakPSet")
-print(" arguments: %s" % sys.argv)
-
-"""
-from old TweakPSet/SetupCMSSWPsetCore useful documentation of args
+from old TweakPSet/SetupCMSSWPsetCore, some useful documentation of args
 inputFiles:     the input files of the job. This must be a list of dictionaries whose keys are "lfn" and "parents"
                 or a list of filenames.
 
@@ -147,7 +50,107 @@ firstRun:       used to tweak process.source.firstRun. Set to 1 if it's None
 seeding:        used in handleSeeding
 oneEventMode:   toggles one event mode
 eventsPerLumi:  start a new lumi section after the specified amount of events.  None disables this.
+
 """
+from __future__ import print_function
+
+import os
+import shutil
+import sys
+import subprocess
+import tarfile
+from ast import literal_eval
+from optparse import OptionParser
+
+from PSetTweaks.PSetTweak import PSetTweak
+
+def readFileFromTarball(filename, tarball):
+    content = '{}'
+    if os.path.isfile(filename):
+        #This is only for Debugging
+        print('DEBUGGING MODE!')
+        with open(filename, 'r') as f:
+            content = f.read()
+        return literal_eval(content)
+    elif not os.path.exists(tarball):
+        raise RuntimeError("Error getting %s file location" % tarball)
+    tar_file = tarfile.open(tarball)
+    for member in tar_file.getmembers():
+        try:
+            f = tar_file.extractfile(filename)
+            content = f.read()
+            break
+        except KeyError as er:
+            #Don`t exit due to KeyError, print error. EventBased and FileBased does not have run and lumis
+            print('Failed to get information from tarball %s and file %s. Error : %s' %(tarball, filename, er))
+            break
+    tar_file.close()
+    return literal_eval(content)
+
+def applyPsetTweak(psetTweak, pklIn, pklOut, skipIfSet=False, allowFailedTweaks=False, createUntrackedPsets=False):
+    """
+    code borrowed from  https://github.com/dmwm/WMCore/blob/master/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L223-L251
+    Apply a tweak to a PSet.pkl file. The tweak is described in the psetTweak input object
+    which must be an instance of the PSetTweak class from WMcore/src/python/PSetTweaks/PSetTweak.py
+    https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/PSetTweak.py#L160
+    Arguments:
+        psetTweak: the tweak
+        psPklIn: the path to the input PSet.pkl file to change
+        psPklOut: the path to the new PSet.pkl file to create
+    Options:
+      skipIfSet: Do not apply a tweak to a parameter that has a value set already.
+      allowFailedTweaks: If the tweak of a parameter fails, do not abort and continue tweaking the rest.
+      createUntrackedPsets: It the tweak wants to add a new Pset
+    """
+
+    procScript = "edm_pset_tweak.py"
+
+    # temporary kludge to use latest edm_pset_tweak.py which is not in /cvmfs yet
+    cmd = "wget https://raw.githubusercontent.com/cms-sw/cmssw-wm-tools/master/bin/edm_pset_tweak.py"
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    out, err = process.communicate()
+    exitcode = process.returncode
+    # for Py3 compatibility
+    stdout = out.decode(encoding='UTF-8') if out else ''
+    stderr = err.decode(encoding='UTF-8') if err else ''
+    if exitcode:
+        print("Non zero exit code from wget edm_pset_tweak.py: %s" % exitcode)
+        print("Error while preparing to tweak.\nStdout:\n%s\nStderr:\%s" % (stdout, stderr))
+        return exitcode
+    st = os.stat('./edm_pset_tweak.py')
+    import stat
+    os.chmod('./edm_pset_tweak.py', st.st_mode | stat.S_IEXEC)
+    procScript = "./edm_pset_tweak.py"
+    # end of temporary kludge
+
+    psetTweakJson = "PSetTweak.json"
+    psetTweak.persist(psetTweakJson, formatting='simplejson')
+
+    cmd = "%s --input_pkl %s --output_pkl %s --json %s" % (
+        procScript, pklIn, pklOut, psetTweakJson)
+    if skipIfSet:
+        cmd += " --skip_if_set"
+    if allowFailedTweaks:
+        cmd += " --allow_failed_tweaks"
+    if createUntrackedPsets:
+        cmd += " --create_untracked_psets"
+
+    print("will execute:\n%s" % cmd)
+
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    out, err = process.communicate()
+    exitcode = process.returncode
+    # for Py3 compatibility
+    stdout = out.decode(encoding='UTF-8') if out else ''
+    stderr = err.decode(encoding='UTF-8') if err else ''
+    if exitcode:
+        print("Non zero exit code: %s" % exitcode)
+        print("Error while tweaking pset.\nStdout:\n%s\nStderr:\%s" % (stdout, stderr))
+    return exitcode
+
+print("Beginning TweakPSet")
+print(" arguments: %s" % sys.argv)
+
 parser = OptionParser()
 parser.add_option('--inputFile', dest='inputFile')
 parser.add_option('--runAndLumis', dest='runAndLumis')
