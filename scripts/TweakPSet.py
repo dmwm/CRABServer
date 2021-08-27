@@ -156,14 +156,20 @@ tweak = PSetTweak()
 # add tweaks
 
 # inputFile will always be present
-# inputFile is a list of dictionaries (one per file) with keys: 'lfn' and 'parents'
-# value for 'lfn' is a string, value for 'parents' is a list of {'lfn':lfn} dictionaries
-# [{'lfn':inputlfn, 'parents':[{'lfn':parentlfn1},{'lfn':parentlfn2}], ....]},...]
+# inputFile can have three formats depending on wether secondary input files are used:
+# 1. a single LFN as a string : "/store/.....root"
+# 2. a list of LFNs : ["/store/.....root", "/store/....root", ...]
+# 3. a list of dictionaries (one per file) with keys: 'lfn' and 'parents'
+#   value for 'lfn' is a string, value for 'parents' is a list of {'lfn':lfn} dictionaries
+#   [{'lfn':inputlfn, 'parents':[{'lfn':parentlfn1},{'lfn':parentlfn2}], ....]},...]
 # to properly prepare the tweak we reuse code fom WMTweak.py:
 # https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/WMTweak.py#L415-L441
 primaryFiles = []
 secondaryFiles = []
 for inputFile in inputFiles:
+    # make sure input is always in format 3.
+    if not isinstance(inputFile, dict):
+        inputFile = {'lfn':inputFile, 'parents':[]}
     #TODO this commented out part needs to be understood and modified.
     """
     if inputFile["lfn"].startswith("MCFakeFile"):
