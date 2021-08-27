@@ -75,7 +75,7 @@ def readFileFromTarball(filename, tarball):
     elif not os.path.exists(tarball):
         raise RuntimeError("Error getting %s file location" % tarball)
     tar_file = tarfile.open(tarball)
-    for member in tar_file.getmembers():
+    for member in tar_file.getmembers():  # pylint: disable=unused-variable
         try:
             f = tar_file.extractfile(filename)
             content = f.read()
@@ -257,9 +257,9 @@ if opts.eventsPerLumi and opts.eventsPerLumi != 'None':
 if opts.maxRuntime and opts.maxRuntime != 'None':
     maxSecondsUntilRampdown = "customTypeCms.untracked.int32(%s)" %opts.maxRuntime
     tweak.addParameter("process.maxSecondsUntilRampdown.input", maxSecondsUntilRampdown)
-    createUntrackedPsets = True
+    untrackedPsets = True
 else:
-    createUntrackedPsets = False
+    untrackedPsets = False
 
 # save original PSet.pkl
 psPklIn =  "PSet-In.pkl"
@@ -267,7 +267,7 @@ shutil.copy('PSet.pkl', psPklIn)
 
 # tweak !
 psPklOut = "PSet-Out.pkl"
-ret = applyPsetTweak(tweak, psPklIn, psPklOut, createUntrackedPsets=createUntrackedPsets)
+ret = applyPsetTweak(tweak, psPklIn, psPklOut, createUntrackedPsets=untrackedPsets)
 
 if ret:
     print ("tweak failed, leave PSet.pkl unchanged")
