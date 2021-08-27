@@ -104,25 +104,6 @@ def applyPsetTweak(psetTweak, pklIn, pklOut, skipIfSet=False, allowFailedTweaks=
     """
 
     procScript = "edm_pset_tweak.py"
-
-    # temporary kludge to use latest edm_pset_tweak.py which is not in /cvmfs yet
-    cmd = "wget https://raw.githubusercontent.com/cms-sw/cmssw-wm-tools/master/bin/edm_pset_tweak.py"
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    out, err = process.communicate()
-    exitcode = process.returncode
-    # for Py3 compatibility
-    stdout = out.decode(encoding='UTF-8') if out else ''
-    stderr = err.decode(encoding='UTF-8') if err else ''
-    if exitcode:
-        print("Non zero exit code from wget edm_pset_tweak.py: %s" % exitcode)
-        print("Error while preparing to tweak.\nStdout:\n%s\nStderr:\%s" % (stdout, stderr))
-        return exitcode
-    st = os.stat('./edm_pset_tweak.py')
-    import stat
-    os.chmod('./edm_pset_tweak.py', st.st_mode | stat.S_IEXEC)
-    procScript = "./edm_pset_tweak.py"
-    # end of temporary kludge
-
     psetTweakJson = "PSetTweak.json"
     psetTweak.persist(psetTweakJson, formatting='simplejson')
 
