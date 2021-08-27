@@ -583,25 +583,29 @@ def getProv(filename, scram):
     return output
 
 def tweakPSet(opts, scram):
-
     # this command is executed with cwd set to the job running directory
-    commandTemplate = 'python %s/TweakPSet.py --location=%s ' + '--inputFile=\'%s\' ' + '--runAndLumis=\'%s\' ' +\
+
+    # since in new WMCore Scram() environmnet does not import anything from current process
+    # need to add PSetTweaks to PYTHONPATH, possibly w/o bringing in the rest of WMCore
+    # start with full WMCore to test things, yeah this code is ugly
+    setEnv = "export PYTHONPATH=`pwd`/WMCore.zip; "
+    commandTemplate = 'python %s/TweakPSet.py  ' + '--inputFile=\'%s\' ' + '--runAndLumis=\'%s\' ' +\
                       '--firstEvent=%s ' + '--lastEvent=%s ' + '--firstLumi=%s ' + '--firstRun=%s ' +\
                       '--seeding=%s ' + '--lheInputFiles=%s ' + '--oneEventMode=%s ' +\
                       '--eventsPerLumi=%s ' + '--maxRuntime=%s'
-    command = commandTemplate %\
-                 (os.getcwd(), os.getcwd(),
-                               opts.inputFile,
-                               opts.runAndLumis,
-                               opts.firstEvent,
-                               opts.lastEvent,
-                               opts.firstLumi,
-                               opts.firstRun,
-                               opts.seeding,
-                               opts.lheInputFiles,
-                               opts.oneEventMode,
-                               opts.eventsPerLumi,
-                               opts.maxRuntime)
+    command = setEnv + commandTemplate %\
+              (os.getcwd(),
+               opts.inputFile,
+               opts.runAndLumis,
+               opts.firstEvent,
+               opts.lastEvent,
+               opts.firstLumi,
+               opts.firstRun,
+               opts.seeding,
+               opts.lheInputFiles,
+               opts.oneEventMode,
+               opts.eventsPerLumi,
+               opts.maxRuntime)
 
     print('Executing %s' % command)
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
