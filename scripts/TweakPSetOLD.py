@@ -1,3 +1,4 @@
+# pylint: disable-all
 """
 It is possible to run this TweakPSet script standalone. These are the requirements:
 
