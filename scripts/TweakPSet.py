@@ -237,7 +237,7 @@ if opts.lastEvent:
 if opts.firstEvent is None or opts.lastEvent is None:
     maxEvents = -1
 else:
-    maxEvents = opts.firstEvent - opts.lastEvent + 1
+    maxEvents = opts.lastEvent - opts.firstEvent + 1
 tweak.addParameter("process.maxEvents.input",
                    "customTypeCms.untracked.int32(%s)" % maxEvents)
 untrackedPsets = True
