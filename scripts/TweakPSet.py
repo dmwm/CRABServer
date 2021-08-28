@@ -198,8 +198,7 @@ for inputFile in inputFiles:
     if not isinstance(inputFile, dict):
         inputFile = {'lfn':inputFile, 'parents':[]}
     if inputFile["lfn"].startswith("MCFakeFile"):
-        # for MC which uses "EmptySource" there must be no inputFile and no lastEvent
-        opts.lastEvent = 'None'
+        # for MC which uses "EmptySource" there must be no inputFile
         continue
     primaryFiles.append(inputFile["lfn"])
     for secondaryFile in inputFile["parents"]:
@@ -231,16 +230,20 @@ if runAndLumis:
 if opts.firstEvent:
     tweak.addParameter("process.source.firstEvent",
                        "customTypeCms.untracked.uint32(%s)" % opts.firstEvent)
-if opts.lastEvent:
-    tweak.addParameter("process.source.lastEvent",
-                       "customTypeCms.untracked.uint32(%s)" % opts.lastEvent)
 if opts.firstEvent is None or opts.lastEvent is None:
+    # what to process is define in runAndLumis, we do no split by events here
     maxEvents = -1
 else:
-    maxEvents = opts.lastEvent - opts.firstEvent + 1
+    # for MC CRAB passes 1st/last event, but cmsRun wants 1st ev + MaxEvents
+    maxEvents = int(opts.lastEvent) - int(opts.firstEvent) + 1
+    opts.lastEvent = None  # for MC there has to be no lastEvent
 tweak.addParameter("process.maxEvents.input",
                    "customTypeCms.untracked.int32(%s)" % maxEvents)
 untrackedPsets = True
+
+if opts.lastEvent:
+    tweak.addParameter("process.source.lastEvent",
+                       "customTypeCms.untracked.uint32(%s)" % opts.lastEvent)
 
 # firstLimi, firstRun and eventsPerLumi are used for MC
 if opts.firstLumi:
