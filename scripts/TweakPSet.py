@@ -149,6 +149,18 @@ opts, args = parser.parse_args()
 # Note about ops: default value is None for all, but if, like usually happens,
 # CRAB code calls this with inputs like --seeding=None
 # the opts variable is set to the string 'None', not to the python type None
+# let's make life easier by replacing 'None' with None. Avoid using
+# ast.literal_eval as in old version since it does not port easily to python3
+if opts.inputFile and opts.inputFile == 'None': opts.inputFile = None
+if opts.firstEvent and opts.firstEvent == 'None': opts.firstEvent = None
+if opts.runAndLumis and opts.runAndLumis == 'None': opts.runAndLumis = None
+if opts.lastEvent and opts.lastEvent == 'None': opts.lastEvent = None
+if opts.firstLumi and opts.firstLumi == 'None': opts.firstLumi = None
+if opts.firstRun and opts.firstRun == 'None': opts.firstRun = None
+if opts.seeding and opts.seeding == 'None': opts.seeding = None
+if opts.lheInputFiles and opts.lheInputFiles == 'None': opts.lheInputFiles = None
+if opts.eventsPerLumi and opts.eventsPerLumi == 'None': opts.eventsPerLumi = None
+if opts.maxRuntime and opts.maxRuntime == 'None': opts.maxRuntime = None
 
 if opts.oneEventMode in ["1", "True", True] :
     print("One event mode disabled until we can put together a decent version of WMCore.")
@@ -166,6 +178,9 @@ if opts.inputFile:
 tweak = PSetTweak()
 
 # add tweaks
+
+# preset option for edm_pset_tweak.py, will set to True if some param. tweaking needs it
+untrackedPsets = False
 
 # inputFile will always be present
 # inputFile can have three formats depending on wether secondary input files are used:
@@ -189,7 +204,6 @@ for inputFile in inputFiles:
     primaryFiles.append(inputFile["lfn"])
     for secondaryFile in inputFile["parents"]:
         secondaryFiles.append(secondaryFile["lfn"])
-
 print("Adding %d files to 'fileNames' attr" % len(primaryFiles))
 print("Adding %d files to 'secondaryFileNames' attr" % len(secondaryFiles))
 if len(primaryFiles) > 0:
@@ -213,18 +227,32 @@ if runAndLumis:
     tweak.addParameter("process.source.lumisToProcess",
                        "customTypeCms.untracked.VLuminosityBlockRange(%s)" % lumisToProcess)
 
-if opts.firstEvent and opts.firstEvent != 'None':
+# how many events to process
+if opts.firstEvent:
     tweak.addParameter("process.source.firstEvent",
                        "customTypeCms.untracked.uint32(%s)" % opts.firstEvent)
-if opts.lastEvent and opts.lastEvent != 'None':
+if opts.lastEvent:
     tweak.addParameter("process.source.lastEvent",
                        "customTypeCms.untracked.uint32(%s)" % opts.lastEvent)
-if opts.firstLumi and opts.firstLumi != 'None':
+if opts.firstEvent is None or opts.lastEvent is None:
+    maxEvents = -1
+else:
+    maxEvents = opts.firstEvent - opts.lastEvent + 1
+tweak.addParameter("process.maxEvents.input",
+                   "customTypeCms.untracked.int32(%s)" % maxEvents)
+untrackedPsets = True
+
+# firstLimi, firstRun and eventsPerLumi are used for MC
+if opts.firstLumi:
     tweak.addParameter("process.source.firstLuminosityBlock",
                        "customTypeCms.untracked.uint32(%s)" % opts.firstLumi)
-if opts.firstRun and opts.firstRun != 'None':
+if opts.firstRun:
     tweak.addParameter("process.source.firstRun",
                        "customTypeCms.untracked.uint32(%s)" % opts.firstRun)
+if opts.eventsPerLumi:
+    numberEventsInLuminosityBlock = "customTypeCms.untracked.uint32(%s)" % opts.eventsPerLumi
+    tweak.addParameter("process.source.numberEventsInLuminosityBlock", numberEventsInLuminosityBlock)
+
 
 #TODO
 # always setup seeding since seeding is only and always set to 'AutomaticSeeding' in CRAB
@@ -235,7 +263,7 @@ if opts.firstRun and opts.firstRun != 'None':
 # maybe only make a call to cmssw_handle_random_seeds.py ?
 # Need expert advice !!
 
-if opts.lheInputFiles and opts.lheInputFiles != 'None':
+if opts.lheInputFiles:
     #TODO
     # IIUC in this case we simply have to enable lazy download via this code
     # https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L529-L542
@@ -243,21 +271,15 @@ if opts.lheInputFiles and opts.lheInputFiles != 'None':
     # Need expert advice !!
     pass
 
-# event limiter for testing
-if opts.oneEventMode in ["1", "True", True] :
-    tweak.addParameter("process.maxEvents.input", "customTypeCms.untracked.int32(1)")
-
-# Apply events per lumi section if available
-if opts.eventsPerLumi and opts.eventsPerLumi != 'None':
-    numberEventsInLuminosityBlock = "customTypeCms.untracked.uint32(%s)" % opts.eventsPerLumi
-    tweak.addParameter("process.source.numberEventsInLuminosityBlock", numberEventsInLuminosityBlock)
-
-if opts.maxRuntime and opts.maxRuntime != 'None':
+# time-limited running is used by automatic splitting probe jobs
+if opts.maxRuntime:
     maxSecondsUntilRampdown = "customTypeCms.untracked.int32(%s)" %opts.maxRuntime
     tweak.addParameter("process.maxSecondsUntilRampdown.input", maxSecondsUntilRampdown)
     untrackedPsets = True
-else:
-    untrackedPsets = False
+
+# event limiter for testing
+if opts.oneEventMode in ["1", "True", True] :
+    tweak.addParameter("process.maxEvents.input", "customTypeCms.untracked.int32(1)")
 
 # make sure that FJR contains useful statistics, reuse code from
 # https://github.com/dmwm/WMCore/blob/c2fa70af3b4c5285d50e6a8bf48636232f738340/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L289-L307
