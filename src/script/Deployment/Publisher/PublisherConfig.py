@@ -30,6 +30,7 @@ config.General.taskFilesDir = '/data/srv/Publisher_files/'
 config.General.logsDir = '/data/srv/Publisher/logs'
 config.General.logMsgFormat = '%(asctime)s:%(levelname)s:%(module)s:%(name)s: %(message)s'
 config.General.logLevel = 'INFO'
+config.General.skipUsers = ['mickeymouse', 'donaldduck']
 
 config.section_('TaskPublisher')
 config.TaskPublisher.DBShost = 'cmsweb-prod.cern.ch'
