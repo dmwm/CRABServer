@@ -341,6 +341,10 @@ class Master(object):
                 if int(taskname[0:4]) < 2008:
                     self.logger.info("Skipped %s. Ignore tasks created before August 2020.", taskname)
                     continue
+                username = task[0][0]
+                if username in self.config.skipUsers:
+                    self.logger.info("Skipped user %s task %s", username, taskname)
+                    continue
                 if self.TestMode:
                     self.startSlave(task)   # sequentially do one task after another
                     continue

@@ -827,6 +827,10 @@ def publishInDBS3(config, taskname, verbose):
     failedBlocks = 0
     max_files_per_block = config.General.max_files_per_block
     #TODO here can tune max_file_per_block based on len(dbsFiles) and dbsFilesSize
+    # start with a horrible hack for identified bad use cases:
+    if '2018UL' in taskname or 'UL2018' in taskname:
+        max_files_per_block = 10
+
     dumpList = []   # keep a list of files where blocks which fail publication are dumped
     while True:
         nIter += 1
