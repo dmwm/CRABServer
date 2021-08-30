@@ -625,7 +625,7 @@ def executeUserApplication(command, scram):
     Scram() never raises and returns the exit code from executing 'command'
     """
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
-        ret = scram(command, runtimeDir=os.getcwd(), cleanEnv=False)
+        ret = scram(command, runtimeDir=os.getcwd())
     if ret > 0:
         with open('cmsRun-stdout.log', 'w') as fh:
             fh.write(scram.diagnostic())
