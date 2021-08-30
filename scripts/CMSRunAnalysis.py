@@ -883,15 +883,17 @@ if __name__ == "__main__":
         # allow us to use a different LFN on job failure.
         rep['jobExitCode'] = jobExitCode
         print("==== Job Exit Code from FrameworkJobReport.xml: %s ====" % jobExitCode)
-        AddChecksums(rep)
-        try:
-            AddPsetHash(rep, scr)
-        except Exception as ex:
-            exmsg = "Unable to compute pset hash for job output. Got exception:"
-            exmsg += "\n" + str(ex) + "\n"
-            handleException("FAILED", EC_PsetHash, exmsg)
-            mintime()
-            sys.exit(EC_PsetHash)
+        if not jobExitCode:
+            # only if application succeeded compute output stats
+            AddChecksums(rep)
+            try:
+                AddPsetHash(rep, scr)
+            except Exception as ex:
+                exmsg = "Unable to compute pset hash for job output. Got exception:"
+                exmsg += "\n" + str(ex) + "\n"
+                handleException("FAILED", EC_PsetHash, exmsg)
+                mintime()
+                sys.exit(EC_PsetHash)
         if jobExitCode: #TODO check exitcode from fwjr
             rep['exitAcronym'] = "FAILED"
             rep['exitCode'] = jobExitCode
