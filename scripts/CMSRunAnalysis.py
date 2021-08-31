@@ -849,6 +849,7 @@ if __name__ == "__main__":
             try:
                 # sanitize FJR in case non-ascii chars have been captured in error messages
                 # e.g. from xroot https://github.com/dmwm/CRABServer/issues/6640#issuecomment-909362639
+                print("Sanitize FJR")
                 cmd = 'cat -v FrameworkJobReport.xml > sane; mv sane FrameworkJobReport.xml'
                 print(commands.getoutput(cmd))
                 # parse FJR
@@ -878,6 +879,7 @@ if __name__ == "__main__":
         print("==== Report file creation STARTING at %s ====" % time.asctime(time.gmtime()))
         # sanitize FJR in case non-ascii chars have been captured in error messages
         # e.g. from xroot https://github.com/dmwm/CRABServer/issues/6640#issuecomment-909362639
+        print("Sanitize FJR")
         cmd = 'cat -v FrameworkJobReport.xml > sane; mv sane FrameworkJobReport.xml'
         print(commands.getoutput(cmd))
         # parse FJR
