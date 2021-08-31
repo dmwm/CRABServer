@@ -8,7 +8,7 @@
 # comes from Jenkins job CRABServer_ExecuteTests configuration.
 
 export WORK_DIR=`pwd`
-export SCRAM_ARCH=${SCRAM_ARCHITECTURE}
+export SCRAM_ARCH=${SCRAM_ARCH}
 mkdir repos
 
 source /cvmfs/cms-ib.cern.ch/latest/cmsset_default.sh
