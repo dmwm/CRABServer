@@ -847,6 +847,12 @@ if __name__ == "__main__":
         # Try to recover what we can from the FJR.  handleException will use this if possible.
         if os.path.exists('FrameworkJobReport.xml'):
             try:
+                # sanitize FJR in case non-ascii chars have been captured in error messages
+                # e.g. from xroot https://github.com/dmwm/CRABServer/issues/6640#issuecomment-909362639
+                print("Sanitize FJR")
+                cmd = 'cat -v FrameworkJobReport.xml > sane; mv sane FrameworkJobReport.xml'
+                print(commands.getoutput(cmd))
+                # parse FJR
                 rep = Report("cmsRun")
                 rep.parse('FrameworkJobReport.xml', "cmsRun")
                 try:
@@ -871,6 +877,12 @@ if __name__ == "__main__":
     #Create the report file
     try:
         print("==== Report file creation STARTING at %s ====" % time.asctime(time.gmtime()))
+        # sanitize FJR in case non-ascii chars have been captured in error messages
+        # e.g. from xroot https://github.com/dmwm/CRABServer/issues/6640#issuecomment-909362639
+        print("Sanitize FJR")
+        cmd = 'cat -v FrameworkJobReport.xml > sane; mv sane FrameworkJobReport.xml'
+        print(commands.getoutput(cmd))
+        # parse FJR
         rep = Report("cmsRun")
         rep.parse('FrameworkJobReport.xml', "cmsRun")
         jobExitCode = rep.getExitCode()
