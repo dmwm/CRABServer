@@ -24,7 +24,7 @@ def parse_result(listOfTasks):
     testResult = []
 
     for task in listOfTasks:
-        if task['dbStatus'] == 'SUBMITTED' and task['status'] == 'COMPLETED':
+        if task['dbStatus'] == 'SUBMITTED' and task['status'] != 'FAILED':
             total_jobs = sum(task['jobsPerStatus'].values())
 
             if ('finished', total_jobs) in task['jobsPerStatus'].items():
@@ -38,7 +38,7 @@ def parse_result(listOfTasks):
         else:
             result = 'TestFailed'
 
-        testResult.append({'taskName': task['taskName'], 'testResult': result, 'dbStatus': task['dbStatus'], 
+        testResult.append({'TN': task['taskName'], 'testResult': result, 'dbStatus': task['dbStatus'], 
                            'combinedStatus': task['status'], 'jobsPerStatus': task['jobsPerStatus']})
 
     return testResult
