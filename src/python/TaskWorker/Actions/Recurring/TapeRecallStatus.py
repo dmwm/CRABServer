@@ -71,7 +71,7 @@ class TapeRecallStatus(BaseRecurringAction):
             self.logger.addHandler(handler)
 
 
-        mw = MasterWorker(config, logWarning=False, logDebug=False, sequential=True,
+        mw = MasterWorker(config, logWarning=False, logDebug=True, sequential=True,
                           console=False, name='masterForTapeRecall')
 
         tapeRecallStatus = 'TAPERECALL'
