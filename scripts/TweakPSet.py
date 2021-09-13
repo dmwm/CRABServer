@@ -155,6 +155,31 @@ def enableLazyDownload(pklIn):
     return exitcode
 
 
+def handleRandomSeeds(pklIn):
+    """
+    make sure random seeds are automatically initialized. See
+    https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L254-L286
+    """
+    procScript = "cmssw_handle_random_seeds.py"
+
+    pklOut = pklIn + '-seeds'
+    cmd = "%s --input_pkl %s --output_pkl %s --seeding dummy" % (procScript, pklIn, pklOut)
+
+    print("will execute:\n%s" % cmd)
+
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    out, err = process.communicate()
+    exitcode = process.returncode
+    # for Py3 compatibility
+    stdout = out.decode(encoding='UTF-8') if out else ''
+    stderr = err.decode(encoding='UTF-8') if err else ''
+    if exitcode:
+        print("Non zero exit code: %s" % exitcode)
+        print("Error while handling randome seeds on pset.\nStdout:\n%s\nStderr:\%s" % (stdout, stderr))
+    os.rename(pklOut, pklIn)
+    return exitcode
+
+
 print("Beginning TweakPSet")
 print(" arguments: %s" % sys.argv)
 
@@ -282,15 +307,6 @@ if opts.eventsPerLumi:
     numberEventsInLuminosityBlock = "customTypeCms.untracked.uint32(%s)" % opts.eventsPerLumi
     tweak.addParameter("process.source.numberEventsInLuminosityBlock", numberEventsInLuminosityBlock)
 
-#TODO
-# always setup seeding since seeding is only and always set to 'AutomaticSeeding' in CRAB
-# (of course only if a RandomeNumberGeneratorService is present in the PSET)
-# so should use this code from SetupCMSSWPset.py
-# https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L254-L286
-# but looking at it, it seems that for "AutomaticSeeding" there is nothing to do,
-# maybe only make a call to cmssw_handle_random_seeds.py ?
-# Need expert advice !!
-
 # time-limited running is used by automatic splitting probe jobs
 if opts.maxRuntime:
     maxSecondsUntilRampdown = "customTypeCms.untracked.int32(%s)" %opts.maxRuntime
@@ -309,17 +325,21 @@ tweak.addParameter("process.SimpleMemoryCheck",
                    "customTypeCms.Service('SimpleMemoryCheck', jobReportOutputOnly=cms.untracked.bool(True))")
 
 # save original PSet.pkl
-psPklIn =  "PSet-In.pkl"
+psPklIn = "PSet-In.pkl"
 shutil.copy('PSet.pkl', psPklIn)
 
 # tweak !
 psPklOut = "PSet-Out.pkl"
 ret = applyPsetTweak(tweak, psPklIn, psPklOut, createUntrackedPsets=untrackedPsets)
+
+# finishing touches to the pset
 if not ret and opts.lheInputFiles:
     ret = enableLazyDownload(psPklOut)
+if not ret:
+    ret = handleRandomSeeds(psPklOut)
 
 if ret:
-    print ("tweak failed, leave PSet.pkl unchanged")
+    print("tweak failed, leave PSet.pkl unchanged. Job will fail")
 else:
     print("PSetTweak successful, overwrite PSet.pkl")
     shutil.copy(psPklOut, 'PSet.pkl')
