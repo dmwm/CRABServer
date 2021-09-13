@@ -106,6 +106,7 @@ config.TaskWorker.minAutomaticRuntimeMins = 60
 
 config.TaskWorker.highPrioEgroups = ['cms-crab-HighPrioUsers']
 config.TaskWorker.bannedUsernames = ['mickeymouse','donaldduck']
+config.TaskWorker.rejectedCommands = ['NONE', 'NOPE']  # commands are upper case e.g. 'SUBMIT'
 
 # Setting the list of users for the highprio accounting group
 # not usually needed since the list if automatically populated from e-group
