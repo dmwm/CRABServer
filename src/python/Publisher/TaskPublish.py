@@ -724,7 +724,12 @@ def publishInDBS3(config, taskname, verbose):
                     parentFiles.add(parentFile)
                     # Is this parent file already in the destination DBS instance?
                     # (If yes, then we don't have to migrate this block.)
-                    blocksDict = destReadApi.listBlocks(logical_file_name=parentFile)
+                    # some parent files are illegal DBS names (GH issue #6771), skip them
+                    try:
+                        blocksDict = destReadApi.listBlocks(logical_file_name=parentFile)
+                    except:
+                        parentsToSkip.add(parentFile)
+                        continue
                     if not blocksDict:
                         # No, this parent file is not in the destination DBS instance.
                         # Maybe it is in the same DBS instance as the input dataset?
