@@ -375,7 +375,7 @@ class MasterWorker(object):
             self.logger.debug("Rejecting command %s", command)
             if command == 'SUBMIT':  # refuse i.e. mark as submission failed
                 self.updateWork(taskname, command, 'SUBMITFAILED')
-            if command == 'RESUMIT':  # ignore, i.e. leave in status 'SUBMITTED'
+            if command == 'RESUBMIT':  # ignore, i.e. leave in status 'SUBMITTED'
                 self.updateWork(taskname, command, 'SUBMITTED')
             if command == 'KILL':  # ignore, i.e. leave in status 'SUBMITTED'
                 self.updateWork(taskname, command, 'SUBMITTED')
