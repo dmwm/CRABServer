@@ -1,5 +1,6 @@
 
 import logging
+from WMCore.Credential.Proxy import Proxy
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
@@ -27,7 +28,6 @@ class MyProxyLogon(TaskAction):
         for later addition via voms-proxy-init. If not rises a TW exception.
         Note that logonRenewMyProxy() does not rise exceptions.
         """
-        from WMCore.Credential.Proxy import Proxy
 
         # WMCore proxy methods are awfully verbose, reduce logging level when using them
         with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
@@ -37,15 +37,19 @@ class MyProxyLogon(TaskAction):
             usergroups = set(proxy.getAllUserGroups(userproxy))  # get VOMS groups from created proxy (if any)
             timeleft = proxy.getTimeLeft(userproxy)  # this is the way to tell if proxy creation succeeded
 
+        errmsg = ''
         if timeleft is None or timeleft <= 0:
-            msg = "Impossible to retrieve proxy from %s for %s." % (proxycfg['myProxySvr'], proxycfg['userDN'])
-            self.logger.error(msg)
+            errmsg = "Impossible to retrieve proxy from %s for %s." % (proxycfg['myProxySvr'], proxycfg['userDN'])
+        if timeleft < (5*24*3600):
+            errmsg = "Could not get a proxy valid for at least 5-days from %s for %s." % (proxycfg['myProxySvr'], proxycfg['userDN'])
+        if errmsg:
+            self.logger.error(errmsg)
             self.logger.error("Will try again in verbose mode")
             self.logger.error("===========PROXY ERROR START ==========================")
             with tempSetLogLevel(logger=self.logger, level=logging.DEBUG):
                 proxy.logonRenewMyProxy()
             self.logger.error("===========PROXY ERROR END   ==========================")
-            raise TaskWorkerException(msg)
+            raise TaskWorkerException(errmsg)
 
         hoursleft = timeleft/3600
         minutesleft = (timeleft%3600)/60
