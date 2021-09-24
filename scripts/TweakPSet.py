@@ -55,12 +55,10 @@ eventsPerLumi:  start a new lumi section after the specified amount of events.  
 from __future__ import print_function
 
 import os
-import shutil
 import sys
-import subprocess
+import shutil
 import tarfile
 from ast import literal_eval
-from optparse import OptionParser
 
 from PSetTweaks.PSetTweak import PSetTweak
 
@@ -87,259 +85,176 @@ def readFileFromTarball(filename, tarball):
     tar_file.close()
     return literal_eval(content)
 
-def applyPsetTweak(psetTweak, pklIn, pklOut, skipIfSet=False, allowFailedTweaks=False, createUntrackedPsets=False):
+def createTweakingCommandLines(cmd, pklIn, pklOut):
     """
-    code borrowed from  https://github.com/dmwm/WMCore/blob/master/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L223-L251
-    Apply a tweak to a PSet.pkl file. The tweak is described in the psetTweak input object
-    which must be an instance of the PSetTweak class from WMcore/src/python/PSetTweaks/PSetTweak.py
-    https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/PSetTweak.py#L160
-    Arguments:
-        psetTweak: the tweak
-        psPklIn: the path to the input PSet.pkl file to change
-        psPklOut: the path to the new PSet.pkl file to create
-    Options:
-      skipIfSet: Do not apply a tweak to a parameter that has a value set already.
-      allowFailedTweaks: If the tweak of a parameter fails, do not abort and continue tweaking the rest.
-      createUntrackedPsets: It the tweak wants to add a new Pset
+    create a bash script fragment to execute the cmd passed in arg to tweak a pickled PSet.
+    Args are tailored for the syntax favored by edm_pset_tweak and cmssw_* comamnds.
+    If command fails pklIn is left unchanged, otherwise it is overwritten with pklOut
     """
+    cmdLines = "\n#\n"
+    cmdLines += 'cmd="%s"\n' % cmd
+    cmdLines += 'echo "will execute: "$cmd\n'
+    cmdLines += '$cmd\n'
+    cmdLines += 'ec=$?\n'
+    cmdLines += 'if ! [ $ec ]; then\n'
+    cmdLines += '  echo "command failed with exit code $ec . Leave PSet unchanged"\n'
+    cmdLines += 'else\n'
+    cmdLines += '  mv %s %s\n' % (pklOut, pklIn)
+    cmdLines += 'fi\n'
+    return cmdLines
+
+def createScriptLines(opts, pklIn):
+    """
+    prepares a bash script fragment which tweaks the PSet params according to opts
+    returns a string containing the script lines separated by '\n'
+    """
+
+    runAndLumis = {}
+    if opts.runAndLumis:
+        runAndLumis = readFileFromTarball(opts.runAndLumis, 'run_and_lumis.tar.gz')
+    inputFiles = {}
+    if opts.inputFile:
+        inputFiles = readFileFromTarball(opts.inputFile, 'input_files.tar.gz')
+
+
+    # build a tweak object with the needed changes to be applied to PSet
+    tweak = PSetTweak()
+
+    # add tweaks
+
+    # inputFile will always be present
+    # inputFile can have three formats depending on wether secondary input files are used:
+    # 1. a single LFN as a string : "/store/.....root"
+    # 2. a list of LFNs : ["/store/.....root", "/store/....root", ...]
+    # 3. a list of dictionaries (one per file) with keys: 'lfn' and 'parents'
+    #   value for 'lfn' is a string, value for 'parents' is a list of {'lfn':lfn} dictionaries
+    #   [{'lfn':inputlfn, 'parents':[{'lfn':parentlfn1},{'lfn':parentlfn2}], ....]},...]
+    # to properly prepare the tweak we reuse code fom WMTweak.py:
+    # https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/WMTweak.py#L415-L441
+    primaryFiles = []
+    secondaryFiles = []
+    for inputFile in inputFiles:
+        # make sure input is always in format 3.
+        if not isinstance(inputFile, dict):
+            inputFile = {'lfn':inputFile, 'parents':[]}
+        if inputFile["lfn"].startswith("MCFakeFile"):
+            # for MC which uses "EmptySource" there must be no inputFile
+            continue
+        primaryFiles.append(inputFile["lfn"])
+        for secondaryFile in inputFile["parents"]:
+            secondaryFiles.append(secondaryFile["lfn"])
+    print("Adding %d files to 'fileNames' attr" % len(primaryFiles))
+    print("Adding %d files to 'secondaryFileNames' attr" % len(secondaryFiles))
+    if len(primaryFiles) > 0:
+        tweak.addParameter("process.source.fileNames",
+                           "customTypeCms.untracked.vstring(%s)" % primaryFiles)
+        if len(secondaryFiles) > 0:
+            tweak.addParameter("process.source.secondaryFileNames",
+                               "customTypeCms.untracked.vstring(%s)" % secondaryFiles)
+
+    # for rearranging runsAndLumis into the structure needed by CMSSW, reuse code taken from
+    # https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/WMTweak.py#L482
+    if runAndLumis:
+        lumisToProcess = []
+        for run in runAndLumis.keys():
+            lumiPairs = runAndLumis[run]
+            for lumiPair in lumiPairs:
+                if len(lumiPair) != 2:
+                    # Do nothing
+                    continue
+                lumisToProcess.append("%s:%s-%s:%s" % (run, lumiPair[0], run, lumiPair[1]))
+        tweak.addParameter("process.source.lumisToProcess",
+                           "customTypeCms.untracked.VLuminosityBlockRange(%s)" % lumisToProcess)
+
+    # how many events to process
+    if opts.firstEvent:
+        tweak.addParameter("process.source.firstEvent",
+                           "customTypeCms.untracked.uint32(%s)" % opts.firstEvent)
+    if opts.firstEvent is None or opts.lastEvent is None:
+        # what to process is define in runAndLumis, we do no split by events here
+        maxEvents = -1
+    else:
+        # for MC CRAB passes 1st/last event, but cmsRun wants 1st ev + MaxEvents
+        maxEvents = int(opts.lastEvent) - int(opts.firstEvent) + 1
+        opts.lastEvent = None  # for MC there has to be no lastEvent
+    tweak.addParameter("process.maxEvents.input",
+                       "customTypeCms.untracked.int32(%s)" % maxEvents)
+
+    if opts.lastEvent:
+        tweak.addParameter("process.source.lastEvent",
+                           "customTypeCms.untracked.uint32(%s)" % opts.lastEvent)
+
+    # firstLumi, firstRun and eventsPerLumi are used for MC
+    if opts.firstLumi:
+        tweak.addParameter("process.source.firstLuminosityBlock",
+                           "customTypeCms.untracked.uint32(%s)" % opts.firstLumi)
+    if opts.firstRun:
+        tweak.addParameter("process.source.firstRun",
+                           "customTypeCms.untracked.uint32(%s)" % opts.firstRun)
+    if opts.eventsPerLumi:
+        numberEventsInLuminosityBlock = "customTypeCms.untracked.uint32(%s)" % opts.eventsPerLumi
+        tweak.addParameter("process.source.numberEventsInLuminosityBlock", numberEventsInLuminosityBlock)
+
+    # time-limited running is used by automatic splitting probe jobs
+    if opts.maxRuntime:
+        maxSecondsUntilRampdown = "customTypeCms.untracked.int32(%s)" %opts.maxRuntime
+        tweak.addParameter("process.maxSecondsUntilRampdown.input", maxSecondsUntilRampdown)
+
+    # event limiter for testing
+    if opts.oneEventMode in ["1", "True", True] :
+        tweak.addParameter("process.maxEvents.input", "customTypeCms.untracked.int32(1)")
+
+    # make sure that FJR contains useful statistics, reuse code from
+    # https://github.com/dmwm/WMCore/blob/c2fa70af3b4c5285d50e6a8bf48636232f738340/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L289-L307
+    tweak.addParameter("process.CPU", "customTypeCms.Service('CPU')")
+    tweak.addParameter("process.Timing", "customTypeCms.Service('Timing', summaryOnly=cms.untracked.bool(True))")
+    tweak.addParameter("process.SimpleMemoryCheck",
+                       "customTypeCms.Service('SimpleMemoryCheck', jobReportOutputOnly=cms.untracked.bool(True))")
+
+    # tweak !
+    psetTweakJson = "PSetTweak.json"
+    tweak.persist(psetTweakJson, formatting='simplejson')
 
     procScript = "edm_pset_tweak.py"
-    psetTweakJson = "PSetTweak.json"
-    psetTweak.persist(psetTweakJson, formatting='simplejson')
-
-    cmd = "%s --input_pkl %s --output_pkl %s --json %s" % (
+    pklOut = pklIn + '-tweaked'
+    # we always create untracked psets in our tweaks
+    cmd = "%s --input_pkl %s --output_pkl %s --json %s --create_untracked_psets" % (
         procScript, pklIn, pklOut, psetTweakJson)
-    if skipIfSet:
-        cmd += " --skip_if_set"
-    if allowFailedTweaks:
-        cmd += " --allow_failed_tweaks"
-    if createUntrackedPsets:
-        cmd += " --create_untracked_psets"
+    commandLines = createTweakingCommandLines(cmd, pklIn, pklOut)
 
-    print("will execute:\n%s" % cmd)
-
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    out, err = process.communicate()
-    exitcode = process.returncode
-    # for Py3 compatibility
-    stdout = out.decode(encoding='UTF-8') if out else ''
-    stderr = err.decode(encoding='UTF-8') if err else ''
-    if exitcode:
-        print("Non zero exit code: %s" % exitcode)
-        print("Error while tweaking pset.\nStdout:\n%s\nStderr:\%s" % (stdout, stderr))
-    return exitcode
-
-def enableLazyDownload(pklIn):
-    """
-    _enableLazyDownload_  code stolen from https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L529-L542
-    Set things to read data remotely
-    will modify input picked Pset (pklIn) adding enabling of lazy download
-    """
-    procScript = "cmssw_enable_lazy_download.py"
-
-    pklOut = pklIn + '-lazy'
-    cmd = "%s --input_pkl %s --output_pkl %s" % (procScript, pklIn, pklOut)
-
-    print("will execute:\n%s" % cmd)
-
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    out, err = process.communicate()
-    exitcode = process.returncode
-    # for Py3 compatibility
-    stdout = out.decode(encoding='UTF-8') if out else ''
-    stderr = err.decode(encoding='UTF-8') if err else ''
-    if exitcode:
-        print("Non zero exit code: %s" % exitcode)
-        print("Error while enabling lazy download on pset.\nStdout:\n%s\nStderr:\%s" % (stdout, stderr))
-    os.rename(pklOut, pklIn)
-    return exitcode
-
-
-def handleRandomSeeds(pklIn):
-    """
-    make sure random seeds are automatically initialized. See
-    https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L254-L286
-    """
-    procScript = "cmssw_handle_random_seeds.py"
+    # there a couple more things to do which require running different EDM/CMSSW commands
+    # enable LazyDownload of LHE files (if needed) and make sure random seeds are initialized
+    if opts.lheInputFiles:
+        pklOut = pklIn + '-lazy'
+        procScript = "cmssw_enable_lazy_download.py"
+        cmd = "%s --input_pkl %s --output_pkl %s" % (procScript, pklIn, pklOut)
+        moreLines = createTweakingCommandLines(cmd, pklIn, pklOut)
+        commandLines += moreLines
 
     pklOut = pklIn + '-seeds'
+    procScript = "cmssw_handle_random_seeds.py"
     cmd = "%s --input_pkl %s --output_pkl %s --seeding dummy" % (procScript, pklIn, pklOut)
+    moreLines += createTweakingCommandLines(cmd, pklIn, pklOut)
+    commandLines += moreLines
 
-    print("will execute:\n%s" % cmd)
-
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    out, err = process.communicate()
-    exitcode = process.returncode
-    # for Py3 compatibility
-    stdout = out.decode(encoding='UTF-8') if out else ''
-    stderr = err.decode(encoding='UTF-8') if err else ''
-    if exitcode:
-        print("Non zero exit code: %s" % exitcode)
-        print("Error while handling randome seeds on pset.\nStdout:\n%s\nStderr:\%s" % (stdout, stderr))
-    os.rename(pklOut, pklIn)
-    return exitcode
+    return commandLines
 
 
-print("Beginning TweakPSet")
-print(" arguments: %s" % sys.argv)
+def prepareTweakingScript(options, scriptName):
+    # prepare a script to run in CMSSW environment which will do the needed
+    # tweaks using edm*.py commands and run it
+    # this is made to be called inside CMSRunAnalysis.py and it is passed the
+    # same list of options as used in there
 
-parser = OptionParser()
-parser.add_option('--inputFile', dest='inputFile')
-parser.add_option('--runAndLumis', dest='runAndLumis')
-parser.add_option('--firstEvent', dest='firstEvent')
-parser.add_option('--lastEvent', dest='lastEvent')
-parser.add_option('--firstLumi', dest='firstLumi')
-parser.add_option('--firstRun', dest='firstRun')
-parser.add_option('--seeding', dest='seeding')
-parser.add_option('--lheInputFiles', dest='lheInputFiles')
-parser.add_option('--oneEventMode', dest='oneEventMode', default=False)
-parser.add_option('--eventsPerLumi', dest='eventsPerLumi')
-parser.add_option('--maxRuntime', dest='maxRuntime')
-opts, args = parser.parse_args()
+    # save original PSet.pkl
+    pklIn = "PSet.pkl"
+    shutil.copy(pklIn, 'PSet-Original.pkl')
 
-# Note about ops: default value is None for all, but if, like usually happens,
-# CRAB code calls this with inputs like --seeding=None
-# the opts variable is set to the string 'None', not to the python type None
-# let's make life easier by replacing 'None' with None. Avoid using
-# ast.literal_eval as in old version since it does not port easily to python3
-if opts.inputFile and opts.inputFile == 'None': opts.inputFile = None
-if opts.firstEvent and opts.firstEvent == 'None': opts.firstEvent = None
-if opts.runAndLumis and opts.runAndLumis == 'None': opts.runAndLumis = None
-if opts.lastEvent and opts.lastEvent == 'None': opts.lastEvent = None
-if opts.firstLumi and opts.firstLumi == 'None': opts.firstLumi = None
-if opts.firstRun and opts.firstRun == 'None': opts.firstRun = None
-if opts.seeding and opts.seeding == 'None': opts.seeding = None
-if opts.lheInputFiles and opts.lheInputFiles == 'None': opts.lheInputFiles = None
-if opts.eventsPerLumi and opts.eventsPerLumi == 'None': opts.eventsPerLumi = None
-if opts.maxRuntime and opts.maxRuntime == 'None': opts.maxRuntime = None
+    # tweak !
 
-if opts.oneEventMode in ["1", "True", True] :
-    print("One event mode disabled until we can put together a decent version of WMCore.")
-    print("TweakPSet.py is going to force one event mode")
+    commandLines = createScriptLines(options, pklIn)
 
-runAndLumis = {}
-if opts.runAndLumis:
-    runAndLumis = readFileFromTarball(opts.runAndLumis, 'run_and_lumis.tar.gz')
-inputFiles = {}
-if opts.inputFile:
-    inputFiles = readFileFromTarball(opts.inputFile, 'input_files.tar.gz')
-
-
-# build a tweak object with the needed changes to be applied to PSet
-tweak = PSetTweak()
-
-# add tweaks
-
-# preset option for edm_pset_tweak.py, will set to True if some param. tweaking needs it
-untrackedPsets = False
-
-# inputFile will always be present
-# inputFile can have three formats depending on wether secondary input files are used:
-# 1. a single LFN as a string : "/store/.....root"
-# 2. a list of LFNs : ["/store/.....root", "/store/....root", ...]
-# 3. a list of dictionaries (one per file) with keys: 'lfn' and 'parents'
-#   value for 'lfn' is a string, value for 'parents' is a list of {'lfn':lfn} dictionaries
-#   [{'lfn':inputlfn, 'parents':[{'lfn':parentlfn1},{'lfn':parentlfn2}], ....]},...]
-# to properly prepare the tweak we reuse code fom WMTweak.py:
-# https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/WMTweak.py#L415-L441
-primaryFiles = []
-secondaryFiles = []
-for inputFile in inputFiles:
-    # make sure input is always in format 3.
-    if not isinstance(inputFile, dict):
-        inputFile = {'lfn':inputFile, 'parents':[]}
-    if inputFile["lfn"].startswith("MCFakeFile"):
-        # for MC which uses "EmptySource" there must be no inputFile
-        continue
-    primaryFiles.append(inputFile["lfn"])
-    for secondaryFile in inputFile["parents"]:
-        secondaryFiles.append(secondaryFile["lfn"])
-print("Adding %d files to 'fileNames' attr" % len(primaryFiles))
-print("Adding %d files to 'secondaryFileNames' attr" % len(secondaryFiles))
-if len(primaryFiles) > 0:
-    tweak.addParameter("process.source.fileNames",
-                       "customTypeCms.untracked.vstring(%s)" % primaryFiles)
-    if len(secondaryFiles) > 0:
-        tweak.addParameter("process.source.secondaryFileNames",
-                           "customTypeCms.untracked.vstring(%s)" % secondaryFiles)
-
-# for rearranging runsAndLumis into the structure needed by CMSSW, reuse code taken from
-# https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/WMTweak.py#L482
-if runAndLumis:
-    lumisToProcess = []
-    for run in runAndLumis.keys():
-        lumiPairs = runAndLumis[run]
-        for lumiPair in lumiPairs:
-            if len(lumiPair) != 2:
-                # Do nothing
-                continue
-            lumisToProcess.append("%s:%s-%s:%s" % (run, lumiPair[0], run, lumiPair[1]))
-    tweak.addParameter("process.source.lumisToProcess",
-                       "customTypeCms.untracked.VLuminosityBlockRange(%s)" % lumisToProcess)
-
-# how many events to process
-if opts.firstEvent:
-    tweak.addParameter("process.source.firstEvent",
-                       "customTypeCms.untracked.uint32(%s)" % opts.firstEvent)
-if opts.firstEvent is None or opts.lastEvent is None:
-    # what to process is define in runAndLumis, we do no split by events here
-    maxEvents = -1
-else:
-    # for MC CRAB passes 1st/last event, but cmsRun wants 1st ev + MaxEvents
-    maxEvents = int(opts.lastEvent) - int(opts.firstEvent) + 1
-    opts.lastEvent = None  # for MC there has to be no lastEvent
-tweak.addParameter("process.maxEvents.input",
-                   "customTypeCms.untracked.int32(%s)" % maxEvents)
-untrackedPsets = True
-
-if opts.lastEvent:
-    tweak.addParameter("process.source.lastEvent",
-                       "customTypeCms.untracked.uint32(%s)" % opts.lastEvent)
-
-# firstLimi, firstRun and eventsPerLumi are used for MC
-if opts.firstLumi:
-    tweak.addParameter("process.source.firstLuminosityBlock",
-                       "customTypeCms.untracked.uint32(%s)" % opts.firstLumi)
-if opts.firstRun:
-    tweak.addParameter("process.source.firstRun",
-                       "customTypeCms.untracked.uint32(%s)" % opts.firstRun)
-if opts.eventsPerLumi:
-    numberEventsInLuminosityBlock = "customTypeCms.untracked.uint32(%s)" % opts.eventsPerLumi
-    tweak.addParameter("process.source.numberEventsInLuminosityBlock", numberEventsInLuminosityBlock)
-
-# time-limited running is used by automatic splitting probe jobs
-if opts.maxRuntime:
-    maxSecondsUntilRampdown = "customTypeCms.untracked.int32(%s)" %opts.maxRuntime
-    tweak.addParameter("process.maxSecondsUntilRampdown.input", maxSecondsUntilRampdown)
-    untrackedPsets = True
-
-# event limiter for testing
-if opts.oneEventMode in ["1", "True", True] :
-    tweak.addParameter("process.maxEvents.input", "customTypeCms.untracked.int32(1)")
-
-# make sure that FJR contains useful statistics, reuse code from
-# https://github.com/dmwm/WMCore/blob/c2fa70af3b4c5285d50e6a8bf48636232f738340/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L289-L307
-tweak.addParameter("process.CPU", "customTypeCms.Service('CPU')")
-tweak.addParameter("process.Timing", "customTypeCms.Service('Timing', summaryOnly=cms.untracked.bool(True))")
-tweak.addParameter("process.SimpleMemoryCheck",
-                   "customTypeCms.Service('SimpleMemoryCheck', jobReportOutputOnly=cms.untracked.bool(True))")
-
-# save original PSet.pkl
-psPklIn = "PSet-In.pkl"
-shutil.copy('PSet.pkl', psPklIn)
-
-# tweak !
-psPklOut = "PSet-Out.pkl"
-ret = applyPsetTweak(tweak, psPklIn, psPklOut, createUntrackedPsets=untrackedPsets)
-
-# finishing touches to the pset
-if not ret and opts.lheInputFiles:
-    ret = enableLazyDownload(psPklOut)
-if not ret:
-    ret = handleRandomSeeds(psPklOut)
-
-if ret:
-    print("tweak failed, leave PSet.pkl unchanged. Job will fail")
-else:
-    print("PSetTweak successful, overwrite PSet.pkl")
-    shutil.copy(psPklOut, 'PSet.pkl')
+    tweakScript = open(scriptName, 'w')
+    tweakScript.write('#/bin/bash\n')
+    tweakScript.write('\n%s\n' % commandLines)
+    tweakScript.close()

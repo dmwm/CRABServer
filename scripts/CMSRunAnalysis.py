@@ -23,6 +23,7 @@ from optparse import OptionParser, BadOptionError, AmbiguousOptionError
 
 import DashboardAPI
 import WMCore.Storage.SiteLocalConfig as SiteLocalConfig
+from TweakPSet import prepareTweakingScript
 
 # replicate here code from ServerUtilities.py to avoid importing CRABServer in jobs
 # see there for more documentation. Ideally could move this to WMCore
@@ -43,7 +44,6 @@ class tempSetLogLevel():
         self.logger.setLevel(self.newLogLevel)
     def __exit__(self, a, b, c):
         self.logger.setLevel(self.previousLogLevel)
-
 
 logCMSSWSaved = False
 
@@ -77,7 +77,6 @@ def mintime():
         time.sleep(remaining)
         print("==== Failure sleep FINISHED at %s ====" % time.asctime(time.gmtime()))
 
-
 class PassThroughOptionParser(OptionParser):
     """
     An unknown option pass-through implementation of OptionParser.
@@ -94,7 +93,6 @@ class PassThroughOptionParser(OptionParser):
                 OptionParser._process_args(self, largs, rargs, values)
             except (BadOptionError, AmbiguousOptionError) as e:
                 largs.append(e.opt_str)
-
 
 def parseAd():
     fd = open(os.environ['_CONDOR_JOB_AD'])
@@ -113,12 +111,6 @@ def parseAd():
         jobad[info[0]] = val
     return jobad
 
-
-def populateDashboardMonitorInfo(myad, params):
-    params['MonitorID'] = myad['CRAB_ReqName']
-    params['MonitorJobID'] = '{0}_https://glidein.cern.ch/{0}/{1}_{2}'.format(myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":"), myad['CRAB_Retry'])
-
-
 def calcOverflowFlag(myad):
     overflowflag = 0
     if 'DESIRED_Sites' in myad and 'JOB_CMSSite' in myad:
@@ -128,40 +120,6 @@ def calcOverflowFlag(myad):
         if job_exec_site in desired_sites:
             overflowflag = 0
     return overflowflag
-
-
-def earlyDashboardMonitoring(myad):
-    params = {
-        'WNHostName': socket.getfqdn(),
-        'SyncGridJobId': 'https://glidein.cern.ch/{0}/{1}'.format(myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":")),
-        'SyncSite': myad['JOB_CMSSite'],
-        'SyncCE': myad['Used_Gatekeeper'].split(":")[0].split(" ")[0],
-        'OverflowFlag': calcOverflowFlag(myad),
-    }
-    populateDashboardMonitorInfo(myad, params)
-    print("Dashboard early startup params: %s" % str(params))
-    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
-    return params['MonitorJobID']
-
-
-def earlyDashboardFailure(myad):
-    params = {
-        'JobExitCode': 10043,
-    }
-    populateDashboardMonitorInfo(myad, params)
-    print("Dashboard early startup params: %s" % str(params))
-    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
-
-
-def startDashboardMonitoring(myad):
-    params = {
-        'WNHostName': socket.getfqdn(),
-        'ExeStart': 'cmsRun',
-    }
-    populateDashboardMonitorInfo(myad, params)
-    print("Dashboard startup parameters: %s" % str(params))
-    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
-
 
 def addReportInfo(params, fjr):
     if 'exitCode' in fjr:
@@ -196,123 +154,6 @@ def addReportInfo(params, fjr):
         for info in fjr['input']['source']:
             if 'events' in info:
                 params['NEventsProcessed'] += info['events']
-
-
-def reportPopularity(monitorId, monitorJobId, myad, fjr):
-    """
-    Using the FJR and job ad, report popularity information to the dashboard.
-
-    Implementation is based on https://github.com/dmwm/CRAB2/blob/63a7c046e8411ab26d4960ef2ae5bf48642024de/python/parseCrabFjr.py
-
-    Note: Unlike CRAB2, we do not report the runs/lumis processed.
-    """
-
-    if 'CRAB_DataBlock' not in myad:
-        print("Not sending data to popularity service because 'CRAB_DataBlock' is not in job ad.")
-    sources = fjr.get('steps', {}).get('cmsRun', {}).get('input', {}).get('source', [])
-    #skippedFiles = fjr.get('skippedFiles', [])
-    fallbackFiles = fjr.get('fallbackFiles', [])
-    if not sources:
-        print("Not sending data to popularity service because no input sources found.")
-
-    # Now, compute the strings about the input files.  Each input file has the following format in the report:
-    #
-    # %(name)s::%(report_type)d::%(file_type)s::%(access_type)s::%(counter)d
-    #
-    # Where each variable has the following values:
-    #  - name: the portion of the LFN after the common prefix
-    #  - report_type: 1 for a file successfully processed, 0 for a failed file with an error message, 2 otherwise
-    #  - file_type: EDM or Unknown
-    #  - access_type: Remote or Local
-    #  - counter: monotonically increasing counter
-
-    # First, pull the LFNs from the FJR.  This will be used to compute the basename.
-    inputInfo = {}
-    parentInputInfo = {}
-    inputCtr = 0
-    parentCtr = 0
-    for source in sources:
-        if 'lfn' not in source:
-            print("Excluding source data from popularity report because no LFN is present. %s" % str(source))
-        if source.get('input_source_class') == 'PoolSource':
-            file_type = 'EDM'
-        else:
-            file_type = 'Unknown'
-        if source['lfn'] in fallbackFiles:
-            access_type = "Remote"
-        else:
-            access_type = "Local"
-
-        if source.get("input_type", "primaryFiles") == "primaryFiles":
-            inputCtr += 1
-            # Note we hardcode 'Local' here.  In CRAB2, it was assumed any PFN with the string 'xrootd'
-            # in it was a remote access; we feel this is no longer a safe assumption.  CMSSW actually
-            # differentiates the fallback accesses.  See https://github.com/dmwm/WMCore/issues/5087
-            inputInfo[source['lfn']] = [source['lfn'], file_type, access_type, inputCtr]
-        else:
-            parentCtr += 1
-            parentInputInfo[source['lfn']] = [source['lfn'], file_type, access_type, parentCtr]
-    baseName = os.path.dirname(os.path.commonprefix(inputInfo.keys()))
-    parentBaseName = os.path.dirname(os.path.commonprefix(parentInputInfo.keys()))
-
-    # Next, go through the sources again to properly record the unique portion of the filename
-    # The dictionary is keyed on the unique portion of the filename after the common prefix.
-    if baseName:
-        for info in inputInfo.values():
-            lfn = info[0].split(baseName, 1)[-1]
-            info[0] = lfn
-    if parentBaseName:
-        for info in parentInputInfo.values():
-            lfn = info[0].split(parentBaseName, 1)[-1]
-            info[0] = lfn
-
-    inputString = ';'.join(["%s::1::%s::%s::%d" % tuple(value) for value in inputInfo.values()])
-    parentInputString = ';'.join(["%s::1::%s::%s::%d" % tuple(value) for value in parentInputInfo.values()])
-
-    # Currently, CRAB3 drops the FJR information for failed files.  Hence, we don't currently do any special
-    # reporting for these like CRAB2 did.  TODO: Revisit once https://github.com/dmwm/CRABServer/issues/4272
-    # is fixed.
-
-    report = {
-        'inputBlocks': myad['CRAB_DataBlock'],
-        'Basename': str(baseName),
-        'BasenameParent': str(parentBaseName),
-        'inputFiles': str(inputString),
-        'parentFiles': str(parentInputString),
-    }
-    print("Dashboard popularity report: %s" % str(report))
-    DashboardAPI.apmonSend(monitorId, monitorJobId, report)
-
-
-def stopDashboardMonitoring(myad):
-    params = {
-        'ExeEnd': 'cmsRun',
-        'NCores': myad['RequestCpus'],
-    }
-    populateDashboardMonitorInfo(myad, params)
-    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
-    del params['ExeEnd']
-    fjr = {}
-    try:
-        fjr = json.load(open("jobReport.json"))
-    except Exception:
-        print("WARNING: Unable to parse jobReport.json; Dashboard reporting will not be useful.\n", traceback.format_exc())
-    try:
-        addReportInfo(params, fjr)
-    except Exception:
-        if 'ExeExitCode' not in params:
-            params['ExeExitCode'] = 50115
-        if 'JobExitCode' not in params:
-            params['JobExitCode'] = params['ExeExitCode']
-        print("ERROR: Unable to parse job info from FJR.\n", traceback.format_exc())
-    print("Dashboard end parameters: %s" % str(params))
-    try:
-        reportPopularity(params['MonitorID'], params['MonitorJobID'], myad, fjr)
-    except Exception:
-        print("ERROR: Failed to report popularity information to Dashboard.\n", traceback.format_exc())
-    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
-    DashboardAPI.apmonFree()
-
 
 def logCMSSW():
     """ First it checks if cmsRun-stdout.log is available and if it
@@ -424,7 +265,6 @@ def handleException(exitAcronym, exitCode, exitMsg):
     if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
         stopDashboardMonitoring(ad)
 
-
 def parseArgs():
     parser = PassThroughOptionParser()
     parser.add_option('-a',
@@ -502,6 +342,15 @@ def parseArgs():
 
     (opts, _) = parser.parse_args(sys.argv[1:])
 
+    # sanitize input options
+    # Note about options: default value is None for all, but if, like it usually happens,
+    # CRAB code calls this with inputs like --seeding=None
+    # the option variable is set to the string 'None', not to the python type None
+    # let's make life easier by replacing 'None' with None.
+    for name,value in vars(opts).items():
+        if value == 'None':
+            setattr(opts, name, None)
+
     try:
         print("==== Parameters Dump at %s ===" % time.asctime(time.gmtime()))
         print("archiveJob:    ", opts.archiveJob)
@@ -534,7 +383,6 @@ def parseArgs():
         sys.exit(EC_MissingArg)
 
     return opts
-
 
 def prepSandbox(opts):
     print("==== Sandbox untarring STARTING at %s ====" % time.asctime(time.gmtime()))
@@ -582,42 +430,6 @@ def getProv(filename, scram):
     output = scram.getStdout()
     return output
 
-def tweakPSet(opts, scram):
-    # this command is executed with cwd set to the job running directory
-
-    # since in new WMCore Scram() environmnet does not import anything from current process
-    # need to add PSetTweaks to PYTHONPATH, possibly w/o bringing in the rest of WMCore
-    # start with full WMCore to test things, yeah this code is ugly
-    setEnv = "export PYTHONPATH=`pwd`/WMCore.zip; "
-    commandTemplate = 'python %s/TweakPSet.py  ' + '--inputFile=\'%s\' ' + '--runAndLumis=\'%s\' ' +\
-                      '--firstEvent=%s ' + '--lastEvent=%s ' + '--firstLumi=%s ' + '--firstRun=%s ' +\
-                      '--seeding=%s ' + '--lheInputFiles=%s ' + '--oneEventMode=%s ' +\
-                      '--eventsPerLumi=%s ' + '--maxRuntime=%s'
-    command = setEnv + commandTemplate %\
-              (os.getcwd(),
-               opts.inputFile,
-               opts.runAndLumis,
-               opts.firstEvent,
-               opts.lastEvent,
-               opts.firstLumi,
-               opts.firstRun,
-               opts.seeding,
-               opts.lheInputFiles,
-               opts.oneEventMode,
-               opts.eventsPerLumi,
-               opts.maxRuntime)
-
-    print('Executing %s' % command)
-    with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
-        ret = scram(command, runtimeDir = os.getcwd())
-    if ret > 0:
-        msg = 'Error executing TweakPSet.\n\tScram Diagnostic %s' % scram.diagnostic()
-        handleException("FAILED", EC_CMSRunWrapper, msg)
-        mintime()
-        sys.exit(EC_CMSRunWrapper)
-    # debuggin help in initial developmenty, print TweakPSet output anyhow
-    print("TweakPSet output:\%s" % scram.diagnostic())
-
 def executeUserApplication(command, scram):
     """
     cmsRun failures will appear in FJR but do not raise exceptions
@@ -659,7 +471,6 @@ def AddChecksums(report):
             print("== FileName: %s  -  FileAdler32: %s  - FileSize: %.3f MBytes" % \
                  (fileInfo['pfn'], adler32, float(fileInfo['size'])/(1024*1024)))
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
-
 
 def AddPsetHash(report, scram):
     """
@@ -730,7 +541,6 @@ def AddPsetHash(report, scram):
                 print(lines)
                 raise Exception("PSet hash missing from edmProvDump output.")
 
-
 def StripReport(report):
     if 'steps' not in report:
         return
@@ -749,6 +559,152 @@ def StripReport(report):
             if 'fileName' in fileInfo:
                 fileInfo['fileName'] = re.sub(r'^file:', '', fileInfo['fileName'])
 
+####################################################
+## old code to be deleted
+
+def populateDashboardMonitorInfo(myad, params):
+    params['MonitorID'] = myad['CRAB_ReqName']
+    params['MonitorJobID'] = '{0}_https://glidein.cern.ch/{0}/{1}_{2}'.format(myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":"), myad['CRAB_Retry'])
+def earlyDashboardMonitoring(myad):
+    params = {
+        'WNHostName': socket.getfqdn(),
+        'SyncGridJobId': 'https://glidein.cern.ch/{0}/{1}'.format(myad['CRAB_Id'], myad['CRAB_ReqName'].replace("_", ":")),
+        'SyncSite': myad['JOB_CMSSite'],
+        'SyncCE': myad['Used_Gatekeeper'].split(":")[0].split(" ")[0],
+        'OverflowFlag': calcOverflowFlag(myad),
+    }
+    populateDashboardMonitorInfo(myad, params)
+    print("Dashboard early startup params: %s" % str(params))
+    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+    return params['MonitorJobID']
+def earlyDashboardFailure(myad):
+    params = {
+        'JobExitCode': 10043,
+    }
+    populateDashboardMonitorInfo(myad, params)
+    print("Dashboard early startup params: %s" % str(params))
+    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+def startDashboardMonitoring(myad):
+    params = {
+        'WNHostName': socket.getfqdn(),
+        'ExeStart': 'cmsRun',
+    }
+    populateDashboardMonitorInfo(myad, params)
+    print("Dashboard startup parameters: %s" % str(params))
+    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+def reportPopularity(monitorId, monitorJobId, myad, fjr):
+    """
+    Using the FJR and job ad, report popularity information to the dashboard.
+
+    Implementation is based on https://github.com/dmwm/CRAB2/blob/63a7c046e8411ab26d4960ef2ae5bf48642024de/python/parseCrabFjr.py
+
+    Note: Unlike CRAB2, we do not report the runs/lumis processed.
+    """
+
+    if 'CRAB_DataBlock' not in myad:
+        print("Not sending data to popularity service because 'CRAB_DataBlock' is not in job ad.")
+    sources = fjr.get('steps', {}).get('cmsRun', {}).get('input', {}).get('source', [])
+    #skippedFiles = fjr.get('skippedFiles', [])
+    fallbackFiles = fjr.get('fallbackFiles', [])
+    if not sources:
+        print("Not sending data to popularity service because no input sources found.")
+
+    # Now, compute the strings about the input files.  Each input file has the following format in the report:
+    #
+    # %(name)s::%(report_type)d::%(file_type)s::%(access_type)s::%(counter)d
+    #
+    # Where each variable has the following values:
+    #  - name: the portion of the LFN after the common prefix
+    #  - report_type: 1 for a file successfully processed, 0 for a failed file with an error message, 2 otherwise
+    #  - file_type: EDM or Unknown
+    #  - access_type: Remote or Local
+    #  - counter: monotonically increasing counter
+
+    # First, pull the LFNs from the FJR.  This will be used to compute the basename.
+    inputInfo = {}
+    parentInputInfo = {}
+    inputCtr = 0
+    parentCtr = 0
+    for source in sources:
+        if 'lfn' not in source:
+            print("Excluding source data from popularity report because no LFN is present. %s" % str(source))
+        if source.get('input_source_class') == 'PoolSource':
+            file_type = 'EDM'
+        else:
+            file_type = 'Unknown'
+        if source['lfn'] in fallbackFiles:
+            access_type = "Remote"
+        else:
+            access_type = "Local"
+
+        if source.get("input_type", "primaryFiles") == "primaryFiles":
+            inputCtr += 1
+            # Note we hardcode 'Local' here.  In CRAB2, it was assumed any PFN with the string 'xrootd'
+            # in it was a remote access; we feel this is no longer a safe assumption.  CMSSW actually
+            # differentiates the fallback accesses.  See https://github.com/dmwm/WMCore/issues/5087
+            inputInfo[source['lfn']] = [source['lfn'], file_type, access_type, inputCtr]
+        else:
+            parentCtr += 1
+            parentInputInfo[source['lfn']] = [source['lfn'], file_type, access_type, parentCtr]
+    baseName = os.path.dirname(os.path.commonprefix(inputInfo.keys()))
+    parentBaseName = os.path.dirname(os.path.commonprefix(parentInputInfo.keys()))
+
+    # Next, go through the sources again to properly record the unique portion of the filename
+    # The dictionary is keyed on the unique portion of the filename after the common prefix.
+    if baseName:
+        for info in inputInfo.values():
+            lfn = info[0].split(baseName, 1)[-1]
+            info[0] = lfn
+    if parentBaseName:
+        for info in parentInputInfo.values():
+            lfn = info[0].split(parentBaseName, 1)[-1]
+            info[0] = lfn
+
+    inputString = ';'.join(["%s::1::%s::%s::%d" % tuple(value) for value in inputInfo.values()])
+    parentInputString = ';'.join(["%s::1::%s::%s::%d" % tuple(value) for value in parentInputInfo.values()])
+
+    # Currently, CRAB3 drops the FJR information for failed files.  Hence, we don't currently do any special
+    # reporting for these like CRAB2 did.  TODO: Revisit once https://github.com/dmwm/CRABServer/issues/4272
+    # is fixed.
+
+    report = {
+        'inputBlocks': myad['CRAB_DataBlock'],
+        'Basename': str(baseName),
+        'BasenameParent': str(parentBaseName),
+        'inputFiles': str(inputString),
+        'parentFiles': str(parentInputString),
+    }
+    print("Dashboard popularity report: %s" % str(report))
+    DashboardAPI.apmonSend(monitorId, monitorJobId, report)
+def stopDashboardMonitoring(myad):
+    params = {
+        'ExeEnd': 'cmsRun',
+        'NCores': myad['RequestCpus'],
+    }
+    populateDashboardMonitorInfo(myad, params)
+    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+    del params['ExeEnd']
+    fjr = {}
+    try:
+        fjr = json.load(open("jobReport.json"))
+    except Exception:
+        print("WARNING: Unable to parse jobReport.json; Dashboard reporting will not be useful.\n", traceback.format_exc())
+    try:
+        addReportInfo(params, fjr)
+    except Exception:
+        if 'ExeExitCode' not in params:
+            params['ExeExitCode'] = 50115
+        if 'JobExitCode' not in params:
+            params['JobExitCode'] = params['ExeExitCode']
+        print("ERROR: Unable to parse job info from FJR.\n", traceback.format_exc())
+    print("Dashboard end parameters: %s" % str(params))
+    try:
+        reportPopularity(params['MonitorID'], params['MonitorJobID'], myad, fjr)
+    except Exception:
+        print("ERROR: Failed to report popularity information to Dashboard.\n", traceback.format_exc())
+    DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
+    DashboardAPI.apmonFree()
+####################################################
 
 if __name__ == "__main__":
     print("==== CMSRunAnalysis.py STARTING at %s ====" % time.asctime(time.gmtime()))
@@ -800,33 +756,47 @@ if __name__ == "__main__":
         if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
             startDashboardMonitoring(ad)
         print("==== CMSSW Stack Execution STARTING at %s ====" % time.asctime(time.gmtime()))
-        scr = Scram(
+        scram = Scram(
             version=options.cmsswVersion,
             directory=os.getcwd(),
             architecture=options.scramArch,
             )
 
         print("==== SCRAM Obj CREATED at %s ====" % time.asctime(time.gmtime()))
-        if scr.project() or scr.runtime(): #if any of the two commands fail...
-            dgn = scr.diagnostic()
+        if scram.project() or scram.runtime(): #if any of the two commands fail...
+            dgn = scram.diagnostic()
             handleException("FAILED", EC_CMSMissingSoftware, 'Error setting CMSSW environment: %s' % dgn)
             mintime()
             sys.exit(EC_CMSMissingSoftware)
+        print("==== SCRAM Obj INITIALIZED at %s ====" % time.asctime(time.gmtime()))
 
         print("==== Extract user sandbox in CMSSW directory ====")
         extractUserSandbox(options.archiveJob, options.cmsswVersion)
 
         # tweaking of the PSet is needed both for CMSSWStack and ScriptEXE
-        print("==== Tweak PSet ====")
-        tweakPSet(options, scr)
-        print("==== Tweak PSet Done ====")
+        print("==== Tweak PSet at %s ====" % time.asctime(time.gmtime()))
+        tweakingScriptName = 'tweakThePset.sh'
+        prepareTweakingScript(options, tweakingScriptName)
+        command = 'sh %s' % tweakingScriptName
+        print('Executing %s in Scram env' % command)
+        with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
+            ret = scram(command, runtimeDir=os.getcwd())
+        if ret > 0:
+            msg = 'Error executing %s\n\tScram Diagnostic %s' % (tweakingScriptName, scram.diagnostic())
+            handleException("FAILED", EC_CMSRunWrapper, msg)
+            mintime()
+            sys.exit(EC_CMSRunWrapper)
+        # debugging help in initial development: print command output in any case
+        print("%s output:\%s" % (tweakingScriptName, scram.diagnostic()))
+
+        print("==== Tweak PSet Done at %s ====" % time.asctime(time.gmtime()))
 
         jobExitCode = None
-        applicationName = 'CMSSW JOB' if options.scriptExe == 'None' else 'ScriptEXE'
+        applicationName = 'CMSSW JOB' if not options.scriptExe else 'ScriptEXE'
         # no matter what we run, it is very likely to need proxy location
         preCmd = 'export X509_USER_PROXY=%s; ' % os.getenv('X509_USER_PROXY')
         print("==== %s Execution started at %s ====" % (applicationName, time.asctime(time.gmtime())))
-        if options.scriptExe == 'None':
+        if not options.scriptExe :
             cmd = 'cmsRun -p PSet.py -j FrameworkJobReport.xml'
         else:
             # make sure scriptexe is executable
@@ -835,7 +805,7 @@ if __name__ == "__main__":
             cmd = os.getcwd() + "/%s %s %s" %\
                   (options.scriptExe, options.jobNumber, " ".join(json.loads(options.scriptArgs)))
         cmd = preCmd + cmd
-        applicationExitCode = executeUserApplication(cmd, scr)
+        applicationExitCode = executeUserApplication(cmd, scram)
         if applicationExitCode:
             print("==== Execution FAILED at %s ====" % time.asctime(time.gmtime()))
         print("==== %s Execution completed at %s ====" % (applicationName, time.asctime(time.gmtime())))
@@ -902,7 +872,7 @@ if __name__ == "__main__":
             # only if application succeeded compute output stats
             AddChecksums(rep)
             try:
-                AddPsetHash(rep, scr)
+                AddPsetHash(rep, scram)
             except Exception as ex:
                 exmsg = "Unable to compute pset hash for job output. Got exception:"
                 exmsg += "\n" + str(ex) + "\n"
