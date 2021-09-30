@@ -845,7 +845,7 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
     uploadProcess = subprocess.Popen(uploadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     stdout, stderr = uploadProcess.communicate()
     exitcode = uploadProcess.returncode
-    logger.debug('exitcode: %s\nstdout: %s\nstderr: %s', exitcode, stdout, stderr)
+    logger.debug('exitcode: %s\nstdout: %s', exitcode, stdout)
 
     if exitcode != 0:
         raise Exception('Failed to upload file with %s. stderr is:\n%s' % (uploadCommand, stderr))
@@ -886,7 +886,7 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
     logger.debug("Will execute:\n%s", downloadCommand)
     stdout, stderr = downloadProcess.communicate()
     exitcode = downloadProcess.returncode
-    logger.debug('exitcode: %s\nstdout: %s\nstderr: %s', exitcode, stdout, stderr)
+    logger.debug('exitcode: %s\nstdout: %s', exitcode, stdout)
 
     if exitcode != 0:
         raise Exception('Download command %s failed. stderr is:\n%s' % (downloadCommand, stderr))
