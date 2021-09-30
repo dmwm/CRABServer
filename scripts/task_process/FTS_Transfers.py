@@ -15,9 +15,12 @@ from httplib import HTTPException
 
 import fts3.rest.client.easy as fts3
 
+from rucio.client import Client as rucioclient
+from rucio.rse.rsemanager import find_matching_scheme
+
 from RESTInteractions import CRABRest
 from ServerUtilities import encodeRequest
-from TransferInterface import CRABDataInjector
+#from TransferInterface import CRABDataInjector
 
 FTS_ENDPOINT = "https://fts3-cms.cern.ch:8446/"
 FTS_MONITORING = "https://fts3-cms.cern.ch:8449/"
@@ -297,6 +300,10 @@ class submit_thread(threading.Thread):
                                                )
                              )
         self.log.info("Submitting %s transfers to FTS server" % len(self.files))
+        #SB#
+        for lfn in self.files:
+            self.log.info("%s %s %s %s", lfn[0],lfn[1],lfn[6],{'oracleId': lfn[2]})
+        #SB#
 
         # Submit fts job
         job = fts3.new_job(transfers,
@@ -385,58 +392,69 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
     jobids = []
     to_update = []
 
-    sources = list(set([x[3] for x in toTrans]))
+    # some things are the same for all files, pick them from the first one
+    username = toTrans[0][5]
+    scope = "user."+username
+    taskname = toTrans[0][6]
+    dst_rse = toTrans[0][4]
+    a_dst_lfn = toTrans[0][1]
+    a_src_lfn = toTrans[0][0]
 
-    for source in sources:
+    # this is not ols ASO anymore. All files here have same destination
+    # and LFN's and PFN's can only differ from each other in the directory counter and actual file name
+    # no reason to lookup lfn2pfn by individual file
+    # remember that src and dst LFN's are in general different (/store/user vs. /store/temp/user)
+    # so we assume: (P/L)FN = (P/L)FN_PREFIX/FILEID
+    # where: FILEID = xxxx/filename.filetype and xxxx is a 0000, 0001, 0002 etc.
 
-        ids = [x[2] for x in toTrans if x[3] == source]
-        sizes = [x[7] for x in toTrans if x[3] == source]
-        checksums = [x[8] for x in toTrans if x[3] == source]
-        username = toTrans[0][5]
-        scope = "user."+username
-        taskname = toTrans[0][6]
-        src_lfns = [x[0] for x in toTrans if x[3] == source]
-        dst_lfns = [x[1] for x in toTrans if x[3] == source]
+    dst_lfn_prefix = '/'.join(a_dst_lfn.split("/")[:-2])
+    dst_did = scope + ':' + dst_lfn_prefix + '/0000/file.root'
 
-        sorted_source_pfns = []
-        sorted_dest_pfns = []
+    src_lfn_prefix = '/'.join(a_src_lfn.split("/")[:-2])
+    src_did = scope + ':' + src_lfn_prefix + '/0000/file.root'
 
+    sourceSites = list(set([x[3] for x in toTrans]))
+
+    for source in sourceSites:
+
+        # find all files for this source
+        toTransFromThisSource = [x for x in toTrans if x[3] == source]
+        # find matching transfer protocol and proper PFN prefixes
+        src_rse = source
         try:
-            for chunk in chunks(src_lfns, 10):
-                rucio_chunk = [scope+":"+x for x in chunk]
-                # 'read' operation should better work here !
-                unsorted_source_pfns = [[k.split(scope+":")[1], str(x)] for k, x in \
-                                        rucioClient.cli.lfns2pfns(source, rucio_chunk, operation='read').items()]
-                #logging.info(unsorted_source_pfns)
-                for order_lfn in chunk:
-                    for lfn, pfn in unsorted_source_pfns:
-                        if order_lfn == lfn:
-                            sorted_source_pfns.append(pfn)
-                            break
-
-            for chunk in chunks(dst_lfns, 10):
-                rucio_chunk = [scope+":"+x for x in chunk]
-                # try 'write' but fall back to 'read' if the site only implemented one
-                try:
-                    unsorted_dest_pfns = [[k.split(scope+":")[1], str(x)] for k, x in \
-                                      rucioClient.cli.lfns2pfns(toTrans[0][4], rucio_chunk, operation='write').items()]
-                except Exception as ex:
-                    unsorted_dest_pfns = [[k.split(scope+":")[1], str(x)] for k, x in \
-                                      rucioClient.cli.lfns2pfns(toTrans[0][4], rucio_chunk, operation='read').items()]
-                #logging.info(unsorted_dest_pfns)
-                for order_lfn in chunk:
-                    for lfn, pfn in unsorted_dest_pfns:
-                        if order_lfn == lfn:
-                            sorted_dest_pfns.append(pfn)
-                            break
+            dst_scheme, src_scheme, _, _ = find_matching_scheme(
+                {"protocols": rucioClient.get_protocols(dst_rse)},
+                {"protocols": rucioClient.get_protocols(src_rse)},
+                "third_party_copy",
+                "third_party_copy",
+            )
+            dst_pfn_template = rucioClient.lfns2pfns(dst_rse, [dst_did],
+                                                     operation="third_party_copy", scheme=dst_scheme)
+            src_pfn_template = rucioClient.lfns2pfns(src_rse, [src_did],
+                                                     operation="third_party_copy", scheme=src_scheme)
+            dst_pfn_prefix = '/'.join(dst_pfn_template[dst_did].split("/")[:-2])
+            src_pfn_prefix = '/'.join(src_pfn_template[src_did].split("/")[:-2])
         except Exception as ex:
             logging.error("Failed to map lfns to pfns: %s", ex)
+            ids = [x[2] for x in toTransFromThisSource]
             mark_failed(ids, ["Failed to map lfn to pfn: " + str(ex) for _ in ids], crabserver)
+            # try next source
+            continue
 
-        source_pfns = sorted_source_pfns
-        dest_pfns = sorted_dest_pfns
+        # OK, have good protocols and PFNs, build info for FTS
+        tx_from_source = []
+        for f in toTransFromThisSource:
+            id = f[2]
+            size = f[7]
+            checksums = f[8]
+            src_lfn = f[0]
+            dst_lfn = f[1]
+            fileid = '/'.join(src_lfn.split('/')[-2:])
+            src_pfn = src_pfn_prefix + '/' + fileid
+            dst_pfn = dst_pfn_prefix + '/' + fileid
 
-        tx_from_source = [[x[0], x[1], x[2], source, username, taskname, x[3], x[4]['adler32'].rjust(8, '0')] for x in zip(source_pfns, dest_pfns, ids, sizes, checksums)]
+            xfer = [src_pfn, dst_pfn, id, source, username, taskname, size, checksums['adler32'].rjust(8, '0')]
+            tx_from_source.append(xfer)
 
         xfersPerFTSJob = 50 if ftsReuse else 200
         for files in chunks(tx_from_source, xfersPerFTSJob):
@@ -648,9 +666,10 @@ def algorithm():
     try:
         logging.info("Initializing Rucio client")
         os.environ["X509_USER_PROXY"] = proxy
-        logging.info("Initializing Rucio client for %s", taskname)
-        rucioClient = CRABDataInjector(taskname, destination, account=username,
-                                       scope="user."+username, auth_type='x509_proxy')
+        os.environ["X509_USER_PROXY"] = proxy
+        rucioClient = rucioclient(account=username, auth_type='x509_proxy')
+        #rucioClient = CRABDataInjector(taskname, destination, account=username,
+        #                               scope="user."+username, auth_type='x509_proxy')
     except Exception as exc:
         msg = "Rucio initialization failed with\n%s" % str(exc)
         logging.warn(msg)
