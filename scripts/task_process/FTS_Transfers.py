@@ -19,7 +19,6 @@ from rucio.rse.rsemanager import find_matching_scheme
 
 from RESTInteractions import CRABRest
 from ServerUtilities import encodeRequest
-#from TransferInterface import CRABDataInjector
 
 FTS_ENDPOINT = "https://fts3-cms.cern.ch:8446/"
 FTS_MONITORING = "https://fts3-cms.cern.ch:8449/"
@@ -66,7 +65,6 @@ def chunks(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
 
-
 def mark_transferred(ids, crabserver):
     """
     Mark the list of files as tranferred
@@ -89,7 +87,6 @@ def mark_transferred(ids, crabserver):
         logging.exception("Error updating documents")
         return False
     return True
-
 
 def mark_failed(ids, failures_reasons, crabserver):
     """
@@ -115,7 +112,6 @@ def mark_failed(ids, failures_reasons, crabserver):
         return False
     return True
 
-
 def remove_files_in_bkg(pfns, logFile, timeout=None):
     """
     fork a process to remove the indicated PFN's without
@@ -137,7 +133,6 @@ def remove_files_in_bkg(pfns, logFile, timeout=None):
     subprocess.call(command, shell=True)
 
     return
-
 
 def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, failed_id, failed_reasons):
     """
@@ -226,8 +221,6 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
             remove_files_in_bkg(list_of_surls, removeLogFile)
         except Exception:
             logger.exception('Failed to remove temp files')
-
-
 
 def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
     """
@@ -322,7 +315,6 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
     logger.info("Marking submitted %s files" % (len(fileDoc['list_of_ids'])))
 
     toUpdate.append(fileDoc)
-
 
 def submit(rucioClient, ftsContext, toTrans, crabserver):
     """
@@ -422,7 +414,6 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
 
     return jobids
 
-
 def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, crabserver):
     """
     get transfers and update last read line number
@@ -467,7 +458,6 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, c
         _lastFile.write(str(lastLine))
 
     return transfers, jobids
-
 
 def state_manager(ftsContext, crabserver):
     """
@@ -535,7 +525,6 @@ def state_manager(ftsContext, crabserver):
 
     return jobs_ongoing
 
-
 def submission_manager(rucioClient, ftsContext, crabserver):
     """
 
@@ -561,10 +550,8 @@ def submission_manager(rucioClient, ftsContext, crabserver):
 
     return jobids
 
-
 def algorithm():
     """
-
     script algorithm
     - instantiates FTS3 python easy client
     - delegate user proxy to fts if needed
@@ -613,8 +600,6 @@ def algorithm():
         os.environ["X509_USER_PROXY"] = proxy
         os.environ["X509_USER_PROXY"] = proxy
         rucioClient = rucioclient(account=username, auth_type='x509_proxy')
-        #rucioClient = CRABDataInjector(taskname, destination, account=username,
-        #                               scope="user."+username, auth_type='x509_proxy')
     except Exception as exc:
         msg = "Rucio initialization failed with\n%s" % str(exc)
         logging.warn(msg)
