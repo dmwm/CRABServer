@@ -7,7 +7,6 @@ from __future__ import division
 from __future__ import print_function
 import json
 import logging
-import threading
 import os
 import subprocess
 from datetime import timedelta
@@ -31,7 +30,7 @@ if not os.path.exists('task_process/transfers'):
 logging.basicConfig(
     filename='task_process/transfers/transfer_inject.log',
     level=logging.INFO,
-    format='%(asctime)s[%(relativeCreated)6d]%(threadName)s: %(message)s'
+    format='%(asctime)s: %(message)s'
 )
 
 if os.path.exists('task_process/RestInfoForFileTransfers.json'):
@@ -140,113 +139,94 @@ def remove_files_in_bkg(pfns, logFile, timeout=None):
     return
 
 
-class check_states_thread(threading.Thread):
+def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, failed_id, failed_reasons):
     """
     get transfers state per jobid
+
+    INPUT PARAMS
+    :param logger: a logging object
+    :param ftsContext:
+    :param jobid:
+    OUTPUT PARAMS
+    :prarm jobsEnded:
+    :param jobs_ongoing:
+    :param done_id:
+    :param failed_id:
+    :param failed_reasons:
+    - check if the fts job is in final state (FINISHED, FINISHEDDIRTY, CANCELED, FAILED)
+    - get file transfers states and get corresponding oracle ID from FTS file metadata
+    - update states on oracle
     """
-    def __init__(self, threadLock, log, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, failed_id, failed_reasons):
-        """
 
-        :param threadLock:
-        :param log:
-        :param ftsContext:
-        :param jobid:
-        :prarm jobsEnded:
-        :param jobs_ongoing:
-        :param done_id:
-        :param failed_id:
-        :param failed_reasons:
-        """
-        threading.Thread.__init__(self)
-        self.ftsContext = ftsContext
-        self.jobid = jobid
-        self.jobsEnded = jobsEnded
-        self.jobs_ongoing = jobs_ongoing
-        self.log = log
-        self.threadLock = threadLock
-        self.done_id = done_id
-        self.failed_id = failed_id
-        self.failed_reasons = failed_reasons
+    logger.info("Getting state of job %s" % jobid)
 
-    def run(self):
-        """
-        - check if the fts job is in final state (FINISHED, FINISHEDDIRTY, CANCELED, FAILED)
-        - get file transfers states and get corresponding oracle ID from FTS file metadata
-        - update states on oracle
-        """
+    jobs_ongoing.append(jobid)
 
-        self.threadLock.acquire()
-        self.log.info("Getting state of job %s" % self.jobid)
+    try:
+        status = fts3.get_job_status(ftsContext, jobid, list_files=False)
+    except HTTPException as hte:
+        logger.exception("failed to retrieve status for %s " % jobid)
+        logger.exception("httpExeption headers %s " % hte.headers)
+        if hte.status == 404:
+            logger.exception("%s not found in FTS3 DB" % jobid)
+            jobs_ongoing.remove(jobid)
+        return
+    except Exception:
+        logger.exception("failed to retrieve status for %s " % jobid)
+        return
 
-        self.jobs_ongoing.append(self.jobid)
+    logger.info("State of job %s: %s" % (jobid, status["job_state"]))
 
-        try:
-            status = fts3.get_job_status(self.ftsContext, self.jobid, list_files=False)
-        except HTTPException as hte:
-            self.log.exception("failed to retrieve status for %s " % self.jobid)
-            self.log.exception("httpExeption headers %s " % hte.headers)
-            if hte.status == 404:
-                self.log.exception("%s not found in FTS3 DB" % self.jobid)
-                self.jobs_ongoing.remove(self.jobid)
-            return
-        except Exception:
-            self.log.exception("failed to retrieve status for %s " % self.jobid)
-            self.threadLock.release()
-            return
+    if status["job_state"] in ['FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
+        jobsEnded.append(jobid)
+    if status["job_state"] in ['ACTIVE', 'FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
+        file_statuses = fts3.get_job_status(ftsContext, jobid, list_files=True)['files']
+        done_id[jobid] = []
+        failed_id[jobid] = []
+        failed_reasons[jobid] = []
+        files_to_remove = []
 
-        self.log.info("State of job %s: %s" % (self.jobid, status["job_state"]))
+        for file_status in file_statuses:
+            _id = file_status['file_metadata']['oracleId']
+            tx_state = file_status['file_state']
 
-        if status["job_state"] in ['FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
-            self.jobsEnded.append(self.jobid)
-        if status["job_state"] in ['ACTIVE', 'FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
-            file_statuses = fts3.get_job_status(self.ftsContext, self.jobid, list_files=True)['files']
-            self.done_id[self.jobid] = []
-            self.failed_id[self.jobid] = []
-            self.failed_reasons[self.jobid] = []
-            files_to_remove = []
-
-            for file_status in file_statuses:
-                _id = file_status['file_metadata']['oracleId']
-                tx_state = file_status['file_state']
-
-                # xfers have only 3 terminal states: FINISHED, FAILED, and CANCELED see
-                # https://fts3-docs.web.cern.ch/fts3-docs/docs/state_machine.html
-                if tx_state == 'FINISHED':
-                    self.done_id[self.jobid].append(_id)
-                    files_to_remove.append(file_status['source_surl'])
-                elif tx_state == 'FAILED' or tx_state == 'CANCELED':
-                    self.failed_id[self.jobid].append(_id)
-                    if file_status['reason']:
-                        self.log.info('Failure reason: ' + file_status['reason'])
-                        self.failed_reasons[self.jobid].append(file_status['reason'])
-                    else:
-                        self.log.exception('Failure reason not found')
-                        self.failed_reasons[self.jobid].append('unable to get failure reason')
-                    files_to_remove.append(file_status['source_surl'])
+            # xfers have only 3 terminal states: FINISHED, FAILED, and CANCELED see
+            # https://fts3-docs.web.cern.ch/fts3-docs/docs/state_machine.html
+            if tx_state == 'FINISHED':
+                done_id[jobid].append(_id)
+                files_to_remove.append(file_status['source_surl'])
+            elif tx_state == 'FAILED' or tx_state == 'CANCELED':
+                failed_id[jobid].append(_id)
+                if file_status['reason']:
+                    logger.info('Failure reason: ' + file_status['reason'])
+                    failed_reasons[jobid].append(file_status['reason'])
                 else:
-                    # file transfer is not terminal:
-                    if status["job_state"] == 'ACTIVE':
-                        # if job is still ACTIVE file status will be updated in future run. See:
-                        # https://fts3-docs.web.cern.ch/fts3-docs/docs/state_machine.html
-                        pass
-                    else:
-                        # job status is terminal but file xfer status is not.
-                        # something went wrong inside FTS and a stuck transfers is waiting to be
-                        # removed by the reapStalledTransfers https://its.cern.ch/jira/browse/FTS-1714
-                        # mark as failed
-                        self.failed_id[self.jobid].append(_id)
-                        self.log.info('Failure reason: stuck inside FTS')
-                        self.failed_reasons[self.jobid].append(file_status['reason'])
-            try:
-                list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
-                for f in files_to_remove:
-                    list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
-                removeLogFile = './task_process/transfers/remove_files.log'
-                remove_files_in_bkg(list_of_surls, removeLogFile)
-            except Exception:
-                self.log.exception('Failed to remove temp files')
+                    logger.exception('Failure reason not found')
+                    failed_reasons[jobid].append('unable to get failure reason')
+                files_to_remove.append(file_status['source_surl'])
+            else:
+                # file transfer is not terminal:
+                if status["job_state"] == 'ACTIVE':
+                    # if job is still ACTIVE file status will be updated in future run. See:
+                    # https://fts3-docs.web.cern.ch/fts3-docs/docs/state_machine.html
+                    pass
+                else:
+                    # job status is terminal but file xfer status is not.
+                    # something went wrong inside FTS and a stuck transfers is waiting to be
+                    # removed by the reapStalledTransfers https://its.cern.ch/jira/browse/FTS-1714
+                    # mark as failed
+                    failed_id[jobid].append(_id)
+                    logger.info('Failure reason: stuck inside FTS')
+                    failed_reasons[jobid].append(file_status['reason'])
+        try:
+            list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
+            for f in files_to_remove:
+                list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
+            removeLogFile = './task_process/transfers/remove_files.log'
+            remove_files_in_bkg(list_of_surls, removeLogFile)
+        except Exception:
+            logger.exception('Failed to remove temp files')
 
-        self.threadLock.release()
 
 
 def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
@@ -434,7 +414,7 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
 
         xfersPerFTSJob = 50 if ftsReuse else 200
         for files in chunks(tx_from_source, xfersPerFTSJob):
-            thread = submitToFTS(logging, ftsContext, files, jobids, to_update)
+            submitToFTS(logging, ftsContext, files, jobids, to_update)
 
     for fileDoc in to_update:
         _ = crabserver.post('/filetransfers', data=encodeRequest(fileDoc))
@@ -493,8 +473,6 @@ def state_manager(ftsContext, crabserver):
     """
 
     """
-    threadLock = threading.Lock()
-    threads = []
     jobs_done = []
     jobs_ongoing = []
     jobsEnded = []
@@ -511,15 +489,11 @@ def state_manager(ftsContext, crabserver):
                 if line:
                     jobid = line.split('\n')[0]
                 if jobid:
-                    thread = check_states_thread(threadLock, logging, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, failed_id, failed_reasons)
-                    thread.start()
-                    threads.append(thread)
+                    check_FTSJob(logging, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, failed_id, failed_reasons)
             _jobids.close()
 
-        for t in threads:
-            t.join()
 
-        # the threads above have filled:
+        # the loop above has filled:
         # job_ongoing: list of FTS jobs processed
         # done_id: a dictionary {jobId:[list_of_tnasfers_id_done in that job]}  the list may be empty
         # failed_id, failed_reasons: dictionaries with same format as above containing list of failed xfers and reasons
@@ -544,7 +518,7 @@ def state_manager(ftsContext, crabserver):
                         jobs_done.append(jobID)
                         jobs_ongoing.remove(jobID)
                     else:
-                        jobs_ongoing.append(jobID)   # SB is this necessary ? AFAIU check_states_thread has filled it
+                        jobs_ongoing.append(jobID)   # SB is this necessary ? AFAIU check_FTSJob has filled it
                 else:
                     jobs_ongoing.append(jobID)  # should not be necessary.. but for consistency with above
         except Exception:
