@@ -249,122 +249,99 @@ class check_states_thread(threading.Thread):
         self.threadLock.release()
 
 
-class submit_thread(threading.Thread):
-    """Thread for actual FTS job submission
-
+def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
+    """
+    actual FTS job submission
+    INPUT PARAMS:
+    :param logger: logging object
+    :param ftsContext: FTS context
+    :param files: [
+           [source_pfn,
+            dest_pfn,
+            file oracle id,
+            source site,
+            username,
+            taskname,
+            file size,
+            checksum],
+           ...]
+    OUTPUT PARAMS:
+    :param jobids: collect the list of job ids when submitted
+    :param toUpdate: list of oracle ids to update
     """
 
-    def __init__(self, threadLock, log, ftsContext, files, source, jobids, toUpdate):
-        """
-        :param threadLock: lock for the thread
-        :param log: log object
-        :param ftsContext: FTS context
-        :param files: [
-               [source_pfn,
-                dest_pfn,
-                file oracle id,
-                source site,
-                username,
-                taskname,
-                file size],
-               ...]
-        :param source: source site name
-        :param jobids: collect the list of job ids when submitted
-        :param toUpdate: list of oracle ids to update
-        """
-        threading.Thread.__init__(self)
-        self.log = log
-        self.threadLock = threadLock
-        self.files = files
-        self.source = source
-        self.jobids = jobids
-        self.ftsContext = ftsContext
-        self.toUpdate = toUpdate
+    transfers = []
+    for lfn in files:
+        transfers.append(fts3.new_transfer(lfn[0],
+                                           lfn[1],
+                                           filesize=lfn[6],
+                                           metadata={'oracleId': lfn[2]}
+                                           )
+                         )
+    logger.info("Submitting %s transfers to FTS server" % len(files))
+    #SB#
+    for lfn in files:
+        logger.info("%s %s %s %s", lfn[0],lfn[1],lfn[6],{'oracleId': lfn[2]})
+    #SB#
 
+    # Submit fts job
+    job = fts3.new_job(transfers,
+                       overwrite=True,
+                       verify_checksum=True,
+                       metadata={"issuer": "ASO",
+                                 "userDN": files[0][4],
+                                 "taskname": files[0][5]},
+                       copy_pin_lifetime=-1,
+                       bring_online=None,
+                       source_spacetoken=None,
+                       spacetoken=None,
+                       # max time for job in the FTS queue in hours. From FTS experts in
+                       # https://cern.service-now.com/service-portal?id=ticket&table=incident&n=INC2776329
+                       # The max_time_in_queue applies per job, not per retry.
+                       # The max_time_in_queue is a timeout for how much the job can stay in
+                       # a SUBMITTED, ACTIVE or STAGING state.
+                       # When a job's max_time_in_queue is reached, the job and all of its
+                       # transfers not yet in a terminal state are marked as CANCELED
+                       # StefanoB: I see that we hit this at times with 6h, causing job resubmissions,
+                       # so will try to make it longer to give FTS maximum chances within our
+                       # 24h overall limit (which takes care also of non-FTS related issues !)
+                       # ASO transfers never require STAGING so jobs can spend max_time_in_queue only
+                       # as SUBMITTED (aka queued) or ACTIVE (at least one transfer has been activated)
+                       max_time_in_queue=10,
+                       # from same cern.service-now.com ticket as above:
+                       # The number of retries applies to each transfer within that job.
+                       # A transfer is granted the first execution + number_of_retries.
+                       # E.g.: retry=3 --> first execution + 3 retries
+                       # so retry=3 means each transfer has 4 chances at most during the 6h
+                       # max_time_in_queue
+                       retry=3,
+                       reuse=ftsReuse,
+                       # seconds after which the transfer is retried
+                       # this is a transfer that fails, gets put to SUBMITTED right away,
+                       # but the scheduler will avoid it until NOW() > last_retry_finish_time + retry_delay
+                       # reduced under FTS suggestion w.r.t. the 3hrs of asov1
+                       # StefanoB: indeed 10 minutes makes much more sense for storage server glitches
+                       retry_delay=600
+                       # timeout on the single transfer process
+                       # TODO: not clear if we may need it
+                       # timeout = 1300
+                       )
 
-    def run(self):
-        """
+    jobid = fts3.submit(ftsContext, job)
 
-        """
+    jobids.append(jobid)
 
-        self.threadLock.acquire()
-        self.log.info("Processing transfers from: %s" % self.source)
+    fileDoc = dict()
+    fileDoc['asoworker'] = asoworker
+    fileDoc['subresource'] = 'updateTransfers'
+    fileDoc['list_of_ids'] = [x[2] for x in files]
+    fileDoc['list_of_transfer_state'] = ["SUBMITTED" for _ in files]
+    fileDoc['list_of_fts_instance'] = [FTS_ENDPOINT for _ in files]
+    fileDoc['list_of_fts_id'] = [jobid for _ in files]
 
-        # create destination and source pfns for job
-        transfers = []
-        for lfn in self.files:
-            transfers.append(fts3.new_transfer(lfn[0],
-                                               lfn[1],
-                                               filesize=lfn[6],
-                                               metadata={'oracleId': lfn[2]}
-                                               )
-                             )
-        self.log.info("Submitting %s transfers to FTS server" % len(self.files))
-        #SB#
-        for lfn in self.files:
-            self.log.info("%s %s %s %s", lfn[0],lfn[1],lfn[6],{'oracleId': lfn[2]})
-        #SB#
+    logger.info("Marking submitted %s files" % (len(fileDoc['list_of_ids'])))
 
-        # Submit fts job
-        job = fts3.new_job(transfers,
-                           overwrite=True,
-                           verify_checksum=True,
-                           metadata={"issuer": "ASO",
-                                     "userDN": self.files[0][4],
-                                     "taskname": self.files[0][5]},
-                           copy_pin_lifetime=-1,
-                           bring_online=None,
-                           source_spacetoken=None,
-                           spacetoken=None,
-                           # max time for job in the FTS queue in hours. From FTS experts in
-                           # https://cern.service-now.com/service-portal?id=ticket&table=incident&n=INC2776329
-                           # The max_time_in_queue applies per job, not per retry.
-                           # The max_time_in_queue is a timeout for how much the job can stay in
-                           # a SUBMITTED, ACTIVE or STAGING state.
-                           # When a job's max_time_in_queue is reached, the job and all of its
-                           # transfers not yet in a terminal state are marked as CANCELED
-                           # StefanoB: I see that we hit this at times with 6h, causing job resubmissions,
-                           # so will try to make it longer to give FTS maximum chances within our
-                           # 24h overall limit (which takes care also of non-FTS related issues !)
-                           # ASO transfers never require STAGING so jobs can spend max_time_in_queue only
-                           # as SUBMITTED (aka queued) or ACTIVE (at least one transfer has been activated)
-                           max_time_in_queue=10,
-                           # from same cern.service-now.com ticket as above:
-                           # The number of retries applies to each transfer within that job.
-                           # A transfer is granted the first execution + number_of_retries.
-                           # E.g.: retry=3 --> first execution + 3 retries
-                           # so retry=3 means each transfer has 4 chances at most during the 6h
-                           # max_time_in_queue
-                           retry=3,
-                           reuse=ftsReuse,
-                           # seconds after which the transfer is retried
-                           # this is a transfer that fails, gets put to SUBMITTED right away,
-                           # but the scheduler will avoid it until NOW() > last_retry_finish_time + retry_delay
-                           # reduced under FTS suggestion w.r.t. the 3hrs of asov1
-                           # StefanoB: indeed 10 minutes makes much more sense for storage server glitches
-                           retry_delay=600
-                           # timeout on the single transfer process
-                           # TODO: not clear if we may need it
-                           # timeout = 1300
-                           )
-
-        jobid = fts3.submit(self.ftsContext, job)
-
-        self.jobids.append(jobid)
-
-        # TODO: manage exception here, what we should do?
-        fileDoc = dict()
-        fileDoc['asoworker'] = asoworker
-        fileDoc['subresource'] = 'updateTransfers'
-        fileDoc['list_of_ids'] = [x[2] for x in self.files]
-        fileDoc['list_of_transfer_state'] = ["SUBMITTED" for _ in self.files]
-        fileDoc['list_of_fts_instance'] = [FTS_ENDPOINT for _ in self.files]
-        fileDoc['list_of_fts_id'] = [jobid for _ in self.files]
-
-        self.log.info("Marking submitted %s files" % (len(fileDoc['list_of_ids'])))
-
-        self.toUpdate.append(fileDoc)
-        self.threadLock.release()
+    toUpdate.append(fileDoc)
 
 
 def submit(rucioClient, ftsContext, toTrans, crabserver):
@@ -387,8 +364,6 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
     :param crabserver: an CRABRest object for doing POST to CRAB server REST
     :return: list of jobids submitted
     """
-    threadLock = threading.Lock()
-    threads = []
     jobids = []
     to_update = []
 
@@ -416,6 +391,7 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
     sourceSites = list(set([x[3] for x in toTrans]))
 
     for source in sourceSites:
+        logging.info("Processing transfers from: %s" % source)
 
         # find all files for this source
         toTransFromThisSource = [x for x in toTrans if x[3] == source]
@@ -458,12 +434,7 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
 
         xfersPerFTSJob = 50 if ftsReuse else 200
         for files in chunks(tx_from_source, xfersPerFTSJob):
-            thread = submit_thread(threadLock, logging, ftsContext, files, source, jobids, to_update)
-            thread.start()
-            threads.append(thread)
-
-    for t in threads:
-        t.join()
+            thread = submitToFTS(logging, ftsContext, files, jobids, to_update)
 
     for fileDoc in to_update:
         _ = crabserver.post('/filetransfers', data=encodeRequest(fileDoc))
